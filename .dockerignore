@@ -1,0 +1,38 @@
+# Keep the Docker build context small and avoid copying host-only or generated
+# files into the image (the Dockerfile runs `pnpm install` and builds fresh).
+
+# Dependencies and build output (reinstalled/rebuilt in the image)
+**/node_modules
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+
+# Version control and IDE
+.git
+.gitignore
+.github
+.vscode
+.idea
+
+# Secrets and local env — never bake these into an image
+.env
+.env.*
+!.env.example
+
+# Local/host tooling and platform configs not needed at build time
+.replit
+.replitignore
+.agents
+.claude
+
+# Code that is intentionally not part of this app
+separated
+attached_assets
+
+# Docs and logs
+*.log
+README.md
+DEPLOY.md
+PRODUCT_SPINE.md
+replit.md
+goal

@@ -1,0 +1,350 @@
+# The Coach — Complete Build Specification
+
+> An AI study coach that leads. You don’t manage flashcards — you talk to a dedicated coach who knows your material, reviews your progress, builds your daily plan, checks your understanding, and pushes you toward your exam. The conversation IS the product.
+
+Built for adults preparing for high-stakes exams: bar exam, professional certifications, university coursework.
+
+-----
+
+## The one-sentence pitch
+
+Most study apps are tools you have to operate. This is a coach who operates *with* you — it opens every day with a plan, teaches through dialogue and real-world scenarios, tests whether you actually understood, and adapts tomorrow based on how today went.
+
+-----
+
+## Core principle: the coach leads
+
+This is the most important instruction in this document. **The AI coach is the spine of the product, not a feature.** The home screen is a conversation with the coach. Everything — learning, planning, testing, reviewing — happens through or is initiated by the coach.
+
+The user should never land on a blank dashboard wondering what to do. They open the app and the coach is already there: “Morning. Yesterday you nailed consideration but stumbled on promissory estoppel. Today I want to fix that. Ready?”
+
+Keep it simple. Do not build twelve screens. Build one strong conversation plus a few supporting views the coach can pull the user into.
+
+-----
+
+## Tech stack
+
+- **Frontend:** React + Vite + TypeScript
+- **Backend:** Node.js + Express + TypeScript
+- **Database:** PostgreSQL (Replit Postgres or Supabase)
+- **ORM:** Prisma
+- **Auth:** Clerk or Supabase Auth (pick one, use throughout)
+- **Payments:** Stripe (subscriptions)
+- **AI:** Anthropic Claude API — server-side only, key in Replit Secrets, never in client bundle
+- **File parsing:** pdf-parse (PDF), mammoth (DOCX), server-side
+- **Web fetch:** server-side fetch + @mozilla/readability + jsdom
+- **Hosting:** Replit Deployments
+
+Do not use Firebase or NoSQL. Do not expose the Anthropic key to the browser.
+
+-----
+
+## Look and feel
+
+The aesthetic should feel like a serious, premium coaching relationship — calm, focused, a little editorial. Not a gamified app with confetti and streaks-as-dopamine. Think: a great private tutor’s study, not a mobile game.
+
+**Palette:** warm and grounded, not cold tech-blue. A parchment/cream background (#f7f2e8 family), deep ink text (#1a1612), one strong accent (a deep oxblood red #7a1f1a or a deep forest, pick one and commit). Dark mode: deep warm charcoal, not pure black.
+
+**Typography:** a serif for the coach’s voice and headlines (something with character — DM Serif Display, Fraunces, or similar — NOT Inter, NOT system default). A clean humanist sans for UI and the user’s own text. The coach’s messages should feel *written*, almost literary — this reinforces that you’re talking to someone with a point of view.
+
+**Conversation design:** the coach’s messages are visually distinct from the user’s — different alignment, the serif voice, maybe a subtle left rule in the accent color. Messages can contain rich elements, not just text: a small inline plan card, a concept visual, a “check your understanding” prompt, a quick-reply button row. The conversation is the canvas.
+
+**Motion:** restrained. Messages fade in. The coach “types” (a brief thinking indicator) before substantial responses so it feels considered, not instant. No bouncing, no confetti.
+
+**Mobile-first.** This is used on commutes and couches. Design for 375px width first, scale up.
+
+**Accessibility:** semantic HTML, real focus states, keyboard navigation, sufficient contrast, ARIA labels, respects reduced-motion.
+
+-----
+
+## Coach personalities
+
+On first run, an assessment (below) recommends one of four coaches. The user can accept the recommendation or pick another, and can change anytime from settings. The personality changes the coach’s *voice and pressure*, never its competence or accuracy.
+
+**1. The Drill Sergeant** — direct, demanding, high accountability. Short sentences. Celebrates effort sparingly and earns-based. “You said you’d do 30 cards. You did 12. What happened?” Best for people who respond to pressure and want to be pushed.
+
+**2. The Socratic Mentor** — leads almost entirely with questions. Rarely hands you the answer; makes you reason to it. Patient, probing, intellectually serious. “Before I tell you — what do you think distinguishes these two doctrines?” Best for people who want deep understanding and enjoy thinking.
+
+**3. The Warm Encourager** — supportive, steady, reassuring without being soft on standards. Normalizes struggle, rebuilds confidence, keeps momentum gentle but consistent. “That one’s genuinely hard — most people miss it the first three times. Let’s walk it through together.” Best for anxious learners or those rebuilding after a setback.
+
+**4. The Strategic Analyst** — calm, data-driven, focused on the path to the exam. Talks in terms of leverage, priorities, and tradeoffs. “Your weakest 20% of topics account for most of your projected lost points. We reallocate this week.” Best for organized, goal-oriented people who want a clear plan and rationale.
+
+Each personality is implemented as a distinct system-prompt persona layer wrapped around the same underlying coaching engine. Same accuracy, same pedagogy, same memory of the user — different voice and pressure.
+
+-----
+
+## The assessment (first run)
+
+Short, conversational — the coach itself runs it, not a sterile form. 6 questions. The coach introduces itself generically first (“I’m going to be your coach. First, let me understand you.”), asks these, then reveals the recommended personality with a one-line rationale.
+
+1. What are you preparing for? (bar / certification / university course / general mastery)
+1. When is your exam or target date? (date, skippable if “general”)
+1. How many hours per week can you realistically commit? (4 / 8 / 15 / 25)
+1. Starting point in this material? (near-zero / foundations with gaps / mostly solid / rusty)
+1. When you think you understand something, how often are you actually right? (almost always / mostly / I often overestimate / I underestimate)
+1. Which coach do you respond to best? (Push me hard / Make me think / Encourage me / Show me the strategy) — this maps to the four personalities, but the recommendation also factors in answers 4 and 5 (e.g., low confidence + “I often overestimate” leans Socratic or Analyst; rebuilding/rusty leans Encourager).
+
+Save as the learner profile. The coach uses every answer to shape its very first real conversation.
+
+-----
+
+## Domain model
+
+```
+User
+  id, email, name, createdAt
+  stripeCustomerId, subscriptionStatus, subscriptionTier (free | pro)
+  coachPersonality: enum (drill | socratic | warm | analyst)
+  Profile (1:1)
+  Concepts (1:many)
+  CoachMessages (1:many)
+  DailyPlans (1:many)
+  Checkpoints (1:many)   // checks for understanding
+  Reviews (1:many)        // spaced repetition state lives here
+
+Profile
+  goal, examDate (nullable), hoursPerWeek, baseline, calibration
+  recommendedCoach, createdAt
+
+Concept (belongs to user)
+  id, title, content, source, visualSVG (nullable), createdAt
+  mastery: float (0-1), dueDate: timestamp
+  ef: float (2.5), interval: int, reps: int   // SM-2 state per concept
+
+CoachMessage (belongs to user)
+  id, role: enum (coach | user | system_event), content, richBlocks (jsonb nullable),
+  createdAt
+  // richBlocks can carry: plan_card, concept_visual, checkpoint, quick_replies
+
+DailyPlan (belongs to user)
+  id, date, goalText, conceptIds (jsonb), estimatedMinutes,
+  status: enum (proposed | active | completed | missed),
+  completedConceptIds (jsonb), createdAt
+
+Checkpoint (belongs to user)
+  id, conceptId, date, prompt, userAnswer, coachGrade (0-3),
+  coachFeedback, confidenceBefore (0-3 nullable)
+
+Review (belongs to user, may merge into Concept if simpler)
+  conceptId, date, grade (0-3), confidence (0-3), gap
+```
+
+Keep it lean. If Review can be folded into Concept + a history jsonb, do that. Don’t over-normalize.
+
+-----
+
+## The three things the coach does
+
+Everything reduces to three behaviors. Build these well and the product works.
+
+### 1. PLAN — the coach opens each day with a plan
+
+When the user opens the app (and it’s a new day, or they ask), the coach generates and presents a daily plan as a conversational message with an inline plan card.
+
+The plan is built server-side from:
+
+- Concepts due for review (spaced repetition)
+- Weakest concepts (lowest mastery)
+- Where the user is relative to exam date and pace
+- What happened yesterday (did they complete the plan? struggle anywhere?)
+
+The coach presents it in its personality’s voice, with a real rationale: *why* these concepts today. The user can accept (“Let’s go”), negotiate (“I only have 20 minutes”), or defer. If they negotiate, the coach re-plans on the spot.
+
+One API call generates the plan content + the coach’s framing message. The plan card renders inline in the conversation: today’s goal, the concepts, estimated time, a “Begin” button.
+
+### 2. TEACH & TEST — the coach leads learning through dialogue
+
+This is the core loop and it is conversational, not flashcard-flipping.
+
+For each concept in today’s plan, the coach:
+
+- **Introduces it in context** — not “Here is the definition” but a real-world hook or scenario relevant to the learner. Real-life references and applicable scenarios are required: a nurse studying contracts gets a hospital supply dispute; a founder gets a SaaS agreement. (Use the learner’s profile — profession/goal — to choose scenario domains. Use sparingly and naturally, never stereotyping.)
+- **Checks understanding actively** — asks the user to explain it back, apply it to a new scenario, or distinguish it from something similar. This is a Checkpoint. The user answers in their own words (typed).
+- **Grades and responds** — server-side AI grades the answer (0-3) against the concept, gives feedback in the coach’s voice, and — critically — the response depends on the grade and the personality. Drill Sergeant on a weak answer hits differently than Warm Encourager.
+- **Updates spaced repetition** — the grade drives SM-2 (same algorithm as below), updating the concept’s mastery, interval, and due date.
+
+Confidence calibration: before revealing whether they’re right, the coach can ask “how sure are you?” (0-3). Track the gap between confidence and actual grade over time; the coach references it (“You were sure on that one and got it — your instincts are sharpening” / “You felt shaky but nailed it — trust yourself more”).
+
+The dialogue continues naturally. The coach moves to the next concept, weaves in connections, and keeps the user engaged. If the user goes off-topic or asks a question, the coach answers (grounded in their material, with web search available for accuracy on time-sensitive or out-of-scope questions — gated by a daily budget).
+
+### 3. REVIEW — the coach reflects and adapts
+
+At the end of a session, and at the start of the next day, the coach reflects: what improved, what’s still weak, what it’s changing. This isn’t a static stats page — it’s the coach telling you, in its voice, what it sees and what it’s doing about it.
+
+The coach also runs a periodic (weekly) deeper retrospective: a longer message reviewing the week’s trajectory, naming the biggest wins and the stickiest problems, and setting the focus for the coming week. This is generated from real data (completed plans, checkpoint grades, mastery changes, accuracy trend).
+
+**Analysis of past work is mandatory and continuous.** Every plan references yesterday. Every session references the relevant history. The coach has memory and uses it visibly — that’s what makes it feel like a coach and not a chatbot.
+
+-----
+
+## SM-2 spaced repetition (under the hood)
+
+The coach’s decisions about what to review are driven by this, even though the user never sees “SM-2” or an interval number. Quality is the checkpoint grade (0-3).
+
+```
+if grade < 1: reps = 0, interval = 1
+else:
+  if reps == 0: interval = 1
+  elif reps == 1: interval = 3
+  else: interval = round(interval * ef)
+  reps += 1
+ef = max(1.3, ef + (0.1 - (3 - grade) * (0.08 + (3 - grade) * 0.02)))
+mastery = mastery * 0.6 + (grade / 3) * 0.4
+dueDate = today + interval days
+```
+
+The user experiences this as the coach “knowing” when to bring something back. The mechanism stays invisible.
+
+-----
+
+## Getting material in
+
+The user gives the coach material to teach from. Three ways, all funnel into the same concept-extraction pipeline:
+
+1. **Paste text** — the user pastes notes/outline/chapter.
+1. **URL** — server fetches via @mozilla/readability, extracts main text. Clear error if blocked/login-required → “paste it directly.”
+1. **File upload** — .pdf (pdf-parse), .docx (mammoth), .txt, .md. Max 10MB. If extracted text < 200 chars, warn it may be a scanned PDF.
+
+The coach frames this conversationally: “Give me what you’re studying — paste it, drop a file, or send me a link — and I’ll turn it into a plan.” After ingestion, the coach reports back: “Got it. I pulled 14 concepts from that chapter. The trickiest looks like [X]. Want to start there or build up to it?”
+
+**Ingestion pipeline (server-side):**
+
+- Extract atomic concepts (one API call → JSON array of {title, content}, 3-12 concepts)
+- For each concept, generate a real-world teaching scenario + a checkpoint question + model answer (folded into the teaching flow, generated on demand rather than all upfront to save cost)
+- Generate an SVG visual per concept asynchronously (decision tree / comparison / timeline / hierarchy as fits the content; defined palette; don’t block on this)
+
+-----
+
+## Interface — keep it to four surfaces
+
+Resist building more than this.
+
+1. **Coach (home)** — the conversation. This is where you live. Plans, teaching, checkpoints, reviews, free Q&A all happen here. Inline rich blocks (plan cards, visuals, checkpoints, quick replies) make it more than a text chat.
+1. **Material** — a simple library of what you’ve given the coach. Add material (the three methods), see your concepts, see mastery at a glance, view a concept’s visual. The coach can deep-link you here (“I’ve added it to your Material — take a look”).
+1. **Progress** — a calm, honest view: readiness vs. exam date, mastery distribution, streak (de-emphasized, not gamified), weekly retrospective archive. The coach references this; the user can also just look.
+1. **Settings** — change coach personality, edit profile/exam date, manage billing, export data (JSON), delete account, dark mode toggle, “scenarios use my background” toggle.
+
+That’s it. Four surfaces. The coach is 90% of the experience.
+
+-----
+
+## Daily rhythm the coach enforces
+
+- **Morning (or first open):** coach presents the day’s plan.
+- **During session:** teach → checkpoint → grade → adapt, concept by concept, conversationally.
+- **End of session:** brief reflection in the coach’s voice.
+- **If the user goes quiet:** the coach is *aggressive but not abusive*. It will, on next open, name the gap honestly in its personality’s voice (“Three days. We don’t have three days to spare before [exam date]. Let’s reset.”). The Encourager does this gently; the Drill Sergeant does it bluntly. None of them shame or manipulate — pressure is about the goal and the calendar, never about the user’s worth.
+
+(If you implement push/email nudges, keep them opt-in and respect frequency limits. Not required for v1.)
+
+-----
+
+## Auth, billing, monetization
+
+**Free tier:** assessment + one coach + up to 20 concepts + daily planning + teaching/checkpoints. No weekly retrospective, no web-search-backed Q&A, no visuals.
+
+**Pro tier ($19/mo or $149/yr):** unlimited concepts, all four coaches, weekly retrospectives, web-search-backed answers (budgeted), concept visuals, priority queue. 7-day free trial, no card required.
+
+**Implementation:** Stripe Checkout + webhook updating subscriptionStatus; server-side middleware gating pro features; customer portal link; trial logic.
+
+**Auth:** email+password or magic link, email verification before access, password reset, server-validated sessions.
+
+-----
+
+## API safety & rate limiting
+
+- Anthropic key server-side only, in Replit Secrets.
+- All AI calls through Express endpoints.
+- Per-user daily caps: free 50 calls/day, pro 500/day. Web-search-backed turns: pro 20/day. Hard caps to bound cost.
+- Exponential backoff on 429/529 (3 retries).
+- Log every call with cost estimate.
+- Use the current Claude Sonnet model (don’t pin a stale version).
+- Conservative max_tokens (planning/teaching ~1500, ingestion ~4000).
+- Cache concept extraction by content hash.
+- Truncate conversation history sent to the model (last ~20 messages) to bound token cost; keep full history in DB.
+
+-----
+
+## Routes
+
+- `/` — marketing landing (the coach concept, the four personalities, pricing, signup)
+- `/login`, `/signup`, `/verify-email`, `/forgot-password`
+- `/start` — assessment + coach reveal
+- `/coach` — THE conversation (home after onboarding)
+- `/material` — library + add material
+- `/progress` — readiness, mastery, retrospectives
+- `/settings` — personality, profile, billing, data, theme
+- `/legal/terms`, `/legal/privacy`
+
+-----
+
+## Production-ready checklist
+
+Before “done”:
+
+- [ ] New user can sign up, verify email, complete the assessment, and meet their recommended coach
+- [ ] User can give the coach material (paste/URL/file) and the coach reports back conversationally
+- [ ] The coach proposes a real daily plan that references the user’s actual concepts and history
+- [ ] Teaching happens in dialogue with real-world scenarios drawn from the user’s profile
+- [ ] Checkpoints are graded by AI in the coach’s voice; grades drive spaced repetition
+- [ ] Switching coach personality visibly changes the voice within one message, without losing memory/progress
+- [ ] Weekly retrospective generates from real data
+- [ ] Stripe subscription + tier gating work end-to-end (test mode fine)
+- [ ] Anthropic key is server-side only; nothing sensitive in client bundle
+- [ ] Per-user rate limits enforced
+- [ ] Mobile works at 375px; dark mode designed properly
+- [ ] No console errors in production build; Prisma migrations run clean
+- [ ] Deployed to a Replit Deployment with a URL; .env.example + README present
+
+-----
+
+## What I do NOT want
+
+- A blank dashboard the user has to figure out. The coach leads — always.
+- A flashcard app with a chat bot stapled on. The conversation is the product; spaced repetition is the invisible engine.
+- A coach that forgets. It must reference past work continuously — that’s the whole point.
+- Personality that changes competence or accuracy. Voice and pressure change; correctness never does.
+- Pressure that shames or manipulates. Aggressive about the goal and the calendar, never about the person’s worth. No dark patterns, no fake urgency, no guilt-tripping.
+- VARK / “learning styles” framing anywhere. Use real-world scenarios and dual coding, not modality-matching pseudoscience.
+- Reproducing copyrighted exam questions. Generate in the *format* of exams; never reproduce proprietary questions.
+- Generic SaaS clichés (purple gradients, confetti, stick-figure illustrations, dopamine-bait streak animations).
+- Mock/stubbed AI. Wire real Anthropic calls from day one.
+- TODO-stubbed logic. If a piece can’t be finished, flag it and stop — don’t ship silent breakage.
+
+-----
+
+## Trust & legal
+
+- User owns their material; export-all-as-JSON and delete-everything in settings.
+- Disclose AI processing (material goes to Anthropic) in Privacy Policy.
+- ToS covers subscription terms, refunds, and the copyright stance on exam questions.
+- If web search is enabled, disclose it.
+- Cookie banner if EU traffic expected.
+
+-----
+
+## Build order
+
+1. Scaffold (Vite+React+TS / Express+TS / Prisma+Postgres / auth)
+1. Schema + migrations
+1. Auth → assessment → coach reveal
+1. The conversation surface + coach engine (personality system prompts, message storage, streaming)
+1. Ingestion (paste → URL → file) + concept extraction
+1. Teaching loop: scenario intro → checkpoint → AI grade → SM-2 update, all in dialogue
+1. Daily plan generation referencing history
+1. Progress view + weekly retrospective
+1. Stripe + tier gating
+1. Polish: mobile, dark mode, accessibility, motion
+1. Legal, README, deploy
+
+-----
+
+## Questions to confirm before building
+
+1. Auth provider — Clerk or Supabase Auth? (Recommend Clerk for speed.)
+1. Database — Replit Postgres or Supabase? (Either; pick one.)
+1. Do you have Stripe + Anthropic keys ready for Secrets?
+1. Streaming coach responses (better feel, more work) or wait-then-show? (Recommend streaming — the coach should feel alive.)
+1. Push/email nudges in v1, or in-app only? (Recommend in-app only for v1.)
+
+Confirm these and build steadily through the order above. Keep it simple, make the coach excellent, don’t sprawl.

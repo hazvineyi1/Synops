@@ -1,0 +1,733 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: The Coach — AI study coach API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: profile
+    description: User learner profile and assessment
+  - name: messages
+    description: Coach conversation messages
+  - name: material
+    description: Study material and concepts
+  - name: plans
+    description: Daily study plans
+  - name: checkpoints
+    description: Understanding checks and grades
+  - name: progress
+    description: Progress tracking and retrospectives
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── Profile ──────────────────────────────────────────────────────────────
+  /profile:
+    get:
+      operationId: getProfile
+      tags: [profile]
+      summary: Get learner profile for the current user
+      responses:
+        "200":
+          description: Profile found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "404":
+          description: No profile yet
+    post:
+      operationId: createProfile
+      tags: [profile]
+      summary: Create learner profile (after assessment)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileInput"
+      responses:
+        "201":
+          description: Profile created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+    patch:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update learner profile fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  # ── Coach messages ────────────────────────────────────────────────────────
+  /messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: Get conversation history (paginated)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: before
+          in: query
+          description: Message ID cursor for pagination
+          schema:
+            type: ["integer", "null"]
+      responses:
+        "200":
+          description: Messages list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CoachMessage"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a user message and get coach reply
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "200":
+          description: Coach reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoachMessage"
+
+  /messages/assessment:
+    post:
+      operationId: runAssessment
+      tags: [messages]
+      summary: Run the onboarding assessment conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentInput"
+      responses:
+        "200":
+          description: Coach assessment response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentResponse"
+
+  /messages/daily-open:
+    post:
+      operationId: dailyOpen
+      tags: [messages]
+      summary: Generate the daily opening message and plan from the coach
+      responses:
+        "200":
+          description: Coach opening message with optional plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyOpenResult"
+
+  # ── Material ──────────────────────────────────────────────────────────────
+  /material:
+    get:
+      operationId: listConcepts
+      tags: [material]
+      summary: List all concepts for the current user
+      parameters:
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [mastery, dueDate, createdAt, title]
+            default: createdAt
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Concepts list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Concept"
+
+  /material/ingest:
+    post:
+      operationId: ingestMaterial
+      tags: [material]
+      summary: Ingest text/URL/file and extract concepts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestInput"
+      responses:
+        "200":
+          description: Ingestion result with extracted concepts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestResult"
+
+  /material/{conceptId}:
+    get:
+      operationId: getConcept
+      tags: [material]
+      summary: Get a single concept
+      parameters:
+        - name: conceptId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Concept
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Concept"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteConcept
+      tags: [material]
+      summary: Delete a concept
+      parameters:
+        - name: conceptId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Daily plans ───────────────────────────────────────────────────────────
+  /plans:
+    get:
+      operationId: listPlans
+      tags: [plans]
+      summary: List daily plans (recent first)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Plans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DailyPlan"
+
+  /plans/today:
+    get:
+      operationId: getTodayPlan
+      tags: [plans]
+      summary: Get or create today's plan
+      responses:
+        "200":
+          description: Today's plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyPlan"
+
+  /plans/{planId}:
+    patch:
+      operationId: updatePlan
+      tags: [plans]
+      summary: Update plan status or completed concepts
+      parameters:
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanUpdate"
+      responses:
+        "200":
+          description: Updated plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyPlan"
+
+  # ── Checkpoints ───────────────────────────────────────────────────────────
+  /checkpoints:
+    get:
+      operationId: listCheckpoints
+      tags: [checkpoints]
+      summary: List checkpoints (recent first)
+      parameters:
+        - name: conceptId
+          in: query
+          schema:
+            type: ["integer", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Checkpoints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Checkpoint"
+
+  /checkpoints/grade:
+    post:
+      operationId: gradeCheckpoint
+      tags: [checkpoints]
+      summary: Submit a checkpoint answer for AI grading and SM-2 update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckpointGradeInput"
+      responses:
+        "200":
+          description: Graded checkpoint with coach feedback
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checkpoint"
+
+  # ── Progress ──────────────────────────────────────────────────────────────
+  /progress/summary:
+    get:
+      operationId: getProgressSummary
+      tags: [progress]
+      summary: Overall readiness, mastery distribution, streak, concept counts
+      responses:
+        "200":
+          description: Progress summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgressSummary"
+
+  /progress/retrospectives:
+    get:
+      operationId: listRetrospectives
+      tags: [progress]
+      summary: List weekly retrospective messages
+      responses:
+        "200":
+          description: Retrospectives
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Retrospective"
+
+  /progress/weekly-retro:
+    post:
+      operationId: generateWeeklyRetro
+      tags: [progress]
+      summary: Generate (or regenerate) this week's retrospective
+      responses:
+        "200":
+          description: Weekly retrospective
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Retrospective"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    # ── Profile ──────────────────────────────────────────────────────────
+    Profile:
+      type: object
+      required: [id, userId, goal, hoursPerWeek, baseline, calibration, coachPersonality, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        goal:
+          type: string
+          description: "bar | certification | university | general"
+        examName:
+          type: ["string", "null"]
+          description: "specific exam/credential, e.g. CompTIA Security+, PMP, MCAT"
+        examDate:
+          type: ["string", "null"]
+          description: ISO date string or null
+        hoursPerWeek:
+          type: integer
+        baseline:
+          type: string
+          description: "zero | foundations | solid | rusty"
+        calibration:
+          type: string
+          description: "accurate | mostly | overestimate | underestimate"
+        coachPersonality:
+          type: string
+          description: "drill | socratic | warm | analyst"
+        recommendedCoach:
+          type: ["string", "null"]
+        assessmentComplete:
+          type: boolean
+        createdAt:
+          type: string
+
+    ProfileInput:
+      type: object
+      required: [goal, hoursPerWeek, baseline, calibration, coachPersonality]
+      properties:
+        goal:
+          type: string
+        examName:
+          type: ["string", "null"]
+        examDate:
+          type: ["string", "null"]
+        hoursPerWeek:
+          type: integer
+        baseline:
+          type: string
+        calibration:
+          type: string
+        coachPersonality:
+          type: string
+        recommendedCoach:
+          type: ["string", "null"]
+        assessmentComplete:
+          type: boolean
+
+    ProfileUpdate:
+      type: object
+      properties:
+        goal:
+          type: string
+        examName:
+          type: ["string", "null"]
+        examDate:
+          type: ["string", "null"]
+        hoursPerWeek:
+          type: integer
+        baseline:
+          type: string
+        calibration:
+          type: string
+        coachPersonality:
+          type: string
+        assessmentComplete:
+          type: boolean
+
+    # ── Messages ─────────────────────────────────────────────────────────
+    CoachMessage:
+      type: object
+      required: [id, role, content, createdAt]
+      properties:
+        id:
+          type: integer
+        role:
+          type: string
+          description: "coach | user | system_event"
+        content:
+          type: string
+        richBlocks:
+          type: ["object", "null"]
+          description: "JSON object containing optional plan_card, checkpoint, quick_replies"
+        createdAt:
+          type: string
+
+    MessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        context:
+          type: ["string", "null"]
+          description: "Optional context hint: teaching | assessment | freeform"
+
+    AssessmentInput:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          type: array
+          items:
+            type: object
+            required: [role, content]
+            properties:
+              role:
+                type: string
+              content:
+                type: string
+
+    AssessmentResponse:
+      type: object
+      required: [message, isComplete]
+      properties:
+        message:
+          type: string
+        isComplete:
+          type: boolean
+        recommendedPersonality:
+          type: ["string", "null"]
+        profileData:
+          type: ["object", "null"]
+
+    DailyOpenResult:
+      type: object
+      required: [message]
+      properties:
+        message:
+          $ref: "#/components/schemas/CoachMessage"
+        plan:
+          $ref: "#/components/schemas/DailyPlan"
+
+    # ── Concepts ─────────────────────────────────────────────────────────
+    Concept:
+      type: object
+      required: [id, title, content, source, mastery, dueDate, createdAt]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        source:
+          type: string
+          description: "paste | url | file"
+        visualSvg:
+          type: ["string", "null"]
+        mastery:
+          type: number
+          description: 0-1 float
+        dueDate:
+          type: string
+          description: ISO date string
+        ef:
+          type: number
+          description: SM-2 ease factor
+        interval:
+          type: integer
+          description: SM-2 interval in days
+        reps:
+          type: integer
+        createdAt:
+          type: string
+
+    IngestInput:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          description: "paste | url"
+        content:
+          type: ["string", "null"]
+          description: Raw text for paste type
+        url:
+          type: ["string", "null"]
+          description: URL for url type
+
+    IngestResult:
+      type: object
+      required: [concepts, coachMessage]
+      properties:
+        concepts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Concept"
+        coachMessage:
+          type: string
+          description: Coach's conversational summary of what was ingested
+
+    # ── Plans ─────────────────────────────────────────────────────────────
+    DailyPlan:
+      type: object
+      required: [id, date, goalText, conceptIds, estimatedMinutes, status, createdAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          description: ISO date YYYY-MM-DD
+        goalText:
+          type: string
+        conceptIds:
+          type: array
+          items:
+            type: integer
+        estimatedMinutes:
+          type: integer
+        status:
+          type: string
+          description: "proposed | active | completed | missed"
+        completedConceptIds:
+          type: array
+          items:
+            type: integer
+        createdAt:
+          type: string
+
+    PlanUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        completedConceptIds:
+          type: array
+          items:
+            type: integer
+
+    # ── Checkpoints ───────────────────────────────────────────────────────
+    Checkpoint:
+      type: object
+      required: [id, conceptId, date, prompt, createdAt]
+      properties:
+        id:
+          type: integer
+        conceptId:
+          type: integer
+        date:
+          type: string
+        prompt:
+          type: string
+        userAnswer:
+          type: ["string", "null"]
+        coachGrade:
+          type: ["integer", "null"]
+          description: 0-3
+        coachFeedback:
+          type: ["string", "null"]
+        confidenceBefore:
+          type: ["integer", "null"]
+          description: 0-3
+        createdAt:
+          type: string
+
+    CheckpointGradeInput:
+      type: object
+      required: [conceptId, prompt, userAnswer]
+      properties:
+        conceptId:
+          type: integer
+        prompt:
+          type: string
+        userAnswer:
+          type: string
+        confidenceBefore:
+          type: ["integer", "null"]
+
+    # ── Progress ──────────────────────────────────────────────────────────
+    ProgressSummary:
+      type: object
+      required: [totalConcepts, masteredConcepts, dueTodayCount, averageMastery, streakDays, examDaysRemaining, readinessPercent, masteryBuckets]
+      properties:
+        totalConcepts:
+          type: integer
+        masteredConcepts:
+          type: integer
+        dueTodayCount:
+          type: integer
+        averageMastery:
+          type: number
+        streakDays:
+          type: integer
+        examDaysRemaining:
+          type: ["integer", "null"]
+        readinessPercent:
+          type: number
+        masteryBuckets:
+          type: object
+          description: "counts per mastery tier: new, learning, reviewing, mastered"
+          properties:
+            new:
+              type: integer
+            learning:
+              type: integer
+            reviewing:
+              type: integer
+            mastered:
+              type: integer
+          required: [new, learning, reviewing, mastered]
+        recentCheckpointAccuracy:
+          type: ["number", "null"]
+
+    Retrospective:
+      type: object
+      required: [id, weekStart, content, createdAt]
+      properties:
+        id:
+          type: integer
+        weekStart:
+          type: string
+          description: ISO date of week start (Monday)
+        content:
+          type: string
+          description: Full coach retrospective text
+        createdAt:
+          type: string

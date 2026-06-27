@@ -1,0 +1,4 @@
+- [Admin access model](admin-access.md) — owner admin gating via ADMIN_EMAILS allowlist + verified-email Clerk lookup; how to add admins.
+- [Typecheck needs libs built first](typecheck-libs.md) — run `pnpm run typecheck:libs` before per-artifact typecheck or @workspace/db shows false "no exported member" errors.
+- [Frontend API client is hand-authored](api-client-codegen.md) — OpenAPI spec is manual; one-off/internal endpoints can use direct fetch instead of regenerating.
+- [Coach plain-text output](coach-plaintext-output.md) — no #/asterisks/em dashes in AI text; enforced via FORMATTING_RULES in every prompt + sanitizeCoachText at every render point.
