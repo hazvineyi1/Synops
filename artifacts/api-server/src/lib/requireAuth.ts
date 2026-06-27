@@ -1,20 +1,17 @@
-import { getAuth, clerkClient } from "@clerk/express";
-import type { Request, Response, NextFunction } from "express";
-import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db";
+import { clerkClient } from "@clerk/express";
+import { createRequireAuth } from "@workspace/identity";
+import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getEntitlement, TRIAL_DAYS } from "./billing";
 import { referralCodeFor } from "./referral";
 
-export async function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const auth = getAuth(req);
-  const userId = auth?.userId;
-  if (!userId) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-  // JIT-provision user in our DB
-  const existing = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+// Generic Clerk gate (from @workspace/identity) + Arete's JIT user provisioning.
+export const requireAuth = createRequireAuth(async (userId, auth) => {
+  const existing = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
   let user = existing[0];
   if (!user) {
     let email = (auth as any)?.sessionClaims?.email ?? null;
@@ -44,12 +41,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       })
       .onConflictDoNothing()
       .returning();
-    // onConflictDoNothing returns nothing if a race already inserted; re-fetch.
     user =
       created ??
       (await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1))[0];
   }
-  (req as any).userId = userId;
-  (req as any).entitlement = getEntitlement(user ?? {});
-  next();
-}
+  return { entitlement: getEntitlement(user ?? {}) };
+});
