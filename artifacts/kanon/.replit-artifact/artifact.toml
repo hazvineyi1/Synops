@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "UVA Production Engine"
+version = "1.0.0"
+id = "artifacts/kanon"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18535
+
+[services.development]
+run = "pnpm --filter @workspace/kanon run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/kanon", "run", "build" ]
+publicDir = "artifacts/kanon/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18535"
+BASE_PATH = "/"

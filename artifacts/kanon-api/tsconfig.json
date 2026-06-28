@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../../lib/kanon-curriculum-engine"
+    },
+    {
+      "path": "../../lib/kanon-db"
+    },
+    {
+      "path": "../../lib/kanon-api-zod"
+    },
+    {
+      "path": "../../lib/kanon-openai"
+    }
+  ]
+}

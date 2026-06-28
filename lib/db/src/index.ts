@@ -10,7 +10,24 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Hosted Postgres (Supabase, Railway external, etc.) requires TLS. Enable SSL
+// for any non-local host; skip it for localhost so local dev still works.
+// rejectUnauthorized:false because managed providers often present a cert chain
+// node-postgres won't verify by default.
+function sslFor(connectionString: string): false | { rejectUnauthorized: false } {
+  try {
+    const host = new URL(connectionString).hostname;
+    if (host === "localhost" || host === "127.0.0.1") return false;
+  } catch {
+    /* fall through to SSL on */
+  }
+  return { rejectUnauthorized: false };
+}
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: sslFor(process.env.DATABASE_URL),
+});
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

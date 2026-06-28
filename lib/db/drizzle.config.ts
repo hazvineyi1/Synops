@@ -10,5 +10,7 @@ export default defineConfig({
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,
+    // Supabase/managed Postgres require TLS; don't hard-fail on the cert chain.
+    ssl: { rejectUnauthorized: false },
   },
 });

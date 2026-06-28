@@ -7,6 +7,12 @@
     { "path": "./lib/api-client-react" },
     { "path": "./lib/api-zod" },
     { "path": "./lib/identity" },
-    { "path": "./lib/billing" }
+    { "path": "./lib/billing" },
+    { "path": "./lib/kanon-db" },
+    { "path": "./lib/kanon-api-client" },
+    { "path": "./lib/kanon-api-zod" },
+    { "path": "./lib/kanon-curriculum-engine" },
+    { "path": "./lib/kanon-evidence-packet" },
+    { "path": "./lib/kanon-openai" }
   ]
 }
