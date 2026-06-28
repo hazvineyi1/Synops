@@ -12,6 +12,7 @@ import { Loader2, Save, Globe, Download, Trash2, ShieldCheck, Sparkles, CreditCa
 import { useToast } from "@/hooks/use-toast";
 import { useT, LanguageSwitcher } from "@/lib/i18n";
 import { DeveloperSettings } from "@/components/developer-settings";
+import { useIsAdmin } from "@/lib/admin-api";
 
 export default function Settings() {
   const { data: profile, isLoading } = useGetProfile();
@@ -20,6 +21,7 @@ export default function Settings() {
   const { toast } = useToast();
   const { t } = useT();
   const { signOut } = useClerk();
+  const { data: adminData } = useIsAdmin();
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [billing, setBilling] = useState<any | null>(null);
@@ -342,7 +344,7 @@ export default function Settings() {
           )}
         </Card>
 
-        <DeveloperSettings />
+        {adminData?.isAdmin && <DeveloperSettings />}
 
         <Card className="shadow-sm border-border bg-card mt-6">
           <CardHeader>

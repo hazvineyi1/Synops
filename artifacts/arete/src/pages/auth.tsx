@@ -64,7 +64,7 @@ export function SignInPage() {
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4 py-12">
       <SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} />
-      <TestAccountButton />
+      {import.meta.env.DEV && <TestAccountButton />}
     </div>
   );
 }
@@ -73,7 +73,7 @@ export function SignUpPage() {
   return (
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4 py-12">
       <SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} />
-      <TestAccountButton />
+      {import.meta.env.DEV && <TestAccountButton />}
     </div>
   );
 }

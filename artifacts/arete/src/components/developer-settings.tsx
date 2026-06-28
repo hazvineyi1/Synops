@@ -90,7 +90,7 @@ export function DeveloperSettings() {
           <KeyRound className="w-4 h-4 text-primary" /> Developer API
         </CardTitle>
         <CardDescription>
-          Build on the Coach with API keys and webhooks. See the{" "}
+          Build on Arete with API keys and webhooks. See the{" "}
           <Link href="/developers" className="text-primary underline">API docs</Link>.
         </CardDescription>
       </CardHeader>

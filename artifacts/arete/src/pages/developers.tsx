@@ -35,7 +35,7 @@ export default function Developers() {
         <div>
           <h1 className="font-serif text-3xl text-primary font-medium mb-1">Developer API</h1>
           <p className="text-sm text-muted-foreground">
-            Build on the Coach: ingest material, read progress, and receive events. Create keys in Settings → Developer API.
+            Build on Arete: ingest material, read progress, and receive events. Create keys in Settings → Developer API.
           </p>
         </div>
 

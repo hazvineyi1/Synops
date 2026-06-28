@@ -43,6 +43,7 @@ const clerkAppearance = {
   },
   variables: {
     colorPrimary: "hsl(0 62% 29%)",
+    colorPrimaryForeground: "hsl(0 0% 100%)",
     colorForeground: "hsl(20 15% 10%)",
     colorMutedForeground: "hsl(20 15% 40%)",
     colorDanger: "hsl(0 84% 60%)",
@@ -61,6 +62,7 @@ const clerkAppearance = {
     headerTitle: "font-serif text-2xl font-bold",
     headerSubtitle: "text-muted-foreground text-sm",
     socialButtonsBlockButtonText: "font-medium",
+    formButtonPrimary: "!text-white",
     formFieldLabel: "text-sm font-medium text-foreground",
     footerActionLink: "text-primary font-medium hover:text-primary/90",
     footerActionText: "text-muted-foreground text-sm",
