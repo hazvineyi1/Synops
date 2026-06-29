@@ -6,6 +6,9 @@ export const usersTable = pgTable("users", {
   id: text("id").primaryKey(), // Clerk user ID
   email: text("email").notNull().unique(),
   name: text("name"),
+  // Admin role tier. "user" for normal learners; elevated tiers gate the admin
+  // panel. ADMIN_EMAILS accounts are always treated as super_admin regardless.
+  role: text("role").notNull().default("user"), // user | support | content_editor | moderator | super_admin
   assessmentComplete: boolean("assessment_complete").notNull().default(false),
   // Billing / subscription state (Stripe). Tier drives feature gates and rate caps.
   stripeCustomerId: text("stripe_customer_id"),

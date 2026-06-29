@@ -11,3 +11,4 @@ export * from "./cohort_members";
 export * from "./api_keys";
 export * from "./webhooks";
 export * from "./activity_sessions";
+export * from "./admin_audit_log";

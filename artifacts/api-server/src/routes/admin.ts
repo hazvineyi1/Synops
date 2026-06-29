@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../lib/requireAuth";
 import { requireAdmin, isAdminUser } from "../lib/requireAdmin";
+import { requireRole, logAdminAction, getUserRole, isValidRole } from "../lib/roles";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
@@ -10,7 +11,8 @@ const router = Router();
 router.get("/admin/me", requireAuth, async (req, res) => {
   const userId = (req as any).userId;
   const admin = await isAdminUser(userId);
-  res.json({ isAdmin: admin });
+  const role = await getUserRole(userId);
+  res.json({ isAdmin: admin, role });
 });
 
 // GET /admin/overview - high level totals
@@ -231,6 +233,45 @@ router.get("/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
     sessions: sessions.rows ?? [],
     recentCheckpoints: recentCheckpoints.rows ?? [],
   });
+});
+
+// GET /admin/audit - recent admin actions (moderator and above)
+router.get("/admin/audit", requireAuth, requireRole("moderator"), async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  const result = await db.execute(sql`
+    SELECT id, actor_user_id, actor_email, action, target_type, target_id, metadata, created_at
+    FROM admin_audit_log
+    ORDER BY id DESC
+    LIMIT ${limit}
+  `);
+  res.json({ entries: result.rows ?? [] });
+});
+
+// POST /admin/users/:id/role - change a user's admin role (super_admin only)
+router.post("/admin/users/:id/role", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const targetId = String(req.params.id);
+  const role = String((req.body?.role ?? "")).trim();
+  if (!isValidRole(role)) {
+    res.status(400).json({ error: "Invalid role" });
+    return;
+  }
+  const actorId = (req as any).userId as string;
+  const prev = await getUserRole(targetId);
+  const updated = await db.execute(sql`
+    UPDATE users SET role = ${role} WHERE id = ${targetId} RETURNING id
+  `);
+  if (!(updated.rows ?? []).length) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  await logAdminAction({
+    actorUserId: actorId,
+    action: "role.set",
+    targetType: "user",
+    targetId,
+    metadata: { from: prev, to: role },
+  });
+  res.json({ ok: true, role });
 });
 
 export default router;
