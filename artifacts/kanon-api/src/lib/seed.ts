@@ -28,7 +28,7 @@ import {
   standardsFrameworksTable,
   standardCompetenciesTable,
 } from "@workspace/kanon-db";
-import { CCNE_FRAMEWORK, domainLabel } from "@workspace/kanon-evidence-packet";
+import { BUILTIN_FRAMEWORKS, domainLabel } from "@workspace/kanon-evidence-packet";
 import { hashPassword } from "./auth";
 
 interface MinimalLogger {
@@ -249,54 +249,56 @@ export async function ensureDemoUsers(
 }
 
 /**
- * Idempotently seed the shared, global standards catalog (currently CCNE / the
- * AACN Essentials domains). Runs in EVERY environment because the evidence
- * packet and crosswalk features depend on the catalog existing. Matching is by
- * framework acronym and competency code, so re-running inserts nothing and
+ * Idempotently seed the shared, global standards catalog (the built-in accreditor
+ * datasets: CCNE, ABET, AACSB, SACSCOC). Runs in EVERY environment because the
+ * evidence packet and crosswalk features depend on the catalog existing. Matching
+ * is by framework acronym and competency code, so re-running inserts nothing and
  * existing curriculum crosswalk links are never disturbed. The competency
  * descriptions are product-authored paraphrases, not verbatim copyrighted text.
  */
 export async function ensureStandardsFrameworksSeed(log: MinimalLogger): Promise<void> {
-  let [framework] = await db
-    .select({ id: standardsFrameworksTable.id })
-    .from(standardsFrameworksTable)
-    .where(eq(standardsFrameworksTable.acronym, CCNE_FRAMEWORK.acronym))
-    .orderBy(standardsFrameworksTable.id);
+  for (const fw of BUILTIN_FRAMEWORKS) {
+    let [framework] = await db
+      .select({ id: standardsFrameworksTable.id })
+      .from(standardsFrameworksTable)
+      .where(eq(standardsFrameworksTable.acronym, fw.acronym))
+      .orderBy(standardsFrameworksTable.id);
 
-  if (!framework) {
-    [framework] = await db
-      .insert(standardsFrameworksTable)
-      .values({
-        name: CCNE_FRAMEWORK.name,
-        acronym: CCNE_FRAMEWORK.acronym,
-        frameworkType: CCNE_FRAMEWORK.frameworkType,
-        description: CCNE_FRAMEWORK.description,
-      })
-      .returning({ id: standardsFrameworksTable.id });
-    log.info({ id: framework.id }, "Seeded CCNE standards framework");
-  }
-
-  const existing = await db
-    .select({ code: standardCompetenciesTable.code })
-    .from(standardCompetenciesTable)
-    .where(eq(standardCompetenciesTable.frameworkId, framework.id));
-  const existingCodes = new Set(existing.map((r) => r.code));
-
-  const toInsert: { frameworkId: number; code: string; description: string; domain: string }[] = [];
-  for (const domain of CCNE_FRAMEWORK.domains) {
-    for (const comp of domain.competencies) {
-      if (existingCodes.has(comp.code)) continue;
-      toInsert.push({
-        frameworkId: framework.id,
-        code: comp.code,
-        description: comp.description,
-        domain: domainLabel(domain),
-      });
+    if (!framework) {
+      [framework] = await db
+        .insert(standardsFrameworksTable)
+        .values({
+          name: fw.name,
+          acronym: fw.acronym,
+          frameworkType: fw.frameworkType,
+          description: fw.description,
+        })
+        .returning({ id: standardsFrameworksTable.id });
+      log.info({ id: framework.id, acronym: fw.acronym }, "Seeded standards framework");
     }
-  }
 
-  if (toInsert.length > 0) {
-    await db.insert(standardCompetenciesTable).values(toInsert);
-    log.info({ count: toInsert.length }, "Seeded CCNE competencies");
+    const existing = await db
+      .select({ code: standardCompetenciesTable.code })
+      .from(standardCompetenciesTable)
+      .where(eq(standardCompetenciesTable.frameworkId, framework.id));
+    const existingCodes = new Set(existing.map((r) => r.code));
+
+    const toInsert: { frameworkId: number; code: string; description: string; domain: string }[] = [];
+    for (const domain of fw.domains) {
+      for (const comp of domain.competencies) {
+        if (existingCodes.has(comp.code)) continue;
+        toInsert.push({
+          frameworkId: framework.id,
+          code: comp.code,
+          description: comp.description,
+          domain: domainLabel(domain),
+        });
+      }
+    }
+
+    if (toInsert.length > 0) {
+      await db.insert(standardCompetenciesTable).values(toInsert);
+      log.info({ count: toInsert.length, acronym: fw.acronym }, "Seeded competencies");
+    }
   }
 }

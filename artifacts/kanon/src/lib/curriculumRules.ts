@@ -102,6 +102,7 @@ function demoCourseToInput(course: DemoCourse): CurriculumEvaluationInput {
       id: a.id,
       title: a.title,
       objectiveIds: a.objectiveIds,
+      type: a.type,
     })),
   };
 }

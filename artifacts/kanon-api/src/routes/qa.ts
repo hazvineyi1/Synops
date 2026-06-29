@@ -185,6 +185,7 @@ async function buildEvaluationInput(projectId: number): Promise<CurriculumEvalua
           id: assessmentsTable.id,
           title: assessmentsTable.title,
           alignedObjectiveIds: assessmentsTable.alignedObjectiveIds,
+          assessmentType: assessmentsTable.assessmentType,
         })
         .from(assessmentsTable)
         .where(inArray(assessmentsTable.courseId, courseIds))
@@ -240,6 +241,7 @@ async function buildEvaluationInput(projectId: number): Promise<CurriculumEvalua
     id: String(a.id),
     title: a.title,
     objectiveIds: parseObjectiveIds(a.alignedObjectiveIds),
+    type: a.assessmentType ?? null,
   }));
 
   return {

@@ -16,7 +16,8 @@ export type RuleCategory =
   | "clarity"
   | "structure"
   | "readability"
-  | "inclusive";
+  | "inclusive"
+  | "balance";
 
 export const RULE_CATEGORY_LABELS: Record<RuleCategory, string> = {
   measurability: "Measurable outcomes",
@@ -26,6 +27,7 @@ export const RULE_CATEGORY_LABELS: Record<RuleCategory, string> = {
   structure: "Course structure",
   readability: "Readability and student experience",
   inclusive: "Inclusive and culturally responsive language",
+  balance: "Assessment balance and rigor",
 };
 
 export const BLOOM_LEVELS = [
@@ -291,6 +293,9 @@ export interface EvaluationAssessment {
   id: string;
   title: string;
   objectiveIds: string[];
+  // Optional formative/summative classification. When absent, the balance
+  // dimension skips the formative-feedback check for this assessment.
+  type?: "formative" | "summative" | string | null;
 }
 
 export interface CurriculumEvaluationInput {
@@ -726,6 +731,90 @@ export function evaluateCurriculum(input: CurriculumEvaluationInput): QaReport {
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Assessment balance & rigor (course-level; advisory).
+  // -------------------------------------------------------------------------
+
+  // Cognitive distribution: how outcomes spread across Bloom's lower-order
+  // (Remember/Understand) vs higher-order (Apply/Analyze/Evaluate/Create).
+  const LOWER_ORDER: BloomLevel[] = ["Remember", "Understand"];
+  const leveled = analyses.filter((a) => a.detection.bloomLevel !== null);
+  if (leveled.length >= 3) {
+    const higherOrder = leveled.filter(
+      (a) => a.detection.bloomLevel && !LOWER_ORDER.includes(a.detection.bloomLevel),
+    ).length;
+    const higherShare = higherOrder / leveled.length;
+    const distinctLevels = new Set(leveled.map((a) => a.detection.bloomLevel)).size;
+    if (higherShare === 0) {
+      findings.push({
+        id: "balance-cognitive",
+        severity: "warn",
+        category: "balance",
+        targetType: "course",
+        targetLabel: "Cognitive rigor",
+        message: "All measurable outcomes sit at the recall/comprehension level.",
+        remediation: "Add higher-order outcomes (apply, analyze, evaluate, or create) so learners build deeper skills.",
+      });
+    } else if (distinctLevels === 1) {
+      findings.push({
+        id: "balance-cognitive",
+        severity: "warn",
+        category: "balance",
+        targetType: "course",
+        targetLabel: "Cognitive rigor",
+        message: "Every outcome targets the same cognitive level, so the course lacks a difficulty progression.",
+        remediation: "Vary Bloom levels across outcomes to scaffold from foundational to advanced thinking.",
+      });
+    } else {
+      findings.push({
+        id: "balance-cognitive",
+        severity: "pass",
+        category: "balance",
+        targetType: "course",
+        targetLabel: "Cognitive rigor",
+        message: `Outcomes span ${distinctLevels} cognitive levels, with ${Math.round(higherShare * 100)}% higher-order.`,
+      });
+    }
+  }
+
+  // Formative/summative mix: low-stakes formative checks should exist alongside
+  // graded summative assessments. Only evaluated when types are provided.
+  const typed = input.assessments.filter((a) => a.type === "formative" || a.type === "summative");
+  if (typed.length >= 2) {
+    const formative = typed.filter((a) => a.type === "formative").length;
+    const summative = typed.filter((a) => a.type === "summative").length;
+    if (formative === 0) {
+      findings.push({
+        id: "balance-formative",
+        severity: "warn",
+        category: "balance",
+        targetType: "course",
+        targetLabel: "Formative assessment",
+        message: "All assessments are summative — there are no low-stakes formative checks.",
+        remediation: "Add formative assessments (quizzes, drafts, check-ins) so learners get feedback before they are graded.",
+      });
+    } else if (summative === 0) {
+      findings.push({
+        id: "balance-summative",
+        severity: "warn",
+        category: "balance",
+        targetType: "course",
+        targetLabel: "Summative assessment",
+        message: "All assessments are formative — there is no summative measure of mastery.",
+        remediation: "Add at least one summative assessment that certifies the outcomes were met.",
+      });
+    } else {
+      findings.push({
+        id: "balance-mix",
+        severity: "pass",
+        category: "balance",
+        targetType: "course",
+        targetLabel: "Assessment mix",
+        message: `Balanced mix of ${formative} formative and ${summative} summative assessments.`,
+      });
+    }
+  }
+
   // Aggregate scores.
   const categories: RuleCategory[] = [
     "measurability",
@@ -735,6 +824,7 @@ export function evaluateCurriculum(input: CurriculumEvaluationInput): QaReport {
     "structure",
     "readability",
     "inclusive",
+    "balance",
   ];
   const categoryScores: CategoryScore[] = categories.map((category) => {
     const inCat = findings.filter((f) => f.category === category);
