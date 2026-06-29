@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useIsAdmin, useAdminOverview, useAdminUsage, useAdminBreakdown, useAdminUsers, useAdminUserDetail, useAdminLogins, useSuspendUser, useResetProgress } from "@/lib/admin-api";
 import { AccessAudit } from "@/components/admin-access-audit";
 import { AdminAnnouncements } from "@/components/admin-announcements";
+import { PricingManager } from "@/components/admin-pricing";
 import { AdminShell } from "@/components/admin-shell";
 import { DeveloperSettings } from "@/components/developer-settings";
 import type { AdminOverview, BreakdownItem, AdminUser } from "@/lib/admin-api";
@@ -397,26 +398,8 @@ export default function Admin() {
 
       {section === "billing" && (
       <div className="p-4 md:p-6 md:px-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-serif flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Billing &amp; pricing</CardTitle>
-            <CardDescription>Subscription mix today. Plan pricing configuration and full revenue reporting arrive with the payments integration.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {overview ? (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <StatCard icon={Sparkles} label="Pro" value={overview.pro_users} />
-                <StatCard icon={Clock} label="On trial" value={overview.trial_users} />
-                <StatCard icon={Users} label="Total users" value={overview.total_users} />
-                <StatCard icon={Gift} label="Referrals" value={overview.total_referrals} />
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            )}
-          </CardContent>
-        </Card>
+        <PricingManager enabled={isAdmin} isSuperAdmin={isSuperAdmin} overview={overview} />
       </div>
-
       )}
 
       {section === "announcements" && (

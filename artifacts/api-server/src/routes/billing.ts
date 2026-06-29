@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../lib/requireAuth";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { logger } from "../lib/logger";
 import {
   createCheckoutSession,
@@ -46,8 +46,34 @@ router.post("/billing/checkout", requireAuth, async (req, res) => {
     return;
   }
   const userId = (req as any).userId;
-  const plan = req.body?.plan === "yearly" ? "yearly" : "monthly";
-  const priceId = priceIdFor(plan);
+
+  // Prefer a catalog plan when the client sends a planId (regional pricing).
+  // A Stripe plan carries its own price id; Flutterwave plans can't check out
+  // through Stripe yet (that arrives with the Flutterwave integration). When no
+  // planId is given we fall back to the env-configured monthly/yearly prices so
+  // existing clients keep working.
+  let priceId: string | undefined;
+  const planId = Number(req.body?.planId);
+  if (Number.isFinite(planId) && planId > 0) {
+    const row = (
+      await db.execute(sql`
+        SELECT processor, stripe_price_id FROM plans
+        WHERE id = ${planId} AND active = true LIMIT 1
+      `)
+    ).rows?.[0] as any;
+    if (!row) {
+      res.status(404).json({ error: "That plan is not available." });
+      return;
+    }
+    if (row.processor !== "stripe") {
+      res.status(409).json({ error: "This plan is sold through a different payment method." });
+      return;
+    }
+    priceId = row.stripe_price_id ?? undefined;
+  } else {
+    const plan = req.body?.plan === "yearly" ? "yearly" : "monthly";
+    priceId = priceIdFor(plan);
+  }
   if (!priceId) {
     res.status(503).json({ error: "That plan is not available." });
     return;

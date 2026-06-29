@@ -11,9 +11,9 @@ async function adminFetch<T>(path: string): Promise<T> {
   return (await res.json()) as T;
 }
 
-async function adminPost<T>(path: string, body: unknown): Promise<T> {
+async function adminSend<T>(method: "POST" | "PATCH", path: string, body: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
-    method: "POST",
+    method,
     credentials: "include",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(body),
@@ -23,6 +23,14 @@ async function adminPost<T>(path: string, body: unknown): Promise<T> {
     throw new Error(data.error || `Request failed (${res.status})`);
   }
   return (await res.json()) as T;
+}
+
+function adminPost<T>(path: string, body: unknown): Promise<T> {
+  return adminSend<T>("POST", path, body);
+}
+
+function adminPatch<T>(path: string, body: unknown): Promise<T> {
+  return adminSend<T>("PATCH", path, body);
 }
 
 export const ADMIN_ROLES = ["user", "support", "content_editor", "moderator", "super_admin"] as const;
@@ -289,5 +297,75 @@ export function useDeactivateAnnouncement() {
     mutationFn: ({ id }: { id: number }) =>
       adminPost<{ ok: boolean }>(`/admin/announcements/${id}/deactivate`, {}),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "announcements"] }),
+  });
+}
+
+// ---- Pricing / plans -------------------------------------------------------
+
+export interface Plan {
+  id: number;
+  product: string;
+  code: string;
+  name: string;
+  interval: "monthly" | "yearly";
+  region: string;
+  currency: string;
+  amount_minor: number;
+  processor: "stripe" | "flutterwave";
+  stripe_price_id: string | null;
+  active: boolean;
+  sort: number;
+  updated_at: string;
+}
+
+export interface PlanInput {
+  code: string;
+  name: string;
+  interval: string;
+  region: string;
+  currency: string;
+  amountMinor: number;
+  processor: string;
+  stripePriceId: string | null;
+  sort: number;
+}
+
+export function useAdminPlans(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "plans"],
+    queryFn: () => adminFetch<{ plans: Plan[] }>("/admin/plans"),
+    enabled,
+  });
+}
+
+export function useCreatePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PlanInput) => adminPost<{ ok: boolean; id: number }>("/admin/plans", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "plans"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+    },
+  });
+}
+
+export function useUpdatePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: PlanInput }) =>
+      adminPatch<{ ok: boolean }>(`/admin/plans/${id}`, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "plans"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+    },
+  });
+}
+
+export function useTogglePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
+      adminPost<{ ok: boolean }>(`/admin/plans/${id}/toggle`, { active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "plans"] }),
   });
 }

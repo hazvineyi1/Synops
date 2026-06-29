@@ -15,6 +15,7 @@ import developerRouter from "./developer";
 import v1Router from "./v1";
 import activityRouter from "./activity";
 import announcementsRouter from "./announcements";
+import pricingRouter from "./pricing";
 import testLoginRouter from "./test-login";
 import { aiLimiter, authLimiter } from "../middlewares/rateLimit";
 
@@ -42,6 +43,7 @@ router.use(developerRouter);
 router.use(v1Router);
 router.use(activityRouter);
 router.use(announcementsRouter);
+router.use(pricingRouter);
 
 // Strict limit on the unauthenticated dev test-login endpoint.
 router.use("/test-login", authLimiter);
