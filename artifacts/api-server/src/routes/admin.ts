@@ -148,6 +148,7 @@ router.get("/admin/users", requireAuth, requireAdmin, async (_req, res) => {
       u.id,
       u.email,
       u.name,
+      u.role,
       u.created_at,
       u.assessment_complete,
       u.last_seen_at,

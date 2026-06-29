@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 async function adminFetch<T>(path: string): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -9,6 +9,33 @@ async function adminFetch<T>(path: string): Promise<T> {
     throw new Error(`Request failed (${res.status})`);
   }
   return (await res.json()) as T;
+}
+
+async function adminPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}) as any);
+    throw new Error(data.error || `Request failed (${res.status})`);
+  }
+  return (await res.json()) as T;
+}
+
+export const ADMIN_ROLES = ["user", "support", "content_editor", "moderator", "super_admin"] as const;
+
+export interface AuditEntry {
+  id: number;
+  actor_user_id: string;
+  actor_email: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  metadata: any;
+  created_at: string;
 }
 
 export interface AdminOverview {
@@ -77,6 +104,7 @@ export interface AdminUser {
   id: string;
   email: string;
   name: string | null;
+  role: string;
   created_at: string;
   assessment_complete: boolean;
   last_seen_at: string | null;
@@ -132,7 +160,7 @@ export function useAdminUserDetail(id: string | null) {
 export function useIsAdmin() {
   return useQuery({
     queryKey: ["admin", "me"],
-    queryFn: () => adminFetch<{ isAdmin: boolean }>("/admin/me"),
+    queryFn: () => adminFetch<{ isAdmin: boolean; role?: string }>("/admin/me"),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -174,5 +202,25 @@ export function useAdminUsers(enabled: boolean) {
     queryKey: ["admin", "users"],
     queryFn: () => adminFetch<AdminUser[]>("/admin/users"),
     enabled,
+  });
+}
+
+export function useAuditLog(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "audit"],
+    queryFn: () => adminFetch<{ entries: AuditEntry[] }>("/admin/audit"),
+    enabled,
+  });
+}
+
+export function useSetUserRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, role }: { id: string; role: string }) =>
+      adminPost<{ ok: boolean; role: string }>(`/admin/users/${id}/role`, { role }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+    },
   });
 }
