@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Users, Activity, MessageSquare, BookOpen, CheckSquare, ClipboardCheck, Loader2, ShieldAlert, Clock, Building2, Gift, Target, Sparkles, Globe } from "lucide-react";
+import { Users, Activity, MessageSquare, BookOpen, CheckSquare, ClipboardCheck, Loader2, ShieldAlert, Clock, Building2, Gift, Target, Sparkles, Globe, MoreHorizontal } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -140,6 +141,9 @@ export default function Admin() {
   const { data: users = [], isLoading: usersLoading } = useAdminUsers(isAdmin);
   const { data: logins = [], isLoading: loginsLoading } = useAdminLogins(isAdmin);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const role = me?.role ?? "user";
+  const isSuperAdmin = role === "super_admin";
+  const canModerate = role === "moderator" || isSuperAdmin;
 
   if (meLoading) {
     return (
@@ -322,6 +326,7 @@ export default function Admin() {
                       <TableHead className="text-right">Time spent</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead>Last seen</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -354,6 +359,9 @@ export default function Admin() {
                         <TableCell className="text-right tabular-nums whitespace-nowrap">{formatDuration(u.total_time_seconds)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{format(parseISO(u.created_at), "MMM d, yyyy")}</TableCell>
                         <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{u.last_seen_at ? format(parseISO(u.last_seen_at), "MMM d, HH:mm") : "Never"}</TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <UserRowActions user={u} isSuperAdmin={isSuperAdmin} canModerate={canModerate} />
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -379,6 +387,57 @@ export default function Admin() {
         canModerate={me?.role === "moderator" || me?.role === "super_admin"}
       />
     </div>
+  );
+}
+
+// Inline per-row actions in the learner table (so admins don't have to open the
+// detail dialog first). Suspend/reactivate for moderators+, reset for super admins.
+function UserRowActions({ user, isSuperAdmin, canModerate }: { user: AdminUser; isSuperAdmin: boolean; canModerate: boolean }) {
+  const suspend = useSuspendUser();
+  const resetProgress = useResetProgress();
+  if (!canModerate && !isSuperAdmin) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+          aria-label="Actions"
+          disabled={suspend.isPending || resetProgress.isPending}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canModerate && (
+          <>
+            <DropdownMenuItem onClick={() => suspend.mutate({ id: user.id, suspend: true })}>
+              Suspend account
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => suspend.mutate({ id: user.id, suspend: false })}>
+              Reactivate account
+            </DropdownMenuItem>
+          </>
+        )}
+        {isSuperAdmin && (
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Reset ALL learning history for ${user.email}? This permanently deletes concepts, checkpoints, plans, messages and sessions. The account is kept. This cannot be undone.`,
+                )
+              ) {
+                resetProgress.mutate({ id: user.id });
+              }
+            }}
+          >
+            Reset progress
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
