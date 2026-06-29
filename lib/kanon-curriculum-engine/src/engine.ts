@@ -14,7 +14,9 @@ export type RuleCategory =
   | "standards"
   | "assessment"
   | "clarity"
-  | "structure";
+  | "structure"
+  | "readability"
+  | "inclusive";
 
 export const RULE_CATEGORY_LABELS: Record<RuleCategory, string> = {
   measurability: "Measurable outcomes",
@@ -22,6 +24,8 @@ export const RULE_CATEGORY_LABELS: Record<RuleCategory, string> = {
   assessment: "Assessment coverage",
   clarity: "Clarity and accessibility",
   structure: "Course structure",
+  readability: "Readability and student experience",
+  inclusive: "Inclusive and culturally responsive language",
 };
 
 export const BLOOM_LEVELS = [
@@ -180,6 +184,95 @@ const CRITERION_PATTERN =
   /(\d+\s?%|\d+\s+(of|out)|at least|with \d|accuracy|within|minimum|score of|by .* points|in under)/i;
 
 // ---------------------------------------------------------------------------
+// Readability & student-experience detectors (deterministic, no dependencies).
+// ---------------------------------------------------------------------------
+
+// Heuristic passive-voice detector: a "to be" form followed by a past participle.
+// Covers regular -ed/-en participles plus common irregulars. Advisory only, so a
+// few false positives are acceptable.
+const PASSIVE_PATTERN =
+  /\b(?:am|is|are|was|were|be|been|being)\s+(?:\w+ed|\w+en|done|made|given|taken|shown|written|built|held|seen|known|met|paid|kept|told|sent|left|put|set|read|led|drawn|chosen|found|brought|taught|caught|begun)\b/i;
+
+// Vague / ambiguous directive phrases that weaken an instruction's clarity.
+const AMBIGUOUS_PHRASES = [
+  "etc.", "etc", "and/or", "as appropriate", "as needed", "as applicable",
+  "where appropriate", "various", "a number of", "and so on", "things like",
+  "some things", "deal with", "work with various", "stuff", "tbd",
+];
+
+// Count vowel groups as a syllable estimate; drop a single trailing silent "e".
+function countSyllables(word: string): number {
+  const w = word.toLowerCase().replace(/[^a-z]/g, "");
+  if (!w) return 0;
+  const groups = w.match(/[aeiouy]+/g);
+  let n = groups ? groups.length : 0;
+  if (w.endsWith("e") && !/[aeiouy]e$/.test(w) && n > 1) n -= 1;
+  return Math.max(1, n);
+}
+
+// Flesch-Kincaid grade level for a block of text. Returns 0 for empty input.
+export function fleschKincaidGrade(text: string): number {
+  const clean = text.trim();
+  if (!clean) return 0;
+  const words = clean.split(/\s+/).filter(Boolean);
+  const sentences = Math.max(1, (clean.match(/[.!?]+/g) ?? []).length);
+  const syllables = words.reduce((s, w) => s + countSyllables(w), 0);
+  if (words.length === 0) return 0;
+  const grade = 0.39 * (words.length / sentences) + 11.8 * (syllables / words.length) - 15.59;
+  return Math.round(grade * 10) / 10;
+}
+
+/** Does the text appear to use passive voice? */
+export function hasPassiveVoice(text: string): boolean {
+  return PASSIVE_PATTERN.test(text);
+}
+
+/** Ambiguous directive phrases present in the text (lowercased, deduped). */
+export function findAmbiguousPhrases(text: string): string[] {
+  const lower = ` ${text.toLowerCase()} `;
+  const hits = AMBIGUOUS_PHRASES.filter((p) => lower.includes(` ${p} `) || lower.includes(`${p} `) || lower.includes(` ${p}`));
+  return Array.from(new Set(hits));
+}
+
+// ---------------------------------------------------------------------------
+// Inclusive / culturally-responsive language detectors.
+// ---------------------------------------------------------------------------
+
+// Non-inclusive term -> suggested alternative. Matched on word boundaries,
+// case-insensitive. Kept intentionally conservative to avoid false positives.
+const NON_INCLUSIVE_TERMS: { pattern: RegExp; term: string; suggestion: string }[] = [
+  { pattern: /\bmanpower\b/i, term: "manpower", suggestion: "workforce, staff, or labor" },
+  { pattern: /\bman-?hours\b/i, term: "man-hours", suggestion: "person-hours or work-hours" },
+  { pattern: /\bchairman\b/i, term: "chairman", suggestion: "chair or chairperson" },
+  { pattern: /\bfreshman\b/i, term: "freshman", suggestion: "first-year student" },
+  { pattern: /\bmankind\b/i, term: "mankind", suggestion: "humankind or humanity" },
+  { pattern: /\bman-?made\b/i, term: "man-made", suggestion: "synthetic, artificial, or human-made" },
+  { pattern: /\b(policeman|fireman|mailman|salesman)\b/i, term: "gendered job title", suggestion: "a gender-neutral title (police officer, firefighter, mail carrier, salesperson)" },
+  { pattern: /\bblacklist\b/i, term: "blacklist", suggestion: "blocklist or denylist" },
+  { pattern: /\bwhitelist\b/i, term: "whitelist", suggestion: "allowlist" },
+  { pattern: /\bgrandfather(ed|\s+clause)?\b/i, term: "grandfather clause", suggestion: "legacy or exempted" },
+  { pattern: /\bsanity\s+check\b/i, term: "sanity check", suggestion: "quick check or confidence check" },
+  { pattern: /\bable-?bodied\b/i, term: "able-bodied", suggestion: "non-disabled" },
+  { pattern: /\bthe\s+(disabled|handicapped)\b/i, term: "the disabled", suggestion: "people with disabilities (person-first language)" },
+  { pattern: /\b(he\/she|s\/he|he or she)\b/i, term: "he/she", suggestion: 'singular "they" for gender-neutral phrasing' },
+  { pattern: /\bthird[-\s]world\b/i, term: "third-world", suggestion: "low-income or developing" },
+  { pattern: /\b(crazy|insane|lame)\b/i, term: "ableist adjective", suggestion: "precise descriptive language (e.g. surprising, intense, ineffective)" },
+];
+
+/** Non-inclusive terms found in the text, with suggested alternatives (deduped). */
+export function findNonInclusiveTerms(text: string): { term: string; suggestion: string }[] {
+  const found: { term: string; suggestion: string }[] = [];
+  const seen = new Set<string>();
+  for (const entry of NON_INCLUSIVE_TERMS) {
+    if (entry.pattern.test(text) && !seen.has(entry.term)) {
+      seen.add(entry.term);
+      found.push({ term: entry.term, suggestion: entry.suggestion });
+    }
+  }
+  return found;
+}
+
+// ---------------------------------------------------------------------------
 // Generalized engine input (decoupled from any caller's storage shape).
 // ---------------------------------------------------------------------------
 
@@ -220,6 +313,11 @@ export interface ObjectiveAnalysis {
   standardAlignmentIds: string[];
   standardAlignmentLabel?: string;
   assessmentCount: number;
+  // Readability / inclusive signals.
+  passiveVoice: boolean;
+  ambiguousTerms: string[];
+  gradeLevel: number;
+  nonInclusiveTerms: { term: string; suggestion: string }[];
 }
 
 export interface QaFinding {
@@ -281,6 +379,10 @@ export function analyzeObjective(
     standardAlignmentIds: objective.standardAlignmentIds,
     standardAlignmentLabel: objective.standardAlignmentLabel,
     assessmentCount,
+    passiveVoice: hasPassiveVoice(trimmed),
+    ambiguousTerms: findAmbiguousPhrases(trimmed),
+    gradeLevel: fleschKincaidGrade(trimmed),
+    nonInclusiveTerms: findNonInclusiveTerms(trimmed),
   };
 }
 
@@ -488,6 +590,57 @@ export function evaluateCurriculum(input: CurriculumEvaluationInput): QaReport {
           : "Concise and readable.",
       });
     }
+
+    // Readability & student experience (advisory; warn, never gate-blocking).
+    if (a.passiveVoice) {
+      findings.push({
+        id: `read-passive-${a.objectiveId}`,
+        severity: "warn",
+        category: "readability",
+        targetType: "objective",
+        targetId: a.objectiveId,
+        targetLabel: label,
+        message: "Outcome appears to use passive voice, which can obscure who does what.",
+        remediation: "Rewrite in the active voice with the learner as the subject (e.g. \"the student analyzes…\").",
+      });
+    }
+    if (a.ambiguousTerms.length > 0) {
+      findings.push({
+        id: `read-ambiguous-${a.objectiveId}`,
+        severity: "warn",
+        category: "readability",
+        targetType: "objective",
+        targetId: a.objectiveId,
+        targetLabel: label,
+        message: `Ambiguous wording: ${a.ambiguousTerms.map((t) => `"${t}"`).join(", ")}.`,
+        remediation: "Replace vague directives with specific, concrete expectations.",
+      });
+    }
+    if (!a.passiveVoice && a.ambiguousTerms.length === 0 && a.text.length > 0) {
+      findings.push({
+        id: `read-${a.objectiveId}`,
+        severity: "pass",
+        category: "readability",
+        targetType: "objective",
+        targetId: a.objectiveId,
+        targetLabel: label,
+        message: "Clear, active, and unambiguous wording.",
+      });
+    }
+
+    // Inclusive / culturally responsive language (advisory; warn).
+    for (const hit of a.nonInclusiveTerms) {
+      findings.push({
+        id: `incl-${a.objectiveId}-${hit.term.replace(/\W+/g, "")}`,
+        severity: "warn",
+        category: "inclusive",
+        targetType: "objective",
+        targetId: a.objectiveId,
+        targetLabel: label,
+        message: `Consider more inclusive language for "${hit.term}".`,
+        remediation: `Use ${hit.suggestion}.`,
+      });
+    }
   }
 
   // Orphan assessments: defined but not aligned to any outcome.
@@ -519,6 +672,60 @@ export function evaluateCurriculum(input: CurriculumEvaluationInput): QaReport {
     );
   }
 
+  // Inclusive-language scan over assessment titles too.
+  for (const assessment of input.assessments) {
+    for (const hit of findNonInclusiveTerms(assessment.title ?? "")) {
+      findings.push({
+        id: `incl-a-${assessment.id}-${hit.term.replace(/\W+/g, "")}`,
+        severity: "warn",
+        category: "inclusive",
+        targetType: "assessment",
+        targetId: assessment.id,
+        targetLabel: truncate(assessment.title || "Untitled assessment"),
+        message: `Consider more inclusive language for "${hit.term}".`,
+        remediation: `Use ${hit.suggestion}.`,
+      });
+    }
+  }
+
+  // Course-level inclusive pass when the scan finds nothing.
+  if (!findings.some((f) => f.category === "inclusive")) {
+    findings.push({
+      id: "inclusive-clean",
+      severity: "pass",
+      category: "inclusive",
+      targetType: "course",
+      targetLabel: "Inclusive language",
+      message: "No non-inclusive terms were flagged across outcomes and assessments.",
+    });
+  }
+
+  // Course-level readability: Flesch-Kincaid grade across all outcome text.
+  const combinedOutcomeText = input.objectives.map((o) => o.text).join(". ");
+  const courseGrade = fleschKincaidGrade(combinedOutcomeText);
+  if (combinedOutcomeText.trim().length > 0) {
+    findings.push(
+      courseGrade > 16
+        ? {
+            id: "read-course-grade",
+            severity: "warn",
+            category: "readability",
+            targetType: "course",
+            targetLabel: "Reading level",
+            message: `Outcomes read above a college-graduate level (Flesch-Kincaid grade ${courseGrade}).`,
+            remediation: "Shorten sentences and prefer plainer words so expectations are accessible to all learners.",
+          }
+        : {
+            id: "read-course-grade",
+            severity: "pass",
+            category: "readability",
+            targetType: "course",
+            targetLabel: "Reading level",
+            message: `Outcomes are at an accessible reading level (Flesch-Kincaid grade ${courseGrade}).`,
+          },
+    );
+  }
+
   // Aggregate scores.
   const categories: RuleCategory[] = [
     "measurability",
@@ -526,6 +733,8 @@ export function evaluateCurriculum(input: CurriculumEvaluationInput): QaReport {
     "assessment",
     "clarity",
     "structure",
+    "readability",
+    "inclusive",
   ];
   const categoryScores: CategoryScore[] = categories.map((category) => {
     const inCat = findings.filter((f) => f.category === category);
