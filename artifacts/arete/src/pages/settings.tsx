@@ -292,56 +292,7 @@ export default function Settings() {
           </div>
         </form>}
 
-        {!adminData?.isAdmin && <Card className="shadow-sm border-border bg-card mt-6">
-          <CardHeader>
-            <CardTitle className="font-serif flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" /> Subscription
-            </CardTitle>
-            <CardDescription>
-              {!billing
-                ? "Loading your plan..."
-                : billing.tier === "pro"
-                  ? billing.inTrial
-                    ? `You're on a Pro trial${trialDaysLeft != null ? ` — ${trialDaysLeft} day${trialDaysLeft === 1 ? "" : "s"} left` : ""}. Pro unlocks unlimited concepts, all four coaches, and weekly retrospectives.`
-                    : "You're on Pro: unlimited concepts, all four coaches, and weekly retrospectives."
-                  : "You're on the Free plan: up to 20 concepts and one coach. Upgrade to Pro for unlimited concepts, all four coaches, and weekly retrospectives."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col sm:flex-row gap-3">
-            {billing && billing.subscriptionStatus !== "active" && (
-              <>
-                <Button
-                  type="button"
-                  className="gap-2"
-                  onClick={() => handleUpgrade("monthly")}
-                  disabled={billingBusy || !billing.stripeEnabled}
-                >
-                  {billingBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  Upgrade — {billing.prices?.monthly?.label ?? "$19 / month"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="gap-2"
-                  onClick={() => handleUpgrade("yearly")}
-                  disabled={billingBusy || !billing.stripeEnabled}
-                >
-                  Yearly — {billing.prices?.yearly?.label ?? "$149 / year"}
-                </Button>
-              </>
-            )}
-            {billing?.hasStripeCustomer && (
-              <Button type="button" variant="outline" className="gap-2" onClick={handleManageBilling} disabled={billingBusy}>
-                <CreditCard className="w-4 h-4" /> Manage billing
-              </Button>
-            )}
-          </CardContent>
-          {billing && !billing.stripeEnabled && billing.subscriptionStatus !== "active" && (
-            <CardContent className="pt-0">
-              <p className="text-xs text-muted-foreground">Billing is not configured in this environment yet.</p>
-            </CardContent>
-          )}
-        </Card>}
+        {!adminData?.isAdmin && <UpgradePanel />}
 
         <Card className="shadow-sm border-border bg-card mt-6">
           <CardHeader>

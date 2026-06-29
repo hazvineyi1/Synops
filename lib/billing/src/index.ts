@@ -114,3 +114,99 @@ export function verifyStripeSignature(
   const b = Buffer.from(v1);
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
+
+// ----------------------------------------------------------------------------
+// Flutterwave (REST, no SDK). Standard hosted-payment flow: create a payment to
+// get a redirect link, the customer pays, we verify the transaction server-side.
+// Amounts here are in MAJOR units (e.g. 19 for $19), unlike Stripe price ids.
+// ----------------------------------------------------------------------------
+
+const FLW_API = "https://api.flutterwave.com/v3";
+
+export function flutterwaveConfigured(): boolean {
+  return !!process.env.FLW_SECRET_KEY;
+}
+
+async function flwFetch(path: string, init: RequestInit): Promise<any> {
+  const key = process.env.FLW_SECRET_KEY;
+  if (!key) throw new Error("Flutterwave is not configured");
+  const res = await fetch(`${FLW_API}/${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  const json: any = await res.json().catch(() => ({}));
+  if (!res.ok || json?.status === "error") {
+    throw new Error(`Flutterwave ${path} failed: ${json?.message ?? res.status}`);
+  }
+  return json;
+}
+
+// Create a hosted payment and return its checkout URL. `amountMajor` is in the
+// currency's main unit (e.g. 250 for ZMW 250). `txRef` must be unique per attempt.
+export async function createFlutterwavePayment(opts: {
+  txRef: string;
+  amountMajor: number;
+  currency: string;
+  customerEmail: string;
+  customerName?: string | null;
+  redirectUrl: string;
+  title?: string;
+  meta?: Record<string, string | number>;
+}): Promise<{ link: string }> {
+  const json = await flwFetch("payments", {
+    method: "POST",
+    body: JSON.stringify({
+      tx_ref: opts.txRef,
+      amount: opts.amountMajor,
+      currency: opts.currency,
+      redirect_url: opts.redirectUrl,
+      customer: { email: opts.customerEmail, name: opts.customerName ?? undefined },
+      meta: opts.meta ?? {},
+      customizations: { title: opts.title ?? "Arete Pro" },
+    }),
+  });
+  const link = json?.data?.link;
+  if (!link) throw new Error("Flutterwave did not return a payment link");
+  return { link };
+}
+
+export type FlutterwaveVerification = {
+  successful: boolean;
+  status: string;
+  amount: number; // major units
+  currency: string;
+  txRef: string | null;
+  transactionId: number | null;
+  customerEmail: string | null;
+  meta: Record<string, any>;
+};
+
+// Verify a transaction by its Flutterwave id (returned on redirect / webhook).
+export async function verifyFlutterwaveTransaction(transactionId: string | number): Promise<FlutterwaveVerification> {
+  const json = await flwFetch(`transactions/${transactionId}/verify`, { method: "GET" });
+  const d = json?.data ?? {};
+  return {
+    successful: d.status === "successful",
+    status: d.status ?? "unknown",
+    amount: Number(d.amount ?? 0),
+    currency: String(d.currency ?? ""),
+    txRef: d.tx_ref ?? null,
+    transactionId: d.id ?? (typeof transactionId === "number" ? transactionId : Number(transactionId)) ?? null,
+    customerEmail: d.customer?.email ?? null,
+    meta: d.meta ?? {},
+  };
+}
+
+// Flutterwave signs webhooks with a static "secret hash" you set in the
+// dashboard; it arrives in the `verif-hash` header and must match exactly.
+export function verifyFlutterwaveWebhook(signatureHeader: string | undefined): boolean {
+  const secret = process.env.FLW_WEBHOOK_HASH;
+  if (!secret || !signatureHeader) return false;
+  const a = Buffer.from(secret);
+  const b = Buffer.from(signatureHeader);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}

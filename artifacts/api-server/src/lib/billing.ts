@@ -8,7 +8,12 @@ export {
   createCheckoutSession,
   createPortalSession,
   verifyStripeSignature,
+  flutterwaveConfigured,
+  createFlutterwavePayment,
+  verifyFlutterwaveTransaction,
+  verifyFlutterwaveWebhook,
 } from "@workspace/billing";
+export type { FlutterwaveVerification } from "@workspace/billing";
 
 // ----------------------------------------------------------------------------
 // Plans & entitlements (product-specific to Arete)
@@ -29,18 +34,25 @@ export type Entitlement = {
 };
 
 // A user is "pro" if they have an active/trialing paid subscription OR are
-// within their free-trial window.
+// within their free-trial window. Stripe subscriptions auto-renew (no expiry is
+// set, the webhook flips status), whereas one-off rails like Flutterwave grant a
+// fixed period via subscriptionExpiresAt — so an expiry in the past means the
+// paid access has lapsed even if the status was never updated.
 export function getEntitlement(user: {
   subscriptionTier?: string | null;
   subscriptionStatus?: string | null;
   trialEndsAt?: Date | null;
+  subscriptionExpiresAt?: Date | null;
 }): Entitlement {
   const now = Date.now();
   const trialEnds = user.trialEndsAt ? new Date(user.trialEndsAt).getTime() : null;
   const inTrialWindow = trialEnds != null && trialEnds > now;
+  const expiresAt = user.subscriptionExpiresAt ? new Date(user.subscriptionExpiresAt).getTime() : null;
+  const notExpired = expiresAt == null || expiresAt > now;
   const paidActive =
     user.subscriptionTier === "pro" &&
-    (user.subscriptionStatus === "active" || user.subscriptionStatus === "trialing");
+    (user.subscriptionStatus === "active" || user.subscriptionStatus === "trialing") &&
+    notExpired;
   const isPro = paidActive || inTrialWindow;
   return {
     tier: isPro ? "pro" : "free",

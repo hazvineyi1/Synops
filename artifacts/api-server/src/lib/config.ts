@@ -67,6 +67,21 @@ export function validateEnv(): void {
     );
   }
 
+  // Flutterwave is optional (regional mobile-money / card rail). The secret key
+  // enables charging; the webhook hash enables server-to-server confirmation.
+  const flwKeys = ["FLW_SECRET_KEY", "FLW_WEBHOOK_HASH"];
+  const flwSet = flwKeys.filter((k) => present(k));
+  if (flwSet.length > 0 && flwSet.length < flwKeys.length) {
+    const flwMissing = flwKeys.filter((k) => !present(k));
+    missing.push(
+      ...flwMissing.map((k) => `${k} (required because other FLW_* vars are set)`),
+    );
+  } else if (flwSet.length === 0) {
+    warnings.push(
+      "Flutterwave is not configured (no FLW_* vars). African mobile-money / card payments are disabled.",
+    );
+  }
+
   // Production-only safety checks.
   if (isProduction) {
     // ENABLE_TEST_LOGIN is a dev-only auth bypass and must never run in prod.

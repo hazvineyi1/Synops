@@ -15,6 +15,9 @@ export const usersTable = pgTable("users", {
   subscriptionStatus: text("subscription_status").notNull().default("none"), // none | trialing | active | past_due | canceled
   subscriptionTier: text("subscription_tier").notNull().default("free"), // free | pro
   trialEndsAt: timestamp("trial_ends_at"), // 7-day free trial of Pro, set on signup
+  // Period end for non-recurring paid access (e.g. Flutterwave/Paynow/manual).
+  // Null for Stripe (auto-renewing) and free users. Past = access lapsed.
+  subscriptionExpiresAt: timestamp("subscription_expires_at"),
   // Referral / distribution loop.
   referralCode: text("referral_code").unique(), // this user's own invite code
   referredBy: text("referred_by"), // userId of the referrer (set once, on claim)
