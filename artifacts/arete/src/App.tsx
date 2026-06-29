@@ -188,6 +188,20 @@ function ProtectedRoute({ component: Component }: { component: any }) {
   );
 }
 
+function AdminRoute() {
+  // The admin console renders its own full-screen shell (no learner AppLayout).
+  return (
+    <>
+      <Show when="signed-in">
+        <Admin />
+      </Show>
+      <Show when="signed-out">
+        <Redirect to="/sign-in" />
+      </Show>
+    </>
+  );
+}
+
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
 
@@ -244,7 +258,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/progress" component={() => <ProtectedRoute component={Progress} />} />
           <Route path="/cohorts" component={() => <ProtectedRoute component={Cohorts} />} />
           <Route path="/settings" component={() => <ProtectedRoute component={Settings} />} />
-          <Route path="/admin" component={() => <ProtectedRoute component={Admin} />} />
+          <Route path="/admin" component={AdminRoute} />
 
           <Route>
             <div className="flex flex-col items-center justify-center min-h-screen">

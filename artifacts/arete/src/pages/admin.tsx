@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { useIsAdmin, useAdminOverview, useAdminUsage, useAdminBreakdown, useAdminUsers, useAdminUserDetail, useAdminLogins, useSuspendUser, useResetProgress } from "@/lib/admin-api";
 import { AccessAudit } from "@/components/admin-access-audit";
 import { AdminAnnouncements } from "@/components/admin-announcements";
+import { AdminShell } from "@/components/admin-shell";
 import { DeveloperSettings } from "@/components/developer-settings";
 import type { AdminOverview, BreakdownItem, AdminUser } from "@/lib/admin-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -175,13 +176,13 @@ export default function Admin() {
   }));
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-y-auto">
+    <AdminShell>
       <div className="p-4 md:p-6 md:px-8 border-b border-border bg-background/95 sticky top-0 z-10">
-        <h1 className="font-serif text-xl md:text-2xl text-primary font-medium">Admin Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Usage, engagement, and what learners are studying.</p>
+        <h1 className="font-serif text-xl md:text-2xl text-primary font-medium">Admin console</h1>
+        <p className="text-sm text-muted-foreground mt-1">Platform overview, students, billing, and configuration.</p>
       </div>
 
-      <div className="p-4 md:p-6 md:px-8 space-y-6 md:space-y-8">
+      <div id="dashboard" className="p-4 md:p-6 md:px-8 space-y-6 md:space-y-8 scroll-mt-4">
         {overviewLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : overview ? (
@@ -260,7 +261,7 @@ export default function Admin() {
           )}
         </div>
 
-        <Card>
+        <Card id="students" className="scroll-mt-4">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-serif flex items-center gap-2"><Globe className="w-4 h-4 text-primary" /> Recent logins</CardTitle>
             <CardDescription>Who signed in, when, from where, and on what (last {logins.length}).</CardDescription>
@@ -376,11 +377,32 @@ export default function Admin() {
         </Card>
       </div>
 
-      <div className="mt-6">
+      <div id="billing" className="p-4 md:px-8 scroll-mt-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-serif flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Billing &amp; pricing</CardTitle>
+            <CardDescription>Subscription mix today. Plan pricing configuration and full revenue reporting arrive with the payments integration.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {overview ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <StatCard icon={Sparkles} label="Pro" value={overview.pro_users} />
+                <StatCard icon={Clock} label="On trial" value={overview.trial_users} />
+                <StatCard icon={Users} label="Total users" value={overview.total_users} />
+                <StatCard icon={Gift} label="Referrals" value={overview.total_referrals} />
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div id="announcements" className="mt-6 p-4 md:px-8 scroll-mt-4">
         <AdminAnnouncements enabled={isAdmin} />
       </div>
 
-      <div className="mt-6">
+      <div id="access" className="mt-6 p-4 md:px-8 scroll-mt-4">
         <AccessAudit
           users={users}
           isSuperAdmin={me?.role === "super_admin"}
@@ -388,7 +410,7 @@ export default function Admin() {
         />
       </div>
 
-      <div className="mt-6">
+      <div id="developers" className="mt-6 p-4 md:px-8 scroll-mt-4">
         <DeveloperSettings />
       </div>
 
@@ -398,7 +420,7 @@ export default function Admin() {
         isSuperAdmin={me?.role === "super_admin"}
         canModerate={me?.role === "moderator" || me?.role === "super_admin"}
       />
-    </div>
+    </AdminShell>
   );
 }
 
