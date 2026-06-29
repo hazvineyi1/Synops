@@ -34,6 +34,7 @@ export interface AuditEntry {
   action: string;
   target_type: string | null;
   target_id: string | null;
+  target_email: string | null;
   metadata: any;
   created_at: string;
 }

@@ -127,8 +127,8 @@ export function AccessAudit({
                     </TableCell>
                     <TableCell className="text-sm">{e.actor_email || e.actor_user_id}</TableCell>
                     <TableCell className="text-sm font-medium">{e.action}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {e.target_id || "—"}
+                    <TableCell className="text-xs text-muted-foreground">
+                      {e.target_email || e.target_id || "—"}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {e.metadata ? JSON.stringify(e.metadata) : "—"}

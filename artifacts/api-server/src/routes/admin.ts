@@ -249,9 +249,16 @@ router.get("/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
 router.get("/admin/audit", requireAuth, requireRole("moderator"), async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 100, 500);
   const result = await db.execute(sql`
-    SELECT id, actor_user_id, actor_email, action, target_type, target_id, metadata, created_at
-    FROM admin_audit_log
-    ORDER BY id DESC
+    SELECT
+      a.id, a.actor_user_id,
+      COALESCE(a.actor_email, au.email) AS actor_email,
+      a.action, a.target_type, a.target_id,
+      tu.email AS target_email,
+      a.metadata, a.created_at
+    FROM admin_audit_log a
+    LEFT JOIN users au ON au.id = a.actor_user_id
+    LEFT JOIN users tu ON tu.id = a.target_id
+    ORDER BY a.id DESC
     LIMIT ${limit}
   `);
   res.json({ entries: result.rows ?? [] });
