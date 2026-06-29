@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useIsAdmin, useAdminOverview, useAdminUsage, useAdminBreakdown, useAdminUsers, useAdminUserDetail, useAdminLogins } from "@/lib/admin-api";
+import { useIsAdmin, useAdminOverview, useAdminUsage, useAdminBreakdown, useAdminUsers, useAdminUserDetail, useAdminLogins, useSuspendUser, useResetProgress } from "@/lib/admin-api";
 import { AccessAudit } from "@/components/admin-access-audit";
 import type { AdminOverview, BreakdownItem, AdminUser } from "@/lib/admin-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Users, Activity, MessageSquare, BookOpen, CheckSquare, ClipboardCheck, Loader2, ShieldAlert, Clock, Building2, Gift, Target, Sparkles, Globe } from "lucide-react";
 import { format, parseISO } from "date-fns";
@@ -371,14 +372,21 @@ export default function Admin() {
         />
       </div>
 
-      <UserDetailDialog user={selectedUser} onClose={() => setSelectedUser(null)} />
+      <UserDetailDialog
+        user={selectedUser}
+        onClose={() => setSelectedUser(null)}
+        isSuperAdmin={me?.role === "super_admin"}
+        canModerate={me?.role === "moderator" || me?.role === "super_admin"}
+      />
     </div>
   );
 }
 
 // Per-learner drill-down: login sessions (times + durations) and progress.
-function UserDetailDialog({ user, onClose }: { user: AdminUser | null; onClose: () => void }) {
+function UserDetailDialog({ user, onClose, isSuperAdmin, canModerate }: { user: AdminUser | null; onClose: () => void; isSuperAdmin: boolean; canModerate: boolean }) {
   const { data, isLoading } = useAdminUserDetail(user?.id ?? null);
+  const suspend = useSuspendUser();
+  const resetProgress = useResetProgress();
   return (
     <Dialog open={!!user} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[640px] max-h-[85vh] overflow-y-auto">
@@ -390,6 +398,49 @@ function UserDetailDialog({ user, onClose }: { user: AdminUser | null; onClose: 
         ) : (
           <div className="space-y-5 text-sm">
             <p className="text-xs text-muted-foreground -mt-2">{user.email} · {planBadge(user.plan)}</p>
+
+            {(canModerate || isSuperAdmin) && (
+              <div className="rounded-md border p-3 space-y-2">
+                <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Admin actions</div>
+                <div className="flex flex-wrap gap-2">
+                  {canModerate && (
+                    <Button
+                      size="sm"
+                      variant={data.banned ? "default" : "destructive"}
+                      disabled={suspend.isPending}
+                      onClick={() => suspend.mutate({ id: user.id, suspend: !data.banned })}
+                    >
+                      {suspend.isPending ? "…" : data.banned ? "Reactivate account" : "Suspend account"}
+                    </Button>
+                  )}
+                  {isSuperAdmin && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={resetProgress.isPending}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Reset ALL learning history for ${user.email}? This permanently deletes concepts, checkpoints, plans, messages and sessions. The account and profile are kept. This cannot be undone.`,
+                          )
+                        ) {
+                          resetProgress.mutate({ id: user.id });
+                        }
+                      }}
+                    >
+                      {resetProgress.isPending ? "Resetting…" : "Reset progress"}
+                    </Button>
+                  )}
+                </div>
+                {data.banned && (
+                  <p className="text-xs text-destructive">This account is currently suspended and cannot sign in.</p>
+                )}
+                {(suspend.isError || resetProgress.isError) && (
+                  <p className="text-xs text-destructive">{((suspend.error || resetProgress.error) as Error)?.message}</p>
+                )}
+                {resetProgress.isSuccess && <p className="text-xs text-primary">Progress reset.</p>}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Stat label="Time spent" value={formatDuration(Number(data.user.total_time_seconds))} icon={Clock} />

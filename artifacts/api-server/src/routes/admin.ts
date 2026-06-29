@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../lib/requireAuth";
 import { requireAdmin, isAdminUser } from "../lib/requireAdmin";
 import { requireRole, logAdminAction, getUserRole, isValidRole } from "../lib/roles";
+import { clerkClient } from "@workspace/identity";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 
@@ -229,8 +230,16 @@ router.get("/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
     res.status(404).json({ error: "User not found" });
     return;
   }
+  let banned = false;
+  try {
+    const cu = await clerkClient.users.getUser(id);
+    banned = !!cu.banned;
+  } catch {
+    // best-effort: clerk lookup failure shouldn't break the detail view
+  }
   res.json({
     user: row,
+    banned,
     sessions: sessions.rows ?? [],
     recentCheckpoints: recentCheckpoints.rows ?? [],
   });
@@ -273,6 +282,77 @@ router.post("/admin/users/:id/role", requireAuth, requireRole("super_admin"), as
     metadata: { from: prev, to: role },
   });
   res.json({ ok: true, role });
+});
+
+// POST /admin/users/:id/suspend - ban the user in Clerk (moderator and above)
+router.post("/admin/users/:id/suspend", requireAuth, requireRole("moderator"), async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    await clerkClient.users.banUser(id);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || "Failed to suspend user" });
+    return;
+  }
+  await logAdminAction({
+    actorUserId: (req as any).userId,
+    action: "user.suspend",
+    targetType: "user",
+    targetId: id,
+  });
+  res.json({ ok: true });
+});
+
+// POST /admin/users/:id/reactivate - unban the user in Clerk (moderator and above)
+router.post("/admin/users/:id/reactivate", requireAuth, requireRole("moderator"), async (req, res) => {
+  const id = String(req.params.id);
+  try {
+    await clerkClient.users.unbanUser(id);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || "Failed to reactivate user" });
+    return;
+  }
+  await logAdminAction({
+    actorUserId: (req as any).userId,
+    action: "user.reactivate",
+    targetType: "user",
+    targetId: id,
+  });
+  res.json({ ok: true });
+});
+
+// POST /admin/users/:id/reset-progress - wipe the learner's learning history in
+// Synops (concepts, checkpoints, plans, messages, retros, sessions). Keeps the
+// account and profile. Destructive + super_admin only. Audited with counts.
+router.post("/admin/users/:id/reset-progress", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const id = String(req.params.id);
+  // All deletes happen in one statement so FK constraints are satisfied at
+  // statement end regardless of CTE evaluation order.
+  const counts = await db.execute(sql`
+    WITH
+      d_ch AS (DELETE FROM checkpoints WHERE user_id = ${id} RETURNING 1),
+      d_re AS (DELETE FROM retrospectives WHERE user_id = ${id} RETURNING 1),
+      d_dp AS (DELETE FROM daily_plans WHERE user_id = ${id} RETURNING 1),
+      d_cm AS (DELETE FROM coach_messages WHERE user_id = ${id} RETURNING 1),
+      d_as AS (DELETE FROM activity_sessions WHERE user_id = ${id} RETURNING 1),
+      d_co AS (DELETE FROM concepts WHERE user_id = ${id} RETURNING 1)
+    SELECT
+      (SELECT count(*) FROM d_ch)::int AS checkpoints,
+      (SELECT count(*) FROM d_re)::int AS retrospectives,
+      (SELECT count(*) FROM d_dp)::int AS daily_plans,
+      (SELECT count(*) FROM d_cm)::int AS coach_messages,
+      (SELECT count(*) FROM d_as)::int AS sessions,
+      (SELECT count(*) FROM d_co)::int AS concepts
+  `);
+  const deleted = (counts.rows ?? [])[0] ?? {};
+  await db.execute(sql`UPDATE users SET assessment_complete = false WHERE id = ${id}`);
+  await logAdminAction({
+    actorUserId: (req as any).userId,
+    action: "progress.reset",
+    targetType: "user",
+    targetId: id,
+    metadata: deleted,
+  });
+  res.json({ ok: true, deleted });
 });
 
 export default router;

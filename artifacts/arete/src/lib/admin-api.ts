@@ -140,6 +140,7 @@ export interface AdminSession {
 
 export interface AdminUserDetail {
   user: Record<string, any>;
+  banned?: boolean;
   sessions: AdminSession[];
   recentCheckpoints: {
     date: string;
@@ -219,6 +220,31 @@ export function useSetUserRole() {
     mutationFn: ({ id, role }: { id: string; role: string }) =>
       adminPost<{ ok: boolean; role: string }>(`/admin/users/${id}/role`, { role }),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "users"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+    },
+  });
+}
+
+export function useSuspendUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, suspend }: { id: string; suspend: boolean }) =>
+      adminPost<{ ok: boolean }>(`/admin/users/${id}/${suspend ? "suspend" : "reactivate"}`, {}),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["admin", "user", v.id] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+    },
+  });
+}
+
+export function useResetProgress() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      adminPost<{ ok: boolean; deleted: Record<string, number> }>(`/admin/users/${id}/reset-progress`, {}),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["admin", "user", v.id] });
       qc.invalidateQueries({ queryKey: ["admin", "users"] });
       qc.invalidateQueries({ queryKey: ["admin", "audit"] });
     },
