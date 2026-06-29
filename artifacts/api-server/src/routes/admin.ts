@@ -362,4 +362,42 @@ router.post("/admin/users/:id/reset-progress", requireAuth, requireRole("super_a
   res.json({ ok: true, deleted });
 });
 
+// POST /admin/users/:id/impersonate - mint a Clerk actor token so a super admin
+// can sign in AS the learner (impersonation). The session carries an "actor"
+// claim (the admin), which drives the impersonation banner and is auditable.
+router.post("/admin/users/:id/impersonate", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const targetId = String(req.params.id);
+  const actorId = (req as any).userId as string;
+  const secret = process.env.CLERK_SECRET_KEY;
+  if (!secret) {
+    res.status(500).json({ error: "Clerk is not configured" });
+    return;
+  }
+  try {
+    const r = await fetch("https://api.clerk.com/v1/actor_tokens", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: targetId,
+        actor: { sub: actorId },
+        expires_in_seconds: 300,
+      }),
+    });
+    const data = (await r.json()) as { token?: string };
+    if (!r.ok || !data.token) {
+      res.status(502).json({ error: "Failed to create impersonation token", details: data });
+      return;
+    }
+    await logAdminAction({
+      actorUserId: actorId,
+      action: "user.impersonate",
+      targetType: "user",
+      targetId,
+    });
+    res.json({ token: data.token });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || "Impersonation failed" });
+  }
+});
+
 export default router;

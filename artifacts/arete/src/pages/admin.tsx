@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useClerk } from "@clerk/react";
+import { useLocation } from "wouter";
 import { useIsAdmin, useAdminOverview, useAdminUsage, useAdminBreakdown, useAdminUsers, useAdminUserDetail, useAdminLogins, useSuspendUser, useResetProgress } from "@/lib/admin-api";
 import { AccessAudit } from "@/components/admin-access-audit";
 import { DeveloperSettings } from "@/components/developer-settings";
@@ -400,6 +402,33 @@ export default function Admin() {
 function UserRowActions({ user, isSuperAdmin, canModerate }: { user: AdminUser; isSuperAdmin: boolean; canModerate: boolean }) {
   const suspend = useSuspendUser();
   const resetProgress = useResetProgress();
+  const clerk = useClerk();
+  const [, setLocation] = useLocation();
+  const [impersonating, setImpersonating] = useState(false);
+  async function impersonate() {
+    setImpersonating(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/impersonate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.token) throw new Error(data.error || "Failed to start impersonation");
+      const signIn = clerk?.client?.signIn;
+      if (!signIn) throw new Error("Auth not ready — try again in a moment");
+      const result = await signIn.create({ strategy: "ticket", ticket: data.token });
+      if (result.status === "complete" && result.createdSessionId) {
+        await clerk.setActive({ session: result.createdSessionId });
+        setLocation("/");
+      } else {
+        throw new Error("Unexpected sign-in status: " + result.status);
+      }
+    } catch (e) {
+      window.alert((e as Error).message);
+      setImpersonating(false);
+    }
+  }
   if (!canModerate && !isSuperAdmin) return null;
   return (
     <DropdownMenu>
@@ -426,7 +455,11 @@ function UserRowActions({ user, isSuperAdmin, canModerate }: { user: AdminUser; 
           </>
         )}
         {isSuperAdmin && (
-          <DropdownMenuItem
+          <>
+            <DropdownMenuItem onClick={impersonate} disabled={impersonating}>
+              {impersonating ? "Starting…" : "View as learner"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
             className="text-destructive focus:text-destructive"
             onClick={() => {
               if (
@@ -440,6 +473,7 @@ function UserRowActions({ user, isSuperAdmin, canModerate }: { user: AdminUser; 
           >
             Reset progress
           </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
