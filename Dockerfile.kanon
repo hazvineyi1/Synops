@@ -1,0 +1,31 @@
+# Kanon (curriculum builder) image. A second Railway service uses this via
+# railway.kanon.json. Builds the Kanon API (esbuild bundle) and the Kanon React
+# frontend, then runs the API, which also serves the built SPA.
+FROM node:24-slim
+
+# Build tools for any native modules.
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+# pnpm 9 (pnpm 10 gates dependency build scripts behind an approval prompt).
+RUN npm install -g pnpm@9
+
+WORKDIR /app
+
+# Copy the whole monorepo.
+COPY . .
+
+# Install all workspace dependencies (lockfile may lag behind package.json).
+RUN pnpm install --no-frozen-lockfile
+
+# Build the Kanon API (esbuild bundle -> artifacts/kanon-api/dist/index.mjs).
+RUN pnpm --filter @workspace/kanon-api run build
+
+# Build the Kanon React frontend. vite.config.ts requires PORT and BASE_PATH at
+# build time; the SPA is served same-origin so no VITE_* runtime keys are needed.
+RUN PORT=8080 BASE_PATH=/ pnpm --filter @workspace/kanon run build
+
+# Railway provides PORT at runtime; the server reads process.env.PORT.
+EXPOSE 8080
+
+# Start the Kanon API, which also serves the built frontend (kanon/dist/public).
+CMD ["node", "--enable-source-maps", "artifacts/kanon-api/dist/index.mjs"]
