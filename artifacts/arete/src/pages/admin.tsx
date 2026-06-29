@@ -5,6 +5,7 @@ import { useIsAdmin, useAdminOverview, useAdminUsage, useAdminBreakdown, useAdmi
 import { AccessAudit } from "@/components/admin-access-audit";
 import { AdminAnnouncements } from "@/components/admin-announcements";
 import { PricingManager } from "@/components/admin-pricing";
+import { PaymentMethodsManager } from "@/components/admin-payment-methods";
 import { AdminShell } from "@/components/admin-shell";
 import { DeveloperSettings } from "@/components/developer-settings";
 import type { AdminOverview, BreakdownItem, AdminUser } from "@/lib/admin-api";
@@ -397,8 +398,9 @@ export default function Admin() {
       )}
 
       {section === "billing" && (
-      <div className="p-4 md:p-6 md:px-8">
+      <div className="p-4 md:p-6 md:px-8 space-y-6">
         <PricingManager enabled={isAdmin} isSuperAdmin={isSuperAdmin} overview={overview} />
+        <PaymentMethodsManager enabled={isAdmin} isSuperAdmin={isSuperAdmin} />
       </div>
       )}
 

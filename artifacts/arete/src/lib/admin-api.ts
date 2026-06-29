@@ -369,3 +369,68 @@ export function useTogglePlan() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "plans"] }),
   });
 }
+
+// ---- Payment methods -------------------------------------------------------
+
+export interface PaymentMethod {
+  id: number;
+  product: string;
+  code: string;
+  label: string;
+  rail: "stripe" | "flutterwave" | "paynow" | "manual";
+  regions: string[];
+  instructions: string | null;
+  active: boolean;
+  sort: number;
+  updated_at: string;
+}
+
+export interface PaymentMethodInput {
+  code: string;
+  label: string;
+  rail: string;
+  regions: string[];
+  instructions: string | null;
+  sort: number;
+}
+
+export function useAdminPaymentMethods(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "payment-methods"],
+    queryFn: () => adminFetch<{ methods: PaymentMethod[] }>("/admin/payment-methods"),
+    enabled,
+  });
+}
+
+export function useCreatePaymentMethod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PaymentMethodInput) =>
+      adminPost<{ ok: boolean; id: number }>("/admin/payment-methods", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+    },
+  });
+}
+
+export function useUpdatePaymentMethod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: PaymentMethodInput }) =>
+      adminPatch<{ ok: boolean }>(`/admin/payment-methods/${id}`, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+    },
+  });
+}
+
+export function useTogglePaymentMethod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
+      adminPost<{ ok: boolean }>(`/admin/payment-methods/${id}/toggle`, { active }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "payment-methods"] }),
+  });
+}

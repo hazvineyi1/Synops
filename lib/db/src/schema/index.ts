@@ -14,3 +14,4 @@ export * from "./activity_sessions";
 export * from "./admin_audit_log";
 export * from "./announcements";
 export * from "./plans";
+export * from "./payment_methods";
