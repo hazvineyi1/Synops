@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Loader2, Save, Globe, Download, Trash2, ShieldCheck, Sparkles, CreditCard, Gift, Copy, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useT, LanguageSwitcher } from "@/lib/i18n";
-import { DeveloperSettings } from "@/components/developer-settings";
 import { useIsAdmin } from "@/lib/admin-api";
 
 export default function Settings() {
@@ -293,7 +292,7 @@ export default function Settings() {
           </div>
         </form>}
 
-        <Card className="shadow-sm border-border bg-card mt-6">
+        {!adminData?.isAdmin && <Card className="shadow-sm border-border bg-card mt-6">
           <CardHeader>
             <CardTitle className="font-serif flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" /> Subscription
@@ -342,9 +341,7 @@ export default function Settings() {
               <p className="text-xs text-muted-foreground">Billing is not configured in this environment yet.</p>
             </CardContent>
           )}
-        </Card>
-
-        {adminData?.isAdmin && <DeveloperSettings />}
+        </Card>}
 
         <Card className="shadow-sm border-border bg-card mt-6">
           <CardHeader>

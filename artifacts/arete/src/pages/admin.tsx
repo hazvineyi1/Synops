@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useIsAdmin, useAdminOverview, useAdminUsage, useAdminBreakdown, useAdminUsers, useAdminUserDetail, useAdminLogins, useSuspendUser, useResetProgress } from "@/lib/admin-api";
 import { AccessAudit } from "@/components/admin-access-audit";
+import { DeveloperSettings } from "@/components/developer-settings";
 import type { AdminOverview, BreakdownItem, AdminUser } from "@/lib/admin-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -378,6 +379,10 @@ export default function Admin() {
           isSuperAdmin={me?.role === "super_admin"}
           enabled={isAdmin}
         />
+      </div>
+
+      <div className="mt-6">
+        <DeveloperSettings />
       </div>
 
       <UserDetailDialog
