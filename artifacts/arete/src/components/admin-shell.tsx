@@ -1,6 +1,7 @@
 import { ReactNode } from "react";
 import { Link } from "wouter";
 import { useClerk } from "@clerk/react";
+import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Users as UsersIcon,
@@ -12,7 +13,7 @@ import {
   LogOut,
 } from "lucide-react";
 
-const adminSections = [
+export const ADMIN_SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "students", label: "Students", icon: UsersIcon },
   { id: "billing", label: "Billing", icon: CreditCard },
@@ -21,9 +22,17 @@ const adminSections = [
   { id: "developers", label: "Developer API", icon: KeyRound },
 ];
 
-// Dedicated admin console layout — its own sidebar and chrome, separate from
-// the learner app. Section links jump to anchored sections in the content.
-export function AdminShell({ children }: { children: ReactNode }) {
+// Dedicated admin console layout — its own sidebar and chrome, separate from the
+// learner app. Each section is a distinct view (only the active one renders).
+export function AdminShell({
+  active,
+  onNavigate,
+  children,
+}: {
+  active: string;
+  onNavigate: (id: string) => void;
+  children: ReactNode;
+}) {
   const { signOut } = useClerk();
   return (
     <div className="flex h-[100dvh] w-full bg-muted/20">
@@ -33,14 +42,20 @@ export function AdminShell({ children }: { children: ReactNode }) {
           <div className="text-[11px] text-muted-foreground">Platform console</div>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-2">
-          {adminSections.map((s) => (
-            <a
+          {ADMIN_SECTIONS.map((s) => (
+            <button
               key={s.id}
-              href={`#${s.id}`}
-              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-foreground hover:bg-muted"
+              type="button"
+              onClick={() => onNavigate(s.id)}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm",
+                active === s.id
+                  ? "bg-primary/10 font-medium text-primary"
+                  : "text-foreground hover:bg-muted",
+              )}
             >
-              <s.icon className="h-4 w-4 text-muted-foreground" /> {s.label}
-            </a>
+              <s.icon className="h-4 w-4" /> {s.label}
+            </button>
           ))}
         </nav>
         <div className="space-y-1 border-t border-border p-2">
@@ -51,6 +66,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <ArrowLeft className="h-4 w-4" /> Open learner app
           </Link>
           <button
+            type="button"
             onClick={() => signOut({ redirectUrl: "/" })}
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted"
           >

@@ -136,6 +136,15 @@ function OverviewGrid({ o }: { o: AdminOverview }) {
   );
 }
 
+const SECTION_TITLES: Record<string, { title: string; subtitle: string }> = {
+  dashboard: { title: "Dashboard", subtitle: "Platform health, activity, and usage at a glance." },
+  students: { title: "Students", subtitle: "Sign-ins, IP addresses, accounts, and per-learner actions." },
+  billing: { title: "Billing", subtitle: "Subscription mix today; pricing config arrives with payments." },
+  announcements: { title: "Announcements", subtitle: "Broadcast messages to learners." },
+  access: { title: "Access & audit", subtitle: "Admin roles and the audit trail of admin actions." },
+  developers: { title: "Developer API", subtitle: "API keys and webhooks for integrations." },
+};
+
 export default function Admin() {
   const { data: me, isLoading: meLoading } = useIsAdmin();
   const isAdmin = !!me?.isAdmin;
@@ -146,6 +155,7 @@ export default function Admin() {
   const { data: users = [], isLoading: usersLoading } = useAdminUsers(isAdmin);
   const { data: logins = [], isLoading: loginsLoading } = useAdminLogins(isAdmin);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [section, setSection] = useState("dashboard");
   const role = me?.role ?? "user";
   const isSuperAdmin = role === "super_admin";
   const canModerate = role === "moderator" || isSuperAdmin;
@@ -176,13 +186,16 @@ export default function Admin() {
   }));
 
   return (
-    <AdminShell>
+    <AdminShell active={section} onNavigate={setSection}>
       <div className="p-4 md:p-6 md:px-8 border-b border-border bg-background/95 sticky top-0 z-10">
-        <h1 className="font-serif text-xl md:text-2xl text-primary font-medium">Admin console</h1>
-        <p className="text-sm text-muted-foreground mt-1">Platform overview, students, billing, and configuration.</p>
+        <h1 className="font-serif text-xl md:text-2xl text-primary font-medium">
+          {SECTION_TITLES[section]?.title ?? "Admin console"}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">{SECTION_TITLES[section]?.subtitle ?? ""}</p>
       </div>
 
-      <div id="dashboard" className="p-4 md:p-6 md:px-8 space-y-6 md:space-y-8 scroll-mt-4">
+      {section === "dashboard" && (
+      <div className="p-4 md:p-6 md:px-8 space-y-6 md:space-y-8">
         {overviewLoading ? (
           <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>
         ) : overview ? (
@@ -260,8 +273,12 @@ export default function Admin() {
             </>
           )}
         </div>
+      </div>
+      )}
 
-        <Card id="students" className="scroll-mt-4">
+      {section === "students" && (
+      <div className="p-4 md:p-6 md:px-8 space-y-6 md:space-y-8">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-serif flex items-center gap-2"><Globe className="w-4 h-4 text-primary" /> Recent logins</CardTitle>
             <CardDescription>Who signed in, when, from where, and on what (last {logins.length}).</CardDescription>
@@ -376,8 +393,10 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+      )}
 
-      <div id="billing" className="p-4 md:px-8 scroll-mt-4">
+      {section === "billing" && (
+      <div className="p-4 md:p-6 md:px-8">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-serif flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Billing &amp; pricing</CardTitle>
@@ -398,21 +417,29 @@ export default function Admin() {
         </Card>
       </div>
 
-      <div id="announcements" className="mt-6 p-4 md:px-8 scroll-mt-4">
+      )}
+
+      {section === "announcements" && (
+      <div className="p-4 md:p-6 md:px-8">
         <AdminAnnouncements enabled={isAdmin} />
       </div>
+      )}
 
-      <div id="access" className="mt-6 p-4 md:px-8 scroll-mt-4">
+      {section === "access" && (
+      <div className="p-4 md:p-6 md:px-8">
         <AccessAudit
           users={users}
           isSuperAdmin={me?.role === "super_admin"}
           enabled={isAdmin}
         />
       </div>
+      )}
 
-      <div id="developers" className="mt-6 p-4 md:px-8 scroll-mt-4">
+      {section === "developers" && (
+      <div className="p-4 md:p-6 md:px-8">
         <DeveloperSettings />
       </div>
+      )}
 
       <UserDetailDialog
         user={selectedUser}
