@@ -14,6 +14,7 @@ import cohortsRouter from "./cohorts";
 import developerRouter from "./developer";
 import v1Router from "./v1";
 import activityRouter from "./activity";
+import announcementsRouter from "./announcements";
 import testLoginRouter from "./test-login";
 import { aiLimiter, authLimiter } from "../middlewares/rateLimit";
 
@@ -40,6 +41,7 @@ router.use(cohortsRouter);
 router.use(developerRouter);
 router.use(v1Router);
 router.use(activityRouter);
+router.use(announcementsRouter);
 
 // Strict limit on the unauthenticated dev test-login endpoint.
 router.use("/test-login", authLimiter);

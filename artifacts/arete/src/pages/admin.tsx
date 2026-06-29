@@ -3,6 +3,7 @@ import { useClerk } from "@clerk/react";
 import { useLocation } from "wouter";
 import { useIsAdmin, useAdminOverview, useAdminUsage, useAdminBreakdown, useAdminUsers, useAdminUserDetail, useAdminLogins, useSuspendUser, useResetProgress } from "@/lib/admin-api";
 import { AccessAudit } from "@/components/admin-access-audit";
+import { AdminAnnouncements } from "@/components/admin-announcements";
 import { DeveloperSettings } from "@/components/developer-settings";
 import type { AdminOverview, BreakdownItem, AdminUser } from "@/lib/admin-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -373,6 +374,10 @@ export default function Admin() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mt-6">
+        <AdminAnnouncements enabled={isAdmin} />
       </div>
 
       <div className="mt-6">

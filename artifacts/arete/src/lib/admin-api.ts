@@ -251,3 +251,43 @@ export function useResetProgress() {
     },
   });
 }
+
+export interface Announcement {
+  id: number;
+  title: string;
+  body: string;
+  audience: string;
+  active: boolean;
+  created_by_email: string | null;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export function useAdminAnnouncements(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin", "announcements"],
+    queryFn: () => adminFetch<{ announcements: Announcement[] }>("/admin/announcements"),
+    enabled,
+  });
+}
+
+export function useCreateAnnouncement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { title: string; body: string; audience: string }) =>
+      adminPost<{ ok: boolean; id: number }>("/admin/announcements", input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "announcements"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+    },
+  });
+}
+
+export function useDeactivateAnnouncement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) =>
+      adminPost<{ ok: boolean }>(`/admin/announcements/${id}/deactivate`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "announcements"] }),
+  });
+}
