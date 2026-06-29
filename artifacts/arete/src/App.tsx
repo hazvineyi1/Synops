@@ -19,6 +19,7 @@ import Developers from "./pages/developers";
 import { Privacy, Terms } from "./pages/legal";
 import { AppLayout } from "./components/layout/app-layout";
 import { LanguageProvider } from "./lib/i18n";
+import { useIsAdmin } from "@/lib/admin-api";
 
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)
   ?? import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -152,11 +153,18 @@ function HeartbeatTracker() {
   return null;
 }
 
+function SignedInHome() {
+  // Admins land in the admin panel; learners land in the coach.
+  const { data: adminData, isLoading } = useIsAdmin();
+  if (isLoading) return null;
+  return <Redirect to={adminData?.isAdmin ? "/admin" : "/coach"} />;
+}
+
 function HomeRedirect() {
   return (
     <>
       <Show when="signed-in">
-        <Redirect to="/coach" />
+        <SignedInHome />
       </Show>
       <Show when="signed-out">
         <Landing />

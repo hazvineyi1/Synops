@@ -210,7 +210,7 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {!adminData?.isAdmin && <form onSubmit={handleSubmit} className="space-y-6">
 
           <Card className="shadow-sm border-border bg-card">
             <CardHeader>
@@ -291,7 +291,7 @@ export default function Settings() {
               {t("set.save")}
             </Button>
           </div>
-        </form>
+        </form>}
 
         <Card className="shadow-sm border-border bg-card mt-6">
           <CardHeader>

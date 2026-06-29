@@ -20,7 +20,7 @@ export function Sidebar() {
   const { t } = useT();
   const { data: adminData } = useIsAdmin();
   const items = adminData?.isAdmin
-    ? [...navItems, { href: "/admin", labelKey: "nav.admin", icon: Shield }]
+    ? [{ href: "/admin", labelKey: "nav.admin", icon: Shield }, ...navItems]
     : navItems;
 
   const handleSignOut = () => {
