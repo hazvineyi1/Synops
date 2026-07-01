@@ -12,9 +12,13 @@ if (!baseURL || !apiKey) {
 
 export const openai = new OpenAI({ baseURL, apiKey });
 
-export const PRIMARY_MODEL = "gpt-5-mini";
+// Served via Anthropic's OpenAI-compatible endpoint (AI_INTEGRATIONS_OPENAI_BASE_URL
+// = https://api.anthropic.com/v1/). Use a Claude model name here, not an OpenAI one.
+// Bump to "claude-sonnet-4-6" for higher-quality tutoring at higher cost.
+export const PRIMARY_MODEL = "claude-haiku-4-5-20251001";
 
-// Approximate USD pricing per 1M tokens for gpt-5-mini. Adjust if pricing changes.
+// Approximate USD pricing per 1M tokens (rough estimate for internal usage tracking
+// only, not user billing; update to current Claude Haiku pricing when convenient).
 // Stored as micro-USD per token for integer math.
 const PROMPT_MICROS_PER_TOKEN = 250; // $0.25 / 1M = 0.00000025 = 250 nano = 0.25 micros per token
 const COMPLETION_MICROS_PER_TOKEN = 2000; // $2.00 / 1M
