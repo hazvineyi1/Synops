@@ -39,6 +39,12 @@ export const studyUsersTable = pgTable("study_users", {
   // optIn must be true for any outbound message to be sent.
   whatsappNumber: text("whatsapp_number"),
   whatsappOptIn: boolean("whatsapp_opt_in").notNull().default(false),
+  // Admin/analytics: last time an authenticated request was seen from this user
+  // (set by the heartbeat tracker). Powers active-user metrics + upgrade targeting.
+  // suspended blocks sign-in; role grants elevated admin scopes.
+  lastActiveAt: timestamp("last_active_at"),
+  suspended: boolean("suspended").notNull().default(false),
+  role: text("role").notNull().default("user"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -802,3 +808,107 @@ export type StudyReferral = typeof studyReferralsTable.$inferSelect;
 export type StudyCommissionEvent = typeof studyCommissionEventsTable.$inferSelect;
 export type StudyPayout = typeof studyPayoutsTable.$inferSelect;
 export type StudyAmbassadorSettings = typeof studyAmbassadorSettingsTable.$inferSelect;
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Admin & analytics (ported from the Arete admin so Coach has the same operator
+// visibility): usage/session telemetry, audit trail, announcements, pricing +
+// payment-method catalogs. Powers the admin console and upgrade targeting.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// A visit/session. The client sends heartbeats while the app is open; a gap longer
+// than the session window starts a new row. startedAt is effectively a login time;
+// (lastSeenAt - startedAt) is the time spent in that session. Captures where/how the
+// visit originated (once, at session start) for geo/device analytics.
+export const studyActivitySessionsTable = pgTable(
+  "study_activity_sessions",
+  {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => studyUsersTable.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    device: text("device"), // parsed "Chrome · Windows · Desktop"
+    country: text("country"),
+    region: text("region"),
+    city: text("city"),
+    entryPath: text("entry_path"), // first path the visit landed on
+  },
+  (t) => ({
+    byUser: index("study_activity_sessions_user_idx").on(t.userId),
+    byStarted: index("study_activity_sessions_started_idx").on(t.startedAt),
+  }),
+);
+
+// Append-only trail of privileged admin actions for accountability.
+export const studyAdminAuditLogTable = pgTable(
+  "study_admin_audit_log",
+  {
+    id: serial("id").primaryKey(),
+    actorUserId: uuid("actor_user_id"),
+    actorEmail: text("actor_email"),
+    action: text("action").notNull(), // user.suspend | plan.update | announcement.create ...
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byCreated: index("study_admin_audit_created_idx").on(t.createdAt),
+  }),
+);
+
+// In-app broadcast messages shown to learners. audience targets a segment; used for
+// upgrade nudges aimed specifically at free users.
+export const studyAnnouncementsTable = pgTable(
+  "study_announcements",
+  {
+    id: serial("id").primaryKey(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    audience: text("audience").notNull().default("all"), // all | free | paid
+    level: text("level").notNull().default("info"), // info | success | warning | promo
+    active: boolean("active").notNull().default(true),
+    createdByEmail: text("created_by_email"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    deactivatedAt: timestamp("deactivated_at"),
+  },
+  (t) => ({
+    byActive: index("study_announcements_active_idx").on(t.active),
+  }),
+);
+
+// Pricing catalog: plan tiers shown on the upgrade page and managed in admin.
+export const studyPlansTable = pgTable("study_plans", {
+  id: serial("id").primaryKey(),
+  key: text("key").unique().notNull(), // free | plus | pro ...
+  name: text("name").notNull(),
+  description: text("description"),
+  priceMinor: integer("price_minor").notNull().default(0), // cents per interval
+  currency: text("currency").notNull().default("USD"),
+  interval: text("interval").notNull().default("month"), // month | year | once
+  features: jsonb("features").$type<string[]>().notNull().default([]),
+  monthlyGenerationCap: integer("monthly_generation_cap"), // null = unlimited
+  active: boolean("active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Which payment methods/gateways are offered, and where. Managed in admin.
+export const studyPaymentMethodsTable = pgTable("study_payment_methods", {
+  id: serial("id").primaryKey(),
+  key: text("key").unique().notNull(), // paynow | flutterwave | stripe | ecocash ...
+  label: text("label").notNull(),
+  provider: text("provider").notNull(),
+  countries: jsonb("countries").$type<string[]>().notNull().default([]),
+  enabled: boolean("enabled").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type StudyActivitySession = typeof studyActivitySessionsTable.$inferSelect;
+export type StudyAnnouncement = typeof studyAnnouncementsTable.$inferSelect;
+export type StudyPlan = typeof studyPlansTable.$inferSelect;
+export type StudyPaymentMethod = typeof studyPaymentMethodsTable.$inferSelect;

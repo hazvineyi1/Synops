@@ -171,6 +171,8 @@ router.get("/me", async (req, res) => {
     email: u.email,
     name: u.name,
     subscriptionStatus: u.subscriptionStatus,
+    subscriptionTier: u.subscriptionTier,
+    isAdmin: u.isAdmin,
     subscriptionCurrentPeriodEnd: u.subscriptionCurrentPeriodEnd?.toISOString() ?? null,
     createdAt: u.createdAt.toISOString(),
   });

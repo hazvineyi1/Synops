@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Link } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,8 +34,24 @@ import StudyUpgrade from "@/pages/StudyUpgrade";
 import StudyAdminCoupons from "@/pages/StudyAdminCoupons";
 import StudyAmbassador from "@/pages/StudyAmbassador";
 import StudyAdminAmbassadors from "@/pages/StudyAdminAmbassadors";
+import StudyAdminConsole from "@/pages/StudyAdminConsole";
+import { studyHeartbeat } from "@/hooks/use-study-api";
 
 const queryClient = new QueryClient();
+
+// Fires a usage heartbeat when an authenticated user navigates or lingers. Powers
+// the activity_sessions telemetry behind the admin analytics + upgrade targeting.
+function HeartbeatTracker() {
+  const { user } = useStudyAuth();
+  const [location] = useLocation();
+  useEffect(() => {
+    if (!user) return;
+    studyHeartbeat(location);
+    const iv = setInterval(() => studyHeartbeat(location), 2 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, [user, location]);
+  return null;
+}
 
 function Protected({ component: Component }: { component: ComponentType }) {
   const { user, loading } = useStudyAuth();
@@ -57,6 +73,21 @@ function Protected({ component: Component }: { component: ComponentType }) {
 
   if (!user) return null;
   return <Component />;
+}
+
+// Small floating entry point to the admin console, shown only to admins.
+function AdminFab() {
+  const { user } = useStudyAuth();
+  const [location] = useLocation();
+  if (!user?.isAdmin || location.startsWith("/admin")) return null;
+  return (
+    <Link
+      href="/admin"
+      className="fixed bottom-4 right-4 z-50 rounded-full bg-primary text-primary-foreground text-xs font-medium px-4 py-2 shadow-lg hover:opacity-90"
+    >
+      Admin
+    </Link>
+  );
 }
 
 function Router() {
@@ -88,6 +119,7 @@ function Router() {
       <Route path="/progress" component={() => <Protected component={StudyProgress} />} />
       <Route path="/upgrade" component={() => <Protected component={StudyUpgrade} />} />
       <Route path="/ambassador" component={() => <Protected component={StudyAmbassador} />} />
+      <Route path="/admin" component={() => <Protected component={StudyAdminConsole} />} />
       <Route path="/admin/coupons" component={() => <Protected component={StudyAdminCoupons} />} />
       <Route path="/admin/ambassadors" component={() => <Protected component={StudyAdminAmbassadors} />} />
       <Route component={NotFound} />
@@ -101,6 +133,8 @@ function App() {
       <TooltipProvider>
         <StudyAuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <HeartbeatTracker />
+            <AdminFab />
             <Router />
           </WouterRouter>
         </StudyAuthProvider>

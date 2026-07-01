@@ -665,3 +665,213 @@ export function useAdminSetAmbassadorStatus() {
       }),
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Admin console: analytics, usage telemetry read-outs, upgrade targeting,
+// announcements, pricing/payments catalogs, audit log, user management.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface AdminOverview {
+  total_users: number; paid_users: number; free_users: number; suspended_users: number;
+  new_users_today: number; new_users_7d: number; new_users_30d: number;
+  active_users_today: number; active_users_7d: number; active_users_30d: number;
+  total_sessions: number; total_time_seconds: number;
+  total_materials: number; total_practice: number; total_exams: number;
+  total_activity_events: number; revenue_minor_paid: number;
+}
+export function useStudyAdminOverview() {
+  return useQuery<AdminOverview, ErrorType<unknown>>({
+    queryKey: ["studyAdminOverview"],
+    queryFn: async () => customFetch<AdminOverview>(`${BASE}/admin/overview`),
+  });
+}
+
+export interface AdminUsagePoint { day: string; new_users: number; events: number; active_users: number; sessions: number; }
+export function useStudyAdminUsage() {
+  return useQuery<AdminUsagePoint[], ErrorType<unknown>>({
+    queryKey: ["studyAdminUsage"],
+    queryFn: async () => customFetch<AdminUsagePoint[]>(`${BASE}/admin/usage`),
+  });
+}
+
+export interface AdminBreakdownItem { key: string | null; count: number; }
+export interface AdminBreakdown {
+  plans: AdminBreakdownItem[]; tiers: AdminBreakdownItem[]; countries: AdminBreakdownItem[];
+  devices: AdminBreakdownItem[]; activities: AdminBreakdownItem[];
+}
+export function useStudyAdminBreakdown() {
+  return useQuery<AdminBreakdown, ErrorType<unknown>>({
+    queryKey: ["studyAdminBreakdown"],
+    queryFn: async () => customFetch<AdminBreakdown>(`${BASE}/admin/breakdown`),
+  });
+}
+
+export interface AdminLoginRow {
+  started_at: string; last_seen_at: string; seconds: number; ip_address: string | null;
+  device: string | null; city: string | null; region: string | null; country: string | null;
+  email: string | null; name: string | null; plan: string;
+}
+export function useStudyAdminLogins() {
+  return useQuery<AdminLoginRow[], ErrorType<unknown>>({
+    queryKey: ["studyAdminLogins"],
+    queryFn: async () => customFetch<AdminLoginRow[]>(`${BASE}/admin/logins`),
+  });
+}
+
+export interface AdminUserRow {
+  id: string; email: string; name: string; subscription_tier: string; subscription_status: string;
+  is_admin: boolean; suspended: boolean; role: string; billing_country: string | null;
+  created_at: string; last_active_at: string | null; is_paid: boolean;
+  session_count: number; total_time_seconds: number; event_count: number;
+  material_count: number; practice_count: number; exam_count: number;
+}
+export function useStudyAdminUsers(q: string) {
+  return useQuery<AdminUserRow[], ErrorType<unknown>>({
+    queryKey: ["studyAdminUsers", q],
+    queryFn: async () =>
+      customFetch<AdminUserRow[]>(`${BASE}/admin/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  });
+}
+
+export interface AdminUserDetail {
+  user: Record<string, unknown>;
+  sessions: Array<Record<string, unknown>>;
+  activity: Array<Record<string, unknown>>;
+  payments: Array<Record<string, unknown>>;
+}
+export function useStudyAdminUserDetail(id: string | null) {
+  return useQuery<AdminUserDetail, ErrorType<unknown>>({
+    queryKey: ["studyAdminUserDetail", id],
+    enabled: !!id,
+    queryFn: async () => customFetch<AdminUserDetail>(`${BASE}/admin/users/${id}`),
+  });
+}
+
+export interface AdminUpgradeTarget {
+  id: string; email: string; name: string; billing_country: string | null;
+  created_at: string; last_active_at: string | null;
+  session_count: number; total_time_seconds: number; event_count: number;
+  material_count: number; practice_count: number;
+  engagement_score: number; days_since_active: number | null;
+}
+export function useStudyAdminUpgradeTargets() {
+  return useQuery<AdminUpgradeTarget[], ErrorType<unknown>>({
+    queryKey: ["studyAdminUpgradeTargets"],
+    queryFn: async () => customFetch<AdminUpgradeTarget[]>(`${BASE}/admin/upgrade-targets`),
+  });
+}
+
+export interface AdminAnnouncement {
+  id: number; title: string; body: string; audience: string; level: string;
+  active: boolean; createdByEmail: string | null; createdAt: string; deactivatedAt: string | null;
+}
+export function useStudyAdminAnnouncements() {
+  return useQuery<{ announcements: AdminAnnouncement[] }, ErrorType<unknown>>({
+    queryKey: ["studyAdminAnnouncements"],
+    queryFn: async () => customFetch<{ announcements: AdminAnnouncement[] }>(`${BASE}/admin/announcements`),
+  });
+}
+export function useStudyCreateAnnouncement() {
+  return useMutation<{ announcement: AdminAnnouncement }, ErrorType<unknown>, { title: string; body: string; audience?: string; level?: string }>({
+    mutationFn: async (data) =>
+      customFetch<{ announcement: AdminAnnouncement }>(`${BASE}/admin/announcements`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      }),
+  });
+}
+export function useStudyUpdateAnnouncement() {
+  return useMutation<{ announcement: AdminAnnouncement }, ErrorType<unknown>, { id: number; active?: boolean; title?: string; body?: string; audience?: string; level?: string }>({
+    mutationFn: async ({ id, ...data }) =>
+      customFetch<{ announcement: AdminAnnouncement }>(`${BASE}/admin/announcements/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      }),
+  });
+}
+
+export interface AdminPlan {
+  id: number; key: string; name: string; description: string | null; priceMinor: number;
+  currency: string; interval: string; features: string[]; monthlyGenerationCap: number | null;
+  active: boolean; sortOrder: number;
+}
+export function useStudyAdminPlans() {
+  return useQuery<{ plans: AdminPlan[] }, ErrorType<unknown>>({
+    queryKey: ["studyAdminPlans"],
+    queryFn: async () => customFetch<{ plans: AdminPlan[] }>(`${BASE}/admin/plans`),
+  });
+}
+export function useStudyCreatePlan() {
+  return useMutation<{ plan: AdminPlan }, ErrorType<unknown>, Partial<AdminPlan>>({
+    mutationFn: async (data) =>
+      customFetch<{ plan: AdminPlan }>(`${BASE}/admin/plans`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      }),
+  });
+}
+export function useStudyUpdatePlan() {
+  return useMutation<{ plan: AdminPlan }, ErrorType<unknown>, { id: number } & Partial<AdminPlan>>({
+    mutationFn: async ({ id, ...data }) =>
+      customFetch<{ plan: AdminPlan }>(`${BASE}/admin/plans/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      }),
+  });
+}
+
+export interface AdminPaymentMethod {
+  id: number; key: string; label: string; provider: string; countries: string[];
+  enabled: boolean; sortOrder: number;
+}
+export function useStudyAdminPaymentMethods() {
+  return useQuery<{ paymentMethods: AdminPaymentMethod[] }, ErrorType<unknown>>({
+    queryKey: ["studyAdminPaymentMethods"],
+    queryFn: async () => customFetch<{ paymentMethods: AdminPaymentMethod[] }>(`${BASE}/admin/payment-methods`),
+  });
+}
+export function useStudyCreatePaymentMethod() {
+  return useMutation<{ paymentMethod: AdminPaymentMethod }, ErrorType<unknown>, Partial<AdminPaymentMethod>>({
+    mutationFn: async (data) =>
+      customFetch<{ paymentMethod: AdminPaymentMethod }>(`${BASE}/admin/payment-methods`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      }),
+  });
+}
+export function useStudyUpdatePaymentMethod() {
+  return useMutation<{ paymentMethod: AdminPaymentMethod }, ErrorType<unknown>, { id: number } & Partial<AdminPaymentMethod>>({
+    mutationFn: async ({ id, ...data }) =>
+      customFetch<{ paymentMethod: AdminPaymentMethod }>(`${BASE}/admin/payment-methods/${id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+      }),
+  });
+}
+
+export interface AdminAuditRow {
+  id: number; actorEmail: string | null; action: string; targetType: string | null;
+  targetId: string | null; metadata: Record<string, unknown> | null; createdAt: string;
+}
+export function useStudyAdminAudit() {
+  return useQuery<{ audit: AdminAuditRow[] }, ErrorType<unknown>>({
+    queryKey: ["studyAdminAudit"],
+    queryFn: async () => customFetch<{ audit: AdminAuditRow[] }>(`${BASE}/admin/audit`),
+  });
+}
+
+export function useStudyAdminUserAction() {
+  return useMutation<{ ok: true }, ErrorType<unknown>, { id: string; action: "suspend" | "reactivate" | "set-admin"; isAdmin?: boolean }>({
+    mutationFn: async ({ id, action, isAdmin }) =>
+      customFetch<{ ok: true }>(`${BASE}/admin/users/${id}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(action === "set-admin" ? { isAdmin } : {}),
+      }),
+  });
+}
+
+// Fire-and-forget usage heartbeat. Best-effort; failures are ignored.
+export function studyHeartbeat(path: string): void {
+  void customFetch(`${BASE}/telemetry/heartbeat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path }),
+  }).catch(() => {
+    /* heartbeat is advisory only */
+  });
+}

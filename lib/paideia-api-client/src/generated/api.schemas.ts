@@ -25,6 +25,8 @@ export interface StudyUser {
   email: string;
   name: string;
   subscriptionStatus: string;
+  subscriptionTier?: string;
+  isAdmin?: boolean;
   /** @nullable */
   subscriptionCurrentPeriodEnd?: string | null;
   createdAt: string;

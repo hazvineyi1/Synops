@@ -16,6 +16,8 @@ import assessmentRouter from "./assessment.js";
 import pathsRouter from "./paths.js";
 import strategyRouter from "./strategy.js";
 import adminRouter from "./admin.js";
+import adminAnalyticsRouter from "./admin-analytics.js";
+import telemetryRouter from "./telemetry.js";
 import notificationsRouter from "./notifications.js";
 import ambassadorRouter from "./ambassador.js";
 
@@ -38,6 +40,8 @@ router.use("/assessments", assessmentRouter);
 router.use("/paths", pathsRouter);
 router.use("/strategy", strategyRouter);
 router.use("/admin", adminRouter);
+router.use("/admin", adminAnalyticsRouter);
+router.use("/telemetry", telemetryRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/ambassador", ambassadorRouter);
 
