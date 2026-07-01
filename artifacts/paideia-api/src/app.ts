@@ -273,8 +273,20 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(reactBuildPath));
-app.get(/^(?!\/api).*/, (_req, res) => {
-  res.sendFile(path.join(reactBuildPath, "index.html"));
+// SPA fallback, per sub-app. Each frontend is a separate single-page app served
+// under its own base path (Coach at /study/, teacher at /app/, marketing at /).
+// A hard load or refresh of a deep client-route (e.g. /study/admin) has no matching
+// static file, so serve the correct sub-app's index.html instead of always falling
+// back to the marketing app (which would 404 on Coach/teacher routes).
+app.get(/^(?!\/api).*/, (req, res) => {
+  const p = req.path;
+  if (p === "/study" || p.startsWith("/study/")) {
+    res.sendFile(path.join(reactBuildPath, "study", "index.html"));
+  } else if (p === "/app" || p.startsWith("/app/")) {
+    res.sendFile(path.join(reactBuildPath, "app", "index.html"));
+  } else {
+    res.sendFile(path.join(reactBuildPath, "index.html"));
+  }
 });
 
 export default app;
