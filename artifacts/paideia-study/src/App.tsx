@@ -35,7 +35,7 @@ import StudyAdminCoupons from "@/pages/StudyAdminCoupons";
 import StudyAmbassador from "@/pages/StudyAmbassador";
 import StudyAdminAmbassadors from "@/pages/StudyAdminAmbassadors";
 import StudyAdminConsole from "@/pages/StudyAdminConsole";
-import { studyHeartbeat } from "@/hooks/use-study-api";
+import { studyHeartbeat, studyStopImpersonating } from "@/hooks/use-study-api";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +73,23 @@ function Protected({ component: Component }: { component: ComponentType }) {
 
   if (!user) return null;
   return <Component />;
+}
+
+// When an admin is impersonating a learner, show a persistent banner with a way
+// back to their own account.
+function ImpersonationBanner() {
+  const { user } = useStudyAuth();
+  if (!user?.impersonating) return null;
+  async function stop() {
+    try { await studyStopImpersonating(); } catch { /* ignore */ }
+    window.location.href = "/study/admin";
+  }
+  return (
+    <div className="fixed top-0 inset-x-0 z-[60] bg-amber-500 text-black text-xs md:text-sm px-3 py-1.5 flex items-center justify-center gap-3">
+      <span>Viewing as <strong>{user.name || user.email}</strong> (impersonating)</span>
+      <button onClick={stop} className="underline font-medium">Stop impersonating</button>
+    </div>
+  );
 }
 
 // Small floating entry point to the admin console, shown only to admins.
@@ -134,6 +151,7 @@ function App() {
         <StudyAuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <HeartbeatTracker />
+            <ImpersonationBanner />
             <AdminFab />
             <Router />
           </WouterRouter>

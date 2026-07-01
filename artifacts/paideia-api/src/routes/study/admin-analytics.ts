@@ -3,19 +3,38 @@
 // and adapted to Coach's study_* schema. Mounted at /admin alongside admin.ts, so
 // it shares the requireStudyAdmin gate. Cross-table analytics use raw SQL because
 // the column set is fixed and known; the simple CRUD uses the query builder.
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
+import { randomBytes, createHash } from "node:crypto";
 import {
   db,
   studyUsersTable,
   studyLearnerProfilesTable,
+  studySessionsTable,
+  studyApiKeysTable,
   studyAnnouncementsTable,
   studyPlansTable,
   studyPaymentMethodsTable,
   studyAdminAuditLogTable,
 } from "@workspace/paideia-db";
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { requireStudyAdmin } from "../../middlewares/auth.js";
-import { hashPassword } from "../../lib/studyAuth.js";
+import {
+  hashPassword,
+  newSessionToken,
+  studySessionExpiry,
+  STUDY_SESSION_COOKIE,
+  STUDY_IMPERSONATOR_COOKIE,
+} from "../../lib/studyAuth.js";
+
+function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env["NODE_ENV"] === "production",
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    path: "/",
+  };
+}
 
 const router: IRouter = Router();
 router.use(requireStudyAdmin);
@@ -470,6 +489,91 @@ router.post("/users/:id/set-admin", async (req, res) => {
     return;
   }
   await writeAudit(req, "user.set_admin", "user", id, { isAdmin: makeAdmin });
+  res.json({ ok: true });
+});
+
+// ─── Impersonation ───────────────────────────────────────────────────────────
+
+// Become another user: mint a fresh session as the target and swap the session
+// cookie, stashing the admin's own token in a second cookie so it can be restored
+// via POST /auth/stop-impersonating. The admin sees exactly what the learner sees.
+router.post("/users/:id/impersonate", async (req, res) => {
+  const targetId = String(req.params.id);
+  if (req.studyUser?.id === targetId) {
+    res.status(400).json({ error: "You are already yourself" });
+    return;
+  }
+  const target = await db
+    .select({ id: studyUsersTable.id })
+    .from(studyUsersTable)
+    .where(eq(studyUsersTable.id, targetId))
+    .limit(1);
+  if (!target[0]) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const adminToken = (req.cookies as Record<string, string> | undefined)?.[STUDY_SESSION_COOKIE];
+  const token = newSessionToken();
+  await db.insert(studySessionsTable).values({ token, userId: targetId, expiresAt: studySessionExpiry() });
+  if (adminToken) res.cookie(STUDY_IMPERSONATOR_COOKIE, adminToken, sessionCookieOptions());
+  res.cookie(STUDY_SESSION_COOKIE, token, sessionCookieOptions());
+  await writeAudit(req, "user.impersonate", "user", targetId, {});
+  res.json({ ok: true });
+});
+
+// ─── Developer API keys ──────────────────────────────────────────────────────
+
+function generateApiKey(): { plaintext: string; hash: string; prefix: string } {
+  const plaintext = `sk_live_${randomBytes(24).toString("base64url")}`;
+  const hash = createHash("sha256").update(plaintext).digest("hex");
+  return { plaintext, hash, prefix: plaintext.slice(0, 14) };
+}
+
+router.get("/api-keys", async (req, res) => {
+  const rows = await db
+    .select({
+      id: studyApiKeysTable.id,
+      name: studyApiKeysTable.name,
+      prefix: studyApiKeysTable.prefix,
+      lastUsedAt: studyApiKeysTable.lastUsedAt,
+      revokedAt: studyApiKeysTable.revokedAt,
+      createdAt: studyApiKeysTable.createdAt,
+    })
+    .from(studyApiKeysTable)
+    .where(eq(studyApiKeysTable.ownerId, req.studyUser?.id ?? ""))
+    .orderBy(desc(studyApiKeysTable.createdAt));
+  res.json({ apiKeys: rows });
+});
+
+router.post("/api-keys", async (req, res) => {
+  const name = String(req.body?.name ?? "").trim() || "Untitled key";
+  const { plaintext, hash, prefix } = generateApiKey();
+  const [row] = await db
+    .insert(studyApiKeysTable)
+    .values({ ownerId: req.studyUser?.id ?? "", name, keyHash: hash, prefix })
+    .returning({
+      id: studyApiKeysTable.id,
+      name: studyApiKeysTable.name,
+      prefix: studyApiKeysTable.prefix,
+      createdAt: studyApiKeysTable.createdAt,
+    });
+  await writeAudit(req, "api_key.create", "api_key", String(row?.id ?? ""), { name });
+  // Return the plaintext ONCE; only its hash is stored.
+  res.status(201).json({ key: plaintext, apiKey: row });
+});
+
+router.delete("/api-keys/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  const updated = await db
+    .update(studyApiKeysTable)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(studyApiKeysTable.id, id), eq(studyApiKeysTable.ownerId, req.studyUser?.id ?? "")))
+    .returning({ id: studyApiKeysTable.id });
+  if (!updated[0]) {
+    res.status(404).json({ error: "Key not found" });
+    return;
+  }
+  await writeAudit(req, "api_key.revoke", "api_key", String(id), {});
   res.json({ ok: true });
 });
 

@@ -908,7 +908,30 @@ export const studyPaymentMethodsTable = pgTable("study_payment_methods", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Developer API keys (integrations). The plaintext key is shown once at creation;
+// only its hash + short prefix are stored. revokedAt disables a key without deleting
+// its audit trail.
+export const studyApiKeysTable = pgTable(
+  "study_api_keys",
+  {
+    id: serial("id").primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => studyUsersTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    keyHash: text("key_hash").notNull(),
+    prefix: text("prefix").notNull(), // first chars, shown in the list for identification
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    byOwner: index("study_api_keys_owner_idx").on(t.ownerId),
+  }),
+);
+
 export type StudyActivitySession = typeof studyActivitySessionsTable.$inferSelect;
 export type StudyAnnouncement = typeof studyAnnouncementsTable.$inferSelect;
 export type StudyPlan = typeof studyPlansTable.$inferSelect;
 export type StudyPaymentMethod = typeof studyPaymentMethodsTable.$inferSelect;
+export type StudyApiKey = typeof studyApiKeysTable.$inferSelect;

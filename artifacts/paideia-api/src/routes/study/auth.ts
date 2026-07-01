@@ -12,6 +12,7 @@ import {
   verifyPassword,
   newSessionToken,
   STUDY_SESSION_COOKIE,
+  STUDY_IMPERSONATOR_COOKIE,
   studySessionExpiry,
 } from "../../lib/studyAuth.js";
 import { requireStudyUser } from "../../middlewares/auth.js";
@@ -173,9 +174,24 @@ router.get("/me", async (req, res) => {
     subscriptionStatus: u.subscriptionStatus,
     subscriptionTier: u.subscriptionTier,
     isAdmin: u.isAdmin,
+    impersonating: !!(req.cookies as Record<string, string> | undefined)?.[STUDY_IMPERSONATOR_COOKIE],
     subscriptionCurrentPeriodEnd: u.subscriptionCurrentPeriodEnd?.toISOString() ?? null,
     createdAt: u.createdAt.toISOString(),
   });
+});
+
+// Return to the admin's own account after impersonating. Restores the stashed admin
+// session token and clears the impersonation cookie. Available to any signed-in user
+// (while impersonating, the caller is the target user, not an admin).
+router.post("/stop-impersonating", requireStudyUser, async (req, res) => {
+  const adminToken = (req.cookies as Record<string, string> | undefined)?.[STUDY_IMPERSONATOR_COOKIE];
+  if (!adminToken) {
+    res.status(400).json({ error: "Not impersonating" });
+    return;
+  }
+  res.cookie(STUDY_SESSION_COOKIE, adminToken, cookieOptions());
+  res.clearCookie(STUDY_IMPERSONATOR_COOKIE, { path: "/", sameSite: "lax" });
+  res.json({ ok: true });
 });
 
 router.post("/logout", async (_req, res) => {

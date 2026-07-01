@@ -22,6 +22,9 @@ export function newSessionToken(): string {
 }
 
 export const STUDY_SESSION_COOKIE = "paideia_study_session";
+// Holds the admin's own session token while they impersonate another user, so
+// "stop impersonating" can restore the original session.
+export const STUDY_IMPERSONATOR_COOKIE = "paideia_study_impersonator";
 export const STUDY_SESSION_TTL_DAYS = 30;
 
 export function studySessionExpiry(): Date {

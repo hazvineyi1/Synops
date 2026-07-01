@@ -727,6 +727,8 @@ components:
           type: string
         isAdmin:
           type: boolean
+        impersonating:
+          type: boolean
         subscriptionCurrentPeriodEnd:
           type: ["string", "null"]
         createdAt:

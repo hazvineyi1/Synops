@@ -27,6 +27,7 @@ export interface StudyUser {
   subscriptionStatus: string;
   subscriptionTier?: string;
   isAdmin?: boolean;
+  impersonating?: boolean;
   /** @nullable */
   subscriptionCurrentPeriodEnd?: string | null;
   createdAt: string;

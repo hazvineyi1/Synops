@@ -887,6 +887,45 @@ export function useStudyAdminDeleteUser() {
   });
 }
 
+export function useStudyAdminImpersonate() {
+  return useMutation<{ ok: true }, ErrorType<unknown>, string>({
+    mutationFn: async (id) =>
+      customFetch<{ ok: true }>(`${BASE}/admin/users/${id}/impersonate`, { method: "POST" }),
+  });
+}
+
+// Restore the admin's own session after impersonating.
+export function studyStopImpersonating(): Promise<unknown> {
+  return customFetch(`${BASE}/auth/stop-impersonating`, { method: "POST" });
+}
+
+export interface AdminApiKey {
+  id: number; name: string; prefix: string;
+  lastUsedAt: string | null; revokedAt: string | null; createdAt: string;
+}
+export function useStudyAdminApiKeys() {
+  return useQuery<{ apiKeys: AdminApiKey[] }, ErrorType<unknown>>({
+    queryKey: ["studyAdminApiKeys"],
+    queryFn: async () => customFetch<{ apiKeys: AdminApiKey[] }>(`${BASE}/admin/api-keys`),
+  });
+}
+export function useStudyCreateApiKey() {
+  return useMutation<{ key: string; apiKey: AdminApiKey }, ErrorType<unknown>, { name: string }>({
+    mutationFn: async (data) =>
+      customFetch<{ key: string; apiKey: AdminApiKey }>(`${BASE}/admin/api-keys`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+  });
+}
+export function useStudyRevokeApiKey() {
+  return useMutation<{ ok: true }, ErrorType<unknown>, number>({
+    mutationFn: async (id) =>
+      customFetch<{ ok: true }>(`${BASE}/admin/api-keys/${id}`, { method: "DELETE" }),
+  });
+}
+
 // Fire-and-forget usage heartbeat. Best-effort; failures are ignored.
 export function studyHeartbeat(path: string): void {
   void customFetch(`${BASE}/telemetry/heartbeat`, {
