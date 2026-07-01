@@ -3,18 +3,23 @@ import { useStudyAuth } from "@/hooks/use-study-auth";
 import {
   LayoutDashboard, BookOpen, TrendingUp,
   LogOut, User, ChevronDown, RotateCcw,
-  MessageCircle, Gift,
+  MessageCircle, Gift, Target, FileText,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
   DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
-// Pared-down nav: only three primary destinations. Everything else lives in
-// the profile dropdown or is reached contextually from the AI-led "Today" flow.
-const TABS = [
+// Primary destinations, always visible in the top bar so every core area of the
+// Coach is one tap away. Secondary items (tutor chat, account, ambassador, restart)
+// live in the profile dropdown.
+type NavTab = { href: string; label: string; icon: typeof LayoutDashboard; match?: string[] };
+const TABS: NavTab[] = [
   { href: "/coach", label: "Today", icon: LayoutDashboard },
   { href: "/materials", label: "Materials", icon: BookOpen, match: ["/materials"] },
+  { href: "/practice", label: "Practice", icon: Target, match: ["/practice"] },
+  { href: "/exams", label: "Exams", icon: FileText, match: ["/exams"] },
+  { href: "/tutor", label: "Tutor", icon: MessageCircle, match: ["/tutor"] },
   { href: "/progress", label: "Progress", icon: TrendingUp },
 ];
 

@@ -6,6 +6,7 @@ import { useStudySubscription, useStudyBillingConfig } from "@/hooks/use-study-a
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowRight, User, Loader2, Check } from "lucide-react";
+import StudyNav from "@/components/StudyNav";
 
 type Personality = "drill" | "socratic" | "warm" | "analyst";
 
@@ -121,12 +122,7 @@ export default function StudyCoach() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="px-6 py-4 flex items-center justify-between border-b border-border/40">
-        <div className="font-serif text-lg tracking-tight">Synops</div>
-        <Button variant="ghost" size="sm" onClick={() => setLoc("/profile")} aria-label="Profile">
-          <User className="h-4 w-4" />
-        </Button>
-      </header>
+      <StudyNav />
 
       <main className="max-w-2xl mx-auto px-6 py-12 md:py-16">
         {/* Coach greeting, the home is a conversation */}
