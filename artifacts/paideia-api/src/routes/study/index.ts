@@ -1,0 +1,44 @@
+import { Router, type IRouter } from "express";
+import authRouter from "./auth.js";
+import materialsRouter from "./materials.js";
+import uploadRouter from "./upload.js";
+import flashcardsRouter from "./flashcards.js";
+import practiceRouter from "./practice.js";
+import examsRouter from "./exams.js";
+import tutorRouter from "./tutor.js";
+import profileRouter from "./profile.js";
+import briefsRouter from "./briefs.js";
+import dashboardRouter from "./dashboard.js";
+import billingRouter from "./billing.js";
+import knowledgeRouter from "./knowledge.js";
+import adaptiveRouter from "./adaptive.js";
+import assessmentRouter from "./assessment.js";
+import pathsRouter from "./paths.js";
+import strategyRouter from "./strategy.js";
+import adminRouter from "./admin.js";
+import notificationsRouter from "./notifications.js";
+import ambassadorRouter from "./ambassador.js";
+
+const router: IRouter = Router();
+
+router.use("/auth", authRouter);
+router.use("/materials/upload", uploadRouter);
+router.use("/materials", materialsRouter);
+router.use("/flashcards", flashcardsRouter);
+router.use("/practice", practiceRouter);
+router.use("/exams", examsRouter);
+router.use("/tutor", tutorRouter);
+router.use("/profile", profileRouter);
+router.use("/briefs", briefsRouter);
+router.use("/dashboard", dashboardRouter);
+router.use("/billing", billingRouter);
+router.use("/knowledge", knowledgeRouter);
+router.use("/adaptive", adaptiveRouter);
+router.use("/assessments", assessmentRouter);
+router.use("/paths", pathsRouter);
+router.use("/strategy", strategyRouter);
+router.use("/admin", adminRouter);
+router.use("/notifications", notificationsRouter);
+router.use("/ambassador", ambassadorRouter);
+
+export default router;

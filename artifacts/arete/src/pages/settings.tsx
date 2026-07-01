@@ -12,6 +12,7 @@ import { Loader2, Save, Globe, Download, Trash2, ShieldCheck, Sparkles, CreditCa
 import { useToast } from "@/hooks/use-toast";
 import { useT, LanguageSwitcher } from "@/lib/i18n";
 import { useIsAdmin } from "@/lib/admin-api";
+import { UpgradePanel } from "@/components/upgrade-panel";
 
 export default function Settings() {
   const { data: profile, isLoading } = useGetProfile();

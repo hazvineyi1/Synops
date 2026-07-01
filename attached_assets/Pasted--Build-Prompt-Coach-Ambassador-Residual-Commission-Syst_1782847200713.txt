@@ -1,0 +1,86 @@
+# Build Prompt — Coach Ambassador Residual Commission System
+
+Paste this into your build agent (Replit Agent, Claude Code, etc.) or hand it to a developer. It specifies a **single-tier, customer-based residual** referral program. The hard constraints at the top are non-negotiable and exist to keep the program legal under South Africa's Consumer Protection Act (s.43) and the equivalent prohibitions in Zimbabwe, Zambia, and Botswana.
+
+> Assumption to confirm: Coach bills customers via subscription and/or coaching packages. The logic below taps residuals against each cleared customer payment, so it works for either — adjust the tenure schedule if Coach is one-off sessions rather than recurring. Replace the placeholder domain with Coach's real URL.
+
+---
+
+## Role & objective
+
+Build an **Ambassador residual-commission system** for Coach (an AI-powered coaching platform, e.g. coach.synops-consulting.com). Ambassadors refer new customers; they earn a recurring percentage of each referred customer's real payments to Coach, for as long as that customer keeps paying. The "residual" tapers over the customer's tenure and is governed by the ambassador's tier. Integrate with the existing Coach backend and billing system.
+
+## HARD CONSTRAINTS (compliance — do not violate or design around)
+
+1. **Commission is paid ONLY on real revenue actually collected from a paying customer.** Never on sign-ups, head-count, or recruitment of other ambassadors.
+2. **Single tier of attribution.** An ambassador earns *only* on customers they personally referred. There is **no downline, no multi-level override, no "people my recruits recruited."** Depth is exactly one: ambassador → customer.
+3. **No joining fee and no required purchase to become an ambassador.** Participation is free.
+4. **No earnings until payment clears the refund/chargeback window.** Pending → confirmed only after the configured holdback period.
+5. **Clawback** any commission already credited if the underlying payment is refunded, charged back, or reversed.
+6. If any requested feature would make commission depend on recruitment rather than real sales, **stop and flag it** rather than implementing it.
+
+## Core commission logic
+
+- Each customer is attributed to at most one ambassador via a referral code / `?ref=CODE` link captured at sign-up.
+- On each successful, cleared payment from an attributed customer, credit the ambassador a percentage of that payment per the **tapering schedule** below.
+- The percentage declines with the **customer's tenure** (months since that customer's first payment), not with any recruitment chain.
+
+### Tapering schedule (configurable, admin-editable)
+
+Default schedule, applied per referred customer based on their months of active payment:
+
+| Customer tenure | Residual rate |
+|---|---|
+| Months 1–3 | 20% |
+| Months 4–12 | 10% |
+| Month 13+ | 5% |
+
+### Ambassador tiers (configurable)
+
+- **Standard:** residual stops after a configurable cap (default 12 months per customer).
+- **Lifetime:** residual continues at the month-13+ rate for as long as the customer pays (no cap). Reserved for ambassadors who meet a performance threshold the admin sets (e.g., X confirmed active referrals).
+- Tier and cap values are admin-configurable; never hard-code them.
+
+## Payouts
+
+- Track per ambassador: **lifetime earned**, **total paid out**, and **available balance** (confirmed, not yet paid).
+- Cash-out unlocks at every **$20 mark**. Ambassador can withdraw the largest whole multiple of $20 in their available balance; the remainder rolls over.
+- Payout methods suitable for Southern Africa: **EcoCash, M-Pesa, Mukuru, bank transfer** (admin-configurable list). Store the ambassador's chosen method and handle/number.
+- Each payout creates an immutable record (amount, method, date, status). Support payout states: requested → processing → paid / failed.
+- On clawback that pushes a balance negative, net it against future earnings (configurable).
+
+## Data model (adapt to existing schema)
+
+- `ambassadors` (id, name, referral_code, tier, payout_method, payout_handle, created_at)
+- `referrals` (id, ambassador_id, customer_id, attributed_at, status)  — status: pending | active | churned
+- `commission_events` (id, referral_id, source_payment_id, gross_payment, rate_applied, amount, customer_tenure_month, state)  — state: pending | confirmed | clawed_back | paid
+- `payouts` (id, ambassador_id, amount, method, handle, status, requested_at, settled_at)
+
+Derive balances from `commission_events` and `payouts`; do not store mutable running totals as source of truth.
+
+## Ambassador dashboard (UI)
+
+- Hero: available-to-cash-out balance, with a clear "every $20 unlocks a payout" progress indicator and a **Cash out** button (disabled below $20).
+- Referral link/code with copy action.
+- List of referred customers showing tenure month and current residual rate per customer.
+- Recent commission events and full payout history.
+- A compliance footnote stating commission is earned only on paid subscriptions/packages, single tier, with no joining fee.
+
+## Admin panel
+
+- Edit the tapering schedule, tier definitions, per-tier caps, refund holdback period, payout-method list, and the performance threshold for Lifetime tier.
+- View per-ambassador ledgers, approve/process payouts, and trigger/inspect clawbacks.
+
+## Acceptance criteria
+
+- No code path credits commission on the act of signing up an ambassador or referring another ambassador.
+- A refunded payment reliably reverses its commission event.
+- Cash-out only ever releases whole $20 increments from *confirmed* balance.
+- All rates, caps, tiers, and holdback windows are configurable without code changes.
+- Balances are reproducible from the event ledger.
+
+## Out of scope (explicitly do NOT build)
+
+- Multi-level / downline overrides of any depth.
+- Recruitment bonuses or pay-to-join mechanics.
+- Any "earn for adding more people" logic.

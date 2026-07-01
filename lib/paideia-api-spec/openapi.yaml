@@ -1,0 +1,1626 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: study-auth
+    description: Study app authentication
+  - name: study-materials
+    description: Study material ingestion
+  - name: study-concepts
+    description: AI-extracted concepts
+  - name: study-flashcards
+    description: Spaced repetition flashcards
+  - name: study-practice
+    description: Adaptive practice sessions
+  - name: study-exams
+    description: Mock exams
+  - name: study-tutor
+    description: AI Socratic tutor
+  - name: study-profile
+    description: Learner profile
+  - name: study-briefs
+    description: Weekly progress briefs
+  - name: study-dashboard
+    description: Dashboard summaries
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ─── Study Auth ───
+  /study/auth/signup:
+    post:
+      operationId: studySignup
+      tags: [study-auth]
+      summary: Sign up as an independent learner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyUserSignup"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyAuthResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyError"
+        "409":
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyError"
+
+  /study/auth/login:
+    post:
+      operationId: studyLogin
+      tags: [study-auth]
+      summary: Log in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyUserLogin"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyAuthResult"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyError"
+
+  /study/auth/me:
+    get:
+      operationId: studyGetMe
+      tags: [study-auth]
+      summary: Get current learner
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyUser"
+        "401":
+          description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyError"
+
+  /study/auth/logout:
+    post:
+      operationId: studyLogout
+      tags: [study-auth]
+      summary: Log out
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySuccess"
+
+  # ─── Study Materials ───
+  /study/materials:
+    get:
+      operationId: listStudyMaterials
+      tags: [study-materials]
+      summary: List learner's study materials
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudyMaterial"
+    post:
+      operationId: createStudyMaterial
+      tags: [study-materials]
+      summary: Ingest new study material
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyMaterialInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyMaterial"
+
+  /study/materials/{materialId}:
+    get:
+      operationId: getStudyMaterial
+      tags: [study-materials]
+      summary: Get a single material
+      parameters:
+        - name: materialId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyMaterial"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyError"
+    delete:
+      operationId: deleteStudyMaterial
+      tags: [study-materials]
+      summary: Delete a material and its concepts/flashcards
+      parameters:
+        - name: materialId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySuccess"
+
+  /study/materials/{materialId}/concepts:
+    get:
+      operationId: listStudyConcepts
+      tags: [study-concepts]
+      summary: Get AI-extracted concepts for a material
+      parameters:
+        - name: materialId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudyConcept"
+
+  # ─── Study Flashcards ───
+  /study/flashcards:
+    get:
+      operationId: listStudyFlashcards
+      tags: [study-flashcards]
+      summary: List all flashcards for the learner
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudyFlashcard"
+    post:
+      operationId: createStudyFlashcard
+      tags: [study-flashcards]
+      summary: Create a flashcard manually or from a concept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyFlashcardInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyFlashcard"
+
+  /study/flashcards/{flashcardId}:
+    patch:
+      operationId: updateStudyFlashcard
+      tags: [study-flashcards]
+      summary: Update a flashcard
+      parameters:
+        - name: flashcardId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyFlashcardUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyFlashcard"
+    delete:
+      operationId: deleteStudyFlashcard
+      tags: [study-flashcards]
+      summary: Delete a flashcard
+      parameters:
+        - name: flashcardId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySuccess"
+
+  /study/flashcards/review-queue:
+    get:
+      operationId: getStudyReviewQueue
+      tags: [study-flashcards]
+      summary: Get flashcards due for review today
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyReviewQueue"
+
+  /study/flashcards/{flashcardId}/review:
+    post:
+      operationId: reviewStudyFlashcard
+      tags: [study-flashcards]
+      summary: Submit a review result (SM-2)
+      parameters:
+        - name: flashcardId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyReviewInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyFlashcard"
+
+  # ─── Study Practice ───
+  /study/practice:
+    post:
+      operationId: createStudyPractice
+      tags: [study-practice]
+      summary: Start an adaptive practice session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyPracticeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyPracticeSession"
+
+  /study/practice/{sessionId}:
+    get:
+      operationId: getStudyPractice
+      tags: [study-practice]
+      summary: Get practice session details
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyPracticeSession"
+
+  /study/practice/{sessionId}/answer:
+    post:
+      operationId: answerStudyPractice
+      tags: [study-practice]
+      summary: Submit an answer and get next question
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyPracticeAnswer"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyPracticeAnswerResult"
+
+  # ─── Study Exams ───
+  /study/exams:
+    get:
+      operationId: listStudyExams
+      tags: [study-exams]
+      summary: List mock exams
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudyMockExam"
+    post:
+      operationId: createStudyExam
+      tags: [study-exams]
+      summary: Generate a mock exam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyMockExamInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyMockExam"
+
+  /study/exams/{examId}:
+    get:
+      operationId: getStudyExam
+      tags: [study-exams]
+      summary: Get exam details
+      parameters:
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyMockExam"
+
+  /study/exams/{examId}/submit:
+    post:
+      operationId: submitStudyExam
+      tags: [study-exams]
+      summary: Submit completed exam for grading
+      parameters:
+        - name: examId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyMockExamSubmit"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyMockExamResult"
+
+  # ─── Study Tutor ───
+  /study/tutor/conversations:
+    get:
+      operationId: listStudyTutorConversations
+      tags: [study-tutor]
+      summary: List tutor conversations
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudyTutorConversation"
+    post:
+      operationId: createStudyTutorConversation
+      tags: [study-tutor]
+      summary: Start a new tutor conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyTutorConversationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyTutorConversation"
+
+  /study/tutor/conversations/{conversationId}:
+    get:
+      operationId: getStudyTutorConversation
+      tags: [study-tutor]
+      summary: Get conversation with messages
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyTutorConversationDetail"
+    delete:
+      operationId: deleteStudyTutorConversation
+      tags: [study-tutor]
+      summary: Delete a conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySuccess"
+
+  /study/tutor/conversations/{conversationId}/messages:
+    post:
+      operationId: sendStudyTutorMessage
+      tags: [study-tutor]
+      summary: Send a message to the tutor
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyTutorMessageInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyTutorMessage"
+
+  # ─── Study Profile ───
+  /study/profile:
+    get:
+      operationId: getStudyProfile
+      tags: [study-profile]
+      summary: Get learner profile
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyLearnerProfile"
+    patch:
+      operationId: updateStudyProfile
+      tags: [study-profile]
+      summary: Update learner profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyLearnerProfileUpdate"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyLearnerProfile"
+
+  # ─── Study Briefs ───
+  /study/briefs:
+    get:
+      operationId: listStudyBriefs
+      tags: [study-briefs]
+      summary: List weekly briefs
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudyWeeklyBrief"
+
+  /study/briefs/latest:
+    get:
+      operationId: getStudyLatestBrief
+      tags: [study-briefs]
+      summary: Get the latest weekly brief
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyWeeklyBrief"
+
+  # ─── Study Dashboard ───
+  /study/dashboard:
+    get:
+      operationId: getStudyDashboard
+      tags: [study-dashboard]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyDashboard"
+
+  # ─── Study Billing ───
+  /study/billing/checkout:
+    post:
+      operationId: createStudyCheckout
+      tags: [study-auth]
+      summary: Create Stripe checkout session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyCheckoutInput"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyCheckoutResult"
+
+  /study/billing/portal:
+    post:
+      operationId: createStudyPortal
+      tags: [study-auth]
+      summary: Create Stripe customer portal session
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyPortalResult"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    StudyError:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: object
+      required:
+        - error
+
+    StudySuccess:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    StudyUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        subscriptionStatus:
+          type: string
+        subscriptionCurrentPeriodEnd:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - email
+        - name
+        - subscriptionStatus
+        - createdAt
+
+    StudyUserSignup:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+          minLength: 1
+      required:
+        - email
+        - password
+        - name
+
+    StudyUserLogin:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    StudyAuthResult:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/StudyUser"
+        message:
+          type: string
+      required:
+        - user
+
+    StudyMaterial:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        sourceType:
+          type: string
+        sourceUrl:
+          type: ["string", "null"]
+        contentText:
+          type: string
+        conceptCount:
+          type: integer
+        flashcardCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - title
+        - sourceType
+        - contentText
+        - conceptCount
+        - flashcardCount
+        - createdAt
+
+    StudyMaterialInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        sourceType:
+          type: string
+          enum: [paste, url, file]
+        sourceUrl:
+          type: ["string", "null"]
+        contentText:
+          type: string
+          minLength: 1
+      required:
+        - title
+        - sourceType
+        - contentText
+
+    StudyConcept:
+      type: object
+      properties:
+        id:
+          type: string
+        materialId:
+          type: string
+        title:
+          type: string
+        explanation:
+          type: string
+        difficulty:
+          type: string
+        keyTerms:
+          type: array
+          items:
+            type: string
+        relatedConceptIds:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+        visualSvg:
+          type: string
+          nullable: true
+      required:
+        - id
+        - materialId
+        - title
+        - explanation
+        - difficulty
+        - keyTerms
+        - relatedConceptIds
+        - createdAt
+
+    StudyFlashcard:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        materialId:
+          type: ["string", "null"]
+        conceptId:
+          type: ["string", "null"]
+        front:
+          type: string
+        back:
+          type: string
+        hint:
+          type: ["string", "null"]
+        intervalDays:
+          type: number
+        repetitions:
+          type: integer
+        easeFactor:
+          type: number
+        nextReviewAt:
+          type: ["string", "null"]
+        lastReviewedAt:
+          type: ["string", "null"]
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - front
+        - back
+        - intervalDays
+        - repetitions
+        - easeFactor
+        - reviewCount
+        - createdAt
+
+    StudyFlashcardInput:
+      type: object
+      properties:
+        materialId:
+          type: ["string", "null"]
+        conceptId:
+          type: ["string", "null"]
+        front:
+          type: string
+          minLength: 1
+        back:
+          type: string
+          minLength: 1
+        hint:
+          type: ["string", "null"]
+      required:
+        - front
+        - back
+
+    StudyFlashcardUpdate:
+      type: object
+      properties:
+        front:
+          type: string
+        back:
+          type: string
+        hint:
+          type: ["string", "null"]
+      required: []
+
+    StudyReviewQueue:
+      type: object
+      properties:
+        dueToday:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudyFlashcard"
+        newCards:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudyFlashcard"
+        totalDue:
+          type: integer
+        streakDays:
+          type: integer
+      required:
+        - dueToday
+        - newCards
+        - totalDue
+        - streakDays
+
+    StudyReviewInput:
+      type: object
+      properties:
+        quality:
+          type: integer
+          minimum: 0
+          maximum: 5
+          description: SM-2 quality rating (0=complete blackout, 5=perfect)
+      required:
+        - quality
+
+    StudyPracticeInput:
+      type: object
+      properties:
+        materialId:
+          type: ["string", "null"]
+        conceptIds:
+          type: array
+          items:
+            type: string
+        questionCount:
+          type: integer
+          default: 10
+        difficulty:
+          type: string
+          enum: [easy, medium, hard, mixed]
+          default: mixed
+      required: []
+
+    StudyPracticeSession:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        materialId:
+          type: ["string", "null"]
+        status:
+          type: string
+        questionCount:
+          type: integer
+        answeredCount:
+          type: integer
+        correctCount:
+          type: integer
+        currentQuestion:
+          $ref: "#/components/schemas/StudyPracticeQuestion"
+        startedAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - status
+        - questionCount
+        - answeredCount
+        - correctCount
+        - startedAt
+        - createdAt
+
+    StudyPracticeQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        prompt:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctOptionIndex:
+          type: integer
+        explanation:
+          type: string
+        conceptId:
+          type: ["string", "null"]
+        difficulty:
+          type: string
+      required:
+        - id
+        - prompt
+        - options
+        - correctOptionIndex
+        - explanation
+        - difficulty
+
+    StudyPracticeAnswer:
+      type: object
+      properties:
+        questionId:
+          type: string
+        selectedOptionIndex:
+          type: integer
+        confidence:
+          type: integer
+          minimum: 1
+          maximum: 5
+      required:
+        - questionId
+        - selectedOptionIndex
+        - confidence
+
+    StudyPracticeAnswerResult:
+      type: object
+      properties:
+        correct:
+          type: boolean
+        correctOptionIndex:
+          type: integer
+        explanation:
+          type: string
+        nextQuestion:
+          $ref: "#/components/schemas/StudyPracticeQuestion"
+        sessionComplete:
+          type: boolean
+        sessionSummary:
+          $ref: "#/components/schemas/StudyPracticeSummary"
+      required:
+        - correct
+        - correctOptionIndex
+        - explanation
+        - sessionComplete
+
+    StudyPracticeSummary:
+      type: object
+      properties:
+        totalQuestions:
+          type: integer
+        correctCount:
+          type: integer
+        accuracy:
+          type: number
+        weakConcepts:
+          type: array
+          items:
+            type: string
+        strongConcepts:
+          type: array
+          items:
+            type: string
+        timeSeconds:
+          type: integer
+      required:
+        - totalQuestions
+        - correctCount
+        - accuracy
+        - weakConcepts
+        - strongConcepts
+        - timeSeconds
+
+    StudyMockExam:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        materialId:
+          type: ["string", "null"]
+        questionCount:
+          type: integer
+        timeLimitMinutes:
+          type: integer
+        status:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudyMockExamQuestion"
+        score:
+          type: ["number", "null"]
+        maxScore:
+          type: ["integer", "null"]
+        completedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - title
+        - questionCount
+        - timeLimitMinutes
+        - status
+        - questions
+        - createdAt
+
+    StudyMockExamQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        prompt:
+          type: string
+        format:
+          type: string
+          enum: [multiple-choice, short-answer, essay, fact-pattern]
+        options:
+          type: array
+          items:
+            type: string
+        correctOptionIndex:
+          type: integer
+        explanation:
+          type: string
+        modelAnswer:
+          type: string
+        scoringPoints:
+          type: array
+          items:
+            type: string
+        conceptId:
+          type: ["string", "null"]
+        points:
+          type: integer
+      required:
+        - id
+        - prompt
+        - points
+
+    StudyMockExamInput:
+      type: object
+      properties:
+        title:
+          type: string
+        materialId:
+          type: ["string", "null"]
+        conceptIds:
+          type: array
+          items:
+            type: string
+        questionCount:
+          type: integer
+          default: 20
+        timeLimitMinutes:
+          type: integer
+          default: 30
+        format:
+          type: string
+          enum: [multiple-choice, short-answer, essay, fact-pattern]
+          default: multiple-choice
+      required: []
+
+    StudyMockExamSubmit:
+      type: object
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId:
+                type: string
+              selectedOptionIndex:
+                type: integer
+              freeformAnswer:
+                type: string
+            required:
+              - questionId
+        timeSpentSeconds:
+          type: integer
+      required:
+        - answers
+        - timeSpentSeconds
+
+    StudyMockExamResult:
+      type: object
+      properties:
+        score:
+          type: number
+        maxScore:
+          type: integer
+        percentage:
+          type: number
+        correctCount:
+          type: integer
+        timeSpentSeconds:
+          type: integer
+        conceptBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudyConceptBreakdown"
+      required:
+        - score
+        - maxScore
+        - percentage
+        - correctCount
+        - timeSpentSeconds
+        - conceptBreakdown
+
+    StudyConceptBreakdown:
+      type: object
+      properties:
+        conceptId:
+          type: string
+        conceptTitle:
+          type: string
+        correct:
+          type: integer
+        total:
+          type: integer
+        percentage:
+          type: number
+      required:
+        - conceptId
+        - conceptTitle
+        - correct
+        - total
+        - percentage
+
+    StudyTutorConversation:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        socraticMode:
+          type: boolean
+        scope:
+          type: string
+        scopeRefId:
+          type: ["string", "null"]
+        messageCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - userId
+        - title
+        - socraticMode
+        - scope
+        - messageCount
+        - createdAt
+        - updatedAt
+
+    StudyTutorConversationInput:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        socraticMode:
+          type: boolean
+          default: false
+        scope:
+          type: string
+          enum: [all_material, specific_material]
+          default: all_material
+        scopeRefId:
+          type: ["string", "null"]
+      required:
+        - title
+
+    StudyTutorConversationDetail:
+      type: object
+      properties:
+        conversation:
+          $ref: "#/components/schemas/StudyTutorConversation"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudyTutorMessage"
+      required:
+        - conversation
+        - messages
+
+    StudyTutorMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        citations:
+          type: array
+          items:
+            type: object
+            properties:
+              type:
+                type: string
+              title:
+                type: string
+              url:
+                type: ["string", "null"]
+            required:
+              - type
+              - title
+        usedPersonalization:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - role
+        - content
+        - createdAt
+
+    StudyTutorMessageInput:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+      required:
+        - content
+
+    LearningProfile:
+      type: object
+      description: "Evidence-based cognitive profile (schemaVersion 1). NOT VARK / learning-styles. Treat as a soft prior, not a fixed label."
+      properties:
+        schemaVersion:
+          type: integer
+          enum: [1]
+        processingStyle:
+          type: string
+          enum: [sequential, conceptual, mixed]
+        pace:
+          type: string
+          enum: [quick, moderate, deliberate]
+        strengthByQuestionType:
+          type: object
+          properties:
+            recall:
+              type: number
+            comprehension:
+              type: number
+            application:
+              type: number
+          required: [recall, comprehension, application]
+        confidencePattern:
+          type: string
+          enum: [improving, fatiguing, consistent]
+        inferenceConfidence:
+          type: string
+          enum: [low, developing, moderate, strong]
+        sampleSize:
+          type: integer
+      required:
+        - schemaVersion
+        - processingStyle
+        - pace
+        - strengthByQuestionType
+        - confidencePattern
+        - inferenceConfidence
+        - sampleSize
+
+    StudyLearnerProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        goals:
+          type: array
+          items:
+            type: string
+        examTarget:
+          type: ["string", "null"]
+        studyStyle:
+          type: string
+        preferredSessionLength:
+          type: integer
+        preferredDifficulty:
+          type: string
+        weakAreas:
+          type: array
+          items:
+            type: string
+        strongAreas:
+          type: array
+          items:
+            type: string
+        interests:
+          type: array
+          items:
+            type: string
+        background:
+          type: ["string", "null"]
+        dailyStudyMinutes:
+          type: integer
+        timezone:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+        learningProfile:
+          oneOf:
+            - $ref: "#/components/schemas/LearningProfile"
+            - type: "null"
+          description: "Latest completed assessment's canonical cognitive profile, or null if no assessment is completed yet."
+      required:
+        - id
+        - userId
+        - goals
+        - studyStyle
+        - preferredSessionLength
+        - preferredDifficulty
+        - weakAreas
+        - strongAreas
+        - interests
+        - dailyStudyMinutes
+        - createdAt
+        - updatedAt
+
+    StudyLearnerProfileUpdate:
+      type: object
+      properties:
+        goals:
+          type: array
+          items:
+            type: string
+        examTarget:
+          type: ["string", "null"]
+        studyStyle:
+          type: string
+        preferredSessionLength:
+          type: integer
+        preferredDifficulty:
+          type: string
+        interests:
+          type: array
+          items:
+            type: string
+        background:
+          type: ["string", "null"]
+        dailyStudyMinutes:
+          type: integer
+        timezone:
+          type: ["string", "null"]
+      required: []
+
+    StudyWeeklyBrief:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        weekStart:
+          type: string
+        weekEnd:
+          type: string
+        flashcardsReviewed:
+          type: integer
+        practiceSessionsCompleted:
+          type: integer
+        mockExamsTaken:
+          type: integer
+        averageAccuracy:
+          type: number
+        tutorConversations:
+          type: integer
+        newConceptsMastered:
+          type: integer
+        weakAreas:
+          type: array
+          items:
+            type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        aiSummary:
+          type: string
+        generatedAt:
+          type: string
+      required:
+        - id
+        - userId
+        - weekStart
+        - weekEnd
+        - flashcardsReviewed
+        - practiceSessionsCompleted
+        - mockExamsTaken
+        - averageAccuracy
+        - tutorConversations
+        - newConceptsMastered
+        - weakAreas
+        - recommendations
+        - aiSummary
+        - generatedAt
+
+    StudyDashboard:
+      type: object
+      properties:
+        materialCount:
+          type: integer
+        conceptCount:
+          type: integer
+        flashcardCount:
+          type: integer
+        dueFlashcards:
+          type: integer
+        currentStreak:
+          type: integer
+        longestStreak:
+          type: integer
+        practiceSessionsThisWeek:
+          type: integer
+        mockExamsTaken:
+          type: integer
+        averageAccuracy:
+          type: number
+        tutorMessagesThisWeek:
+          type: integer
+        subscriptionStatus:
+          type: string
+        subscriptionExpiresAt:
+          type: ["string", "null"]
+      required:
+        - materialCount
+        - conceptCount
+        - flashcardCount
+        - dueFlashcards
+        - currentStreak
+        - longestStreak
+        - practiceSessionsThisWeek
+        - mockExamsTaken
+        - averageAccuracy
+        - tutorMessagesThisWeek
+        - subscriptionStatus
+
+    StudyCheckoutInput:
+      type: object
+      properties:
+        priceId:
+          type: string
+        successUrl:
+          type: string
+        cancelUrl:
+          type: string
+      required:
+        - priceId
+        - successUrl
+        - cancelUrl
+
+    StudyCheckoutResult:
+      type: object
+      properties:
+        sessionId:
+          type: string
+        url:
+          type: string
+      required:
+        - sessionId
+        - url
+
+    StudyPortalResult:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url

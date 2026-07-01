@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/study/"
+title = "Synops Coach"
+version = "1.0.0"
+id = "artifacts/paideia-study"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/study/" ]
+localPort = 25565
+
+[services.development]
+run = "pnpm --filter @workspace/paideia-study run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/paideia-study", "run", "build" ]
+publicDir = "artifacts/paideia-study/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25565"
+BASE_PATH = "/study/"

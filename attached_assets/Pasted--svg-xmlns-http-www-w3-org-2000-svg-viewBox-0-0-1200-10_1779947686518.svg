@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1000" font-family="Georgia, serif">
+  <defs>
+    
+    
+    
+    <linearGradient id="inputGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fef3c7"/>
+      <stop offset="100%" stop-color="#fcd34d"/>
+    </linearGradient>
+    <linearGradient id="analysisGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#e0e7ff"/>
+      <stop offset="100%" stop-color="#a5b4fc"/>
+    </linearGradient>
+    <linearGradient id="diagnosticGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fce7f3"/>
+      <stop offset="100%" stop-color="#f9a8d4"/>
+    </linearGradient>
+    <linearGradient id="profileGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="deliveryGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#d1fae5"/>
+      <stop offset="100%" stop-color="#6ee7b7"/>
+    </linearGradient>
+    <linearGradient id="signalGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fed7aa"/>
+      <stop offset="100%" stop-color="#fb923c"/>
+    </linearGradient>
+  </defs>
+
+  
+  <text x="600" y="38" font-size="23" font-weight="bold" text-anchor="middle" fill="#0f172a">Learner-Driven Adaptive Retention System</text>
+  <text x="600" y="62" font-size="13" font-style="italic" text-anchor="middle" fill="#475569">Your materials. Your gaps. A retention engine built around how you actually learn.</text>
+
+  
+  <rect x="30" y="95" width="280" height="220" rx="12" fill="url(#inputGrad)" stroke="#a16207" stroke-width="2.5"/>
+  <text x="170" y="120" font-size="15" font-weight="bold" text-anchor="middle" fill="#713f12">① LEARNER UPLOADS MATERIALS</text>
+  <text x="170" y="142" font-size="11" font-style="italic" text-anchor="middle" fill="#78350f">Whatever they have, however messy</text>
+  <line x1="50" y1="152" x2="290" y2="152" stroke="#a16207" stroke-width="1"/>
+  <text x="48" y="172" font-size="11" fill="#451a03">📄 Class notes &amp; handouts</text>
+  <text x="48" y="190" font-size="11" fill="#451a03">📊 Slide decks &amp; readings</text>
+  <text x="48" y="208" font-size="11" fill="#451a03">📝 <tspan font-weight="bold">Past failed tests &amp; quizzes</tspan></text>
+  <text x="48" y="226" font-size="11" fill="#451a03">🎙️ Lecture recordings / transcripts</text>
+  <text x="48" y="244" font-size="11" fill="#451a03">📚 Textbook chapters, PDFs</text>
+  <text x="48" y="262" font-size="11" fill="#451a03">✏️ Flashcards, study guides</text>
+  <text x="48" y="280" font-size="11" fill="#451a03">💭 Confusing concepts (in words)</text>
+  <text x="48" y="302" font-size="10" font-style="italic" fill="#92400e">Learner is the source of truth for content</text>
+
+  
+  <rect x="380" y="95" width="280" height="220" rx="12" fill="url(#analysisGrad)" stroke="#3730a3" stroke-width="2.5"/>
+  <text x="520" y="120" font-size="15" font-weight="bold" text-anchor="middle" fill="#312e81">② AI ANALYZES THE CORPUS</text>
+  <text x="520" y="142" font-size="11" font-style="italic" text-anchor="middle" fill="#3730a3">Extract structure + diagnose gaps</text>
+  <line x1="400" y1="152" x2="640" y2="152" stroke="#3730a3" stroke-width="1"/>
+  <text x="398" y="172" font-size="11" fill="#1e1b4b">• Build concept map from notes</text>
+  <text x="398" y="190" font-size="11" fill="#1e1b4b">• Tag Bloom levels &amp; prerequisites</text>
+  <text x="398" y="208" font-size="11" fill="#1e1b4b">• <tspan font-weight="bold">Forensic read of failed tests:</tspan></text>
+  <text x="408" y="225" font-size="10" fill="#312e81">  — what was missed</text>
+  <text x="408" y="240" font-size="10" fill="#312e81">  — pattern of wrong answers</text>
+  <text x="408" y="255" font-size="10" fill="#312e81">  — surface vs. deep errors</text>
+  <text x="398" y="274" font-size="11" fill="#1e1b4b">• Identify likely misconceptions</text>
+  <text x="398" y="292" font-size="11" fill="#1e1b4b">• Map gaps to concept graph</text>
+
+  
+  <rect x="730" y="95" width="280" height="220" rx="12" fill="url(#diagnosticGrad)" stroke="#9d174d" stroke-width="2.5"/>
+  <text x="870" y="120" font-size="15" font-weight="bold" text-anchor="middle" fill="#831843">③ SHORT DIAGNOSTIC</text>
+  <text x="870" y="142" font-size="11" font-style="italic" text-anchor="middle" fill="#9d174d">~10-15 min, multi-modal probe</text>
+  <line x1="750" y1="152" x2="990" y2="152" stroke="#9d174d" stroke-width="1"/>
+  <text x="748" y="172" font-size="11" fill="#500724">Probes BOTH:</text>
+  <text x="748" y="190" font-size="11" fill="#500724">  ◆ What you know</text>
+  <text x="748" y="208" font-size="11" fill="#500724">  ◆ HOW you learn best</text>
+  <line x1="750" y1="218" x2="990" y2="218" stroke="#9d174d" stroke-width="0.5" stroke-dasharray="3,2"/>
+  <text x="748" y="237" font-size="10" fill="#831843">• Recall vs. recognition items</text>
+  <text x="748" y="252" font-size="10" fill="#831843">• Apply concept to new scenario</text>
+  <text x="748" y="267" font-size="10" fill="#831843">• Self-explain a worked example</text>
+  <text x="748" y="282" font-size="10" fill="#831843">• Compare/contrast prompts</text>
+  <text x="748" y="297" font-size="10" fill="#831843">• Confidence + response latency</text>
+
+  
+  <path d="M 310 200 L 375 200" fill="none" stroke="#475569" stroke-width="2.5"/>
+  <path d="M 660 200 L 725 200" fill="none" stroke="#475569" stroke-width="2.5"/>
+
+  
+  <ellipse cx="600" cy="500" rx="180" ry="105" fill="url(#profileGrad)" stroke="#020617" stroke-width="3"/>
+  <text x="600" y="475" font-size="17" font-weight="bold" text-anchor="middle" fill="#fbbf24">LEARNER RETENTION</text>
+  <text x="600" y="497" font-size="17" font-weight="bold" text-anchor="middle" fill="#fbbf24">PROFILE</text>
+  <text x="600" y="520" font-size="11" text-anchor="middle" fill="#e2e8f0">mastery × modality × pace</text>
+  <text x="600" y="535" font-size="11" text-anchor="middle" fill="#e2e8f0">misconceptions × forgetting curve</text>
+  <text x="600" y="555" font-size="10" font-style="italic" text-anchor="middle" fill="#cbd5e0">updates after every interaction</text>
+
+  
+  <path d="M 170 315 Q 280 380 470 440" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="5,3"/>
+  <path d="M 520 315 L 580 395" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="5,3"/>
+  <path d="M 870 315 Q 750 380 720 425" fill="none" stroke="#475569" stroke-width="2" stroke-dasharray="5,3"/>
+
+  
+  <rect x="30" y="650" width="280" height="220" rx="12" fill="url(#deliveryGrad)" stroke="#15803d" stroke-width="2.5"/>
+  <text x="170" y="675" font-size="15" font-weight="bold" text-anchor="middle" fill="#14532d">④ ADAPTIVE DELIVERY</text>
+  <text x="170" y="697" font-size="11" font-style="italic" text-anchor="middle" fill="#166534">Right format. Right moment.</text>
+  <line x1="50" y1="707" x2="290" y2="707" stroke="#15803d" stroke-width="1"/>
+  <text x="48" y="727" font-size="11" fill="#052e16"><tspan font-weight="bold">Retain</tspan> — spaced retrieval cards</text>
+  <text x="48" y="745" font-size="11" fill="#052e16"><tspan font-weight="bold">Relate</tspan> — analogies, concept maps,</text>
+  <text x="58" y="761" font-size="11" fill="#052e16">link to what learner knows</text>
+  <text x="48" y="779" font-size="11" fill="#052e16"><tspan font-weight="bold">Understand</tspan> — Socratic dialogue,</text>
+  <text x="58" y="795" font-size="11" fill="#052e16">self-explanation prompts</text>
+  <text x="48" y="815" font-size="11" fill="#052e16">• Re-attempts of failed test items</text>
+  <text x="48" y="833" font-size="11" fill="#052e16">• Worked examples with fading</text>
+  <text x="48" y="851" font-size="11" fill="#052e16">• Interleaved practice blocks</text>
+
+  
+  <rect x="380" y="650" width="280" height="220" rx="12" fill="url(#signalGrad)" stroke="#9a3412" stroke-width="2.5"/>
+  <text x="520" y="675" font-size="15" font-weight="bold" text-anchor="middle" fill="#7c2d12">⑤ CONTINUOUS SIGNAL CAPTURE</text>
+  <text x="520" y="697" font-size="11" font-style="italic" text-anchor="middle" fill="#9a3412">Every interaction = evidence</text>
+  <line x1="400" y1="707" x2="640" y2="707" stroke="#9a3412" stroke-width="1"/>
+  <text x="398" y="727" font-size="11" fill="#431407">✓ Correctness + error type</text>
+  <text x="398" y="745" font-size="11" fill="#431407">⏱ Response latency</text>
+  <text x="398" y="763" font-size="11" fill="#431407">💡 Hint requests &amp; retries</text>
+  <text x="398" y="781" font-size="11" fill="#431407">🎯 Self-rated confidence</text>
+  <text x="398" y="799" font-size="11" fill="#431407">🔁 Recall stability over time</text>
+  <text x="398" y="817" font-size="11" fill="#431407">📈 Modality response (text vs.</text>
+  <text x="408" y="833" font-size="11" fill="#431407">  video vs. dialogue vs. visual)</text>
+  <text x="398" y="853" font-size="11" fill="#431407">🧠 Transfer-task performance</text>
+
+  
+  <rect x="730" y="650" width="280" height="220" rx="12" fill="#ddd6fe" stroke="#5b21b6" stroke-width="2.5"/>
+  <text x="870" y="675" font-size="15" font-weight="bold" text-anchor="middle" fill="#4c1d95">⑥ ADAPT &amp; REFINE</text>
+  <text x="870" y="697" font-size="11" font-style="italic" text-anchor="middle" fill="#5b21b6">The system keeps learning the learner</text>
+  <line x1="750" y1="707" x2="990" y2="707" stroke="#5b21b6" stroke-width="1"/>
+  <text x="748" y="727" font-size="11" fill="#2e1065">• Re-weight modality preferences</text>
+  <text x="748" y="745" font-size="11" fill="#2e1065">• Update forgetting-curve estimates</text>
+  <text x="748" y="763" font-size="11" fill="#2e1065">• Re-sequence concept order</text>
+  <text x="748" y="781" font-size="11" fill="#2e1065">• Tighten/loosen difficulty</text>
+  <text x="748" y="799" font-size="11" fill="#2e1065">• Surface unexpected gaps</text>
+  <text x="748" y="817" font-size="11" fill="#2e1065">• Generate fresh practice items</text>
+  <text x="748" y="835" font-size="11" fill="#2e1065">• Flag concepts due for review</text>
+  <text x="748" y="855" font-size="10" font-style="italic" fill="#5b21b6">No two learners get the same path</text>
+
+  
+  <path d="M 470 555 Q 350 600 250 645" fill="none" stroke="#c2410c" stroke-width="2.5"/>
+  <text x="295" y="600" font-size="10" font-style="italic" fill="#c2410c">prescribes</text>
+
+  
+  <path d="M 310 760 L 375 760" fill="none" stroke="#c2410c" stroke-width="2.5"/>
+
+  
+  <path d="M 660 760 L 725 760" fill="none" stroke="#c2410c" stroke-width="2.5"/>
+
+  
+  <path d="M 870 645 Q 870 580 780 530" fill="none" stroke="#c2410c" stroke-width="2.5"/>
+  <text x="830" y="610" font-size="10" font-style="italic" fill="#c2410c">updates</text>
+
+  
+  <rect x="450" y="595" width="300" height="35" rx="8" fill="#fffbeb" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="600" y="617" font-size="12" font-weight="bold" text-anchor="middle" fill="#78350f">RETAIN · RELATE · UNDERSTAND</text>
+
+  
+  <rect x="30" y="905" width="1140" height="80" rx="6" fill="#f8fafc" stroke="#cbd5e0"/>
+  <text x="50" y="928" font-size="11" font-weight="bold" fill="#0f172a">Why failed tests are gold:</text>
+  <text x="50" y="945" font-size="10.5" fill="#334155">Wrong answers reveal the shape of a misconception — whether the learner inverted a rule, confused two similar concepts, or applied surface features instead of deep structure.</text>
+  <text x="50" y="961" font-size="10.5" fill="#334155">The AI treats each error as a hypothesis to test, then generates targeted items that distinguish between competing explanations of what went wrong.</text>
+  <text x="50" y="977" font-size="10.5" font-style="italic" fill="#475569">Result: remediation aimed at the actual misunderstanding, not at the symptom.</text>
+</svg>

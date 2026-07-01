@@ -1,0 +1,2290 @@
+import React, { useState, useEffect } from 'react';
+import { ChevronRight, Target, TrendingUp, Settings, Plus, X, Sparkles, ArrowLeft, RefreshCw, Loader, Library, AlertTriangle, CheckCircle2, Image as ImageIcon, Clock, Trophy, FileText, Upload, Link as LinkIcon } from 'lucide-react';
+
+// ============================================================================
+// THE METHOD — v2
+// Three loops: Ingest → Practice → Forecast
+// Evidence-based: retrieval practice, spaced repetition (SM-2),
+// confidence calibration, generation effect, AI-graded semantic recall
+// ============================================================================
+
+const DIAGNOSTIC = [
+  { id: 'goal', q: 'What are you preparing for?',
+    type: 'text-or-pick',
+    opts: [
+      { v: 'bar', label: 'A bar exam' },
+      { v: 'cert', label: 'A professional certification' },
+      { v: 'course', label: 'University coursework' },
+      { v: 'general', label: 'General mastery — no exam date' },
+    ]},
+  { id: 'examDate', q: 'When is your exam (or target date)?',
+    type: 'date',
+    skipIf: (a) => a.goal === 'general' },
+  { id: 'hoursPerWeek', q: 'Realistically, how many hours per week can you commit?',
+    opts: [
+      { v: 4, label: '3–5 hours — life is heavy' },
+      { v: 8, label: '6–10 hours — moderate' },
+      { v: 15, label: '12–18 hours — serious' },
+      { v: 25, label: '20+ hours — full-time prep' },
+    ]},
+  { id: 'baseline', q: 'How would you describe your starting point in this material?',
+    opts: [
+      { v: 'zero', label: 'Near zero — mostly new' },
+      { v: 'foundations', label: 'Foundations with real gaps' },
+      { v: 'solid', label: 'Mostly solid — polishing' },
+      { v: 'rusty', label: 'I knew it once, but it\'s rusty' },
+    ]},
+  { id: 'calibration', q: 'When you THINK you understand something, you\'re actually right…',
+    opts: [
+      { v: 'high', label: 'Almost always — my gauge is reliable' },
+      { v: 'mid', label: 'Most of the time — caught out on details' },
+      { v: 'low', label: 'I often overestimate — familiarity ≠ knowing' },
+      { v: 'under', label: 'I underestimate — I know more than I think' },
+    ]},
+  { id: 'failureMode', q: 'Your biggest study weakness, historically:',
+    opts: [
+      { v: 'passive', label: 'Re-reading and highlighting without retention' },
+      { v: 'cram', label: 'Cramming late, no spacing' },
+      { v: 'avoid', label: 'Avoiding hard topics, over-studying easy ones' },
+      { v: 'scattered', label: 'No system — scattered effort' },
+      { v: 'perfect', label: 'Perfectionism — polishing one area forever' },
+    ]},
+  { id: 'focusSpan', q: 'How long can you focus deeply before quality drops?',
+    opts: [
+      { v: 25, label: '20–25 minutes' },
+      { v: 45, label: '40–50 minutes' },
+      { v: 75, label: '60–90 minutes' },
+    ]},
+];
+
+// ============================================================================
+// AI HELPERS
+// ============================================================================
+async function callClaude(prompt, systemPrompt = null) {
+  const body = {
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 4000,
+    messages: [{ role: "user", content: prompt }],
+  };
+  if (systemPrompt) body.system = systemPrompt;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+  const data = await response.json();
+  const text = data.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
+  return text;
+}
+
+function extractJSON(text) {
+  const cleaned = text.replace(/```json\s*|\s*```/g, '').trim();
+  // try to find a JSON array or object in the text
+  const arrMatch = cleaned.match(/\[[\s\S]*\]/);
+  const objMatch = cleaned.match(/\{[\s\S]*\}/);
+  try {
+    if (arrMatch) return JSON.parse(arrMatch[0]);
+    if (objMatch) return JSON.parse(objMatch[0]);
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("JSON parse failed:", e, text);
+    return null;
+  }
+}
+
+// ============================================================================
+// INGESTION — URL + FILE
+// ============================================================================
+
+// Fetch a URL and extract its main text content
+async function fetchURL(url) {
+  const tryFetch = async (target) => {
+    const r = await fetch(target);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.text();
+  };
+
+  let html;
+  try {
+    html = await tryFetch(url);
+  } catch (e) {
+    // Public CORS proxy fallback
+    try {
+      html = await tryFetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+    } catch (e2) {
+      throw new Error(`Could not fetch URL. The site may block automated requests, or it requires login. Try copy-pasting the text directly instead.`);
+    }
+  }
+
+  return extractMainText(html, url);
+}
+
+// Extract readable text from HTML — strips scripts, styles, nav, footer
+function extractMainText(html, url) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  doc.querySelectorAll('script, style, nav, footer, aside, header, .ad, .ads, .advertisement, .sidebar, .menu, .navigation, [role="navigation"], [role="banner"], [role="contentinfo"]').forEach(el => el.remove());
+
+  const mainSelectors = ['article', 'main', '[role="main"]', '.article', '.post', '.content', '#content', '.entry-content', '.post-content'];
+  let mainEl = null;
+  for (const sel of mainSelectors) {
+    mainEl = doc.querySelector(sel);
+    if (mainEl && mainEl.textContent.trim().length > 200) break;
+  }
+  const target = mainEl || doc.body;
+
+  const title = doc.querySelector('title')?.textContent?.trim() ||
+                doc.querySelector('h1')?.textContent?.trim() ||
+                new URL(url).hostname;
+
+  const text = target.textContent
+    .replace(/\s+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  return { title: title.slice(0, 100), text, url };
+}
+
+// Read text from uploaded file
+async function readFileContent(file) {
+  const name = file.name.toLowerCase();
+  const ext = name.split('.').pop();
+
+  if (ext === 'txt' || ext === 'md') {
+    return await file.text();
+  }
+  if (ext === 'pdf') {
+    return await extractPDFText(file);
+  }
+  if (ext === 'docx') {
+    return await extractDOCXText(file);
+  }
+  if (ext === 'doc') {
+    throw new Error('.doc files are not supported — please save as .docx or paste the text directly.');
+  }
+  try {
+    const text = await file.text();
+    if (text && text.length > 0) return text;
+  } catch (e) {}
+  throw new Error(`Unsupported file type: .${ext}. Supported: .txt, .md, .pdf, .docx`);
+}
+
+// Load pdf.js from CDN and extract text from a PDF file
+async function extractPDFText(file) {
+  if (!window.pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Could not load PDF reader. Check your internet connection.'));
+      document.head.appendChild(script);
+    });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(' ');
+    pages.push(pageText);
+  }
+  return pages.join('\n\n');
+}
+
+// Extract text from DOCX using mammoth
+async function extractDOCXText(file) {
+  if (!window.mammoth) {
+    try {
+      const mod = await import('mammoth');
+      window.mammoth = mod.default || mod;
+    } catch (e) {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('Could not load DOCX reader.'));
+        document.head.appendChild(script);
+      });
+    }
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await window.mammoth.extractRawText({ arrayBuffer });
+  return result.value;
+}
+
+async function extractConcepts(material, source) {
+  const prompt = `You are an expert instructional designer. The user has pasted study material below. Extract the ATOMIC concepts — discrete, testable units of knowledge. Each concept should be one rule, one definition, one principle, one case holding, or one mechanism.
+
+Aim for 3–12 concepts per paste. Don't over-split. Don't lump.
+
+Return ONLY a valid JSON array, no preamble, no markdown fences. Each object:
+{
+  "title": "Short concept name (5-10 words)",
+  "content": "The full content of this concept — the rule, definition, or principle, complete and self-contained. Should be readable in isolation."
+}
+
+MATERIAL:
+${material}`;
+
+  const response = await callClaude(prompt);
+  const parsed = extractJSON(response);
+  if (!Array.isArray(parsed)) throw new Error("Could not extract concepts");
+  return parsed.map((c, i) => ({
+    id: `${Date.now()}-${i}`,
+    title: c.title,
+    content: c.content,
+    source: source || 'Untitled',
+    visualSVG: null,
+    createdAt: new Date().toISOString(),
+  }));
+}
+
+// Generate an SVG diagram — dual-coding: text + structured image encoded together
+async function generateVisual(concept) {
+  const prompt = `You are a visual learning designer. Create an SVG diagram that captures the STRUCTURE of this concept. Choose the best visual form:
+- Decision tree / flowchart for rules with conditions
+- Comparison table / Venn for distinguishing concepts
+- Timeline for sequential or historical material
+- Hierarchy / tree for taxonomies
+- Cycle diagram for processes that loop
+- Concept map for related ideas
+
+CONCEPT:
+Title: ${concept.title}
+Content: ${concept.content}
+
+Requirements:
+- Return ONLY the SVG code. No markdown fences, no preamble.
+- viewBox="0 0 600 400"
+- Colors: ink #1a1612, accent #7a1f1a, muted #6b5d4f, paper #f7f2e8, subtle #e8dfc8
+- Fonts: titles font-family="Georgia, serif" font-size 16-18, labels font-family="system-ui, sans-serif" font-size 12-14
+- Editorial style — clean lines, no gradients, no shadows, generous space
+- Wrap long text using multiple tspan elements
+- The diagram should make the structure visible at a glance, not just decorate
+
+Start with <svg and end with </svg>. Nothing else.`;
+  try {
+    const response = await callClaude(prompt);
+    const cleaned = response.replace(/```svg\s*|```xml\s*|\s*```/g, '').trim();
+    const svgMatch = cleaned.match(/<svg[\s\S]*?<\/svg>/);
+    return svgMatch ? svgMatch[0] : null;
+  } catch (e) {
+    console.error("Visual generation failed:", e);
+    return null;
+  }
+}
+
+// Generate a single exam-format question for mock exam
+async function generateExamQuestion(concept, examFormat) {
+  const formatGuide = {
+    'multiple-choice': 'Multiple choice with 4 options (A, B, C, D). One clearly best answer. Test application, not just recall. Include plausible distractors.',
+    'short-answer': 'A short-answer question requiring 3-5 sentences. Tests application or analysis.',
+    'essay': 'An essay-style question requiring a structured response covering issue identification, rule, analysis, conclusion (IRAC-like).',
+    'fact-pattern': 'A fact-pattern question. Give a brief scenario (3-5 sentences) then ask the user to apply the concept.',
+  };
+  const prompt = `Generate ONE exam question in the format below, based on this concept. The question should feel like a real exam question — testing application and judgment, not memorization.
+
+CONCEPT:
+Title: ${concept.title}
+Content: ${concept.content}
+
+FORMAT: ${examFormat}
+${formatGuide[examFormat]}
+
+Return ONLY valid JSON, no preamble:
+${examFormat === 'multiple-choice' ? `{
+  "prompt": "The question stem with any fact pattern",
+  "options": { "A": "...", "B": "...", "C": "...", "D": "..." },
+  "correct": "A" | "B" | "C" | "D",
+  "explanation": "Why this answer is right and why the others are wrong (2-4 sentences)"
+}` : `{
+  "prompt": "The full question, including any fact pattern",
+  "modelAnswer": "A complete, exam-quality answer (the rubric)",
+  "scoringPoints": ["Key point 1 that must be present", "Key point 2", "Key point 3"]
+}`}`;
+  try {
+    const response = await callClaude(prompt);
+    const parsed = extractJSON(response);
+    return parsed;
+  } catch (e) {
+    console.error("Exam question generation failed:", e);
+    return null;
+  }
+}
+
+// Grade a mock exam free-response answer against scoring rubric
+async function gradeExamAnswer(question, modelAnswer, scoringPoints, userAnswer) {
+  const prompt = `You are grading an exam-format answer against a scoring rubric. Be rigorous like a real exam grader.
+
+QUESTION: ${question}
+
+MODEL ANSWER: ${modelAnswer}
+
+SCORING POINTS (rubric):
+${scoringPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+LEARNER'S ANSWER: ${userAnswer}
+
+For each scoring point, judge whether it is present (1), partially present (0.5), or absent (0). Then give an overall grade out of the total points possible.
+
+Return ONLY valid JSON:
+{
+  "pointsAwarded": [array of 0, 0.5, or 1 per scoring point in order],
+  "totalScore": number (sum of pointsAwarded),
+  "maxScore": ${scoringPoints.length},
+  "feedback": "2-3 sentences: what was strong, what was missing, what to study"
+}`;
+  try {
+    const response = await callClaude(prompt);
+    const parsed = extractJSON(response);
+    return parsed || { pointsAwarded: [], totalScore: 0, maxScore: scoringPoints.length, feedback: "Grading failed." };
+  } catch (e) {
+    return { pointsAwarded: [], totalScore: 0, maxScore: scoringPoints.length, feedback: "Grading failed — check connection." };
+  }
+}
+
+async function generateQuestions(concept) {
+  const prompt = `You are an expert tutor designing retrieval-practice questions for this concept:
+
+TITLE: ${concept.title}
+CONTENT: ${concept.content}
+
+Generate exactly 3 questions, each testing a different cognitive operation:
+1. DEFINITIONAL — state/explain the concept from scratch
+2. DISCRIMINATIVE — distinguish from a similar/related concept, or identify it among alternatives
+3. APPLICATIVE — apply to a brief hypothetical/fact pattern
+
+Each question should be answerable in 2–5 sentences. Provide a model answer for each.
+
+Return ONLY valid JSON, no preamble, no fences:
+[
+  { "type": "definitional", "prompt": "...", "expectedAnswer": "..." },
+  { "type": "discriminative", "prompt": "...", "expectedAnswer": "..." },
+  { "type": "applicative", "prompt": "...", "expectedAnswer": "..." }
+]`;
+  const response = await callClaude(prompt);
+  const parsed = extractJSON(response);
+  if (!Array.isArray(parsed)) throw new Error("Could not generate questions");
+  return parsed;
+}
+
+async function gradeAnswer(question, expectedAnswer, userAnswer, conceptContent) {
+  const prompt = `You are grading a learner's retrieval-practice answer. Be rigorous but fair — reward correct understanding even with imperfect wording. Penalize missing key elements or factual errors.
+
+CONCEPT CONTEXT: ${conceptContent}
+
+QUESTION: ${question}
+
+MODEL ANSWER: ${expectedAnswer}
+
+LEARNER'S ANSWER: ${userAnswer}
+
+Return ONLY valid JSON, no preamble:
+{
+  "grade": 0-3,
+  "feedback": "1-2 sentences. Specific. What they got right, what's missing or wrong."
+}
+
+Grading scale:
+0 = forgot / blank / wrong concept
+1 = partial — key idea missing or major error
+2 = correct — minor gaps or imprecision
+3 = excellent — complete, accurate, fluent`;
+  const response = await callClaude(prompt);
+  const parsed = extractJSON(response);
+  if (!parsed || typeof parsed.grade !== 'number') {
+    return { grade: 2, feedback: "Could not auto-grade — defaulted to 'correct'. Self-assess below." };
+  }
+  return parsed;
+}
+
+async function generateWeeklyBrief(profile, cards, sessions) {
+  const recentSessions = sessions.slice(-7);
+  const weakest = [...cards].sort((a, b) => a.mastery - b.mastery).slice(0, 5);
+  const strongest = [...cards].sort((a, b) => b.mastery - a.mastery).slice(0, 5);
+
+  const prompt = `You are a study coach reviewing a learner's last week of work. Be direct, specific, and warm but honest. No platitudes.
+
+LEARNER PROFILE:
+- Goal: ${profile.goal}, exam: ${profile.examDate || 'no date'}
+- Hours/week target: ${profile.hoursPerWeek}
+- Calibration self-report: ${profile.calibration}
+- Failure mode: ${profile.failureMode}
+
+LAST 7 SESSIONS:
+${recentSessions.map(s => `- ${new Date(s.date).toLocaleDateString()}: ${s.cardsReviewed} cards, ${Math.round(s.accuracy*100)}% accuracy, confidence gap ${Math.round(s.avgConfidenceGap*100)}%`).join('\n')}
+
+WEAKEST CONCEPTS:
+${weakest.map(c => `- ${c.prompt?.slice(0, 80)} (mastery: ${Math.round(c.mastery*100)}%)`).join('\n')}
+
+STRONGEST CONCEPTS:
+${strongest.map(c => `- ${c.prompt?.slice(0, 80)} (mastery: ${Math.round(c.mastery*100)}%)`).join('\n')}
+
+Return ONLY valid JSON, no preamble:
+{
+  "wins": ["specific win 1", "specific win 2", "specific win 3"],
+  "stuck": ["specific issue 1", "specific issue 2"],
+  "prescription": "2-3 sentences: what to actually do in the next 7 days. Concrete."
+}`;
+  try {
+    const response = await callClaude(prompt);
+    const parsed = extractJSON(response);
+    return parsed || { wins: [], stuck: [], prescription: "Brief generation failed." };
+  } catch (e) {
+    return { wins: [], stuck: [], prescription: "Brief generation failed — check connection." };
+  }
+}
+
+// ============================================================================
+// SM-2 — modified for 0-3 quality scale
+// ============================================================================
+function nextReview(card, quality) {
+  let ef = card.ef || 2.5;
+  let interval = card.interval || 0;
+  let reps = card.reps || 0;
+
+  if (quality < 1) {
+    reps = 0;
+    interval = 1;
+  } else {
+    if (reps === 0) interval = 1;
+    else if (reps === 1) interval = 3;
+    else interval = Math.round(interval * ef);
+    reps += 1;
+  }
+  ef = Math.max(1.3, ef + (0.1 - (3 - quality) * (0.08 + (3 - quality) * 0.02)));
+
+  const due = new Date();
+  due.setDate(due.getDate() + interval);
+  return { ef, interval, reps, dueDate: due.toISOString() };
+}
+
+// ============================================================================
+// FORECAST — readiness projection
+// ============================================================================
+function computeReadiness(cards) {
+  if (cards.length === 0) return 0;
+  const sum = cards.reduce((a, c) => a + (c.mastery || 0), 0);
+  return sum / cards.length;
+}
+
+function projectReadiness(cards, sessions, profile) {
+  if (!profile.examDate) return null;
+  const examDate = new Date(profile.examDate);
+  const today = new Date();
+  const daysUntilExam = Math.ceil((examDate - today) / (1000 * 60 * 60 * 24));
+  if (daysUntilExam <= 0) return { daysUntilExam: 0, current: computeReadiness(cards), projected: computeReadiness(cards), gap: 0 };
+
+  const current = computeReadiness(cards);
+
+  // Estimate growth rate from recent sessions
+  if (sessions.length < 2) {
+    // Conservative default: 1% per study day
+    const studyDays = Math.min(daysUntilExam, Math.ceil(daysUntilExam * (profile.hoursPerWeek / 40)));
+    const projected = Math.min(0.95, current + (studyDays * 0.01));
+    return { daysUntilExam, current, projected, gap: 0.85 - projected, hasData: false };
+  }
+
+  // Use recent mastery delta
+  const recent = sessions.slice(-7);
+  const avgAccuracy = recent.reduce((a, s) => a + s.accuracy, 0) / recent.length;
+  // Rough growth: accuracy contributes to mastery delta, scaled by session frequency
+  const sessionsPerWeek = recent.length; // assumes last 7 days
+  const weeklyGrowth = (avgAccuracy - 0.5) * 0.04 * sessionsPerWeek;
+  const weeksUntilExam = daysUntilExam / 7;
+  const projected = Math.max(current, Math.min(0.98, current + weeklyGrowth * weeksUntilExam));
+
+  return { daysUntilExam, current, projected, gap: 0.85 - projected, hasData: true };
+}
+
+// ============================================================================
+// STYLES — editorial / scholarly
+// ============================================================================
+const S = {
+  body: {
+    fontFamily: "'Source Sans 3', 'Helvetica Neue', sans-serif",
+    background: 'radial-gradient(ellipse at top, #f7f2e8 0%, #efe7d6 100%)',
+    color: '#1a1612',
+    minHeight: '100vh',
+    width: '100%',
+  },
+  display: { fontFamily: "'DM Serif Display', Georgia, serif", letterSpacing: '-0.02em' },
+  mono: { fontFamily: "'JetBrains Mono', monospace" },
+  accent: '#7a1f1a',
+  accentSoft: 'rgba(122, 31, 26, 0.08)',
+  ink: '#1a1612',
+  paper: '#f7f2e8',
+  muted: '#6b5d4f',
+  subtle: '#e8dfc8',
+  success: '#3a6b3a',
+  warn: '#a85c2a',
+};
+
+const btn = (variant = 'primary') => ({
+  fontFamily: S.body.fontFamily,
+  fontSize: '0.9rem',
+  fontWeight: 600,
+  letterSpacing: '0.02em',
+  padding: '0.75rem 1.5rem',
+  border: variant === 'primary' ? `1px solid ${S.ink}` : `1px solid ${S.muted}`,
+  background: variant === 'primary' ? S.ink : 'transparent',
+  color: variant === 'primary' ? S.paper : S.ink,
+  cursor: 'pointer',
+  transition: 'all 0.15s ease',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+});
+
+// ============================================================================
+// ROOT
+// ============================================================================
+export default function App() {
+  const [view, setView] = useState('loading');
+  const [profile, setProfile] = useState(null);
+  const [concepts, setConcepts] = useState([]);
+  const [cards, setCards] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [weeklyBriefs, setWeeklyBriefs] = useState([]);
+  const [examResults, setExamResults] = useState([]);
+  const [examConfig, setExamConfig] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const p = await window.storage?.get('profile');
+        const c = await window.storage?.get('concepts');
+        const ca = await window.storage?.get('cards');
+        const s = await window.storage?.get('sessions');
+        const w = await window.storage?.get('weeklyBriefs');
+        const ex = await window.storage?.get('examResults');
+        if (p?.value) {
+          setProfile(JSON.parse(p.value));
+          setView('today');
+        } else {
+          setView('diagnostic');
+        }
+        if (c?.value) setConcepts(JSON.parse(c.value));
+        if (ca?.value) setCards(JSON.parse(ca.value));
+        if (s?.value) setSessions(JSON.parse(s.value));
+        if (w?.value) setWeeklyBriefs(JSON.parse(w.value));
+        if (ex?.value) setExamResults(JSON.parse(ex.value));
+      } catch (e) {
+        setView('diagnostic');
+      }
+    })();
+  }, []);
+
+  const save = async (key, val, setter) => {
+    setter(val);
+    try { await window.storage?.set(key, JSON.stringify(val)); } catch (e) {}
+  };
+
+  const reset = async () => {
+    if (!confirm('Wipe everything and start over?')) return;
+    try {
+      for (const k of ['profile', 'concepts', 'cards', 'sessions', 'weeklyBriefs', 'examResults']) {
+        await window.storage?.delete(k);
+      }
+    } catch (e) {}
+    setProfile(null); setConcepts([]); setCards([]); setSessions([]); setWeeklyBriefs([]); setExamResults([]);
+    setView('diagnostic');
+  };
+
+  if (view === 'loading') return <div style={{ ...S.body, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading…</div>;
+
+  return (
+    <div style={S.body}>
+      <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+      <style>{`
+        * { box-sizing: border-box; }
+        body { margin: 0; }
+        input, textarea, select { font-family: inherit; }
+        button:hover:not(:disabled) { opacity: 0.88; }
+        button:disabled { cursor: not-allowed; opacity: 0.4; }
+        .grain { position: fixed; inset: 0; pointer-events: none; opacity: 0.04;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' /%3E%3C/svg%3E"); }
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+      <div className="grain" />
+      <Nav view={view} setView={setView} hasProfile={!!profile} />
+      <div style={{ maxWidth: '880px', margin: '0 auto', padding: '2rem 1.5rem 5rem' }}>
+        {view === 'diagnostic' && <Diagnostic onComplete={(p) => { save('profile', p, setProfile); setView('library'); }} />}
+        {view === 'today' && <Today profile={profile} concepts={concepts} cards={cards} sessions={sessions} weeklyBriefs={weeklyBriefs} examResults={examResults} setView={setView} saveWeeklyBriefs={(v) => save('weeklyBriefs', v, setWeeklyBriefs)} />}
+        {view === 'library' && <LibraryView concepts={concepts} cards={cards} saveConcepts={(v) => save('concepts', v, setConcepts)} saveCards={(v) => save('cards', v, setCards)} setView={setView} />}
+        {view === 'study' && <StudySession profile={profile} concepts={concepts} cards={cards} saveCards={(v) => save('cards', v, setCards)} sessions={sessions} saveSessions={(v) => save('sessions', v, setSessions)} onDone={() => setView('today')} />}
+        {view === 'exam-setup' && <ExamSetup profile={profile} concepts={concepts} cards={cards} setView={setView} onStart={(config) => { setExamConfig(config); setView('exam-run'); }} />}
+        {view === 'exam-run' && <ExamRun profile={profile} concepts={concepts} cards={cards} config={examConfig} saveCards={(v) => save('cards', v, setCards)} examResults={examResults} saveExamResults={(v) => save('examResults', v, setExamResults)} onDone={() => setView('today')} />}
+        {view === 'forecast' && <Forecast profile={profile} cards={cards} sessions={sessions} concepts={concepts} examResults={examResults} />}
+        {view === 'adjust' && <Adjust profile={profile} saveProfile={(v) => save('profile', v, setProfile)} reset={reset} setView={setView} />}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// NAV
+// ============================================================================
+function Nav({ view, setView, hasProfile }) {
+  return (
+    <div style={{ borderBottom: `1px solid ${S.ink}`, background: S.paper, position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ maxWidth: '880px', margin: '0 auto', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ ...S.display, fontSize: '1.4rem' }}>
+          The Method <span style={{ color: S.accent, fontStyle: 'italic' }}>—</span>{' '}
+          <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.2em', color: S.muted, ...S.body, verticalAlign: 'middle' }}>v.IV</span>
+        </div>
+        {hasProfile && view !== 'diagnostic' && (
+          <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+            <NavBtn active={view === 'today'} onClick={() => setView('today')} icon={<Target size={13} />}>Today</NavBtn>
+            <NavBtn active={view === 'library'} onClick={() => setView('library')} icon={<Library size={13} />}>Library</NavBtn>
+            <NavBtn active={view === 'exam-setup' || view === 'exam-run'} onClick={() => setView('exam-setup')} icon={<Trophy size={13} />}>Mock</NavBtn>
+            <NavBtn active={view === 'forecast'} onClick={() => setView('forecast')} icon={<TrendingUp size={13} />}>Forecast</NavBtn>
+            <NavBtn active={view === 'adjust'} onClick={() => setView('adjust')} icon={<Settings size={13} />}>Adjust</NavBtn>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NavBtn({ active, onClick, icon, children }) {
+  return (
+    <button onClick={onClick} style={{
+      background: active ? S.ink : 'transparent',
+      color: active ? S.paper : S.ink,
+      border: 'none',
+      padding: '0.5rem 0.85rem',
+      fontSize: '0.78rem',
+      fontWeight: 500,
+      letterSpacing: '0.05em',
+      textTransform: 'uppercase',
+      cursor: 'pointer',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.4rem',
+    }}>{icon}{children}</button>
+  );
+}
+
+// ============================================================================
+// DIAGNOSTIC — 6 questions
+// ============================================================================
+function Diagnostic({ onComplete }) {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({});
+
+  // Filter out skipped questions dynamically
+  const visibleQuestions = DIAGNOSTIC.filter(q => !q.skipIf || !q.skipIf(answers));
+  const q = visibleQuestions[step];
+
+  if (step === 0 && Object.keys(answers).length === 0) {
+    return (
+      <div className="fade-in" style={{ paddingTop: '3rem' }}>
+        <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '1.5rem' }}>◆ An Adaptive Study Engine ◆</div>
+        <h1 style={{ ...S.display, fontSize: '4.5rem', lineHeight: 1.0, margin: '0 0 1.5rem', fontWeight: 400 }}>
+          Study smarter,<br /><em style={{ color: S.accent }}>not louder.</em>
+        </h1>
+        <p style={{ fontSize: '1.1rem', lineHeight: 1.65, maxWidth: '580px', color: S.muted, marginBottom: '2rem' }}>
+          Paste your material. An AI extracts atomic concepts and generates real questions. You practice with spaced repetition and confidence calibration. The system forecasts your readiness against your exam date.
+        </p>
+        <p style={{ fontSize: '0.95rem', lineHeight: 1.6, maxWidth: '580px', color: S.muted, marginBottom: '2.5rem' }}>
+          Six quick questions to start. Then we get to work.
+        </p>
+        <button onClick={() => setStep(0.5)} style={btn('primary')}>Begin <ChevronRight size={16} /></button>
+        <div style={{ marginTop: '2.5rem', padding: '1rem', borderLeft: `3px solid ${S.accent}`, background: S.accentSoft, fontSize: '0.85rem', color: S.muted, lineHeight: 1.6, maxWidth: '580px' }}>
+          <strong style={{ color: S.ink }}>Honest note:</strong> No tool guarantees a passing grade. What this does is force the practices that actually drive durable learning — active recall, spacing, calibration, and applied generation — and adapts to your real performance.
+        </div>
+      </div>
+    );
+  }
+
+  const realStep = step === 0.5 ? 0 : step;
+  const realQ = visibleQuestions[realStep];
+
+  const pick = (v) => {
+    const next = { ...answers, [realQ.id]: v };
+    setAnswers(next);
+    const newVisible = DIAGNOSTIC.filter(q => !q.skipIf || !q.skipIf(next));
+    if (realStep + 1 < newVisible.length) setStep(realStep + 1);
+    else onComplete({ ...next, createdAt: new Date().toISOString() });
+  };
+
+  const progress = ((realStep + 1) / visibleQuestions.length) * 100;
+
+  return (
+    <div className="fade-in" key={realStep} style={{ paddingTop: '1rem' }}>
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', ...S.mono, fontSize: '0.72rem', color: S.muted, letterSpacing: '0.1em' }}>
+          <span>QUESTION {String(realStep + 1).padStart(2, '0')} / {String(visibleQuestions.length).padStart(2, '0')}</span>
+          <span>{realQ.id.toUpperCase()}</span>
+        </div>
+        <div style={{ height: '2px', background: S.subtle }}>
+          <div style={{ height: '100%', background: S.accent, width: `${progress}%`, transition: 'width 0.3s ease' }} />
+        </div>
+      </div>
+      <h2 style={{ ...S.display, fontSize: '2.2rem', lineHeight: 1.2, fontWeight: 400, marginBottom: '2rem' }}>{realQ.q}</h2>
+
+      {realQ.type === 'date' ? (
+        <div>
+          <input type="date" onChange={e => pick(e.target.value)}
+            style={{ padding: '1rem', fontSize: '1.05rem', border: `1px solid ${S.muted}`, background: 'rgba(255,255,255,0.6)', width: '100%', maxWidth: '300px' }} />
+          <div style={{ marginTop: '1rem' }}>
+            <button onClick={() => pick(null)} style={{ ...btn('ghost'), padding: '0.5rem 0', border: 'none', color: S.muted }}>Skip — no date yet</button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: '0.6rem' }}>
+          {realQ.opts.map((opt, i) => (
+            <button key={i} onClick={() => pick(opt.v)} style={{
+              textAlign: 'left',
+              padding: '1.1rem 1.4rem',
+              background: 'rgba(255,255,255,0.4)',
+              color: S.ink,
+              border: `1px solid ${S.muted}`,
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '1rem',
+              fontFamily: S.body.fontFamily,
+            }}>
+              <span style={{ ...S.mono, fontSize: '0.72rem', opacity: 0.6, marginTop: '0.15rem' }}>{String.fromCharCode(65 + i)}</span>
+              <span style={{ lineHeight: 1.4 }}>{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {realStep > 0 && (
+        <button onClick={() => setStep(realStep - 1)} style={{ ...btn('ghost'), marginTop: '1.5rem', padding: '0.5rem 0', border: 'none' }}>
+          <ArrowLeft size={14} /> Previous
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// TODAY — dashboard
+// ============================================================================
+function Today({ profile, concepts, cards, sessions, weeklyBriefs, setView, saveWeeklyBriefs }) {
+  const now = new Date();
+  const dueCards = cards.filter(c => new Date(c.dueDate) <= now);
+  const streak = calcStreak(sessions);
+  const readiness = computeReadiness(cards);
+  const recentAccuracy = sessions.slice(-5).reduce((a, s) => a + (s.accuracy || 0), 0) / Math.max(1, Math.min(sessions.length, 5));
+  const projection = projectReadiness(cards, sessions, profile);
+
+  // Adaptive nudge
+  let nudge = null;
+  if (sessions.length >= 3) {
+    const recentGap = sessions.slice(-5).reduce((a, s) => a + (s.avgConfidenceGap || 0), 0) / Math.min(sessions.length, 5);
+    if (recentAccuracy < 0.55) nudge = { tone: 'warn', msg: 'Recent accuracy under 55%. Shrinking queue, pausing new items. Consolidate before expanding.' };
+    else if (recentGap > 0.25) nudge = { tone: 'warn', msg: 'Confidence consistently outruns accuracy. Sessions today will emphasize calibration.' };
+    else if (recentGap < -0.15) nudge = { tone: 'info', msg: 'You\'re underconfident. You know more than you think. Trust your first instinct.' };
+    else if (recentAccuracy > 0.88 && cards.some(c => c.mastery < 0.7)) nudge = { tone: 'info', msg: 'High accuracy — but weak items remain. Surfacing them today.' };
+  }
+
+  // Weekly brief trigger
+  const lastBrief = weeklyBriefs[weeklyBriefs.length - 1];
+  const needsBrief = sessions.length >= 3 && (!lastBrief || (now - new Date(lastBrief.weekStart)) > 7 * 24 * 60 * 60 * 1000);
+
+  return (
+    <div className="fade-in">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
+        <div>
+          <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '0.5rem' }}>
+            {now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </div>
+          <h1 style={{ ...S.display, fontSize: '3rem', lineHeight: 1.0, margin: 0, fontWeight: 400 }}>Today.</h1>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ ...S.mono, fontSize: '0.68rem', color: S.muted, letterSpacing: '0.15em', textTransform: 'uppercase' }}>Streak</div>
+          <div style={{ ...S.display, fontSize: '2.5rem', color: streak > 0 ? S.accent : S.muted }}>{streak}</div>
+        </div>
+      </div>
+
+      {nudge && (
+        <Banner tone={nudge.tone}>
+          <strong>System adjustment.</strong> {nudge.msg}
+        </Banner>
+      )}
+
+      {/* Big stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1rem', marginBottom: '2.5rem' }}>
+        <Stat label="Due now" value={dueCards.length} accent />
+        <Stat label="Cards total" value={cards.length} />
+        <Stat label="Concepts" value={concepts.length} />
+        <Stat label="Readiness" value={`${Math.round(readiness * 100)}%`} />
+      </div>
+
+      {/* Forecast preview */}
+      {projection && projection.daysUntilExam > 0 && (
+        <Section title="Exam forecast" num="I">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', alignItems: 'center' }}>
+            <div>
+              <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.muted }}>Days until exam</div>
+              <div style={{ ...S.display, fontSize: '3.5rem', color: S.ink, lineHeight: 1 }}>{projection.daysUntilExam}</div>
+            </div>
+            <div>
+              <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.muted }}>Projected readiness</div>
+              <div style={{ ...S.display, fontSize: '3.5rem', color: projection.projected >= 0.85 ? S.success : S.accent, lineHeight: 1 }}>
+                {Math.round(projection.projected * 100)}%
+              </div>
+              {!projection.hasData && <div style={{ fontSize: '0.75rem', color: S.muted, marginTop: '0.25rem' }}>* Estimated — log more sessions for accuracy</div>}
+            </div>
+          </div>
+        </Section>
+      )}
+
+      {/* Primary action */}
+      <Section title="Your prescription" num={projection ? 'II' : 'I'}>
+        <p style={{ fontSize: '1.05rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+          {dueCards.length > 0 ? (
+            <>You have <strong>{dueCards.length}</strong> cards due. A focused session of {Math.min(dueCards.length, Math.ceil(profile.focusSpan / 3))} cards will take about <strong>{Math.min(profile.focusSpan, dueCards.length * 3)} minutes</strong>.</>
+          ) : cards.length === 0 ? (
+            <>You haven't loaded any material yet. Head to the Library and paste a chunk — a chapter, an outline, a case brief. The AI will extract concepts and generate questions.</>
+          ) : (
+            <>No cards due — nice job staying on schedule. You can do an optional weakness-targeting session on your lowest-mastery cards.</>
+          )}
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {cards.length === 0 ? (
+            <button onClick={() => setView('library')} style={btn('primary')}>
+              <Plus size={16} /> Load study material
+            </button>
+          ) : (
+            <>
+              <button onClick={() => setView('study')} style={btn('primary')}>
+                <Target size={16} /> {dueCards.length > 0 ? 'Start session' : 'Practice weakest'}
+              </button>
+              {cards.length >= 5 && (
+                <button onClick={() => setView('exam-setup')} style={btn('ghost')}>
+                  <Trophy size={16} /> Mock exam
+                </button>
+              )}
+            </>
+          )}
+          <button onClick={() => setView('library')} style={btn('ghost')}>
+            <Library size={16} /> Library
+          </button>
+        </div>
+      </Section>
+
+      {/* Weekly brief */}
+      {needsBrief && (
+        <Section title="Weekly retrospective" num={projection ? 'III' : 'II'}>
+          <WeeklyBriefGenerator profile={profile} cards={cards} sessions={sessions} weeklyBriefs={weeklyBriefs} saveWeeklyBriefs={saveWeeklyBriefs} />
+        </Section>
+      )}
+
+      {lastBrief && !needsBrief && (
+        <Section title="This week's brief" num={projection ? 'III' : 'II'}>
+          <BriefDisplay brief={lastBrief} />
+        </Section>
+      )}
+    </div>
+  );
+}
+
+function WeeklyBriefGenerator({ profile, cards, sessions, weeklyBriefs, saveWeeklyBriefs }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const generate = async () => {
+    setLoading(true); setError(null);
+    try {
+      const brief = await generateWeeklyBrief(profile, cards, sessions);
+      saveWeeklyBriefs([...weeklyBriefs, { ...brief, weekStart: new Date().toISOString() }]);
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
+  return (
+    <div>
+      <p style={{ color: S.muted, marginBottom: '1rem' }}>A 7-day window has passed. Generate your retrospective.</p>
+      {error && <Banner tone="warn">Couldn't generate brief: {error}</Banner>}
+      <button onClick={generate} disabled={loading} style={btn('primary')}>
+        {loading ? <><Loader size={16} className="spin" /> Generating…</> : <><Sparkles size={16} /> Generate brief</>}
+      </button>
+    </div>
+  );
+}
+
+function BriefDisplay({ brief }) {
+  return (
+    <div>
+      {brief.wins?.length > 0 && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: S.success, marginBottom: '0.5rem' }}>Wins</div>
+          <ul style={{ paddingLeft: '1.2rem', lineHeight: 1.7, margin: 0 }}>
+            {brief.wins.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+      {brief.stuck?.length > 0 && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: S.accent, marginBottom: '0.5rem' }}>Stuck</div>
+          <ul style={{ paddingLeft: '1.2rem', lineHeight: 1.7, margin: 0 }}>
+            {brief.stuck.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+      {brief.prescription && (
+        <div style={{ padding: '1rem 1.25rem', background: S.accentSoft, borderLeft: `3px solid ${S.accent}` }}>
+          <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: S.accent, marginBottom: '0.5rem' }}>Next 7 days</div>
+          <div style={{ fontSize: '1rem', lineHeight: 1.6 }}>{brief.prescription}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// LIBRARY — paste material, manage concepts, view visuals
+// ============================================================================
+function LibraryView({ concepts, cards, saveConcepts, saveCards, setView }) {
+  const [addMode, setAddMode] = useState(concepts.length === 0); // showing the add panel?
+  const [tab, setTab] = useState('paste'); // 'paste' | 'url' | 'file'
+  const [material, setMaterial] = useState('');
+  const [source, setSource] = useState('');
+  const [url, setUrl] = useState('');
+  const [fileInfo, setFileInfo] = useState(null); // { name, text }
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [stage, setStage] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
+  const [generatingVisualFor, setGeneratingVisualFor] = useState(null);
+
+  // The core ingest pipeline — takes text + source label
+  const runIngest = async (text, sourceLabel) => {
+    if (!text || text.trim().length < 50) {
+      setError('Material is too short. Need at least a few sentences.');
+      return;
+    }
+    setLoading(true); setError(null);
+    try {
+      setStage('extracting');
+      const newConcepts = await extractConcepts(text, sourceLabel || 'Untitled');
+      let allConcepts = [...concepts, ...newConcepts];
+      saveConcepts(allConcepts);
+
+      setStage('generating');
+      const newCards = [];
+      for (const concept of newConcepts) {
+        try {
+          const questions = await generateQuestions(concept);
+          questions.forEach((q, i) => {
+            newCards.push({
+              id: `${concept.id}-${i}`,
+              conceptId: concept.id,
+              type: q.type,
+              prompt: q.prompt,
+              expectedAnswer: q.expectedAnswer,
+              ef: 2.5, interval: 0, reps: 0, mastery: 0,
+              dueDate: new Date().toISOString(),
+              history: [], createdAt: new Date().toISOString(),
+            });
+          });
+        } catch (e) { console.error('Q gen failed:', concept.title, e); }
+      }
+      saveCards([...cards, ...newCards]);
+
+      // Background visual generation
+      setStage('visuals');
+      (async () => {
+        const updatedConcepts = [...allConcepts];
+        for (let i = 0; i < newConcepts.length; i++) {
+          const concept = newConcepts[i];
+          const svg = await generateVisual(concept);
+          if (svg) {
+            const idx = updatedConcepts.findIndex(c => c.id === concept.id);
+            if (idx >= 0) updatedConcepts[idx] = { ...updatedConcepts[idx], visualSVG: svg };
+            saveConcepts([...updatedConcepts]);
+          }
+        }
+      })();
+
+      // Reset inputs
+      setMaterial(''); setSource(''); setUrl(''); setFileInfo(null); setAddMode(false);
+    } catch (e) {
+      setError(e.message || 'Something went wrong. Try again.');
+    }
+    setLoading(false); setStage(null);
+  };
+
+  // PASTE: just runs ingest with current material + source
+  const submitPaste = () => runIngest(material, source);
+
+  // URL: fetch, then ingest
+  const submitURL = async () => {
+    if (!url.trim()) { setError('Enter a URL.'); return; }
+    let normalizedUrl = url.trim();
+    if (!normalizedUrl.match(/^https?:\/\//)) normalizedUrl = 'https://' + normalizedUrl;
+
+    setLoading(true); setError(null); setStage('fetching');
+    try {
+      const { title, text } = await fetchURL(normalizedUrl);
+      if (!text || text.length < 50) {
+        throw new Error('Page loaded but very little text was extracted. Try copy-pasting the article directly.');
+      }
+      setLoading(false);
+      await runIngest(text, source || title);
+    } catch (e) {
+      setError(e.message);
+      setLoading(false); setStage(null);
+    }
+  };
+
+  // FILE: read file, then ingest
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true); setError(null); setStage('reading');
+    try {
+      const text = await readFileContent(file);
+      if (!text || text.length < 50) {
+        throw new Error('File loaded but very little text was extracted. The file may be a scanned PDF (image-based) — try OCR first.');
+      }
+      setFileInfo({ name: file.name, text, size: file.size });
+      setLoading(false); setStage(null);
+    } catch (e) {
+      setError(e.message);
+      setLoading(false); setStage(null);
+    }
+  };
+
+  const submitFile = () => {
+    if (!fileInfo) return;
+    runIngest(fileInfo.text, source || fileInfo.name);
+  };
+
+  const deleteConcept = (id) => {
+    if (!confirm('Delete this concept and all its cards?')) return;
+    saveConcepts(concepts.filter(c => c.id !== id));
+    saveCards(cards.filter(c => c.conceptId !== id));
+  };
+
+  const regenerateVisual = async (conceptId) => {
+    setGeneratingVisualFor(conceptId);
+    const concept = concepts.find(c => c.id === conceptId);
+    if (!concept) { setGeneratingVisualFor(null); return; }
+    const svg = await generateVisual(concept);
+    if (svg) {
+      saveConcepts(concepts.map(c => c.id === conceptId ? { ...c, visualSVG: svg } : c));
+    }
+    setGeneratingVisualFor(null);
+  };
+
+  const stageLabel = {
+    fetching: ' Fetching page…',
+    reading: ' Reading file…',
+    extracting: ' Extracting concepts…',
+    generating: ' Generating questions…',
+    visuals: ' Building visuals…',
+  };
+
+  return (
+    <div className="fade-in">
+      <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '1rem' }}>◆ Library ◆</div>
+      <h1 style={{ ...S.display, fontSize: '3rem', lineHeight: 1.0, margin: '0 0 0.5rem', fontWeight: 400 }}>Your material.</h1>
+      <p style={{ color: S.muted, marginBottom: '2rem', maxWidth: '600px', lineHeight: 1.6 }}>
+        Paste text, pull from a URL, or upload a file (PDF, DOCX, TXT, MD). The AI extracts atomic concepts, generates retrieval questions, and creates a visual diagram for each.
+      </p>
+
+      {addMode ? (
+        <div style={{ background: 'rgba(255,255,255,0.5)', border: `1px solid ${S.ink}`, padding: '1.5rem', marginBottom: '2rem' }}>
+          {/* Tab selector */}
+          <div style={{ display: 'flex', gap: '0', marginBottom: '1.5rem', borderBottom: `1px solid ${S.subtle}` }}>
+            {[
+              { v: 'paste', label: 'Paste text', icon: <FileText size={14} /> },
+              { v: 'url', label: 'From URL', icon: <LinkIcon size={14} /> },
+              { v: 'file', label: 'Upload file', icon: <Upload size={14} /> },
+            ].map(t => (
+              <button key={t.v} onClick={() => { setTab(t.v); setError(null); }}
+                disabled={loading}
+                style={{
+                  padding: '0.6rem 1rem',
+                  background: 'transparent',
+                  color: tab === t.v ? S.ink : S.muted,
+                  border: 'none',
+                  borderBottom: tab === t.v ? `2px solid ${S.accent}` : '2px solid transparent',
+                  marginBottom: '-1px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  fontFamily: S.body.fontFamily,
+                  fontSize: '0.85rem',
+                  fontWeight: tab === t.v ? 600 : 500,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}>
+                {t.icon} {t.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Source label (shared across all tabs) */}
+          <label style={lbl}>Source label (optional)</label>
+          <input value={source} onChange={e => setSource(e.target.value)}
+            placeholder='e.g., "Contracts — Ch. 4"'
+            style={inp} disabled={loading} />
+
+          {/* PASTE TAB */}
+          {tab === 'paste' && (
+            <>
+              <label style={lbl}>Study material</label>
+              <textarea value={material} onChange={e => setMaterial(e.target.value)}
+                placeholder="Paste your material here. Don't worry about formatting."
+                rows={12}
+                style={{ ...inp, resize: 'vertical', minHeight: '200px' }}
+                disabled={loading} />
+              {error && <Banner tone="warn">{error}</Banner>}
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                <button onClick={submitPaste} disabled={loading} style={btn('primary')}>
+                  {loading ? (<><Loader size={16} className="spin" />{stageLabel[stage]}</>) : (<><Sparkles size={16} /> Process material</>)}
+                </button>
+                {concepts.length > 0 && !loading && (
+                  <button onClick={() => setAddMode(false)} style={btn('ghost')}>Cancel</button>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* URL TAB */}
+          {tab === 'url' && (
+            <>
+              <label style={lbl}>Web page URL</label>
+              <input value={url} onChange={e => setUrl(e.target.value)}
+                placeholder='https://en.wikipedia.org/wiki/Promissory_estoppel'
+                style={inp} disabled={loading}
+                onKeyDown={e => { if (e.key === 'Enter' && !loading) submitURL(); }} />
+              {error && <Banner tone="warn">{error}</Banner>}
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                <button onClick={submitURL} disabled={loading} style={btn('primary')}>
+                  {loading ? (<><Loader size={16} className="spin" />{stageLabel[stage]}</>) : (<><LinkIcon size={16} /> Fetch and process</>)}
+                </button>
+                {concepts.length > 0 && !loading && (
+                  <button onClick={() => setAddMode(false)} style={btn('ghost')}>Cancel</button>
+                )}
+              </div>
+              <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: S.muted, lineHeight: 1.5 }}>
+                Works best with Wikipedia, blog posts, articles, documentation. Sites that require login or aggressive JavaScript rendering may fail — paste the text directly if so.
+              </div>
+            </>
+          )}
+
+          {/* FILE TAB */}
+          {tab === 'file' && (
+            <>
+              <label style={lbl}>Upload a document</label>
+              {!fileInfo ? (
+                <div style={{
+                  border: `2px dashed ${S.muted}`,
+                  padding: '2rem',
+                  textAlign: 'center',
+                  background: 'rgba(255,255,255,0.3)',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+                  onClick={() => !loading && document.getElementById('file-upload-input').click()}>
+                  <Upload size={28} style={{ color: S.muted, marginBottom: '0.5rem' }} />
+                  <div style={{ ...S.display, fontSize: '1.1rem', marginBottom: '0.3rem' }}>
+                    {loading ? stageLabel[stage]?.trim() : 'Click to choose a file'}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: S.muted }}>
+                    PDF, DOCX, TXT, or MD · Max ~10 MB
+                  </div>
+                  <input id="file-upload-input" type="file"
+                    accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+                    onChange={handleFile}
+                    disabled={loading}
+                    style={{ display: 'none' }} />
+                </div>
+              ) : (
+                <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.4)', border: `1px solid ${S.subtle}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{fileInfo.name}</div>
+                      <div style={{ fontSize: '0.8rem', color: S.muted }}>
+                        {Math.round(fileInfo.text.length / 1000)}k chars extracted · {Math.round(fileInfo.size / 1024)} KB
+                      </div>
+                    </div>
+                    <button onClick={() => setFileInfo(null)} disabled={loading} style={iconBtn}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: S.paper, border: `1px solid ${S.subtle}`, fontSize: '0.8rem', color: S.muted, maxHeight: '120px', overflow: 'auto', lineHeight: 1.5 }}>
+                    {fileInfo.text.slice(0, 400)}{fileInfo.text.length > 400 ? '…' : ''}
+                  </div>
+                </div>
+              )}
+              {error && <Banner tone="warn">{error}</Banner>}
+              {fileInfo && (
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+                  <button onClick={submitFile} disabled={loading} style={btn('primary')}>
+                    {loading ? (<><Loader size={16} className="spin" />{stageLabel[stage]}</>) : (<><Sparkles size={16} /> Process this file</>)}
+                  </button>
+                  {concepts.length > 0 && !loading && (
+                    <button onClick={() => setAddMode(false)} style={btn('ghost')}>Cancel</button>
+                  )}
+                </div>
+              )}
+              <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: S.muted, lineHeight: 1.5 }}>
+                PDF text extraction works for digital PDFs. Scanned PDFs (image-based) won't extract — you'd need to OCR them first.
+              </div>
+            </>
+          )}
+
+          {loading && (
+            <p style={{ color: S.muted, fontSize: '0.85rem', marginTop: '0.75rem' }}>
+              30–90 seconds depending on size. Visuals continue generating in the background after questions are ready.
+            </p>
+          )}
+        </div>
+      ) : (
+        <button onClick={() => setAddMode(true)} style={{ ...btn('primary'), marginBottom: '2rem' }}>
+          <Plus size={16} /> Add material
+        </button>
+      )}
+
+      {concepts.length > 0 && (
+        <>
+          <h3 style={{ ...S.display, fontSize: '1.4rem', marginBottom: '1rem' }}>Concepts ({concepts.length})</h3>
+          <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '2rem' }}>
+            {concepts.map(c => {
+              const conceptCards = cards.filter(cd => cd.conceptId === c.id);
+              const avgMastery = conceptCards.length > 0
+                ? conceptCards.reduce((a, cd) => a + (cd.mastery || 0), 0) / conceptCards.length : 0;
+              const isOpen = expandedId === c.id;
+              return (
+                <div key={c.id} style={{ background: 'rgba(255,255,255,0.4)', border: `1px solid ${S.subtle}` }}>
+                  <div style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', cursor: 'pointer' }}
+                    onClick={() => setExpandedId(isOpen ? null : c.id)}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, marginBottom: '0.25rem', fontSize: '1.02rem' }}>{c.title}</div>
+                      <div style={{ fontSize: '0.85rem', color: S.muted, lineHeight: 1.5, marginBottom: '0.5rem' }}>
+                        {!isOpen && (c.content.length > 140 ? c.content.slice(0, 140) + '…' : c.content)}
+                      </div>
+                      <div style={{ ...S.mono, fontSize: '0.7rem', color: S.muted, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                        {c.source} · {conceptCards.length} cards · {Math.round(avgMastery * 100)}% mastery
+                        {c.visualSVG && ' · ◆ visual'}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                      <button onClick={(e) => { e.stopPropagation(); deleteConcept(c.id); }} style={iconBtn}><X size={14} /></button>
+                    </div>
+                  </div>
+                  {isOpen && (
+                    <div style={{ padding: '0 1.25rem 1.25rem', borderTop: `1px dashed ${S.subtle}`, marginTop: '0' }}>
+                      <div style={{ fontSize: '0.95rem', lineHeight: 1.65, marginTop: '1rem', marginBottom: '1.5rem', whiteSpace: 'pre-wrap' }}>{c.content}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                        <ImageIcon size={14} style={{ color: S.accent }} />
+                        <span style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: S.accent }}>Visual</span>
+                        {c.visualSVG && (
+                          <button onClick={(e) => { e.stopPropagation(); regenerateVisual(c.id); }}
+                            disabled={generatingVisualFor === c.id}
+                            style={{ ...btn('ghost'), padding: '0.25rem 0.5rem', fontSize: '0.7rem', marginLeft: 'auto' }}>
+                            {generatingVisualFor === c.id ? <Loader size={12} className="spin" /> : <RefreshCw size={12} />} Regenerate
+                          </button>
+                        )}
+                      </div>
+                      {c.visualSVG ? (
+                        <div style={{ background: S.paper, border: `1px solid ${S.subtle}`, padding: '1rem', overflow: 'auto' }}
+                          dangerouslySetInnerHTML={{ __html: c.visualSVG }} />
+                      ) : (
+                        <div style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.02)', border: `1px dashed ${S.muted}`, textAlign: 'center', color: S.muted, fontSize: '0.9rem' }}>
+                          {generatingVisualFor === c.id ? (
+                            <><Loader size={16} className="spin" style={{ display: 'inline', verticalAlign: 'middle', marginRight: '0.5rem' }} /> Generating…</>
+                          ) : (
+                            <>
+                              <div style={{ marginBottom: '0.75rem' }}>No visual yet.</div>
+                              <button onClick={(e) => { e.stopPropagation(); regenerateVisual(c.id); }} style={{ ...btn('primary'), padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+                                <Sparkles size={14} /> Generate visual
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <button onClick={() => setView('today')} style={btn('primary')}>
+            Go to today's session <ChevronRight size={16} />
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// STUDY SESSION — the practice loop
+// ============================================================================
+function StudySession({ profile, concepts, cards, saveCards, sessions, saveSessions, onDone }) {
+  const [phase, setPhase] = useState('focus');
+  const [queue, setQueue] = useState([]);
+  const [idx, setIdx] = useState(0);
+  const [confidence, setConfidence] = useState(null);
+  const [userAnswer, setUserAnswer] = useState('');
+  const [grading, setGrading] = useState(false);
+  const [gradeResult, setGradeResult] = useState(null);
+  const [results, setResults] = useState([]);
+  const [startTime] = useState(Date.now());
+
+  useEffect(() => {
+    const now = new Date();
+    let due = cards.filter(c => new Date(c.dueDate) <= now);
+    if (due.length === 0) {
+      due = [...cards].sort((a, b) => (a.mastery || 0) - (b.mastery || 0)).slice(0, 5);
+    }
+    // Interleave: shuffle, but avoid back-to-back same-concept cards
+    due = shuffleWithSpacing(due, 'conceptId');
+    // Cap by focus span
+    const maxItems = Math.max(3, Math.ceil(profile.focusSpan / 4));
+    setQueue(due.slice(0, maxItems));
+  }, []);
+
+  if (queue.length === 0 && phase !== 'focus') {
+    return (
+      <div style={{ textAlign: 'center', paddingTop: '3rem' }}>
+        <h2 style={{ ...S.display, fontSize: '2rem' }}>Nothing to study yet.</h2>
+        <p style={{ color: S.muted, marginBottom: '2rem' }}>Add material in the Library first.</p>
+        <button onClick={onDone} style={btn('primary')}>Back to today</button>
+      </div>
+    );
+  }
+
+  const current = queue[idx];
+  const concept = current ? concepts.find(c => c.id === current.conceptId) : null;
+
+  // FOCUS PHASE
+  if (phase === 'focus') {
+    return (
+      <div className="fade-in" style={{ paddingTop: '2rem', maxWidth: '600px' }}>
+        <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '1rem' }}>◆ Pre-flight ◆</div>
+        <h2 style={{ ...S.display, fontSize: '2.5rem', lineHeight: 1.1, marginBottom: '1.5rem' }}>Three locks.</h2>
+        <p style={{ color: S.muted, lineHeight: 1.6, marginBottom: '2rem' }}>
+          {queue.length} cards. About {Math.ceil(queue.length * 2.5)} minutes. The system needs honest signal — predict your confidence before each answer.
+        </p>
+        <ul style={{ listStyle: 'none', padding: 0, fontSize: '1.05rem', lineHeight: 2 }}>
+          <li>✓ Phone silenced and face-down</li>
+          <li>✓ Other tabs closed</li>
+          <li>✓ Water nearby</li>
+        </ul>
+        <button onClick={() => setPhase('prompt')} style={{ ...btn('primary'), marginTop: '2rem' }}>I'm ready <ChevronRight size={16} /></button>
+      </div>
+    );
+  }
+
+  // DONE PHASE
+  if (phase === 'done') {
+    const accuracy = results.filter(r => r.grade >= 2).length / Math.max(1, results.length);
+    const avgConfidence = results.reduce((a, r) => a + r.confidence, 0) / Math.max(1, results.length) / 3;
+    const avgConfidenceGap = avgConfidence - accuracy;
+    const duration = Math.round((Date.now() - startTime) / 60000);
+
+    return (
+      <div className="fade-in" style={{ paddingTop: '2rem' }}>
+        <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '1rem' }}>◆ Session complete ◆</div>
+        <h2 style={{ ...S.display, fontSize: '3rem', lineHeight: 1.0, marginBottom: '2rem', fontWeight: 400 }}>
+          {accuracy >= 0.8 ? 'Strong session.' : accuracy >= 0.6 ? 'Solid work.' : 'Honest work. That counts.'}
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+          <Stat label="Cards" value={results.length} />
+          <Stat label="Accuracy" value={`${Math.round(accuracy * 100)}%`} accent />
+          <Stat label="Confidence gap" value={`${avgConfidenceGap > 0 ? '+' : ''}${Math.round(avgConfidenceGap * 100)}%`} />
+          <Stat label="Minutes" value={duration} />
+        </div>
+        <div style={{ padding: '1.25rem', background: 'rgba(255,255,255,0.5)', border: `1px solid ${S.subtle}`, marginBottom: '2rem' }}>
+          <div style={{ ...S.display, fontSize: '1.2rem', marginBottom: '0.5rem' }}>What this means</div>
+          <div style={{ fontSize: '0.95rem', lineHeight: 1.6, color: S.muted }}>
+            {accuracy < 0.5 && 'Tomorrow we shrink the queue. Cognitive overload signals — fewer cards, deeper repetition.'}
+            {accuracy >= 0.5 && accuracy < 0.75 && 'Productive zone. Same pace tomorrow, with weak-item priority.'}
+            {accuracy >= 0.75 && 'Strong — we\'ll add new material and stretch your intervals.'}
+            {avgConfidenceGap > 0.2 && ' Your confidence is running ahead of your accuracy. The calibration drill stays active.'}
+            {avgConfidenceGap < -0.15 && ' You\'re underconfident. You actually know more than you think — trust your first instinct.'}
+          </div>
+        </div>
+        <button onClick={() => {
+          saveSessions([...sessions, {
+            date: new Date().toISOString(),
+            duration,
+            cardsReviewed: results.length,
+            accuracy,
+            avgConfidenceGap,
+          }]);
+          onDone();
+        }} style={btn('primary')}>Save and return <ChevronRight size={16} /></button>
+      </div>
+    );
+  }
+
+  // PROMPT
+  if (phase === 'prompt') {
+    return (
+      <div className="fade-in" style={{ paddingTop: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', ...S.mono, fontSize: '0.72rem', color: S.muted, marginBottom: '1rem', letterSpacing: '0.1em' }}>
+          <span>CARD {idx + 1} / {queue.length}</span>
+          <span>{current.type?.toUpperCase()} · {concept?.title?.slice(0, 40)}</span>
+        </div>
+        <div style={{ height: '2px', background: S.subtle, marginBottom: '2rem' }}>
+          <div style={{ width: `${(idx / queue.length) * 100}%`, height: '100%', background: S.accent }} />
+        </div>
+        <div style={{ padding: '2rem', background: 'rgba(255,255,255,0.4)', border: `1px solid ${S.subtle}`, marginBottom: '2rem' }}>
+          <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: S.accent, marginBottom: '1rem' }}>
+            {current.type === 'definitional' ? 'Recall' : current.type === 'discriminative' ? 'Distinguish' : 'Apply'}
+          </div>
+          <div style={{ fontSize: '1.2rem', lineHeight: 1.6, ...S.display }}>{current.prompt}</div>
+        </div>
+        <button onClick={() => setPhase('confidence')} style={btn('primary')}>I have my answer in mind <ChevronRight size={16} /></button>
+      </div>
+    );
+  }
+
+  // CONFIDENCE — predict before showing
+  if (phase === 'confidence') {
+    return (
+      <div className="fade-in" style={{ paddingTop: '1rem' }}>
+        <div style={{ ...S.mono, fontSize: '0.72rem', color: S.muted, marginBottom: '1rem', letterSpacing: '0.1em' }}>CARD {idx + 1} / {queue.length} · CALIBRATION</div>
+        <h2 style={{ ...S.display, fontSize: '2rem', lineHeight: 1.2, fontWeight: 400, marginBottom: '0.5rem' }}>How confident are you in your answer?</h2>
+        <p style={{ color: S.muted, marginBottom: '2rem', fontSize: '0.95rem' }}>Lock this in <em>before</em> you write. This trains calibration.</p>
+        <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '2rem' }}>
+          {[
+            { v: 0, label: 'No idea — total blank' },
+            { v: 1, label: 'Vague feeling, probably wrong' },
+            { v: 2, label: 'Pretty sure I have it' },
+            { v: 3, label: 'Confident — I could teach it' },
+          ].map(({ v, label }) => (
+            <button key={v} onClick={() => { setConfidence(v); setPhase('answer'); }} style={{
+              padding: '1rem 1.5rem',
+              background: 'rgba(255,255,255,0.4)',
+              border: `1px solid ${S.muted}`,
+              fontSize: '1rem', cursor: 'pointer', textAlign: 'left',
+              display: 'flex', gap: '1rem', alignItems: 'center',
+              fontFamily: S.body.fontFamily, color: S.ink,
+            }}>
+              <span style={{ ...S.mono, fontSize: '0.85rem', color: S.accent }}>{v}</span>
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ANSWER — user types their answer
+  if (phase === 'answer') {
+    return (
+      <div className="fade-in" style={{ paddingTop: '1rem' }}>
+        <div style={{ ...S.mono, fontSize: '0.72rem', color: S.muted, marginBottom: '1rem', letterSpacing: '0.1em' }}>CARD {idx + 1} / {queue.length} · YOUR ANSWER</div>
+        <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.3)', border: `1px solid ${S.subtle}`, marginBottom: '1.5rem' }}>
+          <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.muted, marginBottom: '0.5rem' }}>The question</div>
+          <div style={{ fontSize: '1.05rem', lineHeight: 1.5, ...S.display }}>{current.prompt}</div>
+        </div>
+        <textarea value={userAnswer} onChange={e => setUserAnswer(e.target.value)}
+          placeholder="Write your answer here — no notes, no peeking. Just what you actually know."
+          rows={6} autoFocus
+          style={{ ...inp, resize: 'vertical', minHeight: '150px', fontSize: '1rem', lineHeight: 1.6 }} />
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+          <button onClick={async () => {
+            setGrading(true); setPhase('grading');
+            try {
+              const result = await gradeAnswer(current.prompt, current.expectedAnswer, userAnswer || '(blank)', concept?.content || '');
+              setGradeResult(result);
+              setPhase('review');
+            } catch (e) {
+              setGradeResult({ grade: 2, feedback: 'AI grading failed — self-assess below.' });
+              setPhase('review');
+            }
+            setGrading(false);
+          }} disabled={grading} style={btn('primary')}>
+            {grading ? <><Loader size={16} className="spin" /> Grading…</> : <>Submit <ChevronRight size={16} /></>}
+          </button>
+          <button onClick={() => { setUserAnswer(''); }} disabled={grading} style={btn('ghost')}>Clear</button>
+        </div>
+      </div>
+    );
+  }
+
+  // GRADING - quick interstitial
+  if (phase === 'grading') {
+    return (
+      <div style={{ paddingTop: '4rem', textAlign: 'center' }}>
+        <Loader size={32} className="spin" style={{ color: S.accent }} />
+        <div style={{ marginTop: '1rem', color: S.muted }}>Grading…</div>
+      </div>
+    );
+  }
+
+  // REVIEW — show AI grade + model answer
+  if (phase === 'review') {
+    const aiGrade = gradeResult?.grade ?? 2;
+    const calibrationGap = (confidence - aiGrade);
+
+    return (
+      <div className="fade-in" style={{ paddingTop: '1rem' }}>
+        <div style={{ ...S.mono, fontSize: '0.72rem', color: S.muted, marginBottom: '1rem', letterSpacing: '0.1em' }}>CARD {idx + 1} / {queue.length} · REVIEW</div>
+
+        {/* AI grade banner */}
+        <div style={{
+          padding: '1.25rem 1.5rem',
+          background: aiGrade >= 2 ? 'rgba(58, 107, 58, 0.08)' : aiGrade === 1 ? 'rgba(168, 92, 42, 0.08)' : S.accentSoft,
+          borderLeft: `3px solid ${aiGrade >= 2 ? S.success : aiGrade === 1 ? S.warn : S.accent}`,
+          marginBottom: '1.5rem',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+            {aiGrade >= 2 ? <CheckCircle2 size={20} style={{ color: S.success }} /> : <AlertTriangle size={20} style={{ color: aiGrade === 1 ? S.warn : S.accent }} />}
+            <div style={{ ...S.display, fontSize: '1.3rem' }}>
+              {['Forgot', 'Partial', 'Correct', 'Excellent'][aiGrade]}
+            </div>
+            {Math.abs(calibrationGap) >= 2 && (
+              <div style={{ ...S.mono, fontSize: '0.7rem', color: S.accent, padding: '0.25rem 0.5rem', background: S.accentSoft, marginLeft: 'auto' }}>
+                CALIBRATION GAP: {calibrationGap > 0 ? '+' : ''}{calibrationGap}
+              </div>
+            )}
+          </div>
+          <div style={{ fontSize: '0.95rem', lineHeight: 1.5 }}>{gradeResult?.feedback}</div>
+        </div>
+
+        {/* Your answer */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.muted, marginBottom: '0.5rem' }}>You wrote</div>
+          <div style={{ padding: '1rem 1.25rem', background: 'rgba(255,255,255,0.3)', borderLeft: `2px solid ${S.muted}`, fontSize: '0.95rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+            {userAnswer || <em style={{ color: S.muted }}>(blank)</em>}
+          </div>
+        </div>
+
+        {/* Model answer */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.accent, marginBottom: '0.5rem' }}>Model answer</div>
+          <div style={{ padding: '1rem 1.25rem', background: '#fffaf0', border: `1px solid ${S.ink}`, fontSize: '0.95rem', lineHeight: 1.6 }}>
+            {current.expectedAnswer}
+          </div>
+        </div>
+
+        {/* Visual — dual coding: text answer + structured image encoded together */}
+        {concept?.visualSVG && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.accent, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <ImageIcon size={12} /> Concept visual
+            </div>
+            <div style={{ background: S.paper, border: `1px solid ${S.subtle}`, padding: '1rem', overflow: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: concept.visualSVG }} />
+          </div>
+        )}
+
+        {/* Confirm/override grade */}
+        <h3 style={{ ...S.display, fontSize: '1.3rem', marginBottom: '0.5rem' }}>Confirm or adjust the grade</h3>
+        <p style={{ color: S.muted, fontSize: '0.9rem', marginBottom: '1rem' }}>The AI suggested <strong style={{ color: S.ink }}>{['Forgot', 'Partial', 'Correct', 'Excellent'][aiGrade]}</strong>. You have final say — be honest, it drives the spacing.</p>
+        <div style={{ display: 'grid', gap: '0.5rem' }}>
+          {[
+            { v: 0, label: 'Forgot it completely', sub: 'Reset interval', color: S.accent },
+            { v: 1, label: 'Got it wrong / partial', sub: 'Tighten interval', color: S.warn },
+            { v: 2, label: 'Got it — some hesitation', sub: 'Standard interval growth', color: '#5d7a3a' },
+            { v: 3, label: 'Nailed it — fluent', sub: 'Extend interval', color: S.success },
+          ].map(({ v, label, sub, color }) => (
+            <button key={v} onClick={() => gradeItem(v)} style={{
+              padding: '1rem 1.25rem',
+              background: v === aiGrade ? 'rgba(122, 31, 26, 0.04)' : 'rgba(255,255,255,0.4)',
+              border: `1px solid ${v === aiGrade ? S.accent : S.muted}`,
+              cursor: 'pointer', textAlign: 'left',
+              display: 'flex', gap: '1rem', alignItems: 'center',
+              fontFamily: S.body.fontFamily, color: S.ink,
+            }}>
+              <span style={{ ...S.mono, fontSize: '0.85rem', color, fontWeight: 600 }}>{v}</span>
+              <div>
+                <div style={{ fontWeight: 600 }}>{label} {v === aiGrade && <span style={{ fontSize: '0.7rem', color: S.accent, marginLeft: '0.5rem' }}>← AI suggested</span>}</div>
+                <div style={{ fontSize: '0.8rem', color: S.muted }}>{sub}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function gradeItem(quality) {
+    const next = { ...current, ...nextReview(current, quality) };
+    next.mastery = ((current.mastery || 0) * 0.6) + ((quality / 3) * 0.4);
+    next.history = [...(current.history || []), { date: new Date().toISOString(), confidence, grade: quality, gap: confidence - quality }];
+    const newCards = cards.map(c => c.id === current.id ? next : c);
+    saveCards(newCards);
+
+    setResults([...results, { id: current.id, confidence, grade: quality }]);
+
+    if (idx + 1 < queue.length) {
+      setIdx(idx + 1);
+      setPhase('prompt');
+      setConfidence(null); setUserAnswer(''); setGradeResult(null);
+    } else {
+      setPhase('done');
+    }
+  }
+}
+
+function shuffleWithSpacing(arr, key) {
+  // Fisher-Yates then a quick pass to avoid adjacent duplicates by key
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  for (let i = 1; i < a.length; i++) {
+    if (a[i][key] === a[i - 1][key]) {
+      for (let j = i + 1; j < a.length; j++) {
+        if (a[j][key] !== a[i - 1][key]) {
+          [a[i], a[j]] = [a[j], a[i]];
+          break;
+        }
+      }
+    }
+  }
+  return a;
+}
+
+// ============================================================================
+// MOCK EXAM — Setup
+// ============================================================================
+function ExamSetup({ profile, concepts, cards, setView, onStart }) {
+  const [numQuestions, setNumQuestions] = useState(10);
+  const [timeMinutes, setTimeMinutes] = useState(30);
+  const [format, setFormat] = useState('multiple-choice');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [error, setError] = useState(null);
+
+  const sources = [...new Set(concepts.map(c => c.source))];
+  const eligible = sourceFilter === 'all'
+    ? concepts
+    : sourceFilter === 'weakest'
+      ? [...concepts].map(c => {
+          const cs = cards.filter(cd => cd.conceptId === c.id);
+          const mastery = cs.length > 0 ? cs.reduce((a, x) => a + (x.mastery || 0), 0) / cs.length : 0;
+          return { ...c, mastery };
+        }).sort((a, b) => a.mastery - b.mastery).slice(0, Math.min(concepts.length, Math.max(5, numQuestions)))
+      : concepts.filter(c => c.source === sourceFilter);
+
+  const canStart = eligible.length >= 1 && numQuestions >= 1 && timeMinutes >= 1;
+
+  const start = () => {
+    if (eligible.length < 1) { setError('No eligible concepts.'); return; }
+    onStart({
+      numQuestions: Math.min(numQuestions, eligible.length * 3),
+      timeMinutes,
+      format,
+      sourceFilter,
+      eligibleConceptIds: eligible.map(c => c.id),
+      startedAt: new Date().toISOString(),
+    });
+  };
+
+  return (
+    <div className="fade-in">
+      <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '1rem' }}>◆ Mock Exam ◆</div>
+      <h1 style={{ ...S.display, fontSize: '3rem', lineHeight: 1.0, margin: '0 0 1rem', fontWeight: 400 }}>
+        Sit the test.
+      </h1>
+      <p style={{ color: S.muted, marginBottom: '2.5rem', maxWidth: '600px', lineHeight: 1.6 }}>
+        Timed, scored, no calibration drills — like the real thing. Questions are AI-generated in your chosen format. Missed questions feed back into your spaced repetition queue.
+      </p>
+
+      <Section title="Configure your exam" num="I">
+        <label style={lbl}>Question format</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.5rem', marginBottom: '1.5rem' }}>
+          {[
+            { v: 'multiple-choice', label: 'Multiple choice', sub: 'MBE / cert style' },
+            { v: 'short-answer', label: 'Short answer', sub: '3-5 sentences each' },
+            { v: 'fact-pattern', label: 'Fact pattern', sub: 'Apply to scenario' },
+            { v: 'essay', label: 'Essay', sub: 'IRAC-style response' },
+          ].map(opt => (
+            <button key={opt.v} onClick={() => setFormat(opt.v)} style={{
+              padding: '0.85rem',
+              background: format === opt.v ? S.ink : 'rgba(255,255,255,0.4)',
+              color: format === opt.v ? S.paper : S.ink,
+              border: `1px solid ${format === opt.v ? S.ink : S.muted}`,
+              cursor: 'pointer', textAlign: 'left', fontFamily: S.body.fontFamily,
+            }}>
+              <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{opt.label}</div>
+              <div style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '0.2rem' }}>{opt.sub}</div>
+            </button>
+          ))}
+        </div>
+
+        <label style={lbl}>Number of questions</label>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          {[5, 10, 20, 30].map(n => (
+            <button key={n} onClick={() => setNumQuestions(n)} style={{
+              padding: '0.5rem 1rem',
+              border: `1px solid ${numQuestions === n ? S.ink : S.muted}`,
+              background: numQuestions === n ? S.ink : 'transparent',
+              color: numQuestions === n ? S.paper : S.ink,
+              cursor: 'pointer', fontSize: '0.85rem',
+            }}>{n}</button>
+          ))}
+        </div>
+
+        <label style={lbl}>Time limit (minutes)</label>
+        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+          {[10, 20, 30, 60, 90].map(n => (
+            <button key={n} onClick={() => setTimeMinutes(n)} style={{
+              padding: '0.5rem 1rem',
+              border: `1px solid ${timeMinutes === n ? S.ink : S.muted}`,
+              background: timeMinutes === n ? S.ink : 'transparent',
+              color: timeMinutes === n ? S.paper : S.ink,
+              cursor: 'pointer', fontSize: '0.85rem',
+            }}>{n}</button>
+          ))}
+        </div>
+
+        <label style={lbl}>Draw from</label>
+        <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} style={inp}>
+          <option value="all">All concepts ({concepts.length})</option>
+          <option value="weakest">Weakest concepts only</option>
+          {sources.map(s => <option key={s} value={s}>{s} ({concepts.filter(c => c.source === s).length})</option>)}
+        </select>
+
+        <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: S.muted }}>
+          {eligible.length} concept{eligible.length !== 1 ? 's' : ''} eligible · ~{Math.round(timeMinutes / numQuestions * 60)}s per question
+        </div>
+      </Section>
+
+      {error && <Banner tone="warn">{error}</Banner>}
+
+      <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem' }}>
+        <button onClick={start} disabled={!canStart} style={btn('primary')}>
+          <Trophy size={16} /> Begin exam
+        </button>
+        <button onClick={() => setView('today')} style={btn('ghost')}>Cancel</button>
+      </div>
+
+      <div style={{ marginTop: '2rem', padding: '1rem', borderLeft: `3px solid ${S.accent}`, background: S.accentSoft, fontSize: '0.85rem', color: S.muted, lineHeight: 1.6 }}>
+        <strong style={{ color: S.ink }}>Note on exam questions:</strong> Questions are AI-generated in the chosen format. They are not reproductions of real exam questions, which are copyrighted by testing bodies. Format and style fidelity is the goal — for real released questions, use your testing body's official practice materials.
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// MOCK EXAM — Run
+// ============================================================================
+function ExamRun({ profile, concepts, cards, config, saveCards, examResults, saveExamResults, onDone }) {
+  const [phase, setPhase] = useState('loading');
+  const [questions, setQuestions] = useState([]);
+  const [idx, setIdx] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [timeLeft, setTimeLeft] = useState(config.timeMinutes * 60);
+  const [results, setResults] = useState(null);
+  const [genError, setGenError] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const eligible = concepts.filter(c => config.eligibleConceptIds.includes(c.id));
+      const pool = [];
+      for (let i = 0; i < config.numQuestions; i++) {
+        pool.push(eligible[i % eligible.length]);
+      }
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      try {
+        const generated = [];
+        for (const concept of pool) {
+          const q = await generateExamQuestion(concept, config.format);
+          if (q) generated.push({ ...q, conceptId: concept.id, conceptTitle: concept.title });
+        }
+        if (generated.length === 0) {
+          setGenError("Couldn't generate any questions. Try again with different settings.");
+          return;
+        }
+        setQuestions(generated);
+        setPhase('exam');
+      } catch (e) {
+        setGenError(e.message);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'exam') return;
+    if (timeLeft <= 0) { finishExam(); return; }
+    const t = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+    return () => clearTimeout(t);
+  }, [phase, timeLeft]);
+
+  const setAnswer = (val) => {
+    setAnswers({ ...answers, [idx]: val });
+  };
+
+  const finishExam = async () => {
+    setPhase('grading');
+    const graded = [];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      const userAnswer = answers[i] || {};
+      if (config.format === 'multiple-choice') {
+        const correct = userAnswer.mcChoice === q.correct;
+        graded.push({
+          conceptId: q.conceptId,
+          conceptTitle: q.conceptTitle,
+          prompt: q.prompt,
+          userAnswer: userAnswer.mcChoice || '(no answer)',
+          correctAnswer: q.correct,
+          correctText: q.options?.[q.correct],
+          explanation: q.explanation,
+          score: correct ? 1 : 0,
+          maxScore: 1,
+        });
+      } else {
+        const text = userAnswer.text || '';
+        const result = text.trim()
+          ? await gradeExamAnswer(q.prompt, q.modelAnswer, q.scoringPoints || [], text)
+          : { totalScore: 0, maxScore: q.scoringPoints?.length || 1, feedback: 'No answer provided.', pointsAwarded: [] };
+        graded.push({
+          conceptId: q.conceptId,
+          conceptTitle: q.conceptTitle,
+          prompt: q.prompt,
+          userAnswer: text || '(no answer)',
+          modelAnswer: q.modelAnswer,
+          feedback: result.feedback,
+          score: result.totalScore,
+          maxScore: result.maxScore,
+        });
+      }
+    }
+    const totalScore = graded.reduce((a, g) => a + g.score, 0);
+    const maxScore = graded.reduce((a, g) => a + g.maxScore, 0);
+    const finalResult = {
+      date: new Date().toISOString(),
+      format: config.format,
+      numQuestions: questions.length,
+      timeUsed: config.timeMinutes * 60 - timeLeft,
+      timeLimit: config.timeMinutes * 60,
+      score: totalScore,
+      maxScore,
+      percentage: maxScore > 0 ? totalScore / maxScore : 0,
+      questions: graded,
+    };
+
+    const missedConceptIds = [...new Set(graded.filter(g => g.score / g.maxScore < 0.5).map(g => g.conceptId))];
+    if (missedConceptIds.length > 0) {
+      const updatedCards = cards.map(c => {
+        if (missedConceptIds.includes(c.conceptId)) {
+          const due = new Date();
+          due.setDate(due.getDate() + 1);
+          return {
+            ...c,
+            mastery: Math.max(0, (c.mastery || 0) - 0.15),
+            dueDate: due.toISOString(),
+            interval: 1,
+          };
+        }
+        return c;
+      });
+      saveCards(updatedCards);
+    }
+
+    saveExamResults([...examResults, finalResult]);
+    setResults(finalResult);
+    setPhase('results');
+  };
+
+  if (phase === 'loading') {
+    return (
+      <div style={{ paddingTop: '4rem', textAlign: 'center' }}>
+        <Loader size={32} className="spin" style={{ color: S.accent }} />
+        <div style={{ ...S.display, fontSize: '1.5rem', marginTop: '1rem' }}>Building your exam…</div>
+        <div style={{ color: S.muted, marginTop: '0.5rem', fontSize: '0.9rem' }}>Generating {config.numQuestions} {config.format} questions. ~{Math.ceil(config.numQuestions * 3)} seconds.</div>
+        {genError && <Banner tone="warn">{genError}</Banner>}
+      </div>
+    );
+  }
+
+  if (phase === 'grading') {
+    return (
+      <div style={{ paddingTop: '4rem', textAlign: 'center' }}>
+        <Loader size={32} className="spin" style={{ color: S.accent }} />
+        <div style={{ ...S.display, fontSize: '1.5rem', marginTop: '1rem' }}>Grading your exam…</div>
+        <div style={{ color: S.muted, marginTop: '0.5rem' }}>{config.format === 'multiple-choice' ? 'Calculating scores' : 'AI evaluating answers against rubrics'}.</div>
+      </div>
+    );
+  }
+
+  if (phase === 'results') {
+    const pct = results.percentage;
+    const missedConcepts = [...new Set(results.questions.filter(q => q.score / q.maxScore < 0.5).map(q => q.conceptTitle))];
+
+    return (
+      <div className="fade-in">
+        <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '1rem' }}>◆ Exam Complete ◆</div>
+        <h1 style={{ ...S.display, fontSize: '3.5rem', lineHeight: 1.0, margin: '0 0 1rem', fontWeight: 400 }}>
+          {Math.round(pct * 100)}%
+        </h1>
+        <p style={{ color: S.muted, marginBottom: '2rem', fontSize: '1.05rem' }}>
+          {results.score.toFixed(1)} / {results.maxScore} · {Math.round(results.timeUsed / 60)}m {results.timeUsed % 60}s used of {Math.round(results.timeLimit / 60)}m
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
+          <Stat label="Correct" value={results.questions.filter(q => q.score / q.maxScore >= 0.8).length} />
+          <Stat label="Partial" value={results.questions.filter(q => q.score / q.maxScore >= 0.5 && q.score / q.maxScore < 0.8).length} />
+          <Stat label="Missed" value={results.questions.filter(q => q.score / q.maxScore < 0.5).length} accent />
+          <Stat label="Time/q (avg)" value={`${Math.round(results.timeUsed / results.questions.length)}s`} />
+        </div>
+
+        {missedConcepts.length > 0 && (
+          <div style={{ padding: '1rem 1.25rem', background: S.accentSoft, borderLeft: `3px solid ${S.accent}`, marginBottom: '2rem' }}>
+            <div style={{ ...S.display, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Pushed back into your queue</div>
+            <div style={{ fontSize: '0.9rem', lineHeight: 1.6 }}>
+              {missedConcepts.length} concept{missedConcepts.length !== 1 ? 's' : ''} you missed are now due tomorrow at the top of your queue: {missedConcepts.slice(0, 4).join(', ')}{missedConcepts.length > 4 ? `, +${missedConcepts.length - 4} more` : ''}.
+            </div>
+          </div>
+        )}
+
+        <Section title="Question-by-question review" num="I">
+          {results.questions.map((q, i) => (
+            <div key={i} style={{ padding: '1rem 0', borderBottom: `1px dashed ${S.subtle}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.5rem' }}>
+                <div style={{ ...S.mono, fontSize: '0.75rem', color: S.muted }}>Q{i + 1} · {q.conceptTitle}</div>
+                <div style={{ ...S.mono, fontSize: '0.85rem', fontWeight: 600, color: q.score / q.maxScore >= 0.8 ? S.success : q.score / q.maxScore >= 0.5 ? S.warn : S.accent }}>
+                  {q.score}/{q.maxScore}
+                </div>
+              </div>
+              <div style={{ fontSize: '0.95rem', lineHeight: 1.5, marginBottom: '0.5rem' }}>{q.prompt}</div>
+              {q.correctText && (
+                <div style={{ fontSize: '0.85rem', color: S.muted, marginBottom: '0.25rem' }}>
+                  Your answer: <strong style={{ color: S.ink }}>{q.userAnswer}</strong> · Correct: <strong style={{ color: S.success }}>{q.correctAnswer}. {q.correctText}</strong>
+                </div>
+              )}
+              {q.feedback && <div style={{ fontSize: '0.85rem', color: S.muted, marginTop: '0.5rem', fontStyle: 'italic' }}>{q.feedback}</div>}
+              {q.explanation && <div style={{ fontSize: '0.85rem', color: S.muted, marginTop: '0.5rem' }}>{q.explanation}</div>}
+            </div>
+          ))}
+        </Section>
+
+        <button onClick={onDone} style={{ ...btn('primary'), marginTop: '2rem' }}>Done <ChevronRight size={16} /></button>
+      </div>
+    );
+  }
+
+  const q = questions[idx];
+  if (!q) return null;
+
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
+  const lowTime = timeLeft < 60;
+
+  return (
+    <div className="fade-in" style={{ paddingTop: '0.5rem' }}>
+      <div style={{ position: 'sticky', top: '60px', background: S.paper, padding: '0.75rem 0', borderBottom: `1px solid ${S.subtle}`, marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 5 }}>
+        <div style={{ ...S.mono, fontSize: '0.85rem', color: S.muted, letterSpacing: '0.1em' }}>
+          Q {idx + 1} / {questions.length}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: lowTime ? S.accent : S.ink }}>
+          <Clock size={16} />
+          <div style={{ ...S.mono, fontSize: '1.1rem', fontWeight: 600 }}>
+            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.2em', textTransform: 'uppercase', color: S.accent, marginBottom: '0.5rem' }}>
+          {config.format.replace('-', ' ')}
+        </div>
+        <div style={{ fontSize: '1.1rem', lineHeight: 1.65, ...S.display, marginBottom: '1.5rem' }}>{q.prompt}</div>
+
+        {config.format === 'multiple-choice' ? (
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
+            {Object.entries(q.options || {}).map(([letter, text]) => (
+              <button key={letter} onClick={() => setAnswer({ mcChoice: letter })} style={{
+                padding: '1rem 1.25rem',
+                background: answers[idx]?.mcChoice === letter ? S.ink : 'rgba(255,255,255,0.4)',
+                color: answers[idx]?.mcChoice === letter ? S.paper : S.ink,
+                border: `1px solid ${answers[idx]?.mcChoice === letter ? S.ink : S.muted}`,
+                cursor: 'pointer', textAlign: 'left',
+                display: 'flex', gap: '1rem', alignItems: 'flex-start',
+                fontFamily: S.body.fontFamily, fontSize: '0.95rem', lineHeight: 1.5,
+              }}>
+                <span style={{ ...S.mono, fontSize: '0.85rem', opacity: 0.7, marginTop: '0.1rem' }}>{letter}</span>
+                <span>{text}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <textarea
+            value={answers[idx]?.text || ''}
+            onChange={e => setAnswer({ text: e.target.value })}
+            placeholder="Write your answer. The AI will grade it against the scoring rubric."
+            rows={config.format === 'essay' ? 12 : 6}
+            style={{ ...inp, minHeight: config.format === 'essay' ? '300px' : '150px', resize: 'vertical', fontSize: '1rem', lineHeight: 1.6 }}
+          />
+        )}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem' }}>
+        <button onClick={() => idx > 0 && setIdx(idx - 1)} disabled={idx === 0} style={btn('ghost')}>
+          <ArrowLeft size={14} /> Previous
+        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {idx < questions.length - 1 ? (
+            <button onClick={() => setIdx(idx + 1)} style={btn('primary')}>
+              Next <ChevronRight size={16} />
+            </button>
+          ) : (
+            <button onClick={() => { if (confirm('Submit your exam?')) finishExam(); }} style={btn('primary')}>
+              Submit exam <Trophy size={16} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: '2rem', padding: '1rem', borderTop: `1px solid ${S.subtle}` }}>
+        <div style={{ ...S.mono, fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.muted, marginBottom: '0.5rem' }}>Question map</div>
+        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+          {questions.map((_, i) => (
+            <button key={i} onClick={() => setIdx(i)} style={{
+              width: '32px', height: '32px',
+              background: i === idx ? S.ink : answers[i] ? S.accentSoft : 'transparent',
+              color: i === idx ? S.paper : S.ink,
+              border: `1px solid ${answers[i] ? S.accent : S.muted}`,
+              ...S.mono, fontSize: '0.75rem', fontWeight: 600,
+              cursor: 'pointer',
+            }}>{i + 1}</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// FORECAST — readiness projection
+// ============================================================================
+function Forecast({ profile, cards, sessions, concepts, examResults }) {
+  const projection = projectReadiness(cards, sessions, profile);
+  const readiness = computeReadiness(cards);
+  const weakConcepts = concepts.map(c => {
+    const cs = cards.filter(card => card.conceptId === c.id);
+    const mastery = cs.length > 0 ? cs.reduce((a, x) => a + (x.mastery || 0), 0) / cs.length : 0;
+    return { ...c, mastery, cardCount: cs.length };
+  }).sort((a, b) => a.mastery - b.mastery);
+
+  const recentSessions = sessions.slice(-10);
+  const trend = recentSessions.length >= 4
+    ? recentSessions.slice(-3).reduce((a, s) => a + s.accuracy, 0) / 3 -
+      recentSessions.slice(0, 3).reduce((a, s) => a + s.accuracy, 0) / 3
+    : 0;
+
+  return (
+    <div className="fade-in">
+      <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '1rem' }}>◆ Forecast ◆</div>
+      <h1 style={{ ...S.display, fontSize: '3rem', lineHeight: 1.0, margin: '0 0 2rem', fontWeight: 400 }}>The trajectory.</h1>
+
+      {!profile.examDate ? (
+        <div style={{ padding: '1.5rem', background: 'rgba(255,255,255,0.4)', border: `1px solid ${S.subtle}`, marginBottom: '2rem' }}>
+          <p style={{ margin: 0, color: S.muted }}>No exam date set. Set one in <strong>Adjust</strong> to enable projected readiness.</p>
+        </div>
+      ) : projection ? (
+        <Section title="Readiness vs. exam date" num="I">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+            <Stat label="Days remaining" value={projection.daysUntilExam} accent />
+            <Stat label="Current readiness" value={`${Math.round(projection.current * 100)}%`} />
+            <Stat label="Projected" value={`${Math.round(projection.projected * 100)}%`} />
+            <Stat label="Gap to 85%" value={projection.gap > 0 ? `${Math.round(projection.gap * 100)}%` : '✓'} />
+          </div>
+          {projection.gap > 0 && projection.hasData && (
+            <div style={{ padding: '1rem 1.25rem', background: S.accentSoft, borderLeft: `3px solid ${S.accent}`, fontSize: '0.95rem', lineHeight: 1.6 }}>
+              <strong>To hit 85% by your exam date:</strong> at your current pace, you're projected to land at {Math.round(projection.projected * 100)}%. Closing the gap requires roughly <strong>{Math.ceil((projection.gap / 0.04) * 7 / projection.daysUntilExam * profile.hoursPerWeek)} additional hours per week</strong> — or cutting low-priority concepts.
+            </div>
+          )}
+          {!projection.hasData && (
+            <div style={{ padding: '1rem 1.25rem', background: 'rgba(255,255,255,0.4)', border: `1px solid ${S.subtle}`, fontSize: '0.9rem', color: S.muted }}>
+              Projection is rough — log a few more sessions for accuracy.
+            </div>
+          )}
+        </Section>
+      ) : null}
+
+      <Section title="Accuracy trend" num={profile.examDate ? 'II' : 'I'}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem' }}>
+          <div style={{ ...S.display, fontSize: '2.5rem', color: trend > 0.05 ? S.success : trend < -0.05 ? S.accent : S.ink }}>
+            {trend > 0.05 ? '↗' : trend < -0.05 ? '↘' : '→'}
+          </div>
+          <div style={{ color: S.muted }}>
+            {trend > 0.05 && <>Last 3 sessions are stronger than your earliest 3. Pace is working.</>}
+            {trend < -0.05 && <>Last 3 sessions are weaker than your earliest 3. Possible fatigue, overloading, or harder material — consider shrinking session size.</>}
+            {Math.abs(trend) <= 0.05 && <>Steady. {sessions.length < 4 ? 'Log a few more sessions to see trend.' : 'No drift in either direction.'}</>}
+          </div>
+        </div>
+      </Section>
+
+      {examResults && examResults.length > 0 && (
+        <Section title="Mock exam history" num={profile.examDate ? 'III' : 'II'}>
+          {examResults.slice(-5).reverse().map((r, i) => (
+            <div key={i} style={{ padding: '0.75rem 0', borderBottom: `1px dashed ${S.subtle}`, display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>{r.format.replace('-', ' ')} · {r.numQuestions} questions</div>
+                <div style={{ fontSize: '0.75rem', color: S.muted }}>
+                  {new Date(r.date).toLocaleDateString()} · {Math.round(r.timeUsed / 60)}m of {Math.round(r.timeLimit / 60)}m
+                </div>
+              </div>
+              <div style={{ ...S.display, fontSize: '1.5rem', color: r.percentage >= 0.7 ? S.success : r.percentage >= 0.5 ? S.warn : S.accent }}>
+                {Math.round(r.percentage * 100)}%
+              </div>
+            </div>
+          ))}
+        </Section>
+      )}
+
+      <Section title="Weakest concepts — prioritize" num={profile.examDate ? (examResults?.length > 0 ? 'IV' : 'III') : (examResults?.length > 0 ? 'III' : 'II')}>
+        {weakConcepts.length === 0 ? <p style={{ color: S.muted }}>No concepts yet.</p> :
+          weakConcepts.slice(0, 5).map(c => (
+            <div key={c.id} style={{ padding: '0.75rem 0', borderBottom: `1px dashed ${S.subtle}`, display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>{c.title}</div>
+                <div style={{ fontSize: '0.75rem', color: S.muted }}>{c.cardCount} cards · {c.source}</div>
+              </div>
+              <div style={{ ...S.mono, fontSize: '0.9rem', color: c.mastery < 0.4 ? S.accent : S.muted }}>{Math.round(c.mastery * 100)}%</div>
+            </div>
+          ))}
+      </Section>
+    </div>
+  );
+}
+
+// ============================================================================
+// ADJUST
+// ============================================================================
+function Adjust({ profile, saveProfile, reset, setView }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(profile);
+
+  return (
+    <div className="fade-in">
+      <div style={{ fontSize: '0.75rem', letterSpacing: '0.3em', textTransform: 'uppercase', color: S.accent, marginBottom: '1rem' }}>◆ Adjust ◆</div>
+      <h1 style={{ ...S.display, fontSize: '3rem', lineHeight: 1.0, margin: '0 0 2rem', fontWeight: 400 }}>Recalibrate.</h1>
+
+      <Section title="Your profile" num="I">
+        <Datum label="Goal" value={profile.goal} />
+        {profile.examDate && <Datum label="Exam date" value={new Date(profile.examDate).toLocaleDateString()} />}
+        <Datum label="Hours/week" value={profile.hoursPerWeek} />
+        <Datum label="Baseline" value={profile.baseline} />
+        <Datum label="Calibration self-report" value={profile.calibration} />
+        <Datum label="Failure mode" value={profile.failureMode} />
+        <Datum label="Focus span" value={`${profile.focusSpan} min`} />
+      </Section>
+
+      {editing ? (
+        <Section title="Quick edits" num="II">
+          <label style={lbl}>Exam date</label>
+          <input type="date" value={draft.examDate || ''} onChange={e => setDraft({ ...draft, examDate: e.target.value })} style={inp} />
+          <label style={lbl}>Hours per week</label>
+          <input type="number" value={draft.hoursPerWeek} onChange={e => setDraft({ ...draft, hoursPerWeek: parseInt(e.target.value) || 0 })} style={inp} />
+          <label style={lbl}>Focus span (minutes)</label>
+          <select value={draft.focusSpan} onChange={e => setDraft({ ...draft, focusSpan: parseInt(e.target.value) })} style={inp}>
+            <option value={25}>25</option>
+            <option value={45}>45</option>
+            <option value={75}>75</option>
+          </select>
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+            <button onClick={() => { saveProfile(draft); setEditing(false); }} style={btn('primary')}>Save</button>
+            <button onClick={() => { setDraft(profile); setEditing(false); }} style={btn('ghost')}>Cancel</button>
+          </div>
+        </Section>
+      ) : (
+        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem', flexWrap: 'wrap' }}>
+          <button onClick={() => setEditing(true)} style={btn('primary')}>Edit profile</button>
+          <button onClick={() => setView('diagnostic')} style={btn('ghost')}><RefreshCw size={16} /> Retake diagnostic</button>
+          <button onClick={reset} style={{ ...btn('ghost'), color: S.accent, borderColor: S.accent }}>Reset everything</button>
+        </div>
+      )}
+
+      <div style={{ marginTop: '3rem', padding: '1.25rem', background: 'rgba(255,255,255,0.4)', borderLeft: `3px solid ${S.ink}`, fontSize: '0.9rem', lineHeight: 1.6 }}>
+        <strong style={{ ...S.display, fontSize: '1.1rem', display: 'block', marginBottom: '0.5rem' }}>How the system adapts</strong>
+        <ul style={{ paddingLeft: '1.2rem', margin: 0, color: S.muted }}>
+          <li>Accuracy under 55% → queue shrinks, new items pause</li>
+          <li>Confidence &gt;25% above accuracy → calibration emphasis</li>
+          <li>Confidence below accuracy → trust-your-instinct prompts</li>
+          <li>Weak concepts surface ahead of SM-2 schedule</li>
+          <li>Forecast updates weekly based on actual session data</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// SHARED COMPONENTS
+// ============================================================================
+function Section({ title, num, children }) {
+  return (
+    <div style={{ borderTop: `1px solid ${S.ink}`, paddingTop: '1.5rem', marginTop: '2.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '1.25rem' }}>
+        <div style={{ ...S.mono, fontSize: '0.72rem', color: S.accent }}>§ {num}</div>
+        <h3 style={{ ...S.display, fontSize: '1.5rem', margin: 0, fontWeight: 400 }}>{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }) {
+  return (
+    <div style={{ borderTop: `1px solid ${accent ? S.accent : S.ink}`, paddingTop: '0.75rem' }}>
+      <div style={{ ...S.mono, fontSize: '0.65rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.muted, marginBottom: '0.25rem' }}>{label}</div>
+      <div style={{ ...S.display, fontSize: '2rem', color: accent ? S.accent : S.ink }}>{value}</div>
+    </div>
+  );
+}
+
+function Datum({ label, value }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: `1px dashed ${S.subtle}`, gap: '1rem', flexWrap: 'wrap' }}>
+      <span style={{ color: S.muted, fontSize: '0.9rem' }}>{label}</span>
+      <span style={{ fontWeight: 500, textAlign: 'right' }}>{String(value)}</span>
+    </div>
+  );
+}
+
+function Banner({ tone, children }) {
+  const color = tone === 'warn' ? S.accent : S.ink;
+  const bg = tone === 'warn' ? S.accentSoft : 'rgba(26, 22, 18, 0.04)';
+  return (
+    <div style={{
+      padding: '0.85rem 1.1rem',
+      background: bg,
+      borderLeft: `3px solid ${color}`,
+      marginBottom: '1.25rem',
+      fontSize: '0.92rem', lineHeight: 1.5,
+      display: 'flex', gap: '0.5rem', alignItems: 'flex-start',
+    }}>
+      {tone === 'warn' ? <AlertTriangle size={16} style={{ color, marginTop: '0.15rem', flexShrink: 0 }} /> : <Sparkles size={16} style={{ color, marginTop: '0.15rem', flexShrink: 0 }} />}
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function calcStreak(sessions) {
+  if (sessions.length === 0) return 0;
+  const dates = [...new Set(sessions.map(s => new Date(s.date).toDateString()))].sort((a, b) => new Date(b) - new Date(a));
+  let streak = 0;
+  let cursor = new Date();
+  for (const d of dates) {
+    const diff = Math.floor((cursor - new Date(d)) / (1000 * 60 * 60 * 24));
+    if (diff <= streak + 1) { streak++; cursor = new Date(d); }
+    else break;
+  }
+  return streak;
+}
+
+const lbl = { display: 'block', ...S.mono, fontSize: '0.7rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: S.muted, marginBottom: '0.4rem', marginTop: '0.5rem' };
+const inp = { width: '100%', padding: '0.75rem', border: `1px solid ${S.muted}`, background: 'rgba(255,255,255,0.6)', fontSize: '0.95rem', marginBottom: '0.75rem', fontFamily: S.body.fontFamily, color: S.ink };
+const iconBtn = { background: 'transparent', border: `1px solid ${S.muted}`, padding: '0.4rem', cursor: 'pointer', display: 'flex', color: S.ink };

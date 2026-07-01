@@ -1,0 +1,144 @@
+@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,500;1,600;1,700;1,800&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-card-border: hsl(var(--card-border));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-popover-border: hsl(var(--popover-border));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-primary-hero: hsl(var(--primary-hero));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --font-sans: 'Hanken Grotesk', sans-serif;
+  --font-serif: 'Hanken Grotesk', sans-serif; /* For backward compatibility with old theme classes */
+
+  --radius-sm: 0px;
+  --radius-md: 0.375rem; /* 6px */
+  --radius-lg: 0px;
+}
+
+:root {
+  /* #F9FAFB */
+  --background: 210 20% 98%;
+  /* #1B2232 */
+  --foreground: 222 30% 15%;
+  
+  /* #FFFFFF */
+  --card: 0 0% 100%;
+  --card-foreground: 222 30% 15%;
+  --card-border: 206 14% 90%;
+  
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 30% 15%;
+
+  /* Deep teal: #265159 */
+  --primary: 189 40% 25%;
+  --primary-foreground: 0 0% 100%;
+  
+  /* Deep teal hero: #1E4248 */
+  --primary-hero: 189 41% 20%;
+
+  /* Light background for secondary areas */
+  --secondary: 0 0% 100%;
+  --secondary-foreground: 222 30% 15%;
+
+  /* Muted gray text: #67737E */
+  --muted: 210 20% 98%;
+  --muted-foreground: 209 10% 45%;
+
+  /* Action orange: #E66E1A */
+  --accent: 25 81% 50%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* Borders: #E2E6E9 */
+  --border: 206 14% 90%;
+  --input: 206 14% 90%;
+  --ring: 25 81% 50%; /* orange ring */
+  
+  --radius: 0.375rem; /* buttons 6px */
+}
+
+.dark {
+  --background: 222 30% 15%;
+  --foreground: 210 20% 98%;
+  --border: 215 20% 25%;
+  --input: 215 20% 25%;
+  --ring: 25 81% 50%;
+  
+  --primary: 189 40% 25%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 20% 20%;
+  --secondary-foreground: 210 20% 98%;
+  --accent: 25 81% 50%;
+  --accent-foreground: 0 0% 100%;
+  --muted: 215 20% 20%;
+  --muted-foreground: 210 10% 65%;
+  --card: 222 30% 15%;
+  --card-foreground: 210 20% 98%;
+  --popover: 222 30% 15%;
+  --popover-foreground: 210 20% 98%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans tracking-tight;
+  }
+}
+
+/* Backwards compatibility for Privacy/Terms using old class names */
+.text-terracotta {
+  color: hsl(var(--accent));
+}
+
+.hover\:text-terracotta:hover {
+  color: hsl(var(--accent));
+}
+
+.border-l-gold {
+  border-left-width: 2px;
+  border-left-color: hsl(var(--accent));
+  padding-left: 1rem;
+}
+
+.bg-indigo {
+  background-color: hsl(var(--primary));
+  color: white;
+}

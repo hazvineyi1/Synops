@@ -13,6 +13,9 @@
     { "path": "./lib/kanon-api-zod" },
     { "path": "./lib/kanon-curriculum-engine" },
     { "path": "./lib/kanon-evidence-packet" },
-    { "path": "./lib/kanon-openai" }
+    { "path": "./lib/kanon-openai" },
+    { "path": "./lib/paideia-db" },
+    { "path": "./lib/paideia-api-client" },
+    { "path": "./lib/paideia-api-zod" }
   ]
 }

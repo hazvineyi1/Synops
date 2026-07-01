@@ -1,0 +1,44 @@
+import { Router, type IRouter } from "express";
+import authRouter from "./auth.js";
+import catalogRouter from "./catalog.js";
+import plansRouter from "./plans.js";
+import worksheetsRouter from "./worksheets.js";
+import parentDraftsRouter from "./parent-drafts.js";
+import quizzesRouter from "./quizzes.js";
+import samplesRouter from "./samples.js";
+import classesRouter from "./classes.js";
+import assignmentsRouter from "./assignments.js";
+import shareRouter from "./share.js";
+import studentRouter from "./student.js";
+import pilotRequestsRouter from "./pilot-requests.js";
+import eventsRouter from "./events.js";
+import adminRouter from "./admin.js";
+import profilesRouter from "./profiles.js";
+import libraryRouter from "./library.js";
+import resourceSharesRouter from "./resource-shares.js";
+import billingRouter from "./billing.js";
+import tutorRouter from "./tutor.js";
+
+const router: IRouter = Router();
+
+router.use("/auth", authRouter);
+router.use("/catalog", catalogRouter);
+router.use("/plans", plansRouter);
+router.use("/worksheets", worksheetsRouter);
+router.use("/parent-drafts", parentDraftsRouter);
+router.use("/quizzes", quizzesRouter);
+router.use("/samples", samplesRouter);
+router.use("/classes", classesRouter);
+router.use("/assignments", assignmentsRouter);
+router.use("/share", shareRouter);
+router.use("/student", studentRouter);
+router.use("/pilot-requests", pilotRequestsRouter);
+router.use("/events", eventsRouter);
+router.use("/admin", adminRouter);
+router.use("/profiles", profilesRouter);
+router.use("/library", libraryRouter);
+router.use("/resource-shares", resourceSharesRouter);
+router.use("/billing", billingRouter);
+router.use("/student/tutor", tutorRouter);
+
+export default router;

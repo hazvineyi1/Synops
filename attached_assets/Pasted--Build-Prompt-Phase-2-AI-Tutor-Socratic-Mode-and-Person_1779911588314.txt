@@ -1,0 +1,301 @@
+# Build Prompt — Phase 2: AI Tutor, Socratic Mode, and Personalized Scenarios
+
+## Context
+
+Phase 1 of “The Method” is already built and deployed (see phase-1 prompt). Users can sign up, complete onboarding, ingest material (paste/URL/file), practice with spaced repetition, take mock exams, and see their forecast.
+
+This is Phase 2. We’re adding three connected features:
+
+1. **An individualized AI tutor** — a conversational interface grounded in the user’s own material plus web search for accuracy
+1. **Socratic dialogue mode** — a different pedagogical pattern from the existing practice loop, where the tutor leads with questions rather than answers
+1. **Personalized scenarios** — the AI generates worked examples and fact patterns relatable to the user’s life context, with explicit consent and full opt-out
+
+Do not break or refactor Phase 1 features. Add these as new modules.
+
+-----
+
+## Use the same stack as Phase 1
+
+Same Vite + React + TS frontend, same Express + TS backend, same Postgres + Prisma, same auth, same Stripe gating, same Anthropic key handling (server-side only).
+
+-----
+
+## New domain model — additive only
+
+```
+TutorConversation (belongs to user)
+  id, title, createdAt, lastMessageAt
+  scope: enum (all_material | specific_concept | specific_source)
+  scopeRefId: string nullable (concept id or source label)
+  messages: jsonb (array of { role, content, citations?, timestamp })
+
+LearnerContext (one per user, nullable — opt-in)
+  consentGivenAt: timestamp
+  profession: string nullable
+  industryDomain: string nullable
+  careerStage: enum (student | early_career | mid_career | senior | transitioning) nullable
+  locationCity: string nullable
+  locationCountry: string nullable
+  familySituation: enum (single | partnered | parent | caregiver) nullable
+  interests: jsonb nullable (array of strings, max 5)
+  scenariosEnabled: boolean default true
+
+TutorUsage (belongs to user)
+  date, tutorCalls, webSearchCalls, totalTokens
+```
+
+Run a Prisma migration to add these tables. Do not modify existing tables except to add a relation from User to these new tables.
+
+-----
+
+## FEATURE 1: AI Tutor (conversational, grounded)
+
+### What it is
+
+A persistent chat interface where the user can have a back-and-forth with an AI tutor. The tutor knows the user’s uploaded material and can search the web for current/accurate information when needed.
+
+### Routes
+
+- `/tutor` — conversation list view
+- `/tutor/:conversationId` — single conversation interface
+- `/tutor/new` — start a new conversation (asks: scope = all material / specific concept / specific source)
+
+### UI behavior
+
+- ChatGPT-style interface: scrollable message list, input at bottom, streaming responses
+- Each AI message can include **citations** — clickable references back to specific Concepts in the user’s library, or to web sources (with favicon + domain shown)
+- A scope indicator at the top: “Tutoring on: [scope name]”
+- Conversation list shows title + last message preview + last activity timestamp
+- User can rename conversations and delete them
+- Auto-generate conversation titles from the first user message (one short API call)
+
+### Backend endpoint: `POST /api/tutor/message`
+
+Request: `{ conversationId, message }`
+
+Process:
+
+1. Load the conversation history from the database
+1. Load the relevant concepts based on conversation scope:
+- `all_material` → all user’s concepts (cap at 50 most recent if user has many)
+- `specific_concept` → that concept + its 5 nearest neighbors by source
+- `specific_source` → all concepts with that source label
+1. Build a system prompt (see below) that grounds the tutor in the loaded concepts
+1. Decide whether to invoke web search:
+- Heuristic: if the user’s question contains time-sensitive language (“current”, “latest”, “as of”, “today”, year references), or if the question is clearly outside the loaded concepts’ coverage, allow web search
+- Otherwise, do not invoke web search
+1. Call Anthropic API with the system prompt, conversation history, new message, and (if applicable) the web search tool enabled
+1. Stream the response back to the client
+1. Save the new user message and assistant response to the conversation
+1. Increment `TutorUsage` counters
+
+### System prompt for the tutor
+
+```
+You are an expert tutor helping this learner master the material in their study library. Your goals, in order:
+
+1. Be ACCURATE. If you don't know something or aren't sure, say so. Do not invent rules, cases, statutes, or facts.
+
+2. Be GROUNDED. The learner's own study material is below. When their question relates to that material, anchor your answer in it and cite the specific concept by title. When their question goes beyond the material, you can answer from general knowledge or web search, but make this transparent.
+
+3. Be PEDAGOGICAL, not just answering. Default to explaining the WHY, the structure, the connections. When the learner is stuck, walk them through reasoning rather than just delivering the conclusion.
+
+4. Be CONCISE. Do not produce wall-of-text answers when a paragraph will do. Long explanations only when complexity demands it.
+
+5. Cite. When you reference one of their concepts, cite it as [Concept: TITLE]. When you reference a web source, cite it as [Source: DOMAIN].
+
+LEARNER'S STUDY MATERIAL (these are the concepts in their library):
+{concepts injected here as a numbered list of title + first 300 chars of content}
+
+{If learner context exists and scenarios are enabled, append:}
+LEARNER CONTEXT (for crafting relatable examples when helpful — do not over-reference):
+- Profession: {profession}
+- Career stage: {careerStage}
+- Location: {locationCity}, {locationCountry}
+- Family situation: {familySituation}
+- Interests: {interests}
+
+Use this context SPARINGLY — only when a concrete example would help and you can naturally draw from their world. Never reference their personal details unprompted in a way that feels intrusive.
+```
+
+### Citations rendering
+
+- AI responses can include `[Concept: TITLE]` and `[Source: DOMAIN]` markers
+- Parse these in the frontend and render as clickable pills
+- Clicking a Concept citation opens that concept in a side panel or modal
+- Clicking a Source citation opens the source URL in a new tab
+- Track which citations are clicked (useful telemetry later)
+
+### Rate limits
+
+- Free tier: tutor disabled entirely (gate behind pro)
+- Pro tier: 50 tutor turns per day, 20 web-search-enabled turns per day
+- Hard caps. Show the user their remaining budget in the UI.
+
+### Web search implementation
+
+Use Anthropic’s web search tool via the API. Configure with:
+
+- `max_uses: 3` per turn
+- Allowed domain list configurable in admin (start permissive)
+- If web search returns no useful results, the model should say so rather than hallucinating
+
+-----
+
+## FEATURE 2: Socratic dialogue mode
+
+### What it is
+
+A distinct mode the user can toggle on within any tutor conversation. In Socratic mode, the tutor’s behavior shifts: instead of explaining concepts, it asks questions designed to surface the learner’s reasoning, expose misconceptions, and lead them to insight through their own thinking.
+
+This is NOT a different page or feature — it’s a toggle within the existing tutor interface.
+
+### UI
+
+- A toggle button labeled “Socratic mode” at the top of the conversation
+- When active, a subtle visual indicator (different background tint, badge)
+- A short explainer modal the first time it’s enabled: “In Socratic mode, the tutor will lead with questions rather than answers. Use this when you want to deepen understanding, not just get information.”
+
+### How it changes the system prompt
+
+When Socratic mode is on, prepend this to the system prompt:
+
+```
+SOCRATIC MODE IS ACTIVE.
+
+Adjust your approach:
+
+- Default to ASKING rather than telling. When the learner asks a question or makes a claim, respond with a probing question that surfaces their current understanding before you explain.
+- Use the classic Socratic moves: ask for definitions ("What do you mean by X?"), ask for examples ("Can you give me an instance of that?"), probe assumptions ("What are you taking for granted?"), test consequences ("If that's true, what follows?"), examine alternatives ("Is there another way to see this?").
+- Do not interrogate. Aim for one focused question per turn, not five.
+- When the learner is genuinely stuck after two or three turns, switch to teaching mode and explain — but flag the shift: "Let me explain this part directly."
+- When the learner reaches insight on their own, acknowledge it briefly and move forward. Don't lecture.
+- If the learner asks for direct information ("just tell me the rule"), respect that and switch out of Socratic mode for that turn. Pedagogy serves the learner, not the other way around.
+
+Your role is to be a thinking partner, not a quiz-master.
+```
+
+### Behavioral guarantees
+
+- The toggle state is per-conversation, persisted to the database
+- The user can switch it off mid-conversation
+- The first 2 turns in Socratic mode should clearly demonstrate the style shift so the user knows what they signed up for
+
+-----
+
+## FEATURE 3: Personalized scenarios
+
+### What it is
+
+When the AI generates examples (in the tutor, in question generation, in worked examples), it can draw from the learner’s life context — profession, career stage, location, family situation, interests — to make examples relatable rather than abstract.
+
+This is **opt-in**, **transparent**, and **fully reversible**.
+
+### Consent flow
+
+1. After Phase 1 onboarding completes, add a NEW screen called “Personalization (optional)”
+1. The screen explains plainly: “We can make examples and scenarios more relatable by knowing a little about your life. This is optional. You can skip, edit, or turn it off at any time. We do not sell or share this data.”
+1. Two clear buttons: “Set up personalization” and “Skip — generic examples are fine”
+1. If user picks setup, show a form with the LearnerContext fields. All fields optional individually.
+1. Save consent timestamp with the record.
+1. Existing users (pre-Phase-2) see this prompt the next time they log in, dismissible.
+
+### Settings page
+
+Add a “Personalization” section to `/settings` with:
+
+- Edit any field
+- Toggle “Use my context in scenarios” (defaults to on if context exists)
+- “Delete all personalization data” button (hard delete, requires confirmation)
+
+### How it’s used
+
+The LearnerContext is injected into system prompts (see tutor system prompt above) and into question generation prompts when the user adds new material. The model is instructed to use this context **sparingly** — only when it genuinely helps make an example concrete, and never in a way that feels intrusive or stereotyping.
+
+### Critical guardrails — non-negotiable
+
+The AI must NOT:
+
+- Reference the learner’s personal details unprompted in ways that feel surveillance-y (“As a parent in Toronto, you’ll appreciate…”)
+- Use demographic context as a substitute for accurate teaching (the content of the lesson is the same regardless of who’s learning it)
+- Assume that a learner’s profession or background means they already know related material
+- Make assumptions about political views, religion, or values from the collected context
+
+The AI SHOULD:
+
+- Use profession to choose familiar example domains (a nurse studying contracts gets healthcare examples; a startup founder gets SaaS examples)
+- Use career stage to calibrate complexity of examples (junior → simpler scenarios)
+- Use location to choose jurisdictionally relevant references where applicable
+
+### Telemetry
+
+Log when personalization is used so you can verify it’s behaving well. A simple boolean per AI response: “used learner context = true/false” stored on the message record.
+
+-----
+
+## Rate limiting (updates)
+
+Add tutor and web search to existing rate limit infrastructure:
+
+- Track `tutorCalls` and `webSearchCalls` separately in `TutorUsage`
+- Reset daily via existing cron
+- Surface remaining budget in the UI (top right of tutor interface): “Tutor: 23/50 today”
+
+-----
+
+## Pricing tier updates
+
+Update Phase 1’s free/pro gating to reflect new features:
+
+**Free tier** (unchanged from Phase 1 plus):
+
+- AI tutor: disabled
+- Socratic mode: N/A (no tutor)
+- Personalized scenarios: disabled
+
+**Pro tier** ($19/mo or $149/yr — unchanged from Phase 1 plus):
+
+- AI tutor: 50 turns/day, 20 with web search
+- Socratic mode: included
+- Personalized scenarios: included
+
+-----
+
+## Production-ready checklist for Phase 2
+
+Before “done”:
+
+- [ ] User can start a new tutor conversation, scope it, and have a real exchange
+- [ ] Citations render correctly and are clickable (both Concept and Source)
+- [ ] Web search invokes correctly on time-sensitive questions and is gated by daily budget
+- [ ] Socratic mode toggle visibly changes tutor behavior within two turns
+- [ ] Personalization consent screen is clear, skippable, and reversible
+- [ ] Personalization data can be edited and deleted from settings
+- [ ] Rate limits prevent unbounded API spend
+- [ ] All new endpoints are properly auth-protected
+- [ ] Existing Phase 1 features still work — no regressions
+
+-----
+
+## What I do NOT want
+
+- Tutor that confidently makes up case names, statute numbers, or specific facts. If it doesn’t know, it must say so.
+- Personalization that feels invasive (“I see you’re a 32-year-old marketing manager in Austin with two kids…”). The context should be invisible to the user — they should only notice that examples *fit* them, not that the AI is profiling them.
+- Socratic mode that feels like interrogation. One question per turn, not a Q-bank.
+- Tutor that becomes a generic ChatGPT — the grounding in user’s material is the differentiator. If a turn doesn’t reference their material at all when it could, the prompt is failing.
+- Personalization data leaking into other features without explicit signaling.
+
+-----
+
+## Questions to confirm before building
+
+1. Should the tutor stream responses (better UX, more complex) or wait-then-show (simpler)?  
+   *Recommend: streaming. Worth the complexity.*
+1. Should conversation history be summarized for long conversations to control token cost, or just truncated to last N messages?  
+   *Recommend: truncate to last 20 messages for now; revisit if users complain.*
+1. Anthropic web search vs. a separate search API (Brave, Tavily)?  
+   *Recommend: Anthropic’s native web search tool — fewer moving parts.*
+1. Should impersonation by admins (coming in Phase 3) bypass rate limits, or share them?  
+   *Recommend: share. Admin shouldn’t burn user budget while impersonating, but also shouldn’t see a different limit than the user does.*
+
+Confirm those four and start building.

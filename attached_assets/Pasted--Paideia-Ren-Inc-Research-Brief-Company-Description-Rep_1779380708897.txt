@@ -1,0 +1,308 @@
+# Paideia-Ren Inc. — Research Brief, Company Description & Replit Launch-Site Prompt
+
+## TL;DR
+
+- **“Paideia-Ren” fuses two of humanity’s most enduring educational ideals — Greek *paideia* (Werner Jaeger: “the process of educating man into his true form, the real and genuine human nature”) and Confucian *ren* 仁 (humaneness, the moral capacity to recognize and care for the other) — into a single brand promise: technology that forms whole humans within a shared humanity, aligned with the Ubuntu philosophy of “I am because we are.”** There is no Swahili word “paideia”; the closest Swahili equivalents are *malezi* (upbringing/formation) and *elimu* (education/knowledge), best used as honorific sub-lines or program names rather than translations.
+- **The most investor-attractive nonprofit edtech brands (Khan Academy, CAMFED, Pratham, Teach For All, Ubongo, Eneza, ALU) share five language patterns: a sweeping equity promise (“free, world-class education to anyone, anywhere”), a named scalable model, evidence of effect sizes from named studies (J-PAL/NBER Mindspark in India: 0.37 SD math / 0.23 SD Hindi in 4.5 months; Korbit, arXiv 2203.03724: 2–2.5× learning gains; Stanford Tutor CoPilot RCT, Wang et al., arXiv:2410.03017: +4 pp overall and +9 pp for students of lower-rated tutors across 9 Title I schools; Harvard’s Kestin et al. *Scientific Reports* 2025: “more than twice as much learning in less time”), validating awards (Yidan, WISE, UNESCO King Sejong), and an alumnae/community network as proof of multiplier impact.**
+- **The Replit prompt below specifies a 13-section launch site with a highly professional, minimal design system — deep indigo + white + a single gold accent, Cormorant Garamond display type + Inter body, generous white space, no gradients or decorative elements — and three audience-specific conversion paths (Investors/Funders, Schools & Ministries, Educators & Learners) with dedicated CTAs, an Adaptive Learning Demo, a Research & Impact page citing the named studies above, and a hybrid revenue tier matrix (grants + SaaS + government contracts). The design benchmark is the intersection of McKinsey.com’s authority and CAMFED’s human warmth.**
+
+-----
+
+## Key Findings
+
+### 1. Paideia — the deeper philosophical meaning
+
+*Paideia* (παιδεία) in classical Greek thought is far more than schooling. From its root *pais* (child) it originally meant child-rearing, but by the 5th–4th centuries BCE — through Socrates, Plato, Isocrates, and Aristotle — it expanded into the lifelong cultivation of *areté* (excellence) in body, intellect, character, and civic life. Its constitutive elements:
+
+- **Holistic formation** — gymnastics, grammar, rhetoric, music, mathematics, geography, natural history, ethics, and philosophy combined to produce a whole human.
+- **Soul-turning, not data-loading** — Plato’s *Republic* VII (518d) describes education as “the craft… of turning the whole soul” toward the Good, an inner reorientation rather than information transfer.
+- **An ideal of culture** — Jaeger argued paideia is “the shaping of Greek character through a union of civilization, tradition, literature, and philosophy”; it begins “from an ideal, not from an individual.”
+- **An inalienable possession** — Menander: “The possession which no one can take away from a person is paideia.”
+- **Equivalent later concepts** — Latin *humanitas*, German *Bildung*, Christian “formation.”
+
+**Swahili equivalents.** There is no Swahili cognate for “paideia.” The closest functional equivalents are *malezi* (“upbringing, nurturing, formation — including moral, physical, and intellectual development”) and *elimu* (“education, knowledge, learning”). For Paideia-Ren, a Kiswahili honorific sub-line (“Paideia-Ren — *Malezi ya Ulimwengu*, the formation of a world citizen”) could serve as a powerful cultural anchor.
+
+### 2. Ren (仁) — Confucian humaneness
+
+Ren is the supreme Confucian virtue. Its character (仁) is written as person (人) + two (二), encoding the philosophical claim that to be fully human is to be in right relation with another. Key features:
+
+- **Definition** — Confucius told disciple Fan Chi that ren means *ai ren* (愛人), “to love others.” It encompasses benevolence, kindness, compassion, empathy, respect, and “human-heartedness.”
+- **Root virtue** — Ren is the source from which Yi (righteousness), Li (ritual propriety), Zhi (wisdom), and Xin (trustworthiness) flow.
+- **Relational selfhood** — Ren is realized in the five relationships (parent–child, ruler–subject, husband–wife, elder–younger, friend–friend); selfhood is constituted in relation.
+- **The Junzi ideal** — the *junzi* (君子, exemplary person) is the one whose character has been transformed by ren — directly analogous to the Greek concept of the *paideutos* (the formed person).
+- **Mencius’s seed of compassion** — *ce yin zhi xin* (恻隐之心), the spontaneous compassionate response, is the natural seed of ren in every human.
+
+### 3. The synthesis — Paideia + Ren + Ubuntu
+
+The three traditions converge on a single educational anthropology, despite arising on three continents:
+
+|            |Paideia (Greece)                |Ren (China)                                   |Ubuntu (Africa)              |
+|------------|--------------------------------|----------------------------------------------|-----------------------------|
+|Core claim  |Education *forms* the true human|A person becomes human in right relation      |“I am because we are”        |
+|Telos       |Areté (excellence) + citizenship|Junzi (the exemplary person)                  |Communal flourishing         |
+|Method      |Soul-turning, mentorship        |Self-cultivation through relationship and rite|Communal, dialogical learning|
+|Knowledge   |Embedded in character           |Inseparable from moral practice               |Held collectively            |
+|Failure mode|The “uneducated” (apaideutos)   |The “petty person” (xiaoren)                  |One who has lost ubuntu      |
+
+**The synthesis for Paideia-Ren:** *True learning forms the whole person, and a whole person is one whose intelligence is bound to humaneness and to community.* This is the philosophical bedrock that justifies an AI tutoring system grounded in adaptivity (paideia: each soul turned in the way it can turn), relational ethics (ren: technology in service of human relationship, never replacing it), and equity (ubuntu: my child’s learning is bound to your child’s learning). It distinguishes Paideia-Ren from the Silicon Valley “personalized learning” pitch — which optimizes the individual learner as a data point — by re-centering the formation of a relational, moral, globally-aware human.
+
+### 4. Benchmark nonprofit edtechs — what to imitate
+
+**Khan Academy** — Mission: “to provide a free, world-class education to anyone, anywhere.” Brand power: the totalizing universal promise and partnerships with named donors. Reaches 190+ countries. Per K-12 Dive (2025), Khan Academy CLO Kristen DiCerbo reported that Khanmigo grew “from 40,000 to 700,000 K-12 students between the 2023-24 and 2024-25 school years.” Lesson: own the moral universalism.
+
+**CAMFED** — Mission: “multiplies educational opportunities for girls and empowers young women to become leaders of change.” Brand power: a pan-African sisterhood (CAMA: 312,747 members as of 2024) and a stacked award shelf (2020 Yidan Prize, 2021 Hilton Humanitarian Prize, 2023 Al-Sumait Prize). Lesson: build and surface a network/alumnae multiplier.
+
+**Pratham** — Vision: “every child in school and learning well.” Brand power: the proprietary “Teaching at the Right Level” (TaRL) methodology now adopted across Africa via J-PAL and the ASER citizen-led assessment. Lesson: name your method and let governments adopt it.
+
+**Teach For All** — Mission: “expand educational opportunity around the world by cultivating the leadership necessary for change.” Brand power: a 60+-country network of locally-led affiliates. Lesson: federation > franchise.
+
+**African Leadership Academy / ALU** — Positioning: “develop a powerful network of young leaders ready to accelerate the continent’s growth.” Brand power: Ubuntu-coded leadership vocabulary and Pan-African aesthetic. Lesson: lead with leadership development, not just access.
+
+**Ubongo (Tanzania)** — Mission: “Ubongo creates top-quality, localized edutainment to help Africa’s 500 million kids learn.” Validated by a University of Maryland RCT: *Akili and Me* viewers outperformed peers by 24% in counting, 13% in ESL, 9% in fine motor skills. 2017 WISE Award winner. Lesson: localize ferociously and bring an academic validator.
+
+**Eneza Education (Kenya)** — Mission: “make 50 million youth across rural Africa smarter through affordable, quality, lifelong learning through mobile technology.” An impact study found schools using Eneza saw a 22.7% average academic increase in seven months. Lesson: pick a culturally resonant Kiswahili name with a quantitative reach goal.
+
+**FoondaMate (South Africa)** — siSwati for “study buddy”; framing: “talent is equally distributed, but opportunity is not.” Per Meta’s April 2025 Llama Impact Grant announcement, four million resource-limited students across Africa use the chat interface. Lesson: WhatsApp-native, opportunity-equity framing.
+
+**uLesson (Nigeria)** — Mission: “provide high-quality, affordable and accessible education to all Africans.” Time/Statista “World’s Top EdTech Rising Stars 2025.” Some learners “moved from the 50th percentile to the 90th percentile — one whole standard deviation.” Lesson: lead with one striking effect-size stat.
+
+### 5. Differentiators for global scalability — language by audience
+
+**Universal differentiators:**
+
+- Evidence-based (cite RCTs and effect sizes; the Jacobs Foundation found only 21% of edtech products rely on rigorous evidence — be in the 21%).
+- Locally adaptable (multi-language, offline-capable, low-bandwidth, cultural localization).
+- Teacher-augmenting, not teacher-replacing.
+- Privacy-protective and ethically governed (especially child data and AI).
+- Open data and transparent impact reporting.
+- Government-partnership-ready (ministry MoUs, alignment to SDG 4.7).
+
+**For institutional investors and foundations:** *“evidence-based,” “cost-effective,” “measurable learning outcomes,” “scalable,” “RCT-validated,” “system-strengthening,” “SDG 4 / SDG 4.7 alignment,” “catalytic capital,” “theory of change,” “marginal cost per learner.”*
+
+**For school systems and ministries:** *“curriculum-aligned,” “teacher-augmenting,” “interoperability (LTI, OneRoster, SCORM, xAPI),” “child data protection (FERPA / GDPR / Kenya DPA 2019 / POPIA),” “low-bandwidth and offline-first,” “multi-language,” “WCAG 2.2 accessible.”*
+
+**For educators and teachers:** *“saves you time,” “meets every student where they are,” “respects your professional judgment,” “your co-pilot, not your replacement,” “built by educators, with educators,” “no jargon, no surveillance.”*
+
+### 6. The 2025–26 high-converting launch-site anatomy
+
+Best-in-class nonprofit edtech sites combine:
+
+1. A hero with one-sentence mission + one-line proof + dual CTA.
+1. A 30-second “what we do” video.
+1. Three audience pathways above the fold.
+1. Named impact stats with citations.
+1. An organizational and research story.
+1. A platform tour or interactive demo.
+1. Research & evidence library (downloadable PDFs).
+1. A “Where we work” map.
+1. Pricing/partnership tiers with transparency.
+1. Newsroom + thought leadership.
+1. Multi-channel contact (form, email, calendar booking).
+1. Transparency (financials, board, data ethics, AI ethics).
+1. Mobile-first, WCAG 2.2 AA, <3-second load, multi-language toggle.
+
+-----
+
+## Deliverables
+
+### A. Company Description (paste-ready, 3 paragraphs)
+
+> **Paideia-Ren Inc.** is a nonprofit educational technology company building the world’s first adaptive intelligent tutoring platform grounded in three of humanity’s deepest educational traditions. Our name unites *paideia* — the ancient Greek ideal that education is “the process of educating man into his true form, the real and genuine human nature” (Werner Jaeger) — with *ren* (仁), the Confucian virtue of humaneness whose written character depicts two people in relation, encoding the truth that a person becomes fully human only with and for others. Bound to these is the African philosophy of *Ubuntu* — “I am because we are” — that grounds our organizational mission and culture. Together, these three traditions form a single conviction: that real learning forms the whole person, and that a whole person is one whose intelligence is inseparable from humaneness and from community.
+> 
+> Paideia-Ren translates the most rigorous learning science of our time — VARK, the Felder–Silverman model, Kolb’s experiential learning, Bloom’s taxonomy, cognitive-load theory, and Vygotsky’s zone of proximal development — into an AI tutor that meets every learner in the way they actually learn. The platform recognizes how each student thinks, adapts content in real time across modalities, holds challenge inside the zone of proximal development, and offers teachers — never replaces them — a co-pilot for the work only humans can do. Where most “personalized learning” systems optimize an isolated user, Paideia-Ren is built on a relational pedagogy: every learner is connected to a teacher, a cohort, a community, and a global citizenry.
+> 
+> Operating as a nonprofit hybrid — funded by grants and philanthropy, sustained by SaaS subscriptions from schools and corporate training partners, and scaled through government contracts and ministry partnerships — Paideia-Ren serves K–12 systems, universities, workforce-development programs, and the underserved communities the global education system has long failed. Our **“Reimagining Education with a Global Technological Lens”** blueprint aligns the platform with UNESCO’s Global Citizenship Education framework and the SDG 4.7 mandate to equip every learner with the knowledge, skills, and values to build a more just, sustainable, and humane world. We are not building another edtech product. We are building the infrastructure for a planet of learners who know who they are, who recognize one another, and who can learn together what it means to be human in the 21st century.
+
+-----
+
+### B. Replit Prompt — Build a Full Launch Site for Paideia-Ren Inc.
+
+Paste the following into Replit (or any AI website builder) as the master prompt.
+
+-----
+
+**Build a world-class, highly professional, and elegantly minimal launch website for Paideia-Ren Inc., a global nonprofit educational technology company.** The design benchmark is the intersection of McKinsey.com’s authority, the Rockefeller Foundation’s gravitas, and the human warmth of camfed.org — restrained, confident, and institutional. Every design decision should signal that this organization belongs in the same conversation as UNESCO, the Gates Foundation, and the world’s leading universities. The site must be mobile-first, WCAG 2.2 AA accessible, load in under 3 seconds, and be ready to translate (EN / FR / SW / PT toggle in the header). The CMS should be lightweight (Next.js + headless CMS like Sanity, or plain MDX) and forms should pipe to a single contact email with separate routing tags (investor / school / educator / press / volunteer).
+
+**Design philosophy.** Less is more. Every element earns its place. No decorative flourishes, no gradients, no drop shadows, no busy backgrounds. Generous white space is the primary design tool. The site should feel as though it was designed by a world-class agency with a strict brief: clarity, authority, and humanity — in that order. Think: clean grid, precise typography, restrained color, and photography that carries the emotional weight.
+
+**Brand essence.** Paideia-Ren — “the formation of a relational human.” Our name fuses ancient Greek *paideia* (the formation of the whole person) with Confucian *ren* 仁 (humaneness expressed in relationship), grounded in African Ubuntu (“I am because we are”). Our product is an adaptive AI tutor that meets every learner where they are; our mission is global educational equity.
+
+**Tone.** Warm, scholarly, hopeful, decisive. Sentences are short. We use first person plural (“we”). We never use Silicon Valley marketing puffery (“revolutionize,” “disrupt,” “10x”); we speak like a respected educator who has read Plato, Confucius, and Paulo Freire. Quotes from Jaeger, Confucius, Mencius, and Mandela appear sparingly as section openers.
+
+**Color system — minimal and disciplined.**
+
+- Primary: Deep Indigo `#1F2A5C` — used for headings, the primary CTA button, and the sticky nav background on scroll. This is the dominant brand color.
+- Text: Near-black `#1A1A1A` — all body copy.
+- Background: Pure White `#FFFFFF` — default page background. No ivory tint, no texture.
+- Divider / Subtle fill: Light Grey `#F4F4F4` — used sparingly for section backgrounds and card fills only.
+- Accent — Pan-African Gold `#C9971C` — used exclusively for: the Donate button, key pull-quote left-borders, and the small 仁 symbol in the wordmark. Nowhere else.
+- Accent — Terracotta `#C2562C` — used only for hover states on text links and the active nav indicator. Not as a fill color.
+- Rule: no more than two colors visible on any single screen at any time (not counting white and near-black). No gradients. No color blocks as section backgrounds except one full-width indigo section per page maximum.
+
+**Typography — precise and authoritative.**
+
+- Display / Hero headlines: *Cormorant Garamond* (or *Freight Display Pro*), weight 300–400, tracked slightly wide, very large (72–96px desktop). This is the single most important typographic choice — it gives the brand classical authority without feeling old.
+- Section headings (H2): *Cormorant Garamond*, weight 400, 36–48px.
+- Sub-headings (H3): *Inter*, weight 600, 18–20px, uppercase, letter-spacing 0.08em — creates a clean contrast between classical and modern.
+- Body: *Inter*, weight 400, 17px, line-height 1.75 — generous, readable, never cramped.
+- Captions and labels: *Inter*, weight 400, 13px, color `#6B6B6B`.
+- The Chinese character 仁 and Greek word παιδεία appear once each in the hero — set in Cormorant Garamond at 13px, color gold `#C9971C`, spaced wide, below the main headline. They are a subtle philosophical signature, never decorative.
+- No more than two typefaces on any page.
+
+**Spacing and layout — breathe.**
+
+- Base spacing unit: 8px. All spacing is multiples of 8.
+- Section vertical padding: minimum 120px top and bottom on desktop, 64px on mobile.
+- Max content width: 1200px centered. Text columns max 720px for readability.
+- A strict 12-column grid. Most content sits in 8 of 12 columns, centered. Full-bleed images and the one indigo section may use all 12.
+- No carousels. No sliders. Content that cannot be shown statically is cut or deferred.
+
+**Imagery — real, human, high-quality, unified.**
+
+- Only real photographs of learners, teachers, and classrooms from Africa, Asia, the Americas, and Europe. Absolutely no generic stock photography.
+- All photography processed with a single consistent color grade: slightly desaturated, lifted shadows, cooled highlights — creating a unified, documentary-editorial feel.
+- Hero image: a single large, still photograph. No video autoplay in the hero.
+- No stock icons. Use a single, consistent line-icon set (Phosphor Icons or Lucide) at 1.5px stroke weight throughout.
+- Illustrations: none. Photography and typography carry the visual weight.
+
+**Navigation (sticky header — minimal).**
+
+- Left: Wordmark only — “Paideia-Ren” in Cormorant Garamond, with 仁 in gold superscript. No icon, no logo mark.
+- Right: About | Platform | Research | For Schools | For Funders | For Educators | [Donate] (small gold pill button) | Language toggle (EN ▾).
+- On scroll: header gains a 1px bottom border `#E0E0E0` and white background. No box-shadow.
+- Mobile: hamburger menu → full-screen overlay in Deep Indigo with nav links in white Cormorant Garamond at large size.
+
+**Build the following 13 sections / pages:**
+
+**1. Home / Hero.**
+
+- Headline: “**The formation of a relational human.**”
+- Sub-headline: “Paideia-Ren is a nonprofit AI tutor that meets every learner where they are — and connects them to a teacher, a community, and a world.”
+- Two CTAs side by side: “**See the platform**” (primary, indigo) and “**Partner with us**” (outline).
+- Below the fold: a horizontal row of three audience cards — *For Schools & Ministries* | *For Funders & Partners* | *For Educators & Learners* — each with one sentence and a deep-link.
+- A muted 30-second autoplay (no audio) video showing the platform adapting to a student.
+- A trust bar with logos/names of current partners, advisors, university affiliations, and award shortlists (placeholders OK at launch).
+- A one-line organizational tagline: *“I am because we are — and we learn because we are together.”*
+
+**2. About / Our Philosophy.**
+
+- Three-column layout explaining Paideia, Ren, and Ubuntu with a one-line definition, a key quote, and a defining image for each.
+- A “Why this matters” paragraph naming the synthesis: *true learning forms the whole person, and a whole person is one whose intelligence is bound to humaneness and to community.*
+- A pull-quote: Jaeger — *“Paideia: the process of educating man into his true form, the real and genuine human nature.”*
+- A pull-quote: Confucius — *“To love others — that is ren.”*
+- A pull-quote: African proverb — *“Umuntu ngumuntu ngabantu — a person is a person through other persons.”*
+- A subtle Kiswahili sub-line: *Malezi ya Ulimwengu — the formation of a world citizen.*
+
+**3. About / Leadership & Team.**
+
+- An organization-forward page that leads with the institutional mission, research agenda, and theoretical foundations: VARK, Felder–Silverman, Kolb, Bloom, cognitive-load theory, zone of proximal development.
+- A second paragraph introducing the “Reimagining Education with a Global Technological Lens” blueprint as the strategic framework.
+- A placeholder grid for the leadership team, advisors, and board — with short one-line bios and LinkedIn links — to be populated as the team grows publicly.
+- A “Join us” link to careers.
+
+**4. Platform / How It Works.**
+
+- A four-step illustrated flow: **(1) Recognize** (multi-modal learning-style and cognitive-ability assessment) → **(2) Adapt** (dynamic content across visual, auditory, reading, kinesthetic, sequential/global modalities) → **(3) Challenge** (content held inside the learner’s zone of proximal development; cognitive load monitored) → **(4) Connect** (teacher dashboards, peer cohorts, family insights).
+- An interactive mini-demo: a student answers two diagnostic questions, the page visibly re-arranges its layout (a hint of how the system adapts).
+- A clear statement: *“Our AI assists teachers. It does not replace them.”*
+- Feature grid: Adaptive Content Engine | Teacher Co-Pilot | Cohort & Community Layer | Multi-Language (EN/FR/SW/PT at launch; 10+ planned) | Offline-First & Low-Bandwidth | Curriculum Alignment (national curricula, IB, Cambridge, Common Core, CAPS) | Open Data & Privacy by Design.
+
+**5. Research & Impact.**
+
+- A statement: *“We are committed to being in the 21% of edtech products that the Jacobs Foundation found rely on rigorous evidence.”*
+- A “Why adaptive tutoring works” block citing named studies (with one-line summaries and DOI links):
+  - Muralidharan, Singh & Ganimian (NBER w22923, 2019) — Mindspark in India: 0.37 SD in math, 0.23 SD in Hindi in 4.5 months.
+  - Serban et al. (arXiv 2203.03724) — Korbit AI tutor: learning gains 2–2.5× control; 40.9% vs. 18.5% course completion.
+  - Wang, Ribeiro, Robinson, Loeb & Demszky (arXiv:2410.03017, October 2024) — Tutor CoPilot RCT across 9 Title I schools (1,787 eligible students, 900 tutors): +4 pp overall, +9 pp for students of lower-rated tutors.
+  - Kestin et al., *Scientific Reports* (2025) — Harvard PS2 Pal (n≈194): students learn “more than twice as much in less time.”
+  - Bloom (1984) — the 2-sigma aspiration that founded mastery learning at scale.
+- A “Our research agenda” block describing what Paideia-Ren will measure (effect sizes by region, equity gap closure, teacher time saved, retention).
+- A downloadable PDF: “*Reimagining Education with a Global Technological Lens* — the Paideia-Ren blueprint.”
+- An invitation: “Collaborate with our research office.”
+
+**6. For Schools & Ministries.**
+
+- One-paragraph positioning: curriculum-aligned, teacher-augmenting, interoperable (LTI, OneRoster, SCORM, xAPI), low-bandwidth, multilingual, child-data-protection compliant (FERPA, GDPR, POPIA, Kenya DPA 2019).
+- A tier matrix: **Pilot** (free, one school, one term, with research participation) | **District / Regional License** (per-student SaaS) | **National / Ministry Partnership** (custom, multi-year, with capacity building).
+- Implementation timeline graphic.
+- “Request a pilot” form (school name, country, grade levels, contact).
+- Case-study placeholders for the first three pilot partners.
+
+**7. For Funders & Partners.**
+
+- Opening: “We are a nonprofit hybrid. Catalytic philanthropy unlocks the equity mission; earned revenue from licensed schools and corporate training partners makes us sustainable.”
+- A theory-of-change diagram (Inputs → Activities → Outputs → Outcomes → Impact, mapped to SDG 4 and SDG 4.7).
+- Funding asks at three levels (Seed: $X for pilot in two countries; Growth: $Y for 50 schools; Scale: $Z for one ministry partnership).
+- “Why now” block: World Bank Global Director for Education Jaime Saavedra: *“With 7 in 10 of today’s 10-year-olds in low- and middle-income countries now unable to read a simple text, political leaders and society must swiftly move to recover this generation’s future.”*
+- Named target funder categories (Jacobs Foundation, Mastercard Foundation, Hilton Foundation, Gates Foundation, MacArthur, World Bank SIEF, Yidan Prize, WISE — named aspirationally, not as confirmed partners).
+- “Schedule a call” CTA → Calendly embed.
+
+**8. For Educators & Learners.**
+
+- A warm, teacher-first page with the headline: “**Your co-pilot, not your replacement.**”
+- Three short videos / GIFs showing real teacher workflows.
+- A “Join the Educator Network” form (free professional learning community, monthly webinars, early access to features, a research panel).
+- A learner signup for self-directed learners and tutoring cohorts in underserved communities.
+- Quotes from teachers (placeholders at launch).
+
+**9. Where We Work.**
+
+- An interactive world map with pins for current pilots, planned expansion, and partner ministries.
+- A list view with one-line context per country.
+- “Bring Paideia-Ren to your country” CTA.
+
+**10. News & Insights.**
+
+- A blog with three categories: *Research* (peer-reviewed summaries, white papers), *Field Notes* (stories from classrooms), and *Philosophy* (the deeper “why” — Paideia, Ren, Ubuntu, global citizenship).
+- An email-signup with three interest checkboxes (Research / Schools / Funding).
+
+**11. Transparency & Governance.**
+
+- 501(c)(3) status placeholder, board roster placeholder, financials placeholder (links to Form 990 when filed).
+- AI Ethics Charter (a one-page document covering: no surveillance of students or teachers; child-data minimization; explainable adaptation; human-in-the-loop on all consequential decisions; open dataset commitments where ethical).
+- Data Protection page (FERPA, GDPR, POPIA, Kenya DPA 2019, COPPA where applicable).
+
+**12. Contact.**
+
+- A single page with five routing options (Investor & Funder | School & Ministry | Educator | Press & Speaking | Volunteer & Careers), each piping to a tagged inbox.
+- Office address (placeholder), phone, social (LinkedIn primary; X/Twitter and Instagram secondary).
+- A live chat widget or a “We respond within 2 business days” promise.
+
+**13. Footer.**
+
+- The 仁 + παιδεία wordmark, the mission line, a four-column link grid, the language toggle, social icons, the donate button, the privacy/terms/accessibility links, and the line: *“© Paideia-Ren Inc. — Malezi ya Ulimwengu.”*
+
+**Functionality requirements.**
+
+- Donate flow integrated with Stripe (or Givebutter / Donorbox), supporting one-time and recurring giving, with three preset amounts and a custom field.
+- Newsletter signup integrated with Mailchimp or ConvertKit.
+- All forms protected by hCaptcha.
+- Analytics: Plausible (privacy-first) plus optional Google Analytics 4 behind a cookie banner.
+- SEO: structured data for Organization, NonprofitOrganization, EducationalOrganization; Open Graph + Twitter cards for every page.
+- Performance: image CDN, Brotli, lazy-loading, preloaded fonts.
+- Accessibility: WCAG 2.2 AA, semantic HTML, skip-links, focus-visible, alt-text on every image, captions on every video, no color-only signaling.
+- Internationalization: i18n routing (`/en`, `/fr`, `/sw`, `/pt`), with a clear note that translations are in progress where they are.
+
+**Copy guidelines.**
+
+- Reading level: high-school senior to early university. No jargon without a one-line definition.
+- Every page has exactly one primary CTA.
+- Every claim about impact links to a citation.
+- Every photo has a real caption.
+- Quote attribution always includes name, role, country.
+
+**Deliverables.**
+A fully deployed site at a Replit URL, plus an export of source files, plus a one-page README explaining how to update copy, swap photos, and connect the Stripe and Mailchimp keys. Include a `content/` folder with all copy as MDX so a non-technical team member can edit without touching the design.
+
+-----
+
+## Caveats
+
+- **No Swahili word “paideia” exists.** The brand should treat *malezi* and *elimu* as honorific sub-lines or program names, not as translations of “paideia.”
+- **The Bloom 2-sigma figure has been critically re-examined.** Cite it as an aspiration and a useful frame, not as a replicated effect size.
+- **The Harvard Kestin et al. AI-tutor result** (“more than twice as much in less time”) is from a single elite-institution study (n≈194 Harvard undergraduates). Treat as promising, not definitive.
+- **The Khanmigo adoption numbers** are vendor-reported. Independent peer-reviewed efficacy evidence remains thin.
+- **The “21% of edtech relies on rigorous evidence” statistic** is from the Jacobs Foundation FAQ; verify the most current figure before publishing on the live site.
+- **The “7 in 10” learning-poverty statistic** is from the joint 2022 World Bank / UNESCO / UNICEF / FCDO / USAID / Gates Foundation *State of Global Learning Poverty Update*; refresh the figure if a 2025 update is published before site launch.
+- **The minimal color system (indigo / white / gold only) is intentional and disciplined.** Resist the temptation to add more colors as the site grows — restraint is what gives it authority. A professional brand identity exercise (Pantone locks, full print system, logo lockups) should be commissioned before any major investor-facing launch.
+- **The Replit prompt assumes Replit’s AI builder.** If using Webflow, Framer, or a custom Next.js build, the prompt translates cleanly — only the deployment instructions change.

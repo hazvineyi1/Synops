@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-gold: hsl(var(--gold));
+  --color-terracotta: hsl(var(--terracotta));
+
+  --font-sans: 'Inter', sans-serif;
+  --font-serif: 'Cormorant Garamond', serif;
+
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+}
+
+:root {
+  --background: 36 33% 97%;
+  --foreground: 0 0% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 12%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 12%;
+
+  --primary: 229 49% 24%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 36 30% 94%;
+  --secondary-foreground: 229 49% 24%;
+
+  --muted: 36 18% 92%;
+  --muted-foreground: 0 0% 38%;
+
+  --accent: 43 76% 45%;
+  --accent-foreground: 0 0% 100%;
+
+  --destructive: 17 63% 47%;
+  --destructive-foreground: 0 0% 100%;
+
+  --gold: 43 76% 45%;
+  --terracotta: 17 63% 47%;
+
+  --border: 36 16% 86%;
+  --input: 36 16% 86%;
+  --ring: 229 49% 24%;
+  --radius: 0.5rem;
+}
+
+* { border-color: hsl(var(--border)); }
+
+html, body, #root { min-height: 100%; }
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-serif { font-family: var(--font-serif); }
+
+.prose-paideia h1, .prose-paideia h2, .prose-paideia h3 {
+  font-family: var(--font-serif);
+  color: hsl(var(--primary));
+}
+
+.no-print { }
+@media print {
+  @page { margin: 18mm 16mm 22mm 16mm; }
+  .no-print { display: none !important; }
+  body { background: white; color: #111; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+  .print-page::before {
+    content: "Synops · Teacher";
+    display: block;
+    font-family: var(--font-serif);
+    color: hsl(229 49% 24%);
+    font-size: 11pt;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 6pt;
+    margin-bottom: 14pt;
+  }
+  .print-page h1, .print-page h2, .print-page h3 {
+    page-break-after: avoid;
+  }
+  .print-page p, .print-page li { page-break-inside: avoid; }
+}

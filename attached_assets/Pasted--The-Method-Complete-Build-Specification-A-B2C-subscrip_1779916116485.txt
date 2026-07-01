@@ -1,0 +1,1043 @@
+# The Method — Complete Build Specification
+
+> A B2C subscription web app that turns a learner’s own study material into an adaptive, AI-powered practice system grounded in evidence-based learning science. Built for adults preparing for high-stakes exams (bar exam, professional certifications, university coursework).
+
+-----
+
+## ⚠️ READ THIS FIRST — HOW TO USE THIS DOCUMENT
+
+This is the complete specification for the entire product, organized in three sequential phases. **Do not build all three phases at once.** Build them in order, ship each one, get real usage, and then move to the next. Here’s why:
+
+- **Phase 1** alone is already at the edge of what a typical AI coding agent can deliver reliably in one pass. Adding more on top means more subtle breakage.
+- **Phase 2** depends on Phase 1 being in real use. Decisions about the AI tutor (scope defaults, citation styles, rate limits) should be informed by how people actually use the core product.
+- **Phase 3** is admin tooling. You don’t need admin tools until you have users to support. Build it when you can’t keep up with support manually — not before.
+
+**The recommended cadence:**
+
+1. Build Phase 1. Use it yourself for at least a week with real material. Fix what’s broken.
+1. Acquire your first paying users. When users start asking questions that the practice loop can’t answer, build Phase 2.
+1. When you have more than a handful of paying users and support is becoming a burden, build Phase 3.
+
+Each phase is self-contained below. When ready, paste **only that phase’s section** to your AI coding agent. Do not paste the entire document.
+
+-----
+
+## Table of contents
+
+- [Phase 1: Core Product](#phase-1-core-product)
+- [Phase 2: AI Tutor, Socratic Mode, and Personalized Scenarios](#phase-2-ai-tutor-socratic-mode-and-personalized-scenarios)
+- [Phase 3: Admin Panel with User Management and Impersonation](#phase-3-admin-panel-with-user-management-and-impersonation)
+- [Cross-Phase Notes](#cross-phase-notes)
+
+-----
+
+# PHASE 1: Core Product
+
+A B2C subscription web app that helps people studying for high-stakes exams (bar exam, professional certifications, university coursework) learn faster and retain more. It uses AI to turn the user’s own study material into a personalized, adaptive practice system grounded in evidence-based learning science.
+
+I have a working prototype (a single-file React artifact) that proves out the core mechanics. I’m now ready for a production build. **This prompt describes everything the production version needs.** Do not skip sections to save time — I want a real, deployable, monetizable product, not a demo.
+
+-----
+
+## Tech stack — use these specifically
+
+- **Frontend:** React with Vite + TypeScript
+- **Backend:** Node.js + Express (or Fastify), TypeScript
+- **Database:** PostgreSQL (use Replit’s Postgres or Supabase)
+- **ORM:** Prisma
+- **Auth:** Clerk or Supabase Auth (pick one and use it throughout)
+- **Payments:** Stripe (subscriptions)
+- **AI:** Anthropic Claude API (server-side only — never expose the key to the browser)
+- **File parsing:** pdf-parse for PDFs server-side, mammoth for DOCX
+- **Web fetching:** server-side fetch with a real user-agent + readability/cheerio for content extraction
+- **Hosting:** Replit Deployments (Reserved VM for the backend, autoscale acceptable)
+- **Env management:** Replit Secrets for all keys
+
+Do not use Firebase, MongoDB, or NoSQL. Do not put the Anthropic API key anywhere client-accessible.
+
+-----
+
+## Core domain model
+
+These entities, with these relationships:
+
+```
+User
+  id, email, name, createdAt
+  stripeCustomerId, subscriptionStatus, subscriptionTier (free | pro)
+  Profile (1:1)
+  Concepts (1:many)
+  Sessions (1:many)
+  ExamResults (1:many)
+  WeeklyBriefs (1:many)
+
+Profile (one per user)
+  goal: enum (bar | cert | course | general)
+  examDate: date nullable
+  hoursPerWeek: int
+  baseline: enum (zero | foundations | solid | rusty)
+  calibration: enum (high | mid | low | under)
+  failureMode: enum (passive | cram | avoid | scattered | perfect)
+  focusSpan: int (minutes)
+
+Concept (belongs to user)
+  id, title, content, source, visualSVG nullable, createdAt
+  Cards (1:many)
+
+Card (belongs to concept)
+  id, type: enum (definitional | discriminative | applicative)
+  prompt, expectedAnswer
+  ef: float (default 2.5), interval: int, reps: int, mastery: float (0–1)
+  dueDate: timestamp
+  History (1:many)
+
+CardHistory (belongs to card)
+  date, confidence: int (0–3), grade: int (0–3), gap: int
+
+Session (belongs to user)
+  date, durationMinutes, cardsReviewed, accuracy, avgConfidenceGap
+
+ExamResult (belongs to user)
+  date, format, numQuestions, timeUsed, timeLimit, score, maxScore, percentage
+  questions: jsonb (full array of graded questions)
+
+WeeklyBrief (belongs to user)
+  weekStart, wins: jsonb, stuck: jsonb, prescription: text
+```
+
+-----
+
+## Feature scope — three core loops
+
+### LOOP 1: INGESTION
+
+The user provides study material through any of three methods. The system turns it into atomic, testable concepts with retrieval questions and visual diagrams.
+
+**1a. Paste text** — textarea, source label optional.
+
+**1b. URL ingestion** — user pastes a link. Server fetches the page using a real user-agent. Extract main content using Mozilla’s Readability library (`@mozilla/readability` + `jsdom`). Strip ads, navigation, footers. Return clean text + page title. If the fetch fails (404, blocked, login required), return a clear error telling the user to paste the content directly. Do NOT rely on a public CORS proxy in production — do this server-side.
+
+**1c. File upload** — accept `.pdf`, `.docx`, `.txt`, `.md`. Max 10 MB. Server-side text extraction:
+
+- PDF: `pdf-parse`
+- DOCX: `mammoth`
+- TXT/MD: read directly
+- If extracted text is too short (<200 chars), the file may be a scanned PDF — return a clear error.
+
+**1d. Concept extraction** (server-side, one Anthropic API call): given the extracted text, return a JSON array of 3-12 atomic concepts, each with `title` and `content`. The prompt should specify that each concept should be one rule, definition, principle, mechanism, or holding — atomic enough to test in isolation.
+
+**1e. Question generation** (server-side, one Anthropic API call per concept): for each concept, generate three retrieval questions — one definitional, one discriminative, one applicative. Each question includes a model answer. Store as Cards.
+
+**1f. Visual generation** (server-side, one Anthropic API call per concept, async): generate an SVG diagram for each concept. The AI should choose the visual form that fits the content (decision tree, comparison table, timeline, hierarchy, etc.). SVG should use a defined color palette (set CSS variables: ink, accent, muted, paper, subtle). Generate visuals asynchronously after the user is already practicing — don’t block the ingestion completion on them.
+
+**Show progress to the user** during ingestion: “Extracting concepts… Generating questions… Building visuals…” with a percentage or step indicator. Long-running operations should be visible.
+
+### LOOP 2: PRACTICE
+
+Daily spaced-repetition sessions with active recall and confidence calibration.
+
+**2a. Session start** — user opens the daily session. System pulls due cards (those with `dueDate <= now`). If none are due, pulls the 5 weakest cards (lowest mastery). Cap session size based on user’s `focusSpan` (roughly 1 card per 3-4 minutes). Interleave by `conceptId` — never two consecutive cards from the same concept.
+
+**2b. Pre-flight focus screen** — before the session starts, show a checklist: phone silenced, other tabs closed, water nearby. User confirms.
+
+**2c. Per-card flow:**
+
+1. Show the question prompt only (no answer yet, no visual)
+1. User clicks “I have my answer in mind”
+1. **Confidence prediction** — user picks 0/1/2/3 BEFORE seeing the answer (this is the calibration drill, do not skip this)
+1. User types their answer in a textarea
+1. Server-side: send to Anthropic API with the question + model answer + concept context, get back a grade (0-3) and feedback (1-2 sentences)
+1. Show grade, AI feedback, user’s answer, model answer, AND the concept’s visual diagram (dual coding: text answer + visual encoded together at review time)
+1. If `|confidence - grade| >= 2`, flag a calibration gap visibly
+1. User confirms or adjusts the grade (final say belongs to user — drives the SR algorithm)
+1. Apply SM-2 algorithm to update `ef`, `interval`, `reps`, `dueDate`, `mastery`
+1. Save CardHistory entry
+
+**2d. SM-2 algorithm** (modified for 0-3 quality scale):
+
+```
+if quality < 1: reps = 0, interval = 1
+else: 
+  if reps == 0: interval = 1
+  elif reps == 1: interval = 3
+  else: interval = round(interval * ef)
+  reps += 1
+ef = max(1.3, ef + (0.1 - (3 - quality) * (0.08 + (3 - quality) * 0.02)))
+mastery = mastery * 0.6 + (quality / 3) * 0.4
+```
+
+**2e. Session end** — show stats: cards reviewed, accuracy %, confidence gap, minutes. Save Session record. Show an adaptive message based on accuracy bracket: <50% (shrink tomorrow), 50-75% (productive zone), >75% (add new material).
+
+### LOOP 3: FORECAST & MOCK EXAMS
+
+**3a. Readiness forecast** — given current mastery distribution, recent accuracy trend, and exam date: project where the user will land by exam day. Show “current readiness,” “projected readiness,” “gap to 85%,” and “hours/week needed to close the gap.”
+
+**3b. Mock exam mode** — separate flow from daily practice. User configures:
+
+- Format: multiple-choice, short-answer, fact-pattern, essay
+- Number of questions: 5/10/20/30
+- Time limit: 10/20/30/60/90 minutes
+- Source: all concepts, weakest concepts, or specific source label
+
+**3c. Exam runtime:**
+
+- Generate questions in the chosen format (server-side, one API call per question)
+- Sticky timer, question-by-question navigation, no immediate feedback
+- User can navigate back and forth, see which questions are answered
+- On submit (or time expiry): server grades all questions
+  - Multiple-choice: exact match
+  - Free-response: AI grades against scoring rubric using Anthropic API
+- Show full results: score, time used, question-by-question breakdown with feedback
+
+**3d. Feedback loop:** Concepts that scored <50% on the mock exam get pushed back into the SR queue with `dueDate = tomorrow`, `interval = 1`, and `mastery -= 0.15`. This is critical — mock exams shape the next day’s practice.
+
+**3e. Weekly retrospective** — after 7 days of activity, generate a brief via Anthropic API: top wins, sticking points, prescription for next 7 days. Store as WeeklyBrief.
+
+-----
+
+## Onboarding diagnostic
+
+6 questions, conditional logic for date question if goal is not “general”:
+
+1. What are you preparing for? (bar / cert / course / general)
+1. When is your exam? (date picker, skip if “general”)
+1. Hours per week realistic? (4 / 8 / 15 / 25)
+1. Starting baseline? (zero / foundations / solid / rusty)
+1. When you think you understand something, are you right? (high / mid / low / under)
+1. Biggest historical study weakness? (passive / cram / avoid / scattered / perfect)
+1. Focus span before quality drops? (25 / 45 / 75 min)
+
+Save as Profile. Route to Library.
+
+-----
+
+## Auth, billing, monetization
+
+**Free tier:**
+
+- 20 concepts max
+- 5 mock exam questions per month
+- No weekly retrospective
+- No visual generation
+
+**Pro tier ($19/month or $149/year):**
+
+- Unlimited concepts
+- Unlimited mock exams
+- Full weekly retrospectives
+- Visual generation
+- Priority API queue
+
+**Implementation:**
+
+- Stripe Checkout for subscription
+- Stripe webhook to update `subscriptionStatus` on the User record
+- Server-side middleware that gates pro features
+- Customer portal link for users to manage billing
+- 7-day free trial (no card required)
+
+**Auth flow:**
+
+- Email + password (or magic link)
+- Email verification required before app access
+- Password reset
+- Session persistence (cookies, server-side validation)
+
+-----
+
+## API key safety and rate limiting
+
+**Anthropic key:**
+
+- Stored in Replit Secrets, accessed only by server
+- Never sent to client, never in any client-bundled code
+- All Claude API calls go through Express endpoints
+
+**Rate limits per user:**
+
+- Free: 50 API calls/day
+- Pro: 500 API calls/day
+- Hard cap to prevent runaway costs
+- Track in database, reset daily via cron
+
+**Anthropic API best practices:**
+
+- Use the current Claude Sonnet model
+- Exponential backoff on 429/529 errors (retry 3 times)
+- Log every call with cost estimate
+- Set max_tokens conservatively (1500 for grading, 4000 for extraction)
+- Cache concept-extraction results by content hash (don’t re-extract identical material)
+
+-----
+
+## Pages / routes
+
+- `/` — marketing landing (hero, three loops explained, pricing, sign up CTA)
+- `/login`, `/signup`, `/verify-email`, `/forgot-password`
+- `/onboarding` — 6-question diagnostic
+- `/today` — dashboard (due cards, streak, today’s prescription, exam forecast, weekly brief)
+- `/library` — concepts list, add material (three tabs: paste/url/file), concept detail with visual
+- `/study` — daily session runtime
+- `/exam/setup` — mock exam configuration
+- `/exam/run` — mock exam runtime
+- `/exam/results/:id` — exam result detail
+- `/forecast` — readiness projection, accuracy trends, exam history, weak concepts
+- `/settings` — profile edits, retake diagnostic, billing (Stripe portal), delete account
+- `/legal/terms`, `/legal/privacy`
+
+-----
+
+## Design constraints (since you said design is open)
+
+I’m leaving design largely up to you, but with these constraints:
+
+- **Professional, not playful.** Users are adults preparing for high-stakes exams. No emojis in the UI chrome. No cartoonish illustrations.
+- **Typography matters.** Use a high-quality font pairing. NOT Inter (overused), NOT system-ui defaults. Pick something with character.
+- **Generous whitespace.** Reading dense material should feel calm, not crowded.
+- **Mobile-first responsive.** Study sessions often happen on phones during commutes.
+- **Accessible.** Real focus states, semantic HTML, keyboard navigation, sufficient contrast, ARIA labels on interactive elements.
+- **Dark mode toggle** in settings. Both themes need to be properly designed, not just inverted colors.
+
+You can pick the color palette, the visual language, the layout style. Just make it feel like a real, premium product — not a Bootstrap admin template.
+
+-----
+
+## Legal & compliance
+
+**Generate placeholder Terms of Service and Privacy Policy** I can edit. They must cover:
+
+- User data ownership (user owns their material; we don’t claim rights to their uploads)
+- AI processing disclosure (we send their material to Anthropic for processing; Anthropic’s terms apply)
+- Subscription terms, refund policy
+- Data deletion on account closure (GDPR-style)
+- No reproduction of copyrighted exam questions (this product generates questions in exam *format* but does not reproduce real proprietary exam content)
+
+**Cookie banner** if EU traffic is expected.
+
+**Data export** — let users download all their concepts, cards, and history as JSON from settings.
+
+-----
+
+## What “production-ready” means here
+
+Before you say “done,” every item below must be true:
+
+- [ ] User can sign up, verify email, complete onboarding, paste/upload/URL-ingest material, run a study session, take a mock exam, see their forecast, and generate a weekly brief — without errors
+- [ ] Stripe subscription works end-to-end (test mode is fine, but webhook + tier gating must be wired up)
+- [ ] Anthropic API key is server-side only; nothing sensitive in the client bundle
+- [ ] Rate limiting actually prevents abuse (test by simulating)
+- [ ] Mobile layout works (test at 375px width)
+- [ ] All forms have proper validation and error messages
+- [ ] No console errors in production build
+- [ ] Database migrations run cleanly via Prisma
+- [ ] App is deployed to a Replit Deployment and accessible at a URL
+- [ ] Environment variables are documented in a `.env.example`
+- [ ] README explains: how to run locally, env vars needed, deployment steps
+
+-----
+
+## What I do NOT want
+
+- Mock data or fake AI responses — wire up real Anthropic calls from day one
+- “TODO” comments where logic should be
+- Auth stubbed to a single hard-coded user
+- Reproducing copyrighted exam questions (we generate AI questions in the format of exams, not the questions themselves)
+- VARK learning-styles framing anywhere in the UI (it’s debunked)
+- Generic SaaS design clichés (purple gradients, hero illustrations of people pointing at laptops, etc.)
+
+-----
+
+## Build order I’d suggest
+
+1. Scaffold: Vite + React + TS frontend, Express + TS backend, Prisma + Postgres, Clerk/Supabase auth
+1. Database schema + migrations
+1. Auth flow (signup → verify → onboarding → today dashboard)
+1. Ingestion (paste first, then URL, then file)
+1. Practice loop with SM-2 and AI grading
+1. Mock exam flow
+1. Forecast + weekly brief
+1. Stripe billing + tier gating
+1. Polish, mobile, accessibility, dark mode
+1. Legal pages, README, deploy
+
+-----
+
+## Questions to ask me before starting
+
+Before writing code, confirm:
+
+1. Which auth provider should you use — Clerk or Supabase Auth?
+1. Which database — Replit Postgres or Supabase Postgres?
+1. Do I have Stripe and Anthropic API keys ready to add to Secrets?
+1. Free trial: 7 days, no card; or freemium with hard limits forever? (I’d say: try 7-day trial first.)
+1. Anything in the spec that’s unclear?
+
+Once those are answered, build steadily through the order above. Don’t sprint to the end and leave the early pieces broken.
+
+-----
+
+# PHASE 2: AI Tutor, Socratic Mode, and Personalized Scenarios
+
+**Prerequisites:** Phase 1 is deployed, you’ve used it with real material for at least a week, and you have at least a small number of users (yourself counts).
+
+Phase 1 of “The Method” is already built and deployed (see phase-1 prompt). Users can sign up, complete onboarding, ingest material (paste/URL/file), practice with spaced repetition, take mock exams, and see their forecast.
+
+This is Phase 2. We’re adding three connected features:
+
+1. **An individualized AI tutor** — a conversational interface grounded in the user’s own material plus web search for accuracy
+1. **Socratic dialogue mode** — a different pedagogical pattern from the existing practice loop, where the tutor leads with questions rather than answers
+1. **Personalized scenarios** — the AI generates worked examples and fact patterns relatable to the user’s life context, with explicit consent and full opt-out
+
+Do not break or refactor Phase 1 features. Add these as new modules.
+
+-----
+
+## Use the same stack as Phase 1
+
+Same Vite + React + TS frontend, same Express + TS backend, same Postgres + Prisma, same auth, same Stripe gating, same Anthropic key handling (server-side only).
+
+-----
+
+## New domain model — additive only
+
+```
+TutorConversation (belongs to user)
+  id, title, createdAt, lastMessageAt
+  scope: enum (all_material | specific_concept | specific_source)
+  scopeRefId: string nullable (concept id or source label)
+  messages: jsonb (array of { role, content, citations?, timestamp })
+
+LearnerContext (one per user, nullable — opt-in)
+  consentGivenAt: timestamp
+  profession: string nullable
+  industryDomain: string nullable
+  careerStage: enum (student | early_career | mid_career | senior | transitioning) nullable
+  locationCity: string nullable
+  locationCountry: string nullable
+  familySituation: enum (single | partnered | parent | caregiver) nullable
+  interests: jsonb nullable (array of strings, max 5)
+  scenariosEnabled: boolean default true
+
+TutorUsage (belongs to user)
+  date, tutorCalls, webSearchCalls, totalTokens
+```
+
+Run a Prisma migration to add these tables. Do not modify existing tables except to add a relation from User to these new tables.
+
+-----
+
+## FEATURE 1: AI Tutor (conversational, grounded)
+
+### What it is
+
+A persistent chat interface where the user can have a back-and-forth with an AI tutor. The tutor knows the user’s uploaded material and can search the web for current/accurate information when needed.
+
+### Routes
+
+- `/tutor` — conversation list view
+- `/tutor/:conversationId` — single conversation interface
+- `/tutor/new` — start a new conversation (asks: scope = all material / specific concept / specific source)
+
+### UI behavior
+
+- ChatGPT-style interface: scrollable message list, input at bottom, streaming responses
+- Each AI message can include **citations** — clickable references back to specific Concepts in the user’s library, or to web sources (with favicon + domain shown)
+- A scope indicator at the top: “Tutoring on: [scope name]”
+- Conversation list shows title + last message preview + last activity timestamp
+- User can rename conversations and delete them
+- Auto-generate conversation titles from the first user message (one short API call)
+
+### Backend endpoint: `POST /api/tutor/message`
+
+Request: `{ conversationId, message }`
+
+Process:
+
+1. Load the conversation history from the database
+1. Load the relevant concepts based on conversation scope:
+- `all_material` → all user’s concepts (cap at 50 most recent if user has many)
+- `specific_concept` → that concept + its 5 nearest neighbors by source
+- `specific_source` → all concepts with that source label
+1. Build a system prompt (see below) that grounds the tutor in the loaded concepts
+1. Decide whether to invoke web search:
+- Heuristic: if the user’s question contains time-sensitive language (“current”, “latest”, “as of”, “today”, year references), or if the question is clearly outside the loaded concepts’ coverage, allow web search
+- Otherwise, do not invoke web search
+1. Call Anthropic API with the system prompt, conversation history, new message, and (if applicable) the web search tool enabled
+1. Stream the response back to the client
+1. Save the new user message and assistant response to the conversation
+1. Increment `TutorUsage` counters
+
+### System prompt for the tutor
+
+```
+You are an expert tutor helping this learner master the material in their study library. Your goals, in order:
+
+1. Be ACCURATE. If you don't know something or aren't sure, say so. Do not invent rules, cases, statutes, or facts.
+
+2. Be GROUNDED. The learner's own study material is below. When their question relates to that material, anchor your answer in it and cite the specific concept by title. When their question goes beyond the material, you can answer from general knowledge or web search, but make this transparent.
+
+3. Be PEDAGOGICAL, not just answering. Default to explaining the WHY, the structure, the connections. When the learner is stuck, walk them through reasoning rather than just delivering the conclusion.
+
+4. Be CONCISE. Do not produce wall-of-text answers when a paragraph will do. Long explanations only when complexity demands it.
+
+5. Cite. When you reference one of their concepts, cite it as [Concept: TITLE]. When you reference a web source, cite it as [Source: DOMAIN].
+
+LEARNER'S STUDY MATERIAL (these are the concepts in their library):
+{concepts injected here as a numbered list of title + first 300 chars of content}
+
+{If learner context exists and scenarios are enabled, append:}
+LEARNER CONTEXT (for crafting relatable examples when helpful — do not over-reference):
+- Profession: {profession}
+- Career stage: {careerStage}
+- Location: {locationCity}, {locationCountry}
+- Family situation: {familySituation}
+- Interests: {interests}
+
+Use this context SPARINGLY — only when a concrete example would help and you can naturally draw from their world. Never reference their personal details unprompted in a way that feels intrusive.
+```
+
+### Citations rendering
+
+- AI responses can include `[Concept: TITLE]` and `[Source: DOMAIN]` markers
+- Parse these in the frontend and render as clickable pills
+- Clicking a Concept citation opens that concept in a side panel or modal
+- Clicking a Source citation opens the source URL in a new tab
+- Track which citations are clicked (useful telemetry later)
+
+### Rate limits
+
+- Free tier: tutor disabled entirely (gate behind pro)
+- Pro tier: 50 tutor turns per day, 20 web-search-enabled turns per day
+- Hard caps. Show the user their remaining budget in the UI.
+
+### Web search implementation
+
+Use Anthropic’s web search tool via the API. Configure with:
+
+- `max_uses: 3` per turn
+- Allowed domain list configurable in admin (start permissive)
+- If web search returns no useful results, the model should say so rather than hallucinating
+
+-----
+
+## FEATURE 2: Socratic dialogue mode
+
+### What it is
+
+A distinct mode the user can toggle on within any tutor conversation. In Socratic mode, the tutor’s behavior shifts: instead of explaining concepts, it asks questions designed to surface the learner’s reasoning, expose misconceptions, and lead them to insight through their own thinking.
+
+This is NOT a different page or feature — it’s a toggle within the existing tutor interface.
+
+### UI
+
+- A toggle button labeled “Socratic mode” at the top of the conversation
+- When active, a subtle visual indicator (different background tint, badge)
+- A short explainer modal the first time it’s enabled: “In Socratic mode, the tutor will lead with questions rather than answers. Use this when you want to deepen understanding, not just get information.”
+
+### How it changes the system prompt
+
+When Socratic mode is on, prepend this to the system prompt:
+
+```
+SOCRATIC MODE IS ACTIVE.
+
+Adjust your approach:
+
+- Default to ASKING rather than telling. When the learner asks a question or makes a claim, respond with a probing question that surfaces their current understanding before you explain.
+- Use the classic Socratic moves: ask for definitions ("What do you mean by X?"), ask for examples ("Can you give me an instance of that?"), probe assumptions ("What are you taking for granted?"), test consequences ("If that's true, what follows?"), examine alternatives ("Is there another way to see this?").
+- Do not interrogate. Aim for one focused question per turn, not five.
+- When the learner is genuinely stuck after two or three turns, switch to teaching mode and explain — but flag the shift: "Let me explain this part directly."
+- When the learner reaches insight on their own, acknowledge it briefly and move forward. Don't lecture.
+- If the learner asks for direct information ("just tell me the rule"), respect that and switch out of Socratic mode for that turn. Pedagogy serves the learner, not the other way around.
+
+Your role is to be a thinking partner, not a quiz-master.
+```
+
+### Behavioral guarantees
+
+- The toggle state is per-conversation, persisted to the database
+- The user can switch it off mid-conversation
+- The first 2 turns in Socratic mode should clearly demonstrate the style shift so the user knows what they signed up for
+
+-----
+
+## FEATURE 3: Personalized scenarios
+
+### What it is
+
+When the AI generates examples (in the tutor, in question generation, in worked examples), it can draw from the learner’s life context — profession, career stage, location, family situation, interests — to make examples relatable rather than abstract.
+
+This is **opt-in**, **transparent**, and **fully reversible**.
+
+### Consent flow
+
+1. After Phase 1 onboarding completes, add a NEW screen called “Personalization (optional)”
+1. The screen explains plainly: “We can make examples and scenarios more relatable by knowing a little about your life. This is optional. You can skip, edit, or turn it off at any time. We do not sell or share this data.”
+1. Two clear buttons: “Set up personalization” and “Skip — generic examples are fine”
+1. If user picks setup, show a form with the LearnerContext fields. All fields optional individually.
+1. Save consent timestamp with the record.
+1. Existing users (pre-Phase-2) see this prompt the next time they log in, dismissible.
+
+### Settings page
+
+Add a “Personalization” section to `/settings` with:
+
+- Edit any field
+- Toggle “Use my context in scenarios” (defaults to on if context exists)
+- “Delete all personalization data” button (hard delete, requires confirmation)
+
+### How it’s used
+
+The LearnerContext is injected into system prompts (see tutor system prompt above) and into question generation prompts when the user adds new material. The model is instructed to use this context **sparingly** — only when it genuinely helps make an example concrete, and never in a way that feels intrusive or stereotyping.
+
+### Critical guardrails — non-negotiable
+
+The AI must NOT:
+
+- Reference the learner’s personal details unprompted in ways that feel surveillance-y (“As a parent in Toronto, you’ll appreciate…”)
+- Use demographic context as a substitute for accurate teaching (the content of the lesson is the same regardless of who’s learning it)
+- Assume that a learner’s profession or background means they already know related material
+- Make assumptions about political views, religion, or values from the collected context
+
+The AI SHOULD:
+
+- Use profession to choose familiar example domains (a nurse studying contracts gets healthcare examples; a startup founder gets SaaS examples)
+- Use career stage to calibrate complexity of examples (junior → simpler scenarios)
+- Use location to choose jurisdictionally relevant references where applicable
+
+### Telemetry
+
+Log when personalization is used so you can verify it’s behaving well. A simple boolean per AI response: “used learner context = true/false” stored on the message record.
+
+-----
+
+## Rate limiting (updates)
+
+Add tutor and web search to existing rate limit infrastructure:
+
+- Track `tutorCalls` and `webSearchCalls` separately in `TutorUsage`
+- Reset daily via existing cron
+- Surface remaining budget in the UI (top right of tutor interface): “Tutor: 23/50 today”
+
+-----
+
+## Pricing tier updates
+
+Update Phase 1’s free/pro gating to reflect new features:
+
+**Free tier** (unchanged from Phase 1 plus):
+
+- AI tutor: disabled
+- Socratic mode: N/A (no tutor)
+- Personalized scenarios: disabled
+
+**Pro tier** ($19/mo or $149/yr — unchanged from Phase 1 plus):
+
+- AI tutor: 50 turns/day, 20 with web search
+- Socratic mode: included
+- Personalized scenarios: included
+
+-----
+
+## Production-ready checklist for Phase 2
+
+Before “done”:
+
+- [ ] User can start a new tutor conversation, scope it, and have a real exchange
+- [ ] Citations render correctly and are clickable (both Concept and Source)
+- [ ] Web search invokes correctly on time-sensitive questions and is gated by daily budget
+- [ ] Socratic mode toggle visibly changes tutor behavior within two turns
+- [ ] Personalization consent screen is clear, skippable, and reversible
+- [ ] Personalization data can be edited and deleted from settings
+- [ ] Rate limits prevent unbounded API spend
+- [ ] All new endpoints are properly auth-protected
+- [ ] Existing Phase 1 features still work — no regressions
+
+-----
+
+## What I do NOT want
+
+- Tutor that confidently makes up case names, statute numbers, or specific facts. If it doesn’t know, it must say so.
+- Personalization that feels invasive (“I see you’re a 32-year-old marketing manager in Austin with two kids…”). The context should be invisible to the user — they should only notice that examples *fit* them, not that the AI is profiling them.
+- Socratic mode that feels like interrogation. One question per turn, not a Q-bank.
+- Tutor that becomes a generic ChatGPT — the grounding in user’s material is the differentiator. If a turn doesn’t reference their material at all when it could, the prompt is failing.
+- Personalization data leaking into other features without explicit signaling.
+
+-----
+
+## Questions to confirm before building
+
+1. Should the tutor stream responses (better UX, more complex) or wait-then-show (simpler)?  
+   *Recommend: streaming. Worth the complexity.*
+1. Should conversation history be summarized for long conversations to control token cost, or just truncated to last N messages?  
+   *Recommend: truncate to last 20 messages for now; revisit if users complain.*
+1. Anthropic web search vs. a separate search API (Brave, Tavily)?  
+   *Recommend: Anthropic’s native web search tool — fewer moving parts.*
+1. Should impersonation by admins (coming in Phase 3) bypass rate limits, or share them?  
+   *Recommend: share. Admin shouldn’t burn user budget while impersonating, but also shouldn’t see a different limit than the user does.*
+
+Confirm those four and start building.
+
+-----
+
+# PHASE 3: Admin Panel with User Management and Impersonation
+
+**Prerequisites:** Phases 1 and 2 are deployed and have real users. Support volume is becoming a burden to handle manually. You have at least one trusted operator besides yourself who will hold admin role.
+
+Phases 1 and 2 of “The Method” are built and deployed. Users can sign up, ingest material, practice, take exams, see forecasts, chat with an AI tutor (Socratic mode optional), and get personalized scenarios. The product is in real use.
+
+This is Phase 3. We’re adding administrative tooling so a small number of trusted operators can support users, comp pro access, and (with full audit trails) impersonate users for support purposes.
+
+**This is the highest-risk phase to build.** Impersonation is a powerful capability that, if implemented poorly, becomes a serious vulnerability. Do not cut corners on the safeguards specified below.
+
+-----
+
+## Use the same stack as previous phases
+
+Same Vite + React + TS frontend, same Express + TS backend, same Postgres + Prisma, same auth, same Stripe gating, same Anthropic key handling. Add to the existing codebase. Do not refactor previous phases.
+
+-----
+
+## New domain model — additive only
+
+```
+AdminRole (extension to User)
+  Add column: role enum (user | admin | superadmin) default 'user'
+  Only superadmin can grant/revoke admin role
+  At least one user must always be superadmin
+
+AdminAuditLog (immutable, append-only)
+  id, adminUserId, action, targetUserId nullable, metadata jsonb, createdAt, ipAddress, userAgent
+  Indexed on adminUserId, targetUserId, createdAt
+
+ImpersonationSession (separate from regular session)
+  id, adminUserId, targetUserId, startedAt, endedAt nullable, reason text required
+  Expires automatically after 30 minutes
+  One active impersonation per admin at a time
+
+AccessGrant (manual pro access overrides)
+  id, userId, grantedByAdminId, grantedAt, expiresAt nullable, reason text required, revokedAt nullable, revokedByAdminId nullable
+```
+
+Run a Prisma migration. The role column on User defaults to ‘user’ for everyone existing.
+
+-----
+
+## Designating the first superadmin
+
+Provide a CLI script or one-time admin endpoint protected by an environment variable secret:
+
+```
+POST /api/admin/bootstrap-superadmin
+Headers: x-bootstrap-secret: {process.env.BOOTSTRAP_ADMIN_SECRET}
+Body: { email }
+```
+
+This endpoint:
+
+- Only works if no superadmin currently exists, OR if the secret matches
+- Sets the role of the specified user to `superadmin`
+- Logs the action to AdminAuditLog
+- Should be removed or disabled after initial setup (document this in the README)
+
+-----
+
+## Admin authentication
+
+Admins log in through the regular auth flow. After login, the user’s role is checked. If role is `admin` or `superadmin`, they see an additional “Admin” link in the main navigation.
+
+Routes under `/admin/*` require admin role. Routes that modify other users require `superadmin` (specifically: granting/revoking admin role, deleting users). Build a server-side middleware `requireRole(role)` that gates these endpoints.
+
+**Failed admin auth attempts log to AdminAuditLog** as `action: 'unauthorized_admin_access_attempt'`. This is important — you want to see if someone is poking around.
+
+-----
+
+## Admin panel routes and pages
+
+### `/admin` — Dashboard
+
+Top-level admin home. Shows:
+
+- Total users (count, growth chart for last 30 days)
+- Active subscriptions (paid users, MRR estimate)
+- API usage today (total Anthropic calls, top 10 users by usage)
+- Recent signups (last 20)
+- Recent audit log entries (last 20)
+- System health: error rate (last 24h), avg response time
+
+Use clear tables and simple charts. No fancy visualizations — admins need clarity, not flair.
+
+### `/admin/users` — User list
+
+Paginated list of all users. Columns:
+
+- Email, name, signup date, subscription tier, role, last active
+
+Filters:
+
+- Search by email/name
+- Filter by tier (free/pro)
+- Filter by role
+- Sort by signup date, last active, total API usage
+
+Each row has actions: **View**, **Grant access**, **Impersonate**.
+
+### `/admin/users/:userId` — User detail
+
+Shows everything about a user:
+
+- Profile info (email, name, signup date, role)
+- Subscription details (tier, Stripe customer ID, trial status, current period)
+- Active access grants (manual pro overrides)
+- Usage stats (concepts, cards, sessions, exam results, tutor turns — last 30 days)
+- Activity timeline (last 50 events: logins, sessions, exams, tutor conversations)
+- Audit log entries involving this user
+
+Actions on this page:
+
+- **Grant pro access** (manual override, with required reason and optional expiry)
+- **Revoke pro access** (if currently on a grant)
+- **Impersonate user** (with required reason)
+- **Send password reset email**
+- **Export user data** (JSON download of everything they own)
+- **Delete user** (superadmin only, with confirmation, hard delete with cascade)
+
+### `/admin/audit-log` — Full audit history
+
+Searchable, filterable log of all admin actions. Filters:
+
+- By admin user
+- By target user
+- By action type
+- Date range
+
+Read-only. No editing or deletion of audit entries. Ever.
+
+### `/admin/settings` — System settings
+
+Superadmin only:
+
+- Manage admin role assignments
+- Configure rate limit defaults
+- Configure allowed web search domains (from Phase 2)
+- Feature flag toggles (if any)
+
+-----
+
+## Granting and revoking access
+
+### Grant flow
+
+From `/admin/users/:userId`, admin clicks “Grant pro access”:
+
+Modal asks:
+
+- **Reason** (required, free text — e.g., “Beta tester”, “Refund compensation”, “Influencer comp”)
+- **Duration** (radio: 7 days / 30 days / 90 days / 1 year / Permanent)
+
+On submit:
+
+1. Creates an `AccessGrant` row with `expiresAt` computed from duration (or null for permanent)
+1. Updates the user’s `subscriptionTier` to `pro` if not already
+1. Adds a flag `subscriptionStatus: 'comp'` (so Stripe webhooks don’t override)
+1. Logs to AdminAuditLog: `action: 'access_granted', metadata: { duration, reason }`
+1. Sends the user an email: “You’ve been granted pro access — here’s what’s now available”
+
+A nightly cron checks for expired grants and reverts those users back to `free` tier unless they have a paid subscription.
+
+### Revoke flow
+
+Same modal, requires a reason. Updates the grant’s `revokedAt`, reverts user to `free` tier (unless they have a paid subscription), logs the action, emails the user.
+
+-----
+
+## Impersonation — the critical feature
+
+Impersonation lets an admin act as a user for support purposes. It is powerful and dangerous. Build it with all of these safeguards.
+
+### Starting impersonation
+
+From `/admin/users/:userId`, admin clicks “Impersonate”:
+
+A modal appears with required fields:
+
+- **Reason** (free text, minimum 10 characters — e.g., “User reports session crash, investigating”)
+- **Confirmation checkbox**: “I understand this action will be logged with my name, the target user’s name, the timestamp, and my IP address. I will not perform any destructive actions while impersonating.”
+
+On confirm:
+
+1. Server creates an `ImpersonationSession` row
+1. Server issues a NEW session token that carries `actingAs: {targetUserId, impersonationSessionId}` claim
+1. Client redirects to `/today` (the regular user landing page)
+1. AdminAuditLog entry: `action: 'impersonation_started'`
+
+### During impersonation — visual indicators
+
+This is the user safety layer. Make it impossible to forget you’re impersonating.
+
+- A persistent banner at the top of every page in a high-contrast color (red or amber): **“You are viewing as [user.email]. Reason: [reason]. [End impersonation]”**
+- The banner is non-dismissable
+- A subtle border or watermark on the entire viewport (e.g., red 4px border on the outside) — visible peripherally even if the user looks away
+- The browser tab title is prefixed with `[IMPERSONATING] `
+
+### During impersonation — blocked actions
+
+These actions MUST NOT be possible while impersonating, even if the UI is hacked:
+
+- Deleting the user’s account
+- Canceling the user’s subscription
+- Changing the user’s email or password
+- Adding payment methods on the user’s behalf
+- Initiating purchases of any kind
+- Deleting Concepts, Cards, ExamResults, or any user-owned data
+- Sending messages or emails from the user
+- Modifying the user’s personalization data
+
+Server-side: ANY mutation endpoint must check `req.user.actingAs` and reject if present, with a 403 and an audit log entry. Whitelist read-only endpoints only.
+
+If an admin needs to perform one of these on behalf of a user (rare, e.g., account deletion at user’s request), they do it from the admin UI as themselves, not via impersonation.
+
+### Ending impersonation
+
+- “End impersonation” button in the banner
+- Auto-expires after 30 minutes regardless
+- On end: invalidate the impersonation session token, restore the admin’s original session, log `action: 'impersonation_ended'`
+
+### Audit logging for impersonation
+
+Every page view during impersonation logs: `action: 'impersonated_page_view', metadata: { path, method }`. This produces a complete trail of what was looked at.
+
+-----
+
+## Email notifications (for admin transparency to users)
+
+When a user is affected by admin action, they receive an email:
+
+1. **Pro access granted** — friendly email, what they now have access to
+1. **Pro access revoked** — neutral email, what they lose access to, how to subscribe directly
+1. **Password reset initiated by admin** — neutral email, that an admin initiated this and what to do
+1. **Account impersonated** — *delayed* email sent within 24 hours of the impersonation session ending, telling them: “A support admin viewed your account on [date] for the following reason: [reason]. They could not modify your data. If you have questions, contact us.”
+
+That last one is important for trust. Users should know when their account has been accessed by humans on your side. This is becoming standard practice (Google, GitHub, Slack all do it).
+
+-----
+
+## Performance and security
+
+- All admin endpoints rate-limited (10 requests/sec per admin)
+- All admin endpoints log to AdminAuditLog with IP and user agent
+- CSRF protection on all admin mutations
+- Database queries on `/admin/users` paginated (50 per page, no unbounded scans)
+- The audit log table will grow large — add an archival job that moves entries older than 1 year to cold storage, but keep the trail forever
+
+-----
+
+## Production-ready checklist for Phase 3
+
+Before “done”:
+
+- [ ] Superadmin can be bootstrapped via the documented mechanism
+- [ ] Admin role gating works — non-admins get 403 on `/admin/*`
+- [ ] All admin actions write to AdminAuditLog
+- [ ] Granting pro access updates the user’s tier and is reversed on expiry
+- [ ] Impersonation produces a clearly visible banner that cannot be dismissed
+- [ ] Impersonation blocks all destructive actions server-side (test by manually crafting requests)
+- [ ] Impersonation expires after 30 minutes
+- [ ] Users receive email notification of impersonation within 24 hours
+- [ ] Audit log is searchable and read-only
+- [ ] CSRF protection works on admin mutations
+- [ ] All existing user-facing features still work — no regressions
+
+-----
+
+## What I do NOT want
+
+- “Soft” impersonation that doesn’t visibly distinguish from regular use — every interaction must scream “you are impersonating”
+- Impersonation that can write user data — even with “good intentions” by an admin
+- An audit log that admins can edit or delete (this defeats its purpose)
+- Granting admin role via API without superadmin authorization
+- Skipping the user-notification email — this is part of the trust contract with users
+- Storing impersonation reasons that aren’t free text (e.g., dropdowns of “support / debugging / other”) — free text gives meaningful accountability; dropdowns let admins hide behind labels
+
+-----
+
+## Legal and trust considerations
+
+Update Terms of Service and Privacy Policy to disclose:
+
+- That trained operators may access user accounts for support purposes
+- That all such access is logged and the user is notified
+- That operators cannot modify user data through impersonation
+- How users can request the audit trail of any admin access to their account
+
+This disclosure builds trust. Hiding the capability erodes it.
+
+-----
+
+## Questions to confirm before building
+
+1. Who is the first superadmin? (You’ll provide email; document the bootstrap procedure)
+1. What’s the company name to use in the user notification emails? (“On behalf of [Company]…”)
+1. Should admins be able to grant `admin` role to other users, or only `superadmin` can do that?  
+   *Recommend: only superadmin grants role changes. Admins can do everything else.*
+1. Should impersonation sessions be auto-terminated when the admin’s regular session ends, or run independently for the 30-minute timeout?  
+   *Recommend: tied to admin session. If admin logs out, impersonation ends immediately.*
+
+Confirm those four and start building.
+
+-----
+
+# Cross-Phase Notes
+
+These apply across all three phases. Read once; keep them in mind throughout.
+
+## Things I do NOT want, ever
+
+- **VARK or “learning styles” framing anywhere in the UI.** The meshing hypothesis (matching teaching to a preferred modality) has been repeatedly debunked. The product uses dual coding (visual + verbal together, for everyone) and modality variety. Do not introduce VARK self-assessment, “what kind of learner are you” framing, or any UI that implies the system matches teaching to a preferred style.
+- **Reproducing copyrighted exam questions.** Real bar exam, MCAT, AICPA, ETS, NCBE questions are proprietary. The product generates questions in the *format* of these exams — it does not reproduce them. Do not scrape question banks. Do not use training data to reconstruct specific known questions.
+- **Mock data or stubbed AI responses in production.** Wire up real Anthropic calls from day one.
+- **The Anthropic API key in client-side code.** All AI calls go through your server. The key lives in Replit Secrets and is read by the backend only.
+- **“TODO” comments where logic should be.** If the agent can’t complete a section, it should flag it explicitly and stop, not silently leave broken code.
+- **Generic SaaS design clichés.** Purple gradients, illustrations of stick figures pointing at laptops, “Built with ❤️” footers. This is a serious tool for adults preparing for serious exams.
+
+## Things the design must do, every phase
+
+- **Professional, not playful.** No emojis in UI chrome. Real typography (not Inter, not system defaults — something with character).
+- **Mobile-first responsive.** Study sessions happen on commutes. Test at 375px width.
+- **Accessible.** Real focus states, semantic HTML, keyboard navigation, sufficient contrast, ARIA labels.
+- **Dark mode toggle in settings.** Both themes properly designed, not just inverted.
+- **Generous whitespace.** Reading dense material should feel calm.
+
+## Anthropic API best practices, every phase
+
+- Use the current Claude Sonnet model. Do not pin to a specific version that will go stale.
+- Exponential backoff on 429/529 errors (retry up to 3 times).
+- Log every API call with cost estimate.
+- Set `max_tokens` conservatively — don’t waste tokens.
+- Cache results where appropriate (concept extraction by content hash, for instance).
+- Rate-limit per user at the application level — the API key has no built-in per-user limits.
+
+## Trust and transparency, every phase
+
+- User owns their data. They can export everything as JSON and delete everything from settings.
+- AI processing is disclosed. Users know their material goes to Anthropic for processing.
+- When admins access an account (Phase 3), the user is notified within 24 hours.
+- No surprise charges. Free trial converts to paid only with explicit confirmation.
+
+## Legal pages, every phase
+
+Maintain ToS and Privacy Policy. Each phase update must include relevant disclosure:
+
+- Phase 1: data handling, AI processing, subscription terms, copyright stance on exam questions
+- Phase 2: tutor data, personalization data, web search disclosure
+- Phase 3: admin access disclosure, impersonation policy, audit log retention
+
+## When something breaks (it will)
+
+Be specific in your follow-up prompts to the coding agent. Not “the tutor isn’t working” — instead, “when I send a message in the tutor, the response streams but the `[Concept: TITLE]` citations appear as plain text instead of clickable pills.” Specificity gets fixes; vagueness gets refactors that introduce new bugs.
+
+## A final honest note
+
+This specification is detailed but cannot anticipate every decision a coding agent will face. Expect to debug. Expect to write follow-up prompts. Expect Stripe webhooks to misbehave on first try, mobile layouts to need polish, and at least one Anthropic API call pattern to need adjustment for the current SDK version.
+
+Budget time for iteration after each phase build. The product is ready when real users can complete the entire intended flow without your intervention — not when the agent says it’s done.

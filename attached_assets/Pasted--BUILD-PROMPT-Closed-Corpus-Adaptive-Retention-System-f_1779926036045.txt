@@ -1,0 +1,334 @@
+# BUILD PROMPT: Closed-Corpus Adaptive Retention System for Certification & Exam Prep
+
+> **For:** product, engineering, instructional design, and AI/ML teams (or an AI coding agent) building a learner-driven, admin-governed adaptive learning platform.
+> 
+> **Use this prompt to:** scope an MVP, write technical specs, generate user stories, brief vendors, or seed an AI coding agent (Claude Code, Cursor, etc.) to scaffold the system.
+
+-----
+
+## 1. PRODUCT VISION
+
+Build an AI-powered adaptive learning platform that helps learners pass high-stakes certification and licensure exams (PMP, PMI-ACP, CAPM, CSM, PSM, SAFe, CompTIA, AWS, CFA, NCLEX, bar exam, and similar) by ingesting both an authoritative admin-curated knowledge base and the learner’s own materials — including past failed tests — and producing a personalized, continuously adapting study journey.
+
+The system must:
+
+1. **Never hallucinate.** Every factual claim about subject matter is grounded in admin-approved sources with verifiable citations.
+1. **Personalize relentlessly.** Adapt content, modality, pacing, and difficulty to the individual learner based on continuous signal capture.
+1. **Empower the learner.** Build durable retention, conceptual relation, and deep understanding — not just test-pass tricks.
+1. **Give admins full control.** Authoritative content, source whitelist, retrieval boundaries, and audit logs are admin-governed.
+
+-----
+
+## 2. CORE ARCHITECTURE (FOUR LAYERS)
+
+### Layer 1 — Dual Corpus Ingestion
+
+**Admin Corpus (authoritative, governs what the AI may claim is true):**
+
+- Upload interface accepting PDF, DOCX, PPTX, TXT, MD, HTML, MP3/MP4 (with transcription), and URLs.
+- Whitelist of external domains the AI is permitted to fetch from (e.g., `pmi.org`, `scrum.org`, `learn.microsoft.com`).
+- Admin-set authority hierarchy (e.g., Official Guide > Vendor Documentation > Vendor Blog > Community Wiki) for tie-breaking when sources conflict.
+- Version control: pin to specific guide editions (e.g., PMBOK 7 vs. 8); deprecated content marked, never silently deleted.
+
+**Learner Corpus (personal, shapes how the AI teaches this learner):**
+
+- Upload interface accepting the same file types plus images of handwritten notes.
+- **Critical input:** past failed practice tests and score reports with wrong answers preserved.
+- Optional self-described pain points (“I keep mixing up earned value formulas”).
+- Target exam date and goal score.
+
+**Hard rule:** the two corpora are stored, indexed, and retrieved separately. The learner corpus never becomes a citable source for subject-matter claims.
+
+### Layer 2 — Indexed Knowledge Base
+
+- Chunk all admin-corpus content into semantically meaningful units (recommend 300–800 tokens per chunk with 50-token overlap).
+- Embed using a high-quality embedding model (OpenAI `text-embedding-3-large`, Voyage, or equivalent).
+- Store in a vector database (Pinecone, Weaviate, pgvector, Qdrant — choose based on infra preference).
+- **Metadata per chunk (mandatory):** source filename, page/section, version, authority level, upload date, last verified date, exam domain tag, Bloom-level tag, prerequisite concepts.
+- Build a parallel **concept graph**: nodes = exam-blueprint domains and sub-competencies; edges = prerequisite relationships. Map every chunk to one or more concept nodes.
+
+### Layer 3 — Anti-Hallucination Guardrail Layer
+
+Three mechanisms, all required:
+
+1. **Retrieval-required RAG.** The generation model cannot produce subject-matter content without first retrieving supporting chunks. Implement as a hard gate, not a soft prompt instruction.
+1. **Citation enforcement.** Every factual claim in generated output must be traceable to a retrieved chunk. Implement post-generation verification:
+- Parse generated response into claims.
+- For each claim, confirm a supporting chunk was retrieved.
+- Block, rewrite, or flag any uncited claim.
+1. **“I don’t know” path.** When retrieval confidence falls below admin-configured threshold, the system explicitly says so and offers: (a) flag the gap for admin review, (b) request learner upload more material, or (c) request permission to fetch from whitelisted external sources.
+
+### Layer 4 — Adaptive Learning Engine
+
+The decision-making brain. Four-stage continuous loop:
+
+**Diagnose → Recommend → Deliver → Assess → (repeat)**
+
+Implement the learner model using a combination of:
+
+- **Bayesian Knowledge Tracing (BKT)** for binary mastery estimates per concept node.
+- **Item Response Theory (IRT)** for difficulty calibration.
+- **Deep Knowledge Tracing (DKT)** — optional v2 enhancement — for sequential pattern detection.
+
+The engine decides on each loop:
+
+- Which concept to address next (graph traversal with mastery and prerequisite logic).
+- Modality (explanation, scenario, Socratic dialogue, retrieval flashcard, simulation, worked example).
+- Difficulty level (keep learner in zone of proximal development).
+- Scaffolding level (full worked example → faded example → bare problem).
+- Spacing (when to reintroduce previously learned concepts on personalized forgetting curve).
+
+-----
+
+## 3. KEY FEATURES (DETAILED)
+
+### 3.1 Onboarding & Initial Diagnostic
+
+- Learner selects target certification from a catalog (admin-defined).
+- Uploads any existing materials (failed tests prioritized).
+- Sets target exam date and goal score.
+- Takes a **10–15 minute multi-modal diagnostic** that probes both:
+  - **What they know:** mastery probability per exam-blueprint domain.
+  - **How they learn best:** which item formats produce highest accuracy, fastest response, strongest recall (recall vs. recognition, scenario application, self-explanation, compare/contrast).
+- Output: initial Learner Profile with mastery estimates, modality weights, detected misconceptions from failed tests, personalized study plan reverse-engineered from exam date.
+
+### 3.2 Failed-Test Forensic Analysis
+
+When a learner uploads past failed tests:
+
+- Extract question, learner’s answer, correct answer, and any provided explanation.
+- Map each item to concept node(s) in the graph.
+- Classify error types:
+  - **Surface error** (misread, careless) — low remediation priority.
+  - **Conceptual misconception** (confused two concepts) — high priority, generate targeted probes.
+  - **Procedural error** (knew concept, misapplied process) — medium priority, scaffolded practice.
+  - **Knowledge gap** (never learned) — route to instruction.
+- Generate **distinguishing items** that probe between competing misconception hypotheses.
+
+### 3.3 Scenario Generation (Grounded, Not Hallucinated)
+
+The AI generates novel scenarios while keeping underlying facts grounded:
+
+- Retrieve verified content on the concept being practiced.
+- Prompt the generation model to construct a realistic situational scenario that *requires applying* the retrieved facts.
+- Validate generated scenario: does the “correct” answer trace to retrieved chunks? If not, regenerate.
+- Example for PMP: “You’re 60% through execution. The sponsor requests a scope change that pushes past the deadline. The change control board meets in two weeks. What do you do first, and which document governs your next step?” — scenario is novel; the change control process is grounded in PMBOK.
+
+### 3.4 Socratic Dialogue Mode
+
+For deep understanding (not just retention):
+
+- AI engages learner in question-driven dialogue, not lecture.
+- Never gives the answer directly; asks probing questions that lead the learner to reason their way through.
+- Uses learner’s own words back to them; surfaces contradictions gently.
+- Captures dialogue transcripts as evidence of reasoning quality for the learner profile.
+
+### 3.5 Spaced Retrieval & Interleaving
+
+- Each item has a personalized forgetting-curve estimate based on the individual learner’s recall stability.
+- System schedules items for review at expanding intervals (initial implementation: SuperMemo SM-2 or FSRS algorithm).
+- Interleave items from different exam domains in practice blocks (interleaving outperforms blocked practice for transfer).
+
+### 3.6 Adaptive Delivery — The Three R’s
+
+- **Retain:** spaced retrieval flashcards, low-stakes recall checks.
+- **Relate:** analogies that bridge to concepts the learner has already mastered, concept maps showing how new content connects to old.
+- **Understand:** Socratic dialogue, self-explanation prompts (“Explain in your own words why X causes Y”), compare/contrast tasks.
+
+### 3.7 Continuous Signal Capture
+
+Every interaction generates signals that update the Learner Profile:
+
+- Correctness + error classification.
+- Response latency.
+- Hint requests, retries.
+- Self-rated confidence (with calibration tracking — overconfident wrong answers flagged).
+- Modality response (which formats produce best outcomes for this learner).
+- Recall stability over time.
+- Transfer-task performance (can they apply the concept in a new context?).
+- Streak/fatigue signals (response degradation suggesting time for break).
+
+### 3.8 Admin Dashboard
+
+- Corpus management: upload, version, deprecate, set authority levels.
+- Whitelist management: approve/block external domains for retrieval.
+- Audit log: every AI generation traceable to its source chunks; full query/response history searchable.
+- “Did the AI ever say X?” trace queries.
+- Flagged-response queue: low-confidence outputs surfaced for human review.
+- Coverage gap report: concepts where learners frequently hit the “I don’t know” path (signal that corpus needs more content).
+- Item analytics: which practice items perform poorly (statistically broken items flagged for review).
+
+### 3.9 Learner Dashboard
+
+- Mastery heat map across exam-blueprint domains.
+- Days-to-exam countdown with on-track / behind indicator.
+- Current weak areas with one-click practice launch.
+- Streak, time-on-task, retention curve visualization.
+- Source library: every cited source available to read in full.
+
+-----
+
+## 4. TECHNICAL STACK RECOMMENDATIONS
+
+These are starting recommendations; the team should evaluate against their existing infra.
+
+- **Frontend:** Next.js (React) + Tailwind. Mobile-responsive from day one.
+- **Backend:** Python (FastAPI) or Node (Express/NestJS).
+- **LLM:** Claude (Sonnet or Opus) via Anthropic API as primary; structure for model-swappability.
+- **Embeddings:** OpenAI `text-embedding-3-large`, Voyage AI, or Cohere embed-v3.
+- **Vector DB:** pgvector (if Postgres already in stack), Pinecone, Weaviate, or Qdrant.
+- **Relational DB:** Postgres for learner profiles, admin config, audit logs.
+- **Auth:** Auth0, Clerk, or Supabase Auth — must support admin/learner role separation.
+- **File processing:** `unstructured.io` or LlamaIndex for multi-format ingestion; Whisper for audio transcription.
+- **LMS integration:** LTI 1.3 advantage for institutional deployments (Canvas, Brightspace/D2L, Blackboard, Moodle).
+
+-----
+
+## 5. CRITICAL GUARDRAILS — NON-NEGOTIABLE
+
+These must be enforced architecturally, not by prompt instruction alone:
+
+1. **No generation without retrieval.** If retrieval returns zero relevant chunks above threshold, the system says “I don’t have authoritative content on that” and offers next steps. It does not generate from model parametric knowledge.
+1. **Citation required.** Every factual claim in output traces to a chunk. Post-generation validator blocks uncited claims.
+1. **Source whitelist enforced at fetch time.** AI cannot retrieve from non-whitelisted domains under any prompt construction.
+1. **Learner corpus is not citable.** Learner-uploaded content informs the profile and personalization; it never becomes a source the AI cites as authoritative.
+1. **Version pinning honored.** If admin has pinned to PMBOK 7, the AI never cites PMBOK 8 chunks even if present.
+1. **Audit log is append-only.** No deletion of admin actions, no editing of historical generations.
+
+-----
+
+## 6. PEDAGOGICAL PRINCIPLES (BAKE INTO THE DESIGN)
+
+These should guide product decisions when tradeoffs arise:
+
+- **Zone of proximal development (Vygotsky):** keep difficulty calibrated to challenging-but-achievable.
+- **Mastery learning (Bloom):** don’t advance prerequisites until mastery threshold met.
+- **Spaced retrieval (Ebbinghaus, Bjork):** schedule reviews on personalized forgetting curve.
+- **Interleaving:** mix concepts in practice rather than blocking.
+- **Desirable difficulties (Bjork):** don’t optimize for ease; optimize for durable learning.
+- **Retrieval practice over re-reading:** prefer recall over recognition; prefer generation over passive review.
+- **Formative assessment:** every interaction is evidence; assessment is woven into instruction, not separated from it.
+- **Confidence calibration:** track and surface miscalibration; on exam day, knowing what you don’t know is what saves points.
+
+-----
+
+## 7. MVP SCOPE (PHASE 1)
+
+Recommend shipping a focused MVP before adding complexity.
+
+**In scope for MVP:**
+
+- Single certification target (recommend starting with one: e.g., PMP or CSM).
+- Admin corpus ingestion (PDF, DOCX, URL only).
+- Learner corpus ingestion (failed tests, notes — PDF and DOCX only).
+- RAG with citation enforcement.
+- BKT-based learner model.
+- Diagnostic onboarding.
+- Adaptive practice (multiple choice + short scenarios).
+- Spaced retrieval scheduling.
+- Basic admin dashboard (corpus + audit log).
+- Basic learner dashboard (mastery + days-to-exam).
+
+**Defer to Phase 2:**
+
+- Audio/video ingestion.
+- Socratic dialogue mode.
+- Deep Knowledge Tracing.
+- Multi-certification catalog.
+- LTI integration.
+- Mobile native apps.
+
+**Defer to Phase 3:**
+
+- Cohort/institutional features.
+- Instructor dashboards.
+- Cross-learner analytics.
+- Multi-language support.
+
+-----
+
+## 8. SUCCESS METRICS
+
+Measure these from day one:
+
+**Learning effectiveness:**
+
+- Score lift from diagnostic to final practice exam.
+- Mastery achievement rate per domain.
+- Predicted pass probability vs. actual pass rate (calibration).
+
+**Engagement & retention:**
+
+- Daily active learners.
+- Sessions per week.
+- Average session length.
+- Streak duration.
+
+**System trust:**
+
+- Hallucination incident count (target: zero).
+- “I don’t know” rate (should decrease as corpus matures).
+- Citation accuracy on audit samples.
+
+**Admin efficacy:**
+
+- Time-to-deploy a new corpus.
+- Coverage gaps identified and closed.
+- Audit queries resolved.
+
+-----
+
+## 9. BUILD INSTRUCTION SUMMARY
+
+> Build a closed-corpus adaptive learning platform for certification prep with two strictly separated content streams (admin-authoritative and learner-personal), grounded RAG generation with mandatory citation enforcement, a probabilistic learner model driving real-time adaptation across content selection / modality / difficulty / spacing, scenario generation that is novel in situation but grounded in fact, and a full admin governance layer including source whitelist, version control, and audit logging. Hallucination prevention is architectural, not prompted. Personalization is continuous, not session-bound. The learner brings their own material — especially failed tests — and the system builds a precision remediation path around their actual gaps, anchored to admin-approved sources.
+
+-----
+
+## APPENDIX A — Example Admin Config (illustrative)
+
+```yaml
+certification: "PMP"
+version: "PMBOK 7th Edition"
+authoritative_sources:
+  - file: "pmbok_7th_edition.pdf"
+    authority: 1  # highest
+    version: "7.0"
+    pinned: true
+  - file: "pmi_agile_practice_guide.pdf"
+    authority: 1
+  - file: "internal_pmp_study_guide_v3.pdf"
+    authority: 2
+whitelisted_domains:
+  - pmi.org
+  - projectmanagement.com
+retrieval_threshold: 0.72
+citation_mode: visible
+unknown_response: explicit_refusal
+version_pin_enforced: true
+audit_retention_days: 730
+```
+
+## APPENDIX B — Example Learner Interaction (illustrative)
+
+```
+[Learner uploads failed PMP simulation: 62/180, weak in Risk and Integration]
+
+System: I've reviewed your practice exam. Your strongest area is Stakeholder
+Engagement (78%). Your weakest is Risk Management (38%), specifically
+quantitative risk analysis. I noticed a pattern: on 7 of 9 missed items,
+you confused EMV with decision tree analysis. We'll start there.
+
+[Generates scenario]
+"You're managing a software rollout. Two vendor paths exist. Path A has a
+40% chance of $200K savings and 60% chance of $50K cost overrun. Path B
+has a 70% chance of $80K savings and 30% chance of $30K overrun.
+Which has the higher EMV, and what tool would you use to visualize this
+decision across multiple sequential choices?"
+
+[After learner response, system cites:]
+Source: PMBOK 7th Edition, §2.8.3 (Risk Analysis Techniques), p. 124
+```
+
+-----
+
+*End of build prompt.*

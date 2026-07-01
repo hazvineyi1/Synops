@@ -1,0 +1,43 @@
+# Paideia stack as ONE Railway service: marketing site + Coach (study) + Paideia
+# teacher app + the shared API. Builds all three SPAs into the marketing app's
+# dist/public (Coach at /study/, teacher at /app/), bundles the API, then runs the
+# API which serves the assembled static site same-origin and the API under /api.
+# A second/third Railway service can reuse this image (Arete -> railway.json,
+# Kanon -> railway.kanon.json); this is railway.paideia.json.
+FROM node:24-slim
+
+# Build tools for any native modules.
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+# pnpm 9 (pnpm 10 gates dependency build scripts behind an approval prompt).
+RUN npm install -g pnpm@9
+
+WORKDIR /app
+
+# Copy the whole monorepo.
+COPY . .
+
+# Install all workspace dependencies (lockfile may lag behind package.json).
+RUN pnpm install --no-frozen-lockfile
+
+# Build the three frontends. Each vite.config requires PORT and BASE_PATH at build
+# time. The base path must match where the API serves each app:
+#   marketing -> "/", Coach -> "/study/", teacher -> "/app/".
+RUN PORT=8080 BASE_PATH=/       pnpm --filter @workspace/paideia-ren   run build
+RUN PORT=8080 BASE_PATH=/study/ pnpm --filter @workspace/paideia-study run build
+RUN PORT=8080 BASE_PATH=/app/   pnpm --filter @workspace/paideia-app   run build
+
+# Assemble: the API serves from paideia-ren/dist/public. Marketing built there
+# already (emptyOutDir wiped it first), so copy Coach into /study and the teacher
+# app into /app AFTER the marketing build.
+RUN cp -r artifacts/paideia-study/dist/public artifacts/paideia-ren/dist/public/study \
+ && cp -r artifacts/paideia-app/dist/public   artifacts/paideia-ren/dist/public/app
+
+# Build the API (esbuild bundle -> artifacts/paideia-api/dist/index.mjs).
+RUN pnpm --filter @workspace/paideia-api run build
+
+# Railway provides PORT at runtime; the server reads process.env.PORT.
+EXPOSE 8080
+
+# Start the API, which also serves the assembled SPA bundle.
+CMD ["node", "--enable-source-maps", "artifacts/paideia-api/dist/index.mjs"]

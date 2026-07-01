@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/paideia-ren-preview"
+title = "Synops"
+version = "1.0.0"
+id = "artifacts/paideia-ren"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/paideia-ren-preview" ]
+localPort = 23028
+
+[services.development]
+run = "pnpm --filter @workspace/paideia-ren run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/paideia-ren", "run", "build" ]
+publicDir = "artifacts/paideia-ren/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23028"
+BASE_PATH = "/paideia-ren-preview"
