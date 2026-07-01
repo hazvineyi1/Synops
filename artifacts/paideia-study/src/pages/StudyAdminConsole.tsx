@@ -26,8 +26,16 @@ import {
   useStudyAdminApiKeys,
   useStudyCreateApiKey,
   useStudyRevokeApiKey,
+  useAdminAmbassadors,
+  useAdminPayouts,
+  useAdminUpdatePayout,
+  useAdminSetAmbassadorTier,
+  useAdminSetAmbassadorStatus,
+  useAdminAmbassadorReferrals,
+  useAdminAmbassadorEvents,
   type AdminUserRow,
   type AdminUpgradeTarget,
+  type AdminAmbassadorRow,
 } from "@/hooks/use-study-api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,8 +48,12 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   LayoutDashboard, Users, CreditCard, Megaphone, ShieldCheck, KeyRound,
-  ArrowLeft, LogOut, Loader2, Search, Download, Plus, Trash2, Eye, Copy, Menu,
+  ArrowLeft, LogOut, Loader2, Search, Download, Plus, Trash2, Eye, Copy, Menu, Gift,
 } from "lucide-react";
+
+function fmtUsd(minor: number | null | undefined): string {
+  return `$${(Number(minor ?? 0) / 100).toFixed(2)}`;
+}
 
 // ─── formatting helpers ──────────────────────────────────────────────────────
 
@@ -660,12 +672,198 @@ function DeveloperApiSection() {
   );
 }
 
+// ─── Ambassadors ─────────────────────────────────────────────────────────────
+
+function AmbassadorsTracker() {
+  const { data, isLoading } = useAdminAmbassadors();
+  const setTier = useAdminSetAmbassadorTier();
+  const setStatus = useAdminSetAmbassadorStatus();
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState<AdminAmbassadorRow | null>(null);
+  const referrals = useAdminAmbassadorReferrals(selected?.id ?? null);
+  const events = useAdminAmbassadorEvents(selected?.id ?? null);
+  function refresh() { qc.invalidateQueries({ queryKey: ["adminAmbassadors"] }); }
+
+  return (
+    <div className="space-y-3">
+      {isLoading ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
+      ) : (data?.ambassadors ?? []).length === 0 ? (
+        <p className="text-sm text-muted-foreground">No ambassadors yet. Learners join from the Ambassador page in the app.</p>
+      ) : (
+        <div className="border rounded-lg overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>Ambassador</TableHead><TableHead>Code</TableHead><TableHead>Tier</TableHead><TableHead>Status</TableHead>
+              <TableHead className="text-right">Referrals</TableHead><TableHead className="text-right">Pending</TableHead>
+              <TableHead className="text-right">Confirmed</TableHead><TableHead className="text-right">Available</TableHead>
+              <TableHead className="text-right">Lifetime</TableHead><TableHead></TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {(data?.ambassadors ?? []).map((a) => (
+                <TableRow key={a.id} className="cursor-pointer" onClick={() => setSelected(a)}>
+                  <TableCell><div className="font-medium">{a.userName}</div><div className="text-xs text-muted-foreground">{a.userEmail}</div></TableCell>
+                  <TableCell className="font-mono text-xs">{a.referralCode}</TableCell>
+                  <TableCell><Badge variant={a.tier === "lifetime" ? "default" : "secondary"}>{a.tier}</Badge></TableCell>
+                  <TableCell><Badge variant={a.status === "active" ? "default" : "destructive"}>{a.status}</Badge></TableCell>
+                  <TableCell className="text-right tabular-nums">{a.referralsActive}/{a.referralsTotal}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtUsd(a.balances.pendingUsdMinor)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtUsd(a.balances.confirmedUsdMinor)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtUsd(a.balances.availableUsdMinor)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtUsd(a.balances.lifetimeEarnedUsdMinor)}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1 justify-end">
+                      <Button size="sm" variant="outline" onClick={() => setTier.mutate({ id: a.id, tier: a.tier === "lifetime" ? "standard" : "lifetime" }, { onSuccess: refresh })}>
+                        {a.tier === "lifetime" ? "→ standard" : "→ lifetime"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setStatus.mutate({ id: a.id, status: a.status === "active" ? "suspended" : "active" }, { onSuccess: refresh })}>
+                        {a.status === "active" ? "Suspend" : "Activate"}
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{selected?.userName} — ambassador detail</DialogTitle></DialogHeader>
+          {selected ? (
+            <div className="space-y-4 text-sm">
+              <div className="text-xs text-muted-foreground break-all">
+                Code <span className="font-mono text-foreground">{selected.referralCode}</span> · Link{" "}
+                <span className="font-mono">/study/signup?ref={selected.referralCode}</span> · Payout {selected.payoutMethod ?? "—"} {selected.payoutHandle ?? ""}
+              </div>
+              <div>
+                <div className="font-semibold text-xs uppercase text-muted-foreground mb-1">
+                  Referred customers ({referrals.data?.referrals.length ?? 0}) — who signed up via the link
+                </div>
+                {referrals.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
+                  <div className="border rounded max-h-64 overflow-y-auto">
+                    <Table>
+                      <TableHeader><TableRow>
+                        <TableHead>Customer</TableHead><TableHead>Signed up</TableHead><TableHead>Plan</TableHead>
+                        <TableHead className="text-right">Sessions</TableHead><TableHead className="text-right">Time</TableHead>
+                        <TableHead>Last active</TableHead><TableHead>Status</TableHead>
+                      </TableRow></TableHeader>
+                      <TableBody>
+                        {(referrals.data?.referrals ?? []).map((r) => (
+                          <TableRow key={r.referral_id}>
+                            <TableCell><div className="text-xs font-medium">{r.name}</div><div className="text-[11px] text-muted-foreground">{r.email}</div></TableCell>
+                            <TableCell className="text-xs">{fmtDate(r.signed_up_at)}</TableCell>
+                            <TableCell><Badge variant={r.is_paid ? "default" : "secondary"}>{r.is_paid ? r.subscription_tier : "free"}</Badge></TableCell>
+                            <TableCell className="text-right text-xs">{r.session_count}</TableCell>
+                            <TableCell className="text-right text-xs">{fmtDuration(r.total_time_seconds)}</TableCell>
+                            <TableCell className="text-xs">{fmtDate(r.last_active_at)}</TableCell>
+                            <TableCell><Badge variant="outline">{r.status}</Badge></TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="font-semibold text-xs uppercase text-muted-foreground mb-1">Commission ledger</div>
+                <div className="border rounded max-h-48 overflow-y-auto">
+                  <Table>
+                    <TableHeader><TableRow><TableHead>When</TableHead><TableHead className="text-right">Amount</TableHead><TableHead>State</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                      {(events.data?.events ?? []).map((ev, i) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-xs">{fmtDate(String(ev["createdAt"] ?? ""))}</TableCell>
+                          <TableCell className="text-right text-xs">{fmtUsd(Number(ev["amountUsdMinor"] ?? 0))}</TableCell>
+                          <TableCell className="text-xs">{String(ev["state"] ?? "")}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function PayoutsQueue() {
+  const [filter, setFilter] = useState("requested");
+  const { data, isLoading } = useAdminPayouts(filter === "all" ? undefined : filter);
+  const updatePayout = useAdminUpdatePayout();
+  const qc = useQueryClient();
+  function refresh() { qc.invalidateQueries({ queryKey: ["adminPayouts"] }); }
+  const filters = ["requested", "processing", "paid", "failed", "all"];
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1">
+        {filters.map((f) => (
+          <Button key={f} size="sm" variant={filter === f ? "default" : "ghost"} onClick={() => setFilter(f)}>{f}</Button>
+        ))}
+      </div>
+      {isLoading ? (
+        <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
+      ) : (data?.payouts ?? []).length === 0 ? (
+        <p className="text-sm text-muted-foreground">No payouts in this state.</p>
+      ) : (
+        <div className="border rounded-lg overflow-x-auto">
+          <Table>
+            <TableHeader><TableRow>
+              <TableHead>Ambassador</TableHead><TableHead>Method</TableHead><TableHead className="text-right">Amount</TableHead>
+              <TableHead>Status</TableHead><TableHead>Requested</TableHead><TableHead></TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+              {(data?.payouts ?? []).map((p) => (
+                <TableRow key={p.id}>
+                  <TableCell><div className="text-xs font-medium">{p.userName}</div><div className="text-[11px] text-muted-foreground">{p.referralCode}</div></TableCell>
+                  <TableCell className="text-xs">{p.method}{p.handle ? ` · ${p.handle}` : ""}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtUsd(p.amountUsdMinor)}</TableCell>
+                  <TableCell><Badge variant={p.status === "paid" ? "default" : p.status === "failed" ? "destructive" : "secondary"}>{p.status}</Badge></TableCell>
+                  <TableCell className="text-xs">{fmtDate(p.requestedAt)}</TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex gap-1 justify-end">
+                      {p.status === "requested" ? <Button size="sm" variant="outline" onClick={() => updatePayout.mutate({ id: p.id, status: "processing" }, { onSuccess: refresh })}>Process</Button> : null}
+                      {p.status !== "paid" ? <Button size="sm" variant="outline" onClick={() => updatePayout.mutate({ id: p.id, status: "paid" }, { onSuccess: refresh })}>Mark paid</Button> : null}
+                      {p.status !== "failed" && p.status !== "paid" ? <Button size="sm" variant="ghost" className="text-destructive" onClick={() => updatePayout.mutate({ id: p.id, status: "failed" }, { onSuccess: refresh })}>Fail</Button> : null}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AmbassadorsSection() {
+  const [view, setView] = useState<"ambassadors" | "payouts">("ambassadors");
+  const tabs: Array<{ id: typeof view; label: string }> = [
+    { id: "ambassadors", label: "Ambassadors" },
+    { id: "payouts", label: "Payouts" },
+  ];
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1">
+        {tabs.map((t) => <Button key={t.id} size="sm" variant={view === t.id ? "default" : "ghost"} onClick={() => setView(t.id)}>{t.label}</Button>)}
+      </div>
+      {view === "ambassadors" ? <AmbassadorsTracker /> : <PayoutsQueue />}
+    </div>
+  );
+}
+
 // ─── shell ───────────────────────────────────────────────────────────────────
 
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, title: "Dashboard", subtitle: "Platform health, activity, and usage at a glance." },
   { id: "students", label: "Students", icon: Users, title: "Students", subtitle: "Accounts, sign-ins, device & location, and per-learner actions." },
   { id: "billing", label: "Billing", icon: CreditCard, title: "Billing", subtitle: "Subscription mix, plans, and payment methods." },
+  { id: "ambassadors", label: "Ambassadors", icon: Gift, title: "Ambassadors", subtitle: "Referral tracker, who signed up via each link, commission balances, and payouts." },
   { id: "announcements", label: "Announcements", icon: Megaphone, title: "Announcements", subtitle: "Broadcast messages to learners." },
   { id: "access", label: "Access & audit", icon: ShieldCheck, title: "Access & audit", subtitle: "The audit trail of admin actions." },
   { id: "developers", label: "Developer API", icon: KeyRound, title: "Developer API", subtitle: "API keys for integrations." },
@@ -739,6 +937,7 @@ export default function StudyAdminConsole() {
           {section === "dashboard" && <DashboardSection />}
           {section === "students" && <StudentsSection />}
           {section === "billing" && <BillingSection />}
+          {section === "ambassadors" && <AmbassadorsSection />}
           {section === "announcements" && <AnnouncementsSection />}
           {section === "access" && <AccessAuditSection />}
           {section === "developers" && <DeveloperApiSection />}

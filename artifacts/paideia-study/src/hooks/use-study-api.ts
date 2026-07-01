@@ -887,6 +887,27 @@ export function useStudyAdminDeleteUser() {
   });
 }
 
+export interface AdminAmbassadorReferral {
+  referral_id: string; status: string; attributed_at: string | null; first_paid_at: string | null;
+  user_id: string; email: string; name: string; subscription_tier: string; subscription_status: string;
+  signed_up_at: string; last_active_at: string | null; is_paid: boolean;
+  session_count: number; total_time_seconds: number;
+}
+export function useAdminAmbassadorReferrals(id: string | null) {
+  return useQuery<{ referrals: AdminAmbassadorReferral[] }, ErrorType<unknown>>({
+    queryKey: ["adminAmbassadorReferrals", id],
+    enabled: !!id,
+    queryFn: async () => customFetch<{ referrals: AdminAmbassadorReferral[] }>(`${BASE}/admin/ambassadors/${id}/referrals`),
+  });
+}
+export function useAdminAmbassadorEvents(id: string | null) {
+  return useQuery<{ events: Array<Record<string, unknown>> }, ErrorType<unknown>>({
+    queryKey: ["adminAmbassadorEvents", id],
+    enabled: !!id,
+    queryFn: async () => customFetch<{ events: Array<Record<string, unknown>> }>(`${BASE}/admin/ambassadors/${id}/events`),
+  });
+}
+
 export function useStudyAdminImpersonate() {
   return useMutation<{ ok: true }, ErrorType<unknown>, string>({
     mutationFn: async (id) =>

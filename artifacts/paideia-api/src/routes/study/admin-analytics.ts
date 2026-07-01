@@ -577,4 +577,26 @@ router.delete("/api-keys/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Ambassador referrals ────────────────────────────────────────────────────
+
+// Who signed up via one ambassador's link: each referred customer with signup date,
+// plan, engagement, and referral status. (Ambassador list, balances, payouts, events
+// and settings live in admin.ts; this fills in the per-ambassador customer roster.)
+router.get("/ambassadors/:id/referrals", async (req, res) => {
+  const id = String(req.params.id);
+  const result = await db.execute(sql`
+    SELECT r.id AS referral_id, r.status, r.attributed_at, r.first_paid_at,
+      u.id AS user_id, u.email, u.name, u.subscription_tier, u.subscription_status,
+      u.created_at AS signed_up_at, u.last_active_at,
+      (${PAID}) AS is_paid,
+      (SELECT count(*) FROM study_activity_sessions s WHERE s.user_id = u.id)::int AS session_count,
+      (SELECT coalesce(sum(extract(epoch FROM (s.last_seen_at - s.started_at))), 0)::float8 FROM study_activity_sessions s WHERE s.user_id = u.id) AS total_time_seconds
+    FROM study_referrals r
+    JOIN study_users u ON u.id = r.customer_id
+    WHERE r.ambassador_id = ${id}
+    ORDER BY r.attributed_at DESC NULLS LAST
+  `);
+  res.json({ referrals: result.rows ?? [] });
+});
+
 export default router;
