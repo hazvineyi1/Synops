@@ -20,6 +20,8 @@ import {
   useStudyUpdatePaymentMethod,
   useStudyAdminAudit,
   useStudyAdminUserAction,
+  useStudyAdminCreateUser,
+  useStudyAdminDeleteUser,
   type AdminUserRow,
   type AdminUpgradeTarget,
 } from "@/hooks/use-study-api";
@@ -38,7 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft, Loader2, Users, Activity, Target, LogIn, Megaphone,
-  CreditCard, DollarSign, ShieldCheck, Search, Download,
+  CreditCard, DollarSign, ShieldCheck, Search, Download, Plus, Trash2,
 } from "lucide-react";
 
 // ─── formatting helpers ──────────────────────────────────────────────────────
@@ -177,7 +179,25 @@ function UsersTab() {
   const { data: users, isLoading } = useStudyAdminUsers(q);
   const detail = useStudyAdminUserDetail(selected);
   const action = useStudyAdminUserAction();
+  const createUser = useStudyAdminCreateUser();
+  const deleteUser = useStudyAdminDeleteUser();
   const qc = useQueryClient();
+  const [showAdd, setShowAdd] = useState(false);
+  const [nu, setNu] = useState({ email: "", name: "", password: "", tier: "free" });
+  const [addErr, setAddErr] = useState<string | null>(null);
+
+  function refreshUsers() { qc.invalidateQueries({ queryKey: ["studyAdminUsers"] }); }
+  function submitNewUser() {
+    setAddErr(null);
+    createUser.mutate(nu, {
+      onSuccess: () => { setNu({ email: "", name: "", password: "", tier: "free" }); setShowAdd(false); refreshUsers(); },
+      onError: (e) => setAddErr((e as { message?: string })?.message ?? "Could not create user"),
+    });
+  }
+  function removeUser(id: string, email: string) {
+    if (!window.confirm(`Permanently delete ${email} and ALL their data? This cannot be undone.`)) return;
+    deleteUser.mutate(id, { onSuccess: refreshUsers });
+  }
 
   function runAction(id: string, act: "suspend" | "reactivate" | "set-admin", isAdmin?: boolean) {
     action.mutate({ id, action: act, isAdmin }, {
@@ -198,7 +218,31 @@ function UsersTab() {
         <Button variant="outline" size="sm" onClick={() => downloadCsv("coach-users.csv", (users ?? []) as unknown as Array<Record<string, unknown>>)}>
           <Download className="w-4 h-4 mr-1" /> Export CSV
         </Button>
+        <Button size="sm" onClick={() => { setShowAdd((v) => !v); setAddErr(null); }}>
+          <Plus className="w-4 h-4 mr-1" /> Add user
+        </Button>
       </div>
+      {showAdd ? (
+        <Card>
+          <CardContent className="p-3 flex flex-wrap items-end gap-2">
+            <div><label className="text-xs">Email</label><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="user@example.com" /></div>
+            <div><label className="text-xs">Name</label><Input value={nu.name} onChange={(e) => setNu({ ...nu, name: e.target.value })} placeholder="Full name" /></div>
+            <div><label className="text-xs">Password</label><Input type="password" value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="min 8 chars" /></div>
+            <div>
+              <label className="text-xs block">Tier</label>
+              <select className="border rounded h-9 px-2 text-sm bg-background" value={nu.tier} onChange={(e) => setNu({ ...nu, tier: e.target.value })}>
+                <option value="free">free</option>
+                <option value="plus">plus</option>
+                <option value="pro">pro</option>
+              </select>
+            </div>
+            <Button onClick={submitNewUser} disabled={createUser.isPending}>
+              {createUser.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create"}
+            </Button>
+            {addErr ? <span className="text-xs text-destructive self-center">{addErr}</span> : null}
+          </CardContent>
+        </Card>
+      ) : null}
       {isLoading ? (
         <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
       ) : (
@@ -236,11 +280,16 @@ function UsersTab() {
                   <TableCell className="text-xs">{fmtDate(u.last_active_at)}</TableCell>
                   <TableCell className="text-xs">{fmtDate(u.created_at)}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
-                    {u.suspended ? (
-                      <Button size="sm" variant="outline" onClick={() => runAction(u.id, "reactivate")}>Reactivate</Button>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => runAction(u.id, "suspend")}>Suspend</Button>
-                    )}
+                    <div className="flex gap-1 justify-end">
+                      {u.suspended ? (
+                        <Button size="sm" variant="outline" onClick={() => runAction(u.id, "reactivate")}>Reactivate</Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => runAction(u.id, "suspend")}>Suspend</Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="text-destructive" title="Delete user" onClick={() => removeUser(u.id, u.email)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

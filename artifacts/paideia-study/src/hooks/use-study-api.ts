@@ -865,6 +865,28 @@ export function useStudyAdminUserAction() {
   });
 }
 
+export function useStudyAdminCreateUser() {
+  return useMutation<
+    { user: { id: string; email: string } },
+    ErrorType<unknown>,
+    { email: string; name: string; password: string; tier?: string; isAdmin?: boolean }
+  >({
+    mutationFn: async (data) =>
+      customFetch<{ user: { id: string; email: string } }>(`${BASE}/admin/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useStudyAdminDeleteUser() {
+  return useMutation<{ ok: true }, ErrorType<unknown>, string>({
+    mutationFn: async (id) =>
+      customFetch<{ ok: true }>(`${BASE}/admin/users/${id}`, { method: "DELETE" }),
+  });
+}
+
 // Fire-and-forget usage heartbeat. Best-effort; failures are ignored.
 export function studyHeartbeat(path: string): void {
   void customFetch(`${BASE}/telemetry/heartbeat`, {

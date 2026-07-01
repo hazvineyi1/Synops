@@ -7,6 +7,7 @@ import { Router, type IRouter, type Request } from "express";
 import {
   db,
   studyUsersTable,
+  studyLearnerProfilesTable,
   studyAnnouncementsTable,
   studyPlansTable,
   studyPaymentMethodsTable,
@@ -14,6 +15,7 @@ import {
 } from "@workspace/paideia-db";
 import { desc, eq, sql } from "drizzle-orm";
 import { requireStudyAdmin } from "../../middlewares/auth.js";
+import { hashPassword } from "../../lib/studyAuth.js";
 
 const router: IRouter = Router();
 router.use(requireStudyAdmin);
@@ -384,6 +386,74 @@ router.post("/users/:id/reactivate", async (req, res) => {
     return;
   }
   await writeAudit(req, "user.reactivate", "user", id, {});
+  res.json({ ok: true });
+});
+
+// Create a user from the admin side (mirrors self-signup: hashed password + a
+// default learner profile). Lets an admin add accounts directly.
+router.post("/users", async (req, res) => {
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const name = String(req.body?.name ?? "").trim();
+  const password = String(req.body?.password ?? "");
+  if (!email || !name) {
+    res.status(400).json({ error: "email and name are required" });
+    return;
+  }
+  if (password.length < 8) {
+    res.status(400).json({ error: "password must be at least 8 characters" });
+    return;
+  }
+  const existing = await db
+    .select({ id: studyUsersTable.id })
+    .from(studyUsersTable)
+    .where(eq(studyUsersTable.email, email))
+    .limit(1);
+  if (existing[0]) {
+    res.status(409).json({ error: "A user with that email already exists" });
+    return;
+  }
+  const tier = ["free", "plus", "pro"].includes(req.body?.tier) ? req.body.tier : "free";
+  const makeAdmin = Boolean(req.body?.isAdmin);
+  const [user] = await db
+    .insert(studyUsersTable)
+    .values({
+      email,
+      name,
+      passwordHash: hashPassword(password),
+      subscriptionTier: tier,
+      subscriptionStatus: tier === "free" ? "free" : "active",
+      isAdmin: makeAdmin,
+      role: makeAdmin ? "super_admin" : "user",
+    })
+    .returning({ id: studyUsersTable.id, email: studyUsersTable.email });
+  await db.insert(studyLearnerProfilesTable).values({
+    userId: user.id,
+    studyStyle: "balanced",
+    preferredSessionLength: 25,
+    preferredDifficulty: "mixed",
+    dailyStudyMinutes: 30,
+  });
+  await writeAudit(req, "user.create", "user", user.id, { email, tier, isAdmin: makeAdmin });
+  res.status(201).json({ user });
+});
+
+// Permanently delete a user and all their data (rows in study_* tables cascade via
+// their FK onDelete). Irreversible; an admin cannot delete their own account.
+router.delete("/users/:id", async (req, res) => {
+  const id = String(req.params.id);
+  if (req.studyUser?.id === id) {
+    res.status(400).json({ error: "You cannot delete your own account" });
+    return;
+  }
+  const deleted = await db
+    .delete(studyUsersTable)
+    .where(eq(studyUsersTable.id, id))
+    .returning({ id: studyUsersTable.id, email: studyUsersTable.email });
+  if (!deleted[0]) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  await writeAudit(req, "user.delete", "user", id, { email: deleted[0].email });
   res.json({ ok: true });
 });
 
