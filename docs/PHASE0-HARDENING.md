@@ -93,10 +93,33 @@ To turn it on:
 3. Redeploy. Backend errors and unhandled frontend errors now flow to Sentry,
    tagged with the Railway commit SHA as the release.
 
-## Next in Phase 0 (not yet shipped)
+## Playwright smoke tests (shipped)
 
-- **Playwright smoke tests** on the 5 core journeys (signup, upload/extract,
-  practice, exam, tutor), wired into CI against a deploy/preview URL.
+A standalone `e2e/` package (isolated from the app build) with a `.github/
+workflows/e2e.yml` workflow that smoke-tests the live deployment: liveness
+(`/api/healthz`), readiness (`/api/readyz`), the Coach sign-in page renders, the
+marketing root loads, and an optional authenticated sign-in. Runs daily at 06:00
+UTC and on demand (Actions → E2E Smoke → Run workflow).
+
+Optional, to enable the authenticated test:
+
+1. Create a dedicated throwaway learner account in the app (not a real user).
+2. Add repo secrets `TEST_EMAIL` and `TEST_PASSWORD` with its credentials.
+   Without them, that one test is skipped and the rest still run.
+3. To point the suite at a different environment, set a `BASE_URL` repository
+   variable.
+
+This is a deployment/uptime smoke, deliberately not a per-commit gate — `ci.yml`
+(typecheck + build) is the per-push gate. Full journey E2E (upload → extract →
+practice → exam → tutor, which drives real AI generation and cost) is a larger
+follow-up beyond Phase 0.
+
+## Phase 0 status: complete
+
+All six Phase 0 items are done: AI-endpoint rate limits + trust proxy, `/readyz`,
+CI gate, nightly DB backups (verified), Sentry error tracking (needs a DSN to turn
+on), and Playwright smoke tests. Next is Phase 1 (payments end-to-end, privacy/ToS
++ data export/delete, PII stripping before AI calls, age gate).
 
 Then Phase 1 (payments end-to-end, privacy/ToS + data export/delete, PII stripping
 before AI calls, age gate) and Phase 2 (activation funnel, PWA/offline for the

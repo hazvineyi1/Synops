@@ -1,0 +1,54 @@
+# Playwright smoke tests against the live Coach deployment.
+#
+# Runs on a schedule (a daily "is production still healthy?" check) and on demand.
+# Not run on every push: it drives a real browser against the live site, so it's
+# a deployment/uptime smoke, not a per-commit gate (that's ci.yml's job).
+#
+# The authenticated test only runs if TEST_EMAIL / TEST_PASSWORD repository
+# secrets are set (use a dedicated throwaway learner account, never a real user).
+# Point at a different environment by setting a BASE_URL repository variable.
+name: E2E Smoke
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 6 * * *" # daily at 06:00 UTC
+
+jobs:
+  smoke:
+    name: playwright smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: e2e
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke tests
+        run: npx playwright test
+        env:
+          BASE_URL: ${{ vars.BASE_URL || 'https://wonderful-adaptation-production-ce7f.up.railway.app' }}
+          TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 14
+          if-no-files-found: ignore

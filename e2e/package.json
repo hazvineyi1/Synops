@@ -1,0 +1,12 @@
+{
+  "name": "synops-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright smoke tests for the Coach deployment. Standalone (not a pnpm workspace member) so it never affects the app build; the e2e workflow installs it separately with npm.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}
