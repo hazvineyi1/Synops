@@ -3,41 +3,48 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { StudyAuthProvider, useStudyAuth } from "@/hooks/use-study-auth";
-import { useEffect, type ComponentType } from "react";
+import { useEffect, lazy, Suspense, type ComponentType } from "react";
 
+// Public entry pages stay eager so first paint (landing / sign-in) is instant
+// and ships a tiny bundle.
 import NotFound from "@/pages/not-found";
 import StudyLanding from "@/pages/StudyLanding";
 import StudyLandingUS from "@/pages/StudyLandingUS";
-import { captureEntrySource, isUsAudience } from "@/lib/entry";
 import StudyLogin from "@/pages/StudyLogin";
 import StudySignup from "@/pages/StudySignup";
-import StudyDashboard from "@/pages/StudyDashboard";
-import StudyMaterials from "@/pages/StudyMaterials";
-import StudyMaterialNew from "@/pages/StudyMaterialNew";
-import StudyPractice from "@/pages/StudyPractice";
-import StudyPracticeSession from "@/pages/StudyPracticeSession";
-import StudyExams from "@/pages/StudyExams";
-import StudyExamTake from "@/pages/StudyExamTake";
-import StudyTutor from "@/pages/StudyTutor";
-import StudyTutorChat from "@/pages/StudyTutorChat";
-import StudyTutorGuided from "@/pages/StudyTutorGuided";
-import StudyProfile from "@/pages/StudyProfile";
-import StudyBriefs from "@/pages/StudyBriefs";
-import StudyKnowledgeMap from "@/pages/StudyKnowledgeMap";
-import StudyMaterialView from "@/pages/StudyMaterialView";
-import StudyAssessment from "@/pages/StudyAssessment";
-import StudyReadStep from "@/pages/StudyReadStep";
-import StudyStrategy from "@/pages/StudyStrategy";
-import StudyProgress from "@/pages/StudyProgress";
-import StudyIntake from "@/pages/StudyIntake";
-import StudyStartOver from "@/pages/StudyStartOver";
-import StudyCoach from "@/pages/StudyCoach";
-import StudyUpgrade from "@/pages/StudyUpgrade";
-import StudyAdminCoupons from "@/pages/StudyAdminCoupons";
-import StudyAmbassador from "@/pages/StudyAmbassador";
-import StudyAdminAmbassadors from "@/pages/StudyAdminAmbassadors";
-import StudyAdminConsole from "@/pages/StudyAdminConsole";
+import { captureEntrySource, isUsAudience } from "@/lib/entry";
 import { studyHeartbeat, studyStopImpersonating } from "@/hooks/use-study-api";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
+
+// Authenticated pages are the heavy part of the bundle (charts, admin console,
+// editors). Lazy-load them so a first visit downloads only the small public
+// pages — important on low-end Android over a slow connection.
+const StudyDashboard = lazy(() => import("@/pages/StudyDashboard"));
+const StudyMaterials = lazy(() => import("@/pages/StudyMaterials"));
+const StudyMaterialNew = lazy(() => import("@/pages/StudyMaterialNew"));
+const StudyPractice = lazy(() => import("@/pages/StudyPractice"));
+const StudyPracticeSession = lazy(() => import("@/pages/StudyPracticeSession"));
+const StudyExams = lazy(() => import("@/pages/StudyExams"));
+const StudyExamTake = lazy(() => import("@/pages/StudyExamTake"));
+const StudyTutor = lazy(() => import("@/pages/StudyTutor"));
+const StudyTutorChat = lazy(() => import("@/pages/StudyTutorChat"));
+const StudyTutorGuided = lazy(() => import("@/pages/StudyTutorGuided"));
+const StudyProfile = lazy(() => import("@/pages/StudyProfile"));
+const StudyBriefs = lazy(() => import("@/pages/StudyBriefs"));
+const StudyKnowledgeMap = lazy(() => import("@/pages/StudyKnowledgeMap"));
+const StudyMaterialView = lazy(() => import("@/pages/StudyMaterialView"));
+const StudyAssessment = lazy(() => import("@/pages/StudyAssessment"));
+const StudyReadStep = lazy(() => import("@/pages/StudyReadStep"));
+const StudyStrategy = lazy(() => import("@/pages/StudyStrategy"));
+const StudyProgress = lazy(() => import("@/pages/StudyProgress"));
+const StudyIntake = lazy(() => import("@/pages/StudyIntake"));
+const StudyStartOver = lazy(() => import("@/pages/StudyStartOver"));
+const StudyCoach = lazy(() => import("@/pages/StudyCoach"));
+const StudyUpgrade = lazy(() => import("@/pages/StudyUpgrade"));
+const StudyAdminCoupons = lazy(() => import("@/pages/StudyAdminCoupons"));
+const StudyAmbassador = lazy(() => import("@/pages/StudyAmbassador"));
+const StudyAdminAmbassadors = lazy(() => import("@/pages/StudyAdminAmbassadors"));
+const StudyAdminConsole = lazy(() => import("@/pages/StudyAdminConsole"));
 
 const queryClient = new QueryClient();
 
@@ -55,7 +62,16 @@ function HeartbeatTracker() {
   return null;
 }
 
-function Protected({ component: Component }: { component: ComponentType }) {
+// Shown while a lazy-loaded page chunk is being fetched.
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+    </div>
+  );
+}
+
+function Protected({ component: Component }: { component: ComponentType<any> }) {
   const { user, loading } = useStudyAuth();
   const [, setLoc] = useLocation();
 
@@ -118,6 +134,7 @@ function RootLanding() {
 
 function Router() {
   return (
+    <Suspense fallback={<PageLoader />}>
     <Switch>
       <Route path="/" component={RootLanding} />
       <Route path="/login" component={StudyLogin} />
@@ -150,6 +167,7 @@ function Router() {
       <Route path="/admin/ambassadors" component={() => <Protected component={StudyAdminAmbassadors} />} />
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 
@@ -162,6 +180,7 @@ function App() {
             <HeartbeatTracker />
             <ImpersonationBanner />
             <AdminFab />
+            <OfflineIndicator />
             <Router />
           </WouterRouter>
         </StudyAuthProvider>
