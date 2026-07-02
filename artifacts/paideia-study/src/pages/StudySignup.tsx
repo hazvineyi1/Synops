@@ -7,14 +7,36 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useStudyAuth } from "@/hooks/use-study-auth";
 import { BookOpen } from "lucide-react";
 
+// Whole years between a "YYYY-MM-DD" date of birth and today.
+function ageFromDob(d: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  const dt = new Date(`${d}T00:00:00Z`);
+  if (Number.isNaN(dt.getTime())) return null;
+  const now = new Date();
+  let a = now.getUTCFullYear() - dt.getUTCFullYear();
+  const m = now.getUTCMonth() - dt.getUTCMonth();
+  if (m < 0 || (m === 0 && now.getUTCDate() < dt.getUTCDate())) a -= 1;
+  return a;
+}
+
 export default function StudySignup() {
   const [, setLoc] = useLocation();
   const { signup } = useStudyAuth();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [dob, setDob] = useState("");
+  const [guardianEmail, setGuardianEmail] = useState("");
+  const [guardianConsent, setGuardianConsent] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const age = ageFromDob(dob);
+  const tooYoung = age !== null && age < 13;
+  const isMinor = age !== null && age >= 13 && age < 18;
+  const blockSubmit =
+    submitting || !dob || tooYoung || (isMinor && (!guardianEmail || !guardianConsent));
 
   // Capture an ambassador referral code from ?ref= and remember it, so the
   // attribution survives the user browsing other pages before signing up.
@@ -40,7 +62,12 @@ export default function StudySignup() {
       } catch {
         ref = undefined;
       }
-      await signup(email, password, name, ref);
+      await signup(email, password, name, {
+        ref,
+        dateOfBirth: dob,
+        guardianEmail: isMinor ? guardianEmail.trim() : undefined,
+        guardianConsent: isMinor ? guardianConsent : undefined,
+      });
       try {
         localStorage.removeItem("studyReferralCode");
       } catch {
@@ -97,10 +124,60 @@ export default function StudySignup() {
                 minLength={8}
               />
             </div>
+            <div>
+              <Label htmlFor="dob">Date of Birth</Label>
+              <Input
+                id="dob"
+                type="date"
+                value={dob}
+                max={todayStr}
+                onChange={(e) => setDob(e.target.value)}
+                required
+                className="mt-0.5"
+              />
+            </div>
+
+            {tooYoung && (
+              <p className="text-sm text-red-600">
+                You must be at least 13 years old to use Synops Coach.
+              </p>
+            )}
+
+            {isMinor && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-3">
+                <p className="text-xs text-amber-800">
+                  Because you are under 18, a parent or guardian must give permission.
+                </p>
+                <div>
+                  <Label htmlFor="guardianEmail">Parent / Guardian Email</Label>
+                  <Input
+                    id="guardianEmail"
+                    type="email"
+                    value={guardianEmail}
+                    onChange={(e) => setGuardianEmail(e.target.value)}
+                    required
+                    className="mt-0.5"
+                  />
+                </div>
+                <label className="flex items-start gap-2 text-xs text-amber-900">
+                  <input
+                    type="checkbox"
+                    checked={guardianConsent}
+                    onChange={(e) => setGuardianConsent(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    I confirm my parent or guardian has given permission for me to create
+                    this account.
+                  </span>
+                </label>
+              </div>
+            )}
+
             {error && (
               <p className="text-sm text-red-600">{error}</p>
             )}
-            <Button type="submit" className="w-full" disabled={submitting}>
+            <Button type="submit" className="w-full" disabled={blockSubmit}>
               {submitting ? "Creating account..." : "Get Started"}
             </Button>
           </form>

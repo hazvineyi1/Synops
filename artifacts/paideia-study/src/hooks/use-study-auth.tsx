@@ -7,11 +7,18 @@ import {
 } from "@workspace/paideia-api-client";
 import type { StudyUser } from "@workspace/paideia-api-client";
 
+interface SignupExtra {
+  ref?: string;
+  dateOfBirth?: string;
+  guardianEmail?: string;
+  guardianConsent?: boolean;
+}
+
 interface AuthContextType {
   user: StudyUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, name: string, ref?: string) => Promise<void>;
+  signup: (email: string, password: string, name: string, extra?: SignupExtra) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -37,11 +44,12 @@ export function StudyAuthProvider({ children }: { children: React.ReactNode }) {
     setUser(result.user);
   };
 
-  const signup = async (email: string, password: string, name: string, ref?: string) => {
+  const signup = async (email: string, password: string, name: string, extra?: SignupExtra) => {
     const result = await signupMutation.mutateAsync({
-      // `ref` is an optional ambassador referral code; the generated signup type
-      // does not model it, so it is attached here for the backend to read.
-      data: { email, password, name, ...(ref ? { ref } : {}) } as { email: string; password: string; name: string },
+      // The generated signup type models only email/password/name; the referral
+      // code and age-gate fields (dateOfBirth, guardianEmail, guardianConsent)
+      // are attached here for the backend to read.
+      data: { email, password, name, ...(extra ?? {}) } as { email: string; password: string; name: string },
     });
     setUser(result.user);
   };

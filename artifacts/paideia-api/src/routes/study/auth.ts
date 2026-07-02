@@ -24,9 +24,25 @@ const signupSchema = z.object({
   email: z.string().email().max(200),
   password: z.string().min(8).max(200),
   name: z.string().min(1).max(120),
+  // Age gate: ISO date of birth (required for new signups).
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  // For 13-17 learners: a guardian's email and an affirmed consent.
+  guardianEmail: z.string().email().max(200).optional(),
+  guardianConsent: z.boolean().optional(),
   // Optional ambassador referral code captured from a ?ref= link.
   ref: z.string().max(64).optional(),
 });
+
+// Whole years between a "YYYY-MM-DD" date of birth and today (UTC).
+function ageFromDob(dob: string): number {
+  const d = new Date(`${dob}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return NaN;
+  const now = new Date();
+  let age = now.getUTCFullYear() - d.getUTCFullYear();
+  const m = now.getUTCMonth() - d.getUTCMonth();
+  if (m < 0 || (m === 0 && now.getUTCDate() < d.getUTCDate())) age -= 1;
+  return age;
+}
 
 const loginSchema = z.object({
   email: z.string().email().max(200),
@@ -52,6 +68,35 @@ router.post("/signup", rateLimit({ windowMs: 60 * 60 * 1000, max: 5 }), async (r
   const data = parsed.data;
   const emailLower = data.email.trim().toLowerCase();
 
+  // Age gate: under-13 blocked; 13-17 require a guardian email + consent; 18+ ok.
+  const age = ageFromDob(data.dateOfBirth);
+  if (!Number.isFinite(age) || age < 0 || age > 120) {
+    res.status(400).json({ error: "Please enter a valid date of birth." });
+    return;
+  }
+  if (age < 13) {
+    res.status(403).json({
+      error: "You must be at least 13 years old to use Synops Coach.",
+      code: "under_13",
+    });
+    return;
+  }
+  let ageBand = "adult";
+  let guardianEmail: string | null = null;
+  let guardianConsentAt: Date | null = null;
+  if (age < 18) {
+    ageBand = "minor";
+    if (!data.guardianEmail || data.guardianConsent !== true) {
+      res.status(422).json({
+        error: "A parent or guardian's email and consent are required for learners under 18.",
+        code: "guardian_required",
+      });
+      return;
+    }
+    guardianEmail = data.guardianEmail.trim().toLowerCase();
+    guardianConsentAt = new Date();
+  }
+
   const existing = await db
     .select({ id: studyUsersTable.id })
     .from(studyUsersTable)
@@ -69,6 +114,10 @@ router.post("/signup", rateLimit({ windowMs: 60 * 60 * 1000, max: 5 }), async (r
       email: emailLower,
       passwordHash,
       name: data.name,
+      dateOfBirth: data.dateOfBirth,
+      ageBand,
+      guardianEmail,
+      guardianConsentAt,
     })
     .returning();
 

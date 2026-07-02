@@ -64,10 +64,24 @@ New `routes/study/account.ts` (mounted at `/api/study/account`, auth-gated):
 UI: a "Privacy & Data" card on the Coach profile page (download button +
 password-gated delete flow that hard-reloads to sign-in on success).
 
+## Age gate (shipped 2026-07-02)
+
+Signup now collects date of birth and enforces: **under-13 blocked**, **13-17
+require a guardian email + consent affirmation**, **18+ proceeds**. Stored on
+`study_users` (new nullable columns `date_of_birth`, `age_band`,
+`guardian_email`, `guardian_consent_at`; existing accounts unaffected). Files:
+`auth.ts` signup, `StudySignup.tsx`, `use-study-auth.tsx`, schema `study.ts`.
+
+> DB MIGRATION REQUIRED before this deploys: the signup insert writes the new
+> columns. Run the schema push against the production DB **before** pushing the
+> code, so the columns exist first:
+> `pnpm --filter @workspace/paideia-db run push` with `DATABASE_URL` set to the
+> Railway public Postgres URL. The columns are nullable — additive, no data loss.
+> (v1 records the guardian email + consent affirmation; double-opt-in guardian
+> email verification is a later enhancement.)
+
 ## Remaining Phase 1 items (not yet built)
 
-- **Age gate**: DOB / 18+ confirmation at signup; block under-18 or route through
-  guardian consent; store status on `study_users`.
 - **Legal**: review Privacy/Terms content, link them inside the Coach app, and
   add a version/last-updated stamp.
 - **Payments lifecycle hardening**: verify webhooks, renewal, cancel, refunds,

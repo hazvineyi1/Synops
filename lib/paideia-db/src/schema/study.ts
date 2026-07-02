@@ -45,6 +45,13 @@ export const studyUsersTable = pgTable("study_users", {
   lastActiveAt: timestamp("last_active_at"),
   suspended: boolean("suspended").notNull().default(false),
   role: text("role").notNull().default("user"),
+  // Age gate (set at signup). dateOfBirth is ISO "YYYY-MM-DD"; ageBand is
+  // "adult" | "minor". For 13-17 learners a guardian email + consent timestamp is
+  // captured. Nullable so existing accounts (pre-gate) are unaffected.
+  dateOfBirth: text("date_of_birth"),
+  ageBand: text("age_band"),
+  guardianEmail: text("guardian_email"),
+  guardianConsentAt: timestamp("guardian_consent_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
