@@ -68,7 +68,7 @@ app.post(
       if (typeof customerId === "string" && customerId.length > 0) {
         await syncTeacherFromCustomer(customerId);
         // Also reflect Stripe state onto study learners (card auto-renew).
-        const { activateStudyStripeFromCustomer, getStudyUserIdByStripeCustomer } =
+        const { activateStudyStripeFromCustomer, getStudyUserIdByStripeCustomer, downgradeStudyUserToFree } =
           await import("./lib/billing/service.js");
         await activateStudyStripeFromCustomer(customerId);
 
@@ -99,12 +99,18 @@ app.post(
               });
             }
           } else if (event.type === "charge.refunded") {
+            // Revoke Coach access on a refund, then claw back any ambassador residual.
+            const refundedUserId = await getStudyUserIdByStripeCustomer(customerId);
+            if (refundedUserId) await downgradeStudyUserToFree(refundedUserId, "refunded");
             // The event object is a charge, which carries the invoice id directly.
             const invoiceId = typeof obj["invoice"] === "string" ? (obj["invoice"] as string) : null;
             if (invoiceId) {
               await clawbackBySourcePayment("stripe", invoiceId, `stripe ${event.type}`);
             }
           } else if (event.type === "charge.dispute.created") {
+            // Revoke Coach access on a chargeback, then claw back any residual.
+            const disputedUserId = await getStudyUserIdByStripeCustomer(customerId);
+            if (disputedUserId) await downgradeStudyUserToFree(disputedUserId, "disputed");
             // The event object is a dispute, which does NOT expose `invoice`.
             // Resolve the underlying charge first, then read its invoice id so the
             // clawback targets the same source payment that minted the commission.

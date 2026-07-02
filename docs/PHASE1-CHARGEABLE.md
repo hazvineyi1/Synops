@@ -94,7 +94,27 @@ Linked from the signup page (consent line) and the profile "Privacy & Data" card
 > - Set a real, monitored contact inbox (currently `support@synops-consulting.com`
 >   placeholder in both files) and a governing-law jurisdiction in the Terms.
 
-## Remaining Phase 1 items (not yet built)
+## Payment lifecycle hardening (shipped 2026-07-02)
 
-- **Payments lifecycle hardening**: verify webhooks, renewal, cancel, refunds,
-  receipts, and failed-payment dunning against each live gateway once keys exist.
+Audit found the lifecycle mostly built (activation, Stripe reflection, cancel,
+lazy expiry in `getSubscription`, renewal reminders, refund->ambassador clawback).
+Two correctness gaps fixed:
+
+- **Expiry self-heal** (`middlewares/auth.ts` `loadTeacher`): feature gating reads
+  the raw `subscriptionTier` column, but nothing flipped it back to free when a
+  MOBILE-MONEY sub's period ended (no renewal webhook). Now, on any authenticated
+  request, an expired + non-auto-renew subscription is downgraded to free/expired.
+  Stripe auto-renew is still managed by its webhook.
+- **Refund / chargeback revokes access** (`app.ts` Stripe webhook + new
+  `downgradeStudyUserToFree` in billing/service): `charge.refunded` and
+  `charge.dispute.created` now downgrade the learner to free (in addition to the
+  existing ambassador clawback).
+
+Verified by CI (compiles/builds). END-TO-END verification against live gateways
+(activation, renewal, cancel, refund, dunning) requires real merchant keys.
+Follow-up (nice-to-have): payment receipts (in-app notification / email).
+
+## Merchant keys unblock the rest
+
+Once `PAYNOW_*`, Flutterwave, and Stripe keys are set in Railway, tell me and I'll
+run a real end-to-end payment test per gateway and confirm each lifecycle event.

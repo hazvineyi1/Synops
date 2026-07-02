@@ -153,6 +153,24 @@ export async function markPaymentFailed(
     .where(eq(studyPaymentsTable.reference, reference));
 }
 
+// Immediately revoke paid access: set the tier back to free, stamp a status
+// (e.g. "refunded" | "disputed" | "expired"), and end the period now. Used by the
+// refund/dispute webhook handlers and the lazy expiry reconciler.
+export async function downgradeStudyUserToFree(
+  userId: string,
+  status: string,
+): Promise<void> {
+  await db
+    .update(studyUsersTable)
+    .set({
+      subscriptionTier: "free",
+      subscriptionStatus: status,
+      autoRenew: false,
+      subscriptionCurrentPeriodEnd: new Date(),
+    })
+    .where(eq(studyUsersTable.id, userId));
+}
+
 // Reflect a Stripe subscription onto the matching study user. Called from the
 // Stripe webhook so card auto-renew (active, renewals, cancellations) keeps the
 // user's Pro access in sync. No-op when the customer is not a study learner.

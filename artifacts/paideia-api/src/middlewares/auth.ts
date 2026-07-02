@@ -126,6 +126,27 @@ export async function loadTeacher(
           .where(eq(studyUsersTable.id, sessionRow.userId))
           .limit(1);
         if (user) {
+          // Self-healing entitlement: mobile-money and canceled subscriptions
+          // have no renewal webhook, so when their paid period ends nothing flips
+          // the stored tier back to free -- and feature gating reads that column.
+          // Reconcile it lazily here. Stripe auto-renew (autoRenew=true) is left
+          // to its own webhook, which advances the period or downgrades on lapse.
+          const end = user.subscriptionCurrentPeriodEnd
+            ? new Date(user.subscriptionCurrentPeriodEnd)
+            : null;
+          const expired = !!end && end.getTime() < Date.now();
+          if (expired && user.subscriptionTier !== "free" && !user.autoRenew) {
+            try {
+              await db
+                .update(studyUsersTable)
+                .set({ subscriptionTier: "free", subscriptionStatus: "expired" })
+                .where(eq(studyUsersTable.id, user.id));
+            } catch (err) {
+              req.log?.warn({ err }, "expiry downgrade failed");
+            }
+            user.subscriptionTier = "free";
+            user.subscriptionStatus = "expired";
+          }
           req.studyUser = user;
         }
       }
