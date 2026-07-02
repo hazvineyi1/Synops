@@ -23,7 +23,9 @@ test.describe("Coach smoke", () => {
   test("Coach sign-in page renders", async ({ page }) => {
     await page.goto("/study/login");
     await expect(page.getByText("Synops Coach")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    // The card title "Sign in" renders as a styled div, not a semantic heading,
+    // so match on exact text rather than the heading role.
+    await expect(page.getByText("Sign in", { exact: true })).toBeVisible();
     await expect(page.locator("#email")).toBeVisible();
     await expect(page.locator("#password")).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign In" })).toBeVisible();
