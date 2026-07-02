@@ -83,17 +83,17 @@ export default function StudyTutorChat() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {messages.map((msg: StudyTutorMessage) => {
               const isUser = msg.role === "user";
               return (
                 <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
                   <div
-                    className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm ${
+                    className={
                       isUser
-                        ? "bg-primary text-primary-foreground rounded-br-none whitespace-pre-wrap"
-                        : "bg-muted rounded-bl-none"
-                    }`}
+                        ? "max-w-[80%] px-4 py-2.5 rounded-2xl rounded-br-none bg-primary text-primary-foreground text-sm whitespace-pre-wrap"
+                        : "max-w-[92%] px-5 py-4 rounded-2xl rounded-bl-none bg-muted text-[15px] text-foreground"
+                    }
                   >
                     {isUser ? msg.content : <Markdown content={msg.content} />}
                   </div>
