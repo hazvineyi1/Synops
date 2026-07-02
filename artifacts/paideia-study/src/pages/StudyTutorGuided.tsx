@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import StudyNav from "@/components/StudyNav";
+import { Markdown } from "@/components/Markdown";
 import {
   Brain, CheckCircle2, XCircle, Loader2, ChevronRight,
   Globe, Sparkles, GraduationCap, Trophy, BookOpen, RefreshCw,
@@ -246,8 +247,10 @@ function TurnView({
     const isUser = message.role === "user";
     return (
       <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-        <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm ${isUser ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-          {message.content}
+        <div className={isUser
+          ? "max-w-[80%] px-4 py-2.5 rounded-2xl bg-primary text-primary-foreground text-sm whitespace-pre-wrap"
+          : "max-w-[92%] px-5 py-4 rounded-2xl bg-muted text-[15px] text-foreground"}>
+          {isUser ? message.content : <Markdown content={message.content} />}
         </div>
       </div>
     );

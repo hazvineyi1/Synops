@@ -26,8 +26,14 @@ function splitRow(line: string): string[] {
   return line.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
 }
 
+// Brand rule: no em dashes. Replace em dashes with a comma (reads naturally in
+// prose) and en dashes with a hyphen, collapsing any doubled spaces.
+export function stripEmDashes(s: string): string {
+  return (s ?? "").replace(/\s*—\s*/g, ", ").replace(/\s*–\s*/g, "-").replace(/ {2,}/g, " ");
+}
+
 export function Markdown({ content }: { content: string }) {
-  const lines = (content ?? "").replace(/\r\n/g, "\n").split("\n");
+  const lines = stripEmDashes(content ?? "").replace(/\r\n/g, "\n").split("\n");
   const blocks: ReactNode[] = [];
   let i = 0;
   let key = 0;

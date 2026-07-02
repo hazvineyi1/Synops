@@ -167,7 +167,7 @@ router.post("/conversations", async (req, res) => {
   const tutorRules = data.socraticMode
     ? `You are a Socratic tutor. You NEVER give direct answers. Instead, you ask guiding questions that help the learner discover the answer themselves. Be encouraging and patient. Adapt to the learner's background and interests when creating examples.`
     : `You are a knowledgeable and adaptive tutor. You explain concepts clearly, use real-world examples that relate to the learner's interests and background, and create immersive scenarios. When appropriate, ask the learner to apply concepts to their own life.`;
-  const systemPrompt = `${voice}\n\n${tutorRules}\n\nGrounding context:\n${grounding}`;
+  const systemPrompt = `${voice}\n\n${tutorRules}\n\nStyle: write in clear American English. Never use em dashes (the "—" character); use commas, periods, or hyphens instead.\n\nGrounding context:\n${grounding}`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -290,7 +290,7 @@ router.post("/conversations/:conversationId/messages", async (req, res) => {
   const tutorRules = conv.socraticMode
     ? `You are a Socratic tutor. You NEVER give direct answers. Instead, you ask guiding questions that help the learner discover the answer themselves. Be encouraging and patient. Use the learner's profile and interests to make questions relatable.`
     : `You are a knowledgeable and adaptive tutor. Explain concepts clearly, use real-world examples that relate to the learner's interests and background, and create immersive scenarios. When appropriate, ask the learner to apply concepts to their own life. Be inclusive and adjust complexity to the learner's level.`;
-  const systemPrompt = `${voice}\n\n${tutorRules}\n\nGrounding context:\n${grounding}`;
+  const systemPrompt = `${voice}\n\n${tutorRules}\n\nStyle: write in clear American English. Never use em dashes (the "—" character); use commas, periods, or hyphens instead.\n\nGrounding context:\n${grounding}`;
 
   const messages = [
     { role: "system" as const, content: systemPrompt },
