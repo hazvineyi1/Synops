@@ -230,16 +230,16 @@ export default function StudyMaterialView() {
           </Card>
         </div>
 
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-6 items-start">
           {/* Main Content */}
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0">
             <Card className="mb-6">
               <CardContent className="py-5">
                 <h2 className="font-semibold text-sm mb-3 flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />
                   Content
                 </h2>
-                <div className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+                <div className="prose prose-sm max-w-none text-sm leading-relaxed whitespace-pre-wrap break-words text-foreground/90">
                   {material.contentText}
                 </div>
               </CardContent>
@@ -267,7 +267,7 @@ export default function StudyMaterialView() {
           </div>
 
           {/* Sidebar */}
-          <aside className="w-full lg:w-80 shrink-0 space-y-4">
+          <aside className="min-w-0 space-y-4">
             {/* Flashcard Coverage */}
             {totalConcepts > 0 && (
               <Card>
