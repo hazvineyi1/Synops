@@ -319,10 +319,10 @@ export default function Home() {
                 An AI study coach for learners. Adaptive study plans, practice sets, exam prep, and a guided Socratic tutor.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/study/signup" className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors">
+                <a href="/study/signup?from=web" className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors">
                   Get started
                 </a>
-                <a href="/study/" className="border border-white/30 text-white px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/10 transition-colors">
+                <a href="/study/?from=web" className="border border-white/30 text-white px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/10 transition-colors">
                   Open app
                 </a>
               </div>

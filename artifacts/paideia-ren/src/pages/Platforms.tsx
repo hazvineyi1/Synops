@@ -53,8 +53,8 @@ export default function Platforms() {
                 An AI study coach for students. Adaptive study plans, practice sets, exam prep, and a guided tutor that adapts to a chosen coaching personality. Built for learners.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/study/signup" className="bg-accent text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-accent/90 transition-colors">Get started</a>
-                <a href="/study/login" className="border border-border text-foreground text-center font-bold px-6 py-3 rounded-[6px] hover:bg-muted transition-colors">Sign in</a>
+                <a href="/study/signup?from=web" className="bg-accent text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-accent/90 transition-colors">Get started</a>
+                <a href="/study/login?from=web" className="border border-border text-foreground text-center font-bold px-6 py-3 rounded-[6px] hover:bg-muted transition-colors">Sign in</a>
               </div>
             </div>
           </div>

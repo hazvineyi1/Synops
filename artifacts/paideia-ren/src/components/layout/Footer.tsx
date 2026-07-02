@@ -33,8 +33,8 @@ export function Footer() {
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-foreground mb-2">Products</h3>
             <a href="/app/signup" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Teacher Free Trial</a>
             <a href="/app/login" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Teacher Sign-In</a>
-            <a href="/study/" className="text-[15px] text-muted-foreground hover:text-accent transition-colors mt-2">Synops Coach</a>
-            <a href="/study/login" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Student Sign-In</a>
+            <a href="/study/?from=web" className="text-[15px] text-muted-foreground hover:text-accent transition-colors mt-2">Synops Coach</a>
+            <a href="/study/login?from=web" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Student Sign-In</a>
           </div>
 
           <div className="flex flex-col gap-4">
