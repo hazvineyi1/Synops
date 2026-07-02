@@ -1,0 +1,61 @@
+# Coach — Phase 1: Make It Chargeable (and Legal)
+
+Phase 1 is the gate for a public paid launch. Do NOT charge money / collect
+student (often minor) PII publicly until every item here is done.
+
+## Audit findings (2026-07-02)
+
+- **Payment providers are real, not stubbed.** Paynow (Zimbabwe: EcoCash /
+  OneMoney / card) and Flutterwave (rest of Africa) both make genuine gateway API
+  calls; Stripe is wired for card. Files: `paideia-api/src/lib/billing/`.
+- **Critical risk (now fixed):** a `mock` provider auto-approves payments after
+  6s, and `resolveProvider` silently fell back to it whenever live keys were
+  missing — *including in production*. A real user could get Pro for free.
+- **Legal pages exist**: `paideia-ren/src/pages/Privacy.tsx` + `Terms.tsx`,
+  linked in the marketing footer. Need a content review + linking from inside the
+  Coach app + versioning.
+- **Data rights: MISSING.** There is an admin delete-user and a profile "reset",
+  but no learner-facing data export and no self-service account deletion.
+- **Age gate: MISSING.** Signup collects no date of birth / age / guardian.
+- **PII to AI: clean.** No name/email/id is injected into any prompt; the tutor
+  sends only pedagogical profile fields (goals, interests, background, level).
+  The only place identity leaves the platform is to the payment processors, which
+  is necessary and appropriate.
+
+## Shipped in this batch
+
+1. **Fail-closed payments.** `resolveProvider` now throws
+   `PaymentsNotConfiguredError` in production when no live gateway is configured,
+   instead of using the mock. The mobile checkout route catches it and returns a
+   clean 503 ("Payments are not available yet"). A controlled production demo can
+   still opt in with `BILLING_ALLOW_MOCK=true`. Dev/staging is unaffected.
+2. **Defensive PII scrub.** `lib/redact.ts` strips email addresses and phone
+   numbers from learner-entered free-text profile fields (background, goals,
+   interests) before they reach the model. Not applied to uploaded study material
+   or AI-generated content (which can legitimately contain long numbers).
+
+## Merchant accounts — YOUR parallel track (real lead time)
+
+Payments stay in the safe fail-closed state until these keys are set in Railway
+on the **wonderful-adaptation** service. Each needs business registration / KYC:
+
+- **Paynow (Zimbabwe)** — merchant account at paynow.co.zw → set
+  `PAYNOW_INTEGRATION_ID` and `PAYNOW_INTEGRATION_KEY`.
+- **Flutterwave (rest of Africa)** — account at flutterwave.com → set the
+  Flutterwave secret key(s) the provider reads, plus `FLUTTERWAVE_SECRET_HASH`
+  for webhook verification.
+- **Stripe (card / US)** — the Stripe keys the existing stripe client + webhook
+  read.
+
+Until a gateway is configured, its country's checkout returns the 503 above.
+
+## Remaining Phase 1 items (not yet built)
+
+- **Data rights**: learner data export (full machine-readable record) +
+  self-service account deletion (cascade + session invalidation) + profile UI.
+- **Age gate**: DOB / 18+ confirmation at signup; block under-18 or route through
+  guardian consent; store status on `study_users`.
+- **Legal**: review Privacy/Terms content, link them inside the Coach app, and
+  add a version/last-updated stamp.
+- **Payments lifecycle hardening**: verify webhooks, renewal, cancel, refunds,
+  receipts, and failed-payment dunning against each live gateway once keys exist.

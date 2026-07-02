@@ -12,6 +12,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { requireStudyUser } from "../../middlewares/auth.js";
 import { openai, PRIMARY_MODEL, generateJSON } from "../../lib/openai.js";
 import { researchTopic } from "../../lib/extract.js";
+import { redactContactInfo } from "../../lib/redact.js";
 
 const TUTOR_TURN_PREFIX = "<<TUTOR_TURN>>";
 function encodeTurn(turn: unknown): string {
@@ -91,11 +92,13 @@ async function buildGroundingContext(userId: string): Promise<string> {
 
   if (profile.length > 0) {
     const p = profile[0];
+    // Free-text profile fields are learner-entered: scrub any contact details
+    // (email/phone) before they reach the model. Enum-ish fields below are safe.
     parts.push(`Learner Profile:`);
-    if (p.examTarget) parts.push(`- Exam Target: ${p.examTarget}`);
-    if (p.goals.length > 0) parts.push(`- Goals: ${p.goals.join(", ")}`);
-    if (p.interests.length > 0) parts.push(`- Interests: ${p.interests.join(", ")}`);
-    if (p.background) parts.push(`- Background: ${p.background}`);
+    if (p.examTarget) parts.push(`- Exam Target: ${redactContactInfo(p.examTarget)}`);
+    if (p.goals.length > 0) parts.push(`- Goals: ${redactContactInfo(p.goals.join(", "))}`);
+    if (p.interests.length > 0) parts.push(`- Interests: ${redactContactInfo(p.interests.join(", "))}`);
+    if (p.background) parts.push(`- Background: ${redactContactInfo(p.background)}`);
     parts.push(`- Study Style: ${p.studyStyle}`);
     parts.push(`- Preferred Difficulty: ${p.preferredDifficulty}`);
   }
@@ -340,11 +343,13 @@ async function loadLearnerProfileText(userId: string): Promise<string> {
     .limit(1);
   if (rows.length === 0) return "(no learner profile on file)";
   const p = rows[0];
+  // Scrub contact details from learner-entered free-text fields before this
+  // profile is sent to the model.
   const lines = [
-    p.examTarget ? `Goal: ${p.examTarget}` : null,
-    p.goals.length ? `Aspirations: ${p.goals.join(", ")}` : null,
-    p.interests.length ? `Interests: ${p.interests.join(", ")}` : null,
-    p.background ? `Background: ${p.background}` : null,
+    p.examTarget ? `Goal: ${redactContactInfo(p.examTarget)}` : null,
+    p.goals.length ? `Aspirations: ${redactContactInfo(p.goals.join(", "))}` : null,
+    p.interests.length ? `Interests: ${redactContactInfo(p.interests.join(", "))}` : null,
+    p.background ? `Background: ${redactContactInfo(p.background)}` : null,
     `Study style: ${p.studyStyle}`,
     `Preferred difficulty: ${p.preferredDifficulty}`,
   ].filter(Boolean);

@@ -17,7 +17,7 @@ import {
   type CountryCode,
   type TierId,
 } from "../../lib/billing/config.js";
-import { resolveProvider, getProviderById } from "../../lib/billing/providers/index.js";
+import { resolveProvider, getProviderById, PaymentsNotConfiguredError } from "../../lib/billing/providers/index.js";
 import {
   activatePayment,
   getPaymentById,
@@ -126,7 +126,22 @@ router.post("/mobile/checkout", async (req, res) => {
 
   const amountMajor = amountMinor / 100;
   const reference = `SC-${user.id.slice(0, 8)}-${Date.now()}`;
-  const provider = resolveProvider(country, method);
+
+  // Fail closed: in production with no live gateway configured, resolveProvider
+  // throws rather than falling back to the auto-approving mock. Surface that as a
+  // clean "not available yet" instead of a 500, and never create a payment row.
+  let provider: ReturnType<typeof resolveProvider>;
+  try {
+    provider = resolveProvider(country, method);
+  } catch (err) {
+    if (err instanceof PaymentsNotConfiguredError) {
+      res.status(503).json({
+        error: "Payments are not available yet. Please check back soon.",
+      });
+      return;
+    }
+    throw err;
+  }
 
   const returnUrl = `${publicBaseUrl()}/study/upgrade?ref=${reference}`;
   const resultUrl = `${publicBaseUrl()}/api/study/billing/webhook/${provider.id}`;

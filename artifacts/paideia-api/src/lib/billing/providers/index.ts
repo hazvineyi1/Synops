@@ -6,6 +6,16 @@ import { mockProvider } from "./mock.js";
 
 export { paynowProvider, flutterwaveProvider, mockProvider };
 
+// Thrown when a real payment is requested but no live gateway is configured and
+// the mock is not allowed (i.e. production). Callers should translate this into a
+// clean "payments unavailable" response rather than a 500.
+export class PaymentsNotConfiguredError extends Error {
+  constructor(public readonly gateway: string) {
+    super(`No live payment gateway configured for ${gateway}`);
+    this.name = "PaymentsNotConfiguredError";
+  }
+}
+
 // Which live gateway owns a given country. Zimbabwe -> Paynow (EcoCash/OneMoney);
 // everything else -> Flutterwave.
 function liveProviderFor(country: CountryCode): PaymentProvider {
@@ -13,14 +23,26 @@ function liveProviderFor(country: CountryCode): PaymentProvider {
   return flutterwaveProvider;
 }
 
-// Resolve the provider to actually use. Falls back to the sandbox mock when the
-// live gateway has no keys configured yet, so the flow is always testable.
+// Resolve the provider to actually use.
+//
+// The mock provider auto-approves payments without charging anyone, so it must
+// NEVER run live. In production we fail closed: if the live gateway has no keys,
+// we throw instead of silently handing out paid tiers for free. Non-production
+// falls back to the mock so the flow stays testable, and a controlled production
+// demo can opt in explicitly with BILLING_ALLOW_MOCK=true.
 export function resolveProvider(
   country: CountryCode,
   _method: PaymentMethod,
 ): PaymentProvider {
   const live = liveProviderFor(country);
-  return live.isConfigured() ? live : mockProvider;
+  if (live.isConfigured()) return live;
+
+  const isProd = process.env["NODE_ENV"] === "production";
+  const allowMock = process.env["BILLING_ALLOW_MOCK"] === "true";
+  if (isProd && !allowMock) {
+    throw new PaymentsNotConfiguredError(live.id);
+  }
+  return mockProvider;
 }
 
 export function getProviderById(id: string): PaymentProvider {
