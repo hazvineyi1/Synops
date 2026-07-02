@@ -14,7 +14,7 @@ import {
 } from "@workspace/paideia-api-client";
 import {
   ArrowLeft, User, Save, Brain, Layers, Gauge, ListChecks, TrendingUp as TrendIcon,
-  TrendingUp, Target, Zap, BarChart3, Clock, ChevronRight
+  TrendingUp, Target, Zap, BarChart3, Clock, ChevronRight, Download, Trash2, ShieldCheck
 } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
 
@@ -65,6 +65,56 @@ export default function StudyProfile() {
       alert("Failed to save profile");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── Data rights (GDPR): export + self-delete ──────────────────────────────
+  const [exporting, setExporting] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/study/account/export", { credentials: "include" });
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "synops-coach-data.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Could not export your data. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleteError("");
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/study/account/delete", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: deletePassword }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error || "Could not delete your account");
+      }
+      // Session is cleared server-side; hard-reload to the sign-in page.
+      window.location.href = "/study/login";
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : "Could not delete your account");
+      setDeleting(false);
     }
   };
 
@@ -318,6 +368,102 @@ export default function StudyProfile() {
                   AI balances challenge vs. confidence
                 </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Privacy & data (GDPR data rights) */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              Privacy &amp; Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium">Download your data</p>
+                <p className="text-xs text-muted-foreground">
+                  A complete copy of everything Synops holds about you, as a JSON file.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0"
+                disabled={exporting}
+                onClick={handleExport}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {exporting ? "Preparing..." : "Download my data"}
+              </Button>
+            </div>
+
+            <div className="border-t pt-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-red-600">Delete your account</p>
+                  <p className="text-xs text-muted-foreground">
+                    Permanently erases your account and all study data. This cannot be undone.
+                  </p>
+                </div>
+                {!showDelete && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 shrink-0 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                    onClick={() => setShowDelete(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Delete account
+                  </Button>
+                )}
+              </div>
+
+              {showDelete && (
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-3">
+                  <p className="text-sm text-red-700">
+                    This is permanent. Enter your password to confirm you want to delete
+                    your account and everything in it.
+                  </p>
+                  <div>
+                    <Label htmlFor="deletePassword">Password</Label>
+                    <Input
+                      id="deletePassword"
+                      type="password"
+                      autoComplete="current-password"
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      className="mt-1.5 max-w-sm"
+                    />
+                  </div>
+                  {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      className="gap-1.5 bg-red-600 hover:bg-red-700 text-white"
+                      disabled={deleting || !deletePassword}
+                      onClick={handleDelete}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      {deleting ? "Deleting..." : "Permanently delete"}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={deleting}
+                      onClick={() => {
+                        setShowDelete(false);
+                        setDeletePassword("");
+                        setDeleteError("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

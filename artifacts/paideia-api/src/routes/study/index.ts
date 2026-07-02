@@ -20,6 +20,7 @@ import adminAnalyticsRouter from "./admin-analytics.js";
 import telemetryRouter from "./telemetry.js";
 import notificationsRouter from "./notifications.js";
 import ambassadorRouter from "./ambassador.js";
+import accountRouter from "./account.js";
 import { writeRateLimit } from "../../middlewares/rateLimit.js";
 
 const router: IRouter = Router();
@@ -54,5 +55,6 @@ router.use("/admin", adminAnalyticsRouter);
 router.use("/telemetry", telemetryRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/ambassador", ambassadorRouter);
+router.use("/account", accountRouter);
 
 export default router;

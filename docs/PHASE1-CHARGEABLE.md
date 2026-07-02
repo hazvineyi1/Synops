@@ -49,10 +49,23 @@ on the **wonderful-adaptation** service. Each needs business registration / KYC:
 
 Until a gateway is configured, its country's checkout returns the 503 above.
 
+## Data rights (shipped 2026-07-02)
+
+New `routes/study/account.ts` (mounted at `/api/study/account`, auth-gated):
+
+- **`GET /export`** — streams a downloadable JSON of everything held on the
+  signed-in learner (account minus password hash, profile, materials, concepts,
+  flashcards, practice, exams, assessments, tutor conversations + messages,
+  knowledge graph, annotations, paths, activity log, notifications, payments).
+- **`POST /delete`** — password-confirmed hard delete of the learner's own
+  account; every `study_*` row cascades from the user row (incl. sessions). The
+  password check also blocks an impersonating admin from deleting the learner.
+
+UI: a "Privacy & Data" card on the Coach profile page (download button +
+password-gated delete flow that hard-reloads to sign-in on success).
+
 ## Remaining Phase 1 items (not yet built)
 
-- **Data rights**: learner data export (full machine-readable record) +
-  self-service account deletion (cascade + session invalidation) + profile UI.
 - **Age gate**: DOB / 18+ confirmation at signup; block under-18 or route through
   guardian consent; store status on `study_users`.
 - **Legal**: review Privacy/Terms content, link them inside the Coach app, and
