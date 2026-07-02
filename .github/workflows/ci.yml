@@ -1,0 +1,58 @@
+# CI quality gate for the Synops monorepo.
+#
+# Runs on every push and pull request. It reproduces the two checks that have
+# historically caught breakage before it reached Railway:
+#   1. `pnpm run typecheck` across the workspace (libs + all app artifacts).
+#   2. Building the Coach deployment exactly the way Dockerfile.paideia does,
+#      so a change that compiles in isolation but breaks the real build fails
+#      here instead of in production.
+#
+# Node 24 + pnpm 9 mirror Dockerfile.paideia. Keep them in sync with that file.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch cancels the older, still-running job.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: typecheck + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      # Matches Dockerfile.paideia (--no-frozen-lockfile). CI still fails loudly
+      # if a dependency is missing or a build script errors.
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      # The hard gate: typecheck the whole workspace (libs + artifacts).
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      # Build the Coach deployment the same way the production image does.
+      - name: Build Coach (marketing + study + app + api)
+        run: |
+          PORT=8080 BASE_PATH=/       pnpm --filter @workspace/paideia-ren   run build
+          PORT=8080 BASE_PATH=/study/ pnpm --filter @workspace/paideia-study run build
+          PORT=8080 BASE_PATH=/app/   pnpm --filter @workspace/paideia-app   run build
+          pnpm --filter @workspace/paideia-api run build

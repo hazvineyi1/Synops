@@ -15,6 +15,12 @@ const reactBuildPath = path.resolve(__dirname, "../../paideia-ren/dist/public");
 
 const app: Express = express();
 
+// Railway (and any load balancer) terminates TLS and forwards the real client
+// address in X-Forwarded-For. Trust the first proxy hop so req.ip is the actual
+// caller rather than the shared proxy address; without this, every request looks
+// like it comes from one IP and per-IP rate limiting throttles all users as one.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,

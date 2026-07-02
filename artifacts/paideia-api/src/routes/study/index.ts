@@ -20,25 +20,35 @@ import adminAnalyticsRouter from "./admin-analytics.js";
 import telemetryRouter from "./telemetry.js";
 import notificationsRouter from "./notifications.js";
 import ambassadorRouter from "./ambassador.js";
+import { writeRateLimit } from "../../middlewares/rateLimit.js";
 
 const router: IRouter = Router();
 
+// Cap the cost/abuse exposure of the expensive AI-generation endpoints. These
+// only throttle mutating requests (POST/PUT/PATCH/DELETE) so reads are never
+// blocked. Keyed by client IP + route (needs `trust proxy`, set in app.ts, so
+// req.ip is the real caller and not Railway's shared proxy address). Limits are
+// generous for a real learner but stop a runaway loop from burning model spend.
+const aiWrite = writeRateLimit({ windowMs: 10 * 60 * 1000, max: 40 });
+// The tutor is chat: many short messages per session are normal, so allow more.
+const tutorWrite = writeRateLimit({ windowMs: 10 * 60 * 1000, max: 80 });
+
 router.use("/auth", authRouter);
-router.use("/materials/upload", uploadRouter);
-router.use("/materials", materialsRouter);
+router.use("/materials/upload", aiWrite, uploadRouter);
+router.use("/materials", aiWrite, materialsRouter);
 router.use("/flashcards", flashcardsRouter);
-router.use("/practice", practiceRouter);
-router.use("/exams", examsRouter);
-router.use("/tutor", tutorRouter);
+router.use("/practice", aiWrite, practiceRouter);
+router.use("/exams", aiWrite, examsRouter);
+router.use("/tutor", tutorWrite, tutorRouter);
 router.use("/profile", profileRouter);
 router.use("/briefs", briefsRouter);
 router.use("/dashboard", dashboardRouter);
 router.use("/billing", billingRouter);
-router.use("/knowledge", knowledgeRouter);
-router.use("/adaptive", adaptiveRouter);
-router.use("/assessments", assessmentRouter);
-router.use("/paths", pathsRouter);
-router.use("/strategy", strategyRouter);
+router.use("/knowledge", aiWrite, knowledgeRouter);
+router.use("/adaptive", aiWrite, adaptiveRouter);
+router.use("/assessments", aiWrite, assessmentRouter);
+router.use("/paths", aiWrite, pathsRouter);
+router.use("/strategy", aiWrite, strategyRouter);
 router.use("/admin", adminRouter);
 router.use("/admin", adminAnalyticsRouter);
 router.use("/telemetry", telemetryRouter);

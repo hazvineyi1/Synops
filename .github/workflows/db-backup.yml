@@ -1,0 +1,68 @@
+# Free nightly Postgres backup for the Coach database.
+#
+# Runs pg_dump against the Railway Postgres every night and stores the dump as a
+# downloadable GitHub Actions artifact (retained 90 days). This is the no-cost
+# alternative to Railway's Pro-plan backups — adequate protection for a pre-launch
+# app. Upgrade to Railway Pro + point-in-time recovery once there's revenue.
+#
+# ONE-TIME SETUP (you do this once, in the GitHub repo):
+#   Settings → Secrets and variables → Actions → New repository secret
+#     Name:  DATABASE_PUBLIC_URL
+#     Value: the Postgres *public* connection string from Railway
+#            (Railway → Postgres service → Variables → DATABASE_PUBLIC_URL).
+#   The public URL is required because GitHub's runners are outside Railway's
+#   private network. The value is stored encrypted and never printed by this job.
+#
+# To fetch a backup: open the workflow run → Artifacts → download the .dump, then
+# restore locally with:  pg_restore --clean --no-owner -d "$TARGET_URL" file.dump
+
+name: DB Backup
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # every day at 02:00 UTC
+  workflow_dispatch: {} # allow manual "Run workflow" from the Actions tab
+
+jobs:
+  backup:
+    name: pg_dump → artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Install a current PostgreSQL client (17) from the official PGDG repo, so
+      # pg_dump is at least as new as the server. If your Railway Postgres is a
+      # newer major version and pg_dump complains about a version mismatch, bump
+      # the "17" below to match.
+      - name: Install PostgreSQL client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Run pg_dump
+        env:
+          DATABASE_PUBLIC_URL: ${{ secrets.DATABASE_PUBLIC_URL }}
+        run: |
+          if [ -z "$DATABASE_PUBLIC_URL" ]; then
+            echo "::error::DATABASE_PUBLIC_URL secret is not set. Add it in repo Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          echo "BACKUP_FILE=coach-db-$STAMP.dump" >> "$GITHUB_ENV"
+          # --format=custom is compressed and restorable with pg_restore.
+          # --no-owner / --no-privileges keep the dump portable across roles.
+          pg_dump "$DATABASE_PUBLIC_URL" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --file "coach-db-$STAMP.dump"
+          ls -lh "coach-db-$STAMP.dump"
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 90
+          if-no-files-found: error
