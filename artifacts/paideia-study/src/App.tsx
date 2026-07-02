@@ -8,7 +8,7 @@ import { useEffect, type ComponentType } from "react";
 import NotFound from "@/pages/not-found";
 import StudyLanding from "@/pages/StudyLanding";
 import StudyLandingUS from "@/pages/StudyLandingUS";
-import { captureEntrySource, cameFromMarketing } from "@/lib/entry";
+import { captureEntrySource, isUsAudience } from "@/lib/entry";
 import StudyLogin from "@/pages/StudyLogin";
 import StudySignup from "@/pages/StudySignup";
 import StudyDashboard from "@/pages/StudyDashboard";
@@ -113,7 +113,7 @@ function AdminFab() {
 // get the US-focused page; anyone reaching the Coach directly gets the default one.
 function RootLanding() {
   useEffect(() => { captureEntrySource(); }, []);
-  return cameFromMarketing() ? <StudyLandingUS /> : <StudyLanding />;
+  return isUsAudience() ? <StudyLandingUS /> : <StudyLanding />;
 }
 
 function Router() {

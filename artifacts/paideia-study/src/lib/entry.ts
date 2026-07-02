@@ -21,6 +21,23 @@ export function captureEntrySource(): void {
   }
 }
 
+// The US-facing marketing brand's domain(s). Loading the Coach on one of these,
+// or arriving from one, means the visitor is in the US audience.
+const US_HOSTS = ["synops-consulting.com", "www.synops-consulting.com"];
+
+// True for the US audience: on the US marketing domain, or arrived from it. Anyone
+// on the Coach's own domain (e.g. synopscoach.com) or reaching it directly is treated
+// as the African/global audience.
+export function isUsAudience(): boolean {
+  try {
+    const host = window.location.hostname.toLowerCase();
+    if (US_HOSTS.includes(host)) return true;
+    return cameFromMarketing();
+  } catch {
+    return false;
+  }
+}
+
 // True when the visit originated from the marketing website (US-facing brand).
 export function cameFromMarketing(): boolean {
   try {

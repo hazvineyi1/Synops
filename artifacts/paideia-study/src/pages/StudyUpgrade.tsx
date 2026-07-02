@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { isUsAudience } from "@/lib/entry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,12 +77,28 @@ export default function StudyUpgrade() {
     if (pending) setActivePaymentId(pending);
   }, []);
 
+  // US audience (from the marketing site / US domain) is billed in USD by card; the
+  // African/global audience keeps the country picker + mobile-money rails untouched.
+  const isUS = useMemo(() => isUsAudience(), []);
+
   const country = useMemo(() => {
-    const found = config?.countries.find((c) => c.code === countryCode);
+    const code = isUS ? "ZW" : countryCode; // ZW's currency is USD — the USD anchor
+    const found = config?.countries.find((c) => c.code === code);
     if (!found) return null;
-    // Card payments are not available yet, so hide card methods from the picker.
-    return { ...found, methods: found.methods.filter((m) => m.kind !== "card") };
-  }, [config, countryCode]);
+    const methods = isUS
+      ? found.methods.filter((m) => m.kind === "card") // US: card only
+      : found.methods.filter((m) => m.kind !== "card"); // African: mobile money (card hidden)
+    return { ...found, methods };
+  }, [config, countryCode, isUS]);
+
+  // For US visitors, preselect the card method and enable auto-renew so checkout
+  // uses the Stripe card path (requires STRIPE_SECRET_KEY + a card plan configured).
+  useEffect(() => {
+    if (isUS && country && !method && country.methods[0]) {
+      setMethod(country.methods[0].id);
+      setAutoRenew(true);
+    }
+  }, [isUS, country, method]);
   // For showing prices on the tier cards before a country is chosen, fall back
   // to the USD (Zimbabwe) anchor.
   const priceCountry = useMemo(
@@ -419,6 +436,11 @@ export default function StudyUpgrade() {
 
             {/* Country, a discreet dropdown so the list scales as more countries
                 are added. Payment methods only appear once a country is chosen. */}
+            {isUS ? (
+              <div className="mb-8 text-xs uppercase tracking-wide text-muted-foreground">
+                Billed in USD
+              </div>
+            ) : (
             <div className="mb-8 max-w-xs">
               <Label htmlFor="country" className="text-xs uppercase tracking-wide text-muted-foreground">
                 Your country
@@ -442,6 +464,7 @@ export default function StudyUpgrade() {
                 ))}
               </select>
             </div>
+            )}
 
             {/* Method, revealed only after a country is picked */}
             {country && (
