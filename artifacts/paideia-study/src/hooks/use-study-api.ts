@@ -956,8 +956,14 @@ export function useStudyReanalyzeMaterial() {
   });
 }
 
-// Fire-and-forget usage heartbeat. Best-effort; failures are ignored.
+// Fire-and-forget usage heartbeat. Best-effort; failures are ignored. Debounced to
+// at most once per 20s so mount + route-change bursts (and React re-renders) can't
+// double-log sessions.
+let lastHeartbeatAt = 0;
 export function studyHeartbeat(path: string): void {
+  const now = Date.now();
+  if (now - lastHeartbeatAt < 20_000) return;
+  lastHeartbeatAt = now;
   void customFetch(`${BASE}/telemetry/heartbeat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

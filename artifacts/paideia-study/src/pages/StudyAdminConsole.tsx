@@ -146,7 +146,10 @@ function DashboardSection() {
   const { data: ov } = useStudyAdminOverview();
   const { data: usage } = useStudyAdminUsage();
   const { data: bd } = useStudyAdminBreakdown();
-  const maxUsage = Math.max(1, ...(usage ?? []).map((u) => u.events));
+  // Plot sessions AND learning-events per day (whichever is larger drives the bar),
+  // so the chart isn't flat when there are sign-ins but no practice activity yet.
+  const dayVal = (u: { events: number; sessions: number }) => Math.max(u.events, u.sessions);
+  const maxUsage = Math.max(1, ...(usage ?? []).map(dayVal));
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -165,8 +168,8 @@ function DashboardSection() {
           <div className="flex items-end gap-0.5 h-32">
             {(usage ?? []).map((u) => (
               <div key={u.day} className="flex-1 bg-primary/70 hover:bg-primary rounded-t"
-                style={{ height: `${(u.events / maxUsage) * 100}%`, minHeight: 2 }}
-                title={`${u.day}: ${u.events} events · ${u.active_users} active · ${u.new_users} new`} />
+                style={{ height: `${(dayVal(u) / maxUsage) * 100}%`, minHeight: 2 }}
+                title={`${u.day}: ${u.sessions} sessions · ${u.events} events · ${u.active_users} active · ${u.new_users} new`} />
             ))}
           </div>
           <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
@@ -476,7 +479,7 @@ function PlansPanel() {
                   <TableCell>{p.name}</TableCell>
                   <TableCell className="text-right">{money(p.priceMinor, p.currency)}</TableCell>
                   <TableCell className="text-xs">{p.interval}</TableCell>
-                  <TableCell><Button size="sm" variant="outline" onClick={() => update.mutate({ id: p.id, active: !p.active }, { onSuccess: refresh })}>{p.active ? "Active" : "Inactive"}</Button></TableCell>
+                  <TableCell>{p.id < 0 ? <Badge variant="outline" title="From the live pricing config — add a plan to override">config</Badge> : <Button size="sm" variant="outline" onClick={() => update.mutate({ id: p.id, active: !p.active }, { onSuccess: refresh })}>{p.active ? "Active" : "Inactive"}</Button>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -517,7 +520,7 @@ function PaymentMethodsPanel() {
                   <TableCell className="font-mono text-xs">{m.key}</TableCell>
                   <TableCell>{m.label}</TableCell>
                   <TableCell className="text-xs">{m.provider}</TableCell>
-                  <TableCell><Button size="sm" variant="outline" onClick={() => update.mutate({ id: m.id, enabled: !m.enabled }, { onSuccess: refresh })}>{m.enabled ? "Enabled" : "Disabled"}</Button></TableCell>
+                  <TableCell>{m.id < 0 ? <Badge variant="outline" title="From the billing config — add a method to override">config</Badge> : <Button size="sm" variant="outline" onClick={() => update.mutate({ id: m.id, enabled: !m.enabled }, { onSuccess: refresh })}>{m.enabled ? "Enabled" : "Disabled"}</Button>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

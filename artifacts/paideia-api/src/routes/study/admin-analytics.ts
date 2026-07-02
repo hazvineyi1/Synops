@@ -18,6 +18,7 @@ import {
 } from "@workspace/paideia-db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { requireStudyAdmin } from "../../middlewares/auth.js";
+import { METHODS, COUNTRIES } from "../../lib/billing/config.js";
 import {
   hashPassword,
   newSessionToken,
@@ -63,6 +64,20 @@ async function writeAudit(
   } catch {
     // audit is advisory only
   }
+}
+
+// Mask the last octet/group of an IP so the admin sees enough to spot patterns
+// without exposing the full address (privacy by default).
+function maskIp(ip: unknown): string | null {
+  if (typeof ip !== "string" || !ip) return null;
+  if (ip.includes(".")) {
+    const p = ip.split(".");
+    return p.length === 4 ? `${p[0]}.${p[1]}.${p[2]}.x` : ip;
+  }
+  if (ip.includes(":")) {
+    return ip.split(":").slice(0, 3).join(":") + "::x";
+  }
+  return ip;
 }
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
@@ -147,7 +162,8 @@ router.get("/logins", async (_req, res) => {
     ORDER BY s.started_at DESC
     LIMIT 150
   `);
-  res.json(result.rows ?? []);
+  const rows = (result.rows ?? []).map((r) => ({ ...r, ip_address: maskIp((r as Record<string, unknown>)["ip_address"]) }));
+  res.json(rows);
 });
 
 // GET /admin/users — per-user list with usage counts (search via ?q=).
@@ -276,7 +292,27 @@ router.patch("/announcements/:id", async (req, res) => {
 
 router.get("/plans", async (_req, res) => {
   const rows = await db.select().from(studyPlansTable).orderBy(studyPlansTable.sortOrder);
-  res.json({ plans: rows });
+  if (rows.length > 0) {
+    res.json({ plans: rows, fromConfig: false });
+    return;
+  }
+  // No custom plans saved yet — surface the live pricing config (USD anchor) as
+  // read-only rows (negative id = config-derived, not editable) so the table isn't blank.
+  const zw = COUNTRIES.ZW;
+  const plans = (["plus", "pro"] as const).map((key, i) => ({
+    id: -(i + 1),
+    key,
+    name: key[0]!.toUpperCase() + key.slice(1),
+    description: null,
+    priceMinor: Math.round(zw.price[key].month * 100),
+    currency: zw.currency,
+    interval: "month",
+    features: [] as string[],
+    monthlyGenerationCap: null,
+    active: true,
+    sortOrder: i,
+  }));
+  res.json({ plans, fromConfig: true });
 });
 
 router.post("/plans", async (req, res) => {
@@ -333,7 +369,21 @@ router.patch("/plans/:id", async (req, res) => {
 
 router.get("/payment-methods", async (_req, res) => {
   const rows = await db.select().from(studyPaymentMethodsTable).orderBy(studyPaymentMethodsTable.sortOrder);
-  res.json({ paymentMethods: rows });
+  if (rows.length > 0) {
+    res.json({ paymentMethods: rows, fromConfig: false });
+    return;
+  }
+  // No custom methods saved yet — surface the configured gateways as read-only rows.
+  const paymentMethods = Object.values(METHODS).map((m, i) => ({
+    id: -(i + 1),
+    key: m.id,
+    label: m.label,
+    provider: m.kind === "card" ? "paynow / flutterwave" : m.id === "ecocash" || m.id === "onemoney" ? "paynow" : "flutterwave",
+    countries: [] as string[],
+    enabled: true,
+    sortOrder: i,
+  }));
+  res.json({ paymentMethods, fromConfig: true });
 });
 
 router.post("/payment-methods", async (req, res) => {
