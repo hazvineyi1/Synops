@@ -8,12 +8,13 @@ import {
 } from "@workspace/paideia-api-client";
 import { Send, BrainCircuit, Lightbulb } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
+import { Markdown } from "@/components/Markdown";
 import type { StudyTutorMessage } from "@workspace/paideia-api-client";
 
 export default function StudyTutorChat() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const [, setLoc] = useLocation();
-  const { data: detail, isLoading } = useGetStudyTutorConversation(conversationId);
+  const { data: detail, isLoading, refetch } = useGetStudyTutorConversation(conversationId);
   const sendMutation = useSendStudyTutorMessage();
 
   const [input, setInput] = useState("");
@@ -36,6 +37,9 @@ export default function StudyTutorChat() {
         data: { content: input.trim() },
       });
       setInput("");
+      // The mutation persists the message + reply server-side but does not update the
+      // conversation query cache, so re-fetch to render the new turn (and auto-scroll).
+      await refetch();
     } catch {
       alert("Failed to send message.");
     } finally {
@@ -87,11 +91,11 @@ export default function StudyTutorChat() {
                   <div
                     className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm ${
                       isUser
-                        ? "bg-primary text-primary-foreground rounded-br-none"
+                        ? "bg-primary text-primary-foreground rounded-br-none whitespace-pre-wrap"
                         : "bg-muted rounded-bl-none"
                     }`}
                   >
-                    {msg.content}
+                    {isUser ? msg.content : <Markdown content={msg.content} />}
                   </div>
                 </div>
               );
@@ -107,7 +111,13 @@ export default function StudyTutorChat() {
             placeholder="Ask about a concept, exam strategy, or anything else..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+            onKeyDown={(e) => {
+              // Enter (or Cmd/Ctrl+Enter) sends; Shift+Enter is reserved for newlines.
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
             disabled={sending}
             className="flex-1"
           />

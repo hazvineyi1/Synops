@@ -35,6 +35,26 @@ export interface GenerateOpts {
   kind: string;
 }
 
+// Pull a JSON value out of a model response that may be wrapped in ```json fences
+// or padded with prose (common with Claude via the OpenAI-compat endpoint, which
+// does not honor response_format). Isolates the outermost {...} or [...].
+function extractJson(text: string): string {
+  let t = text.trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence && fence[1]) t = fence[1].trim();
+  const firstObj = t.indexOf("{");
+  const firstArr = t.indexOf("[");
+  let start = -1;
+  if (firstObj === -1) start = firstArr;
+  else if (firstArr === -1) start = firstObj;
+  else start = Math.min(firstObj, firstArr);
+  if (start >= 0) {
+    const end = Math.max(t.lastIndexOf("}"), t.lastIndexOf("]"));
+    if (end > start) t = t.slice(start, end + 1);
+  }
+  return t;
+}
+
 export async function generateJSON<T>(
   systemPrompt: string,
   userPrompt: string,
@@ -50,12 +70,17 @@ export async function generateJSON<T>(
   try {
     const response = await openai.chat.completions.create({
       model: PRIMARY_MODEL,
-      max_completion_tokens: 8192,
+      // Anthropic's OpenAI-compatible endpoint expects `max_tokens` and does NOT
+      // support `response_format: json_object`; we instruct JSON in the prompt and
+      // parse robustly (see extractJson) instead.
+      max_tokens: 8192,
       messages: [
-        { role: "system", content: systemPrompt },
+        {
+          role: "system",
+          content: `${systemPrompt}\n\nRespond with ONLY the JSON described above — no markdown, no code fences, and no commentary before or after it.`,
+        },
         { role: "user", content: userPrompt },
       ],
-      response_format: { type: "json_object" },
     });
     promptTokens = response.usage?.prompt_tokens ?? 0;
     completionTokens = response.usage?.completion_tokens ?? 0;
@@ -65,7 +90,7 @@ export async function generateJSON<T>(
       throw new Error("Empty response from model");
     }
     try {
-      parsed = JSON.parse(text) as T;
+      parsed = JSON.parse(extractJson(text)) as T;
     } catch {
       throw new Error("Model returned invalid JSON");
     }

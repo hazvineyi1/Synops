@@ -11,7 +11,8 @@ import {
   useCreateStudyFlashcard,
   useCreateStudyPractice,
 } from "@workspace/paideia-api-client";
-import { useStudyKnowledgeGraph } from "@/hooks/use-study-api";
+import { useStudyKnowledgeGraph, useStudyReanalyzeMaterial } from "@/hooks/use-study-api";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft, BookOpen, Network, Brain, Flashlight, Target,
   FileText, ExternalLink, Tag, ChevronRight, Plus, Check,
@@ -32,6 +33,23 @@ export default function StudyMaterialView() {
 
   const [createdFlashcards, setCreatedFlashcards] = useState<Set<string>>(new Set());
   const [startingPractice, setStartingPractice] = useState(false);
+
+  const queryClient = useQueryClient();
+  const reanalyze = useStudyReanalyzeMaterial();
+  const [reanalyzeMsg, setReanalyzeMsg] = useState<string | null>(null);
+  const runReanalyze = async () => {
+    if (!materialId) return;
+    setReanalyzeMsg(null);
+    try {
+      const r = await reanalyze.mutateAsync(materialId);
+      await queryClient.invalidateQueries();
+      setReanalyzeMsg(
+        r.conceptCount > 0 ? `Extracted ${r.conceptCount} concepts.` : (r.warning ?? "No concepts found in this material."),
+      );
+    } catch (e) {
+      setReanalyzeMsg((e as { message?: string })?.message ?? "Extraction failed. Please try again.");
+    }
+  };
 
   const startPracticeNow = async () => {
     if (!materialId || startingPractice) return;
@@ -280,7 +298,13 @@ export default function StudyMaterialView() {
                 <Card className="border-dashed">
                   <CardContent className="py-6 text-center">
                     <Brain className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">AI is still analyzing this material...</p>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      No concepts yet. Extraction may not have run, or this material has little teachable content.
+                    </p>
+                    <Button size="sm" onClick={runReanalyze} disabled={reanalyze.isPending}>
+                      {reanalyze.isPending ? "Analyzing…" : "Re-analyze material"}
+                    </Button>
+                    {reanalyzeMsg ? <p className="text-xs text-muted-foreground mt-2">{reanalyzeMsg}</p> : null}
                   </CardContent>
                 </Card>
               ) : (

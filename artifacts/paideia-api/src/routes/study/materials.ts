@@ -258,4 +258,73 @@ router.get("/:materialId/concepts", async (req, res) => {
   res.json(concepts);
 });
 
+// Re-run concept + flashcard extraction for an existing material, synchronously, so
+// the caller gets a real result (count) or a real error instead of the silent
+// fire-and-forget on create. Used by the "Re-analyze" button to recover a material
+// whose first extraction failed, or to manually kick off extraction.
+router.post("/:materialId/reanalyze", async (req, res) => {
+  const userId = req.studyUser!.id;
+  const { materialId } = req.params;
+
+  const [material] = await db
+    .select()
+    .from(studyMaterialsTable)
+    .where(and(eq(studyMaterialsTable.id, materialId), eq(studyMaterialsTable.userId, userId)))
+    .limit(1);
+  if (!material) {
+    res.status(404).json({ error: "Material not found" });
+    return;
+  }
+
+  // Clean slate so a retry doesn't duplicate concepts.
+  await db.delete(studyFlashcardsTable).where(and(eq(studyFlashcardsTable.materialId, materialId), eq(studyFlashcardsTable.userId, userId)));
+  await db.delete(studyConceptsTable).where(and(eq(studyConceptsTable.materialId, materialId), eq(studyConceptsTable.userId, userId)));
+
+  try {
+    const raw = await generateJSON<
+      { concepts?: Array<{ title: string; explanation: string; difficulty: string; keyTerms: string[] }> }
+      | Array<{ title: string; explanation: string; difficulty: string; keyTerms: string[] }>
+    >(
+      "You are an expert educator. Extract key concepts from the study material. Return JSON with a top-level array named 'concepts'. Each concept has: title, explanation (2-3 sentences), difficulty (easy/medium/hard), and keyTerms (array of important terms).",
+      `Extract concepts from this material:\n\nTitle: ${material.title}\n\n${material.contentText.slice(0, 8000)}`,
+      { kind: "study_concept_extraction" },
+    );
+    const conceptsData: Array<{ title: string; explanation: string; difficulty: string; keyTerms: string[] }> =
+      Array.isArray(raw) ? raw : raw?.concepts ?? [];
+
+    if (conceptsData.length === 0) {
+      res.json({ conceptCount: 0, warning: "The AI couldn't find teachable concepts in this material. Try a more study-oriented document." });
+      return;
+    }
+
+    const conceptRows = conceptsData.map((c) => ({
+      userId,
+      materialId,
+      title: String(c.title ?? "Untitled concept"),
+      explanation: String(c.explanation ?? ""),
+      difficulty: ["easy", "medium", "hard"].includes(c.difficulty) ? c.difficulty : "medium",
+      keyTerms: Array.isArray(c.keyTerms) ? c.keyTerms.map((t) => String(t)) : [],
+    }));
+    await db.insert(studyConceptsTable).values(conceptRows);
+
+    const flashcardRows = conceptRows.map((c) => ({
+      userId,
+      materialId,
+      front: c.title,
+      back: c.explanation,
+      hint: c.keyTerms.length > 0 ? `Think about: ${c.keyTerms.slice(0, 3).join(", ")}` : null,
+      intervalDays: 1,
+      repetitions: 0,
+      easeFactor: 2.5,
+      nextReviewAt: new Date(),
+      reviewCount: 0,
+    }));
+    await db.insert(studyFlashcardsTable).values(flashcardRows);
+
+    res.json({ conceptCount: conceptRows.length });
+  } catch {
+    res.status(502).json({ error: "AI extraction failed. Please try again in a moment." });
+  }
+});
+
 export default router;
