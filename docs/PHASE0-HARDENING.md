@@ -73,11 +73,28 @@ compromised.
 > (branch protection + "require status checks"), so CI actually gates production
 > rather than just running alongside it.
 
+## Sentry error tracking (shipped — needs a DSN to turn on)
+
+Sentry is wired into both the API and the Coach frontend. It is a **no-op until a
+DSN is set**, so nothing changes until you turn it on. Boot-safe: init is wrapped
+in try/catch and error capture swallows its own failures, so it can never take the
+server down.
+
+To turn it on:
+
+1. Create a free project at https://sentry.io → you get a DSN (looks like
+   `https://xxxx@oyyy.ingest.sentry.io/zzz`). Create two projects (or one) — a
+   Node project for the API and a React project for the frontend.
+2. In Railway → service **wonderful-adaptation** → Variables, add:
+   - `SENTRY_DSN` = the Node project DSN (backend errors).
+   - `VITE_SENTRY_DSN` = the React project DSN (frontend errors). This one is read
+     at **build time**, so it must be set before/at deploy.
+   - (optional) `SENTRY_ENVIRONMENT` = `production`.
+3. Redeploy. Backend errors and unhandled frontend errors now flow to Sentry,
+   tagged with the Railway commit SHA as the release.
+
 ## Next in Phase 0 (not yet shipped)
 
-- **Sentry error tracking** (FE + BE), gated on `SENTRY_DSN`, boot-safe. Deferred
-  until CI is proven green on this batch, because it touches the server boot path
-  and shouldn't be shipped without a compile gate in place.
 - **Playwright smoke tests** on the 5 core journeys (signup, upload/extract,
   practice, exam, tutor), wired into CI against a deploy/preview URL.
 

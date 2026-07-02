@@ -9,6 +9,7 @@ import { logger } from "./lib/logger.js";
 import { loadTeacher } from "./middlewares/auth.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { syncTeacherFromCustomer } from "./lib/stripeSync.js";
+import { captureError } from "./instrument.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const reactBuildPath = path.resolve(__dirname, "../../paideia-ren/dist/public");
@@ -293,6 +294,16 @@ app.get(/^(?!\/api).*/, (req, res) => {
   } else {
     res.sendFile(path.join(reactBuildPath, "index.html"));
   }
+});
+
+// Central error handler (must be last). Reports the error to Sentry, logs it,
+// and returns a generic 500 so internals aren't leaked to clients. Express 5
+// forwards rejected async handlers here automatically.
+app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  captureError(err);
+  logger.error({ err }, "unhandled request error");
+  if (res.headersSent) { next(err); return; }
+  res.status(500).json({ error: "Internal server error" });
 });
 
 export default app;

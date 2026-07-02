@@ -1,3 +1,6 @@
+// Must be first: initialises Sentry (no-op without SENTRY_DSN) before anything
+// else loads, so early startup errors are captured too.
+import "./instrument";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { getStripeSync } from "./lib/stripeClient";
