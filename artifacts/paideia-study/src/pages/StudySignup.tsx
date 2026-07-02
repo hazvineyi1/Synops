@@ -180,6 +180,12 @@ export default function StudySignup() {
             <Button type="submit" className="w-full" disabled={blockSubmit}>
               {submitting ? "Creating account..." : "Get Started"}
             </Button>
+            <p className="text-center text-[11px] text-muted-foreground">
+              By creating an account, you agree to our{" "}
+              <button type="button" className="underline hover:text-foreground" onClick={() => setLoc("/terms")}>Terms</button>
+              {" "}and{" "}
+              <button type="button" className="underline hover:text-foreground" onClick={() => setLoc("/privacy")}>Privacy Policy</button>.
+            </p>
           </form>
           <p className="text-center text-sm text-muted-foreground mt-4">
             Already have an account?{" "}

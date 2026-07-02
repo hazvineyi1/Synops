@@ -80,9 +80,21 @@ require a guardian email + consent affirmation**, **18+ proceeds**. Stored on
 > (v1 records the guardian email + consent affirmation; double-opt-in guardian
 > email verification is a later enhancement.)
 
+## Legal pages (shipped 2026-07-02)
+
+The existing marketing Privacy/Terms describe "Synops Teacher" (wrong product for
+Coach). New Coach-specific pages were created: `StudyPrivacy.tsx` +
+`StudyTerms.tsx` (routes `/study/privacy`, `/study/terms`), covering learner
+accounts, minors/guardian consent, uploaded material, AI processing (with the
+identifier-stripping), payment providers, and the export/delete data rights.
+Linked from the signup page (consent line) and the profile "Privacy & Data" card.
+
+> BEFORE PUBLIC LAUNCH, you must:
+> - Have legal counsel review both documents (esp. minors / COPPA / GDPR).
+> - Set a real, monitored contact inbox (currently `support@synops-consulting.com`
+>   placeholder in both files) and a governing-law jurisdiction in the Terms.
+
 ## Remaining Phase 1 items (not yet built)
 
-- **Legal**: review Privacy/Terms content, link them inside the Coach app, and
-  add a version/last-updated stamp.
 - **Payments lifecycle hardening**: verify webhooks, renewal, cancel, refunds,
   receipts, and failed-payment dunning against each live gateway once keys exist.

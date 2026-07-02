@@ -465,6 +465,13 @@ export default function StudyProfile() {
                 </div>
               )}
             </div>
+
+            <p className="text-xs text-muted-foreground border-t pt-4">
+              Read our{" "}
+              <button className="underline hover:text-foreground" onClick={() => setLoc("/privacy")}>Privacy Policy</button>
+              {" "}and{" "}
+              <button className="underline hover:text-foreground" onClick={() => setLoc("/terms")}>Terms of Service</button>.
+            </p>
           </CardContent>
         </Card>
       </main>

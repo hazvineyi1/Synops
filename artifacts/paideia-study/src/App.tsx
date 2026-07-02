@@ -12,6 +12,8 @@ import StudyLanding from "@/pages/StudyLanding";
 import StudyLandingUS from "@/pages/StudyLandingUS";
 import StudyLogin from "@/pages/StudyLogin";
 import StudySignup from "@/pages/StudySignup";
+import StudyPrivacy from "@/pages/StudyPrivacy";
+import StudyTerms from "@/pages/StudyTerms";
 import { captureEntrySource, isUsAudience } from "@/lib/entry";
 import { studyHeartbeat, studyStopImpersonating } from "@/hooks/use-study-api";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
@@ -139,6 +141,8 @@ function Router() {
       <Route path="/" component={RootLanding} />
       <Route path="/login" component={StudyLogin} />
       <Route path="/signup" component={StudySignup} />
+      <Route path="/privacy" component={StudyPrivacy} />
+      <Route path="/terms" component={StudyTerms} />
       <Route path="/coach" component={() => <Protected component={StudyCoach} />} />
       <Route path="/dashboard" component={() => <Protected component={StudyDashboard} />} />
       <Route path="/materials" component={() => <Protected component={StudyMaterials} />} />
