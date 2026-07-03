@@ -120,7 +120,18 @@ export default function StudyTerms() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-2">10. Contact</h2>
+            <h2 className="text-lg font-semibold mb-2">10. Governing law</h2>
+            <p>
+              These Terms are governed by the laws of the Commonwealth of Virginia,
+              United States, without regard to its conflict-of-law rules. Any dispute
+              arising from these Terms or your use of Coach will be brought exclusively
+              in the state or federal courts located in Virginia, and you consent to
+              their jurisdiction.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold mb-2">11. Contact</h2>
             <p>
               Questions about these terms? Email{" "}
               <a className="text-primary underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.

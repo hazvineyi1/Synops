@@ -9,6 +9,7 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireStudyUser } from "../../middlewares/auth.js";
 import { generateJSON } from "../../lib/openai.js";
+import { isPaidTier } from "../../lib/billing/limits.js";
 
 const router: IRouter = Router();
 router.use(requireStudyUser);
@@ -157,6 +158,16 @@ router.delete("/:materialId", async (req, res) => {
 router.post("/:materialId/concepts/:conceptId/visual", async (req, res) => {
   const userId = req.studyUser!.id;
   const { materialId, conceptId } = req.params;
+
+  // Concept visuals are a paid (Plus+) feature.
+  if (!isPaidTier(req.studyUser!.subscriptionTier)) {
+    res.status(402).json({
+      error: "Concept visuals are a Plus feature. Upgrade to generate diagrams for your concepts.",
+      code: "upgrade_required",
+      feature: "visuals",
+    });
+    return;
+  }
 
   const [concept] = await db
     .select()

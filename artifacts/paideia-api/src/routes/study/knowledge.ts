@@ -10,6 +10,7 @@ import {
 import { eq, and, sql } from "drizzle-orm";
 import { requireStudyUser } from "../../middlewares/auth.js";
 import { generateJSON } from "../../lib/openai.js";
+import { isProTier } from "../../lib/billing/limits.js";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -38,6 +39,17 @@ router.get("/edges", async (req, res) => {
 // POST /study/knowledge/generate - fire-and-forget extraction from material
 router.post("/generate", async (req, res) => {
   const userId = req.studyUser!.id;
+
+  // The knowledge map is a Pro feature.
+  if (!isProTier(req.studyUser!.subscriptionTier)) {
+    res.status(402).json({
+      error: "The knowledge map is a Pro feature. Upgrade to Pro to build your map.",
+      code: "upgrade_required",
+      feature: "knowledge_map",
+    });
+    return;
+  }
+
   const schema = z.object({ materialId: z.string() });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {

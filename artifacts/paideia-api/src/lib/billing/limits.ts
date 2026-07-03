@@ -19,6 +19,11 @@ export function isPaidTier(tier: string | null | undefined): boolean {
   return tier === "plus" || tier === "pro";
 }
 
+// Pro-only features (knowledge map, web-search-backed answers).
+export function isProTier(tier: string | null | undefined): boolean {
+  return tier === "pro";
+}
+
 function startOfTodayUtc(): Date {
   const d = new Date();
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));

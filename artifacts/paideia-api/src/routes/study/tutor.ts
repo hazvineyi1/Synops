@@ -13,7 +13,7 @@ import { requireStudyUser } from "../../middlewares/auth.js";
 import { openai, PRIMARY_MODEL, generateJSON } from "../../lib/openai.js";
 import { researchTopic } from "../../lib/extract.js";
 import { redactContactInfo } from "../../lib/redact.js";
-import { isPaidTier, countTutorMessagesToday, FREE_LIMITS } from "../../lib/billing/limits.js";
+import { isPaidTier, isProTier, countTutorMessagesToday, FREE_LIMITS } from "../../lib/billing/limits.js";
 
 const TUTOR_TURN_PREFIX = "<<TUTOR_TURN>>";
 function encodeTurn(turn: unknown): string {
@@ -620,6 +620,16 @@ router.post("/guided/:conversationId/reply", async (req, res) => {
       });
       return;
     }
+  }
+
+  // Web-search-backed deep dives ("research deeper") are a Pro feature.
+  if (reply.kind === "research_deeper" && !isProTier(req.studyUser!.subscriptionTier)) {
+    res.status(402).json({
+      error: "Web-search-backed deep dives are a Pro feature. Upgrade to Pro to research beyond your materials.",
+      code: "upgrade_required",
+      feature: "web_search",
+    });
+    return;
   }
 
   const convs = await db

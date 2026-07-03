@@ -10,6 +10,7 @@ import {
   type KnowledgeNode,
 } from "@/hooks/use-study-api";
 import { useListStudyMaterials } from "@workspace/paideia-api-client";
+import { upgradeError } from "@/lib/upgrade";
 import StudyNav from "@/components/StudyNav";
 import {
   Network, Brain, ZoomIn, ZoomOut, Maximize2,
@@ -120,8 +121,13 @@ export default function StudyKnowledgeMap() {
     try {
       await generateMutation.mutateAsync({ materialId });
       await refetch();
-    } catch {
-      alert("Couldn't generate the knowledge map. Please try again.");
+    } catch (err) {
+      const up = upgradeError(err);
+      if (up) {
+        if (window.confirm(`${up.message}\n\nOpen the plans page?`)) setLoc("/upgrade");
+      } else {
+        alert("Couldn't generate the knowledge map. Please try again.");
+      }
     } finally {
       setGeneratingFor(null);
     }
