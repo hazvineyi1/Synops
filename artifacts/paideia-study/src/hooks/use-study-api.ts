@@ -686,6 +686,17 @@ export function useStudyAdminOverview() {
   });
 }
 
+export interface AdminFunnel {
+  signups: number; activated: number; engaged: number; retained: number;
+  eligible_return: number; returned_after_day1: number;
+}
+export function useStudyAdminFunnel() {
+  return useQuery<AdminFunnel, ErrorType<unknown>>({
+    queryKey: ["studyAdminFunnel"],
+    queryFn: async () => customFetch<AdminFunnel>(`${BASE}/admin/funnel`),
+  });
+}
+
 export interface AdminUsagePoint { day: string; new_users: number; events: number; active_users: number; sessions: number; }
 export function useStudyAdminUsage() {
   return useQuery<AdminUsagePoint[], ErrorType<unknown>>({

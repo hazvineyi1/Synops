@@ -107,6 +107,32 @@ router.get("/overview", async (_req, res) => {
   res.json((result.rows ?? [])[0] ?? {});
 });
 
+// GET /admin/funnel — activation funnel + a simple return-rate, over non-suspended
+// learners. Built entirely on data we already collect (signups, materials,
+// practice/exams, last-active). Percentages are computed client-side.
+router.get("/funnel", async (_req, res) => {
+  const result = await db.execute(sql`
+    WITH u AS (SELECT id, created_at, last_active_at FROM study_users WHERE suspended = false)
+    SELECT
+      (SELECT count(*) FROM u)::int AS signups,
+      (SELECT count(DISTINCT m.user_id) FROM study_materials m JOIN u ON u.id = m.user_id)::int AS activated,
+      (SELECT count(DISTINCT e.user_id) FROM (
+          SELECT user_id FROM study_practice_sessions
+          UNION SELECT user_id FROM study_mock_exams
+        ) e JOIN u ON u.id = e.user_id)::int AS engaged,
+      (SELECT count(*) FROM u
+         WHERE last_active_at IS NOT NULL
+           AND last_active_at >= now() - interval '7 days'
+           AND created_at < now() - interval '7 days')::int AS retained,
+      (SELECT count(*) FROM u WHERE created_at < now() - interval '1 day')::int AS eligible_return,
+      (SELECT count(*) FROM u
+         WHERE created_at < now() - interval '1 day'
+           AND last_active_at IS NOT NULL
+           AND last_active_at >= created_at + interval '1 day')::int AS returned_after_day1
+  `);
+  res.json((result.rows ?? [])[0] ?? {});
+});
+
 // GET /admin/usage — 30-day daily time series.
 router.get("/usage", async (_req, res) => {
   const result = await db.execute(sql`

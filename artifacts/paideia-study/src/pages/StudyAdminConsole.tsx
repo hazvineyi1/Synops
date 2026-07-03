@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStudyAuth } from "@/hooks/use-study-auth";
 import {
   useStudyAdminOverview,
+  useStudyAdminFunnel,
   useStudyAdminUsage,
   useStudyAdminBreakdown,
   useStudyAdminLogins,
@@ -862,8 +863,59 @@ function AmbassadorsSection() {
 
 // ─── shell ───────────────────────────────────────────────────────────────────
 
+// Activation funnel + return-rate, on data we already collect. Shows where
+// learners fall out between signing up and forming a returning habit.
+function ActivationSection() {
+  const { data, isLoading } = useStudyAdminFunnel();
+  if (isLoading || !data) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  const max = data.signups || 1;
+  const stages = [
+    { label: "Signed up", value: data.signups },
+    { label: "Uploaded material", value: data.activated },
+    { label: "Practiced or took an exam", value: data.engaged },
+    { label: "Retained (active in last 7 days)", value: data.retained },
+  ];
+  const returnRate = data.eligible_return
+    ? Math.round((data.returned_after_day1 / data.eligible_return) * 100)
+    : 0;
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {stages.map((s, i) => (
+          <Kpi key={s.label} label={s.label} value={s.value}
+            sub={i === 0 ? "learners" : `${Math.round((s.value / max) * 100)}% of signups`} />
+        ))}
+      </div>
+      <div className="rounded-lg border bg-card p-4">
+        <div className="text-xs uppercase tracking-wide text-muted-foreground mb-3">Activation funnel</div>
+        <div className="space-y-3">
+          {stages.map((s) => {
+            const pct = Math.round((s.value / max) * 100);
+            return (
+              <div key={s.label}>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>{s.label}</span>
+                  <span className="text-muted-foreground tabular-nums">{s.value} · {pct}%</span>
+                </div>
+                <div className="h-2.5 rounded bg-muted overflow-hidden">
+                  <div className="h-full rounded bg-primary" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Kpi label="Return rate" value={`${returnRate}%`} sub="active again after their first day" />
+        <Kpi label="Old enough to return" value={data.eligible_return} sub="accounts older than 1 day" />
+      </div>
+    </div>
+  );
+}
+
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, title: "Dashboard", subtitle: "Platform health, activity, and usage at a glance." },
+  { id: "activation", label: "Activation", icon: Activity, title: "Activation & retention", subtitle: "Where learners drop off, from signup to a returning habit." },
   { id: "students", label: "Students", icon: Users, title: "Students", subtitle: "Accounts, sign-ins, device & location, and per-learner actions." },
   { id: "billing", label: "Billing", icon: CreditCard, title: "Billing", subtitle: "Subscription mix, plans, and payment methods." },
   { id: "ambassadors", label: "Ambassadors", icon: Gift, title: "Ambassadors", subtitle: "Referral tracker, who signed up via each link, commission balances, and payouts." },
@@ -938,6 +990,7 @@ export default function StudyAdminConsole() {
           </div>
           <SectionHeader title={meta.title} subtitle={meta.subtitle} />
           {section === "dashboard" && <DashboardSection />}
+          {section === "activation" && <ActivationSection />}
           {section === "students" && <StudentsSection />}
           {section === "billing" && <BillingSection />}
           {section === "ambassadors" && <AmbassadorsSection />}
