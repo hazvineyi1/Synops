@@ -467,7 +467,8 @@ export default function StudyProfile() {
             </div>
 
             <p className="text-xs text-muted-foreground border-t pt-4">
-              Read our{" "}
+              Need a hand? <button className="underline hover:text-foreground" onClick={() => setLoc("/help")}>Help &amp; FAQ</button>.
+              {" "}Read our{" "}
               <button className="underline hover:text-foreground" onClick={() => setLoc("/privacy")}>Privacy Policy</button>
               {" "}and{" "}
               <button className="underline hover:text-foreground" onClick={() => setLoc("/terms")}>Terms of Service</button>.

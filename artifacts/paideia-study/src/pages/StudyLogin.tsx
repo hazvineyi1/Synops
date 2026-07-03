@@ -78,6 +78,9 @@ export default function StudyLogin() {
               Create one
             </button>
           </p>
+          <p className="text-center text-xs text-muted-foreground mt-3">
+            <button className="underline hover:text-foreground" onClick={() => setLoc("/help")}>Help &amp; FAQ</button>
+          </p>
         </CardContent>
       </Card>
     </div>
