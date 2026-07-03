@@ -21,6 +21,7 @@ import telemetryRouter from "./telemetry.js";
 import notificationsRouter from "./notifications.js";
 import ambassadorRouter from "./ambassador.js";
 import accountRouter from "./account.js";
+import feedbackRouter from "./feedback.js";
 import { writeRateLimit } from "../../middlewares/rateLimit.js";
 
 const router: IRouter = Router();
@@ -56,5 +57,6 @@ router.use("/telemetry", telemetryRouter);
 router.use("/notifications", notificationsRouter);
 router.use("/ambassador", ambassadorRouter);
 router.use("/account", accountRouter);
+router.use("/feedback", feedbackRouter);
 
 export default router;

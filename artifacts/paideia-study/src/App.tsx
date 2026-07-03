@@ -18,6 +18,7 @@ import StudyHelp from "@/pages/StudyHelp";
 import { captureEntrySource, isUsAudience } from "@/lib/entry";
 import { studyHeartbeat, studyStopImpersonating } from "@/hooks/use-study-api";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 
 // Authenticated pages are the heavy part of the bundle (charts, admin console,
 // editors). Lazy-load them so a first visit downloads only the small public
@@ -187,6 +188,7 @@ function App() {
             <ImpersonationBanner />
             <AdminFab />
             <OfflineIndicator />
+            <FeedbackWidget />
             <Router />
           </WouterRouter>
         </StudyAuthProvider>

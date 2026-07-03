@@ -4,6 +4,7 @@ import { useStudyAuth } from "@/hooks/use-study-auth";
 import {
   useStudyAdminOverview,
   useStudyAdminFunnel,
+  useStudyAdminFeedback,
   useStudyAdminUsage,
   useStudyAdminBreakdown,
   useStudyAdminLogins,
@@ -48,7 +49,7 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Activity,
+  Activity, MessageSquare,
   LayoutDashboard, Users, CreditCard, Megaphone, ShieldCheck, KeyRound,
   ArrowLeft, LogOut, Loader2, Search, Download, Plus, Trash2, Eye, Copy, Menu, Gift,
 } from "lucide-react";
@@ -914,6 +915,32 @@ function ActivationSection() {
   );
 }
 
+// Learner feedback submitted via the in-app widget.
+function FeedbackSection() {
+  const { data, isLoading } = useStudyAdminFeedback();
+  if (isLoading) return <div className="text-sm text-muted-foreground">Loading…</div>;
+  const rows = data ?? [];
+  if (rows.length === 0)
+    return <div className="text-sm text-muted-foreground">No feedback yet. The floating button in the learner app lets people send it.</div>;
+  return (
+    <div className="space-y-3">
+      {rows.map((r) => (
+        <div key={r.id} className="rounded-lg border bg-card p-4">
+          <p className="text-sm whitespace-pre-wrap">{r.metadata?.message}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+            <span>{r.name || r.metadata?.name || "Someone"}</span>
+            <span>·</span>
+            <span>{r.email || r.metadata?.email || "no email"}</span>
+            {r.metadata?.page ? (<><span>·</span><span className="font-mono">{r.metadata.page}</span></>) : null}
+            <span>·</span>
+            <span>{new Date(r.created_at).toLocaleString()}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const SECTIONS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, title: "Dashboard", subtitle: "Platform health, activity, and usage at a glance." },
   { id: "activation", label: "Activation", icon: Activity, title: "Activation & retention", subtitle: "Where learners drop off, from signup to a returning habit." },
@@ -921,6 +948,7 @@ const SECTIONS = [
   { id: "billing", label: "Billing", icon: CreditCard, title: "Billing", subtitle: "Subscription mix, plans, and payment methods." },
   { id: "ambassadors", label: "Ambassadors", icon: Gift, title: "Ambassadors", subtitle: "Referral tracker, who signed up via each link, commission balances, and payouts." },
   { id: "announcements", label: "Announcements", icon: Megaphone, title: "Announcements", subtitle: "Broadcast messages to learners." },
+  { id: "feedback", label: "Feedback", icon: MessageSquare, title: "Feedback", subtitle: "What learners are telling you, in their own words." },
   { id: "access", label: "Access & audit", icon: ShieldCheck, title: "Access & audit", subtitle: "The audit trail of admin actions." },
   { id: "developers", label: "Developer API", icon: KeyRound, title: "Developer API", subtitle: "API keys for integrations." },
 ] as const;
@@ -996,6 +1024,7 @@ export default function StudyAdminConsole() {
           {section === "billing" && <BillingSection />}
           {section === "ambassadors" && <AmbassadorsSection />}
           {section === "announcements" && <AnnouncementsSection />}
+          {section === "feedback" && <FeedbackSection />}
           {section === "access" && <AccessAuditSection />}
           {section === "developers" && <DeveloperApiSection />}
         </div>

@@ -697,6 +697,30 @@ export function useStudyAdminFunnel() {
   });
 }
 
+export interface AdminFeedbackRow {
+  id: number;
+  created_at: string;
+  metadata: { message?: string; page?: string; email?: string; name?: string } | null;
+  email: string | null;
+  name: string | null;
+}
+export function useStudyAdminFeedback() {
+  return useQuery<AdminFeedbackRow[], ErrorType<unknown>>({
+    queryKey: ["studyAdminFeedback"],
+    queryFn: async () => customFetch<AdminFeedbackRow[]>(`${BASE}/admin/feedback`),
+  });
+}
+
+// Submit in-app feedback. Plain function (not a hook) so it can be called from a
+// widget handler.
+export async function studySubmitFeedback(message: string, page: string): Promise<{ ok: true }> {
+  return customFetch<{ ok: true }>(`${BASE}/feedback`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, page }),
+  });
+}
+
 export interface AdminUsagePoint { day: string; new_users: number; events: number; active_users: number; sessions: number; }
 export function useStudyAdminUsage() {
   return useQuery<AdminUsagePoint[], ErrorType<unknown>>({

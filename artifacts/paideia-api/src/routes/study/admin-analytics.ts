@@ -133,6 +133,19 @@ router.get("/funnel", async (_req, res) => {
   res.json((result.rows ?? [])[0] ?? {});
 });
 
+// GET /admin/feedback — in-app feedback submissions (stored in the activity log).
+router.get("/feedback", async (_req, res) => {
+  const result = await db.execute(sql`
+    SELECT a.id, a.created_at, a.metadata, u.email, u.name
+    FROM study_activity_log a
+    LEFT JOIN study_users u ON u.id = a.user_id
+    WHERE a.activity_type = 'feedback'
+    ORDER BY a.created_at DESC
+    LIMIT 200
+  `);
+  res.json(result.rows ?? []);
+});
+
 // GET /admin/usage — 30-day daily time series.
 router.get("/usage", async (_req, res) => {
   const result = await db.execute(sql`
