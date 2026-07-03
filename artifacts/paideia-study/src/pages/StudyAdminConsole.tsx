@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
+  Activity,
   LayoutDashboard, Users, CreditCard, Megaphone, ShieldCheck, KeyRound,
   ArrowLeft, LogOut, Loader2, Search, Download, Plus, Trash2, Eye, Copy, Menu, Gift,
 } from "lucide-react";
