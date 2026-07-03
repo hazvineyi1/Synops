@@ -5,7 +5,7 @@ import { BookOpen, ArrowLeft, Mail } from "lucide-react";
 // Coach help / FAQ. Plain answers to the questions learners actually ask, plus a
 // support-contact section. Static page, no backend. Keep the support email in
 // sync with the legal pages.
-const CONTACT_EMAIL = "support@synops-consulting.com";
+const CONTACT_EMAIL = "info@synops-consulting.com";
 
 const FAQS: Array<{ q: string; a: ReactNode }> = [
   {

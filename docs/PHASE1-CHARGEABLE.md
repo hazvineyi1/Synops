@@ -91,7 +91,7 @@ Linked from the signup page (consent line) and the profile "Privacy & Data" card
 
 > BEFORE PUBLIC LAUNCH, you must:
 > - Have legal counsel review both documents (esp. minors / COPPA / GDPR).
-> - Set a real, monitored contact inbox (currently `support@synops-consulting.com`
+> - Set a real, monitored contact inbox (currently `info@synops-consulting.com`
 >   placeholder in both files) and a governing-law jurisdiction in the Terms.
 
 ## Payment lifecycle hardening (shipped 2026-07-02)

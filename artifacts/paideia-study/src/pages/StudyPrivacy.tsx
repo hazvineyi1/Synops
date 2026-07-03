@@ -6,7 +6,7 @@ import { BookOpen, ArrowLeft } from "lucide-react";
 // mobile-money/card payments, and the export/delete data rights). Plain language,
 // versioned. NOTE: have legal counsel review before a public launch.
 const LAST_UPDATED = "2 July 2026";
-const CONTACT_EMAIL = "support@synops-consulting.com";
+const CONTACT_EMAIL = "info@synops-consulting.com";
 
 export default function StudyPrivacy() {
   return (

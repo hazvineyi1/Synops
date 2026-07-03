@@ -6,7 +6,7 @@ import { BookOpen, ArrowLeft } from "lucide-react";
 // money/card, AI-generated study aids). NOTE: have legal counsel review, and set
 // the governing-law jurisdiction, before a public launch.
 const LAST_UPDATED = "2 July 2026";
-const CONTACT_EMAIL = "support@synops-consulting.com";
+const CONTACT_EMAIL = "info@synops-consulting.com";
 
 export default function StudyTerms() {
   return (
