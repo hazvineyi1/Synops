@@ -88,11 +88,34 @@ export default function StudyExamTake() {
   }
 
   if (!question) {
+    // A 0-question exam (usually because the source material had no concepts) would
+    // otherwise trap the learner on an endless "Processing..." spinner. Distinguish
+    // that broken state from a genuine finishing state, and always give a way out.
+    const noQuestions = !exam.questions || exam.questions.length === 0;
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground mb-4">Processing your results...</p>
-          <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto" />
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="text-center max-w-sm">
+          {noQuestions ? (
+            <>
+              <p className="font-medium mb-1">This exam has no questions</p>
+              <p className="text-sm text-muted-foreground mb-5">
+                Something went wrong generating it, usually because the source material
+                had no analyzed concepts to build from. Create a new exam from a
+                material that has concepts.
+              </p>
+              <Button onClick={() => setLoc("/exams")}>
+                <ArrowLeft className="h-4 w-4 mr-2" /> Back to Exams
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-muted-foreground mb-4">Processing your results...</p>
+              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full mx-auto mb-5" />
+              <Button variant="outline" size="sm" onClick={() => setLoc("/exams")}>
+                Back to Exams
+              </Button>
+            </>
+          )}
         </div>
       </div>
     );

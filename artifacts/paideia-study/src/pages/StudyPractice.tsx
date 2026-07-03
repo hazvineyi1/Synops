@@ -181,11 +181,21 @@ export default function StudyPractice() {
               </p>
             </div>
 
+            {(() => {
+              const sel = materials?.find((m) => m.id === materialId);
+              if (!sel || (sel.conceptCount ?? 0) > 0) return null;
+              return (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2">
+                  This material has no analyzed concepts yet, so questions can&apos;t be
+                  generated. Open it from Materials and use &quot;Re-analyze material&quot; first.
+                </p>
+              );
+            })()}
             <Button
               className="w-full gap-2"
               size="lg"
               onClick={handleCreate}
-              disabled={!materialId || creating}
+              disabled={!materialId || creating || ((materials?.find((m) => m.id === materialId)?.conceptCount ?? 1) === 0)}
             >
               {creating ? (
                 <>
