@@ -12,6 +12,7 @@ import {
 import type { StudyMockExam } from "@workspace/paideia-api-client";
 import { Award, Play, Plus, FileText, Calendar } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
+import { upgradeError } from "@/lib/upgrade";
 
 export default function StudyExams() {
   const [, setLoc] = useLocation();
@@ -34,8 +35,13 @@ export default function StudyExams() {
         data: { title, materialId, questionCount, timeLimitMinutes, format },
       });
       setLoc(`/exams/${res.id}/take`);
-    } catch {
-      alert("Failed to create mock exam.");
+    } catch (err) {
+      const up = upgradeError(err);
+      if (up) {
+        if (window.confirm(`${up.message}\n\nOpen the plans page?`)) setLoc("/upgrade");
+      } else {
+        alert("Failed to create mock exam.");
+      }
       setCreating(false);
     }
   };

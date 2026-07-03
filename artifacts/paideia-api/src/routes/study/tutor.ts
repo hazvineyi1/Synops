@@ -13,6 +13,7 @@ import { requireStudyUser } from "../../middlewares/auth.js";
 import { openai, PRIMARY_MODEL, generateJSON } from "../../lib/openai.js";
 import { researchTopic } from "../../lib/extract.js";
 import { redactContactInfo } from "../../lib/redact.js";
+import { isPaidTier, countTutorMessagesToday, FREE_LIMITS } from "../../lib/billing/limits.js";
 
 const TUTOR_TURN_PREFIX = "<<TUTOR_TURN>>";
 function encodeTurn(turn: unknown): string {
@@ -252,6 +253,19 @@ router.post("/conversations/:conversationId/messages", async (req, res) => {
   const { content } = parsed.data;
   const userId = req.studyUser!.id;
   const conversationId = req.params.conversationId;
+
+  // Free tier: capped tutor messages per day, then upgrade.
+  if (!isPaidTier(req.studyUser!.subscriptionTier)) {
+    const usedToday = await countTutorMessagesToday(userId);
+    if (usedToday >= FREE_LIMITS.tutorMessagesPerDay) {
+      res.status(402).json({
+        error: `You've reached today's free tutor limit (${FREE_LIMITS.tutorMessagesPerDay} messages). Upgrade to Plus for unlimited tutoring.`,
+        code: "upgrade_required",
+        feature: "tutor",
+      });
+      return;
+    }
+  }
 
   const convs = await db
     .select()
@@ -593,6 +607,20 @@ router.post("/guided/:conversationId/reply", async (req, res) => {
     return;
   }
   const reply = parsed.data;
+
+  // Free tier: capped tutor messages per day (the "done" action is always allowed
+  // so a learner is never stuck mid-session).
+  if (reply.kind !== "done" && !isPaidTier(req.studyUser!.subscriptionTier)) {
+    const usedToday = await countTutorMessagesToday(userId);
+    if (usedToday >= FREE_LIMITS.tutorMessagesPerDay) {
+      res.status(402).json({
+        error: `You've reached today's free tutor limit (${FREE_LIMITS.tutorMessagesPerDay} messages). Upgrade to Plus for unlimited tutoring.`,
+        code: "upgrade_required",
+        feature: "tutor",
+      });
+      return;
+    }
+  }
 
   const convs = await db
     .select()

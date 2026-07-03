@@ -12,6 +12,7 @@ import {
   useListStudyMaterials,
   useCreateStudyPractice,
 } from "@workspace/paideia-api-client";
+import { upgradeError } from "@/lib/upgrade";
 import {
   ArrowLeft, Play, BrainCircuit, Target, Zap, BarChart3,
   BookOpen, ChevronRight, TrendingUp, Check, Loader2
@@ -61,8 +62,14 @@ export default function StudyPractice() {
       });
       setLoc(`/practice/${res.id}`);
     } catch (err: unknown) {
+      const up = upgradeError(err);
+      if (up) {
+        if (window.confirm(`${up.message}\n\nOpen the plans page?`)) setLoc("/upgrade");
+        setCreating(false);
+        return;
+      }
       const msg =
-        (err as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+        (err as { data?: { error?: string } })?.data?.error ||
         (err as { message?: string })?.message ||
         "Failed to start practice session. Please try again.";
       setError(msg);

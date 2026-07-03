@@ -10,6 +10,7 @@ import {
 import { eq, and } from "drizzle-orm";
 import { requireStudyUser } from "../../middlewares/auth.js";
 import { generateJSON } from "../../lib/openai.js";
+import { isPaidTier, countPracticeQuestionsToday, FREE_LIMITS } from "../../lib/billing/limits.js";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -47,6 +48,19 @@ router.post("/", async (req, res) => {
   }
   const data = parsed.data;
   const userId = req.studyUser!.id;
+
+  // Free tier: capped practice questions per day, then upgrade.
+  if (!isPaidTier(req.studyUser!.subscriptionTier)) {
+    const usedToday = await countPracticeQuestionsToday(userId);
+    if (usedToday >= FREE_LIMITS.practiceQuestionsPerDay) {
+      res.status(402).json({
+        error: `You've reached today's free practice limit (${FREE_LIMITS.practiceQuestionsPerDay} questions). Upgrade to Plus for unlimited practice.`,
+        code: "upgrade_required",
+        feature: "practice",
+      });
+      return;
+    }
+  }
 
   // Load concepts for question generation, STRICTLY scoped to selected material
   let concepts: { id: string; title: string; explanation: string; difficulty: string; materialId: string | null }[] = [];

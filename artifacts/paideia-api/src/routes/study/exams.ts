@@ -8,6 +8,7 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import { requireStudyUser } from "../../middlewares/auth.js";
 import { generateJSON } from "../../lib/openai.js";
+import { isPaidTier, countMockExams, FREE_LIMITS } from "../../lib/billing/limits.js";
 import { randomUUID } from "crypto";
 
 const router: IRouter = Router();
@@ -76,6 +77,19 @@ router.post("/", async (req, res) => {
   }
   const data = parsed.data;
   const userId = req.studyUser!.id;
+
+  // Free tier: one mock exam total, then upgrade (mock exams are a paid feature).
+  if (!isPaidTier(req.studyUser!.subscriptionTier)) {
+    const used = await countMockExams(userId);
+    if (used >= FREE_LIMITS.mockExamsTotal) {
+      res.status(402).json({
+        error: "You've used your free mock exam. Upgrade to Plus for unlimited exams.",
+        code: "upgrade_required",
+        feature: "exams",
+      });
+      return;
+    }
+  }
 
   let concepts: { id: string; title: string; explanation: string }[] = [];
   if (data.conceptIds && data.conceptIds.length > 0) {
