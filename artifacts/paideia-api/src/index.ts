@@ -49,6 +49,28 @@ const gradingSweeper = setInterval(() => {
 }, 60_000);
 gradingSweeper.unref();
 
+// Embed the Compass Curriculum Builder API (its frontend is served at /builder/).
+// GUARDED: only mounts when SESSION_SECRET is configured, and any import/setup
+// failure is caught so it can never crash this host (Coach + marketing + the
+// synops-consulting deployment). Mounted at "/api" so paths match the Compass
+// generated client (e.g. /api/compass/clients); the SPA fallback already excludes
+// /api, and paideia's own /api routers are registered first, so a Coach request
+// (/api/study/*) is answered before ever reaching the Compass mount. Its routes
+// stay non-functional until the Compass DB tables + user_sessions exist (Phase 3).
+void (async () => {
+  if (!process.env["SESSION_SECRET"]) {
+    logger.info("SESSION_SECRET not set; Compass builder API not mounted (dormant)");
+    return;
+  }
+  try {
+    const { createCompassMount } = await import("@workspace/compass-api/mount");
+    app.use("/api", createCompassMount());
+    logger.info("Compass Curriculum Builder API mounted at /api");
+  } catch (err) {
+    logger.error({ err }, "Failed to mount Compass builder API; skipping (host unaffected)");
+  }
+})();
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {

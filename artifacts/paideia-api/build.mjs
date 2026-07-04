@@ -28,6 +28,9 @@ async function buildAll() {
     // - uses native modules and loads them dynamically (e.g. sharp)
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
+      // pdfkit reads font .afm files from a sibling data dir at runtime; keep it
+      // external (needed by the embedded Compass API).
+      "pdfkit",
       "*.node",
       "sharp",
       "better-sqlite3",
