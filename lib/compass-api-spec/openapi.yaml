@@ -1,0 +1,5612 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: UVA Production Engine API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: clients
+    description: Client management
+  - name: projects
+    description: Project pipeline management
+  - name: courses
+    description: Course and module structure
+  - name: objectives
+    description: Objectives cascade
+  - name: assessments
+    description: Assessments and activities
+  - name: ledger
+    description: Evidence Ledger
+  - name: qa
+    description: QA and accessibility
+  - name: standards
+    description: Standards frameworks and accreditation crosswalk
+  - name: dashboard
+    description: Dashboard summaries
+  - name: recordings
+    description: Project meeting recordings (uploads and external links)
+  - name: time-tracking
+    description: Per-project billing time entries (hours and minutes only)
+  - name: agenda
+    description: Per-project meeting agenda, notes, action items, and derived progress
+  - name: storage
+    description: Object storage upload and serving
+  - name: roster
+    description: Class roster membership
+  - name: billing
+    description: Subscription plans, checkout, and billing portal
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── Dashboard ───────────────────────────────────────────────
+  /compass/dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /compass/dashboard/activity:
+    get:
+      operationId: getDashboardActivity
+      tags: [dashboard]
+      summary: Get recent activity feed
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityFeedItem"
+
+  # ── Clients ──────────────────────────────────────────────────
+  /compass/clients:
+    get:
+      operationId: listClients
+      tags: [clients]
+      summary: List all clients
+      responses:
+        "200":
+          description: List of clients
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Client"
+    post:
+      operationId: createClient
+      tags: [clients]
+      summary: Create a new client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  /compass/clients/{id}:
+    get:
+      operationId: getClient
+      tags: [clients]
+      summary: Get a client by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Client
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateClient
+      tags: [clients]
+      summary: Update a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClientUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Client"
+
+  # ── Projects ─────────────────────────────────────────────────
+  /compass/projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /compass/projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /compass/projects/{id}/advance-stage:
+    post:
+      operationId: advanceProjectStage
+      tags: [projects]
+      summary: Advance the project to the next pipeline stage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StageAdvanceInput"
+      responses:
+        "200":
+          description: Stage advanced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "400":
+          description: Gate requirements not met
+
+  /compass/projects/{id}/gate-status:
+    get:
+      operationId: getProjectGateStatus
+      tags: [projects]
+      summary: Get gate requirements and status for the current stage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Gate status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GateStatus"
+
+  # ── Courses ───────────────────────────────────────────────────
+  /compass/projects/{projectId}/courses:
+    get:
+      operationId: listCourses
+      tags: [courses]
+      summary: List courses for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Courses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+    post:
+      operationId: createCourse
+      tags: [courses]
+      summary: Create a course for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+
+  /compass/courses/{id}:
+    get:
+      operationId: getCourse
+      tags: [courses]
+      summary: Get a course by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+    patch:
+      operationId: updateCourse
+      tags: [courses]
+      summary: Update a course
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+
+  # ── Modules ───────────────────────────────────────────────────
+  /compass/courses/{courseId}/modules:
+    get:
+      operationId: listModules
+      tags: [courses]
+      summary: List modules for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Modules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Module"
+    post:
+      operationId: createModule
+      tags: [courses]
+      summary: Create a module for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Module"
+
+  /compass/modules/{id}:
+    patch:
+      operationId: updateModule
+      tags: [courses]
+      summary: Update a module
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Module"
+    delete:
+      operationId: deleteModule
+      tags: [courses]
+      summary: Delete a module
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Objectives Cascade ────────────────────────────────────────
+  /compass/projects/{projectId}/objectives:
+    get:
+      operationId: listObjectives
+      tags: [objectives]
+      summary: List objectives for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Objectives
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Objective"
+    post:
+      operationId: createObjective
+      tags: [objectives]
+      summary: Create an objective
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ObjectiveInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Objective"
+
+  /compass/objectives/{id}:
+    patch:
+      operationId: updateObjective
+      tags: [objectives]
+      summary: Update an objective
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ObjectiveUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Objective"
+    delete:
+      operationId: deleteObjective
+      tags: [objectives]
+      summary: Delete an objective
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Assessments ───────────────────────────────────────────────
+  /compass/courses/{courseId}/assessments:
+    get:
+      operationId: listAssessments
+      tags: [assessments]
+      summary: List assessments for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Assessments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assessment"
+    post:
+      operationId: createAssessment
+      tags: [assessments]
+      summary: Create an assessment
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assessment"
+
+  /compass/assessments/{id}:
+    patch:
+      operationId: updateAssessment
+      tags: [assessments]
+      summary: Update an assessment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assessment"
+    delete:
+      operationId: deleteAssessment
+      tags: [assessments]
+      summary: Delete an assessment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Activities ────────────────────────────────────────────────
+  /compass/courses/{courseId}/activities:
+    get:
+      operationId: listActivities
+      tags: [assessments]
+      summary: List activities for a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Activities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Activity"
+    post:
+      operationId: createActivity
+      tags: [assessments]
+      summary: Create an activity
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
+
+  /compass/activities/{id}:
+    patch:
+      operationId: updateActivity
+      tags: [assessments]
+      summary: Update an activity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Activity"
+    delete:
+      operationId: deleteActivity
+      tags: [assessments]
+      summary: Delete an activity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Evidence Ledger ───────────────────────────────────────────
+  /compass/projects/{projectId}/ledger:
+    get:
+      operationId: listLedgerEntries
+      tags: [ledger]
+      summary: List evidence ledger entries for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ledger entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LedgerEntry"
+    post:
+      operationId: createLedgerEntry
+      tags: [ledger]
+      summary: Create an evidence ledger entry
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LedgerEntryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerEntry"
+
+  /compass/projects/{projectId}/ledger/report:
+    get:
+      operationId: getLedgerReport
+      tags: [ledger]
+      summary: Generate proof artifacts from the evidence ledger
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LedgerReport"
+
+  # ── QA & Accessibility ────────────────────────────────────────
+  /compass/projects/{projectId}/qa:
+    get:
+      operationId: listQAChecks
+      tags: [qa]
+      summary: List QA checks for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: QA checks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/QACheck"
+    post:
+      operationId: createQACheck
+      tags: [qa]
+      summary: Create or record a QA check
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QACheckInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QACheck"
+
+  /compass/qa-checks/{id}:
+    patch:
+      operationId: updateQACheck
+      tags: [qa]
+      summary: Update a QA check result
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QACheckUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QACheck"
+
+  /compass/projects/{id}/qa/evaluate:
+    post:
+      operationId: evaluateProjectQA
+      tags: [qa]
+      summary: Run the curriculum engine on a project and persist a scored QA report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: A freshly computed and persisted QA report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QaReportRecord"
+        "404":
+          description: Project not found or outside the actor's organization scope
+
+  /compass/projects/{id}/qa/report:
+    get:
+      operationId: getLatestQAReport
+      tags: [qa]
+      summary: Get the latest persisted QA report for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: The latest persisted QA report, or null if none has been computed
+          content:
+            application/json:
+              schema:
+                anyOf:
+                  - $ref: "#/components/schemas/QaReportRecord"
+                  - type: "null"
+        "404":
+          description: Project not found or outside the actor's organization scope
+
+  # ── Standards Frameworks ──────────────────────────────────────
+  /compass/standards-frameworks:
+    get:
+      operationId: listStandardsFrameworks
+      tags: [standards]
+      summary: List all standards frameworks
+      responses:
+        "200":
+          description: Frameworks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StandardsFramework"
+    post:
+      operationId: createStandardsFramework
+      tags: [standards]
+      summary: Create a standards framework
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StandardsFrameworkInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardsFramework"
+
+  /compass/standards-frameworks/{id}/competencies:
+    get:
+      operationId: listCompetencies
+      tags: [standards]
+      summary: List competencies for a framework
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Competencies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StandardCompetency"
+    post:
+      operationId: createCompetency
+      tags: [standards]
+      summary: Add a competency to a framework
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StandardCompetencyInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandardCompetency"
+
+  /compass/projects/{projectId}/crosswalk:
+    get:
+      operationId: listCrosswalkLinks
+      tags: [standards]
+      summary: List standards crosswalk links for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Crosswalk links
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CrosswalkLink"
+    post:
+      operationId: createCrosswalkLink
+      tags: [standards]
+      summary: Create a crosswalk link
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CrosswalkLinkInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrosswalkLink"
+
+  /compass/crosswalk-links/{id}:
+    delete:
+      operationId: deleteCrosswalkLink
+      tags: [standards]
+      summary: Remove a crosswalk link
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /compass/projects/{projectId}/crosswalk/gaps:
+    get:
+      operationId: getCrosswalkGaps
+      tags: [standards]
+      summary: Get unmapped competency gaps for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Gap report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CrosswalkGapReport"
+
+  # ── Intake progress ───────────────────────────────────────────
+  /compass/projects/{projectId}/intake-progress:
+    get:
+      operationId: getIntakeProgress
+      tags: [intake]
+      summary: Get saved kickoff/intake progress for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Intake progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeProgress"
+    put:
+      operationId: updateIntakeProgress
+      tags: [intake]
+      summary: Save kickoff/intake progress for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntakeProgressInput"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntakeProgress"
+
+  /compass/projects/{projectId}/intake-generated-agenda:
+    post:
+      operationId: generateIntakeAgenda
+      tags: [intake]
+      summary: Generate a rules-based kickoff agenda from the project, course, and objectives
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Generated agenda
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeneratedAgenda"
+
+  # ── Meeting recordings ───────────────────────────────────────
+  /compass/projects/{projectId}/recordings:
+    get:
+      operationId: listMeetingRecordings
+      tags: [recordings]
+      summary: List meeting recordings for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Recordings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MeetingRecording"
+    post:
+      operationId: createMeetingRecording
+      tags: [recordings]
+      summary: Attach a meeting recording (uploaded object or external link) to a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingRecordingInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeetingRecording"
+
+  /compass/meeting-recordings/{id}:
+    delete:
+      operationId: deleteMeetingRecording
+      tags: [recordings]
+      summary: Delete a meeting recording
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /compass/meeting-recordings/{id}/transcribe:
+    post:
+      operationId: transcribeMeetingRecording
+      tags: [recordings]
+      summary: Transcribe an uploaded recording and draft meeting notes from it
+      description: >
+        Transcribes the audio of an uploaded recording (speech-to-text) and
+        drafts clean meeting notes from the transcript using AI. Only uploaded
+        recordings are supported. Requires the AI integration to be configured.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Transcript (and draft notes when available) saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeetingRecording"
+        "409":
+          description: Recording is not an uploaded audio file
+        "413":
+          description: Recording exceeds the size or duration limit for transcription
+        "422":
+          description: Audio could not be decoded for transcription
+        "503":
+          description: AI transcription is not configured
+
+  # ── Time tracking (per-project billing time entries) ─────────
+  /compass/projects/{projectId}/time-entries:
+    get:
+      operationId: listTimeEntries
+      tags: [time-tracking]
+      summary: List time entries for a project (newest first)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Time entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TimeEntry"
+    post:
+      operationId: createTimeEntry
+      tags: [time-tracking]
+      summary: Start a timer or log a manual time entry for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeEntryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeEntry"
+
+  /compass/time-entries/{id}/stop:
+    post:
+      operationId: stopTimeEntry
+      tags: [time-tracking]
+      summary: Stop a running timer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeEntry"
+
+  /compass/time-entries/{id}:
+    patch:
+      operationId: updateTimeEntry
+      tags: [time-tracking]
+      summary: Edit a time entry (note, duration, or date)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TimeEntryUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TimeEntry"
+    delete:
+      operationId: deleteTimeEntry
+      tags: [time-tracking]
+      summary: Delete a time entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Agenda (meetings, action items, derived progress) ────────
+  /compass/projects/{projectId}/meetings:
+    get:
+      operationId: listProjectMeetings
+      tags: [agenda]
+      summary: List meetings for a project (newest first)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Meetings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Meeting"
+    post:
+      operationId: createProjectMeeting
+      tags: [agenda]
+      summary: Log a meeting for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meeting"
+
+  /compass/meetings/{id}:
+    get:
+      operationId: getMeeting
+      tags: [agenda]
+      summary: Get a single meeting
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Meeting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meeting"
+    put:
+      operationId: updateMeeting
+      tags: [agenda]
+      summary: Update a meeting's title, schedule, or notes
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meeting"
+    delete:
+      operationId: deleteMeeting
+      tags: [agenda]
+      summary: Delete a meeting (its action items are retained)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /compass/meetings/{id}/process-notes:
+    post:
+      operationId: processMeetingNotes
+      tags: [agenda]
+      summary: Extract the three live-capture streams from a meeting's notes and propose the next agenda
+      description: >-
+        Extracts decisions, action items, and open questions from the meeting's
+        notes (built-in AI when configured, deterministic rules otherwise). New
+        entries are added idempotently: anything matching an existing project
+        entry by normalized text is skipped, so re-running does not duplicate.
+        Also builds the proposed agenda for the next meeting from its standing
+        template plus everything carried forward (open action items, open
+        questions, and unmet exit criteria from this meeting).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProcessNotesInput"
+      responses:
+        "200":
+          description: Processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProcessNotesResult"
+
+  /compass/meetings/{id}/agenda-checklist:
+    patch:
+      operationId: setAgendaChecklist
+      tags: [agenda]
+      summary: Check off a proposed-agenda item or one of its prompts
+      description: >-
+        Toggles the completion state of a single proposed-agenda item, or a
+        single prompt within an item, on the meeting's stored agenda. The update
+        is applied with a row lock so concurrent toggles never lose each other.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgendaChecklistToggle"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meeting"
+
+  /compass/projects/{projectId}/action-items:
+    get:
+      operationId: listProjectActionItems
+      tags: [agenda]
+      summary: List action items for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Action items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActionItem"
+    post:
+      operationId: createProjectActionItem
+      tags: [agenda]
+      summary: Add an action item to a project by hand
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionItemInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionItem"
+
+  /compass/action-items/{id}:
+    patch:
+      operationId: updateActionItem
+      tags: [agenda]
+      summary: Update an action item (status, owner, due date, category, week)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActionItemUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionItem"
+    delete:
+      operationId: deleteActionItem
+      tags: [agenda]
+      summary: Delete an action item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /compass/projects/{projectId}/agenda-summary:
+    get:
+      operationId: getAgendaSummary
+      tags: [agenda]
+      summary: Derived agenda progress for a project (build bars, accessibility, latest agenda)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Agenda summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgendaSummary"
+
+  /compass/meetings/{id}/checklist:
+    patch:
+      operationId: setMeetingChecklist
+      tags: [agenda]
+      summary: Toggle a pre-work, standing-agenda, or exit-criteria item on a meeting's plan
+      description: >-
+        Toggles one item on the meeting's own structured plan: a pre-work
+        checklist item, a standing-agenda item (or a single prompt within it via
+        promptIndex), or an exit criterion. Applied under a row lock so concurrent
+        toggles never lose each other. Exit criteria are advisory only; marking
+        them does not gate any server action and completion is allowed with unmet
+        criteria.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingChecklistToggle"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Meeting"
+
+  /compass/projects/{projectId}/decisions:
+    get:
+      operationId: listProjectDecisions
+      tags: [agenda]
+      summary: List decisions recorded for a project (newest first)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Decisions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MeetingDecision"
+    post:
+      operationId: createProjectDecision
+      tags: [agenda]
+      summary: Record a decision for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingDecisionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeetingDecision"
+
+  /compass/decisions/{id}:
+    patch:
+      operationId: updateDecision
+      tags: [agenda]
+      summary: Edit a recorded decision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingDecisionUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeetingDecision"
+    delete:
+      operationId: deleteDecision
+      tags: [agenda]
+      summary: Delete a recorded decision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /compass/projects/{projectId}/open-questions:
+    get:
+      operationId: listProjectOpenQuestions
+      tags: [agenda]
+      summary: List open questions for a project (unresolved first, newest first)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Open questions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MeetingOpenQuestion"
+    post:
+      operationId: createProjectOpenQuestion
+      tags: [agenda]
+      summary: Record an open question for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingOpenQuestionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeetingOpenQuestion"
+
+  /compass/open-questions/{id}:
+    patch:
+      operationId: updateOpenQuestion
+      tags: [agenda]
+      summary: Edit or resolve an open question
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MeetingOpenQuestionUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeetingOpenQuestion"
+    delete:
+      operationId: deleteOpenQuestion
+      tags: [agenda]
+      summary: Delete an open question
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Correspondence (email/message repository) ────────────────
+  /compass/projects/{projectId}/correspondence:
+    get:
+      operationId: listProjectCorrespondence
+      tags: [correspondence]
+      summary: List correspondence logged for a project (newest first)
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Correspondence
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Correspondence"
+    post:
+      operationId: createProjectCorrespondence
+      tags: [correspondence]
+      summary: Log a piece of correspondence for a project
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorrespondenceInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Correspondence"
+
+  /compass/correspondence/{id}:
+    patch:
+      operationId: updateCorrespondence
+      tags: [correspondence]
+      summary: Update a logged piece of correspondence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorrespondenceUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Correspondence"
+    delete:
+      operationId: deleteCorrespondence
+      tags: [correspondence]
+      summary: Delete a logged piece of correspondence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Builders (school admin management) ───────────────────────
+  /compass/builders:
+    get:
+      operationId: listBuilders
+      tags: [builders]
+      summary: List builders the actor manages
+      parameters:
+        - name: organizationId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of builders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Builder"
+    post:
+      operationId: createBuilder
+      tags: [builders]
+      summary: Provision a builder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBuilderInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Builder"
+
+  /compass/builders/{id}/status:
+    patch:
+      operationId: updateBuilderStatus
+      tags: [builders]
+      summary: Activate or deactivate a builder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBuilderStatusInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Builder"
+
+  /compass/builders/{id}/password:
+    post:
+      operationId: resetBuilderPassword
+      tags: [builders]
+      summary: Reset a builder's password
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetBuilderPasswordInput"
+      responses:
+        "200":
+          description: Reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /compass/builders/{id}/activity:
+    get:
+      operationId: getBuilderActivity
+      tags: [builders]
+      summary: Per-builder activity feed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Builder activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityFeedItem"
+
+  # ── Allocations ──────────────────────────────────────────────
+  /compass/allocations:
+    get:
+      operationId: listAllocations
+      tags: [allocations]
+      summary: List allocations the actor manages
+      parameters:
+        - name: organizationId
+          in: query
+          required: false
+          schema:
+            type: integer
+        - name: builderUserId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of allocations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Allocation"
+    post:
+      operationId: createAllocation
+      tags: [allocations]
+      summary: Allocate a builder to a scope
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAllocationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Allocation"
+
+  /compass/allocations/{id}/revoke:
+    patch:
+      operationId: revokeAllocation
+      tags: [allocations]
+      summary: Revoke an allocation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Allocation"
+
+  /compass/my/allocations:
+    get:
+      operationId: getMyAllocations
+      tags: [allocations]
+      summary: The caller's own active allocations
+      responses:
+        "200":
+          description: Active allocations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Allocation"
+
+  # ── Classes ──────────────────────────────────────────────────
+  /compass/courses/{courseId}/classes:
+    get:
+      operationId: listClasses
+      tags: [classes]
+      summary: List classes under a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of classes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Class"
+    post:
+      operationId: createClass
+      tags: [classes]
+      summary: Create a class under a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClassInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Class"
+
+  /compass/classes/{id}:
+    patch:
+      operationId: updateClass
+      tags: [classes]
+      summary: Update a class
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClassUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Class"
+
+  # ── Class roster ──────────────────────────────────────────────
+  /compass/classes/{classId}/roster:
+    get:
+      operationId: listClassRoster
+      tags: [roster]
+      summary: List members on a class roster
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Roster members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClassMember"
+        "404":
+          description: Not found
+    post:
+      operationId: addClassMember
+      tags: [roster]
+      summary: Add a member to a class roster
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddClassMemberInput"
+      responses:
+        "201":
+          description: Added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClassMember"
+        "404":
+          description: Not found
+        "409":
+          description: Already a member
+
+  /compass/classes/{classId}/roster/{memberId}:
+    delete:
+      operationId: removeClassMember
+      tags: [roster]
+      summary: Remove a member from a class roster
+      parameters:
+        - name: classId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+        "404":
+          description: Not found
+
+  # ── Org members picker ────────────────────────────────────────
+  /compass/org-members:
+    get:
+      operationId: listOrgMembers
+      tags: [roster]
+      summary: List active org staff (school_admin and builder) for pickers
+      parameters:
+        - name: organizationId
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Global admins may specify an org; school_admins always see their own.
+      responses:
+        "200":
+          description: Org members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrgMember"
+
+  # ── School report ────────────────────────────────────────────
+  /compass/school/report:
+    get:
+      operationId: getSchoolReport
+      tags: [school]
+      summary: Organization curriculum and builder rollup
+      parameters:
+        - name: organizationId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: School report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchoolReport"
+
+  /compass/school/report.md:
+    get:
+      operationId: getSchoolReportMarkdown
+      tags: [school]
+      summary: School report as downloadable markdown
+      parameters:
+        - name: organizationId
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: School report markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
+
+  # ── Super-admin console: cross-organization analytics ────────
+  /compass/admin/overview:
+    get:
+      operationId: getPlatformOverview
+      tags: [admin]
+      summary: Cross-organization platform overview (global roles only)
+      responses:
+        "200":
+          description: Platform overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformOverview"
+
+  /compass/admin/report.md:
+    get:
+      operationId: getPlatformReportMarkdown
+      tags: [admin]
+      summary: Platform overview as downloadable markdown (global roles only)
+      responses:
+        "200":
+          description: Platform report markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
+
+  /compass/stats/scope:
+    get:
+      operationId: getScopeStats
+      tags: [admin]
+      summary: Rollup statistics for a single curriculum scope
+      parameters:
+        - name: scopeType
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [project, course, class]
+        - name: scopeId
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scope statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScopeStats"
+
+  /compass/admin/users:
+    get:
+      operationId: getPlatformUsers
+      tags: [admin]
+      summary: User directory across all organizations (global roles only)
+      responses:
+        "200":
+          description: Platform user directory
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlatformUser"
+
+  /compass/admin/organizations:
+    get:
+      operationId: listOrganizations
+      tags: [admin]
+      summary: Organization directory (global roles only)
+      responses:
+        "200":
+          description: Organizations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrganizationSummary"
+
+  # ── White-label branding management ──────────────────────────
+  /compass/admin/organizations/{id}/branding:
+    patch:
+      operationId: updateOrganizationBranding
+      tags: [admin]
+      summary: Update an organization's white-label branding
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBrandingInput"
+      responses:
+        "200":
+          description: Updated branding
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationBranding"
+
+  # ── Impersonation (top-level, not gated to one product) ──────
+  /impersonation/start:
+    post:
+      operationId: startImpersonation
+      tags: [impersonation]
+      summary: Begin impersonating a user (super admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartImpersonationInput"
+      responses:
+        "200":
+          description: Impersonation started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /impersonation/stop:
+    post:
+      operationId: stopImpersonation
+      tags: [impersonation]
+      summary: Stop impersonating and restore your own session
+      responses:
+        "200":
+          description: Impersonation stopped
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  # ── White-label branding (public, host-resolved) ─────────────
+  /branding:
+    get:
+      operationId: getBranding
+      tags: [branding]
+      summary: Resolve white-label branding for the requesting host
+      description: >-
+        Public. Resolves branding by the request host only; the host never
+        authorizes anything. Returns a neutral (unbranded) response when the
+        host does not match a configured organization domain.
+      responses:
+        "200":
+          description: Branding for the host (neutral when unmatched)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandingResponse"
+
+  # ── Auth ─────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Start a free trial (sends a verification email)
+      description: >-
+        Creates an unverified account and emails a verification link. No session
+        is established and the trial clock does not start until the email is
+        verified. Always returns the same shape whether or not the email already
+        existed, to avoid account enumeration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "202":
+          description: Verification email sent (if the address is eligible)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+
+  /auth/verify-email:
+    post:
+      operationId: verifyEmail
+      tags: [auth]
+      summary: Verify an email address and start the trial
+      description: >-
+        Consumes a single-use verification token, marks the account verified,
+        starts the 14 day trial, provisions the first client, and establishes a
+        session. Returns the authenticated user on success.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyEmailInput"
+      responses:
+        "200":
+          description: Verified and signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "400":
+          description: Invalid or expired token
+
+  /auth/resend-verification:
+    post:
+      operationId: resendVerification
+      tags: [auth]
+      summary: Resend a verification email
+      description: >-
+        Sends a fresh verification link if the address belongs to an unverified
+        account. Always returns the same shape to avoid account enumeration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendVerificationInput"
+      responses:
+        "202":
+          description: Verification email sent (if the address is eligible)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the currently authenticated user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
+
+  # ── Contact & newsletter ─────────────────────────────────────
+  /contact:
+    post:
+      operationId: submitContact
+      tags: [contact]
+      summary: Submit a contact inquiry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "201":
+          description: Received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResult"
+
+  /newsletter:
+    post:
+      operationId: subscribeNewsletter
+      tags: [contact]
+      summary: Subscribe to the newsletter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewsletterInput"
+      responses:
+        "201":
+          description: Subscribed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+
+  # ── Adaptive demo ────────────────────────────────────────────
+  /demo/levels:
+    get:
+      operationId: getDemoLevels
+      tags: [demo]
+      summary: List available reading levels
+      responses:
+        "200":
+          description: Levels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DemoLevelOption"
+
+  /demo/bank:
+    get:
+      operationId: getDemoBank
+      tags: [demo]
+      summary: Get the item bank for a level (no answer keys)
+      parameters:
+        - name: level
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [elementary, secondary, higher]
+      responses:
+        "200":
+          description: Item bank
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoBank"
+
+  /demo/answer:
+    post:
+      operationId: answerDemoItem
+      tags: [demo]
+      summary: Grade a single demo answer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoAnswerInput"
+      responses:
+        "200":
+          description: Result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoAnswerResult"
+
+  /demo/sessions:
+    post:
+      operationId: saveDemoSession
+      tags: [demo]
+      summary: Persist an anonymous completed demo run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoSessionInput"
+      responses:
+        "201":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResult"
+
+  /demo/curriculum-sessions:
+    post:
+      operationId: saveCurriculumDemoSession
+      tags: [demo]
+      summary: Persist an anonymous curriculum builder demo run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurriculumDemoSessionInput"
+      responses:
+        "201":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResult"
+
+  /demo/leads:
+    post:
+      operationId: submitDemoLead
+      tags: [demo]
+      summary: Capture an opt-in demo lead and notify the team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoLeadInput"
+      responses:
+        "201":
+          description: Received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmitResult"
+
+  # ── Object storage ───────────────────────────────────────────
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned URL to upload a file directly to object storage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL and the object path to persist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+
+  /storage/objects/{objectPath}:
+    get:
+      operationId: getStorageObject
+      tags: [storage]
+      summary: Serve an uploaded object entity (auth + ACL enforced server-side)
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The object bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found or not accessible
+
+  # ── Billing ───────────────────────────────────────────────────
+  /compass/billing/subscription:
+    get:
+      operationId: getBillingSubscription
+      tags: [billing]
+      summary: The acting organization's current plan, status, and usage
+      responses:
+        "200":
+          description: Subscription state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingSubscription"
+
+  /compass/billing/checkout:
+    post:
+      operationId: createBillingCheckout
+      tags: [billing]
+      summary: Start a Stripe Checkout session to subscribe the organization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingCheckoutInput"
+      responses:
+        "200":
+          description: Checkout session URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingRedirect"
+
+  /compass/billing/portal:
+    post:
+      operationId: createBillingPortal
+      tags: [billing]
+      summary: Open the Stripe billing portal for the organization
+      responses:
+        "200":
+          description: Billing portal URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingRedirect"
+
+  /compass/billing/reconcile:
+    post:
+      operationId: reconcileBilling
+      tags: [billing]
+      summary: Pull the latest subscription state from Stripe after checkout
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingReconcileInput"
+      responses:
+        "200":
+          description: Updated subscription state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillingSubscription"
+
+# ── Component Schemas ───────────────────────────────────────────────
+components:
+  schemas:
+    # ── Auth ──────────────────────────────────────────────────────
+    ProductKey:
+      type: string
+      description: The product/portal a user belongs to.
+      enum:
+        [compass]
+
+    AuthUser:
+      type: object
+      required: [id, email, name, role, productKey, status, createdAt]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: string
+        organization:
+          type: ["string", "null"]
+        role:
+          type: string
+        productKey:
+          $ref: "#/components/schemas/ProductKey"
+        status:
+          type: string
+          description: Account lifecycle status (active or deactivated).
+        organizationId:
+          type: ["integer", "null"]
+        organizationName:
+          type: ["string", "null"]
+        organizationType:
+          type: ["string", "null"]
+        organizationSlug:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        impersonator:
+          anyOf:
+            - $ref: "#/components/schemas/Impersonator"
+            - type: "null"
+          description: >-
+            When set, the real super admin currently impersonating this user.
+            Null during a normal session.
+        effectiveTier:
+          type: string
+          description: >-
+            The actor's current entitled plan tier (e.g. trial, starter,
+            enterprise). Presentational only; never authorizes anything.
+        planLabel:
+          type: string
+          description: Human-readable label for the effective plan tier.
+        trialEndsAt:
+          type: ["string", "null"]
+          format: date-time
+          description: When the free trial ends, or null when not on a trial.
+        trialDaysRemaining:
+          type: ["integer", "null"]
+          description: >-
+            Whole days left in the trial (0 once lapsed), or null when not on a
+            trial. Display only.
+        readOnly:
+          type: boolean
+          description: >-
+            True when the tenant may view but not create or edit (e.g. an expired
+            trial). Advisory only; the server enforces writes independently.
+
+    RegisterResponse:
+      type: object
+      required: [ok, email, verificationRequired]
+      properties:
+        ok:
+          type: boolean
+        email:
+          type: string
+          format: email
+          description: The address the verification link was sent to.
+        verificationRequired:
+          type: boolean
+          description: >-
+            True when the account was created unverified and a verification link
+            was sent (no session established). False only when email verification
+            is disabled by the server kill-switch, in which case the trial has
+            already started and a session was established.
+
+    RegisterInput:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+        organization:
+          type: string
+        productKey:
+          $ref: "#/components/schemas/ProductKey"
+
+    VerifyEmailInput:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    ResendVerificationInput:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    # ── Billing ───────────────────────────────────────────────────
+    PlanFeatures:
+      type: object
+      required: [whiteLabel, multiAccreditorExport, customDomain]
+      properties:
+        whiteLabel:
+          type: boolean
+        multiAccreditorExport:
+          type: boolean
+        customDomain:
+          type: boolean
+
+    BillingCheckoutInput:
+      type: object
+      required: [tier, interval]
+      properties:
+        tier:
+          type: string
+          enum: [starter, professional, enterprise]
+        interval:
+          type: string
+          enum: [month, year]
+
+    BillingReconcileInput:
+      type: object
+      properties:
+        sessionId:
+          type: string
+          description: A Stripe Checkout Session id to reconcile after redirect.
+
+    BillingRedirect:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: A Stripe-hosted URL to redirect the browser to.
+
+    BillingSubscription:
+      type: object
+      required:
+        [
+          tier,
+          planLabel,
+          planTier,
+          subscriptionStatus,
+          activeCourseLimit,
+          activeCourseCount,
+          features,
+          trialExpired,
+          hasStripeCustomer,
+        ]
+      properties:
+        tier:
+          type: string
+          description: The effective entitlement tier the org currently has.
+          enum: [trial, starter, professional, enterprise]
+        planLabel:
+          type: string
+        planTier:
+          type: string
+          description: The raw purchased tier stored on the org.
+        subscriptionStatus:
+          type: string
+        trialEndsAt:
+          type: ["string", "null"]
+          format: date-time
+        currentPeriodEnd:
+          type: ["string", "null"]
+          format: date-time
+        activeCourseLimit:
+          type: ["integer", "null"]
+        activeCourseCount:
+          type: integer
+        features:
+          $ref: "#/components/schemas/PlanFeatures"
+        trialExpired:
+          type: boolean
+        hasStripeCustomer:
+          type: boolean
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+
+    SubmitResult:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+        id:
+          type: integer
+
+    # ── Contact & newsletter ──────────────────────────────────────
+    ContactInput:
+      type: object
+      required: [name, email, areaOfInterest, message]
+      properties:
+        name:
+          type: string
+        organization:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        areaOfInterest:
+          type: string
+          enum:
+            - "Healthcare & Operations"
+            - "Learning, EdTech & AI"
+            - "Platforms & SaaS"
+            - "Other"
+        message:
+          type: string
+        website:
+          type: string
+          description: Honeypot field, leave empty.
+
+    NewsletterInput:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+        website:
+          type: string
+          description: Honeypot field, leave empty.
+
+    # ── Adaptive demo ─────────────────────────────────────────────
+    DemoLevelOption:
+      type: object
+      required: [value, label]
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+
+    DemoBankItem:
+      type: object
+      required: [id, difficulty, skill, passage, question, options]
+      properties:
+        id:
+          type: string
+        difficulty:
+          type: integer
+        skill:
+          type: string
+        passage:
+          type: string
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+
+    DemoBank:
+      type: object
+      required: [level, items]
+      properties:
+        level:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DemoBankItem"
+
+    DemoAnswerInput:
+      type: object
+      required: [itemId, optionIndex]
+      properties:
+        itemId:
+          type: string
+        optionIndex:
+          type: integer
+
+    DemoAnswerResult:
+      type: object
+      required: [correct, correctIndex]
+      properties:
+        correct:
+          type: boolean
+        correctIndex:
+          type: integer
+        hint:
+          type: ["string", "null"]
+
+    DemoPathStep:
+      type: object
+      required: [itemId, difficulty, correct]
+      properties:
+        itemId:
+          type: string
+        difficulty:
+          type: integer
+        correct:
+          type: boolean
+
+    DemoSessionInput:
+      type: object
+      required: [level, itemsAttempted, correctCount, masteryEstimate, path]
+      properties:
+        level:
+          type: string
+          enum: [elementary, secondary, higher]
+        itemsAttempted:
+          type: integer
+        correctCount:
+          type: integer
+        masteryEstimate:
+          type: integer
+        finalRung:
+          type: string
+        path:
+          type: array
+          items:
+            $ref: "#/components/schemas/DemoPathStep"
+
+    CurriculumDemoSessionInput:
+      type: object
+      required: [objectiveCount, assessmentCount, qaScore, stageReached]
+      properties:
+        courseTitle:
+          type: string
+        gradeBand:
+          type: string
+        objectiveCount:
+          type: integer
+        assessmentCount:
+          type: integer
+        qaScore:
+          type: integer
+        stageReached:
+          type: string
+          enum: [qa, handoff]
+
+    DemoLeadInput:
+      type: object
+      required: [name, email, demo]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        organization:
+          type: string
+        demo:
+          type: string
+          enum: [curriculum, reading]
+        summary:
+          type: string
+        website:
+          type: string
+          description: Honeypot field, leave empty.
+
+    IntakeProgressInput:
+      type: object
+      properties:
+        agendaChecks:
+          type: array
+          items:
+            type: array
+            items:
+              type: boolean
+        segStatuses:
+          type: array
+          items:
+            type: string
+        confirmedPre:
+          type: array
+          items:
+            type: integer
+        notes:
+          type: object
+          additionalProperties:
+            type: string
+        inventorySelections:
+          type: object
+          additionalProperties:
+            type: string
+        autoRules:
+          type: object
+          additionalProperties:
+            type: boolean
+        kickoffAnswers:
+          $ref: "#/components/schemas/KickoffState"
+
+    IntakeProgress:
+      type: object
+      required: [projectId, agendaChecks, segStatuses, confirmedPre, notes, inventorySelections, autoRules]
+      properties:
+        projectId:
+          type: integer
+        agendaChecks:
+          type: array
+          items:
+            type: array
+            items:
+              type: boolean
+        segStatuses:
+          type: array
+          items:
+            type: string
+        confirmedPre:
+          type: array
+          items:
+            type: integer
+        notes:
+          type: object
+          additionalProperties:
+            type: string
+        inventorySelections:
+          type: object
+          additionalProperties:
+            type: string
+        autoRules:
+          type: object
+          additionalProperties:
+            type: boolean
+        kickoffAnswers:
+          $ref: "#/components/schemas/KickoffState"
+        generatedAgenda:
+          oneOf:
+            - $ref: "#/components/schemas/GeneratedAgenda"
+            - type: "null"
+        updatedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    KickoffAnswer:
+      type: object
+      required: [nodeId, prompt, value, label]
+      properties:
+        nodeId:
+          type: string
+        prompt:
+          type: string
+        value:
+          type: string
+        label:
+          type: string
+
+    KickoffState:
+      type: object
+      description: "Interactive Socratic kickoff answers (rules-based). An empty object means not started."
+      properties:
+        version:
+          type: integer
+        designMethod:
+          type: ["string", "null"]
+        currentNodeId:
+          type: ["string", "null"]
+        completed:
+          type: boolean
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/KickoffAnswer"
+        summary:
+          type: array
+          items:
+            type: string
+
+    GeneratedAgendaItem:
+      type: object
+      required: [title, minutes, prompts]
+      properties:
+        title:
+          type: string
+        minutes:
+          type: integer
+        prompts:
+          type: array
+          items:
+            type: string
+
+    GeneratedAgenda:
+      type: object
+      required: [generatedAt, projectTitle, totalMinutes, items]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        projectTitle:
+          type: string
+        courseTitle:
+          type: ["string", "null"]
+        objectiveCount:
+          type: integer
+        totalMinutes:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedAgendaItem"
+
+    # ── Meeting recordings ────────────────────────────────────────
+    MeetingRecording:
+      type: object
+      required: [id, projectId, kind, title, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        meetingId:
+          type: ["integer", "null"]
+          description: The meeting this recording belongs to, when scoped to one.
+        kind:
+          type: string
+          enum: [upload, external]
+        title:
+          type: string
+        objectPath:
+          type: ["string", "null"]
+        externalUrl:
+          type: ["string", "null"]
+        durationSec:
+          type: ["integer", "null"]
+        contentType:
+          type: ["string", "null"]
+        sizeBytes:
+          type: ["integer", "null"]
+        transcript:
+          type: ["string", "null"]
+          description: Speech-to-text transcript, present after transcription.
+        draftNotes:
+          type: ["string", "null"]
+          description: AI-drafted meeting notes derived from the transcript.
+        transcribedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    MeetingRecordingInput:
+      type: object
+      required: [kind, title]
+      properties:
+        meetingId:
+          type: integer
+          description: Optional meeting to scope this recording to (must belong to the project).
+        kind:
+          type: string
+          enum: [upload, external]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        objectPath:
+          type: string
+          description: Required when kind is "upload"; the path returned by the upload endpoint.
+        externalUrl:
+          type: string
+          description: Required when kind is "external"; an http(s) link to the recording.
+        durationSec:
+          type: integer
+          minimum: 0
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          minimum: 0
+
+    # ── Time tracking (per-project billing time entries) ──────────
+    TimeEntry:
+      type: object
+      required: [id, projectId, userId, source, startedAt, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        source:
+          type: string
+          enum: [timer, manual]
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: ["string", "null"]
+          format: date-time
+        durationSeconds:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    TimeEntryInput:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [timer, manual]
+          description: timer starts a running stopwatch now; manual logs a completed entry and requires minutes.
+        description:
+          type: string
+          maxLength: 500
+        minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: Required when kind is manual; total minutes worked.
+        spentOn:
+          type: string
+          format: date
+          description: Optional when kind is manual; the date the work happened (defaults to today).
+
+    TimeEntryUpdate:
+      type: object
+      properties:
+        description:
+          type: ["string", "null"]
+          maxLength: 500
+        minutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+        spentOn:
+          type: string
+          format: date
+
+    # ── Agenda (meetings, action items, derived progress) ─────────
+    AgendaPlanItem:
+      type: object
+      required: [title, minutes, prompts]
+      properties:
+        title:
+          type: string
+        minutes:
+          type: integer
+        prompts:
+          type: array
+          items:
+            type: string
+        done:
+          type: boolean
+          description: Whether the whole item is checked off (used for items with no prompts).
+        promptsDone:
+          type: array
+          description: Per-prompt completion, aligned by index with prompts.
+          items:
+            type: boolean
+
+    AgendaChecklistToggle:
+      type: object
+      required: [itemIndex, done]
+      properties:
+        itemIndex:
+          type: integer
+          minimum: 0
+        promptIndex:
+          type: ["integer", "null"]
+          minimum: 0
+        done:
+          type: boolean
+
+    AgendaPlan:
+      type: object
+      required: [generatedAt, summary, items, openActionCount]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        proposedDate:
+          type: ["string", "null"]
+          format: date
+        proposedTime:
+          type: ["string", "null"]
+        summary:
+          type: array
+          items:
+            type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgendaPlanItem"
+        openActionCount:
+          type: integer
+        nextMeetingType:
+          type: string
+          enum: [kickoff, working, final]
+        openQuestionCount:
+          type: integer
+        unmetExitCriteriaCount:
+          type: integer
+
+    MeetingPlanChecklistItem:
+      type: object
+      required: [text, done]
+      properties:
+        text:
+          type: string
+        done:
+          type: boolean
+
+    MeetingPlanExitCriterion:
+      type: object
+      required: [text, met]
+      properties:
+        text:
+          type: string
+        met:
+          type: boolean
+
+    MeetingPlan:
+      type: object
+      required: [prework, agenda, exitCriteria]
+      properties:
+        prework:
+          type: array
+          items:
+            $ref: "#/components/schemas/MeetingPlanChecklistItem"
+        agenda:
+          type: array
+          items:
+            $ref: "#/components/schemas/AgendaPlanItem"
+        exitCriteria:
+          type: array
+          items:
+            $ref: "#/components/schemas/MeetingPlanExitCriterion"
+
+    MeetingChecklistToggle:
+      type: object
+      required: [section, itemIndex, value]
+      properties:
+        section:
+          type: string
+          enum: [prework, agenda, exitCriteria]
+        itemIndex:
+          type: integer
+          minimum: 0
+        promptIndex:
+          type: ["integer", "null"]
+          minimum: 0
+          description: Only valid when section is agenda; toggles a single prompt within the item.
+        value:
+          type: boolean
+
+    MeetingDecision:
+      type: object
+      required: [id, projectId, text, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        meetingId:
+          type: ["integer", "null"]
+        text:
+          type: string
+        decidedBy:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MeetingDecisionInput:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        decidedBy:
+          type: string
+          maxLength: 200
+        meetingId:
+          type: integer
+          description: Optional meeting this decision was captured in; must belong to the same project.
+
+    MeetingDecisionUpdate:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        decidedBy:
+          type: ["string", "null"]
+          maxLength: 200
+
+    MeetingOpenQuestion:
+      type: object
+      required: [id, projectId, text, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        meetingId:
+          type: ["integer", "null"]
+        text:
+          type: string
+        status:
+          type: string
+          enum: [open, resolved]
+        resolvedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MeetingOpenQuestionInput:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        meetingId:
+          type: integer
+          description: Optional meeting this question was captured in; must belong to the same project.
+
+    MeetingOpenQuestionUpdate:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        status:
+          type: string
+          enum: [open, resolved]
+
+    ProcessNotesInput:
+      type: object
+      properties:
+        nextMeetingType:
+          type: string
+          enum: [kickoff, working, final]
+          description: Type of the next meeting to propose an agenda for. Defaults to a sensible follow-up type.
+
+    Meeting:
+      type: object
+      required: [id, projectId, title, meetingType, status, notes, agendaPlan, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        title:
+          type: string
+        meetingType:
+          type: string
+          enum: [kickoff, working, final]
+        focus:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [scheduled, completed]
+        scheduledAt:
+          type: ["string", "null"]
+          format: date-time
+        notes:
+          type: string
+        agendaPlan:
+          $ref: "#/components/schemas/MeetingPlan"
+        nextMeetingAt:
+          type: ["string", "null"]
+          format: date-time
+        generatedAgenda:
+          oneOf:
+            - $ref: "#/components/schemas/AgendaPlan"
+            - type: "null"
+        aiProvider:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    MeetingInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        meetingType:
+          type: string
+          enum: [kickoff, working, final]
+          description: Defaults to working when omitted. Seeds the standing template.
+        focus:
+          type: string
+          maxLength: 200
+        scheduledAt:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          maxLength: 20000
+
+    MeetingUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        meetingType:
+          type: string
+          enum: [kickoff, working, final]
+        focus:
+          type: ["string", "null"]
+          maxLength: 200
+        status:
+          type: string
+          enum: [scheduled, completed]
+        scheduledAt:
+          type: ["string", "null"]
+          format: date-time
+        notes:
+          type: string
+          maxLength: 20000
+        nextMeetingAt:
+          type: ["string", "null"]
+          format: date-time
+
+    ActionItem:
+      type: object
+      required: [id, projectId, title, status, category, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        sourceMeetingId:
+          type: ["integer", "null"]
+        sourceCorrespondenceId:
+          type: ["integer", "null"]
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        ownerName:
+          type: ["string", "null"]
+        dueAt:
+          type: ["string", "null"]
+          format: date-time
+        status:
+          type: string
+          enum: [open, done]
+        category:
+          type: string
+          enum: [general, content, review, accessibility]
+        weekIndex:
+          type: ["integer", "null"]
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ActionItemInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: string
+          maxLength: 2000
+        ownerName:
+          type: string
+          maxLength: 200
+        dueAt:
+          type: string
+          format: date-time
+        category:
+          type: string
+          enum: [general, content, review, accessibility]
+        weekIndex:
+          type: integer
+          minimum: 0
+        sourceCorrespondenceId:
+          type: integer
+        sourceMeetingId:
+          type: integer
+
+    ActionItemUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        description:
+          type: ["string", "null"]
+          maxLength: 2000
+        ownerName:
+          type: ["string", "null"]
+          maxLength: 200
+        dueAt:
+          type: ["string", "null"]
+          format: date-time
+        status:
+          type: string
+          enum: [open, done]
+        category:
+          type: string
+          enum: [general, content, review, accessibility]
+        weekIndex:
+          type: ["integer", "null"]
+          minimum: 0
+
+    ProcessNotesResult:
+      type: object
+      required: [provider, meeting, createdActionItems, createdDecisions, createdOpenQuestions, agenda]
+      properties:
+        provider:
+          type: string
+          enum: [openai, rules]
+        meeting:
+          $ref: "#/components/schemas/Meeting"
+        createdActionItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActionItem"
+        createdDecisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MeetingDecision"
+        createdOpenQuestions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MeetingOpenQuestion"
+        agenda:
+          $ref: "#/components/schemas/AgendaPlan"
+
+    WeekProgress:
+      type: object
+      required: [weekIndex, label, total, done, percent]
+      properties:
+        weekIndex:
+          type: integer
+        label:
+          type: string
+        total:
+          type: integer
+        done:
+          type: integer
+        percent:
+          type: integer
+
+    CategoryProgress:
+      type: object
+      required: [total, done, percent]
+      properties:
+        total:
+          type: integer
+        done:
+          type: integer
+        percent:
+          type: integer
+
+    AgendaSummary:
+      type: object
+      required:
+        [
+          projectId,
+          totalActionItems,
+          doneActionItems,
+          openActionItems,
+          buildProgressPercent,
+          weeks,
+          accessibility,
+          latestAgenda,
+          nextMeetingAt,
+        ]
+      properties:
+        projectId:
+          type: integer
+        totalActionItems:
+          type: integer
+        doneActionItems:
+          type: integer
+        openActionItems:
+          type: integer
+        buildProgressPercent:
+          type: integer
+        weeks:
+          type: array
+          items:
+            $ref: "#/components/schemas/WeekProgress"
+        accessibility:
+          $ref: "#/components/schemas/CategoryProgress"
+        latestAgenda:
+          oneOf:
+            - $ref: "#/components/schemas/AgendaPlan"
+            - type: "null"
+        nextMeetingAt:
+          type: ["string", "null"]
+          format: date-time
+
+    # ── Correspondence ────────────────────────────────────────────
+    Correspondence:
+      type: object
+      required: [id, projectId, direction, subject, body, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        subject:
+          type: string
+        party:
+          type: ["string", "null"]
+        body:
+          type: string
+        occurredAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CorrespondenceInput:
+      type: object
+      required: [subject]
+      properties:
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 300
+        party:
+          type: string
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 20000
+        occurredAt:
+          type: string
+          format: date-time
+
+    CorrespondenceUpdate:
+      type: object
+      properties:
+        direction:
+          type: string
+          enum: [inbound, outbound]
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 300
+        party:
+          type: ["string", "null"]
+          maxLength: 200
+        body:
+          type: string
+          maxLength: 20000
+        occurredAt:
+          type: ["string", "null"]
+          format: date-time
+
+    # ── Object storage ────────────────────────────────────────────
+    UploadUrlRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+        contentType:
+          type: string
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string
+
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    # ── Dashboard ─────────────────────────────────────────────────
+    DashboardSummary:
+      type: object
+      required: [totalProjects, activeProjects, projectsByStage, totalClients, gateBlockedCount, overdueCount]
+      properties:
+        totalProjects:
+          type: integer
+        activeProjects:
+          type: integer
+        projectsByStage:
+          type: array
+          items:
+            $ref: "#/components/schemas/StageCount"
+        totalClients:
+          type: integer
+        gateBlockedCount:
+          type: integer
+        overdueCount:
+          type: integer
+
+    StageCount:
+      type: object
+      required: [stage, label, count]
+      properties:
+        stage:
+          type: integer
+        label:
+          type: string
+        count:
+          type: integer
+
+    ActivityFeedItem:
+      type: object
+      required: [id, projectId, projectTitle, action, entityType, entityTitle, timestamp]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        projectTitle:
+          type: string
+        action:
+          type: string
+        entityType:
+          type: string
+        entityTitle:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    # ── Client ────────────────────────────────────────────────────
+    Client:
+      type: object
+      required: [id, organizationId, name, createdAt]
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+          description: Owning organization (tenant). Set by the server on creation.
+        name:
+          type: string
+        contactName:
+          type: ["string", "null"]
+        contactEmail:
+          type: ["string", "null"]
+        institution:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        projectCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ClientInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        contactName:
+          type: string
+        contactEmail:
+          type: string
+        institution:
+          type: string
+        notes:
+          type: string
+        organizationId:
+          type: integer
+          description: >-
+            Target organization (tenant) for the new client. Honored ONLY for
+            global administrators, who are not bound to an organization and must
+            choose one. Ignored for organization-bound users, whose own
+            organization is always used by the server.
+
+    OrganizationSummary:
+      type: object
+      required: [id, name, slug, type]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        type:
+          type: string
+
+    ClientUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        contactName:
+          type: string
+        contactEmail:
+          type: string
+        institution:
+          type: string
+        notes:
+          type: string
+
+    # ── Project ───────────────────────────────────────────────────
+    Project:
+      type: object
+      required: [id, clientId, title, stage, status, createdAt]
+      properties:
+        id:
+          type: integer
+        clientId:
+          type: integer
+        clientName:
+          type: ["string", "null"]
+        title:
+          type: string
+        stage:
+          type: integer
+          description: "0=Kickoff/Intake, 1=Backward Design, 2=QA, 3=Handoff"
+        status:
+          type: string
+          description: "active | paused | complete | gate_blocked"
+        tier:
+          type: ["string", "null"]
+        modality:
+          type: ["string", "null"]
+        lms:
+          type: ["string", "null"]
+          description: "Learning management system (Canvas, Blackboard, Moodle, D2L Brightspace, Schoology, other)"
+        designMethod:
+          type: ["string", "null"]
+          description: "Selected instructional design method key that guides the build (addie, sam, backward-design, blooms, gagne, merrill, four-c-id, kirkpatrick)"
+        description:
+          type: ["string", "null"]
+        targetDeliveryDate:
+          type: ["string", "null"]
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ProjectInput:
+      type: object
+      required: [clientId, title]
+      properties:
+        clientId:
+          type: integer
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        tier:
+          type: string
+        modality:
+          type: string
+        lms:
+          type: string
+          description: "Target LMS platform"
+        targetDeliveryDate:
+          type: string
+          format: date
+
+    ProjectUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        tier:
+          type: string
+        modality:
+          type: string
+        lms:
+          type: string
+        designMethod:
+          type: ["string", "null"]
+          enum: [addie, sam, backward-design, blooms, gagne, merrill, four-c-id, kirkpatrick, null]
+          description: "Instructional design method key that guides the build, or null to clear"
+        targetDeliveryDate:
+          type: string
+          format: date
+
+    StageAdvanceInput:
+      type: object
+      required: [notes]
+      properties:
+        notes:
+          type: string
+
+    GateStatus:
+      type: object
+      required: [stage, canAdvance, requirements]
+      properties:
+        stage:
+          type: integer
+        canAdvance:
+          type: boolean
+        requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/GateRequirement"
+
+    GateRequirement:
+      type: object
+      required: [label, met, blocking]
+      properties:
+        label:
+          type: string
+        met:
+          type: boolean
+        blocking:
+          type: boolean
+        detail:
+          type: ["string", "null"]
+
+    # ── Course ────────────────────────────────────────────────────
+    Course:
+      type: object
+      required: [id, projectId, title, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        title:
+          type: string
+        creditHours:
+          type: ["integer", "null"]
+        termWeeks:
+          type: ["integer", "null"]
+        moduleCount:
+          type: ["integer", "null"]
+        modality:
+          type: ["string", "null"]
+        accreditors:
+          type: ["string", "null"]
+          description: "Comma-separated accreditor names/acronyms"
+        seatTimeHours:
+          type: ["number", "null"]
+        courseDescription:
+          type: ["string", "null"]
+        instructorName:
+          type: ["string", "null"]
+        instructorEmail:
+          type: ["string", "null"]
+        instructorTitle:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    CourseInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        creditHours:
+          type: integer
+        termWeeks:
+          type: integer
+        moduleCount:
+          type: integer
+        modality:
+          type: string
+        accreditors:
+          type: string
+        seatTimeHours:
+          type: number
+        courseDescription:
+          type: string
+        instructorName:
+          type: string
+        instructorEmail:
+          type: string
+        instructorTitle:
+          type: string
+
+    CourseUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        creditHours:
+          type: integer
+        termWeeks:
+          type: integer
+        moduleCount:
+          type: integer
+        modality:
+          type: string
+        accreditors:
+          type: string
+        seatTimeHours:
+          type: number
+        courseDescription:
+          type: string
+        instructorName:
+          type: string
+        instructorEmail:
+          type: string
+        instructorTitle:
+          type: string
+
+    # ── Module ────────────────────────────────────────────────────
+    Module:
+      type: object
+      required: [id, courseId, title, position, createdAt]
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        title:
+          type: string
+        position:
+          type: integer
+        weekNumber:
+          type: ["integer", "null"]
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "draft | in_progress | complete | approved"
+        isPrototype:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    ModuleInput:
+      type: object
+      required: [title, position]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        position:
+          type: integer
+        weekNumber:
+          type: integer
+        description:
+          type: string
+        isPrototype:
+          type: boolean
+
+    ModuleUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        position:
+          type: integer
+        weekNumber:
+          type: integer
+        description:
+          type: string
+        status:
+          type: string
+        isPrototype:
+          type: boolean
+
+    # ── Objective ─────────────────────────────────────────────────
+    Objective:
+      type: object
+      required: [id, projectId, level, text, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        level:
+          type: string
+          description: "university | program | course | module"
+        text:
+          type: string
+        parentId:
+          type: ["integer", "null"]
+        moduleId:
+          type: ["integer", "null"]
+        masteryEvidence:
+          type: ["string", "null"]
+        cognitiveLevel:
+          type: ["string", "null"]
+          description: "Engine-derived Bloom's level (Remember..Create); null until first QA evaluation"
+        measurabilityStatus:
+          type: ["string", "null"]
+          description: "Engine-derived: measurable | vague | unmeasurable; null until first QA evaluation"
+        alignedAssessmentCount:
+          type: integer
+        alignedActivityCount:
+          type: integer
+        isFlagged:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    ObjectiveInput:
+      type: object
+      required: [level, text]
+      properties:
+        level:
+          type: string
+        text:
+          type: string
+          minLength: 1
+        parentId:
+          type: integer
+        moduleId:
+          type: integer
+        masteryEvidence:
+          type: string
+
+    ObjectiveUpdate:
+      type: object
+      properties:
+        level:
+          type: string
+        text:
+          type: string
+        parentId:
+          type: integer
+        moduleId:
+          type: integer
+        masteryEvidence:
+          type: string
+        isFlagged:
+          type: boolean
+
+    # ── Assessment ────────────────────────────────────────────────
+    Assessment:
+      type: object
+      required: [id, courseId, title, assessmentType, status, createdAt]
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        title:
+          type: string
+        assessmentType:
+          type: string
+          description: "formative | summative | quiz | assignment | project | exam | discussion"
+        description:
+          type: ["string", "null"]
+        masteryEvidence:
+          type: ["string", "null"]
+        misconceptionTargeted:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "draft | in_progress | complete | approved"
+        alignedObjectiveIds:
+          type: array
+          items:
+            type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    AssessmentInput:
+      type: object
+      required: [title, assessmentType]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        assessmentType:
+          type: string
+        description:
+          type: string
+        masteryEvidence:
+          type: string
+        misconceptionTargeted:
+          type: string
+        alignedObjectiveIds:
+          type: array
+          items:
+            type: integer
+
+    AssessmentUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        assessmentType:
+          type: string
+        description:
+          type: string
+        masteryEvidence:
+          type: string
+        misconceptionTargeted:
+          type: string
+        status:
+          type: string
+        alignedObjectiveIds:
+          type: array
+          items:
+            type: integer
+
+    # ── Activity ──────────────────────────────────────────────────
+    Activity:
+      type: object
+      required: [id, courseId, title, activityType, status, createdAt]
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        title:
+          type: string
+        activityType:
+          type: string
+          description: "discussion | assignment | interactive | learnersourcing | peer_review | simulation | lab"
+        description:
+          type: ["string", "null"]
+        moderationPolicy:
+          type: ["string", "null"]
+        incentiveStructure:
+          type: ["string", "null"]
+        status:
+          type: string
+          description: "draft | in_progress | complete | approved"
+        alignedObjectiveIds:
+          type: array
+          items:
+            type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ActivityInput:
+      type: object
+      required: [title, activityType]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        activityType:
+          type: string
+        description:
+          type: string
+        moderationPolicy:
+          type: string
+        incentiveStructure:
+          type: string
+        alignedObjectiveIds:
+          type: array
+          items:
+            type: integer
+
+    ActivityUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        activityType:
+          type: string
+        description:
+          type: string
+        moderationPolicy:
+          type: string
+        incentiveStructure:
+          type: string
+        status:
+          type: string
+        alignedObjectiveIds:
+          type: array
+          items:
+            type: integer
+
+    # ── Evidence Ledger ───────────────────────────────────────────
+    LedgerEntry:
+      type: object
+      required: [id, projectId, entryType, content, aiGenerated, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        entryType:
+          type: string
+          description: "design_decision | qa_finding | accessibility_finding | ai_disclosure | approval | standards_crosswalk | efficacy_note"
+        content:
+          type: string
+        aiGenerated:
+          type: boolean
+        aiDisclosure:
+          type: ["string", "null"]
+        authorName:
+          type: ["string", "null"]
+        entityType:
+          type: ["string", "null"]
+        entityId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    LedgerEntryInput:
+      type: object
+      required: [entryType, content]
+      properties:
+        entryType:
+          type: string
+        content:
+          type: string
+        aiGenerated:
+          type: boolean
+        aiDisclosure:
+          type: string
+        authorName:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: integer
+
+    LedgerReport:
+      type: object
+      required: [projectId, generatedAt, accessibilityConformance, aiDisclosure, designRationale, standardsCrosswalk]
+      properties:
+        projectId:
+          type: integer
+        generatedAt:
+          type: string
+          format: date-time
+        accessibilityConformance:
+          $ref: "#/components/schemas/ReportSection"
+        aiDisclosure:
+          $ref: "#/components/schemas/ReportSection"
+        designRationale:
+          $ref: "#/components/schemas/ReportSection"
+        standardsCrosswalk:
+          $ref: "#/components/schemas/ReportSection"
+
+    ReportSection:
+      type: object
+      required: [title, entries, summary]
+      properties:
+        title:
+          type: string
+        summary:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/LedgerEntry"
+
+    # ── QA ────────────────────────────────────────────────────────
+    QACheck:
+      type: object
+      required: [id, projectId, checkType, status, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        checkType:
+          type: string
+          description: "oedi_rubric | accessibility_auto | accessibility_manual | standards_coverage | udl | brand"
+        status:
+          type: string
+          description: "pending | pass | fail | in_remediation"
+        findings:
+          type: ["string", "null"]
+        remediationNotes:
+          type: ["string", "null"]
+        gateBlock:
+          type: boolean
+        passedCount:
+          type: ["integer", "null"]
+        failedCount:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    QACheckInput:
+      type: object
+      required: [checkType, status]
+      properties:
+        checkType:
+          type: string
+        status:
+          type: string
+        findings:
+          type: string
+        gateBlock:
+          type: boolean
+        passedCount:
+          type: integer
+        failedCount:
+          type: integer
+
+    QACheckUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        findings:
+          type: string
+        remediationNotes:
+          type: string
+        gateBlock:
+          type: boolean
+        passedCount:
+          type: integer
+        failedCount:
+          type: integer
+
+    # ── Curriculum QA engine ──────────────────────────────────────
+    QaVerbDetection:
+      type: object
+      required: [verb, bloomLevel, kind]
+      properties:
+        verb:
+          type: ["string", "null"]
+        bloomLevel:
+          type: ["string", "null"]
+          description: "Bloom's level: Remember | Understand | Apply | Analyze | Evaluate | Create"
+        kind:
+          type: string
+          enum: [measurable, vague, missing]
+        suggestion:
+          type: string
+
+    QaObjectiveAnalysis:
+      type: object
+      required:
+        [
+          objectiveId,
+          text,
+          detection,
+          measurability,
+          wordCount,
+          hasCriterion,
+          compound,
+          aligned,
+          standardAlignmentIds,
+          assessmentCount,
+        ]
+      properties:
+        objectiveId:
+          type: string
+        text:
+          type: string
+        detection:
+          $ref: "#/components/schemas/QaVerbDetection"
+        measurability:
+          type: string
+          enum: [measurable, vague, unmeasurable]
+        wordCount:
+          type: integer
+        hasCriterion:
+          type: boolean
+        compound:
+          type: boolean
+        aligned:
+          type: boolean
+        standardAlignmentIds:
+          type: array
+          items:
+            type: string
+        standardAlignmentLabel:
+          type: string
+        assessmentCount:
+          type: integer
+
+    QaFinding:
+      type: object
+      required: [id, severity, category, targetType, targetLabel, message]
+      properties:
+        id:
+          type: string
+        severity:
+          type: string
+          enum: [pass, warn, fail]
+        category:
+          type: string
+          enum: [measurability, standards, assessment, clarity, structure]
+        targetType:
+          type: string
+          enum: [course, objective, assessment]
+        targetId:
+          type: string
+        targetLabel:
+          type: string
+        message:
+          type: string
+        remediation:
+          type: string
+
+    QaCategoryScore:
+      type: object
+      required: [category, passed, total, score]
+      properties:
+        category:
+          type: string
+          enum: [measurability, standards, assessment, clarity, structure]
+        passed:
+          type: integer
+        total:
+          type: integer
+        score:
+          type: integer
+
+    QaReportCounts:
+      type: object
+      required: [pass, warn, fail]
+      properties:
+        pass:
+          type: integer
+        warn:
+          type: integer
+        fail:
+          type: integer
+
+    QaBloomDistributionEntry:
+      type: object
+      required: [level, count]
+      properties:
+        level:
+          type: string
+          description: "Bloom's level: Remember | Understand | Apply | Analyze | Evaluate | Create"
+        count:
+          type: integer
+
+    QaReportData:
+      type: object
+      required: [findings, score, categoryScores, counts, bloomDistribution, objectiveAnalyses]
+      properties:
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/QaFinding"
+        score:
+          type: integer
+        categoryScores:
+          type: array
+          items:
+            $ref: "#/components/schemas/QaCategoryScore"
+        counts:
+          $ref: "#/components/schemas/QaReportCounts"
+        bloomDistribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/QaBloomDistributionEntry"
+        objectiveAnalyses:
+          type: array
+          items:
+            $ref: "#/components/schemas/QaObjectiveAnalysis"
+
+    QaReportRecord:
+      type: object
+      required: [id, projectId, report, score, status, gateBlock, runAt, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        report:
+          $ref: "#/components/schemas/QaReportData"
+        score:
+          type: integer
+        status:
+          type: string
+          description: "pass | warn | fail"
+        gateBlock:
+          type: boolean
+        runAt:
+          type: string
+          format: date-time
+        runByUserId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── Standards ─────────────────────────────────────────────────
+    StandardsFramework:
+      type: object
+      required: [id, name, frameworkType, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        acronym:
+          type: ["string", "null"]
+        frameworkType:
+          type: string
+          description: "accreditor | licensure_board"
+        description:
+          type: ["string", "null"]
+        competencyCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    StandardsFrameworkInput:
+      type: object
+      required: [name, frameworkType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        acronym:
+          type: string
+        frameworkType:
+          type: string
+        description:
+          type: string
+
+    StandardCompetency:
+      type: object
+      required: [id, frameworkId, code, description]
+      properties:
+        id:
+          type: integer
+        frameworkId:
+          type: integer
+        code:
+          type: string
+        description:
+          type: string
+        domain:
+          type: ["string", "null"]
+
+    StandardCompetencyInput:
+      type: object
+      required: [code, description]
+      properties:
+        code:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        domain:
+          type: string
+
+    CrosswalkLink:
+      type: object
+      required: [id, projectId, competencyId, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        competencyId:
+          type: integer
+        competencyCode:
+          type: ["string", "null"]
+        competencyDescription:
+          type: ["string", "null"]
+        objectiveId:
+          type: ["integer", "null"]
+        assessmentId:
+          type: ["integer", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    CrosswalkLinkInput:
+      type: object
+      required: [competencyId]
+      properties:
+        competencyId:
+          type: integer
+        objectiveId:
+          type: integer
+        assessmentId:
+          type: integer
+        notes:
+          type: string
+
+    CrosswalkGapReport:
+      type: object
+      required: [projectId, frameworkName, totalCompetencies, mappedCount, unmappedCount, gaps]
+      properties:
+        projectId:
+          type: integer
+        frameworkName:
+          type: string
+        totalCompetencies:
+          type: integer
+        mappedCount:
+          type: integer
+        unmappedCount:
+          type: integer
+        deliveryBlocked:
+          type: boolean
+        gaps:
+          type: array
+          items:
+            $ref: "#/components/schemas/StandardCompetency"
+
+    # ── Builders / Allocations / Classes / School (Task 3) ────────
+    Builder:
+      type: object
+      required: [id, name, email, role, status, organizationId, createdAt, activeAllocationCount]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        organizationId:
+          type: ["integer", "null"]
+        organizationName:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        activeAllocationCount:
+          type: integer
+
+    CreateBuilderInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+        organizationId:
+          type: integer
+          description: Required for global admins; ignored for school admins (their own org is used).
+
+    UpdateBuilderStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, deactivated]
+
+    ResetBuilderPasswordInput:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 8
+          maxLength: 200
+
+    Allocation:
+      type: object
+      required: [id, organizationId, builderUserId, scopeType, scopeId, scopeTitle, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        organizationId:
+          type: integer
+        builderUserId:
+          type: integer
+        builderName:
+          type: ["string", "null"]
+        scopeType:
+          type: string
+          enum: [project, course, class]
+        scopeId:
+          type: integer
+        scopeTitle:
+          type: string
+        projectId:
+          type: ["integer", "null"]
+        projectTitle:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, revoked]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateAllocationInput:
+      type: object
+      required: [builderUserId, scopeType, scopeId]
+      properties:
+        builderUserId:
+          type: integer
+        scopeType:
+          type: string
+          enum: [project, course, class]
+        scopeId:
+          type: integer
+        notes:
+          type: string
+          maxLength: 1000
+
+    Class:
+      type: object
+      required: [id, courseId, name, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+        courseId:
+          type: integer
+        name:
+          type: string
+        section:
+          type: ["string", "null"]
+        term:
+          type: ["string", "null"]
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ClassInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        section:
+          type: ["string", "null"]
+          maxLength: 100
+        term:
+          type: ["string", "null"]
+          maxLength: 100
+        status:
+          type: string
+          enum: [active, archived]
+
+    ClassUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        section:
+          type: ["string", "null"]
+          maxLength: 100
+        term:
+          type: ["string", "null"]
+          maxLength: 100
+        status:
+          type: string
+          enum: [active, archived]
+
+    # ── Roster ────────────────────────────────────────────────────
+    ClassMember:
+      type: object
+      required: [id, classId, userId, userName, userEmail, userRole, addedAt]
+      properties:
+        id:
+          type: integer
+        classId:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        userEmail:
+          type: string
+        userRole:
+          type: string
+        addedAt:
+          type: string
+          format: date-time
+
+    AddClassMemberInput:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: integer
+
+    OrgMember:
+      type: object
+      required: [id, name, email, role, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+
+    SchoolReportTotals:
+      type: object
+      required: [clients, projects, activeProjects, courses, classes, builders, activeAllocations]
+      properties:
+        clients:
+          type: integer
+        projects:
+          type: integer
+        activeProjects:
+          type: integer
+        courses:
+          type: integer
+        classes:
+          type: integer
+        builders:
+          type: integer
+        activeAllocations:
+          type: integer
+
+    SchoolReportStage:
+      type: object
+      required: [stage, label, count]
+      properties:
+        stage:
+          type: integer
+        label:
+          type: string
+        count:
+          type: integer
+
+    SchoolReportBuilder:
+      type: object
+      required: [id, name, email, status, activeAllocations, allocationsByScope]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        status:
+          type: string
+        activeAllocations:
+          type: integer
+        allocationsByScope:
+          type: object
+          required: [project, course, class]
+          properties:
+            project:
+              type: integer
+            course:
+              type: integer
+            class:
+              type: integer
+
+    SchoolReport:
+      type: object
+      required: [organization, generatedAt, totals, projectsByStage, builders]
+      properties:
+        organization:
+          type: object
+          required: [id, name, slug, type]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            slug:
+              type: string
+            type:
+              type: string
+        generatedAt:
+          type: string
+          format: date-time
+        totals:
+          $ref: "#/components/schemas/SchoolReportTotals"
+        projectsByStage:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchoolReportStage"
+        builders:
+          type: array
+          items:
+            $ref: "#/components/schemas/SchoolReportBuilder"
+
+    # ── Impersonation ─────────────────────────────────────────────
+    Impersonator:
+      type: object
+      required: [id, name, email]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+
+    StartImpersonationInput:
+      type: object
+      required: [userId]
+      properties:
+        userId:
+          type: integer
+          description: The id of the user to impersonate.
+
+    # ── White-label branding ──────────────────────────────────────
+    BrandingOrganization:
+      type: object
+      required: [id, name, slug, type]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        type:
+          type: string
+        accentColor:
+          type: ["string", "null"]
+        tagline:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+
+    BrandingResponse:
+      type: object
+      required: [branded, organization]
+      properties:
+        branded:
+          type: boolean
+          description: True when the host matched a configured organization domain.
+        organization:
+          anyOf:
+            - $ref: "#/components/schemas/BrandingOrganization"
+            - type: "null"
+
+    OrganizationBranding:
+      type: object
+      required: [id, name, slug, type]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        type:
+          type: string
+        accentColor:
+          type: ["string", "null"]
+        tagline:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        domain:
+          type: ["string", "null"]
+
+    UpdateBrandingInput:
+      type: object
+      description: >-
+        All fields optional. A null clears that field. The `domain` field can be
+        changed by a global admin only; a school admin editing their own org may
+        not set it. accentColor must be a hex color; logoUrl must be https or a
+        site-relative path. These are validated server-side.
+      properties:
+        name:
+          type: string
+          minLength: 1
+        tagline:
+          type: ["string", "null"]
+        accentColor:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        domain:
+          type: ["string", "null"]
+
+    # ── Super-admin platform analytics ────────────────────────────
+    PlatformOverviewTotals:
+      type: object
+      required:
+        [organizations, users, clients, projects, activeProjects, courses, classes, builders, activeAllocations]
+      properties:
+        organizations:
+          type: integer
+        users:
+          type: integer
+        clients:
+          type: integer
+        projects:
+          type: integer
+        activeProjects:
+          type: integer
+        courses:
+          type: integer
+        classes:
+          type: integer
+        builders:
+          type: integer
+        activeAllocations:
+          type: integer
+
+    PlatformOverviewOrganization:
+      type: object
+      required:
+        [id, name, slug, type, tier, planLabel, subscriptionStatus, features, users, clients, projects, activeProjects, courses, classes, builders, activeAllocations]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        type:
+          type: string
+        tier:
+          type: string
+          description: The org's effective entitlement tier (not the raw purchased planTier).
+          enum: [trial, starter, professional, enterprise]
+        planLabel:
+          type: string
+        subscriptionStatus:
+          type: string
+        features:
+          $ref: "#/components/schemas/PlanFeatures"
+        domain:
+          type: ["string", "null"]
+        accentColor:
+          type: ["string", "null"]
+        tagline:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        users:
+          type: integer
+        clients:
+          type: integer
+        projects:
+          type: integer
+        activeProjects:
+          type: integer
+        courses:
+          type: integer
+        classes:
+          type: integer
+        builders:
+          type: integer
+        activeAllocations:
+          type: integer
+
+    PlatformCountByKey:
+      type: object
+      required: [key, count]
+      properties:
+        key:
+          type: string
+        count:
+          type: integer
+
+    PlatformUser:
+      type: object
+      required: [id, name, email, role, productKey, status]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        productKey:
+          type: string
+        status:
+          type: string
+        organizationId:
+          type: ["integer", "null"]
+        organizationName:
+          type: ["string", "null"]
+
+    PlatformOverview:
+      type: object
+      required: [generatedAt, totals, usersByRole, usersByProduct, organizations]
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        totals:
+          $ref: "#/components/schemas/PlatformOverviewTotals"
+        usersByRole:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformCountByKey"
+        usersByProduct:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformCountByKey"
+        organizations:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformOverviewOrganization"
+
+    ScopeStatsTotals:
+      type: object
+      required:
+        [courses, modules, objectives, assessments, activities, classes, crosswalkLinks, qaChecks]
+      properties:
+        courses:
+          type: integer
+        modules:
+          type: integer
+        objectives:
+          type: integer
+        assessments:
+          type: integer
+        activities:
+          type: integer
+        classes:
+          type: integer
+        crosswalkLinks:
+          type: integer
+        qaChecks:
+          type: integer
+
+    ScopeStats:
+      type: object
+      required: [scopeType, scopeId, name, totals]
+      properties:
+        scopeType:
+          type: string
+          enum: [project, course, class]
+        scopeId:
+          type: integer
+        name:
+          type: string
+        totals:
+          $ref: "#/components/schemas/ScopeStatsTotals"
