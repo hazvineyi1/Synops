@@ -99,10 +99,16 @@ export default function Platforms() {
                 Rules-based quality checks ensure measurable outcomes, standards alignment, assessment coverage, and accessibility.
               </p>
             </div>
-            <div className="shrink-0">
-              <Link 
-                href="/contact?area=platforms" 
-                className="inline-block bg-white text-primary px-8 py-4 font-bold text-[16px] transition-colors hover:bg-white/90 rounded-[6px]"
+            <div className="shrink-0 flex flex-col gap-3">
+              <a
+                href="/builder/"
+                className="inline-block bg-accent text-primary px-8 py-4 font-bold text-[16px] text-center transition-colors hover:bg-accent/90 rounded-[6px]"
+              >
+                Open the Curriculum Builder
+              </a>
+              <Link
+                href="/contact?area=platforms"
+                className="inline-block bg-white text-primary px-8 py-4 font-bold text-[16px] text-center transition-colors hover:bg-white/90 rounded-[6px]"
               >
                 Request a tailored build
               </Link>

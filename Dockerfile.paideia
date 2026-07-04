@@ -22,16 +22,18 @@ RUN pnpm install --no-frozen-lockfile
 
 # Build the three frontends. Each vite.config requires PORT and BASE_PATH at build
 # time. The base path must match where the API serves each app:
-#   marketing -> "/", Coach -> "/study/", teacher -> "/app/".
-RUN PORT=8080 BASE_PATH=/       pnpm --filter @workspace/paideia-ren   run build
-RUN PORT=8080 BASE_PATH=/study/ pnpm --filter @workspace/paideia-study run build
-RUN PORT=8080 BASE_PATH=/app/   pnpm --filter @workspace/paideia-app   run build
+#   marketing -> "/", Coach -> "/study/", teacher -> "/app/", builder -> "/builder/".
+RUN PORT=8080 BASE_PATH=/         pnpm --filter @workspace/paideia-ren   run build
+RUN PORT=8080 BASE_PATH=/study/   pnpm --filter @workspace/paideia-study run build
+RUN PORT=8080 BASE_PATH=/app/     pnpm --filter @workspace/paideia-app   run build
+RUN PORT=8080 BASE_PATH=/builder/ pnpm --filter @workspace/compass-web   run build
 
 # Assemble: the API serves from paideia-ren/dist/public. Marketing built there
 # already (emptyOutDir wiped it first), so copy Coach into /study and the teacher
 # app into /app AFTER the marketing build.
 RUN cp -r artifacts/paideia-study/dist/public artifacts/paideia-ren/dist/public/study \
- && cp -r artifacts/paideia-app/dist/public   artifacts/paideia-ren/dist/public/app
+ && cp -r artifacts/paideia-app/dist/public   artifacts/paideia-ren/dist/public/app \
+ && cp -r artifacts/compass-web/dist/public   artifacts/paideia-ren/dist/public/builder
 
 # Build the API (esbuild bundle -> artifacts/paideia-api/dist/index.mjs).
 RUN pnpm --filter @workspace/paideia-api run build

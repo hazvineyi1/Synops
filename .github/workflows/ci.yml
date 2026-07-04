@@ -50,9 +50,10 @@ jobs:
         run: pnpm run typecheck
 
       # Build the Coach deployment the same way the production image does.
-      - name: Build Coach (marketing + study + app + api)
+      - name: Build Coach (marketing + study + app + builder + api)
         run: |
-          PORT=8080 BASE_PATH=/       pnpm --filter @workspace/paideia-ren   run build
-          PORT=8080 BASE_PATH=/study/ pnpm --filter @workspace/paideia-study run build
-          PORT=8080 BASE_PATH=/app/   pnpm --filter @workspace/paideia-app   run build
+          PORT=8080 BASE_PATH=/         pnpm --filter @workspace/paideia-ren   run build
+          PORT=8080 BASE_PATH=/study/   pnpm --filter @workspace/paideia-study run build
+          PORT=8080 BASE_PATH=/app/     pnpm --filter @workspace/paideia-app   run build
+          PORT=8080 BASE_PATH=/builder/ pnpm --filter @workspace/compass-web   run build
           pnpm --filter @workspace/paideia-api run build

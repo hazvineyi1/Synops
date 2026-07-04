@@ -297,6 +297,8 @@ app.get(/^(?!\/api).*/, (req, res) => {
     res.sendFile(path.join(reactBuildPath, "study", "index.html"));
   } else if (p === "/app" || p.startsWith("/app/")) {
     res.sendFile(path.join(reactBuildPath, "app", "index.html"));
+  } else if (p === "/builder" || p.startsWith("/builder/")) {
+    res.sendFile(path.join(reactBuildPath, "builder", "index.html"));
   } else {
     res.sendFile(path.join(reactBuildPath, "index.html"));
   }

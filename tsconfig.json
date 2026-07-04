@@ -16,6 +16,8 @@
     { "path": "./lib/kanon-openai" },
     { "path": "./lib/paideia-db" },
     { "path": "./lib/paideia-api-client" },
-    { "path": "./lib/paideia-api-zod" }
+    { "path": "./lib/paideia-api-zod" },
+    { "path": "./lib/compass-api-client" },
+    { "path": "./lib/compass-curriculum-engine" }
   ]
 }

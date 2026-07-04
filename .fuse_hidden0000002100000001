@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    { "path": "./lib/db" },
+    { "path": "./lib/api-client-react" },
+    { "path": "./lib/api-zod" },
+    { "path": "./lib/identity" },
+    { "path": "./lib/billing" },
+    { "path": "./lib/kanon-db" },
+    { "path": "./lib/kanon-api-client" },
+    { "path": "./lib/kanon-api-zod" },
+    { "path": "./lib/kanon-curriculum-engine" },
+    { "path": "./lib/kanon-evidence-packet" },
+    { "path": "./lib/kanon-openai" },
+    { "path": "./lib/paideia-db" },
+    { "path": "./lib/paideia-api-client" },
+    { "path": "./lib/paideia-api-zod" }
+  ]
+}
