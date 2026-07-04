@@ -62,6 +62,14 @@ void (async () => {
     logger.info("SESSION_SECRET not set; Compass builder API not mounted (dormant)");
     return;
   }
+  // Compass MUST run against its own database (COMPASS_DATABASE_URL): 31 of its 35
+  // table names collide with tables in the shared host Postgres, so falling back
+  // to DATABASE_URL here would point it at the wrong instance. Stay dormant until
+  // its dedicated DB is configured.
+  if (!process.env["COMPASS_DATABASE_URL"]) {
+    logger.info("COMPASS_DATABASE_URL not set; Compass builder API not mounted (dormant)");
+    return;
+  }
   try {
     const { createCompassMount } = await import("@workspace/compass-api/mount");
     app.use("/api", createCompassMount());
