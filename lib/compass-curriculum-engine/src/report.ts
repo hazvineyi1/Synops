@@ -7,7 +7,7 @@ import {
   type EngineCourse,
   type QaReport,
   type Severity,
-} from "./engine.ts";
+} from "./engine";
 
 function severitySymbol(severity: Severity): string {
   if (severity === "pass") return "[pass]";

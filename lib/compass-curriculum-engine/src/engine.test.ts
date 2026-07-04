@@ -3,7 +3,7 @@ import {
   detectVerb,
   evaluateCourse,
   type EngineCourse,
-} from "./index.ts";
+} from "./index";
 
 describe("detectVerb", () => {
   it("classifies a measurable Bloom verb", () => {
