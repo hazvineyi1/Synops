@@ -21,7 +21,11 @@ export default function StudyLogin() {
     setSubmitting(true);
     try {
       await login(email, password);
-      setLoc("/coach");
+      // Honor a ?next= destination (used by the "Admin" entry point -> /admin),
+      // but only internal paths to avoid open redirects.
+      const next = new URLSearchParams(window.location.search).get("next");
+      const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
+      setLoc(safeNext ?? "/coach");
     } catch (err: any) {
       setError(err?.data?.error || "Invalid email or password");
     } finally {

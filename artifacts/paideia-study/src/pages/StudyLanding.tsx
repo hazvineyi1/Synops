@@ -68,6 +68,7 @@ export default function StudyLanding() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setLoc("/login?next=/admin")}>Admin</Button>
           <Button variant="ghost" size="sm" onClick={() => setLoc("/login")}>Sign In</Button>
           <Button size="sm" onClick={() => setLoc("/signup")}>Get Started</Button>
         </div>
