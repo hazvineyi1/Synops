@@ -168,7 +168,7 @@ export default function StudyAdminCoupons() {
         >
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
-        <div className="font-serif text-lg tracking-tight">Synops admin</div>
+        <button onClick={() => setLoc("/coach")} className="font-serif text-lg tracking-tight hover:opacity-80" title="Home">Synops admin</button>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-12">

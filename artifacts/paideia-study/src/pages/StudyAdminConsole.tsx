@@ -1025,7 +1025,7 @@ export default function StudyAdminConsole() {
   const Sidebar = (
     <aside className="w-60 shrink-0 flex-col border-r border-border bg-card flex">
       <div className="border-b border-border px-4 py-4">
-        <div className="font-serif text-lg font-semibold text-primary">Coach Admin</div>
+        <a href="/study/coach" className="font-serif text-lg font-semibold text-primary hover:opacity-80 block" title="Back to home">Coach Admin</a>
         <div className="text-[11px] text-muted-foreground">Platform console</div>
       </div>
       <nav className="flex-1 space-y-1 overflow-y-auto p-2">

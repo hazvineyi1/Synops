@@ -58,15 +58,15 @@ export default function StudyLanding() {
     <div className="min-h-screen bg-background">
       {/* Hero */}
       <header className="px-6 py-4 flex items-center justify-between border-b sticky top-0 bg-background/95 backdrop-blur-sm z-50">
-        <div className="flex items-center gap-2.5">
+        <button onClick={() => setLoc("/")} className="flex items-center gap-2.5 hover:opacity-80" title="Home">
           <div className="bg-primary/10 p-1.5 rounded-lg">
             <Brain className="h-5 w-5 text-primary" />
           </div>
-          <div>
+          <div className="text-left">
             <span className="font-bold text-sm tracking-tight">Synops</span>
             <span className="font-light text-sm text-muted-foreground ml-0.5">Coach</span>
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setLoc("/login?next=/admin")}>Admin</Button>
           <Button variant="ghost" size="sm" onClick={() => setLoc("/login")}>Sign In</Button>
