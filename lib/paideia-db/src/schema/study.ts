@@ -122,11 +122,15 @@ export const studyCouponsTable = pgTable("study_coupons", {
   id: uuid("id").primaryKey().defaultRandom(),
   code: text("code").notNull().unique(), // stored uppercase
   description: text("description"),
-  discountType: text("discount_type").notNull(), // percent | fixed
+  discountType: text("discount_type").notNull(), // percent | fixed | grant
   percentOff: integer("percent_off"), // 1-100 when discountType = percent
   amountOffMinor: integer("amount_off_minor"), // minor units when discountType = fixed
   currency: text("currency"), // required for fixed coupons: USD | ZAR | ZMW | BWP
   appliesToTier: text("applies_to_tier"), // plus | pro | null (any paid tier)
+  // "grant" (access) codes only: redeeming grants this tier for grant_days days
+  // (null = indefinite), without any payment/checkout.
+  grantTier: text("grant_tier"), // plus | pro when discountType = grant
+  grantDays: integer("grant_days"), // duration in days; null = indefinite
   active: boolean("active").notNull().default(true),
   maxRedemptions: integer("max_redemptions"), // null = unlimited
   timesRedeemed: integer("times_redeemed").notNull().default(0),

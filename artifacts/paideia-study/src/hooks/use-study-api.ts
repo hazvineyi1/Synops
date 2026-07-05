@@ -309,7 +309,7 @@ export interface AdminCoupon {
   id: string;
   code: string;
   description: string | null;
-  discountType: "percent" | "fixed";
+  discountType: "percent" | "fixed" | "grant";
   percentOff: number | null;
   amountOffMinor: number | null;
   currency: string | null;
@@ -318,13 +318,15 @@ export interface AdminCoupon {
   maxRedemptions: number | null;
   timesRedeemed: number;
   expiresAt: string | null;
+  grantTier: "plus" | "pro" | null;
+  grantDays: number | null;
   createdAt: string;
 }
 
 export interface AdminCouponInput {
   code: string;
   description?: string | null;
-  discountType: "percent" | "fixed";
+  discountType: "percent" | "fixed" | "grant";
   percentOff?: number | null;
   amountOffMinor?: number | null;
   currency?: string | null;
@@ -332,6 +334,27 @@ export interface AdminCouponInput {
   active?: boolean;
   maxRedemptions?: number | null;
   expiresAt?: string | null;
+  grantTier?: "plus" | "pro" | null;
+  grantDays?: number | null;
+}
+
+// Redeem an access ("grant") code -> grants a tier directly, no payment.
+export function useStudyRedeemCode() {
+  return useMutation<
+    { ok: true; tier: string; subscriptionCurrentPeriodEnd: string | null },
+    ErrorType<unknown>,
+    { code: string }
+  >({
+    mutationFn: async ({ code }) =>
+      customFetch<{ ok: true; tier: string; subscriptionCurrentPeriodEnd: string | null }>(
+        `${BASE}/billing/redeem-code`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        },
+      ),
+  });
 }
 
 export function useStudyAdminCoupons() {

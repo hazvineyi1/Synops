@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, studyUsersTable, studyPaymentsTable } from "@workspace/paideia-db";
+import { db, studyUsersTable, studyPaymentsTable, studyCouponsTable } from "@workspace/paideia-db";
 import { eq, sql } from "drizzle-orm";
 import { requireStudyUser } from "../../middlewares/auth.js";
 import { getUncachableStripeClient } from "../../lib/stripeClient.js";
@@ -23,7 +23,7 @@ import {
   getPaymentById,
   getSubscription,
 } from "../../lib/billing/service.js";
-import { previewCoupon } from "../../lib/billing/coupons.js";
+import { previewCoupon, normalizeCode } from "../../lib/billing/coupons.js";
 
 const router: IRouter = Router();
 router.use(requireStudyUser);
@@ -49,6 +49,60 @@ router.get("/config", (req, res) => {
     countries,
     selected,
     tiers: Object.values(TIERS),
+  });
+});
+
+// Redeem an access ("grant") code: grants the coded tier directly, no payment.
+// Discount codes are NOT redeemable here -- they apply at checkout instead.
+router.post("/redeem-code", async (req, res) => {
+  const raw = req.body?.code;
+  if (typeof raw !== "string" || !raw.trim()) {
+    res.status(400).json({ error: "A code is required" });
+    return;
+  }
+  const code = normalizeCode(raw);
+  const [coupon] = await db
+    .select()
+    .from(studyCouponsTable)
+    .where(eq(studyCouponsTable.code, code))
+    .limit(1);
+  if (!coupon || !coupon.active) {
+    res.status(404).json({ error: "That code is not valid" });
+    return;
+  }
+  if (coupon.discountType !== "grant" || !coupon.grantTier) {
+    res.status(400).json({ error: "That's a discount code — apply it at checkout, not here." });
+    return;
+  }
+  if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()) {
+    res.status(410).json({ error: "That code has expired" });
+    return;
+  }
+  if (coupon.maxRedemptions != null && coupon.timesRedeemed >= coupon.maxRedemptions) {
+    res.status(410).json({ error: "That code has reached its redemption limit" });
+    return;
+  }
+  const periodEnd =
+    coupon.grantDays != null
+      ? new Date(Date.now() + coupon.grantDays * 24 * 60 * 60 * 1000)
+      : null;
+  await db
+    .update(studyUsersTable)
+    .set({
+      subscriptionTier: coupon.grantTier,
+      subscriptionStatus: "active",
+      subscriptionCurrentPeriodEnd: periodEnd,
+      autoRenew: false,
+    })
+    .where(eq(studyUsersTable.id, req.studyUser!.id));
+  await db
+    .update(studyCouponsTable)
+    .set({ timesRedeemed: sql`${studyCouponsTable.timesRedeemed} + 1` })
+    .where(eq(studyCouponsTable.id, coupon.id));
+  res.json({
+    ok: true,
+    tier: coupon.grantTier,
+    subscriptionCurrentPeriodEnd: periodEnd?.toISOString() ?? null,
   });
 });
 

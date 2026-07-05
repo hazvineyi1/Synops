@@ -12,6 +12,7 @@ import {
   useStudyPaymentStatus,
   useStudyCancelSubscription,
   useStudyCouponPreview,
+  useStudyRedeemCode,
   type BillingCountry,
   type CouponPreview,
   type TierId,
@@ -57,6 +58,28 @@ export default function StudyUpgrade() {
   const cardCheckout = useStudyCardCheckout();
   const cancel = useStudyCancelSubscription();
   const couponPreview = useStudyCouponPreview();
+  const redeemCode = useStudyRedeemCode();
+  const [accessCode, setAccessCode] = useState("");
+  const [redeemMsg, setRedeemMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  function handleRedeem() {
+    setRedeemMsg(null);
+    const c = accessCode.trim();
+    if (!c) return;
+    redeemCode.mutate(
+      { code: c },
+      {
+        onSuccess: (r) => {
+          setRedeemMsg({ ok: true, text: `Unlocked ${TIER_LABEL[r.tier] ?? r.tier}! Reloading…` });
+          setAccessCode("");
+          refetchSub?.();
+          setTimeout(() => { window.location.href = "/study/coach"; }, 1200);
+        },
+        onError: (e) =>
+          setRedeemMsg({ ok: false, text: (e as { message?: string })?.message ?? "That code isn't valid." }),
+      },
+    );
+  }
 
   const [tier, setTier] = useState<TierId>("pro");
   const [interval, setInterval] = useState<Interval>("month");
@@ -296,6 +319,24 @@ export default function StudyUpgrade() {
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-12">
+        <div className="mb-8 rounded-xl border border-border/60 p-4 flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="flex-1">
+            <Label htmlFor="accessCode" className="text-sm">Have an access code?</Label>
+            <Input
+              id="accessCode"
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+              placeholder="Enter code"
+              className="mt-1.5 uppercase"
+            />
+          </div>
+          <Button onClick={handleRedeem} disabled={redeemCode.isPending || !accessCode.trim()} className="gap-2">
+            {redeemCode.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Redeem
+          </Button>
+        </div>
+        {redeemMsg && (
+          <p className={`-mt-4 mb-6 text-sm ${redeemMsg.ok ? "text-primary" : "text-destructive"}`}>{redeemMsg.text}</p>
+        )}
         {isPro ? (
           <section className="text-center">
             <div className="mx-auto mb-6 h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">

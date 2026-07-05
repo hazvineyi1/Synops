@@ -47,6 +47,8 @@ interface CouponInput {
   active?: unknown;
   maxRedemptions?: unknown;
   expiresAt?: unknown;
+  grantTier?: unknown;
+  grantDays?: unknown;
 }
 
 // Validate + normalize a coupon payload. Returns either parsed values or an error
@@ -63,16 +65,20 @@ function parseCoupon(body: CouponInput): { error: string } | {
     active: boolean;
     maxRedemptions: number | null;
     expiresAt: Date | null;
+    grantTier: string | null;
+    grantDays: number | null;
   };
 } {
   const discountType = body.discountType;
-  if (discountType !== "percent" && discountType !== "fixed") {
-    return { error: "discountType must be 'percent' or 'fixed'" };
+  if (discountType !== "percent" && discountType !== "fixed" && discountType !== "grant") {
+    return { error: "discountType must be 'percent', 'fixed', or 'grant'" };
   }
 
   let percentOff: number | null = null;
   let amountOffMinor: number | null = null;
   let currency: string | null = null;
+  let grantTier: string | null = null;
+  let grantDays: number | null = null;
 
   if (discountType === "percent") {
     const pct = Number(body.percentOff);
@@ -80,7 +86,7 @@ function parseCoupon(body: CouponInput): { error: string } | {
       return { error: "percentOff must be between 1 and 100" };
     }
     percentOff = Math.round(pct);
-  } else {
+  } else if (discountType === "fixed") {
     const amt = Number(body.amountOffMinor);
     if (!Number.isFinite(amt) || amt < 1) {
       return { error: "amountOffMinor must be a positive integer (minor units)" };
@@ -90,6 +96,19 @@ function parseCoupon(body: CouponInput): { error: string } | {
       return { error: `currency must be one of ${CURRENCIES.join(", ")} for fixed coupons` };
     }
     currency = body.currency;
+  } else {
+    // "grant" (access) code: no discount; redeeming grants a tier directly.
+    if (body.grantTier !== "plus" && body.grantTier !== "pro") {
+      return { error: "grantTier must be 'plus' or 'pro' for an access code" };
+    }
+    grantTier = body.grantTier as "plus" | "pro";
+    if (body.grantDays != null && body.grantDays !== "") {
+      const d = Number(body.grantDays);
+      if (!Number.isFinite(d) || d < 1) {
+        return { error: "grantDays must be a positive integer, or empty for indefinite" };
+      }
+      grantDays = Math.round(d);
+    }
   }
 
   let appliesToTier: string | null = null;
@@ -133,6 +152,8 @@ function parseCoupon(body: CouponInput): { error: string } | {
       active: body.active === undefined ? true : Boolean(body.active),
       maxRedemptions,
       expiresAt,
+      grantTier,
+      grantDays,
     },
   };
 }

@@ -15,7 +15,7 @@ import {
 } from "@/hooks/use-study-api";
 import { ArrowLeft, Loader2, Plus, Trash2, Pencil, X } from "lucide-react";
 
-type DiscountType = "percent" | "fixed";
+type DiscountType = "percent" | "fixed" | "grant";
 
 interface FormState {
   id: string | null;
@@ -29,6 +29,8 @@ interface FormState {
   active: boolean;
   maxRedemptions: string;
   expiresAt: string;
+  grantTier: "plus" | "pro";
+  grantDays: string;
 }
 
 const EMPTY_FORM: FormState = {
@@ -43,11 +45,16 @@ const EMPTY_FORM: FormState = {
   active: true,
   maxRedemptions: "",
   expiresAt: "",
+  grantTier: "pro",
+  grantDays: "30",
 };
 
 const CURRENCIES = ["USD", "ZAR", "ZMW", "BWP"];
 
 function describeCoupon(c: AdminCoupon): string {
+  if (c.discountType === "grant") {
+    return `Grants ${c.grantTier ?? "?"} · ${c.grantDays != null ? `${c.grantDays} days` : "forever"} (free)`;
+  }
   if (c.discountType === "percent") return `${c.percentOff}% off`;
   const amount = (c.amountOffMinor ?? 0) / 100;
   return `${c.currency} ${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })} off`;
@@ -89,6 +96,8 @@ export default function StudyAdminCoupons() {
       active: c.active,
       maxRedemptions: c.maxRedemptions != null ? String(c.maxRedemptions) : "",
       expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : "",
+      grantTier: c.grantTier ?? "pro",
+      grantDays: c.grantDays != null ? String(c.grantDays) : "",
     });
     setError(null);
     setShowForm(true);
@@ -107,9 +116,13 @@ export default function StudyAdminCoupons() {
     };
     if (form.discountType === "percent") {
       payload.percentOff = Number(form.percentOff);
-    } else {
+    } else if (form.discountType === "fixed") {
       payload.amountOffMinor = Math.round(Number(form.amountOffMajor) * 100);
       payload.currency = form.currency;
+    } else {
+      payload.grantTier = form.grantTier;
+      payload.grantDays = form.grantDays ? Number(form.grantDays) : null;
+      payload.appliesToTier = null;
     }
 
     try {
@@ -161,9 +174,9 @@ export default function StudyAdminCoupons() {
       <main className="max-w-4xl mx-auto px-6 py-12">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="font-serif text-3xl mb-1">Coupons</h1>
+            <h1 className="font-serif text-3xl mb-1">Codes</h1>
             <p className="text-muted-foreground text-sm">
-              Create discount codes for sales. Learners apply them at checkout.
+              Discount codes apply at checkout. Access-grant codes unlock a plan for free — learners redeem them on the upgrade page.
             </p>
           </div>
           {!showForm && (
@@ -210,7 +223,7 @@ export default function StudyAdminCoupons() {
               <div>
                 <Label>Discount type</Label>
                 <div className="mt-1.5 inline-flex rounded-lg border border-border/60 p-1">
-                  {(["percent", "fixed"] as DiscountType[]).map((dt) => (
+                  {(["percent", "fixed", "grant"] as DiscountType[]).map((dt) => (
                     <button
                       key={dt}
                       type="button"
@@ -221,7 +234,7 @@ export default function StudyAdminCoupons() {
                           : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
-                      {dt === "percent" ? "Percent off" : "Fixed amount"}
+                      {dt === "percent" ? "Percent off" : dt === "fixed" ? "Fixed amount" : "Access grant"}
                     </button>
                   ))}
                 </div>
@@ -240,7 +253,7 @@ export default function StudyAdminCoupons() {
                     className="mt-1.5 max-w-[140px]"
                   />
                 </div>
-              ) : (
+              ) : form.discountType === "fixed" ? (
                 <div className="flex gap-3">
                   <div>
                     <Label htmlFor="amountOff">Amount off</Label>
@@ -268,23 +281,52 @@ export default function StudyAdminCoupons() {
                     </select>
                   </div>
                 </div>
+              ) : (
+                <div className="flex gap-3">
+                  <div>
+                    <Label htmlFor="grantTier">Grants plan</Label>
+                    <select
+                      id="grantTier"
+                      value={form.grantTier}
+                      onChange={(e) => setForm({ ...form, grantTier: e.target.value as "plus" | "pro" })}
+                      className="mt-1.5 block rounded-md border border-border/60 bg-background px-3 py-2 text-sm h-10"
+                    >
+                      <option value="plus">Plus</option>
+                      <option value="pro">Pro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="grantDays">For (days)</Label>
+                    <Input
+                      id="grantDays"
+                      type="number"
+                      min={1}
+                      value={form.grantDays}
+                      onChange={(e) => setForm({ ...form, grantDays: e.target.value })}
+                      placeholder="Forever"
+                      className="mt-1.5 max-w-[140px]"
+                    />
+                  </div>
+                </div>
               )}
 
-              <div>
-                <Label htmlFor="appliesToTier">Applies to</Label>
-                <select
-                  id="appliesToTier"
-                  value={form.appliesToTier}
-                  onChange={(e) =>
-                    setForm({ ...form, appliesToTier: e.target.value as FormState["appliesToTier"] })
-                  }
-                  className="mt-1.5 block rounded-md border border-border/60 bg-background px-3 py-2 text-sm h-10 w-full"
-                >
-                  <option value="">Any paid plan</option>
-                  <option value="plus">Plus only</option>
-                  <option value="pro">Pro only</option>
-                </select>
-              </div>
+              {form.discountType !== "grant" && (
+                <div>
+                  <Label htmlFor="appliesToTier">Applies to</Label>
+                  <select
+                    id="appliesToTier"
+                    value={form.appliesToTier}
+                    onChange={(e) =>
+                      setForm({ ...form, appliesToTier: e.target.value as FormState["appliesToTier"] })
+                    }
+                    className="mt-1.5 block rounded-md border border-border/60 bg-background px-3 py-2 text-sm h-10 w-full"
+                  >
+                    <option value="">Any paid plan</option>
+                    <option value="plus">Plus only</option>
+                    <option value="pro">Pro only</option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="maxRedemptions">Max redemptions (optional)</Label>
