@@ -32,7 +32,7 @@ const STALE_PURGE_BATCH = 50;
 // Matches the contact-email default: Resend's shared onboarding domain only
 // delivers to the Resend account owner. Set CONTACT_FROM_EMAIL to an address on
 // a verified domain for real delivery to arbitrary recipients.
-const DEFAULT_FROM = "Synops Advisory <onboarding@resend.dev>";
+const DEFAULT_FROM = "Synops Consulting <onboarding@resend.dev>";
 
 export function hashToken(raw: string): string {
   return crypto.createHash("sha256").update(raw).digest("hex");

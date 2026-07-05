@@ -138,7 +138,7 @@ export async function ensureOrganizationsSeed(
     [internal] = await db
       .insert(organizationsTable)
       .values({
-        name: "Synops Advisory Group",
+        name: "Synops Consulting Group",
         slug: INTERNAL_ORG_SLUG,
         type: "internal",
         tagline: "Internal consulting tenant",
@@ -237,7 +237,7 @@ export async function ensureDemoUsers(
           email: acct.email,
           passwordHash,
           name: acct.name,
-          organization: "Synops Advisory Group",
+          organization: "Synops Consulting Group",
           organizationId: acct.organizationId,
           role: acct.role,
           productKey: acct.productKey,

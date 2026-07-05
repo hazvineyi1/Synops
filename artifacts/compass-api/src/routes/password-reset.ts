@@ -21,7 +21,7 @@ const SEND_TIMEOUT_MS = 8000;
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 // Resend's shared onboarding domain only delivers to the Resend account owner.
 // Set CONTACT_FROM_EMAIL to an address on a verified domain for real delivery.
-const DEFAULT_FROM = "Synops Advisory <onboarding@resend.dev>";
+const DEFAULT_FROM = "Synops Consulting <onboarding@resend.dev>";
 
 interface MinimalLogger {
   info: (obj: object, msg?: string) => void;

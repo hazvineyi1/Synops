@@ -27,6 +27,20 @@ declare global {
   }
 }
 
+// Env-based super-admin bootstrap for the Coach. Emails listed in ADMIN_EMAILS
+// (comma-separated) are treated as admins even when their DB is_admin flag is
+// false. This lets the first/super admin be designated by configuration -- the
+// same pattern the teacher app already uses -- instead of a manual production DB
+// edit. The DB is_admin flag still works; this only ever grants, never revokes.
+function coachAdminEmails(): Set<string> {
+  return new Set(
+    (process.env["ADMIN_EMAILS"] ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
 export async function loadTeacher(
   req: Request,
   _res: Response,
@@ -146,6 +160,11 @@ export async function loadTeacher(
             }
             user.subscriptionTier = "free";
             user.subscriptionStatus = "expired";
+          }
+          // Grant admin to allowlisted emails (config-based super-admin bootstrap).
+          if (!user.isAdmin && coachAdminEmails().has(user.email.toLowerCase())) {
+            user.isAdmin = true;
+            if (user.role !== "super_admin") user.role = "super_admin";
           }
           req.studyUser = user;
         }

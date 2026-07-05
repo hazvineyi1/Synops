@@ -12,7 +12,7 @@ import type { Product } from "@/lib/products";
 export default function ProductLogin({ product }: { product: Product }) {
   usePageMeta(
     `Sign in to ${product.name}`,
-    `Sign in to ${product.name}, the ${product.title} from Synops Advisory Group.`,
+    `Sign in to ${product.name}, the ${product.title} from Synops Consulting Group.`,
   );
   const { user, login, resendVerification } = useAuth();
   const { isBranded, organization } = useBranding();
@@ -97,7 +97,7 @@ export default function ProductLogin({ product }: { product: Product }) {
             className="rounded-md border-l-4 bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
             style={{ borderLeftColor: accent }}
           >
-            Provided for {branded.name} via Synops Advisory Group.
+            Provided for {branded.name} via Synops Consulting Group.
           </div>
         )}
         {error && (

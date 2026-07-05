@@ -53,7 +53,7 @@ function PortalCard({ product }: { product: Product }) {
 export default function Portals() {
   usePageMeta(
     "Curriculum Builder",
-    "Sign in to Curriculum Builder, the Synops Advisory Group standards-aligned curriculum platform.",
+    "Sign in to Curriculum Builder, the Synops Consulting Group standards-aligned curriculum platform.",
   );
 
   return (

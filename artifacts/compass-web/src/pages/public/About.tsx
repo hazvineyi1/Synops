@@ -6,7 +6,7 @@ export default function About() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-24 space-y-16">
       <div className="space-y-6 max-w-3xl">
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary">About Synops Advisory Group</h1>
+        <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-primary">About Synops Consulting Group</h1>
         <p className="text-xl text-muted-foreground leading-relaxed">
           A complementary partnership spanning healthcare operations and education technology, serving organizations across the United States.
         </p>

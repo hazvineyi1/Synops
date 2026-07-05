@@ -1,5 +1,5 @@
 // US-focused Coach landing. Shown when a visitor arrives from the marketing site
-// (synops-consulting.com) — the US-facing Synops Advisory brand. Direct visitors get
+// (synops-consulting.com) — the US-facing Synops Consulting brand. Direct visitors get
 // the default StudyLanding instead. This page is standalone and safe to edit: the
 // copy lives in plain JSX below, and the US_EXAMS list drives the exam chips.
 import { useEffect } from "react";

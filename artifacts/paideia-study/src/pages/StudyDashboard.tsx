@@ -103,10 +103,13 @@ export default function StudyDashboard() {
   // (The legacy learning-style gate was removed, The Coach spec forbids VARK/modality framing.)
   // Wait for profile data to load to avoid a flash-redirect on first paint.
   useEffect(() => {
-    if (profile && !profile.diagnosticComplete) {
+    // Admins (and super admins) are exempt from the onboarding gate so they can
+    // always reach the dashboard + admin console instead of being trapped on the
+    // learner intake. They can still open /intake manually if they want it.
+    if (profile && !profile.diagnosticComplete && !user?.isAdmin) {
       setLoc("/intake");
     }
-  }, [profile, setLoc]);
+  }, [profile, setLoc, user]);
 
   const hasActivePath = sessionData?.hasActivePath ?? false;
   const progress = sessionData?.progress ?? { completedSteps: 0, totalSteps: 0, percentComplete: 0 };

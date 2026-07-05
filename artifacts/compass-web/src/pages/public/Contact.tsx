@@ -24,7 +24,7 @@ const formSchema = z.object({
 });
 
 export default function Contact() {
-  usePageMeta("Contact", "Book a consultation with Synops Advisory Group.");
+  usePageMeta("Contact", "Book a consultation with Synops Consulting Group.");
   const { toast } = useToast();
   const submitContact = useSubmitContact();
 

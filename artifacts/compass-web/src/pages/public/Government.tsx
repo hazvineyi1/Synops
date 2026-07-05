@@ -27,7 +27,7 @@ export default function Government() {
         <Badge variant="outline" className="text-primary border-primary">Government Procurement</Badge>
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Federal & Multi-State Ready</h1>
         <p className="text-xl text-muted-foreground leading-relaxed max-w-3xl">
-          Synops Advisory Group provides enterprise-grade consulting and technical execution for government agencies across the United States. We are fully remote and deliver across all U.S. time zones.
+          Synops Consulting Group provides enterprise-grade consulting and technical execution for government agencies across the United States. We are fully remote and deliver across all U.S. time zones.
         </p>
       </div>
 

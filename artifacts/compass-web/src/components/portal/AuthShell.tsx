@@ -11,11 +11,11 @@ export function AuthShell({
   children,
   footer,
   eyebrow = "Client Portal",
-  panelLine = "One platform for the Synops Advisory Group products you rely on.",
+  panelLine = "One platform for the Synops Consulting Group products you rely on.",
   panelNote,
   accent,
   logoUrl,
-  brandName = "Synops Advisory",
+  brandName = "Synops Consulting",
 }: {
   title: string;
   subtitle?: string;

@@ -260,7 +260,7 @@ export async function loadEvidencePacket(projectId: number): Promise<EvidencePac
     crosswalkLinks,
     qa,
     branding: {
-      organizationName: org?.name ?? "Synops Advisory Group",
+      organizationName: org?.name ?? "Synops Consulting Group",
       tagline: org?.tagline ?? null,
       accentColor: org?.accentColor ?? null,
       logoUrl: org?.logoUrl ?? null,

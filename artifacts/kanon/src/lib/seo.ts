@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const SITE_NAME = "Synops Advisory Group";
+const SITE_NAME = "Synops Consulting Group";
 
 /**
  * Sets the document title and meta description for a route. Restores nothing on

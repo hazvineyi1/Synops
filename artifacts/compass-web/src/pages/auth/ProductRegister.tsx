@@ -12,7 +12,7 @@ import type { Product } from "@/lib/products";
 export default function ProductRegister({ product }: { product: Product }) {
   usePageMeta(
     `Create your ${product.name} account`,
-    `Register for ${product.name}, the ${product.title} from Synops Advisory Group.`,
+    `Register for ${product.name}, the ${product.title} from Synops Consulting Group.`,
   );
   const { user, register, resendVerification } = useAuth();
 

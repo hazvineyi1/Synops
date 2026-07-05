@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { format, parseISO } from "date-fns";
 
 export default function Insights() {
-  usePageMeta("Insights", "Articles and perspectives from Synops Advisory Group.");
+  usePageMeta("Insights", "Articles and perspectives from Synops Consulting Group.");
   return (
     <div className="mx-auto max-w-5xl px-4 py-24 space-y-16">
       <div className="space-y-4">

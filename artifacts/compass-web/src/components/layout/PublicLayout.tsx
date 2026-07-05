@@ -23,7 +23,7 @@ function Brandmark() {
         <span className="relative z-10 text-[11px] font-bold">SA</span>
       </span>
       <span className="text-base leading-tight">
-        Synops <span className="text-muted-foreground font-normal">Advisory</span>
+        Synops <span className="text-muted-foreground font-normal">Consulting</span>
       </span>
     </Link>
   );
@@ -155,7 +155,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
         </div>
         <div className="border-t border-border">
           <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-2 px-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:px-6 lg:px-8">
-            <p>&copy; {new Date().getFullYear()} Synops Advisory Group. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Synops Consulting Group. All rights reserved.</p>
             <p>Built to WCAG 2.1 AA. Contact us if you encounter any barrier using this site.</p>
           </div>
         </div>

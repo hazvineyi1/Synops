@@ -14,7 +14,7 @@ export function Footer() {
                 </svg>
               </div>
               <span className="font-sans text-[22px] tracking-tight text-foreground">
-                <span className="font-bold">Synops</span> <span className="font-normal">Advisory</span>
+                <span className="font-bold">Synops</span> <span className="font-normal">Consulting</span>
               </span>
             </Link>
             <p className="text-[15px] text-muted-foreground leading-relaxed max-w-sm">

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { InterestForm } from "@/components/public/InterestForm";
 
 export default function Home() {
-  usePageMeta("Synops Advisory Group", "Operations, learning, and technology consulting, from strategy to build.");
+  usePageMeta("Synops Consulting Group", "Operations, learning, and technology consulting, from strategy to build.");
 
   useEffect(() => {
     const script = document.createElement("script");
@@ -16,7 +16,7 @@ export default function Home() {
     script.text = JSON.stringify({
       "@context": "https://schema.org",
       "@type": "ProfessionalService",
-      "name": "Synops Advisory Group",
+      "name": "Synops Consulting Group",
       "description": "Operations, learning, and technology consulting, from strategy to build.",
       "areaServed": "US",
       "foundingLocation": "Virginia"
@@ -35,7 +35,7 @@ export default function Home() {
               Nationwide Advisory & Build
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-balance">
-              Synops Advisory Group
+              Synops Consulting Group
             </h1>
             <p className="text-xl text-primary-foreground/90 max-w-lg leading-relaxed">
               Operations, learning, and technology consulting, from strategy to build.

@@ -38,7 +38,7 @@ export function Nav() {
               </svg>
             </div>
             <span className={`font-sans text-[22px] tracking-tight ${isScrolled ? "text-foreground" : "text-white"}`}>
-              <span className="font-bold">Synops</span> <span className="font-normal">Advisory</span>
+              <span className="font-bold">Synops</span> <span className="font-normal">Consulting</span>
             </span>
           </Link>
 

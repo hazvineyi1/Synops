@@ -20,7 +20,7 @@ export default function Home() {
                 Nationwide Advisory & Build
               </div>
               <h1 className="text-white text-5xl lg:text-[64px] font-bold leading-[1.1] tracking-tight mb-6">
-                Synops Advisory Group
+                Synops Consulting Group
               </h1>
               <p className="text-[20px] lg:text-[24px] text-white/90 leading-relaxed mb-6 font-medium">
                 Operations, learning, and technology consulting, from strategy to build.

@@ -21,9 +21,9 @@ export interface ContactNotification {
 
 // Default sender uses Resend's shared onboarding domain, which only delivers to
 // the Resend account owner. Set CONTACT_FROM_EMAIL to an address on a verified
-// domain (e.g. "Synops Advisory <notifications@synops-consulting.com>") for real
+// domain (e.g. "Synops Consulting <notifications@synops-consulting.com>") for real
 // delivery to arbitrary recipients.
-const DEFAULT_FROM = "Synops Advisory <onboarding@resend.dev>";
+const DEFAULT_FROM = "Synops Consulting <onboarding@resend.dev>";
 
 // Bound the provider call so a slow/hung Resend never stalls the public form.
 const SEND_TIMEOUT_MS = 8000;
