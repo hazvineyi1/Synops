@@ -10,10 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.21.0",
     "@sentry/node": "^8.0.0",
     "@workspace/paideia-api-zod": "workspace:*",
     "@workspace/paideia-db": "workspace:*",
     "cookie-parser": "^1.4.7",
+    "pdfkit": "^0.19.1",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
