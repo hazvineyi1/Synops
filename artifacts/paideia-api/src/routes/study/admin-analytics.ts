@@ -581,6 +581,47 @@ router.post("/users/:id/set-admin", async (req, res) => {
   res.json({ ok: true });
 });
 
+// Admin: directly set (comp/upgrade/downgrade) a user's plan without payment.
+// tier: free | plus | pro. days: duration for a paid grant (empty/0 = indefinite).
+// Grants are marked autoRenew=false, so a dated grant auto-downgrades to free when
+// its period ends (the lazy-expiry reconcile in loadTeacher handles that); an
+// indefinite grant (no period end) never lapses until changed here.
+router.post("/users/:id/set-plan", async (req, res) => {
+  const id = String(req.params.id);
+  const tier = req.body?.tier;
+  if (!["free", "plus", "pro"].includes(tier)) {
+    res.status(400).json({ error: "tier must be 'free', 'plus', or 'pro'" });
+    return;
+  }
+  let periodEnd: Date | null = null;
+  let grantDays: number | null = null;
+  if (tier !== "free" && req.body?.days != null && req.body.days !== "") {
+    const days = Number(req.body.days);
+    if (!Number.isFinite(days) || days < 1) {
+      res.status(400).json({ error: "days must be a positive number, or empty for indefinite" });
+      return;
+    }
+    grantDays = Math.round(days);
+    periodEnd = new Date(Date.now() + grantDays * 24 * 60 * 60 * 1000);
+  }
+  const updated = await db
+    .update(studyUsersTable)
+    .set({
+      subscriptionTier: tier,
+      subscriptionStatus: tier === "free" ? "free" : "active",
+      subscriptionCurrentPeriodEnd: tier === "free" ? null : periodEnd,
+      autoRenew: false,
+    })
+    .where(eq(studyUsersTable.id, id))
+    .returning({ id: studyUsersTable.id, email: studyUsersTable.email });
+  if (!updated[0]) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  await writeAudit(req, "user.set_plan", "user", id, { tier, days: grantDays });
+  res.json({ ok: true, tier, subscriptionCurrentPeriodEnd: periodEnd?.toISOString() ?? null });
+});
+
 // ─── Impersonation ───────────────────────────────────────────────────────────
 
 // Become another user: mint a fresh session as the target and swap the session

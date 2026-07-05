@@ -22,6 +22,7 @@ import {
   useStudyUpdatePaymentMethod,
   useStudyAdminAudit,
   useStudyAdminUserAction,
+  useStudyAdminSetPlan,
   useStudyAdminCreateUser,
   useStudyAdminDeleteUser,
   useStudyAdminImpersonate,
@@ -202,10 +203,25 @@ function Roster() {
   const createUser = useStudyAdminCreateUser();
   const deleteUser = useStudyAdminDeleteUser();
   const impersonate = useStudyAdminImpersonate();
+  const setPlan = useStudyAdminSetPlan();
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [nu, setNu] = useState({ email: "", name: "", password: "", tier: "free" });
   const [addErr, setAddErr] = useState<string | null>(null);
+  const [planTier, setPlanTier] = useState<"free" | "plus" | "pro">("pro");
+  const [planDays, setPlanDays] = useState("30");
+
+  function applyPlan(id: string) {
+    setPlan.mutate(
+      { id, tier: planTier, days: planTier === "free" || !planDays ? null : Number(planDays) },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: ["studyAdminUsers"] });
+          qc.invalidateQueries({ queryKey: ["studyAdminUserDetail"] });
+        },
+      },
+    );
+  }
 
   function refreshUsers() { qc.invalidateQueries({ queryKey: ["studyAdminUsers"] }); }
   function submitNewUser() {
@@ -331,6 +347,38 @@ function Roster() {
                   <Button size="sm" variant="outline" onClick={() => runImpersonate(String(detail.data!.user["id"]))}>
                     <Eye className="w-4 h-4 mr-1" /> Impersonate
                   </Button>
+                </div>
+                <div className="mt-3 border rounded-md p-3 bg-muted/30">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+                    Plan &mdash; currently {String(detail.data.user["subscription_tier"] ?? "free")}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={planTier}
+                      onChange={(e) => setPlanTier(e.target.value as "free" | "plus" | "pro")}
+                      className="border rounded px-2 py-1.5 text-sm bg-background"
+                    >
+                      <option value="free">Free</option>
+                      <option value="plus">Plus</option>
+                      <option value="pro">Pro</option>
+                    </select>
+                    {planTier !== "free" && (
+                      <>
+                        <input
+                          type="number"
+                          min={1}
+                          value={planDays}
+                          onChange={(e) => setPlanDays(e.target.value)}
+                          placeholder="days"
+                          className="border rounded px-2 py-1.5 text-sm w-20 bg-background"
+                        />
+                        <span className="text-xs text-muted-foreground">days (blank = forever)</span>
+                      </>
+                    )}
+                    <Button size="sm" disabled={setPlan.isPending} onClick={() => applyPlan(String(detail.data!.user["id"]))}>
+                      {setPlan.isPending ? "Applying…" : "Apply plan"}
+                    </Button>
+                  </div>
                 </div>
               </div>
               <div>

@@ -900,6 +900,25 @@ export function useStudyAdminUserAction() {
   });
 }
 
+// Admin: comp/upgrade/downgrade a user's plan without payment. days empty = indefinite.
+export function useStudyAdminSetPlan() {
+  return useMutation<
+    { ok: true; tier: string; subscriptionCurrentPeriodEnd: string | null },
+    ErrorType<unknown>,
+    { id: string; tier: "free" | "plus" | "pro"; days?: number | null }
+  >({
+    mutationFn: async ({ id, tier, days }) =>
+      customFetch<{ ok: true; tier: string; subscriptionCurrentPeriodEnd: string | null }>(
+        `${BASE}/admin/users/${id}/set-plan`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tier, days: days ?? null }),
+        },
+      ),
+  });
+}
+
 export function useStudyAdminCreateUser() {
   return useMutation<
     { user: { id: string; email: string } },
