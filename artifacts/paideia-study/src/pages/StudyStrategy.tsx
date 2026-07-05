@@ -76,15 +76,25 @@ export default function StudyStrategy() {
   }
 
   if (generate.isError && !strategy) {
+    const msg = (generate.error as Error)?.message || "Please try again.";
+    // The strategy engine needs the learning-style diagnostic. If it's missing
+    // (e.g. an admin who skipped onboarding), send the user to complete it rather
+    // than a dead "Try again" that can't succeed.
+    const needsDiagnostic = /diagnostic/i.test(msg);
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-4">
         <Card className="max-w-md w-full">
           <CardContent className="py-8 text-center">
             <h2 className="font-bold mb-2">Strategy generation failed</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              {(generate.error as Error)?.message || "Please try again."}
-            </p>
-            <Button onClick={() => generate.mutate({ materialId })}>Try again</Button>
+            <p className="text-sm text-muted-foreground mb-4">{msg}</p>
+            {needsDiagnostic ? (
+              <div className="flex flex-col items-center gap-2">
+                <Button onClick={() => setLoc("/intake")}>Complete diagnostic</Button>
+                <button className="text-xs text-muted-foreground underline" onClick={() => setLoc("/dashboard")}>Back to dashboard</button>
+              </div>
+            ) : (
+              <Button onClick={() => generate.mutate({ materialId })}>Try again</Button>
+            )}
           </CardContent>
         </Card>
       </div>
