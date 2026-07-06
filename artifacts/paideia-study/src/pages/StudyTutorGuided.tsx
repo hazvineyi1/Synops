@@ -25,7 +25,7 @@ type Turn =
   | {
       v: 1; kind: "lesson"; conceptId: string; conceptTitle: string;
       explanation_md: string; example: string;
-      check: { question: string; options: string[]; correctIndex: number; explanation: string };
+      check: { question: string; options: string[]; correctIndex: number; explanation: string } | null;
       sources: string[];
     }
   | {
@@ -91,18 +91,30 @@ export default function StudyTutorGuided() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversation, setConversation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [diagAnswers, setDiagAnswers] = useState<Record<string, number>>({});
   const [checkAnswers, setCheckAnswers] = useState<Record<string, number>>({});
 
   const load = async () => {
-    const r = await fetch(`/api/study/tutor/guided/${conversationId}`, { credentials: "include" });
-    if (!r.ok) { setLoading(false); return; }
-    const data = await r.json();
-    setConversation(data.conversation);
-    setMessages(data.messages);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const r = await fetch(`/api/study/tutor/guided/${conversationId}`, { credentials: "include" });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        setLoadError(e?.error || "Couldn't load this session. Please try again.");
+        setLoading(false);
+        return;
+      }
+      const data = await r.json();
+      setConversation(data.conversation ?? null);
+      setMessages(Array.isArray(data.messages) ? data.messages : []);
+      setLoading(false);
+    } catch {
+      setLoadError("Couldn't load this session. Check your connection and try again.");
+      setLoading(false);
+    }
   };
   useEffect(() => { load(); }, [conversationId]);
   useEffect(() => {
@@ -131,6 +143,16 @@ export default function StudyTutorGuided() {
 
   // Render
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+
+  if (loadError) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center">
+      <p className="text-sm text-muted-foreground max-w-sm">{loadError}</p>
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={() => { setLoading(true); load(); }}>Retry</Button>
+        <Button onClick={() => setLoc("/tutor")}>Back to Tutor</Button>
+      </div>
+    </div>
+  );
 
   const visibleMessages = messages.filter((m) => !(m.turn?.kind === "user_reply"));
   const isSocratic = !!conversation?.socraticMode;
@@ -376,36 +398,50 @@ function TurnView({
             </div>
           )}
           <div className="border-t pt-3 space-y-2">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Quick check</div>
-            <p className="text-sm font-medium">{turn.check.question}</p>
-            <div className="space-y-1.5">
-              {turn.check.options.map((opt, idx) => {
-                const selected = ans === idx;
-                return (
-                  <button
-                    key={idx}
-                    disabled={pending}
-                    onClick={() => setCheckAnswers({ ...checkAnswers, [key]: idx })}
-                    className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
-                      selected ? "border-primary bg-primary/5" : "border-input hover:bg-muted/50"
-                    }`}
-                  >
-                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full border text-[11px] mr-2 align-middle">
-                      {String.fromCharCode(65 + idx)}
-                    </span>
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
+            {turn.check ? (
+              <>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Quick check</div>
+                <p className="text-sm font-medium">{turn.check.question}</p>
+                <div className="space-y-1.5">
+                  {turn.check.options.map((opt, idx) => {
+                    const selected = ans === idx;
+                    return (
+                      <button
+                        key={idx}
+                        disabled={pending}
+                        onClick={() => setCheckAnswers({ ...checkAnswers, [key]: idx })}
+                        className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                          selected ? "border-primary bg-primary/5" : "border-input hover:bg-muted/50"
+                        }`}
+                      >
+                        <span className="inline-flex items-center justify-center h-5 w-5 rounded-full border text-[11px] mr-2 align-middle">
+                          {String.fromCharCode(65 + idx)}
+                        </span>
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            ) : null}
             <div className="flex gap-2 pt-1">
-              <Button
-                size="sm"
-                disabled={typeof ans !== "number" || pending}
-                onClick={() => onSend({ kind: "check_answer", lessonMessageId: message.id, selectedIndex: ans })}
-              >
-                Check my answer
-              </Button>
+              {turn.check ? (
+                <Button
+                  size="sm"
+                  disabled={typeof ans !== "number" || pending}
+                  onClick={() => onSend({ kind: "check_answer", lessonMessageId: message.id, selectedIndex: ans })}
+                >
+                  Check my answer
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => onSend({ kind: "teach_next" })}
+                >
+                  Continue <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"

@@ -10,7 +10,11 @@ if (!baseURL || !apiKey) {
   );
 }
 
-export const openai = new OpenAI({ baseURL, apiKey });
+// timeout caps how long a single AI call can hang (the endpoint occasionally
+// stalls); maxRetries:1 avoids the SDK's default 2-retry backoff turning a bad
+// request into a ~minute-long hang. A failed call then surfaces as a clean error
+// the caller converts into a 500, instead of a spinner that never resolves.
+export const openai = new OpenAI({ baseURL, apiKey, timeout: 60_000, maxRetries: 1 });
 
 // Served via Anthropic's OpenAI-compatible endpoint (AI_INTEGRATIONS_OPENAI_BASE_URL
 // = https://api.anthropic.com/v1/). Use a Claude model name here, not an OpenAI one.

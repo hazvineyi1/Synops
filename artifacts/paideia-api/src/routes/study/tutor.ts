@@ -549,6 +549,14 @@ Return JSON exactly:
     explanation: String(q.explanation ?? "").slice(0, 400),
   })).filter((q: any) => q.options.length === 4 && q.question.length > 0);
 
+  // Post-sanitize guard: if every question was dropped (malformed AI output), do
+  // NOT persist an empty diagnostic — that would create a session the UI renders
+  // with no answer buttons (a dead end). Surface a clean retryable error instead.
+  if (diagnostic.questions.length === 0) {
+    res.status(500).json({ error: "Tutor could not assemble a valid diagnostic. Try again." });
+    return;
+  }
+
   // Tag guided conversations so the list view can route them to the guided page,
   // not the free-form chat (which would render raw <<TUTOR_TURN>> JSON).
   const guidedTag = `guided:${materialId ?? ""}`;
@@ -724,6 +732,14 @@ router.post("/guided/:conversationId/reply", async (req, res) => {
         .values({ conversationId, role: "assistant", content: encodeTurn(feedbackTurn), usedPersonalization: true })
         .returning();
 
+      // Only attach a check if the AI produced a well-formed one (4 options + a
+      // question). Otherwise check:null so the UI shows a "Continue" button rather
+      // than a dead-end block with no answers.
+      const fbCheckQuestion = String(lesson.check?.question ?? "").slice(0, 500);
+      const fbCheckOptions = Array.isArray(lesson.check?.options)
+        ? lesson.check.options.slice(0, 4).map((o: any) => String(o).slice(0, 200)).filter((o: string) => o.length > 0)
+        : [];
+      const fbValidCheck = fbCheckQuestion.length > 0 && fbCheckOptions.length === 4;
       const lessonTurn = {
         v: 1,
         kind: "lesson" as const,
@@ -731,14 +747,14 @@ router.post("/guided/:conversationId/reply", async (req, res) => {
         conceptTitle: focusConcept.title,
         explanation_md: String(lesson.explanation_md ?? "").slice(0, 5000),
         example: String(lesson.example ?? "").slice(0, 800),
-        check: {
-          question: String(lesson.check?.question ?? "").slice(0, 500),
-          options: Array.isArray(lesson.check?.options)
-            ? lesson.check.options.slice(0, 4).map((o: any) => String(o).slice(0, 200))
-            : [],
-          correctIndex: Math.max(0, Math.min(3, Number(lesson.check?.correctIndex) || 0)),
-          explanation: String(lesson.check?.explanation ?? "").slice(0, 400),
-        },
+        check: fbValidCheck
+          ? {
+              question: fbCheckQuestion,
+              options: fbCheckOptions,
+              correctIndex: Math.max(0, Math.min(3, Number(lesson.check?.correctIndex) || 0)),
+              explanation: String(lesson.check?.explanation ?? "").slice(0, 400),
+            }
+          : null,
         sources: [] as string[],
       };
       const [lsMsg] = await db
@@ -764,6 +780,10 @@ router.post("/guided/:conversationId/reply", async (req, res) => {
       const lessonTurn = lessonRow[0] ? decodeTurn(lessonRow[0].content) : null;
       if (!lessonTurn || lessonTurn.kind !== "lesson") {
         res.status(400).json({ error: "Lesson not found." });
+        return;
+      }
+      if (!lessonTurn.check) {
+        res.status(400).json({ error: "This lesson has no check question to grade." });
         return;
       }
       const laterMsgs = await db
@@ -843,6 +863,14 @@ router.post("/guided/:conversationId/reply", async (req, res) => {
           target,
           contextNote: "",
         });
+        // Only build a "quick check" if the AI produced a well-formed one (exactly
+        // 4 options + a non-empty question). Otherwise emit check:null so the UI
+        // renders a "Continue" button instead of a dead-end block with no answers.
+        const checkQuestion = String(lesson.check?.question ?? "").slice(0, 500);
+        const checkOptions = Array.isArray(lesson.check?.options)
+          ? lesson.check.options.slice(0, 4).map((o: any) => String(o).slice(0, 200)).filter((o: string) => o.length > 0)
+          : [];
+        const validCheck = checkQuestion.length > 0 && checkOptions.length === 4;
         const lessonTurn = {
           v: 1,
           kind: "lesson" as const,
@@ -850,14 +878,14 @@ router.post("/guided/:conversationId/reply", async (req, res) => {
           conceptTitle: target.title,
           explanation_md: String(lesson.explanation_md ?? "").slice(0, 5000),
           example: String(lesson.example ?? "").slice(0, 800),
-          check: {
-            question: String(lesson.check?.question ?? "").slice(0, 500),
-            options: Array.isArray(lesson.check?.options)
-              ? lesson.check.options.slice(0, 4).map((o: any) => String(o).slice(0, 200))
-              : [],
-            correctIndex: Math.max(0, Math.min(3, Number(lesson.check?.correctIndex) || 0)),
-            explanation: String(lesson.check?.explanation ?? "").slice(0, 400),
-          },
+          check: validCheck
+            ? {
+                question: checkQuestion,
+                options: checkOptions,
+                correctIndex: Math.max(0, Math.min(3, Number(lesson.check?.correctIndex) || 0)),
+                explanation: String(lesson.check?.explanation ?? "").slice(0, 400),
+              }
+            : null,
           sources: [] as string[],
         };
         const [m] = await db
