@@ -223,6 +223,20 @@ function Roster() {
     );
   }
 
+  // Inline quick-change from the roster: comps the tier indefinitely (no payment).
+  // Use the detail dialog for a time-limited grant.
+  function quickSetPlan(id: string, tier: "free" | "plus" | "pro") {
+    setPlan.mutate(
+      { id, tier, days: null },
+      {
+        onSuccess: () => {
+          qc.invalidateQueries({ queryKey: ["studyAdminUsers"] });
+          qc.invalidateQueries({ queryKey: ["studyAdminUserDetail"] });
+        },
+      },
+    );
+  }
+
   function refreshUsers() { qc.invalidateQueries({ queryKey: ["studyAdminUsers"] }); }
   function submitNewUser() {
     setAddErr(null);
@@ -300,10 +314,22 @@ function Roster() {
                     <div className="font-medium">{u.name}</div>
                     <div className="text-xs text-muted-foreground">{u.email}</div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={u.is_paid ? "default" : "secondary"}>{u.is_paid ? u.subscription_tier || "paid" : "free"}</Badge>
-                    {u.is_admin ? <Badge variant="outline" className="ml-1">admin</Badge> : null}
-                    {u.suspended ? <Badge variant="destructive" className="ml-1">suspended</Badge> : null}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-1">
+                      <select
+                        value={(u.subscription_tier as string) || "free"}
+                        onChange={(e) => quickSetPlan(u.id, e.target.value as "free" | "plus" | "pro")}
+                        disabled={setPlan.isPending}
+                        title="Change plan — comps instantly, no payment (use the row for a timed grant)"
+                        className="border rounded h-8 px-1.5 text-xs bg-background capitalize"
+                      >
+                        <option value="free">free</option>
+                        <option value="plus">plus</option>
+                        <option value="pro">pro</option>
+                      </select>
+                      {u.is_admin ? <Badge variant="outline">admin</Badge> : null}
+                      {u.suspended ? <Badge variant="destructive">suspended</Badge> : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{u.session_count}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtDuration(u.total_time_seconds)}</TableCell>
