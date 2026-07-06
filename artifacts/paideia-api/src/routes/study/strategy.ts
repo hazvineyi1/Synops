@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   db,
   studyMaterialsTable,
-  studyLearningStyleProfilesTable,
+  studyLearnerProfilesTable,
 } from "@workspace/paideia-db";
 import { eq, and } from "drizzle-orm";
 import { requireStudyUser } from "../../middlewares/auth.js";
@@ -58,16 +58,27 @@ router.post("/:materialId/generate", async (req, res) => {
     return;
   }
 
-  const [style] = await db
+  const [profile] = await db
     .select()
-    .from(studyLearningStyleProfilesTable)
-    .where(eq(studyLearningStyleProfilesTable.userId, userId))
+    .from(studyLearnerProfilesTable)
+    .where(eq(studyLearnerProfilesTable.userId, userId))
     .limit(1);
 
-  if (!style) {
+  // Diagnostic is "complete" once the 5 intake signals are set (same rule the
+  // dashboard + /profile use). The legacy VARK "learning-style profile" table is
+  // no longer written by intake, so we must NOT gate on it here.
+  const diagnosticComplete = Boolean(
+    profile &&
+      profile.examTarget &&
+      profile.hoursPerWeek &&
+      profile.baselineLevel &&
+      profile.calibrationSelfRating &&
+      profile.failureMode,
+  );
+  if (!profile || !diagnosticComplete) {
     res.status(409).json({
       error: "Complete your learning-style diagnostic first.",
-      code: "no_learning_style",
+      code: "no_diagnostic",
     });
     return;
   }
@@ -81,7 +92,7 @@ router.post("/:materialId/generate", async (req, res) => {
   }
 
   const sys = `You are an expert learning coach. Build a personalized study strategy for ONE specific learner and ONE specific material.
-You MUST honour the learner's modality preferences and pace, the strategy is FOR THEM, not generic.
+You MUST tailor to the learner's level, pace, study style, interests, and failure mode; the strategy is FOR THEM, not generic. Choose a sensible modalityMix for this material and learner.
 Return strict JSON with this shape:
 {
   "summary": string (2-3 sentences explaining the approach, written TO the learner in second person),
@@ -94,16 +105,16 @@ Return strict JSON with this shape:
 }`;
 
   const learnerBlock = `LEARNER PROFILE
-- Reading: ${(style.textPref * 100).toFixed(0)}% preference
-- Listening: ${(style.audioPref * 100).toFixed(0)}%
-- Visual / diagrams: ${(style.visualPref * 100).toFixed(0)}%
-- Hands-on practice: ${(style.practicePref * 100).toFixed(0)}%
-- Pace: ${style.pace}
-- Preferred session length: ${style.preferredSessionMinutes} min
-- Focus span: ${style.focusMinutes} min before a break
-- Motivation: ${style.motivationType}
-- Prior knowledge of the topic area: ${style.priorKnowledge}
-- Best study time: ${style.studyTime}`;
+- Exam / goal: ${profile.examTarget ?? "general study"}
+- Current level: ${profile.baselineLevel ?? "unknown"}
+- Self-rated confidence (1-5): ${profile.calibrationSelfRating ?? "unknown"}
+- Failure mode to guard against: ${profile.failureMode ?? "unknown"}
+- Study hours per week: ${profile.hoursPerWeek ?? "unknown"}
+- Preferred session length: ${profile.preferredSessionLength ?? 25} min
+- Study style: ${profile.studyStyle ?? "balanced"}
+- Preferred difficulty: ${profile.preferredDifficulty ?? "mixed"}
+- Interests: ${profile.interests ?? "n/a"}
+- Background: ${profile.background ?? "n/a"}`;
 
   const materialBlock = `MATERIAL: ${material.title}\n---\n${snippet}\n---`;
 
