@@ -154,7 +154,7 @@ async function extractImage(buffer: Buffer, mimetype: string): Promise<string> {
   const dataUrl = `data:${mimetype};base64,${b64}`;
   const response = await openai.chat.completions.create({
     model: PRIMARY_MODEL,
-    max_completion_tokens: 4096,
+    max_tokens: 4096,
     messages: [
       {
         role: "system",

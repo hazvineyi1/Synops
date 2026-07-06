@@ -205,7 +205,7 @@ Rules:
   try {
     const response = await openai.chat.completions.create({
       model: PRIMARY_MODEL,
-      max_completion_tokens: 4096,
+      max_tokens: 4096,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },

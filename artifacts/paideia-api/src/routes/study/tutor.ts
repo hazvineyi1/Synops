@@ -176,7 +176,7 @@ router.post("/conversations", async (req, res) => {
   try {
     const response = await openai.chat.completions.create({
       model: PRIMARY_MODEL,
-      max_completion_tokens: 2048,
+      max_tokens: 2048,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `The learner has started a new conversation: "${data.title}". Please introduce yourself warmly and ask how you can help them today.` },
@@ -317,7 +317,7 @@ router.post("/conversations/:conversationId/messages", async (req, res) => {
   try {
     const response = await openai.chat.completions.create({
       model: PRIMARY_MODEL,
-      max_completion_tokens: 4096,
+      max_tokens: 4096,
       messages,
     });
     const aiContent = response.choices[0]?.message?.content ?? "I'm not sure about that. Could you rephrase or ask a different question?";
