@@ -120,7 +120,7 @@ export default function Platforms() {
                 See it in action
               </Link>
               <Link
-                href="/products#register-interest"
+                href="/contact?area=platforms"
                 className="inline-block bg-white text-primary px-8 py-4 font-bold text-[16px] text-center transition-colors hover:bg-white/90 rounded-[6px]"
               >
                 Request a tailored build

@@ -201,6 +201,142 @@ function Sampler({
   );
 }
 
+/* ------------------------------------------------------- Product section */
+
+/**
+ * One product block. All three products render through this so the page keeps a
+ * single, consistent rhythm: a full-width header, then a balanced two-column
+ * body (pitch + proof points on the left, sampler on the right), then a
+ * full-width scalability strip. Deliberately NOT alternated left/right, which
+ * made the eye jump and left dead space under the shorter column.
+ */
+function ProductSection({
+  letter,
+  name,
+  tagline,
+  lead,
+  bulletsTitle,
+  bullets,
+  scaleTitle,
+  scale,
+  samples,
+  accent,
+  tint,
+}: {
+  letter: string;
+  name: string;
+  tagline: string;
+  lead: string;
+  bulletsTitle: string;
+  bullets: string[];
+  scaleTitle: string;
+  scale: string;
+  samples: typeof TEACHER_SAMPLES;
+  accent: "accent" | "primary";
+  tint: string;
+}) {
+  const badge = accent === "accent" ? "bg-accent" : "bg-primary";
+
+  return (
+    <section className={`py-20 px-6 border-b border-border ${tint}`}>
+      <div className="max-w-[1200px] mx-auto">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-x-5 gap-y-3 mb-3">
+          <div className={`w-11 h-11 shrink-0 rounded-[6px] ${badge} flex items-center justify-center text-white font-bold text-lg`}>
+            {letter}
+          </div>
+          <h2 className="text-[38px] leading-tight font-bold text-primary tracking-tight">{name}</h2>
+        </div>
+        <p className="text-[14px] font-bold uppercase tracking-wider text-accent mb-12 sm:pl-16">
+          {tagline}
+        </p>
+
+        {/* Body */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-16 items-start">
+          <div>
+            <p className="text-[18px] text-muted-foreground leading-relaxed mb-8">{lead}</p>
+
+            <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-4">{bulletsTitle}</h3>
+            <ul className="space-y-3">
+              {bullets.map((t) => (
+                <li key={t} className="flex gap-3 text-[16px] text-muted-foreground leading-relaxed">
+                  <span className="text-accent font-bold mt-0.5 shrink-0">&rarr;</span>
+                  <span>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <Sampler samples={samples} accent={accent} />
+        </div>
+
+        {/* Scalability strip */}
+        <div className="mt-12 border-t border-border pt-8 grid grid-cols-1 md:grid-cols-[minmax(0,260px)_1fr] gap-4 md:gap-10">
+          <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary">{scaleTitle}</h3>
+          <p className="text-[16px] text-muted-foreground leading-relaxed max-w-3xl">{scale}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const PRODUCTS = [
+  {
+    letter: "T",
+    name: "Synops Teacher",
+    tagline: "Give every teacher back their evenings",
+    lead: "An AI co-pilot for teachers. It drafts the lesson plans, worksheets, quizzes, mark schemes and parent communications that consume a teacher's unpaid hours, grounded in your curriculum and pitched at your year groups. It does not replace teacher judgement. It removes the blank page, so judgement is spent where it actually matters.",
+    bulletsTitle: "Why departments adopt it",
+    bullets: [
+      "Cuts planning and admin time materially, recovering the hours teachers say they lose to paperwork.",
+      "Consistent quality across a department, not just from your strongest planners.",
+      "Every output is aligned to your curriculum and standards, not a generic template.",
+      "Built-in differentiation: support and stretch generated with every plan.",
+    ],
+    scaleTitle: "Scales from one classroom to a trust",
+    scale: "Start with a single department pilot. Expand to whole-school with shared resource libraries, class and assignment management, and admin oversight of usage and quality. Multi-school rollouts run on the same tenancy model our consulting clients already operate: isolated data, per-institution branding, and central control.",
+    samples: TEACHER_SAMPLES,
+    accent: "accent" as const,
+    tint: "bg-white",
+  },
+  {
+    letter: "C",
+    name: "Synops Coach",
+    tagline: "A tutor that refuses to just give the answer",
+    lead: "An AI study coach for learners. Adaptive study plans, spaced retrieval, exam practice with honest marking, and a guided Socratic tutor that leads a student to the answer instead of handing it over. Most AI tools make it easier for a student to avoid thinking. This one is engineered to make that impossible.",
+    bulletsTitle: "Why institutions fund it",
+    bullets: [
+      "One-to-one tutoring is the most effective intervention we know, and the least affordable. This is the first thing that scales it.",
+      "Socratic by design: students reach the answer themselves, so the understanding survives the exam.",
+      "Study plans built on spaced retrieval and interleaving, not on how long a student sits at a desk.",
+      "Honest marking against real mark schemes, so students find out now rather than in August.",
+    ],
+    scaleTitle: "Scales to a whole cohort",
+    scale: "Deploy to a single intervention group, a year cohort, or an entire student body. Seat-based licensing keeps cost predictable as you grow, and the marginal cost of the next student is a fraction of an hour of human tutoring. Institutional dashboards show who is engaging, who is struggling, and where the cohort is weakest.",
+    samples: COACH_SAMPLES,
+    accent: "primary" as const,
+    tint: "bg-background",
+  },
+  {
+    letter: "B",
+    name: "Curriculum Builder",
+    tagline: "Good design and audit-ready evidence, from one workflow",
+    lead: "A curriculum design platform that takes instructional teams from intake through design, quality assurance, and handoff. Backward design by default, with objectives, assessments and activities held in a live alignment map. Most curriculum tools track approvals. This one helps you build the course, and produces the accreditation evidence as a by-product of doing it properly.",
+    bulletsTitle: "Why institutions buy it",
+    bullets: [
+      "Accreditation self-studies stop being a six-month scramble. The evidence is already there, mapped to the performance indicator.",
+      "Rules-based QA catches unmeasurable objectives, unassessed outcomes and accessibility failures before handoff, not after a site visit.",
+      "Standards library covering regional and specialist accreditors, plus your own institutional outcomes.",
+      "Replaces specialist accreditation consultants billing by the hour.",
+    ],
+    scaleTitle: "Scales from one program to an institution",
+    scale: "Start with a single program build. Expand to department, college and whole-institution curriculum mapping, with a live view of where every program outcome is introduced, practiced and assessed. Multi-tenant by design: isolated data, your branding, and central oversight across every course in development.",
+    samples: BUILDER_SAMPLES,
+    accent: "primary" as const,
+    tint: "bg-white",
+  },
+];
+
 /* ------------------------------------------------------------------- Page */
 
 export default function Products() {
@@ -279,170 +415,11 @@ export default function Products() {
         </div>
       </section>
 
-      {/* Synops Teacher */}
-      <section className="py-24 px-6 bg-white border-b border-border">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-            <div>
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-[6px] bg-accent flex items-center justify-center text-white font-bold text-xl">T</div>
-                <h2 className="text-4xl font-bold text-primary tracking-tight">Synops Teacher</h2>
-              </div>
-              <p className="text-[15px] font-bold uppercase tracking-wider text-accent mb-6">
-                Give every teacher back their evenings
-              </p>
-              <p className="text-[19px] text-muted-foreground leading-relaxed mb-6">
-                An AI co-pilot for teachers. It drafts the lesson plans, worksheets, quizzes, mark schemes
-                and parent communications that consume a teacher's unpaid hours, grounded in your
-                curriculum, pitched at your year groups, and always editable.
-              </p>
-              <p className="text-[17px] text-muted-foreground leading-relaxed mb-8">
-                It does not replace teacher judgement. It removes the blank page, so judgement is spent
-                where it actually matters.
-              </p>
-
-              <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-4">Why departments adopt it</h3>
-              <ul className="space-y-3 mb-8">
-                {[
-                  "Cuts planning and admin time materially, recovering the hours teachers say they lose to paperwork.",
-                  "Consistent quality across a department, not just from your strongest planners.",
-                  "Every output is aligned to your curriculum and standards, not a generic template.",
-                  "Built-in differentiation: support and stretch generated with every plan.",
-                ].map((t) => (
-                  <li key={t} className="flex gap-3 text-[16px] text-muted-foreground leading-relaxed">
-                    <span className="text-accent font-bold mt-0.5">&rarr;</span>
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="bg-muted/40 border border-border rounded-[8px] p-6">
-                <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-3">Scales from one classroom to a trust</h3>
-                <p className="text-[16px] text-muted-foreground leading-relaxed">
-                  Start with a single department pilot. Expand to whole-school with shared resource
-                  libraries, class and assignment management, and admin oversight of usage and quality.
-                  Multi-school rollouts run on the same tenancy model our consulting clients already
-                  operate: isolated data, per-institution branding, and central control.
-                </p>
-              </div>
-            </div>
-
-            <div className="lg:sticky lg:top-28">
-              <Sampler samples={TEACHER_SAMPLES} accent="accent" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Synops Coach */}
-      <section className="py-24 px-6 bg-background border-b border-border">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-            <div className="lg:order-2">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-[6px] bg-primary flex items-center justify-center text-white font-bold text-xl">C</div>
-                <h2 className="text-4xl font-bold text-primary tracking-tight">Synops Coach</h2>
-              </div>
-              <p className="text-[15px] font-bold uppercase tracking-wider text-accent mb-6">
-                A tutor that refuses to just give the answer
-              </p>
-              <p className="text-[19px] text-muted-foreground leading-relaxed mb-6">
-                An AI study coach for learners. Adaptive study plans, spaced retrieval, exam practice with
-                honest marking, and a guided Socratic tutor that leads a student to the answer instead of
-                handing it over.
-              </p>
-              <p className="text-[17px] text-muted-foreground leading-relaxed mb-8">
-                Most AI tools make it easier for a student to avoid thinking. This one is engineered to
-                make that impossible.
-              </p>
-
-              <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-4">Why institutions fund it</h3>
-              <ul className="space-y-3 mb-8">
-                {[
-                  "One-to-one tutoring is the most effective intervention we know, and the least affordable. This is the first thing that scales it.",
-                  "Socratic by design: students reach the answer themselves, so the understanding survives the exam.",
-                  "Study plans built on spaced retrieval and interleaving, not on how long a student sits at a desk.",
-                  "Honest marking against real mark schemes, so students find out now rather than in August.",
-                ].map((t) => (
-                  <li key={t} className="flex gap-3 text-[16px] text-muted-foreground leading-relaxed">
-                    <span className="text-accent font-bold mt-0.5">&rarr;</span>
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="bg-white border border-border rounded-[8px] p-6">
-                <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-3">Scales to a whole cohort</h3>
-                <p className="text-[16px] text-muted-foreground leading-relaxed">
-                  Deploy to a single intervention group, a year cohort, or an entire student body. Seat-based
-                  licensing keeps cost predictable as you grow, and the marginal cost of the next student is
-                  a fraction of an hour of human tutoring. Institutional dashboards show who is engaging,
-                  who is struggling, and where the cohort is weakest.
-                </p>
-              </div>
-            </div>
-
-            <div className="lg:order-1 lg:sticky lg:top-28">
-              <Sampler samples={COACH_SAMPLES} accent="primary" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Curriculum Builder (Compass) */}
-      <section className="py-24 px-6 bg-white border-b border-border">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
-            <div>
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-[6px] bg-primary flex items-center justify-center text-white font-bold text-xl">B</div>
-                <h2 className="text-4xl font-bold text-primary tracking-tight">Curriculum Builder</h2>
-              </div>
-              <p className="text-[15px] font-bold uppercase tracking-wider text-accent mb-6">
-                Good design and audit-ready evidence, from one workflow
-              </p>
-              <p className="text-[19px] text-muted-foreground leading-relaxed mb-6">
-                A curriculum design platform that takes instructional teams from intake through design,
-                quality assurance, and handoff. Backward design by default, with learning objectives,
-                assessments and activities held in a live alignment map.
-              </p>
-              <p className="text-[17px] text-muted-foreground leading-relaxed mb-8">
-                Most curriculum tools track approvals. This one actually helps you build the course, and
-                produces the accreditation evidence as a by-product of doing it properly.
-              </p>
-
-              <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-4">Why institutions buy it</h3>
-              <ul className="space-y-3 mb-8">
-                {[
-                  "Accreditation self-studies stop being a six-month scramble. The evidence is already there, mapped to the performance indicator.",
-                  "Rules-based QA catches unmeasurable objectives, unassessed outcomes and accessibility failures before handoff, not after a site visit.",
-                  "Standards library covering regional and specialist accreditors, plus your own institutional outcomes.",
-                  "Replaces specialist accreditation consultants billing by the hour.",
-                ].map((t) => (
-                  <li key={t} className="flex gap-3 text-[16px] text-muted-foreground leading-relaxed">
-                    <span className="text-accent font-bold mt-0.5">&rarr;</span>
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="bg-muted/40 border border-border rounded-[8px] p-6">
-                <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-3">Scales from one program to an institution</h3>
-                <p className="text-[16px] text-muted-foreground leading-relaxed">
-                  Start with a single program build. Expand to department, college and whole-institution
-                  curriculum mapping, with a live view of where every program outcome is introduced,
-                  practiced and assessed. Multi-tenant by design: isolated data, your branding, and central
-                  oversight across every course in development.
-                </p>
-              </div>
-            </div>
-
-            <div className="lg:sticky lg:top-28">
-              <Sampler samples={BUILDER_SAMPLES} accent="primary" />
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* All three products render through one component, so the page keeps a
+          single consistent rhythm instead of three bespoke, alternating blocks. */}
+      {PRODUCTS.map((p) => (
+        <ProductSection key={p.name} {...p} />
+      ))}
 
       {/* Interest form */}
       <section id="register-interest" className="py-24 px-6 bg-white scroll-mt-24">
