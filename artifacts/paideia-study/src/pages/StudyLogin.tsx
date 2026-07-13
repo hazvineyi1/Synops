@@ -60,7 +60,16 @@ export default function StudyLogin() {
               />
             </div>
             <div>
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <button
+                  type="button"
+                  className="text-xs text-primary underline hover:text-primary/80"
+                  onClick={() => setLoc("/forgot-password")}
+                >
+                  Forgot password?
+                </button>
+              </div>
               <Input
                 id="password"
                 type="password"

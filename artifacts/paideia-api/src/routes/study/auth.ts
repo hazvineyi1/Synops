@@ -1,12 +1,14 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
+import { randomBytes, createHash } from "node:crypto";
 import {
   db,
   studyUsersTable,
   studySessionsTable,
   studyLearnerProfilesTable,
+  studyPasswordResetsTable,
 } from "@workspace/paideia-db";
-import { eq } from "drizzle-orm";
+import { eq, and, isNull, gt } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
@@ -17,6 +19,33 @@ import {
 } from "../../lib/studyAuth.js";
 import { requireStudyUser } from "../../middlewares/auth.js";
 import { rateLimit } from "../../middlewares/rateLimit.js";
+import { sendEmail, isEmailConfigured, passwordResetEmail, coachBaseUrl } from "../../lib/email.js";
+
+const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/** Hash a reset token for storage. We never persist the raw token. */
+export function hashResetToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Mint a single-use reset token for a user and persist only its hash.
+ * Returns the RAW token (shown once) and the full reset link.
+ */
+export async function createResetToken(
+  userId: string,
+  issuedBy: "self_service" | "admin",
+): Promise<{ token: string; link: string; expiresAt: Date }> {
+  const token = randomBytes(32).toString("base64url");
+  const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+  await db.insert(studyPasswordResetsTable).values({
+    userId,
+    tokenHash: hashResetToken(token),
+    expiresAt,
+    issuedBy,
+  });
+  return { token, link: `${coachBaseUrl()}/reset-password?token=${token}`, expiresAt };
+}
 
 const router: IRouter = Router();
 
@@ -247,5 +276,108 @@ router.post("/logout", async (_req, res) => {
   res.clearCookie(STUDY_SESSION_COOKIE, { path: "/", sameSite: "lax" });
   res.json({ success: true });
 });
+
+// POST /study/auth/forgot-password { email }
+// Always answers 200 with the same body whether or not the address is registered:
+// a different response for "no such user" would let anyone enumerate who has an
+// account. Rate limited to blunt brute-force enumeration by timing/volume.
+router.post(
+  "/forgot-password",
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 5 }),
+  async (req, res) => {
+    const parsed = z.object({ email: z.string().email().max(200) }).safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "A valid email is required." });
+      return;
+    }
+    const email = parsed.data.email.toLowerCase().trim();
+
+    const [user] = await db
+      .select({ id: studyUsersTable.id, name: studyUsersTable.name })
+      .from(studyUsersTable)
+      .where(eq(studyUsersTable.email, email))
+      .limit(1);
+
+    if (user) {
+      try {
+        const { link } = await createResetToken(user.id, "self_service");
+        const msg = passwordResetEmail(user.name, link);
+        const sent = await sendEmail({ to: email, ...msg });
+        if (!sent.ok) {
+          // Email is down or not configured. Don't leak that to the caller, but do
+          // log it loudly: without email, self-service reset silently does nothing
+          // and the user must be given an admin-issued link instead.
+          req.log?.error(
+            { email, configured: sent.configured, err: sent.error },
+            "password reset email could not be delivered",
+          );
+        }
+      } catch (err) {
+        req.log?.error({ err }, "failed to create password reset token");
+      }
+    }
+
+    res.json({
+      ok: true,
+      message:
+        "If that email has an account, we have sent a reset link. It expires in 1 hour.",
+      // Surfaces in the UI only so a self-hosted/admin operator knows delivery is off.
+      emailConfigured: isEmailConfigured(),
+    });
+  },
+);
+
+// POST /study/auth/reset-password { token, password }
+// Consumes a single-use token, sets the new password, and revokes every existing
+// session for that user so a thief holding a stolen cookie is kicked out too.
+router.post(
+  "/reset-password",
+  rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }),
+  async (req, res) => {
+    const parsed = z
+      .object({ token: z.string().min(10).max(200), password: z.string().min(8).max(200) })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Password must be at least 8 characters." });
+      return;
+    }
+
+    const tokenHash = hashResetToken(parsed.data.token);
+    const [row] = await db
+      .select()
+      .from(studyPasswordResetsTable)
+      .where(
+        and(
+          eq(studyPasswordResetsTable.tokenHash, tokenHash),
+          isNull(studyPasswordResetsTable.usedAt),
+          gt(studyPasswordResetsTable.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+
+    if (!row) {
+      res.status(400).json({
+        error: "This reset link is invalid or has expired. Please request a new one.",
+      });
+      return;
+    }
+
+    await db
+      .update(studyUsersTable)
+      .set({ passwordHash: hashPassword(parsed.data.password) })
+      .where(eq(studyUsersTable.id, row.userId));
+
+    // Burn the token, then revoke all sessions for this user.
+    await db
+      .update(studyPasswordResetsTable)
+      .set({ usedAt: new Date() })
+      .where(eq(studyPasswordResetsTable.id, row.id));
+
+    await db.delete(studySessionsTable).where(eq(studySessionsTable.userId, row.userId));
+
+    res.clearCookie(STUDY_SESSION_COOKIE, { path: "/", sameSite: "lax" });
+    res.json({ ok: true, message: "Password updated. You can now sign in." });
+  },
+);
 
 export default router;

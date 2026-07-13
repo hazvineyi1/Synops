@@ -26,6 +26,7 @@ import {
   STUDY_SESSION_COOKIE,
   STUDY_IMPERSONATOR_COOKIE,
 } from "../../lib/studyAuth.js";
+import { createResetToken } from "./auth.js";
 
 function sessionCookieOptions() {
   return {
@@ -586,6 +587,26 @@ router.post("/users/:id/set-admin", async (req, res) => {
 // Grants are marked autoRenew=false, so a dated grant auto-downgrades to free when
 // its period ends (the lazy-expiry reconcile in loadTeacher handles that); an
 // indefinite grant (no period end) never lapses until changed here.
+// Issue a one-time password reset link for a user, for an admin to pass to them
+// directly. Exists because email delivery is optional on this deployment: during a
+// hand-onboarded private beta an admin can unlock a locked-out user without any mail
+// provider. The raw token is returned ONCE and never stored (only its hash is).
+router.post("/users/:id/reset-link", async (req, res) => {
+  const id = String(req.params.id);
+  const [user] = await db
+    .select({ id: studyUsersTable.id, email: studyUsersTable.email })
+    .from(studyUsersTable)
+    .where(eq(studyUsersTable.id, id))
+    .limit(1);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  const { link, expiresAt } = await createResetToken(user.id, "admin");
+  await writeAudit(req, "user.reset_link", "user", user.id, { email: user.email });
+  res.json({ link, expiresAt, email: user.email });
+});
+
 router.post("/users/:id/set-plan", async (req, res) => {
   const id = String(req.params.id);
   const tier = req.body?.tier;

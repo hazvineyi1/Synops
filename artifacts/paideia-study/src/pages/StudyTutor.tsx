@@ -26,6 +26,10 @@ export default function StudyTutor() {
   const createMutation = useCreateStudyTutorConversation();
   const [starting, setStarting] = useState<string | null>(null);
   const [showAllSessions, setShowAllSessions] = useState(false);
+  // Inline error instead of alert(). A native alert() blocks the renderer thread:
+  // when session start failed, the whole tab froze until the dialog was dismissed,
+  // which read to users (and to us) as "the Socratic coach hangs".
+  const [startError, setStartError] = useState<string | null>(null);
 
   // Weakest concepts = knowledge nodes sorted by ascending masteryLevel, take 3
   const focusNodes = useMemo(() => {
@@ -46,6 +50,7 @@ export default function StudyTutor() {
   ) => {
     const tag = opts.socratic ? "socratic" : "guided";
     setStarting(tag);
+    setStartError(null);
     try {
       const r = await fetch("/api/study/tutor/guided/start", {
         method: "POST",
@@ -59,27 +64,33 @@ export default function StudyTutor() {
       });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
-        alert(e?.error || "Could not start session.");
+        setStartError(e?.error || "Could not start session. Please try again.");
         setStarting(null);
         return;
       }
       const data = await r.json();
+      if (!data?.conversation?.id) {
+        setStartError("The tutor did not return a session. Please try again.");
+        setStarting(null);
+        return;
+      }
       setLoc(`/tutor/guided/${data.conversation.id}`);
     } catch {
-      alert("Could not start session.");
+      setStartError("Could not reach the tutor. Check your connection and try again.");
       setStarting(null);
     }
   };
 
   const handleNewChat = async (title?: string) => {
     setStarting("chat");
+    setStartError(null);
     try {
       const res = await createMutation.mutateAsync({
         data: { title: title || "Free-form chat" },
       });
       setLoc(`/tutor/${res.id}`);
     } catch {
-      alert("Failed to start chat.");
+      setStartError("Failed to start chat. Please try again.");
       setStarting(null);
     }
   };
@@ -110,6 +121,35 @@ export default function StudyTutor() {
             </Button>
           )}
         </div>
+
+        {/* Session-start error. Rendered inline; never alert(), which freezes the tab. */}
+        {startError && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 flex items-start gap-3">
+            <AlertCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-foreground">{startError}</p>
+              {/* The overwhelmingly common cause is "no studied concepts yet": the
+                  tutor can only teach from analyzed material. Route them there. */}
+              {/concept|material/i.test(startError) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => setLoc("/materials")}
+                >
+                  Go to Materials
+                </Button>
+              )}
+            </div>
+            <button
+              onClick={() => setStartError(null)}
+              className="text-muted-foreground hover:text-foreground text-xs shrink-0"
+              aria-label="Dismiss"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Primary CTAs, two paths, above the fold */}
         <div className="grid sm:grid-cols-2 gap-3">

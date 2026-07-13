@@ -924,6 +924,22 @@ export function useStudyAdminUserAction() {
 }
 
 // Admin: comp/upgrade/downgrade a user's plan without payment. days empty = indefinite.
+// Generate a one-time password reset link for a locked-out user. The raw link is
+// returned once and never stored, so the admin must copy it there and then.
+export function useStudyAdminResetLink() {
+  return useMutation<
+    { link: string; expiresAt: string; email: string },
+    ErrorType<unknown>,
+    { id: string }
+  >({
+    mutationFn: async ({ id }) =>
+      customFetch<{ link: string; expiresAt: string; email: string }>(
+        `${BASE}/admin/users/${id}/reset-link`,
+        { method: "POST", headers: { "Content-Type": "application/json" } },
+      ),
+  });
+}
+
 export function useStudyAdminSetPlan() {
   return useMutation<
     { ok: true; tier: string; subscriptionCurrentPeriodEnd: string | null },

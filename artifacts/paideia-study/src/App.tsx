@@ -11,6 +11,8 @@ import NotFound from "@/pages/not-found";
 import StudyLanding from "@/pages/StudyLanding";
 import StudyLandingUS from "@/pages/StudyLandingUS";
 import StudyLogin from "@/pages/StudyLogin";
+import StudyForgotPassword from "@/pages/StudyForgotPassword";
+import StudyResetPassword from "@/pages/StudyResetPassword";
 import StudySignup from "@/pages/StudySignup";
 import StudyPrivacy from "@/pages/StudyPrivacy";
 import StudyTerms from "@/pages/StudyTerms";
@@ -143,6 +145,8 @@ function Router() {
       <Route path="/" component={RootLanding} />
       <Route path="/login" component={StudyLogin} />
       <Route path="/signup" component={StudySignup} />
+      <Route path="/forgot-password" component={StudyForgotPassword} />
+      <Route path="/reset-password" component={StudyResetPassword} />
       <Route path="/privacy" component={StudyPrivacy} />
       <Route path="/terms" component={StudyTerms} />
       <Route path="/help" component={StudyHelp} />

@@ -1,8 +1,17 @@
 import OpenAI from "openai";
 import { db, aiUsageTable } from "@workspace/paideia-db";
 
-const baseURL = process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"];
-const apiKey = process.env["AI_INTEGRATIONS_OPENAI_API_KEY"];
+// TRIM IS LOAD-BEARING. Secrets pasted into a hosting dashboard routinely pick up a
+// leading space or a trailing newline, and that silently destroys the whole AI layer:
+// the key goes straight into an Authorization header, and a header value containing
+// whitespace/newlines is rejected by undici with "is not a legal HTTP header value".
+// The OpenAI SDK wraps that as a generic APIConnectionError ("Connection error."),
+// which looks exactly like a network outage, so it is extremely easy to misdiagnose.
+// This actually happened in production: the key was stored as " sk-ant-...\n\n" and
+// EVERY AI call (concept extraction, tutor, diagnostics, strategy) failed for weeks
+// while the key, base URL, model and network were all perfectly fine.
+const baseURL = process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"]?.trim();
+const apiKey = process.env["AI_INTEGRATIONS_OPENAI_API_KEY"]?.trim();
 
 if (!baseURL || !apiKey) {
   throw new Error(

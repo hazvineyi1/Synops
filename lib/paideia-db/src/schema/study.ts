@@ -150,6 +150,23 @@ export const studySessionsTable = pgTable("study_sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// One-time password reset tokens. We store only a SHA-256 hash of the token, never
+// the token itself, so a database leak cannot be used to reset anyone's password.
+// Tokens are single-use (usedAt) and short-lived (expiresAt). Rows are created by
+// the self-service "forgot password" flow and by an admin issuing a reset link.
+export const studyPasswordResetsTable = pgTable("study_password_resets", {
+  id: serial("id").primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => studyUsersTable.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").unique().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  usedAt: timestamp("used_at"),
+  // "self_service" (user asked) | "admin" (admin generated a link for them)
+  issuedBy: text("issued_by").notNull().default("self_service"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const studyMaterialsTable = pgTable("study_materials", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")

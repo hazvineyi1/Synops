@@ -23,6 +23,7 @@ import {
   useStudyAdminAudit,
   useStudyAdminUserAction,
   useStudyAdminSetPlan,
+  useStudyAdminResetLink,
   useStudyAdminCreateUser,
   useStudyAdminDeleteUser,
   useStudyAdminImpersonate,
@@ -204,6 +205,8 @@ function Roster() {
   const deleteUser = useStudyAdminDeleteUser();
   const impersonate = useStudyAdminImpersonate();
   const setPlan = useStudyAdminSetPlan();
+  const resetLink = useStudyAdminResetLink();
+  const [issuedLink, setIssuedLink] = useState<string | null>(null);
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [nu, setNu] = useState({ email: "", name: "", password: "", tier: "free" });
@@ -340,6 +343,20 @@ function Roster() {
                       <Button size="sm" variant="ghost" title="Impersonate" onClick={() => runImpersonate(u.id)}>
                         <Eye className="w-4 h-4" />
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Generate a one-time password reset link for this user"
+                        disabled={resetLink.isPending}
+                        onClick={() =>
+                          resetLink.mutate(
+                            { id: u.id },
+                            { onSuccess: (d) => setIssuedLink(d.link) },
+                          )
+                        }
+                      >
+                        <KeyRound className="w-4 h-4" />
+                      </Button>
                       {u.suspended ? (
                         <Button size="sm" variant="outline" onClick={() => runAction(u.id, "reactivate")}>Reactivate</Button>
                       ) : (
@@ -356,6 +373,38 @@ function Roster() {
           </Table>
         </div>
       )}
+
+      {/* One-time reset link. Shown once: the raw token is never stored, so if the
+          admin closes this without copying it, they must generate a new link. */}
+      <Dialog open={!!issuedLink} onOpenChange={(o) => !o && setIssuedLink(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>One-time password reset link</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Send this to the user. It expires in 1 hour, works once, and signs them out of all
+              other sessions when used. Copy it now: it is not stored and cannot be shown again.
+            </p>
+            <div className="flex gap-2">
+              <input
+                readOnly
+                value={issuedLink ?? ""}
+                onFocus={(e) => e.currentTarget.select()}
+                className="flex-1 border rounded px-2 py-1.5 text-xs font-mono bg-muted"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => issuedLink && navigator.clipboard?.writeText(issuedLink)}
+              >
+                <Copy className="w-4 h-4 mr-1" /> Copy
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>User detail</DialogTitle></DialogHeader>
