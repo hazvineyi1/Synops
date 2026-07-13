@@ -275,15 +275,22 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Products Teaser */}
+      {/* Products Teaser. Products are in private beta: we market them and show what
+          they do, but there are deliberately NO links into /app/ or /study/. Both
+          CTAs route to /products, where access is gated behind the interest form. */}
       <section className="py-24 lg:py-32 px-6 bg-primary text-white">
         <div className="max-w-[1200px] mx-auto">
           <div className="mb-16">
+            <div className="inline-block text-[12px] font-bold uppercase tracking-wider bg-white/10 border border-white/20 px-4 py-1.5 rounded-full mb-6">
+              Private beta — by invitation
+            </div>
             <h2 className="text-4xl lg:text-[48px] font-bold tracking-tight mb-6">
               Beyond Advisory: We Build
             </h2>
             <p className="text-[20px] text-white/80 max-w-2xl leading-relaxed">
-              We translate strategic requirements into working software. Explore our purpose-built platforms for educators and students.
+              We translate strategic requirements into working software. Two platforms — one for the
+              people who teach, one for the people who learn. Running today with real institutions,
+              opening to new partners deliberately.
             </p>
           </div>
 
@@ -295,17 +302,19 @@ export default function Home() {
                 </div>
                 <h3 className="text-2xl font-bold">Synops Teacher</h3>
               </div>
-              <p className="text-[16px] text-white/70 mb-8 flex-1 leading-relaxed">
-                An AI co-pilot for teachers. Generate rigorous lesson plans, worksheets, quizzes, and parent communications in minutes.
+              <p className="text-[16px] text-white/70 mb-4 leading-relaxed">
+                An AI co-pilot for teachers. Lesson plans, worksheets, quizzes, mark schemes and parent
+                updates — drafted against your curriculum in minutes, not evenings.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/app/signup" className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors">
-                  Start free trial
-                </a>
-                <a href="/app/" className="border border-white/30 text-white px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/10 transition-colors">
-                  Explore app
-                </a>
-              </div>
+              <p className="text-[15px] text-white/50 mb-8 flex-1 leading-relaxed">
+                Scales from a single department pilot to a whole trust.
+              </p>
+              <Link
+                href="/products"
+                className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors"
+              >
+                See it in action
+              </Link>
             </div>
 
             <div className="bg-white/5 border border-white/10 p-10 flex flex-col rounded-none hover:bg-white/10 transition-colors">
@@ -315,18 +324,26 @@ export default function Home() {
                 </div>
                 <h3 className="text-2xl font-bold">Synops Coach</h3>
               </div>
-              <p className="text-[16px] text-white/70 mb-8 flex-1 leading-relaxed">
-                An AI study coach for learners. Adaptive study plans, practice sets, exam prep, and a guided Socratic tutor.
+              <p className="text-[16px] text-white/70 mb-4 leading-relaxed">
+                An AI study coach for learners. Adaptive study plans, exam practice with honest marking,
+                and a Socratic tutor that refuses to simply hand over the answer.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/study/signup?from=web" className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors">
-                  Get started
-                </a>
-                <a href="/study/?from=web" className="border border-white/30 text-white px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/10 transition-colors">
-                  Open app
-                </a>
-              </div>
+              <p className="text-[15px] text-white/50 mb-8 flex-1 leading-relaxed">
+                The first thing that makes one-to-one tutoring scale to a whole cohort.
+              </p>
+              <Link
+                href="/products"
+                className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors"
+              >
+                See it in action
+              </Link>
             </div>
+          </div>
+
+          <div className="mt-10 text-center">
+            <Link href="/products" className="text-[16px] font-bold text-white/80 hover:text-white underline underline-offset-4">
+              Try the sampler and register your interest →
+            </Link>
           </div>
         </div>
       </section>

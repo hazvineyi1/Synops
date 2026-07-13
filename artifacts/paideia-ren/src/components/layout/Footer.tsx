@@ -29,12 +29,13 @@ export function Footer() {
             <Link href="/platforms" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Platforms & Build</Link>
           </div>
 
+          {/* Products: private beta. These link to the /products showcase (sampler +
+              interest form), NOT to the apps. No /app/ or /study/ links here. */}
           <div className="flex flex-col gap-4">
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-foreground mb-2">Products</h3>
-            <a href="/app/signup" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Teacher Free Trial</a>
-            <a href="/app/login" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Teacher Sign-In</a>
-            <a href="/study/?from=web" className="text-[15px] text-muted-foreground hover:text-accent transition-colors mt-2">Synops Coach</a>
-            <a href="/study/login?from=web" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Student Sign-In</a>
+            <Link href="/products" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Teacher</Link>
+            <Link href="/products" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Coach</Link>
+            <Link href="/products#register-interest" className="text-[15px] text-muted-foreground hover:text-accent transition-colors mt-2">Request access</Link>
           </div>
 
           <div className="flex flex-col gap-4">

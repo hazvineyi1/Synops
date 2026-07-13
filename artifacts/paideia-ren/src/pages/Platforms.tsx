@@ -21,41 +21,47 @@ export default function Platforms() {
         </div>
       </section>
 
-      {/* The Products (Centerpiece) */}
+      {/* Our Products. Private beta: we show what they are and route to /products
+          for the sampler + interest form. No direct links into /app/ or /study/. */}
       <section className="py-24 px-6 bg-white border-b border-border">
         <div className="max-w-[1200px] mx-auto">
           <div className="text-center mb-16">
+            <div className="inline-block text-[12px] font-bold uppercase tracking-wider bg-muted border border-border text-muted-foreground px-4 py-1.5 rounded-full mb-6">
+              Private beta — by invitation
+            </div>
             <h2 className="text-4xl font-bold text-primary tracking-tight mb-4">Our Products</h2>
             <p className="text-[18px] text-muted-foreground">Purpose-built platforms reflecting our rigorous standards.</p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="bg-background border border-border p-12">
+            <div className="bg-background border border-border p-12 flex flex-col">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 rounded-[6px] bg-accent flex items-center justify-center text-white font-bold text-xl">T</div>
                 <h3 className="text-3xl font-bold text-foreground tracking-tight">Synops Teacher</h3>
               </div>
-              <p className="text-[18px] text-muted-foreground leading-relaxed mb-8">
-                An AI co-pilot for teachers. Generate lesson plans, worksheets, quizzes, and parent communications, and run a student tutor. Built for educators and schools.
+              <p className="text-[18px] text-muted-foreground leading-relaxed mb-8 flex-1">
+                An AI co-pilot for teachers. Lesson plans, worksheets, quizzes, mark schemes and parent
+                communications, drafted against your curriculum. Scales from a single department pilot
+                to a whole trust.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/app/signup" className="bg-primary text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-primary/90 transition-colors">Start free trial</a>
-                <a href="/app/login" className="border border-border text-foreground text-center font-bold px-6 py-3 rounded-[6px] hover:bg-muted transition-colors">Sign in</a>
-              </div>
+              <Link href="/products" className="bg-primary text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-primary/90 transition-colors">
+                See it in action
+              </Link>
             </div>
 
-            <div className="bg-background border border-border p-12">
+            <div className="bg-background border border-border p-12 flex flex-col">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 rounded-[6px] bg-primary flex items-center justify-center text-white font-bold text-xl">C</div>
                 <h3 className="text-3xl font-bold text-foreground tracking-tight">Synops Coach</h3>
               </div>
-              <p className="text-[18px] text-muted-foreground leading-relaxed mb-8">
-                An AI study coach for students. Adaptive study plans, practice sets, exam prep, and a guided tutor that adapts to a chosen coaching personality. Built for learners.
+              <p className="text-[18px] text-muted-foreground leading-relaxed mb-8 flex-1">
+                An AI study coach for students. Adaptive study plans, exam practice with honest marking,
+                and a Socratic tutor that leads learners to the answer. Scales one-to-one tutoring to a
+                whole cohort.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <a href="/study/signup?from=web" className="bg-accent text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-accent/90 transition-colors">Get started</a>
-                <a href="/study/login?from=web" className="border border-border text-foreground text-center font-bold px-6 py-3 rounded-[6px] hover:bg-muted transition-colors">Sign in</a>
-              </div>
+              <Link href="/products" className="bg-accent text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-accent/90 transition-colors">
+                See it in action
+              </Link>
             </div>
           </div>
         </div>

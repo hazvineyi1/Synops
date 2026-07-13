@@ -14,6 +14,7 @@ import About from "@/pages/About";
 import Healthcare from "@/pages/Healthcare";
 import Learning from "@/pages/Learning";
 import Platforms from "@/pages/Platforms";
+import Products from "@/pages/Products";
 import Insights from "@/pages/Insights";
 import Article from "@/pages/Article";
 import Contact from "@/pages/Contact";
@@ -54,6 +55,7 @@ function Router() {
           <Route path="/healthcare" component={Healthcare} />
           <Route path="/learning" component={Learning} />
           <Route path="/platforms" component={Platforms} />
+          <Route path="/products" component={Products} />
           <Route path="/insights" component={Insights} />
           <Route path="/insights/:slug" component={Article} />
           <Route path="/contact" component={Contact} />

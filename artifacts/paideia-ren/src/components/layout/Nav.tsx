@@ -20,6 +20,7 @@ export function Nav() {
     { href: "/healthcare", label: "Healthcare" },
     { href: "/learning", label: "Learning & AI" },
     { href: "/platforms", label: "Platforms" },
+    { href: "/products", label: "Products" },
     { href: "/insights", label: "Insights" },
   ];
 
@@ -57,15 +58,9 @@ export function Nav() {
           </nav>
           
           <div className="hidden md:flex items-center gap-6">
-            <a 
-              href="/app/signup" 
-              className={`text-[14px] font-medium transition-colors hover:text-accent ${
-                isScrolled ? "text-foreground" : "text-white/90"
-              }`}
-            >
-              Start free trial
-            </a>
-            <Link 
+            {/* "Start free trial" (Synops Teacher signup) hidden for now — product
+                not yet publicly launched. Restore when ready. */}
+            <Link
               href="/contact" 
               className={`text-[14px] font-bold px-5 py-2.5 rounded-[6px] transition-colors ${
                 isScrolled ? "bg-primary text-white hover:bg-primary/90" : "bg-accent text-white hover:bg-accent/90"
@@ -109,13 +104,8 @@ export function Nav() {
               >
                 Book a consultation
               </Link>
-              <a 
-                href="/app/signup" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full text-center text-[15px] font-semibold py-2 text-muted-foreground"
-              >
-                Start free trial
-              </a>
+              {/* "Start free trial" (Synops Teacher signup) hidden for now — product
+                  not yet publicly launched. Restore when ready. */}
             </div>
           </div>
         </div>
