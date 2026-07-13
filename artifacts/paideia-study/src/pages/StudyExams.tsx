@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,7 +41,7 @@ export default function StudyExams() {
       if (up) {
         if (window.confirm(`${up.message}\n\nOpen the plans page?`)) setLoc("/upgrade");
       } else {
-        alert("Failed to create mock exam.");
+        notifyError(undefined, "Could not create the mock exam. Please try again.");
       }
       setCreating(false);
     }

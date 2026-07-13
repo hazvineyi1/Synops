@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Card, CardContent } from "@/components/ui/card";
 import { customFetch } from "@workspace/paideia-api-client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -66,7 +67,7 @@ export default function StudyStartOver() {
       setDone(picked);
     } catch {
       setRunning(false);
-      alert("Couldn't reset. Please try again.");
+      notifyError(undefined, "Couldn't reset. Please try again.");
     }
   };
 

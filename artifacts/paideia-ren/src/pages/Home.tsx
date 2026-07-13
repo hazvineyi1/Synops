@@ -288,13 +288,14 @@ export default function Home() {
               Beyond Advisory: We Build
             </h2>
             <p className="text-[20px] text-white/80 max-w-2xl leading-relaxed">
-              We translate strategic requirements into working software. Two platforms: one for the
-              people who teach, one for the people who learn. Running today with real institutions,
-              opening to new partners deliberately.
+              We translate strategic requirements into working software. Three platforms: one for the
+              people who teach, one for the people who learn, and one for the teams who design the
+              curriculum itself. Running today with real institutions, opening to new partners
+              deliberately.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white/5 border border-white/10 p-10 flex flex-col rounded-none hover:bg-white/10 transition-colors">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-[6px] bg-accent flex items-center justify-center">
@@ -333,6 +334,28 @@ export default function Home() {
               </p>
               <Link
                 href="/products#coach"
+                className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors"
+              >
+                See it in action
+              </Link>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 p-10 flex flex-col rounded-none hover:bg-white/10 transition-colors">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-[6px] bg-primary-hero border border-white/20 flex items-center justify-center">
+                  <span className="font-bold text-white text-lg">B</span>
+                </div>
+                <h3 className="text-2xl font-bold">Curriculum Builder</h3>
+              </div>
+              <p className="text-[16px] text-white/70 mb-4 leading-relaxed">
+                A curriculum design platform. Intake through design, quality assurance and handoff,
+                with objectives, assessments and activities held in a live alignment map.
+              </p>
+              <p className="text-[15px] text-white/50 mb-8 flex-1 leading-relaxed">
+                Accreditation evidence as a by-product of designing the course properly.
+              </p>
+              <Link
+                href="/products#builder"
                 className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors"
               >
                 See it in action

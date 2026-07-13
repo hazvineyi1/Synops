@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -93,7 +94,7 @@ export default function StudyDashboard() {
     try {
       await customFetch(`${API_BASE}/practice/sessions`, { method: "DELETE" });
     } catch {
-      alert("Couldn't clear practice history. Please try again.");
+      notifyError(undefined, "Couldn't clear practice history. Please try again.");
     } finally {
       setClearingHistory(false);
     }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -60,7 +61,7 @@ export default function StudyMaterialView() {
       });
       setLoc(`/practice/${res.id}`);
     } catch {
-      alert("Could not generate a practice session. Try again, or open the configure page.");
+      notifyError(undefined, "Could not generate a practice session. Try again, or open the configure page.");
       setStartingPractice(false);
     }
   };
@@ -74,11 +75,15 @@ export default function StudyMaterialView() {
         credentials: "include",
         body: JSON.stringify({ materialId }),
       });
-      if (!r.ok) { alert("Could not start tutor session."); return; }
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        notifyError(e?.error, "Could not start the tutor session.");
+        return;
+      }
       const data = await r.json();
       setLoc(`/tutor/guided/${data.conversation.id}`);
     } catch {
-      alert("Could not start tutor session.");
+      notifyError(undefined, "Could not start the tutor session.");
     }
   };
 

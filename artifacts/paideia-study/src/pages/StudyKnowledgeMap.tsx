@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -126,7 +127,7 @@ export default function StudyKnowledgeMap() {
       if (up) {
         if (window.confirm(`${up.message}\n\nOpen the plans page?`)) setLoc("/upgrade");
       } else {
-        alert("Couldn't generate the knowledge map. Please try again.");
+        notifyError(undefined, "Couldn't generate the knowledge map. Please try again.");
       }
     } finally {
       setGeneratingFor(null);

@@ -1,6 +1,7 @@
 import { useState, useRef, DragEvent } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -114,7 +115,7 @@ export default function StudyMaterialNew() {
       await triggerKnowledgeGen(material.id);
       setStage("done");
     } catch (err: any) {
-      alert(err?.data?.error || "Failed to add material");
+      notifyError(err?.data?.error, "Could not add that material. Please try again.");
       setSubmitting(false);
       setStage("input");
     }
@@ -146,7 +147,7 @@ export default function StudyMaterialNew() {
       for (const m of data.materials ?? []) await triggerKnowledgeGen(m.id);
       setStage("done");
     } catch (err: any) {
-      alert(err?.message || "Failed to add material");
+      notifyError(err?.message, "Could not add that material. Please try again.");
       setSubmitting(false);
       setStage("input");
     }
@@ -179,7 +180,7 @@ export default function StudyMaterialNew() {
       for (const m of data.materials ?? []) await triggerKnowledgeGen(m.id);
       setStage("done");
     } catch (err: any) {
-      alert(err?.message || "Failed to research topic");
+      notifyError(err?.message, "Could not research that topic. Please try again.");
       setSubmitting(false);
       setStage("input");
     }
@@ -211,7 +212,7 @@ export default function StudyMaterialNew() {
       for (const m of data.materials ?? []) await triggerKnowledgeGen(m.id);
       setStage("done");
     } catch (err: any) {
-      alert(err?.message || "Failed to add materials");
+      notifyError(err?.message, "Could not add those materials. Please try again.");
       setSubmitting(false);
       setStage("input");
     }

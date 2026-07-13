@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,7 +63,7 @@ export default function StudyProfile() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
-      alert("Failed to save profile");
+      notifyError(undefined, "Could not save your profile. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -90,7 +91,7 @@ export default function StudyProfile() {
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      alert("Could not export your data. Please try again.");
+      notifyError(undefined, "Could not export your data. Please try again.");
     } finally {
       setExporting(false);
     }

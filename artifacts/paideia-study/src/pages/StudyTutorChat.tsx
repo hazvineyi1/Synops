@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Input } from "@/components/ui/input";
 import {
   useGetStudyTutorConversation,
@@ -41,7 +42,7 @@ export default function StudyTutorChat() {
       // conversation query cache, so re-fetch to render the new turn (and auto-scroll).
       await refetch();
     } catch {
-      alert("Failed to send message.");
+      notifyError(undefined, "Could not send your message. Please try again.");
     } finally {
       setSending(false);
     }

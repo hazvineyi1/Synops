@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -17,6 +19,31 @@ export default function StudyMaterials() {
   const { data: materials, isLoading } = useListStudyMaterials();
   const deleteMutation = useDeleteStudyMaterial();
   const queryClient = useQueryClient();
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+
+  // Retry concept extraction for a material that has none. Unlike the upload path
+  // (fire-and-forget), /reanalyze is synchronous and returns a real error, so the
+  // user finally learns WHY analysis failed instead of staring at "0 concepts".
+  const runAnalyze = async (id: string) => {
+    setAnalyzingId(id);
+    try {
+      const r = await fetch(`/api/study/materials/${id}/reanalyze`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        notifyError(data?.error, "Analysis failed. Please try again in a moment.");
+        return;
+      }
+      notifySuccess(`Extracted ${data?.conceptCount ?? 0} concepts.`, "Analyzed");
+      queryClient.invalidateQueries({ queryKey: getListStudyMaterialsQueryKey() });
+    } catch {
+      notifyError(undefined, "Could not reach the server. Check your connection.");
+    } finally {
+      setAnalyzingId(null);
+    }
+  };
 
   const handleDelete = async (e: React.MouseEvent, id: string, title: string) => {
     e.stopPropagation();
@@ -26,7 +53,7 @@ export default function StudyMaterials() {
       await deleteMutation.mutateAsync({ materialId: id });
       queryClient.invalidateQueries({ queryKey: getListStudyMaterialsQueryKey() });
     } catch {
-      alert("Failed to delete material. Please try again.");
+      notifyError(undefined, "Could not delete that material. Please try again.");
     }
   };
 
@@ -113,13 +140,36 @@ export default function StudyMaterials() {
                           </span>
                           <span>{new Date(m.createdAt).toLocaleDateString()}</span>
                         </div>
-                        {m.conceptCount && m.conceptCount > 0 && (
+                        {m.conceptCount && m.conceptCount > 0 ? (
                           <div className="mt-2">
                             <div className="flex items-center justify-between text-[10px] mb-1">
                               <span className="text-muted-foreground">Study Progress</span>
                               <span className="font-medium">{Math.round(((m.flashcardCount ?? 0) / (m.conceptCount * 0.7)) * 100)}%</span>
                             </div>
                             <Progress value={Math.min(100, ((m.flashcardCount ?? 0) / (m.conceptCount * 0.7)) * 100)} className="h-1" />
+                          </div>
+                        ) : (
+                          // Zero concepts means analysis never succeeded. Extraction runs
+                          // fire-and-forget on upload, so a failure used to leave the material
+                          // sitting here silently with nothing in it -- and the tutor would then
+                          // refuse to start ("I need at least one studied concept") with no clue
+                          // why. Surface it, and give them a one-click retry.
+                          <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-2 flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-amber-900 leading-snug">
+                              Not analyzed yet. The tutor and practice need concepts from this material.
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 text-[11px] shrink-0"
+                              disabled={analyzingId === m.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                runAnalyze(m.id);
+                              }}
+                            >
+                              {analyzingId === m.id ? "Analyzing..." : "Analyze"}
+                            </Button>
                           </div>
                         )}
                       </div>

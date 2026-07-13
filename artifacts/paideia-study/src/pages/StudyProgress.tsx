@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import StudyNav from "@/components/StudyNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Badge } from "@/components/ui/badge";
 import { useStudyKnowledgeGraph } from "@/hooks/use-study-api";
 import { useListStudyMaterials } from "@workspace/paideia-api-client";
@@ -82,14 +83,14 @@ export default function StudyProgress() {
       });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
-        alert(e?.error || "Could not start session.");
+        notifyError(e?.error, "Could not start the session.");
         setStarting(false);
         return;
       }
       const data = await r.json();
       setLoc(`/tutor/guided/${data.conversation.id}`);
     } catch {
-      alert("Could not start session.");
+      notifyError(undefined, "Could not start the session.");
       setStarting(false);
     }
   };

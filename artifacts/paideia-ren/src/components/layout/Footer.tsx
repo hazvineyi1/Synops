@@ -33,8 +33,9 @@ export function Footer() {
               interest form), NOT to the apps. No /app/ or /study/ links here. */}
           <div className="flex flex-col gap-4">
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-foreground mb-2">Products</h3>
-            <Link href="/products" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Teacher</Link>
-            <Link href="/products" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Coach</Link>
+            <Link href="/products#teacher" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Teacher</Link>
+            <Link href="/products#coach" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Coach</Link>
+            <Link href="/products#builder" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Curriculum Builder</Link>
             <Link href="/products#register-interest" className="text-[15px] text-muted-foreground hover:text-accent transition-colors mt-2">Request access</Link>
           </div>
 

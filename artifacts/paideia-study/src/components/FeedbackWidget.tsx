@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useStudyAuth } from "@/hooks/use-study-auth";
+import { notifyError } from "@/lib/notify";
 import { studySubmitFeedback } from "@/hooks/use-study-api";
 import { MessageSquarePlus, X } from "lucide-react";
 
@@ -31,7 +32,7 @@ export function FeedbackWidget() {
         setOpen(false);
       }, 1800);
     } catch {
-      alert("Could not send your feedback. Please try again.");
+      notifyError(undefined, "Could not send your feedback. Please try again.");
     } finally {
       setSending(false);
     }

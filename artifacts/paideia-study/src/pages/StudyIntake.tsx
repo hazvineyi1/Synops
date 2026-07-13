@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, CheckCircle2, Compass, Sparkles } from "lucide-react";
@@ -143,7 +144,7 @@ export default function StudyIntake() {
       setLoc("/coach");
     } catch {
       setSaving(false);
-      alert("Couldn't save your intake. Please try again.");
+      notifyError(undefined, "Couldn't save your intake. Please try again.");
     }
   };
 

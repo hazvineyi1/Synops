@@ -3,7 +3,7 @@ import { useStudyAuth } from "@/hooks/use-study-auth";
 import {
   LayoutDashboard, BookOpen, TrendingUp,
   LogOut, User, ChevronDown, RotateCcw,
-  MessageCircle, Gift, Target, FileText,
+  MessageCircle, Gift, Target, FileText, ShieldCheck,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -90,6 +90,17 @@ export default function StudyNav() {
               <DropdownMenuItem onClick={() => setLoc("/profile")}>
                 <User className="h-3.5 w-3.5 mr-2" /> Account settings
               </DropdownMenuItem>
+              {/* Admins had no entry point in the learner app: you had to know to type
+                  /study/admin. An admin who lands on the student dashboard and sees no
+                  admin link reasonably concludes they are not an admin. */}
+              {user?.isAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setLoc("/admin")}>
+                    <ShieldCheck className="h-3.5 w-3.5 mr-2" /> Admin console
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => logout()}>
                 <LogOut className="h-3.5 w-3.5 mr-2" /> Sign out

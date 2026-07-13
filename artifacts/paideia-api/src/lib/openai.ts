@@ -38,9 +38,17 @@ const COMPLETION_MICROS_PER_TOKEN = 2000; // $2.00 / 1M
 
 function estimateMicrosUsd(model: string, promptTokens: number, completionTokens: number): number {
   void model;
-  return Math.round(
-    promptTokens * PROMPT_MICROS_PER_TOKEN + completionTokens * COMPLETION_MICROS_PER_TOKEN,
-  ) / 1000; // store as micros (1e-6 USD), dividing nanos by 1000
+  // The round MUST wrap the division, not precede it. Previously this was
+  // Math.round(nanos) / 1000, which yields a FRACTION (e.g. 1234.567) -- and
+  // cost_micros_usd is an integer column, so Postgres rejected the insert and the
+  // error was swallowed by the .catch() on the usage write. Net effect: successful
+  // AI calls were NEVER recorded (their token counts are non-zero, so the cost was
+  // fractional), while failures always were (zero tokens -> cost 0 -> a valid int).
+  // The usage table therefore showed nothing but errors, and looked like the AI was
+  // 100% broken even during the periods it worked.
+  const nanos =
+    promptTokens * PROMPT_MICROS_PER_TOKEN + completionTokens * COMPLETION_MICROS_PER_TOKEN;
+  return Math.round(nanos / 1000); // store as whole micros (1e-6 USD)
 }
 
 export interface GenerateOpts {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
+import { notifyError } from "@/lib/notify";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import StudyNav from "@/components/StudyNav";
@@ -132,7 +133,9 @@ export default function StudyTutorGuided() {
       });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
-        alert(e?.error || "Tutor stumbled. Try again.");
+        // Never alert() here: a native modal freezes the tab, which is exactly what
+        // made a failed reply look like "the socratic dialogue won't send".
+        notifyError(e?.error, "The tutor stumbled. Try again.");
       } else {
         await load();
       }
@@ -170,14 +173,19 @@ export default function StudyTutorGuided() {
       });
       if (!r.ok) {
         const e = await r.json().catch(() => ({}));
-        alert(e?.error || "Could not restart diagnostic.");
+        notifyError(e?.error, "Could not restart the diagnostic.");
         setPending(false);
         return;
       }
       const data = await r.json();
+      if (!data?.conversation?.id) {
+        notifyError(undefined, "The tutor did not return a session. Try again.");
+        setPending(false);
+        return;
+      }
       setLoc(`/tutor/guided/${data.conversation.id}`);
     } catch {
-      alert("Could not restart diagnostic.");
+      notifyError(undefined, "Could not restart the diagnostic.");
       setPending(false);
     }
   };

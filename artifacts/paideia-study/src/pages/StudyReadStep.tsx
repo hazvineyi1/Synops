@@ -1,6 +1,7 @@
 import { useLocation, useParams } from "wouter";
 import { useStudyPath, useCompletePathStep } from "@/hooks/use-study-journey";
 import { useListStudyConcepts, customFetch } from "@workspace/paideia-api-client";
+import { notifyError } from "@/lib/notify";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -139,7 +140,7 @@ export default function StudyReadStep() {
       setLoc("/coach");
     } catch {
       setCompleting(false);
-      alert("Couldn't mark this step complete. Please try again.");
+      notifyError(undefined, "Couldn't mark this step complete. Please try again.");
     }
   };
 
