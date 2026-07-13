@@ -17,7 +17,7 @@ import { getAnonymousId, getUtm, track } from "@/lib/analytics";
  * Synops Teacher and Synops Coach are presented as products with a preview, a
  * short explanation, sales/scalability positioning, and an interactive "sampler"
  * that demonstrates the output WITHOUT granting access. There are deliberately
- * NO links into /app/ or /study/ — access is gated behind the interest form
+ * NO links into /app/ or /study/. Access is gated behind the interest form
  * below, and the team follows up manually.
  */
 
@@ -37,7 +37,7 @@ type FormValues = z.infer<typeof schema>;
 const TEACHER_SAMPLES = [
   {
     label: "Lesson plan",
-    prompt: "Year 9 Biology — cell division, 50 minutes, mixed ability",
+    prompt: "Year 9 Biology, cell division, 50 minutes, mixed ability",
     output: [
       { h: "Learning objective", p: "Students explain the stages of mitosis and why cell division matters for growth and repair." },
       { h: "Starter (5 min)", p: "Show two images: a healing cut and a growing seedling. Ask: what do these have in common?" },
@@ -48,10 +48,10 @@ const TEACHER_SAMPLES = [
   },
   {
     label: "Parent update",
-    prompt: "Update for Amara's guardian — improving, needs homework consistency",
+    prompt: "Update for Amara's guardian: improving, needs homework consistency",
     output: [
       { h: "Subject", p: "Amara's progress in Biology this half-term" },
-      { h: "Message", p: "Amara has made real progress in class this half-term — her contributions during practical work are thoughtful and she now explains her reasoning rather than just giving an answer." },
+      { h: "Message", p: "Amara has made real progress in class this half-term. Her contributions during practical work are thoughtful, and she now explains her reasoning rather than just giving an answer." },
       { h: "Where to help", p: "Homework has been submitted late three times. A consistent slot at home would help her consolidate what she is clearly grasping in lessons." },
       { h: "Next step", p: "I will check in with her weekly and would welcome a short call if that would be useful." },
     ],
@@ -60,9 +60,9 @@ const TEACHER_SAMPLES = [
     label: "Quiz",
     prompt: "10-question retrieval quiz, cell division, with mark scheme",
     output: [
-      { h: "Q1 (Recall)", p: "Name the stage where chromosomes line up at the centre of the cell. — Metaphase [1 mark]" },
-      { h: "Q4 (Understand)", p: "Explain why the DNA must be copied before the cell divides. — So each daughter cell receives a complete set [2 marks]" },
-      { h: "Q9 (Apply)", p: "A cell divides but one daughter cell has no nucleus. Suggest which stage failed and why. — Telophase/anaphase; chromosomes did not separate [3 marks]" },
+      { h: "Q1 (Recall)", p: "Name the stage where chromosomes line up at the centre of the cell. Answer: Metaphase [1 mark]" },
+      { h: "Q4 (Understand)", p: "Explain why the DNA must be copied before the cell divides. Answer: so each daughter cell receives a complete set [2 marks]" },
+      { h: "Q9 (Apply)", p: "A cell divides but one daughter cell has no nucleus. Suggest which stage failed and why. Answer: telophase/anaphase; chromosomes did not separate [3 marks]" },
       { h: "Mark scheme", p: "Full answers, common misconceptions and follow-up prompts generated alongside every question." },
     ],
   },
@@ -73,12 +73,12 @@ const COACH_SAMPLES = [
     label: "Socratic tutor",
     prompt: "I don't understand why enzymes stop working when it gets too hot",
     output: [
-      { h: "Coach", p: "Before I explain — what do you already know about what an enzyme is made of?" },
+      { h: "Coach", p: "Before I explain, what do you already know about what an enzyme is made of?" },
       { h: "You", p: "It's a protein I think" },
       { h: "Coach", p: "Exactly. And proteins are folded into a particular shape. What do you think heat does to a folded shape?" },
       { h: "You", p: "Unfolds it?" },
-      { h: "Coach", p: "Right — and the enzyme's active site depends on that shape. So what happens to the substrate that used to fit?" },
-      { h: "You", p: "It won't fit anymore… so the reaction stops" },
+      { h: "Coach", p: "Right, and the enzyme's active site depends on that shape. So what happens to the substrate that used to fit?" },
+      { h: "You", p: "It won't fit anymore... so the reaction stops" },
       { h: "Coach", p: "You just derived denaturation yourself. That's the answer, and now it's yours." },
     ],
   },
@@ -86,10 +86,10 @@ const COACH_SAMPLES = [
     label: "Study plan",
     prompt: "Biology exam in 6 weeks, 5 hours a week, weakest on genetics",
     output: [
-      { h: "Weeks 1–2", p: "Genetics first, while energy is highest. Three 45-min sessions/week: inheritance, then variation, then a mixed retrieval set." },
-      { h: "Weeks 3–4", p: "Interleave genetics with your stronger topics so recall is tested under mixed conditions — the way the exam actually presents it." },
-      { h: "Weeks 5–6", p: "Full past papers under timed conditions. Every wrong answer becomes a flashcard scheduled for spaced review." },
-      { h: "Why this order", p: "Your weakest topic gets the most spacing and the most retrieval attempts — not just the most hours." },
+      { h: "Weeks 1-2", p: "Genetics first, while energy is highest. Three 45-min sessions per week: inheritance, then variation, then a mixed retrieval set." },
+      { h: "Weeks 3-4", p: "Interleave genetics with your stronger topics so recall is tested under mixed conditions, the way the exam actually presents it." },
+      { h: "Weeks 5-6", p: "Full past papers under timed conditions. Every wrong answer becomes a flashcard scheduled for spaced review." },
+      { h: "Why this order", p: "Your weakest topic gets the most spacing and the most retrieval attempts, not simply the most hours." },
     ],
   },
   {
@@ -98,8 +98,41 @@ const COACH_SAMPLES = [
     output: [
       { h: "Question", p: "Explain how a change in a single DNA base can lead to a non-functioning protein. [6 marks]" },
       { h: "Your answer", p: "The base changes so the protein is different and doesn't work." },
-      { h: "Marked", p: "2/6 — you have the start and the end, but none of the middle." },
-      { h: "What's missing", p: "The changed base alters a codon → a different amino acid is placed → the primary sequence changes → folding changes → active site shape changes → substrate no longer binds. Examiners award the chain, not the conclusion." },
+      { h: "Marked", p: "2 out of 6. You have the start and the end, but none of the middle." },
+      { h: "What's missing", p: "The changed base alters a codon, a different amino acid is placed, the primary sequence changes, folding changes, the active site shape changes, and the substrate no longer binds. Examiners award the chain, not the conclusion." },
+    ],
+  },
+];
+
+const BUILDER_SAMPLES = [
+  {
+    label: "Alignment map",
+    prompt: "Show me where PLO 3 is actually assessed across the program",
+    output: [
+      { h: "Coverage", p: "PLO 3 (clinical reasoning) is introduced in NUR 210, practiced in NUR 315, and assessed once, in NUR 420." },
+      { h: "Gap flagged", p: "Assessed only once, at the end. An accreditor will ask how you know students are progressing before their final year." },
+      { h: "Recommendation", p: "Add a graded formative assessment in NUR 315, mapped to the same performance indicator." },
+      { h: "Evidence trail", p: "Every mapping links to the specific assessment and rubric criterion, ready to export." },
+    ],
+  },
+  {
+    label: "Quality checks",
+    prompt: "Run QA on this course before it goes to handoff",
+    output: [
+      { h: "Measurable outcomes", p: "4 of 6 objectives use measurable verbs. Two flagged: 'understand' and 'be familiar with' cannot be assessed." },
+      { h: "Assessment coverage", p: "Objective 5 has no assessment attached. Every claimed outcome needs evidence." },
+      { h: "Cognitive spread", p: "82% of assessments sit at recall. No objective is assessed above 'apply'." },
+      { h: "Accessibility", p: "3 documents fail contrast checks; 2 videos have no captions. Listed with the exact fixes." },
+    ],
+  },
+  {
+    label: "Standards alignment",
+    prompt: "Map this course to our accreditor's standards",
+    output: [
+      { h: "Matched", p: "Course objectives mapped to the specific performance indicators, not just the standard headers." },
+      { h: "Unsupported claim", p: "Standard 4.2 is claimed but the attached assessment's rubric never references it. Flagged before an auditor finds it." },
+      { h: "Export", p: "A clean alignment matrix, formatted to the accreditor's template, generated in one click." },
+      { h: "Why it matters", p: "The work that normally takes a team months of spreadsheets becomes a by-product of designing the course properly." },
     ],
   },
 ];
@@ -117,7 +150,7 @@ function Sampler({
 
   return (
     <div className="bg-white border border-border rounded-[10px] overflow-hidden shadow-sm">
-      {/* Fake app chrome — signals "this is the product" without being a link */}
+      {/* Fake app chrome that signals "this is the product" without being a link */}
       <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/40">
         <span className="w-2.5 h-2.5 rounded-full bg-border" />
         <span className="w-2.5 h-2.5 rounded-full bg-border" />
@@ -225,15 +258,17 @@ export default function Products() {
       <section className="py-24 px-6 bg-primary text-white">
         <div className="max-w-[1000px] mx-auto">
           <div className="inline-block text-[12px] font-bold uppercase tracking-wider bg-white/10 border border-white/20 px-4 py-1.5 rounded-full mb-8">
-            Private beta — by invitation
+            Private beta, by invitation
           </div>
           <h1 className="text-5xl lg:text-[64px] font-bold leading-[1.1] tracking-tight mb-8">
             We don't just advise. We ship.
           </h1>
           <p className="text-[21px] text-white/80 leading-relaxed max-w-3xl mb-10">
-            Two platforms built from the same conviction: that good pedagogy should scale without being
-            diluted. Both are running today with real institutions. Neither is open to the public yet —
-            we onboard deliberately, so every partner gets the attention that makes a rollout succeed.
+            Three platforms built from the same conviction: that good pedagogy should scale without being
+            diluted. One for the people who teach, one for the people who learn, and one for the teams who
+            design the curriculum itself. All are running today with real institutions. None are open to
+            the public yet. We onboard deliberately, so every partner gets the attention that makes a
+            rollout succeed.
           </p>
           <a
             href="#register-interest"
@@ -258,7 +293,7 @@ export default function Products() {
               </p>
               <p className="text-[19px] text-muted-foreground leading-relaxed mb-6">
                 An AI co-pilot for teachers. It drafts the lesson plans, worksheets, quizzes, mark schemes
-                and parent communications that consume a teacher's unpaid hours — grounded in your
+                and parent communications that consume a teacher's unpaid hours, grounded in your
                 curriculum, pitched at your year groups, and always editable.
               </p>
               <p className="text-[17px] text-muted-foreground leading-relaxed mb-8">
@@ -269,13 +304,13 @@ export default function Products() {
               <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-4">Why departments adopt it</h3>
               <ul className="space-y-3 mb-8">
                 {[
-                  "Cuts planning and admin time materially — the hours teachers say they lose to paperwork.",
+                  "Cuts planning and admin time materially, recovering the hours teachers say they lose to paperwork.",
                   "Consistent quality across a department, not just from your strongest planners.",
                   "Every output is aligned to your curriculum and standards, not a generic template.",
                   "Built-in differentiation: support and stretch generated with every plan.",
                 ].map((t) => (
                   <li key={t} className="flex gap-3 text-[16px] text-muted-foreground leading-relaxed">
-                    <span className="text-accent font-bold mt-0.5">→</span>
+                    <span className="text-accent font-bold mt-0.5">&rarr;</span>
                     <span>{t}</span>
                   </li>
                 ))}
@@ -287,7 +322,7 @@ export default function Products() {
                   Start with a single department pilot. Expand to whole-school with shared resource
                   libraries, class and assignment management, and admin oversight of usage and quality.
                   Multi-school rollouts run on the same tenancy model our consulting clients already
-                  operate — isolated data, per-institution branding, and central control.
+                  operate: isolated data, per-institution branding, and central control.
                 </p>
               </div>
             </div>
@@ -324,13 +359,13 @@ export default function Products() {
               <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-4">Why institutions fund it</h3>
               <ul className="space-y-3 mb-8">
                 {[
-                  "One-to-one tutoring is the most effective intervention we know — and the least affordable. This is the first thing that scales it.",
+                  "One-to-one tutoring is the most effective intervention we know, and the least affordable. This is the first thing that scales it.",
                   "Socratic by design: students reach the answer themselves, so the understanding survives the exam.",
                   "Study plans built on spaced retrieval and interleaving, not on how long a student sits at a desk.",
-                  "Honest marking against real mark schemes — students find out now, not in August.",
+                  "Honest marking against real mark schemes, so students find out now rather than in August.",
                 ].map((t) => (
                   <li key={t} className="flex gap-3 text-[16px] text-muted-foreground leading-relaxed">
-                    <span className="text-accent font-bold mt-0.5">→</span>
+                    <span className="text-accent font-bold mt-0.5">&rarr;</span>
                     <span>{t}</span>
                   </li>
                 ))}
@@ -349,6 +384,61 @@ export default function Products() {
 
             <div className="lg:order-1 lg:sticky lg:top-28">
               <Sampler samples={COACH_SAMPLES} accent="primary" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Curriculum Builder (Compass) */}
+      <section className="py-24 px-6 bg-white border-b border-border">
+        <div className="max-w-[1200px] mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+            <div>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-[6px] bg-primary flex items-center justify-center text-white font-bold text-xl">B</div>
+                <h2 className="text-4xl font-bold text-primary tracking-tight">Curriculum Builder</h2>
+              </div>
+              <p className="text-[15px] font-bold uppercase tracking-wider text-accent mb-6">
+                Good design and audit-ready evidence, from one workflow
+              </p>
+              <p className="text-[19px] text-muted-foreground leading-relaxed mb-6">
+                A curriculum design platform that takes instructional teams from intake through design,
+                quality assurance, and handoff. Backward design by default, with learning objectives,
+                assessments and activities held in a live alignment map.
+              </p>
+              <p className="text-[17px] text-muted-foreground leading-relaxed mb-8">
+                Most curriculum tools track approvals. This one actually helps you build the course, and
+                produces the accreditation evidence as a by-product of doing it properly.
+              </p>
+
+              <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-4">Why institutions buy it</h3>
+              <ul className="space-y-3 mb-8">
+                {[
+                  "Accreditation self-studies stop being a six-month scramble. The evidence is already there, mapped to the performance indicator.",
+                  "Rules-based QA catches unmeasurable objectives, unassessed outcomes and accessibility failures before handoff, not after a site visit.",
+                  "Standards library covering regional and specialist accreditors, plus your own institutional outcomes.",
+                  "Replaces specialist accreditation consultants billing by the hour.",
+                ].map((t) => (
+                  <li key={t} className="flex gap-3 text-[16px] text-muted-foreground leading-relaxed">
+                    <span className="text-accent font-bold mt-0.5">&rarr;</span>
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="bg-muted/40 border border-border rounded-[8px] p-6">
+                <h3 className="text-[13px] font-bold uppercase tracking-wider text-primary mb-3">Scales from one program to an institution</h3>
+                <p className="text-[16px] text-muted-foreground leading-relaxed">
+                  Start with a single program build. Expand to department, college and whole-institution
+                  curriculum mapping, with a live view of where every program outcome is introduced,
+                  practiced and assessed. Multi-tenant by design: isolated data, your branding, and central
+                  oversight across every course in development.
+                </p>
+              </div>
+            </div>
+
+            <div className="lg:sticky lg:top-28">
+              <Sampler samples={BUILDER_SAMPLES} accent="primary" />
             </div>
           </div>
         </div>
@@ -414,7 +504,8 @@ export default function Products() {
                     <SelectContent>
                       <SelectItem value="Synops Teacher">Synops Teacher</SelectItem>
                       <SelectItem value="Synops Coach">Synops Coach</SelectItem>
-                      <SelectItem value="Both">Both</SelectItem>
+                      <SelectItem value="Curriculum Builder">Curriculum Builder</SelectItem>
+                      <SelectItem value="More than one">More than one</SelectItem>
                       <SelectItem value="Not sure yet">Not sure yet</SelectItem>
                     </SelectContent>
                   </Select>

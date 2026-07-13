@@ -27,7 +27,7 @@ export default function Platforms() {
         <div className="max-w-[1200px] mx-auto">
           <div className="text-center mb-16">
             <div className="inline-block text-[12px] font-bold uppercase tracking-wider bg-muted border border-border text-muted-foreground px-4 py-1.5 rounded-full mb-6">
-              Private beta — by invitation
+              Private beta, by invitation
             </div>
             <h2 className="text-4xl font-bold text-primary tracking-tight mb-4">Our Products</h2>
             <p className="text-[18px] text-muted-foreground">Purpose-built platforms reflecting our rigorous standards.</p>
@@ -89,16 +89,23 @@ export default function Platforms() {
             </div>
           </div>
           
+          {/* Curriculum Builder (Compass). Private beta, same treatment as Teacher and
+              Coach: we show what it does, but there is NO direct /builder/ link and no
+              free trial. Both CTAs route to /products, where access is gated behind the
+              interest form. */}
           <div className="mt-16 bg-primary text-white p-12 flex flex-col md:flex-row gap-12 items-center">
             <div className="flex-1">
-              <h2 className="text-3xl font-bold mb-4 tracking-tight">Curriculum Builder Showcase</h2>
+              <div className="inline-block text-[12px] font-bold uppercase tracking-wider bg-white/10 border border-white/20 px-4 py-1.5 rounded-full mb-6">
+                Private beta, by invitation
+              </div>
+              <h2 className="text-3xl font-bold mb-4 tracking-tight">Curriculum Builder</h2>
               <p className="text-[18px] text-white/80 leading-relaxed mb-6">
                 Our curriculum design platform takes instructional teams from intake through design, quality assurance, and handoff.
               </p>
               <div className="flex items-center gap-4 text-[14px] font-bold tracking-widest uppercase text-accent mb-8 flex-wrap">
-                <span>Intake</span> <span>→</span>
-                <span>Design</span> <span>→</span>
-                <span>QA</span> <span>→</span>
+                <span>Intake</span> <span>&rarr;</span>
+                <span>Design</span> <span>&rarr;</span>
+                <span>QA</span> <span>&rarr;</span>
                 <span>Handoff</span>
               </div>
               <p className="text-[16px] text-white/70 leading-relaxed">
@@ -106,14 +113,14 @@ export default function Platforms() {
               </p>
             </div>
             <div className="shrink-0 flex flex-col gap-3">
-              <a
-                href="/builder/"
+              <Link
+                href="/products"
                 className="inline-block bg-accent text-primary px-8 py-4 font-bold text-[16px] text-center transition-colors hover:bg-accent/90 rounded-[6px]"
               >
-                Open the Curriculum Builder
-              </a>
+                See it in action
+              </Link>
               <Link
-                href="/contact?area=platforms"
+                href="/products#register-interest"
                 className="inline-block bg-white text-primary px-8 py-4 font-bold text-[16px] text-center transition-colors hover:bg-white/90 rounded-[6px]"
               >
                 Request a tailored build

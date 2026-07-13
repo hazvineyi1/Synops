@@ -28,7 +28,7 @@ export default function Learning() {
         <div className="max-w-[1200px] mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-20">
             {[
-              { title: "Instructional Design & Curriculum", desc: "Course and program design, storyboarding, assessment design, and standards/accreditation alignment across legal, higher-ed, and K-12 contexts. High-volume development (competency modules of 10,000–15,000 words) without losing rigor." },
+              { title: "Instructional Design & Curriculum", desc: "Course and program design, storyboarding, assessment design, and standards/accreditation alignment across legal, higher-ed, and K-12 contexts. High-volume development (competency modules of 10,000 to 15,000 words) without losing rigor." },
               { title: "LMS Strategy & Administration", desc: "Selection, implementation, migration, and day-to-day administration across Canvas, Blackboard, Moodle, and Brightspace/D2L, plus authoring with Articulate Storyline 360, Rise 360, Adobe Captivate, Camtasia, and Vyond." },
               { title: "AI in Education & Content Evaluation", desc: "Generative-AI integration, prompt engineering, custom GPT/model development and evaluation, structured AI quality-review protocols, and AI-transparency practices." },
               { title: "Learning Analytics & Outcomes", desc: "Using interaction and performance data to find content gaps and drive iterative improvement (a documented ~20% lift in learner engagement), with Tableau, Power BI, and Python-based analysis." },

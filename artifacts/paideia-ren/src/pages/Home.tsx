@@ -282,13 +282,13 @@ export default function Home() {
         <div className="max-w-[1200px] mx-auto">
           <div className="mb-16">
             <div className="inline-block text-[12px] font-bold uppercase tracking-wider bg-white/10 border border-white/20 px-4 py-1.5 rounded-full mb-6">
-              Private beta — by invitation
+              Private beta, by invitation
             </div>
             <h2 className="text-4xl lg:text-[48px] font-bold tracking-tight mb-6">
               Beyond Advisory: We Build
             </h2>
             <p className="text-[20px] text-white/80 max-w-2xl leading-relaxed">
-              We translate strategic requirements into working software. Two platforms — one for the
+              We translate strategic requirements into working software. Two platforms: one for the
               people who teach, one for the people who learn. Running today with real institutions,
               opening to new partners deliberately.
             </p>
@@ -304,7 +304,7 @@ export default function Home() {
               </div>
               <p className="text-[16px] text-white/70 mb-4 leading-relaxed">
                 An AI co-pilot for teachers. Lesson plans, worksheets, quizzes, mark schemes and parent
-                updates — drafted against your curriculum in minutes, not evenings.
+                updates, drafted against your curriculum in minutes, not evenings.
               </p>
               <p className="text-[15px] text-white/50 mb-8 flex-1 leading-relaxed">
                 Scales from a single department pilot to a whole trust.

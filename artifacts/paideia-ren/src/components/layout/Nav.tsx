@@ -58,7 +58,7 @@ export function Nav() {
           </nav>
           
           <div className="hidden md:flex items-center gap-6">
-            {/* "Start free trial" (Synops Teacher signup) hidden for now — product
+            {/* "Start free trial" (Synops Teacher signup) hidden for now. Product
                 not yet publicly launched. Restore when ready. */}
             <Link
               href="/contact" 
@@ -104,7 +104,7 @@ export function Nav() {
               >
                 Book a consultation
               </Link>
-              {/* "Start free trial" (Synops Teacher signup) hidden for now — product
+              {/* "Start free trial" (Synops Teacher signup) hidden for now. Product
                   not yet publicly launched. Restore when ready. */}
             </div>
           </div>
