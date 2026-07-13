@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -201,79 +201,102 @@ function Sampler({
   );
 }
 
-/* ------------------------------------------------------- Product section */
+/* ------------------------------------------------------ Product explorer */
 
 /**
- * One product block. All three products render through this so the page keeps a
- * single, consistent rhythm: a full-width header, then a balanced two-column
- * body (pitch + proof points on the left, sampler on the right), then a
- * full-width scalability strip. Deliberately NOT alternated left/right, which
- * made the eye jump and left dead space under the shorter column.
+ * Compact product explorer.
+ *
+ * Replaces three tall stacked sections (which took three screens of scrolling
+ * and read as clunky) with a single switcher: pick a product, see its pitch and
+ * sampler in place. Deep-linkable via #teacher / #coach / #builder, so a
+ * "See it in action" link from elsewhere on the site lands on the RIGHT product
+ * instead of dumping the visitor at the top of the page on Synops Teacher.
  */
-function ProductSection({
-  letter,
-  name,
-  tagline,
-  lead,
-  bulletsTitle,
-  bullets,
-  scaleTitle,
-  scale,
-  samples,
-  accent,
-  tint,
-}: {
-  letter: string;
-  name: string;
-  tagline: string;
-  lead: string;
-  bulletsTitle: string;
-  bullets: string[];
-  scaleTitle: string;
-  scale: string;
-  samples: typeof TEACHER_SAMPLES;
-  accent: "accent" | "primary";
-  tint: string;
-}) {
-  const badge = accent === "accent" ? "bg-accent" : "bg-primary";
+function ProductExplorer() {
+  const [active, setActive] = useState(0);
+
+  useEffect(() => {
+    const applyHash = () => {
+      const slug = window.location.hash.replace("#", "").toLowerCase();
+      const i = PRODUCTS.findIndex((p) => p.slug === slug);
+      if (i < 0) return;
+      setActive(i);
+      // Deep link should land ON the product, not at the top of the page.
+      window.requestAnimationFrame(() => {
+        document.getElementById("explore")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    };
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
+  const p = PRODUCTS[active]!;
 
   return (
-    <section className={`py-20 px-6 border-b border-border ${tint}`}>
+    <section id="explore" className="py-16 px-6 bg-white border-b border-border scroll-mt-20">
       <div className="max-w-[1200px] mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-x-5 gap-y-3 mb-3">
-          <div className={`w-11 h-11 shrink-0 rounded-[6px] ${badge} flex items-center justify-center text-white font-bold text-lg`}>
-            {letter}
-          </div>
-          <h2 className="text-[38px] leading-tight font-bold text-primary tracking-tight">{name}</h2>
+        {/* Product switcher */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-12">
+          {PRODUCTS.map((x, i) => {
+            const on = i === active;
+            return (
+              <button
+                key={x.slug}
+                type="button"
+                onClick={() => {
+                  setActive(i);
+                  window.history.replaceState(null, "", `#${x.slug}`);
+                }}
+                className={`text-left p-5 rounded-[8px] border transition-colors ${
+                  on
+                    ? "border-primary bg-primary text-white"
+                    : "border-border bg-white hover:bg-muted/50"
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <div
+                    className={`w-8 h-8 shrink-0 rounded-[5px] flex items-center justify-center font-bold text-[13px] ${
+                      on ? "bg-white text-primary" : "bg-primary text-white"
+                    }`}
+                  >
+                    {x.letter}
+                  </div>
+                  <div className={`font-bold text-[17px] ${on ? "text-white" : "text-primary"}`}>
+                    {x.name}
+                  </div>
+                </div>
+                <div className={`text-[13.5px] leading-snug ${on ? "text-white/70" : "text-muted-foreground"}`}>
+                  {x.short}
+                </div>
+              </button>
+            );
+          })}
         </div>
-        <p className="text-[14px] font-bold uppercase tracking-wider text-accent mb-12 sm:pl-16">
-          {tagline}
-        </p>
 
-        {/* Body */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-16 items-start">
+        {/* Selected product */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 xl:gap-14 items-start">
           <div>
-            <p className="text-[18px] text-muted-foreground leading-relaxed mb-8">{lead}</p>
+            <p className="text-[13px] font-bold uppercase tracking-wider text-accent mb-4">{p.tagline}</p>
+            <p className="text-[17px] text-muted-foreground leading-relaxed mb-7">{p.lead}</p>
 
-            <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-4">{bulletsTitle}</h3>
-            <ul className="space-y-3">
-              {bullets.map((t) => (
-                <li key={t} className="flex gap-3 text-[16px] text-muted-foreground leading-relaxed">
+            <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-3">{p.bulletsTitle}</h3>
+            <ul className="space-y-2.5 mb-7">
+              {p.bullets.map((t) => (
+                <li key={t} className="flex gap-3 text-[15.5px] text-muted-foreground leading-relaxed">
                   <span className="text-accent font-bold mt-0.5 shrink-0">&rarr;</span>
                   <span>{t}</span>
                 </li>
               ))}
             </ul>
+
+            <div className="border-t border-border pt-5">
+              <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-2">{p.scaleTitle}</h3>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">{p.scale}</p>
+            </div>
           </div>
 
-          <Sampler samples={samples} accent={accent} />
-        </div>
-
-        {/* Scalability strip */}
-        <div className="mt-12 border-t border-border pt-8 grid grid-cols-1 md:grid-cols-[minmax(0,260px)_1fr] gap-4 md:gap-10">
-          <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary">{scaleTitle}</h3>
-          <p className="text-[16px] text-muted-foreground leading-relaxed max-w-3xl">{scale}</p>
+          <Sampler samples={p.samples} accent={p.accent} />
         </div>
       </div>
     </section>
@@ -282,6 +305,8 @@ function ProductSection({
 
 const PRODUCTS = [
   {
+    slug: "teacher",
+    short: "For the people who teach.",
     letter: "T",
     name: "Synops Teacher",
     tagline: "Give every teacher back their evenings",
@@ -297,9 +322,10 @@ const PRODUCTS = [
     scale: "Start with a single department pilot. Expand to whole-school with shared resource libraries, class and assignment management, and admin oversight of usage and quality. Multi-school rollouts run on the same tenancy model our consulting clients already operate: isolated data, per-institution branding, and central control.",
     samples: TEACHER_SAMPLES,
     accent: "accent" as const,
-    tint: "bg-white",
   },
   {
+    slug: "coach",
+    short: "For the people who learn.",
     letter: "C",
     name: "Synops Coach",
     tagline: "A tutor that refuses to just give the answer",
@@ -315,9 +341,10 @@ const PRODUCTS = [
     scale: "Deploy to a single intervention group, a year cohort, or an entire student body. Seat-based licensing keeps cost predictable as you grow, and the marginal cost of the next student is a fraction of an hour of human tutoring. Institutional dashboards show who is engaging, who is struggling, and where the cohort is weakest.",
     samples: COACH_SAMPLES,
     accent: "primary" as const,
-    tint: "bg-background",
   },
   {
+    slug: "builder",
+    short: "For the teams who design the curriculum.",
     letter: "B",
     name: "Curriculum Builder",
     tagline: "Good design and audit-ready evidence, from one workflow",
@@ -333,7 +360,6 @@ const PRODUCTS = [
     scale: "Start with a single program build. Expand to department, college and whole-institution curriculum mapping, with a live view of where every program outcome is introduced, practiced and assessed. Multi-tenant by design: isolated data, your branding, and central oversight across every course in development.",
     samples: BUILDER_SAMPLES,
     accent: "primary" as const,
-    tint: "bg-white",
   },
 ];
 
@@ -415,11 +441,8 @@ export default function Products() {
         </div>
       </section>
 
-      {/* All three products render through one component, so the page keeps a
-          single consistent rhythm instead of three bespoke, alternating blocks. */}
-      {PRODUCTS.map((p) => (
-        <ProductSection key={p.name} {...p} />
-      ))}
+      {/* One compact switcher instead of three tall stacked sections. */}
+      <ProductExplorer />
 
       {/* Interest form */}
       <section id="register-interest" className="py-24 px-6 bg-white scroll-mt-24">
@@ -429,7 +452,7 @@ export default function Products() {
               Request access
             </h2>
             <p className="text-[19px] text-muted-foreground leading-relaxed">
-              Both products are in private beta and are not publicly available. Tell us who you are and
+              All three products are in private beta and are not publicly available. Tell us who you are and
               what you are trying to solve, and our team will contact you to arrange a walkthrough and
               discuss a pilot.
             </p>

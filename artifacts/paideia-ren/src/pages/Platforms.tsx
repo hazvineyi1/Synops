@@ -44,7 +44,7 @@ export default function Platforms() {
                 communications, drafted against your curriculum. Scales from a single department pilot
                 to a whole trust.
               </p>
-              <Link href="/products" className="bg-primary text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-primary/90 transition-colors">
+              <Link href="/products#teacher" className="bg-primary text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-primary/90 transition-colors">
                 See it in action
               </Link>
             </div>
@@ -59,7 +59,7 @@ export default function Platforms() {
                 and a Socratic tutor that leads learners to the answer. Scales one-to-one tutoring to a
                 whole cohort.
               </p>
-              <Link href="/products" className="bg-accent text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-accent/90 transition-colors">
+              <Link href="/products#coach" className="bg-accent text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-accent/90 transition-colors">
                 See it in action
               </Link>
             </div>
@@ -114,7 +114,7 @@ export default function Platforms() {
             </div>
             <div className="shrink-0 flex flex-col gap-3">
               <Link
-                href="/products"
+                href="/products#builder"
                 className="inline-block bg-accent text-primary px-8 py-4 font-bold text-[16px] text-center transition-colors hover:bg-accent/90 rounded-[6px]"
               >
                 See it in action

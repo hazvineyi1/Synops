@@ -310,7 +310,7 @@ export default function Home() {
                 Scales from a single department pilot to a whole trust.
               </p>
               <Link
-                href="/products"
+                href="/products#teacher"
                 className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors"
               >
                 See it in action
@@ -332,7 +332,7 @@ export default function Home() {
                 The first thing that makes one-to-one tutoring scale to a whole cohort.
               </p>
               <Link
-                href="/products"
+                href="/products#coach"
                 className="bg-white text-primary px-6 py-3 font-bold rounded-[6px] text-center hover:bg-white/90 transition-colors"
               >
                 See it in action
