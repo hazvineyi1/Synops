@@ -1,0 +1,234 @@
+
+
+You are building Synops Praxis: a white-label, multi-tenant learning platform for the South African skills and enterprise-development market that turns an organisation's own knowledge into verified, job-ready competence.
+
+It is not a video-and-quiz LMS. Its heart is a Socratic tutor that teaches by questioning rather than lecturing, an animation studio that turns a client's documents into short, voiced, on-brand animated modules, and a living credential that proves demonstrated skill and expires when that skill goes stale. It is sold as a platform that partners resell under their own brand, so it needs a genuine super-admin tier and true tenancy from day one.
+
+In one line: knowledge in, verified capability out, under anyone's brand, at scale.
+
+Build for mobile-first low-bandwidth learners, for partner-led distribution, and for South African law.
+
+
+1. The four differentiators (protect these above all else)
+
+Every incumbent already does hosting, enrolment, quizzes, and certificates. Do not compete there. Compete on the four things no incumbent combines. If a design decision weakens any of these four, reconsider the decision.
+
+
+Socratic by default. Learning is a guided dialogue. The tutor asks, the learner reasons, and a wrong answer opens a teaching moment, never a bare "incorrect."
+Documents become animated modules automatically. Upload a manual; get a short, voiced, branded animated lesson. No film crew, no curriculum team.
+Credentials that mean something now. Every credential resolves to a full evidence trail and decays without re-verification, so "qualified" always means qualified today.
+One engine, every brand. Partners resell it as their own platform. The engine and the credential standard are shared, invisible, and trusted; the brand on the front is theirs.
+
+
+
+2. Competitive synthesis (borrow deliberately)
+
+Take the best of each incumbent and combine what none of them combine.
+
+
+From Moodle: multi-tenancy and extensibility (the basis for scale and white-label).
+From Canvas: clean, modern UX and a genuinely good mobile experience (non-negotiable for this market).
+From D2L Brightspace: adaptive release, content that unlocks on demonstrated mastery, not seat-time.
+From VQManager: competency-and-portfolio-of-evidence tracking against a standard (the accredited and ESD world).
+From Alison: frictionless access and certificate motivation at scale.
+What none of them do, and you will: a Socratic tutor, auto-generated animation, a decaying verifiable credential, and true white-label distribution. That gap is the product.
+
+
+
+3. Users and access (fully custom RBAC, presets ship first)
+
+Build a capability-based permission system: a role is a bundle of granular capabilities (an action on a resource) assigned at a scope. Ship the presets below as working defaults, and let an admin clone a role, edit its capabilities, or create a new one, without a code release.
+
+Every tier sees only its own scope and everything nested beneath it. Never sideways, never up.
+
+
+Super admin (platform / Synops). Manages partner tenants, the shared assessment standard, the item bank, the credential registry, platform billing, and system health. Sees cross-platform stats in aggregate only. Explicitly cannot open individual personal profiles or a partner's identifiable client data.
+Partner admin (reseller). Manages their own branding, their client organisations, their delivery and coaching team, and their billing. Sees their whole book of business in aggregate. Cannot see other partners, touch platform controls, or alter the shared credential standard.
+Org admin (employer / sponsor). Manages their departments, learners, and which modules run. Sees their full workforce diagnostics and their funder-evidence. Cannot see other organisations.
+Coach / manager. Sees their own learners' progress, gaps, and submitted work; assigns and tracks modules. Cannot see other teams or bulk-export data.
+Learner. Takes assessments and modules; sees their own progress and credentials; shares their own credential link. Never sees others' data or upcoming assessment items.
+Individual (free assessment user). Owns their profile and consent; controls deletion; opts in or out of the talent pool. Sits outside any organisation and is never added to one, or scored for a hiring decision, without explicit consent.
+
+
+
+4. Multi-tenancy and white-labelling (architecture, not a theme)
+
+Retrofitting tenancy later is the expensive mistake. Design it in now.
+
+
+Hierarchy: platform → partner → organisation → learner. Branding, configuration, and data are inheritable and overridable at each level. One partner runs many organisations; each organisation is an isolated tenant whose data never crosses to another.
+Partner-configurable theming: name, logo, colour palette, favicon, custom domain or subdomain, login and landing screens, email sender, credential certificate title and design, and the active language set.
+The credential is the delicate part. Partners brand the certificate, but every credential resolves to the same shared evidence standard and the same registry. Their name on the front; a shared, locked verification standard underneath. Never let a partner define their own evidence standard or fork the registry, that is what preserves cross-market trust and is itself a selling point ("your brand, our verifiable standard").
+Locked, never white-labelled: the evidence standard behind a credential, the validity-and-bias methodology, data-residency controls, the audit trail, and cross-partner registry integrity.
+Rollout: support a manually onboarded single reseller first, on an architecture that later opens to self-serve white-label (partner admin panel, self-service theming, usage-based billing) so the platform grows revenue without growing headcount.
+
+
+
+5. The Socratic learning engine (the core, make it excellent)
+
+Make the Socratic walk-through the default lesson type, not an option.
+
+
+A lesson is a guided dialogue, not a video then a quiz. Present a short, workplace-authentic scenario; ask the learner what they would do; respond with a probing follow-up that advances their reasoning, not a verdict.
+Adaptive, LLM-driven dialogue. Go beyond fixed pre-written branches: the tutor (Claude via API) generates its next question in response to the learner's actual answer, grounded strictly in the source content and guardrailed against drift. This is the cutting-edge mechanic, a tutor that reasons with the learner, not a decision tree.
+Wrong answers are the lesson. A poor choice returns a Socratic prompt that exposes the flaw in the reasoning and invites another attempt.
+Mastery gating, not seat-time. Learners advance only by demonstrating understanding; modules unlock on demonstrated competence (adaptive release), never on watch-to-the-end.
+Spaced reinforcement. Schedule short retrieval checks over time; feed results into credential freshness.
+Grounded in adult learning (Knowles' andragogy, Bloom's mastery): problem-centred, built on the learner's own experience, useful tomorrow morning.
+Human-in-the-loop content. The tutor's dialogue and scripts are generated from source content but reviewed and editable before going live. Never ship unchecked model output.
+
+
+Illustrative exchange (build the mechanic to do this):
+
+
+Scenario: A learner selling handmade soap is busy every market day but has no savings. Where would you look first?
+Learner picks: "Sell more soap."
+Tutor: "Before we sell more, let's test something. If each bar costs you R18 to make and you sell it for R25, how much are you actually keeping, and what happens to that gap once you add the taxi fare to the market? What might 'sell more' do to a thin margin?"
+
+
+
+
+6. The animation studio (content → animated module)
+
+Turn a client's documents into short animated modules. Do not use raw text-to-video (Sora/Runway-style) generation as the core, it is costly, slow, and uncontrollable, and a taught concept must be accurate and on-brand. Build a controllable three-part pipeline instead:
+
+
+Script. Claude deconstructs the source document into competency units and writes a short narration script, chunked into 5-to-10-minute modules and discrete beats. Reviewable and editable by a human.
+Voice. Each beat's narration is synthesised by the voice layer (section 7), multilingual.
+Visuals. Beats populate pre-designed, on-brand animated templates rendered programmatically (e.g. a code-driven video framework such as Remotion). The model decides what is on each beat; the template decides how it looks. Template types: title card; points-with-icons build; diagram fill (e.g. a business-model canvas filling block by block); compare (wrong vs right); close. Templates inherit the partner's brand, so output is consistent, accurate, cheap, fast, and white-label by construction.
+
+
+Deliver a studio UI: paste or select source content → see the generated script beats → preview the animated result → render the final voiced module. Treat full auto-generation as Phase 2; the MVP may assemble template modules semi-manually.
+
+Innovative extension: modules are living, when a source document changes, the module can be regenerated rather than rebuilt by hand.
+
+
+7. Voice and narration (ElevenLabs)
+
+
+Provider: ElevenLabs, integrated behind a pluggable voice interface (the platform requests speech for a text string in a chosen language and voice and receives audio; the provider is swappable, but ElevenLabs is the chosen implementation). Keeping the interface clean protects you if requirements change.
+Use its strengths: natural neural voices, a selectable voice library, streaming synthesis for responsiveness, and multilingual output. Confirm South African language coverage (South African English plus, on the roadmap, isiZulu, isiXhosa, Sesotho, Afrikaans); where a language is not natively covered, plan the fallback.
+Cost discipline: narration is generated per module; cache rendered audio aggressively and regenerate only on content change, so voice cost stays at cents, not dollars, per module at scale.
+Captions/subtitles are generated from the same script for accessibility and low-audio contexts, and are on by default.
+
+
+
+8. Assessment, diagnostics, and credentialing
+
+
+Adaptive diagnostic engine. An item-response-theory (IRT) style adaptive assessment that converges on a learner's true ability per competency in few items rather than a fixed battery, with an item bank, calibration, and a bias-review pipeline. Be honest in-product: adaptivity sharpens as response data accumulates, so early cohorts partly calibrate the engine.
+Strengths assay → pathway routing. A short, free strengths assessment (RIASEC-based) maps a person to occupations against live demand, and routes them into the right pathway. Discovery and development only, not selection (see section 10).
+Competency graph. Every skill unit maps to occupational codes (South Africa's OFO) and NQF levels, so results and credentials are legible to sponsors, SETAs, and the QCTO ecosystem. The graph is the connective tissue between people, jobs, training, and credentials.
+Accreditation honesty. Grant-eligible, accredited programmes are delivered through an accredited partner; the platform hosts and tracks the evidence and the portfolio but does not claim to be an accredited provider or to issue formal NQF qualifications itself.
+The credential (PraxisMark). Evidence-backed, signed, publicly verifiable in seconds; resolves to its full evidence trail; decays without re-verification on a schedule. It sits alongside formal qualifications, never impersonating one. Re-verification is a product loop, not an afterthought.
+Evidence ledger. An append-only record of every assessment, scenario response, and attestation, feeding credentials, audits, and funder reports.
+
+
+
+9. Coaching hand-off (blended, human-first)
+
+
+The platform carries the teachable material and the evidence; human coaches carry judgment, strategy, relationship, and encouragement. Do not build an AI that replaces the coach or plays therapist to a stressed learner, support the business reasoning and leave the human side to the human.
+On module or course completion, support a hand-off: the learner submits work (e.g. a business-model canvas), and the coach receives it with a pre-session read of the learner's strengths and gaps, so no coaching hour is spent on what the platform already covered.
+Give coaches a dashboard of learner progress, submissions to review, and readiness for a session.
+
+
+
+10. Data, analytics, and funder evidence
+
+
+Rollup with de-identification. A learner's individual score is visible to their coach; by the time data reaches the partner or platform tier it is a statistic, not a person. Enforce a hard identity boundary as data climbs above the organisation tier.
+Three streams: learning/assessment telemetry (which also calibrates the diagnostic), outcome and recovery data (readiness movement, time-to-competency, credentials, completions), and product/funnel telemetry (assay completion, opt-in, drop-off).
+Funder-facing evidence is a first-class feature. Auto-compile a sponsor/funder report per cohort: enrolments, completions, verified credentials, coaching hand-offs, and outcomes. This is the proof-of-impact that renews enterprise-development and grant funding, the commercial wedge, not an export afterthought.
+Psychometric data is walled off from general analytics; item-level data must never be visible to anyone who could game the assessment.
+
+
+
+11. Core data model (name these entities)
+
+Tenant/Partner; Organisation; User; Role; Capability; BrandTheme. Course; Module; Beat; MediaAsset (audio/render); ScriptDraft. CompetencyUnit (→ OFO, NQF); CompetencyGraph. Assessment; Item; ItemResponse; AbilityEstimate. StrengthsProfile; ConsentRecord; TalentPoolEntry. Credential (PraxisMark); EvidenceRecord (append-only ledger); VerificationRecord; DecaySchedule. CohortReport; AuditEvent.
+
+Design rule: an Individual (assay user) and an Employee record are separate by design; joining them requires the person's explicit consent.
+
+
+12. Compliance and security (South African context, build in, do not bolt on)
+
+
+POPIA. Personal data at scale. South African personal data is hosted in a South African cloud region. Consent is explicit and revocable, with deletion rights. Processing outside South Africa handles de-identified data only. Profiles are never sold. Support an Information Officer's needs (records of consent, access, processing).
+Employment Equity Act, section 8. Assessments used in employment decisions must be scientifically valid, reliable, and unbiased. So the assessment runs in discovery/development mode by default; any selection use is gated behind an independent validity-and-bias study. Build the gate as hard configuration, not a caveat.
+Tenant isolation. One client's documents and results never leak to another. Client-uploaded content is ring-fenced per tenant and used only to build that client's training, never to train shared models.
+Audit log. Immutable record of who accessed what and when, for POPIA and for defending a credential in an audit.
+IP. Client content and platform IP are cleanly separated; client content ownership stays with the client.
+
+
+
+13. Scale, performance, and non-functional targets (confirm with team)
+
+
+Mobile-first, low-bandwidth. Primary learner is on a modest phone with limited data. Light payloads, progressive loading, offline-tolerant where feasible; page interactions responsive on a mid-tier device over 3G. A WhatsApp delivery channel is on the roadmap, keep content degradable to it.
+Async by design. Script generation, voice synthesis, and rendering are the expensive jobs, run them on queued workers, cache aggressively, and never block the learner experience on them.
+Scalable, isolated, observable. Horizontally scalable services; strict per-tenant data isolation; metrics, logging, and tracing from day one.
+Cost model. Compute true cost per learner per month (compute, storage, voice, LLM) so the per-learner licence price covers it with margin. Cost discipline is a feature.
+Accessibility. WCAG 2.1 AA target; captions on all voiced content; keyboard and screen-reader support.
+
+
+
+14. Suggested stack (directional)
+
+
+Front end: React + TypeScript; clean, modern, fast, excellent on mobile.
+Services: Python (FastAPI) for assessment, scripting, and orchestration.
+LLM: Claude (Anthropic API) for Socratic dialogue and script generation.
+Assessment: an IRT library with an item-bank store and calibration pipeline.
+Animation render: a programmatic video framework (e.g. Remotion) driven by branded templates.
+Voice: ElevenLabs behind a pluggable interface.
+Data: PostgreSQL (relational); encrypted object store (documents, rendered media); a graph layer for the competency graph as it grows.
+Hosting: a South African cloud region for personal data; queue + async workers for generation and render.
+MVP pragmatism: evaluate standing up a proven open-source LMS core (e.g. Moodle) for solved plumbing (enrolment, courses, quizzes, certificates, SCORM) and building the four differentiators on top, versus full custom. Decide core-vs-custom deliberately.
+
+
+
+15. Anti-goals (do not build these)
+
+
+Do not make raw AI text-to-video the core generation method.
+Do not build an AI that replaces the human coach, or that counsels a distressed learner.
+Do not let a partner fork or redefine the credential/evidence standard.
+Do not put the individual's free assay behind a paywall, the individual is never the revenue source.
+Do not use assessment results for hiring/selection before the independent validity study clears.
+Do not store South African personal data outside South Africa.
+Do not rebuild solved LMS plumbing from scratch if a proven core serves the MVP.
+
+
+
+16. Phasing (honest scoping)
+
+
+MVP (Phase 0–1): the Socratic learning experience with at least one fully Socratic course; the adaptive diagnostic; super-admin, partner, coach, and learner views; white-label theming on the tenancy hierarchy; the PraxisMark credential with its evidence trail; the funder-evidence report; and template-based animation with ElevenLabs voice in a few languages.
+Phase 2: full auto-generation animation studio; WhatsApp channel; public credential registry; independent validity study (unlocks selection use); self-serve white-label onboarding.
+Phase 3: more languages, sector content packs, SADC expansion.
+
+
+Ship the smallest thing that proves the four differentiators to a first partner and a first paying client. Everything else waits behind that.
+
+
+17. Definition of done (MVP acceptance)
+
+The MVP is done when, under enforced tenant isolation and the South African compliance rails above, you can demonstrate end to end:
+
+
+A super admin creates a partner, who themes the platform with their own brand.
+That partner creates an organisation and uploads a source document.
+The studio turns it into a short voiced, branded, animated module (ElevenLabs narration, captions on).
+A learner takes a genuinely Socratic lesson where a wrong answer produces a probing follow-up, and cannot progress without demonstrating mastery.
+The adaptive diagnostic produces a defensible per-competency score.
+On completion, a PraxisMark is issued, is publicly verifiable, resolves to its evidence trail, and shows a decay date.
+The learner is handed to a coach with a pre-session read.
+An org admin sees workforce diagnostics; a partner admin sees aggregate, de-identified stats; a sponsor/funder report is generated for the cohort.
+Data isolation, consent, SA data residency, and the section-8 discovery-only gate are all enforced and demonstrable.
+
+
+
+18. End-to-end walkthrough (the story the MVP must tell)
+
+An incubator partner themes Praxis as their own. They upload their "Business Model Canvas" guide; the studio turns it into a five-beat animated module, narrated in South African English, canvas filling block by block. Nomvula, an aspiring entrepreneur, works through it as a Socratic dialogue, when she says "sell more soap," the tutor probes her margin instead of marking her wrong. She reaches mastery, earns the partner's branded PraxisMark (verifiable, decaying), and submits her own canvas to a human coach who arrives already knowing her gaps. The incubator's admin pulls a cohort report showing completions and verified credentials, and takes it to the corporate sponsor whose enterprise-development budget funded the programme. The sponsor renews. None of them ever sees the name Synops.

@@ -1,0 +1,92 @@
+{
+  "nav": {
+    "today": "Today",
+    "myCourses": "My Courses",
+    "credentials": "Credentials",
+    "myCoach": "My Coach",
+    "learners": "Learners",
+    "submissions": "Submissions",
+    "workforce": "Workforce",
+    "reports": "Reports",
+    "organisations": "Organisations",
+    "courseCatalog": "Course Catalog",
+    "studio": "Studio",
+    "partners": "Partners",
+    "platformSettings": "Platform Settings",
+    "overview": "Overview",
+    "notifications": "Notifications",
+    "signOut": "Sign Out",
+    "more": "More",
+    "members": "Members"
+  },
+  "common": {
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "submit": "Submit",
+    "submitting": "Submitting…",
+    "loading": "Loading…",
+    "search": "Search",
+    "invite": "Invite",
+    "remove": "Remove",
+    "edit": "Edit",
+    "delete": "Delete",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "error": "Something went wrong. Please try again.",
+    "noResults": "No results found.",
+    "required": "This field is required."
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "welcome": "Welcome back",
+    "email": "Email address",
+    "password": "Password"
+  },
+  "courses": {
+    "enrol": "Enrol Now",
+    "enrolled": "Enrolled",
+    "startLearning": "Start Learning",
+    "continueLearning": "Continue Learning",
+    "completed": "Completed",
+    "modules": "Modules",
+    "assignments": "Assignments",
+    "progress": "Progress"
+  },
+  "members": {
+    "title": "Members",
+    "subtitle": "Manage learners, coaches and admins in your organisation.",
+    "inviteMember": "Invite Member",
+    "inviteEmail": "Email address",
+    "inviteRole": "Role",
+    "roleChanged": "Role updated.",
+    "memberRemoved": "Member removed.",
+    "memberInvited": "Invitation sent.",
+    "confirmRemove": "Remove this member from the organisation?",
+    "noMembers": "No members yet. Invite someone to get started.",
+    "roles": {
+      "learner": "Learner",
+      "coach": "Coach",
+      "org_admin": "Org Admin"
+    }
+  },
+  "branding": {
+    "title": "Branding",
+    "displayName": "Display Name",
+    "logoUrl": "Logo URL",
+    "primaryColor": "Primary Colour",
+    "accentColor": "Accent Colour",
+    "saved": "Branding saved."
+  },
+  "language": {
+    "label": "Language",
+    "en": "English",
+    "zu": "isiZulu",
+    "xh": "isiXhosa",
+    "af": "Afrikaans"
+  }
+}

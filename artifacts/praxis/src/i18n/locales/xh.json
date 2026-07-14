@@ -1,0 +1,92 @@
+{
+  "nav": {
+    "today": "Namhlanje",
+    "myCourses": "Izifundo Zam",
+    "credentials": "Iimpawu",
+    "myCoach": "UMqeqeshi Wam",
+    "learners": "Abafundi",
+    "submissions": "Izibheno",
+    "workforce": "Abasebenzi",
+    "reports": "Iingxelo",
+    "organisations": "Imibutho",
+    "courseCatalog": "Uluhlu Lwezifundo",
+    "studio": "Istudiyo",
+    "partners": "Abalingane",
+    "platformSettings": "Useto Lomgaqo-nkqubo",
+    "overview": "Isishwankathelo",
+    "notifications": "Izaziso",
+    "signOut": "Phuma",
+    "more": "Ngaphezulu",
+    "members": "Amalungu"
+  },
+  "common": {
+    "save": "Gcina",
+    "saving": "Igcina…",
+    "cancel": "Rhoxisa",
+    "submit": "Thumela",
+    "submitting": "Ithumela…",
+    "loading": "Iyalayisha…",
+    "search": "Khangela",
+    "invite": "Mema",
+    "remove": "Susa",
+    "edit": "Hlela",
+    "delete": "Cima",
+    "confirm": "Qinisekisa",
+    "close": "Vala",
+    "back": "Emva",
+    "next": "Okulandelayo",
+    "done": "Gqityiwe",
+    "error": "Kukho into engahambanga kakuhle. Zama kwakhona.",
+    "noResults": "Akukho ziphumo.",
+    "required": "Le ntsimi iyafuneka."
+  },
+  "auth": {
+    "signIn": "Ngena",
+    "signUp": "Bhalisa",
+    "welcome": "Wamkelekile",
+    "email": "Idilesi ye-imeyile",
+    "password": "Ipasiwedi"
+  },
+  "courses": {
+    "enrol": "Bhalisa Ngoku",
+    "enrolled": "Ubhalisile",
+    "startLearning": "Qala Ukufunda",
+    "continueLearning": "Qhubeka Nokufunda",
+    "completed": "Igqityiwe",
+    "modules": "Izifundo",
+    "assignments": "Imisebenzi",
+    "progress": "Inkqubela Phambili"
+  },
+  "members": {
+    "title": "Amalungu",
+    "subtitle": "Phatha abafundi, abacoach nabalawuli kulo mbutho.",
+    "inviteMember": "Mema Ilungu",
+    "inviteEmail": "Idilesi ye-imeyile",
+    "inviteRole": "Indima",
+    "roleChanged": "Indima iguquliwe.",
+    "memberRemoved": "Ilungu lisuswe.",
+    "memberInvited": "Umemo uthunyiwe.",
+    "confirmRemove": "Susa eli lungu kulo mbutho?",
+    "noMembers": "Akukho malungu. Mema umntu ukuze uqale.",
+    "roles": {
+      "learner": "Umfundi",
+      "coach": "UMqeqeshi",
+      "org_admin": "Umlawuli"
+    }
+  },
+  "branding": {
+    "title": "Uphawu",
+    "displayName": "Igama Loboniso",
+    "logoUrl": "I-URL yelogo",
+    "primaryColor": "Umbala Oyintloko",
+    "accentColor": "Umbala Wokubonakalisa",
+    "saved": "Uphawu lushicilelwe."
+  },
+  "language": {
+    "label": "Ulwimi",
+    "en": "English",
+    "zu": "isiZulu",
+    "xh": "isiXhosa",
+    "af": "Afrikaans"
+  }
+}

@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "sDDF4sbAI01eVEnPB0LrO"
+uri = "file://docs/synops-praxis-spec.md"
+type = "text"
+title = "Synops Praxis — Buildable Product Specification"

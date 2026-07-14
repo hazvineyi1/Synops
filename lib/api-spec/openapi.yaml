@@ -1,0 +1,2273 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Synops Praxis LMS API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: users
+    description: User & identity management
+  - name: partners
+    description: Partner tenant management (super admin)
+  - name: organisations
+    description: Organisation management
+  - name: brand
+    description: Brand theming
+  - name: courses
+    description: Course & content management
+  - name: modules
+    description: Module management
+  - name: beats
+    description: Beat management
+  - name: studio
+    description: Animation studio & script generation
+  - name: sessions
+    description: Socratic learning sessions
+  - name: assessments
+    description: Assessments & diagnostics
+  - name: credentials
+    description: PraxisMark credentials
+  - name: coach
+    description: Coach dashboard
+  - name: analytics
+    description: Analytics & reporting
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── Users & Auth ──────────────────────────────────────────────────────────
+
+  /users/me:
+    get:
+      operationId: getMe
+      tags: [users]
+      summary: Get current authenticated user with role and tenant context
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Unauthorized
+    patch:
+      operationId: updateMe
+      tags: [users]
+      summary: Update own profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  # ── Partners (Super Admin) ─────────────────────────────────────────────────
+
+  /partners:
+    get:
+      operationId: listPartners
+      tags: [partners]
+      summary: List all partners (super admin only)
+      responses:
+        "200":
+          description: List of partners
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Partner"
+    post:
+      operationId: createPartner
+      tags: [partners]
+      summary: Create a new partner tenant (super admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartnerInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Partner"
+
+  /partners/{partnerId}:
+    get:
+      operationId: getPartner
+      tags: [partners]
+      summary: Get partner details
+      parameters:
+        - name: partnerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Partner
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Partner"
+    patch:
+      operationId: updatePartner
+      tags: [partners]
+      summary: Update partner (super admin or partner admin)
+      parameters:
+        - name: partnerId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartnerUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Partner"
+
+  /partners/{partnerId}/stats:
+    get:
+      operationId: getPartnerStats
+      tags: [partners]
+      summary: Partner aggregate stats (de-identified)
+      parameters:
+        - name: partnerId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Aggregated partner stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerStats"
+
+  # ── Organisations ──────────────────────────────────────────────────────────
+
+  /organisations:
+    get:
+      operationId: listOrganisations
+      tags: [organisations]
+      summary: List organisations (scoped to caller's partner)
+      responses:
+        "200":
+          description: List of organisations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Organisation"
+    post:
+      operationId: createOrganisation
+      tags: [organisations]
+      summary: Create an organisation under current partner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganisationInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organisation"
+
+  /organisations/{orgId}:
+    get:
+      operationId: getOrganisation
+      tags: [organisations]
+      summary: Get organisation
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Organisation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organisation"
+    patch:
+      operationId: updateOrganisation
+      tags: [organisations]
+      summary: Update organisation
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganisationUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organisation"
+
+  /organisations/{orgId}/members:
+    get:
+      operationId: listOrgMembers
+      tags: [organisations]
+      summary: List members of an organisation
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Members list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserProfile"
+    post:
+      operationId: addOrgMember
+      tags: [organisations]
+      summary: Add or invite a user to an organisation
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrgMemberInput"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+  /organisations/{orgId}/stats:
+    get:
+      operationId: getOrgStats
+      tags: [organisations]
+      summary: Workforce diagnostics for org admin
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Org workforce stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrgStats"
+
+  # ── Brand Theming ──────────────────────────────────────────────────────────
+
+  /brand/theme:
+    get:
+      operationId: getBrandTheme
+      tags: [brand]
+      summary: Get active brand theme for current tenant
+      responses:
+        "200":
+          description: Brand theme
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandTheme"
+    put:
+      operationId: updateBrandTheme
+      tags: [brand]
+      summary: Update brand theme (partner admin or super admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandThemeInput"
+      responses:
+        "200":
+          description: Updated theme
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandTheme"
+
+  # ── Courses ────────────────────────────────────────────────────────────────
+
+  /courses:
+    get:
+      operationId: listCourses
+      tags: [courses]
+      summary: List courses (scoped to caller's tenant)
+      responses:
+        "200":
+          description: Courses list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+    post:
+      operationId: createCourse
+      tags: [courses]
+      summary: Create a course
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseInput"
+      responses:
+        "201":
+          description: Created course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+
+  /courses/{courseId}:
+    get:
+      operationId: getCourse
+      tags: [courses]
+      summary: Get course with module list
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CourseDetail"
+    patch:
+      operationId: updateCourse
+      tags: [courses]
+      summary: Update course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CourseUpdate"
+      responses:
+        "200":
+          description: Updated course
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+    delete:
+      operationId: deleteCourse
+      tags: [courses]
+      summary: Delete course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  # ── Modules ────────────────────────────────────────────────────────────────
+
+  /courses/{courseId}/modules:
+    get:
+      operationId: listModules
+      tags: [modules]
+      summary: List modules in a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Modules list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Module"
+    post:
+      operationId: createModule
+      tags: [modules]
+      summary: Create a module in a course
+      parameters:
+        - name: courseId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleInput"
+      responses:
+        "201":
+          description: Created module
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Module"
+
+  /modules/{moduleId}:
+    get:
+      operationId: getModule
+      tags: [modules]
+      summary: Get module with its beats
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Module with beats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleDetail"
+    patch:
+      operationId: updateModule
+      tags: [modules]
+      summary: Update module
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModuleUpdate"
+      responses:
+        "200":
+          description: Updated module
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Module"
+    delete:
+      operationId: deleteModule
+      tags: [modules]
+      summary: Delete module
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /modules/{moduleId}/publish:
+    post:
+      operationId: publishModule
+      tags: [modules]
+      summary: Mark module as published (live for learners)
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Module"
+
+  # ── Beats ──────────────────────────────────────────────────────────────────
+
+  /modules/{moduleId}/beats:
+    get:
+      operationId: listBeats
+      tags: [beats]
+      summary: List beats in a module
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Beats list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Beat"
+    post:
+      operationId: createBeat
+      tags: [beats]
+      summary: Create a beat in a module
+      parameters:
+        - name: moduleId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeatInput"
+      responses:
+        "201":
+          description: Created beat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beat"
+
+  /beats/{beatId}:
+    patch:
+      operationId: updateBeat
+      tags: [beats]
+      summary: Update a beat
+      parameters:
+        - name: beatId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BeatUpdate"
+      responses:
+        "200":
+          description: Updated beat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beat"
+    delete:
+      operationId: deleteBeat
+      tags: [beats]
+      summary: Delete a beat
+      parameters:
+        - name: beatId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /beats/{beatId}/generate-audio:
+    post:
+      operationId: generateBeatAudio
+      tags: [beats]
+      summary: Queue ElevenLabs audio generation for a beat's narration
+      parameters:
+        - name: beatId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: Audio generation queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Beat"
+
+  # ── Studio ─────────────────────────────────────────────────────────────────
+
+  /studio/generate-script:
+    post:
+      operationId: generateScript
+      tags: [studio]
+      summary: Generate script beats from source document text (Claude)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateScriptInput"
+      responses:
+        "200":
+          description: Generated script draft with beats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptDraft"
+
+  /studio/scripts:
+    get:
+      operationId: listScriptDrafts
+      tags: [studio]
+      summary: List script drafts for current tenant
+      responses:
+        "200":
+          description: Script drafts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ScriptDraft"
+
+  /studio/scripts/{draftId}:
+    get:
+      operationId: getScriptDraft
+      tags: [studio]
+      summary: Get a script draft
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Script draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptDraft"
+    patch:
+      operationId: updateScriptDraft
+      tags: [studio]
+      summary: Update/edit a script draft before publishing
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScriptDraftUpdate"
+      responses:
+        "200":
+          description: Updated draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScriptDraft"
+
+  /studio/scripts/{draftId}/publish:
+    post:
+      operationId: publishScriptDraft
+      tags: [studio]
+      summary: Convert approved script draft into a module with beats
+      parameters:
+        - name: draftId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishDraftInput"
+      responses:
+        "201":
+          description: Module created from draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModuleDetail"
+
+  # ── Socratic Learning Sessions ─────────────────────────────────────────────
+
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List learner's sessions
+      responses:
+        "200":
+          description: Sessions list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LearningSession"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Start a new Socratic learning session for a module
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LearningSession"
+
+  /sessions/{sessionId}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get session with dialogue history
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Session with turns
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionDetail"
+
+  /sessions/{sessionId}/respond:
+    post:
+      operationId: respondToSession
+      tags: [sessions]
+      summary: Submit learner response and receive Socratic follow-up (streaming SSE)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LearnerResponseInput"
+      responses:
+        "200":
+          description: Socratic follow-up (SSE stream)
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  /sessions/{sessionId}/progress:
+    get:
+      operationId: getSessionProgress
+      tags: [sessions]
+      summary: Get mastery progress for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Progress summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionProgress"
+
+  # ── Assessments ────────────────────────────────────────────────────────────
+
+  /assessments:
+    get:
+      operationId: listAssessments
+      tags: [assessments]
+      summary: List assessments available to caller
+      responses:
+        "200":
+          description: Assessments list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assessment"
+    post:
+      operationId: createAssessment
+      tags: [assessments]
+      summary: Create an assessment (org admin / partner admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentInput"
+      responses:
+        "201":
+          description: Created assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assessment"
+
+  /assessments/{assessmentId}:
+    get:
+      operationId: getAssessment
+      tags: [assessments]
+      summary: Get assessment
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Assessment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Assessment"
+
+  /assessments/{assessmentId}/attempt:
+    post:
+      operationId: startAttempt
+      tags: [assessments]
+      summary: Start an assessment attempt
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Attempt started with first item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttemptState"
+
+  /attempts/{attemptId}/respond:
+    post:
+      operationId: submitItemResponse
+      tags: [assessments]
+      summary: Submit response to an item and receive next item or result
+      parameters:
+        - name: attemptId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemResponseInput"
+      responses:
+        "200":
+          description: Next item or final result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttemptState"
+
+  # ── Credentials ────────────────────────────────────────────────────────────
+
+  /credentials:
+    get:
+      operationId: listCredentials
+      tags: [credentials]
+      summary: List credentials for the current user
+      responses:
+        "200":
+          description: Credentials list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Credential"
+
+  /credentials/{credentialId}:
+    get:
+      operationId: getCredential
+      tags: [credentials]
+      summary: Get credential details (authenticated)
+      parameters:
+        - name: credentialId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Credential
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Credential"
+
+  /verify/{credentialId}:
+    get:
+      operationId: verifyCredential
+      tags: [credentials]
+      summary: Public credential verification — no auth required
+      parameters:
+        - name: credentialId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Public verification record with evidence summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialVerification"
+        "404":
+          description: Not found or revoked
+
+  # ── Coach Dashboard ────────────────────────────────────────────────────────
+
+  /coach/learners:
+    get:
+      operationId: listCoachLearners
+      tags: [coach]
+      summary: List coach's assigned learners with readiness summary
+      responses:
+        "200":
+          description: Learners
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LearnerSummary"
+
+  /coach/learners/{userId}/presession:
+    get:
+      operationId: getLearnerPresession
+      tags: [coach]
+      summary: Pre-session read — strengths, gaps, recent activity for a learner
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Pre-session brief
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresessionBrief"
+
+  /coach/submissions:
+    get:
+      operationId: listSubmissions
+      tags: [coach]
+      summary: List submitted work awaiting coach review
+      responses:
+        "200":
+          description: Submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Submission"
+
+  /coach/submissions/{submissionId}:
+    patch:
+      operationId: reviewSubmission
+      tags: [coach]
+      summary: Add coach feedback to a submission
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionReview"
+      responses:
+        "200":
+          description: Reviewed submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+
+  /learner/submit-work:
+    post:
+      operationId: submitWork
+      tags: [sessions]
+      summary: Learner submits work (e.g. canvas) for coach review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkSubmissionInput"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+
+  # ── Analytics & Reports ────────────────────────────────────────────────────
+
+  /analytics/overview:
+    get:
+      operationId: getAnalyticsOverview
+      tags: [analytics]
+      summary: Dashboard KPI overview — role-scoped aggregates
+      responses:
+        "200":
+          description: Analytics overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsOverview"
+
+  /analytics/activity:
+    get:
+      operationId: getActivityFeed
+      tags: [analytics]
+      summary: Recent platform activity (completions, credentials issued, enrolments)
+      responses:
+        "200":
+          description: Activity events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEvent"
+
+  /analytics/competency-breakdown:
+    get:
+      operationId: getCompetencyBreakdown
+      tags: [analytics]
+      summary: Competency mastery breakdown across learners (org-scoped)
+      responses:
+        "200":
+          description: Competency breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompetencyBreakdown"
+
+  /reports/funder:
+    get:
+      operationId: getFunderReport
+      tags: [analytics]
+      summary: Generate funder/cohort evidence report
+      parameters:
+        - name: orgId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: fromDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: toDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Funder report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunderReport"
+
+  /platform/stats:
+    get:
+      operationId: getPlatformStats
+      tags: [analytics]
+      summary: Platform-wide stats (super admin only, fully aggregate)
+      responses:
+        "200":
+          description: Platform stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    # ── Users ──────────────────────────────────────────────────────────────
+
+    UserProfile:
+      type: object
+      required: [id, clerkId, email, role]
+      properties:
+        id:
+          type: string
+        clerkId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [super_admin, partner_admin, org_admin, coach, learner]
+        partnerId:
+          type: ["string", "null"]
+        organisationId:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+
+    # ── Partners ───────────────────────────────────────────────────────────
+
+    Partner:
+      type: object
+      required: [id, name, status, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended, onboarding]
+        contactEmail:
+          type: ["string", "null"]
+        orgCount:
+          type: integer
+        learnerCount:
+          type: integer
+        createdAt:
+          type: string
+
+    PartnerInput:
+      type: object
+      required: [name, slug, contactEmail]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        contactEmail:
+          type: string
+
+    PartnerUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        contactEmail:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended, onboarding]
+
+    PartnerStats:
+      type: object
+      required: [partnerId, totalLearners, activeEnrolments, credentialsIssued, completionRate, orgCount]
+      properties:
+        partnerId:
+          type: string
+        totalLearners:
+          type: integer
+        activeEnrolments:
+          type: integer
+        credentialsIssued:
+          type: integer
+        completionRate:
+          type: number
+        orgCount:
+          type: integer
+
+    # ── Organisations ──────────────────────────────────────────────────────
+
+    Organisation:
+      type: object
+      required: [id, name, partnerId, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        partnerId:
+          type: string
+        industry:
+          type: ["string", "null"]
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+
+    OrganisationInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        industry:
+          type: string
+
+    OrganisationUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        industry:
+          type: string
+
+    OrgMemberInput:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+          enum: [org_admin, coach, learner]
+
+    OrgStats:
+      type: object
+      required: [orgId, totalMembers, activeEnrolments, completions, credentialsIssued, avgMasteryScore, competencyGaps]
+      properties:
+        orgId:
+          type: string
+        totalMembers:
+          type: integer
+        activeEnrolments:
+          type: integer
+        completions:
+          type: integer
+        credentialsIssued:
+          type: integer
+        avgMasteryScore:
+          type: number
+        competencyGaps:
+          type: array
+          items:
+            type: string
+
+    # ── Brand Theme ────────────────────────────────────────────────────────
+
+    BrandTheme:
+      type: object
+      required: [id, tenantId]
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        tenantType:
+          type: string
+          enum: [platform, partner, organisation]
+        displayName:
+          type: ["string", "null"]
+        primaryColor:
+          type: ["string", "null"]
+        secondaryColor:
+          type: ["string", "null"]
+        accentColor:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+        faviconUrl:
+          type: ["string", "null"]
+        fontFamily:
+          type: ["string", "null"]
+        credentialTitle:
+          type: ["string", "null"]
+        emailSenderName:
+          type: ["string", "null"]
+        customDomain:
+          type: ["string", "null"]
+        updatedAt:
+          type: string
+
+    BrandThemeInput:
+      type: object
+      properties:
+        displayName:
+          type: string
+        primaryColor:
+          type: string
+        secondaryColor:
+          type: string
+        accentColor:
+          type: string
+        logoUrl:
+          type: string
+        faviconUrl:
+          type: string
+        fontFamily:
+          type: string
+        credentialTitle:
+          type: string
+        emailSenderName:
+          type: string
+        customDomain:
+          type: string
+
+    # ── Courses ────────────────────────────────────────────────────────────
+
+    Course:
+      type: object
+      required: [id, title, tenantId, status, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        tenantId:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, archived]
+        moduleCount:
+          type: integer
+        enrolmentCount:
+          type: integer
+        competencyTags:
+          type: array
+          items:
+            type: string
+        nqfLevel:
+          type: ["integer", "null"]
+        thumbnailUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    CourseInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        competencyTags:
+          type: array
+          items:
+            type: string
+        nqfLevel:
+          type: integer
+        thumbnailUrl:
+          type: string
+
+    CourseUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, published, archived]
+        competencyTags:
+          type: array
+          items:
+            type: string
+        nqfLevel:
+          type: integer
+        thumbnailUrl:
+          type: string
+
+    CourseDetail:
+      type: object
+      required: [id, title, tenantId, status, modules, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        tenantId:
+          type: string
+        status:
+          type: string
+        modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/Module"
+        competencyTags:
+          type: array
+          items:
+            type: string
+        nqfLevel:
+          type: ["integer", "null"]
+        thumbnailUrl:
+          type: ["string", "null"]
+        enrolmentCount:
+          type: integer
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    # ── Modules ────────────────────────────────────────────────────────────
+
+    Module:
+      type: object
+      required: [id, courseId, title, status, order, createdAt]
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [draft, review, published]
+        order:
+          type: integer
+        beatCount:
+          type: integer
+        estimatedMinutes:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    ModuleInput:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        estimatedMinutes:
+          type: integer
+        order:
+          type: integer
+
+    ModuleUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, review, published]
+        estimatedMinutes:
+          type: integer
+        order:
+          type: integer
+
+    ModuleDetail:
+      type: object
+      required: [id, courseId, title, status, order, beats, createdAt]
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        status:
+          type: string
+        order:
+          type: integer
+        beats:
+          type: array
+          items:
+            $ref: "#/components/schemas/Beat"
+        estimatedMinutes:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    # ── Beats ──────────────────────────────────────────────────────────────
+
+    Beat:
+      type: object
+      required: [id, moduleId, type, order, title, narration]
+      properties:
+        id:
+          type: string
+        moduleId:
+          type: string
+        type:
+          type: string
+          enum: [title_card, points, scenario, compare, diagram, close]
+        order:
+          type: integer
+        title:
+          type: string
+        narration:
+          type: string
+        bulletPoints:
+          type: array
+          items:
+            type: string
+        scenario:
+          type: ["string", "null"]
+        visualData:
+          description: Arbitrary JSON for template rendering
+        audioUrl:
+          type: ["string", "null"]
+        audioStatus:
+          type: string
+          enum: [none, pending, ready, error]
+
+    BeatInput:
+      type: object
+      required: [type, title, narration]
+      properties:
+        type:
+          type: string
+          enum: [title_card, points, scenario, compare, diagram, close]
+        title:
+          type: string
+        narration:
+          type: string
+        bulletPoints:
+          type: array
+          items:
+            type: string
+        scenario:
+          type: string
+        order:
+          type: integer
+
+    BeatUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        narration:
+          type: string
+        bulletPoints:
+          type: array
+          items:
+            type: string
+        scenario:
+          type: string
+        order:
+          type: integer
+
+    # ── Studio ─────────────────────────────────────────────────────────────
+
+    GenerateScriptInput:
+      type: object
+      required: [sourceText, title]
+      properties:
+        title:
+          type: string
+        sourceText:
+          type: string
+        language:
+          type: string
+          default: "en-ZA"
+        maxBeats:
+          type: integer
+          default: 6
+
+    ScriptDraft:
+      type: object
+      required: [id, title, status, beats, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        sourceText:
+          type: string
+        status:
+          type: string
+          enum: [generating, ready, published]
+        beats:
+          type: array
+          items:
+            $ref: "#/components/schemas/Beat"
+        tenantId:
+          type: string
+        createdAt:
+          type: string
+
+    ScriptDraftUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        beats:
+          type: array
+          items:
+            $ref: "#/components/schemas/BeatUpdate"
+
+    PublishDraftInput:
+      type: object
+      required: [courseId]
+      properties:
+        courseId:
+          type: string
+        moduleTitle:
+          type: string
+        # The server has always read lessonType from this body
+        # (routes/studio.ts: `const { courseId, moduleTitle, lessonType } = req.body`)
+        # but the spec never declared it, so the generated client rejected it and
+        # Studio could not choose a lesson type when publishing.
+        lessonType:
+          type: string
+          enum: [socratic, video, slides, quiz]
+
+    # ── Sessions ───────────────────────────────────────────────────────────
+
+    LearningSession:
+      type: object
+      required: [id, moduleId, userId, status, masteryScore, createdAt]
+      properties:
+        id:
+          type: string
+        moduleId:
+          type: string
+        userId:
+          type: string
+        status:
+          type: string
+          enum: [active, mastered, abandoned]
+        masteryScore:
+          type: number
+        currentBeatId:
+          type: ["string", "null"]
+        turnCount:
+          type: integer
+        createdAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+
+    SessionInput:
+      type: object
+      required: [moduleId]
+      properties:
+        moduleId:
+          type: string
+
+    DialogueTurn:
+      type: object
+      required: [id, role, content, createdAt]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [tutor, learner]
+        content:
+          type: string
+        beatId:
+          type: ["string", "null"]
+        reasoning:
+          type: ["string", "null"]
+        masteryDelta:
+          type: ["number", "null"]
+        createdAt:
+          type: string
+
+    SessionDetail:
+      type: object
+      required: [id, moduleId, userId, status, masteryScore, turns, createdAt]
+      properties:
+        id:
+          type: string
+        moduleId:
+          type: string
+        userId:
+          type: string
+        status:
+          type: string
+        masteryScore:
+          type: number
+        turns:
+          type: array
+          items:
+            $ref: "#/components/schemas/DialogueTurn"
+        currentBeatId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+
+    LearnerResponseInput:
+      type: object
+      required: [response]
+      properties:
+        response:
+          type: string
+        beatId:
+          type: string
+
+    SessionProgress:
+      type: object
+      required: [sessionId, masteryScore, beatsCompleted, totalBeats, status]
+      properties:
+        sessionId:
+          type: string
+        masteryScore:
+          type: number
+        beatsCompleted:
+          type: integer
+        totalBeats:
+          type: integer
+        status:
+          type: string
+        competencyScores:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetencyScore"
+
+    CompetencyScore:
+      type: object
+      required: [tag, score]
+      properties:
+        tag:
+          type: string
+        score:
+          type: number
+
+    # ── Assessments ────────────────────────────────────────────────────────
+
+    Assessment:
+      type: object
+      required: [id, title, type, status, itemCount, createdAt]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        type:
+          type: string
+          enum: [diagnostic, mastery, formative]
+        status:
+          type: string
+          enum: [draft, active, archived]
+        itemCount:
+          type: integer
+        competencyTags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+
+    AssessmentInput:
+      type: object
+      required: [title, type]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: [diagnostic, mastery, formative]
+        competencyTags:
+          type: array
+          items:
+            type: string
+
+    AssessmentItem:
+      type: object
+      required: [id, stem, options, difficulty]
+      properties:
+        id:
+          type: string
+        stem:
+          type: string
+        options:
+          type: array
+          items:
+            type: object
+            required: [id, text]
+            properties:
+              id:
+                type: string
+              text:
+                type: string
+        difficulty:
+          type: number
+        competencyTag:
+          type: ["string", "null"]
+
+    AttemptState:
+      type: object
+      required: [attemptId, status]
+      properties:
+        attemptId:
+          type: string
+        status:
+          type: string
+          enum: [in_progress, complete]
+        nextItem:
+          allOf:
+            - $ref: "#/components/schemas/AssessmentItem"
+          nullable: true
+        result:
+          allOf:
+            - $ref: "#/components/schemas/AttemptResult"
+          nullable: true
+
+    AttemptResult:
+      type: object
+      required: [attemptId, competencyScores, overallAbility, completedAt]
+      properties:
+        attemptId:
+          type: string
+        competencyScores:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetencyScore"
+        overallAbility:
+          type: number
+        completedAt:
+          type: string
+
+    ItemResponseInput:
+      type: object
+      required: [itemId, selectedOptionId]
+      properties:
+        itemId:
+          type: string
+        selectedOptionId:
+          type: string
+        responseTimeMs:
+          type: integer
+
+    # ── Credentials ────────────────────────────────────────────────────────
+
+    Credential:
+      type: object
+      required: [id, userId, moduleId, issuedAt, decayDate, status, verificationUrl]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        moduleId:
+          type: string
+        moduleTitle:
+          type: string
+        issuedAt:
+          type: string
+        decayDate:
+          type: string
+        status:
+          type: string
+          enum: [valid, expired, revoked]
+        masteryScore:
+          type: number
+        evidenceSummary:
+          type: string
+        verificationUrl:
+          type: string
+        badgeUrl:
+          type: ["string", "null"]
+        partnerName:
+          type: string
+
+    CredentialVerification:
+      type: object
+      required: [credentialId, holderName, moduleTitle, issuedAt, decayDate, status, evidenceItems, partnerName]
+      properties:
+        credentialId:
+          type: string
+        holderName:
+          type: string
+        moduleTitle:
+          type: string
+        issuedAt:
+          type: string
+        decayDate:
+          type: string
+        status:
+          type: string
+          enum: [valid, expired, revoked]
+        masteryScore:
+          type: number
+        evidenceItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceItem"
+        partnerName:
+          type: string
+        verifiedAt:
+          type: string
+
+    EvidenceItem:
+      type: object
+      required: [type, description, recordedAt]
+      properties:
+        type:
+          type: string
+          enum: [session_response, assessment_result, coach_attestation, submission_review]
+        description:
+          type: string
+        recordedAt:
+          type: string
+        score:
+          type: ["number", "null"]
+
+    # ── Coach ──────────────────────────────────────────────────────────────
+
+    LearnerSummary:
+      type: object
+      required: [userId, email, activeEnrolments, completions, lastActivityAt, readinessScore]
+      properties:
+        userId:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        activeEnrolments:
+          type: integer
+        completions:
+          type: integer
+        credentialsEarned:
+          type: integer
+        lastActivityAt:
+          type: ["string", "null"]
+        readinessScore:
+          type: number
+        topGaps:
+          type: array
+          items:
+            type: string
+
+    PresessionBrief:
+      type: object
+      required: [userId, strengths, gaps, recentActivity, completedModules, pendingWork]
+      properties:
+        userId:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        strengths:
+          type: array
+          items:
+            type: string
+        gaps:
+          type: array
+          items:
+            type: string
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityEvent"
+        completedModules:
+          type: array
+          items:
+            type: string
+        pendingWork:
+          type: array
+          items:
+            $ref: "#/components/schemas/Submission"
+        avgMasteryScore:
+          type: number
+
+    Submission:
+      type: object
+      required: [id, userId, moduleId, title, status, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        moduleId:
+          type: string
+        moduleTitle:
+          type: string
+        title:
+          type: string
+        contentText:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [submitted, reviewed, approved]
+        coachFeedback:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        reviewedAt:
+          type: ["string", "null"]
+
+    SubmissionReview:
+      type: object
+      required: [status, feedback]
+      properties:
+        status:
+          type: string
+          enum: [reviewed, approved]
+        feedback:
+          type: string
+
+    WorkSubmissionInput:
+      type: object
+      required: [moduleId, title, contentText]
+      properties:
+        moduleId:
+          type: string
+        title:
+          type: string
+        contentText:
+          type: string
+
+    # ── Analytics ──────────────────────────────────────────────────────────
+
+    AnalyticsOverview:
+      type: object
+      required: [totalLearners, activeEnrolments, completions, credentialsIssued, avgMastery, enrolmentTrend]
+      properties:
+        totalLearners:
+          type: integer
+        activeEnrolments:
+          type: integer
+        completions:
+          type: integer
+        credentialsIssued:
+          type: integer
+        avgMastery:
+          type: number
+        enrolmentTrend:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendPoint"
+        completionTrend:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendPoint"
+
+    TrendPoint:
+      type: object
+      required: [date, value]
+      properties:
+        date:
+          type: string
+        value:
+          type: integer
+
+    ActivityEvent:
+      type: object
+      required: [id, type, description, createdAt]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [enrolment, completion, credential_issued, submission, session_mastered]
+        description:
+          type: string
+        userId:
+          type: ["string", "null"]
+        moduleId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    CompetencyBreakdown:
+      type: object
+      required: [tag, avgScore, learnerCount, masteredCount]
+      properties:
+        tag:
+          type: string
+        avgScore:
+          type: number
+        learnerCount:
+          type: integer
+        masteredCount:
+          type: integer
+
+    FunderReport:
+      type: object
+      required: [generatedAt, period, orgName, enrolments, completions, credentialsIssued, coachHandoffs, avgMastery]
+      properties:
+        generatedAt:
+          type: string
+        period:
+          type: object
+          required: [from, to]
+          properties:
+            from:
+              type: string
+            to:
+              type: string
+        orgName:
+          type: string
+        enrolments:
+          type: integer
+        completions:
+          type: integer
+        credentialsIssued:
+          type: integer
+        coachHandoffs:
+          type: integer
+        avgMastery:
+          type: number
+        competencyHighlights:
+          type: array
+          items:
+            $ref: "#/components/schemas/CompetencyBreakdown"
+
+    PlatformStats:
+      type: object
+      required: [partnerCount, orgCount, learnerCount, credentialsIssued, activeEnrolments]
+      properties:
+        partnerCount:
+          type: integer
+        orgCount:
+          type: integer
+        learnerCount:
+          type: integer
+        credentialsIssued:
+          type: integer
+        activeEnrolments:
+          type: integer
+        monthlyActiveLearners:
+          type: integer

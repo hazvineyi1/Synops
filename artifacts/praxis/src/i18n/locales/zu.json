@@ -1,0 +1,92 @@
+{
+  "nav": {
+    "today": "Namhlanje",
+    "myCourses": "Izifundo Zami",
+    "credentials": "Izitifiketi",
+    "myCoach": "Umqeqeshi Wami",
+    "learners": "Abafundi",
+    "submissions": "Izifuneko",
+    "workforce": "Abasebenzi",
+    "reports": "Imibiko",
+    "organisations": "Izinhlangano",
+    "courseCatalog": "Uhlu Lwezifundo",
+    "studio": "Isitudiyo",
+    "partners": "Ozakwethu",
+    "platformSettings": "Izilungiselelo Zesizindalwazi",
+    "overview": "Ukubuka Konke",
+    "notifications": "Izaziso",
+    "signOut": "Phuma",
+    "more": "Okuningi",
+    "members": "Amalungu"
+  },
+  "common": {
+    "save": "Gcina",
+    "saving": "Kuyagcina…",
+    "cancel": "Khansela",
+    "submit": "Thumela",
+    "submitting": "Kuyathumela…",
+    "loading": "Iyalayisha…",
+    "search": "Sesha",
+    "invite": "Mema",
+    "remove": "Susa",
+    "edit": "Hlela",
+    "delete": "Susa",
+    "confirm": "Qinisekisa",
+    "close": "Vala",
+    "back": "Emuva",
+    "next": "Okulandelayo",
+    "done": "Kuqedile",
+    "error": "Kukhona okungahambanga kahle. Zama futhi.",
+    "noResults": "Ayikho imiphumela.",
+    "required": "Le nsimu iyadingeka."
+  },
+  "auth": {
+    "signIn": "Ngena",
+    "signUp": "Bhalisa",
+    "welcome": "Wamukelekile",
+    "email": "Ikheli le-imeyili",
+    "password": "Iphasiwedi"
+  },
+  "courses": {
+    "enrol": "Bhalisa Manje",
+    "enrolled": "Ubhalisiwe",
+    "startLearning": "Qala Ukufunda",
+    "continueLearning": "Qhubeka Nokufunda",
+    "completed": "Kuqediwe",
+    "modules": "Izifundo",
+    "assignments": "Imisebenzi",
+    "progress": "Inqubekela Phambili"
+  },
+  "members": {
+    "title": "Amalungu",
+    "subtitle": "Phatha abafundi, ababeqeshi nabaphathi enhlanganweni yakho.",
+    "inviteMember": "Mema Ilungu",
+    "inviteEmail": "Ikheli le-imeyili",
+    "inviteRole": "Indima",
+    "roleChanged": "Indima ishintshe.",
+    "memberRemoved": "Ilungu lisusiwe.",
+    "memberInvited": "Imemo ithunyelwe.",
+    "confirmRemove": "Susa leli lungu enhlanganweni?",
+    "noMembers": "Awekho amalungu. Mema umuntu ukuze uqale.",
+    "roles": {
+      "learner": "Umfundi",
+      "coach": "Umqeqeshi",
+      "org_admin": "Umphathi"
+    }
+  },
+  "branding": {
+    "title": "Isimbo",
+    "displayName": "Igama Elihloniphekile",
+    "logoUrl": "I-URL yelogo",
+    "primaryColor": "Umbala Oyinhloko",
+    "accentColor": "Umbala Wokugqamisa",
+    "saved": "Isimbo sigcinwe."
+  },
+  "language": {
+    "label": "Ulimi",
+    "en": "English",
+    "zu": "isiZulu",
+    "xh": "isiXhosa",
+    "af": "Afrikaans"
+  }
+}

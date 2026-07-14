@@ -1,0 +1,2 @@
+- [Synops Praxis architecture](praxis-architecture.md) — full MVP built: DB schema, Express routes, Socratic engine, Studio, PraxisMark, frontend
+- [Praxis mastery invariants](praxis-mastery-invariants.md) — checkpoint = one tx + upsert + idempotent credential; enrolment gate must match the coach plan; WhatsApp webhook signature; test-user gotcha
