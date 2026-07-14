@@ -1,0 +1,92 @@
+{
+  "nav": {
+    "today": "Vandag",
+    "myCourses": "My Kursusse",
+    "credentials": "Kwalifikasies",
+    "myCoach": "My Afrigter",
+    "learners": "Leerders",
+    "submissions": "Indienstes",
+    "workforce": "Werksmag",
+    "reports": "Verslae",
+    "organisations": "Organisasies",
+    "courseCatalog": "Kursuslys",
+    "studio": "Ateljee",
+    "partners": "Vennote",
+    "platformSettings": "Platforminstellings",
+    "overview": "Oorsig",
+    "notifications": "Kennisgewings",
+    "signOut": "Teken Uit",
+    "more": "Meer",
+    "members": "Lede"
+  },
+  "common": {
+    "save": "Stoor",
+    "saving": "Stoor tans…",
+    "cancel": "Kanselleer",
+    "submit": "Indien",
+    "submitting": "Indien tans…",
+    "loading": "Laai tans…",
+    "search": "Soek",
+    "invite": "Nooi",
+    "remove": "Verwyder",
+    "edit": "Wysig",
+    "delete": "Skrap",
+    "confirm": "Bevestig",
+    "close": "Sluit",
+    "back": "Terug",
+    "next": "Volgende",
+    "done": "Klaar",
+    "error": "Iets het verkeerd gegaan. Probeer asseblief weer.",
+    "noResults": "Geen resultate gevind nie.",
+    "required": "Hierdie veld is verpligtend."
+  },
+  "auth": {
+    "signIn": "Teken In",
+    "signUp": "Registreer",
+    "welcome": "Welkom terug",
+    "email": "E-posadres",
+    "password": "Wagwoord"
+  },
+  "courses": {
+    "enrol": "Skryf Nou In",
+    "enrolled": "Ingeskryf",
+    "startLearning": "Begin Leer",
+    "continueLearning": "Leer Verder",
+    "completed": "Voltooi",
+    "modules": "Modules",
+    "assignments": "Opdragte",
+    "progress": "Vordering"
+  },
+  "members": {
+    "title": "Lede",
+    "subtitle": "Bestuur leerders, afrigters en administrateurs in jou organisasie.",
+    "inviteMember": "Nooi Lid",
+    "inviteEmail": "E-posadres",
+    "inviteRole": "Rol",
+    "roleChanged": "Rol opgedateer.",
+    "memberRemoved": "Lid verwyder.",
+    "memberInvited": "Uitnodiging gestuur.",
+    "confirmRemove": "Verwyder hierdie lid uit die organisasie?",
+    "noMembers": "Nog geen lede nie. Nooi iemand om te begin.",
+    "roles": {
+      "learner": "Leerder",
+      "coach": "Afrigter",
+      "org_admin": "Org-administrateur"
+    }
+  },
+  "branding": {
+    "title": "Handelsmerk",
+    "displayName": "Vertoonaam",
+    "logoUrl": "Logo-URL",
+    "primaryColor": "Primêre Kleur",
+    "accentColor": "Aksentkleur",
+    "saved": "Handelsmerk gestoor."
+  },
+  "language": {
+    "label": "Taal",
+    "en": "English",
+    "zu": "isiZulu",
+    "xh": "isiXhosa",
+    "af": "Afrikaans"
+  }
+}

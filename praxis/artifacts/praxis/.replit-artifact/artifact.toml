@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Synops Praxis"
+version = "1.0.0"
+id = "artifacts/praxis"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19186
+
+[services.development]
+run = "pnpm --filter @workspace/praxis run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/praxis", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/praxis/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19186"
+BASE_PATH = "/"

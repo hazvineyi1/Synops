@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "compilerOptions": {
+    "noEmit": true,
+    // Inherit module/moduleResolution from tsconfig.base ("esnext" + "bundler").
+    //
+    // This package previously overrode them with NodeNext, which REQUIRES explicit
+    // .js extensions on every relative import. The source is written extensionless
+    // and is bundled by esbuild (bundle: true), which resolves extensionless imports
+    // fine -- so the override contradicted both the code and the build tool, and the
+    // api-server typecheck had never passed: ~70 of ~80 errors were TS2835 "needs an
+    // explicit file extension" on imports that work perfectly at runtime.
+    "lib": ["esnext"],
+    "types": ["node"]
+  },
+  "references": [
+    { "path": "../../lib/api-zod" },
+    { "path": "../../lib/db" },
+    { "path": "../../lib/integrations-anthropic-ai" }
+  ]
+}
