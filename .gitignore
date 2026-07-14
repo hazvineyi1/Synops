@@ -53,3 +53,11 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local dev helper scripts + logs (machine-specific paths). Not for the repo.
+merge-praxis.ps1
+commit-monorepo.ps1
+MERGE-PRAXIS.bat
+COMMIT-MONO.bat
+.praxis-merge-log.txt
+.mono-commit-log.txt
