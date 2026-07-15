@@ -8,6 +8,9 @@ export const userRoleEnum = pgEnum("user_role", [
   "org_admin",
   "coach",
   "learner",
+  // Instructional Design Hub tier (decision doc §3). Hub-only authoring role, off the
+  // delivery chain. Enum value added additively via migration-role-instructional-designer.sql.
+  "instructional_designer",
 ]);
 
 export const coachPersonalityEnum = pgEnum("coach_personality", [

@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { organisationsTable, usersTable } from "@workspace/db";
 import { eq, and, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canAdministerOrg, canAccessOrg, canAssignRole, assignableRoles } from "../lib/roles";
 
 const router = Router();
 
@@ -100,6 +101,26 @@ router.get("/organisations/:orgId/members", requireAuth, async (req, res) => {
 router.post("/organisations/:orgId/members", requireAuth, async (req, res) => {
   const { email, role } = req.body;
   const user = req.dbUser!;
+
+  // Tier + scope + assignment-ceiling gate (decision §4.2). Previously this route was
+  // authentication-only: any signed-in user could add a member to any org with any role.
+  if (!canAdministerOrg(user.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const org = await db.query.organisationsTable.findFirst({
+    where: eq(organisationsTable.id, req.params.orgId),
+  });
+  if (!org) { res.status(404).json({ error: "Organisation not found" }); return; }
+  if (!canAccessOrg(user, org)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  if (!canAssignRole(user.role, role)) {
+    res.status(403).json({ error: `You may only assign: ${assignableRoles(user.role).join(", ")}` });
+    return;
+  }
+
   // Find or create user by email (in production you'd send an invite)
   let member = await db.query.usersTable.findFirst({
     where: eq(usersTable.email, email),
@@ -118,7 +139,9 @@ router.post("/organisations/:orgId/members", requireAuth, async (req, res) => {
         email,
         role,
         status: "invited",
-        partnerId: user.partnerId,
+        // Own the new member to the ORG's partner, not the actor's — a Super Admin
+        // acting here has no partnerId of their own.
+        partnerId: org.partnerId,
         organisationId: req.params.orgId,
       })
       .returning();
@@ -126,7 +149,7 @@ router.post("/organisations/:orgId/members", requireAuth, async (req, res) => {
   } else {
     const [updated] = await db
       .update(usersTable)
-      .set({ role, organisationId: req.params.orgId, partnerId: user.partnerId })
+      .set({ role, organisationId: req.params.orgId, partnerId: org.partnerId })
       .where(eq(usersTable.id, member.id))
       .returning();
     member = updated;
@@ -137,14 +160,23 @@ router.post("/organisations/:orgId/members", requireAuth, async (req, res) => {
 // PATCH /organisations/:orgId/members/:userId — change role
 router.patch("/organisations/:orgId/members/:userId", requireAuth, async (req, res) => {
   const user = req.dbUser!;
-  if (!["super_admin", "partner_admin", "org_admin"].includes(user.role)) {
+  if (!canAdministerOrg(user.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const org = await db.query.organisationsTable.findFirst({
+    where: eq(organisationsTable.id, req.params.orgId),
+  });
+  if (!org) { res.status(404).json({ error: "Organisation not found" }); return; }
+  if (!canAccessOrg(user, org)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
   const { role } = req.body;
-  const allowed = ["learner", "coach", "org_admin"];
-  if (!allowed.includes(role)) {
-    res.status(400).json({ error: "Invalid role" });
+  // Enforce the assignment ceiling (decision §4.2): a Facilitator may set only coach or
+  // learner; only a Super Admin may promote to a Facilitator/ID/Super Admin role.
+  if (!canAssignRole(user.role, role)) {
+    res.status(403).json({ error: `You may only assign: ${assignableRoles(user.role).join(", ")}` });
     return;
   }
   const [updated] = await db
@@ -159,7 +191,15 @@ router.patch("/organisations/:orgId/members/:userId", requireAuth, async (req, r
 // DELETE /organisations/:orgId/members/:userId — remove from org
 router.delete("/organisations/:orgId/members/:userId", requireAuth, async (req, res) => {
   const user = req.dbUser!;
-  if (!["super_admin", "partner_admin", "org_admin"].includes(user.role)) {
+  if (!canAdministerOrg(user.role)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const org = await db.query.organisationsTable.findFirst({
+    where: eq(organisationsTable.id, req.params.orgId),
+  });
+  if (!org) { res.status(404).json({ error: "Organisation not found" }); return; }
+  if (!canAccessOrg(user, org)) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { usersTable, authSessionsTable } from "@workspace/db";
 import { eq, and, isNull, gt } from "drizzle-orm";
 import { SESSION_COOKIE } from "../lib/auth";
+import { FACILITATOR_ROLES, HUB_ROLES, ROLE } from "../lib/roles";
 
 // Extend request with our user
 declare global {
@@ -116,3 +117,22 @@ export const requireRole = (...roles: string[]): RequestHandler<any, any, any, a
 
 /** Platform owner only. */
 export const requireSuperAdmin = requireRole("super_admin");
+
+/**
+ * Org/Facilitator tier or above (super_admin, partner_admin, org_admin). Gate for
+ * org-administration actions. Note: this checks the TIER only — the handler must still
+ * confirm the actor is in scope of the specific organization/course it is acting on
+ * (see canAccessOrg / canAccessCourse in ../lib/roles).
+ */
+export const requireFacilitator = requireRole(...FACILITATOR_ROLES);
+
+/** Instructional Design Hub access — Instructional Designers plus Super Admin. */
+export const requireHub = requireRole(...HUB_ROLES);
+
+/** Co-facilitator (coach) or above — anyone who can act on a course section. */
+export const requireCoFacilitatorOrAbove = requireRole(
+  ROLE.SUPER_ADMIN,
+  ROLE.PARTNER_ADMIN,
+  ROLE.ORG_ADMIN,
+  ROLE.COACH,
+);
