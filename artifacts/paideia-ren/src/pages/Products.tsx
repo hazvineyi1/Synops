@@ -362,7 +362,18 @@ function ProductExplorer() {
                   {x.letter}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className={`font-bold text-[18px] ${isOpen ? "text-white" : "text-primary"}`}>{x.name}</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-bold text-[18px] ${isOpen ? "text-white" : "text-primary"}`}>{x.name}</span>
+                    {x.tag && (
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                          isOpen ? "bg-white/20 text-white" : "bg-accent/10 text-accent"
+                        }`}
+                      >
+                        {x.tag}
+                      </span>
+                    )}
+                  </div>
                   <div className={`text-[13.5px] leading-snug ${isOpen ? "text-white/70" : "text-muted-foreground"}`}>
                     {x.short}
                   </div>
@@ -407,6 +418,8 @@ type Product = {
   // Live products (e.g. Praxis) render a direct action button; private-beta ones don't.
   href?: string;
   cta?: string;
+  // Optional category chip shown next to the name (e.g. "LMS").
+  tag?: string;
 };
 
 const PRODUCTS: Product[] = [
@@ -469,9 +482,10 @@ const PRODUCTS: Product[] = [
   },
   {
     slug: "praxis",
-    short: "For the institutions that deliver it.",
+    short: "For the institutions that deliver the learning.",
     letter: "P",
     name: "Synops Praxis",
+    tag: "LMS",
     tagline: "The learning platform where it all comes together",
     lead: "A full learning management system for institutions and workforce training. Enrolled learners take courses, complete interactive activities and hand them in, earn verifiable credentials, and get help from a built-in support desk. Coaches review and grade; administrators run the whole platform. Praxis is where the curriculum you design and the coaching you provide actually reach learners, under one roof with real access control.",
     bulletsTitle: "Why organisations run it",

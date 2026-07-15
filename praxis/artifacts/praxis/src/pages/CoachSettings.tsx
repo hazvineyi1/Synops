@@ -9,8 +9,6 @@ import {
   ACCOMMODATION_OPTIONS,
   type CoachPersonality,
 } from "@/lib/coachApi";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -21,11 +19,6 @@ export function CoachSettings() {
   const { data: waStatus } = useWhatsappStatus();
   const update = useUpdateCoachProfile();
   const { toast } = useToast();
-
-  const [phone, setPhone] = React.useState("");
-  React.useEffect(() => {
-    if (profile?.phone) setPhone(profile.phone);
-  }, [profile?.phone]);
 
   if (isLoading || !profile) {
     return (
@@ -138,15 +131,17 @@ export function CoachSettings() {
 
       {/* WhatsApp */}
       <section className="space-y-3">
-        <SectionHeading icon={MessageCircle} title="WhatsApp coaching" hint="Answer your coach's questions from WhatsApp, and get nudges before credentials expire." />
-        <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <SectionHeading icon={MessageCircle} title="WhatsApp coaching" hint="Opt in to answer your coach's questions from WhatsApp and get nudges before your credentials expire." />
+        <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="font-medium">Two-way WhatsApp</p>
+              <p className="font-medium">Use WhatsApp coaching</p>
               <p className="text-sm text-muted-foreground">
-                {waStatus?.configured
-                  ? "Send START to your coach on WhatsApp to begin a session."
-                  : "Outbound nudges activate once WhatsApp is connected for this workspace."}
+                {profile.whatsappOptIn
+                  ? waStatus?.configured
+                    ? "You're opted in. Send START on WhatsApp to begin a session. Messages go to the number registered when you enrolled."
+                    : "You're opted in. WhatsApp activates once it is connected for your organisation."
+                  : "Chat with your coach on the WhatsApp number your organisation registered when you enrolled."}
               </p>
             </div>
             <Switch
@@ -154,25 +149,6 @@ export function CoachSettings() {
               onCheckedChange={(v) => save({ whatsappOptIn: v }, v ? "WhatsApp coaching on" : "WhatsApp coaching off")}
             />
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+27 82 000 0000"
-              inputMode="tel"
-              className="flex-1"
-            />
-            <Button
-              variant="secondary"
-              onClick={() => save({ phone }, "Number saved")}
-              disabled={update.isPending || phone === (profile.phone ?? "")}
-            >
-              Save number
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Use the full international format. This is the number your coach will message.
-          </p>
         </div>
       </section>
     </div>
