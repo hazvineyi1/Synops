@@ -1,0 +1,31 @@
+# Praxis LMS as its OWN Railway service (railway.praxis.json).
+#
+# Praxis lives in this monorepo at praxis/ as a SELF-CONTAINED pnpm workspace (its own
+# pnpm-workspace.yaml + lockfile), so its @workspace/* packages never collide with the
+# host monorepo's. This image builds only that subtree: the SPA (served at /) and the
+# API, then runs the API which serves the assembled static site same-origin plus /api.
+FROM node:24-slim
+
+# Build tools for any native modules.
+RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+# pnpm 9 (pnpm 10 gates dependency build scripts behind an approval prompt).
+RUN npm install -g pnpm@9
+
+WORKDIR /app
+
+# Copy ONLY the praxis subtree (its own workspace root becomes /app).
+COPY praxis/ ./
+
+# Install the praxis workspace's dependencies.
+RUN pnpm install --no-frozen-lockfile
+
+# Build the SPA at base path "/" (own service, served at root), then bundle the API.
+RUN PORT=8080 BASE_PATH=/ pnpm --filter @workspace/praxis run build
+RUN pnpm --filter @workspace/api-server run build
+
+# Railway provides PORT at runtime; the server reads process.env.PORT.
+EXPOSE 8080
+
+# Start the API, which also serves the built SPA from artifacts/praxis/dist/public.
+CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]

@@ -2,6 +2,9 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -37,6 +40,22 @@ app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// ── Serve the built SPA (production single-service on Railway) ──
+// The web app builds to artifacts/praxis/dist/public. This bundle runs from
+// artifacts/api-server/dist/index.mjs, so the client build sits at ../../praxis/dist/public.
+// In local dev that directory does not exist (Vite serves the SPA on :5173 and proxies
+// /api here), so this whole block is guarded and simply does nothing in dev.
+const bundleDir = path.dirname(fileURLToPath(import.meta.url));
+const clientDist = path.resolve(bundleDir, "../../praxis/dist/public");
+if (fs.existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+  // SPA fallback: any non-/api GET returns index.html so client-side routing works on
+  // deep links and refreshes. The negative lookahead keeps /api/* on the API.
+  app.get(/^(?!\/api).*/, (_req, res) => {
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+}
 
 // Central error handler. Previously there was none, so any thrown/rejected route
 // (e.g. a dropped DB connection) fell through to Express's default handler: an opaque
