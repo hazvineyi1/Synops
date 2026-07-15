@@ -12,6 +12,7 @@ import {
 import { eq, and, or, inArray, desc, type SQL } from "drizzle-orm";
 import { requireAuth, requireHub } from "../middlewares/requireAuth";
 import { canAdministerOrg, canAccessCourse, hasHubAccess } from "../lib/roles";
+import { logAudit } from "../lib/audit";
 
 /**
  * Accreditation compliance (decision doc §10.4). Unit standards and their mapping to
@@ -34,6 +35,7 @@ router.post("/compliance/unit-standards", requireAuth, requireHub, async (req, r
     code, title, framework: framework ?? "qcto",
     nqfLevel: nqfLevel ?? null, credits: credits ?? null, description: description ?? null,
   }).returning();
+  await logAudit(req, "compliance.standard_create", "unit_standard", row.id, { code, framework: framework ?? "qcto" });
   res.status(201).json(row);
 });
 
@@ -54,6 +56,7 @@ router.patch("/compliance/unit-standards/:id", requireAuth, requireHub, async (r
 router.delete("/compliance/unit-standards/:id", requireAuth, requireHub, async (req, res) => {
   await db.delete(unitStandardMappingsTable).where(eq(unitStandardMappingsTable.unitStandardId, req.params.id));
   await db.delete(unitStandardsTable).where(eq(unitStandardsTable.id, req.params.id));
+  await logAudit(req, "compliance.standard_delete", "unit_standard", req.params.id);
   res.status(204).send();
 });
 
@@ -76,11 +79,13 @@ router.post("/compliance/mappings", requireAuth, requireHub, async (req, res) =>
     return;
   }
   const [row] = await db.insert(unitStandardMappingsTable).values({ unitStandardId, targetType, targetId }).returning();
+  await logAudit(req, "compliance.mapping_create", "unit_standard_mapping", row.id, { unitStandardId, targetType, targetId });
   res.status(201).json(row);
 });
 
 router.delete("/compliance/mappings/:id", requireAuth, requireHub, async (req, res) => {
   await db.delete(unitStandardMappingsTable).where(eq(unitStandardMappingsTable.id, req.params.id));
+  await logAudit(req, "compliance.mapping_delete", "unit_standard_mapping", req.params.id);
   res.status(204).send();
 });
 

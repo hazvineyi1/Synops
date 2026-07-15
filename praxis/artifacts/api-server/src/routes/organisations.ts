@@ -4,6 +4,7 @@ import { organisationsTable, usersTable } from "@workspace/db";
 import { eq, and, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canAdministerOrg, canAccessOrg, canAssignRole, assignableRoles } from "../lib/roles";
+import { logAudit } from "../lib/audit";
 
 const router = Router();
 
@@ -154,6 +155,7 @@ router.post("/organisations/:orgId/members", requireAuth, async (req, res) => {
       .returning();
     member = updated;
   }
+  await logAudit(req, "org.member_add", "user", member.id, { role, organisationId: req.params.orgId });
   res.status(201).json(toUserResponse(member));
 });
 
@@ -185,6 +187,7 @@ router.patch("/organisations/:orgId/members/:userId", requireAuth, async (req, r
     .where(and(eq(usersTable.id, req.params.userId), eq(usersTable.organisationId, req.params.orgId)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Member not found" }); return; }
+  await logAudit(req, "org.member_role_change", "user", req.params.userId, { role, organisationId: req.params.orgId });
   res.json(toUserResponse(updated));
 });
 
@@ -207,6 +210,7 @@ router.delete("/organisations/:orgId/members/:userId", requireAuth, async (req, 
     .update(usersTable)
     .set({ organisationId: null, updatedAt: new Date() })
     .where(and(eq(usersTable.id, req.params.userId), eq(usersTable.organisationId, req.params.orgId)));
+  await logAudit(req, "org.member_remove", "user", req.params.userId, { organisationId: req.params.orgId });
   res.status(204).send();
 });
 

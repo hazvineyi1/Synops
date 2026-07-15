@@ -11,8 +11,9 @@ import {
   organisationsTable,
   enrolmentsTable,
 } from "@workspace/db";
-import { eq, and, isNull, desc, sql, or, ilike } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, or, ilike, gte, type SQL } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
+import { logAudit as audit } from "../lib/audit";
 import {
   newSessionToken,
   sessionExpiry,
@@ -38,29 +39,8 @@ const RESET_TTL_MS = 60 * 60 * 1000;
 /** Cookie holding the admin's own session while they impersonate someone else. */
 const IMPERSONATOR_COOKIE = "praxis_impersonator";
 
-async function audit(
-  req: any,
-  action: string,
-  resourceType: string,
-  resourceId: string | null,
-  metadata?: unknown,
-) {
-  await db
-    .insert(auditEventsTable)
-    .values({
-      action,
-      resourceType,
-      resourceId,
-      actorId: req.userId ?? null,
-      actorRole: req.dbUser?.role ?? null,
-      partnerId: req.dbUser?.partnerId ?? null,
-      metadata: metadata ? JSON.stringify(metadata) : null,
-    })
-    .catch(() => {
-      // Never fail the operation because the audit write failed, but do surface it.
-      req.log?.error({ action, resourceType }, "audit write failed");
-    });
-}
+// The audit helper now lives in ../lib/audit (imported above as `audit`) so every route
+// file can write to the same tamper-evident trail, not just the platform console.
 
 /* ───────────────────────────── Users ───────────────────────────── */
 
@@ -321,13 +301,49 @@ router.get("/platform/login-activity", requireAuth, requireSuperAdmin, async (re
 
 /** GET /platform/audit — the trail of every privileged action. */
 router.get("/platform/audit", requireAuth, requireSuperAdmin, async (req, res) => {
-  const limit = Math.min(Number(req.query.limit ?? 100), 500);
+  const q = req.query as Record<string, string | undefined>;
+  const limit = Math.min(Number(q.limit ?? 100), 1000);
+  const conds: SQL[] = [];
+  if (q.action) conds.push(eq(auditEventsTable.action, q.action));
+  if (q.resourceType) conds.push(eq(auditEventsTable.resourceType, q.resourceType));
+  if (q.actorId) conds.push(eq(auditEventsTable.actorId, q.actorId));
+  if (q.since) conds.push(gte(auditEventsTable.createdAt, new Date(Date.now() - Number(q.since) * 86400000)));
+
   const rows = await db
     .select()
     .from(auditEventsTable)
+    .where(conds.length ? and(...conds) : undefined)
     .orderBy(desc(auditEventsTable.createdAt))
     .limit(limit);
+
+  if (q.format === "csv") {
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const header = ["When", "Action", "Resource type", "Resource id", "Actor id", "Actor role", "Metadata"];
+    const csv = [
+      header.map(esc).join(","),
+      ...rows.map((r) =>
+        [r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt, r.action, r.resourceType, r.resourceId, r.actorId, r.actorRole, r.metadata]
+          .map(esc)
+          .join(","),
+      ),
+    ].join("\n");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="audit-log.csv"');
+    res.send(csv);
+    return;
+  }
   res.json(rows);
+});
+
+// GET /platform/audit/actions — the distinct action + resourceType values, for filter UIs.
+router.get("/platform/audit/actions", requireAuth, requireSuperAdmin, async (_req, res) => {
+  const rows = await db
+    .selectDistinct({ action: auditEventsTable.action, resourceType: auditEventsTable.resourceType })
+    .from(auditEventsTable);
+  res.json({
+    actions: [...new Set(rows.map((r) => r.action))].sort(),
+    resourceTypes: [...new Set(rows.map((r) => r.resourceType))].sort(),
+  });
 });
 
 /* ───────────────────────────── API keys ───────────────────────────── */

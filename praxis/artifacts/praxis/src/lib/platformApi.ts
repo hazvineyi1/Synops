@@ -148,7 +148,22 @@ export const platformApi = {
     }),
 
   loginActivity: (limit = 100) => req<LoginEvent[]>(`/platform/login-activity?limit=${limit}`),
-  audit: (limit = 100) => req<AuditEvent[]>(`/platform/audit?limit=${limit}`),
+  audit: (params: { limit?: number; action?: string; resourceType?: string; since?: number } = {}) => {
+    const q = new URLSearchParams();
+    q.set("limit", String(params.limit ?? 150));
+    if (params.action) q.set("action", params.action);
+    if (params.resourceType) q.set("resourceType", params.resourceType);
+    if (params.since) q.set("since", String(params.since));
+    return req<AuditEvent[]>(`/platform/audit?${q.toString()}`);
+  },
+  auditActions: () => req<{ actions: string[]; resourceTypes: string[] }>(`/platform/audit/actions`),
+  auditExportUrl: (params: { action?: string; resourceType?: string; since?: number } = {}) => {
+    const q = new URLSearchParams({ limit: "1000", format: "csv" });
+    if (params.action) q.set("action", params.action);
+    if (params.resourceType) q.set("resourceType", params.resourceType);
+    if (params.since) q.set("since", String(params.since));
+    return `${API}/platform/audit?${q.toString()}`;
+  },
 
   listApiKeys: () => req<ApiKey[]>("/platform/api-keys"),
   createApiKey: (name: string, partnerId?: string | null) =>

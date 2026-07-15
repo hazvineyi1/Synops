@@ -417,13 +417,40 @@ function ActivityTab() {
 /* ───────────────────────── Audit log ───────────────────────── */
 
 function AuditTab() {
+  const [action, setAction] = useState("");
+  const [resourceType, setResourceType] = useState("");
+  const [since, setSince] = useState(0);
+  const { data: opts } = useQuery({ queryKey: ["platform", "audit-actions"], queryFn: () => platformApi.auditActions() });
   const { data, isLoading } = useQuery({
-    queryKey: ["platform", "audit"],
-    queryFn: () => platformApi.audit(150),
+    queryKey: ["platform", "audit", action, resourceType, since],
+    queryFn: () => platformApi.audit({ action: action || undefined, resourceType: resourceType || undefined, since: since || undefined, limit: 300 }),
   });
+  const selCls = "h-9 rounded-md border border-input bg-background px-2 text-sm";
 
   return (
     <Card>
+      <div className="flex flex-wrap items-center gap-2 p-4 border-b border-border">
+        <select value={action} onChange={(e) => setAction(e.target.value)} className={selCls}>
+          <option value="">All actions</option>
+          {(opts?.actions ?? []).map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select value={resourceType} onChange={(e) => setResourceType(e.target.value)} className={selCls}>
+          <option value="">All resources</option>
+          {(opts?.resourceTypes ?? []).map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select value={since} onChange={(e) => setSince(Number(e.target.value))} className={selCls}>
+          <option value={0}>All time</option>
+          <option value={1}>Last 24h</option>
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+        </select>
+        <a
+          href={platformApi.auditExportUrl({ action: action || undefined, resourceType: resourceType || undefined, since: since || undefined })}
+          className="ml-auto inline-flex items-center h-9 px-3 rounded-md border border-input text-sm font-medium hover:bg-muted/50"
+        >
+          Export CSV
+        </a>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

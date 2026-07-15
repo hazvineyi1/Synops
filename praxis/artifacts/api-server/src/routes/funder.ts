@@ -11,6 +11,7 @@ import { eq, and, inArray, count } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { isSuperAdmin, isFunder } from "../lib/roles";
 import { funderOrgIds, orgCoachingHours } from "../lib/scope";
+import { logAudit } from "../lib/audit";
 
 /**
  * Funder / sponsor endpoints (decision doc §10.2).
@@ -159,6 +160,7 @@ router.post("/funders", requireAuth, requireSuperAdmin, async (req, res) => {
     .insert(usersTable)
     .values({ email, firstName: firstName ?? null, lastName: lastName ?? null, role: "funder", status: "invited" })
     .returning();
+  await logAudit(req, "funder.create", "user", u.id, { email });
   res.status(201).json({ id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName, status: u.status, scopeCount: 0 });
 });
 
@@ -185,12 +187,14 @@ router.post("/funders/:id/scopes", requireAuth, requireSuperAdmin, async (req, r
     .insert(funderScopesTable)
     .values({ funderId: req.params.id, organisationId, courseId: courseId ?? null, label: label ?? null })
     .returning();
+  await logAudit(req, "funder.scope_grant", "funder_scope", s.id, { funderId: req.params.id, organisationId });
   res.status(201).json(s);
 });
 
 // DELETE /funder-scopes/:scopeId — revoke a scope.
 router.delete("/funder-scopes/:scopeId", requireAuth, requireSuperAdmin, async (req, res) => {
   await db.delete(funderScopesTable).where(eq(funderScopesTable.id, req.params.scopeId));
+  await logAudit(req, "funder.scope_revoke", "funder_scope", req.params.scopeId);
   res.status(204).send();
 });
 
