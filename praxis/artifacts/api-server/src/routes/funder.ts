@@ -10,7 +10,7 @@ import {
 import { eq, and, inArray, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isSuperAdmin, isFunder } from "../lib/roles";
-import { funderOrgIds } from "../lib/scope";
+import { funderOrgIds, orgCoachingHours } from "../lib/scope";
 
 /**
  * Funder / sponsor endpoints (decision doc §10.2).
@@ -76,6 +76,7 @@ router.get("/funder/report", requireAuth, async (req, res) => {
   let tLearners = 0;
   let tCompletions = 0;
   let tCredentials = 0;
+  let tCoachingHours = 0;
 
   for (const orgId of orgIds) {
     const learnerRows = await db
@@ -99,6 +100,7 @@ router.get("/funder/report", requireAuth, async (req, res) => {
       credentials = Number(c2.count);
     }
 
+    const coachingHours = await orgCoachingHours(orgId);
     const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, orgId) });
     organisations.push({
       organisationId: orgId,
@@ -106,17 +108,22 @@ router.get("/funder/report", requireAuth, async (req, res) => {
       learners: learnerIds.length,
       completions,
       credentials,
-      // Coaching-hour totals arrive with the blended-delivery tracking phase (§10.3).
-      coachingHours: null as number | null,
+      coachingHours,
     });
     tLearners += learnerIds.length;
     tCompletions += completions;
     tCredentials += credentials;
+    tCoachingHours += coachingHours;
   }
 
   res.json({
     organisations,
-    totals: { learners: tLearners, completions: tCompletions, credentials: tCredentials },
+    totals: {
+      learners: tLearners,
+      completions: tCompletions,
+      credentials: tCredentials,
+      coachingHours: tCoachingHours,
+    },
   });
 });
 

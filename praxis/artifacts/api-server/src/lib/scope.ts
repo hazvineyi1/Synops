@@ -8,7 +8,14 @@
  * analytics) can scope to them.
  */
 import { db } from "@workspace/db";
-import { courseGroupsTable, courseGroupMembersTable, coursesTable, funderScopesTable } from "@workspace/db";
+import {
+  courseGroupsTable,
+  courseGroupMembersTable,
+  coursesTable,
+  funderScopesTable,
+  deliverySessionsTable,
+  attendanceRecordsTable,
+} from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import {
   isSuperAdmin,
@@ -28,6 +35,20 @@ export async function funderOrgIds(funderId: string): Promise<string[]> {
     .from(funderScopesTable)
     .where(eq(funderScopesTable.funderId, funderId));
   return [...new Set(rows.map((r) => r.organisationId))];
+}
+
+/**
+ * Total coaching hours logged for an organisation (§10.3) — summed across every attendance
+ * record whose delivery session belongs to that org. Used by facilitator reporting and by
+ * the funder report's aggregate coaching-hour total.
+ */
+export async function orgCoachingHours(orgId: string): Promise<number> {
+  const rows = await db
+    .select({ h: attendanceRecordsTable.coachingHours })
+    .from(attendanceRecordsTable)
+    .innerJoin(deliverySessionsTable, eq(attendanceRecordsTable.sessionId, deliverySessionsTable.id))
+    .where(eq(deliverySessionsTable.tenantId, orgId));
+  return rows.reduce((sum, r) => sum + (r.h ? Number(r.h) : 0), 0);
 }
 
 /** Group (section) ids this user leads. */

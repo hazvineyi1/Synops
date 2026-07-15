@@ -32,6 +32,7 @@ import activitiesRouter from "./activities";
 import supportRouter from "./support";
 import whatsappRouter from "./whatsapp";
 import funderRouter from "./funder";
+import deliveryRouter from "./delivery";
 import devRouter from "./dev";
 
 const router = Router();
@@ -69,6 +70,7 @@ router.use(activitiesRouter);
 router.use(supportRouter);
 router.use(whatsappRouter);
 router.use(funderRouter);
+router.use(deliveryRouter);
 router.use(devRouter);
 
 export default router;
