@@ -8,23 +8,26 @@ import { Link, useLocation } from 'wouter';
 import { BeatType } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
 
-// Helper for streaming the tutor's response
-async function streamTutorResponse(
-  sessionId: string, 
-  response: string, 
-  beatId: string, 
+type DoneMeta = { scaffold?: boolean; grade?: number; mastered?: boolean; masteryScore?: number };
+
+// Generic SSE reader: streams text tokens, captures the final done-event metadata,
+// and hands that metadata to onComplete so the caller can react (e.g. offer support).
+async function streamSSE(
+  url: string,
+  body: unknown,
   onToken: (token: string) => void,
-  onComplete: () => void
+  onComplete: (meta: DoneMeta) => void
 ) {
+  let meta: DoneMeta = {};
   try {
-    const res = await fetch(`/api/sessions/${sessionId}/respond`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ response, beatId }),
+      body: JSON.stringify(body),
       credentials: 'include',
     });
-    
-    if (!res.body) return onComplete();
+
+    if (!res.body) return onComplete(meta);
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -33,20 +36,23 @@ async function streamTutorResponse(
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      
+
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-      
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.slice(6));
-            if (data.content) {
-              onToken(data.content);
-            }
+            if (data.content) onToken(data.content);
             if (data.done) {
-              // stream finished
+              meta = {
+                scaffold: data.scaffold,
+                grade: data.grade,
+                mastered: data.mastered,
+                masteryScore: data.masteryScore,
+              };
             }
           } catch (e) {
             // parse error, ignore partial chunk
@@ -57,7 +63,7 @@ async function streamTutorResponse(
   } catch (error) {
     console.error("Streaming error:", error);
   } finally {
-    onComplete();
+    onComplete(meta);
   }
 }
 
@@ -73,6 +79,10 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   const [inputValue, setInputValue] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState('');
+  // Scaffolding trigger: when the learner has struggled with several items in a row,
+  // the backend flags `scaffold` on the done event. We surface a gentle, opt-in offer
+  // of a worked example rather than another question (the worked-example effect).
+  const [showScaffold, setShowScaffold] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Local state for turns to optimistically append user message and streaming tutor message
@@ -108,6 +118,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
     setInputValue('');
     setIsStreaming(true);
     setStreamingText('');
+    setShowScaffold(false);
 
     // Optimistically add user message
     const tempUserTurn = {
@@ -116,18 +127,41 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
       content: userMessage,
       createdAt: new Date().toISOString()
     };
-    
+
     setLocalTurns(prev => [...prev, tempUserTurn]);
 
-    await streamTutorResponse(
-      sessionId,
-      userMessage,
-      session.currentBeatId || '',
+    await streamSSE(
+      `/api/sessions/${sessionId}/respond`,
+      { response: userMessage, beatId: session.currentBeatId || '' },
+      (token) => {
+        setStreamingText(prev => prev + token);
+      },
+      (meta) => {
+        // When complete, refetch the session to get the real turns and updated mastery/beat
+        refetchSession().then(() => {
+          setIsStreaming(false);
+          setStreamingText('');
+          // Offer a worked example only when the learner has genuinely been struggling.
+          if (meta.scaffold && !meta.mastered) setShowScaffold(true);
+        });
+      }
+    );
+  };
+
+  // Deliberate scaffolding: fetch one worked example, then let the learner try again.
+  const handleWorkedExample = async () => {
+    if (isStreaming) return;
+    setShowScaffold(false);
+    setIsStreaming(true);
+    setStreamingText('');
+
+    await streamSSE(
+      `/api/sessions/${sessionId}/worked-example`,
+      {},
       (token) => {
         setStreamingText(prev => prev + token);
       },
       () => {
-        // When complete, refetch the session to get the real turns and updated mastery/beat
         refetchSession().then(() => {
           setIsStreaming(false);
           setStreamingText('');
@@ -229,6 +263,41 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                   </span>
                 )}
                 {streamingText && <span className="inline-block w-1.5 h-4 bg-primary ml-1 animate-pulse align-middle" />}
+              </div>
+            </motion.div>
+          )}
+
+          {/* Scaffolding offer — appears after a run of struggle. Warm, not punitive:
+              it normalises the difficulty and offers a worked example, opt-in. */}
+          {showScaffold && !isStreaming && !isMastered && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+              className="rounded-2xl border border-orange-200 bg-orange-50 p-5 sm:p-6 dark:border-orange-900/40 dark:bg-orange-950/20"
+            >
+              <p className="text-sm font-semibold text-orange-900 dark:text-orange-200">
+                This one is genuinely tricky — that's normal.
+              </p>
+              <p className="mt-1 text-sm text-orange-800/90 dark:text-orange-200/80">
+                Want me to walk through one worked example first? Then you can try a similar one yourself.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleWorkedExample}
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  Show me a worked example
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowScaffold(false)}
+                  className="text-orange-800 hover:bg-orange-100 dark:text-orange-200 dark:hover:bg-orange-900/30"
+                >
+                  I'll keep trying
+                </Button>
               </div>
             </motion.div>
           )}

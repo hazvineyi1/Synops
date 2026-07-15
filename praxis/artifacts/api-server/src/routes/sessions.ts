@@ -276,6 +276,16 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
 
     const masteryDelta = result.newMastery - Number(session.masteryScore);
 
+    // Scaffolding trigger (brief 7.4): three consecutive struggling items => offer a
+    // worked example NOW, no waiting. A struggle = grade 0 or 1. For the two prior turns
+    // we use masteryDelta <= 0 as the struggle proxy (grade isn't stored per turn), and
+    // the current turn uses the actual grade. This only OFFERS support; it never blocks
+    // or penalises, and the learner can ignore it.
+    const recentTutor = historyOrdered.filter((t) => t.role === "tutor").slice(-2);
+    const priorTwoStruggled =
+      recentTutor.length === 2 && recentTutor.every((t) => Number(t.masteryDelta ?? 0) <= 0);
+    const scaffold = result.grade <= 1 && priorTwoStruggled;
+
     // Save tutor turn
     await db.insert(dialogueTurnsTable).values({
       sessionId,
@@ -286,10 +296,85 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       masteryDelta: masteryDelta.toFixed(4),
     });
 
-    res.write(`data: ${JSON.stringify({ done: true, masteryScore: result.newMastery, grade: result.grade, mastered: result.mastered })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true, masteryScore: result.newMastery, grade: result.grade, mastered: result.mastered, scaffold })}\n\n`);
     res.end();
   } catch (err) {
     req.log.error({ err }, "Session respond error");
+    res.write(`data: ${JSON.stringify({ error: "Generation failed", done: true })}\n\n`);
+    res.end();
+  }
+});
+
+/**
+ * POST /sessions/:sessionId/worked-example — the deliberate scaffolding bump.
+ *
+ * When a learner has struggled several times, another Socratic question adds load
+ * without adding support. This ONE turn relaxes the "questions only" rule and gives a
+ * single clear worked example (the worked-example effect), then invites the learner to
+ * try a similar one. It is offered, never forced, and framed as normal, not as failure.
+ */
+router.post("/sessions/:sessionId/worked-example", requireAuth, async (req, res) => {
+  const { sessionId } = req.params;
+  const session = await db.query.sessionsTable.findFirst({ where: eq(sessionsTable.id, sessionId) });
+  if (!session || session.userId !== req.userId) {
+    res.status(404).json({ error: "Not found" });
+    return;
+  }
+
+  const beat = session.currentBeatId
+    ? await db.query.beatsTable.findFirst({ where: eq(beatsTable.id, session.currentBeatId) })
+    : null;
+
+  const history = await db
+    .select()
+    .from(dialogueTurnsTable)
+    .where(eq(dialogueTurnsTable.sessionId, sessionId))
+    .orderBy(desc(dialogueTurnsTable.createdAt))
+    .limit(8);
+  const historyOrdered = history.reverse();
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  try {
+    const learner = req.dbUser!;
+    const system = `You are a patient learning coach helping ${learner.firstName ?? "a learner"}. They have found this concept tricky a few times, so instead of another question you will give ONE short worked example.
+Concept: ${beat?.title ?? "the current concept"}.${beat?.narration ? " Context: " + beat.narration : ""}
+Rules:
+- Work through a SINGLE concrete example step by step, showing the reasoning at each step.
+- Keep it short and plain; no jargon they have not met.
+- Frame the difficulty as completely normal, never evaluative or discouraging.
+- End by inviting them to try one similar example themselves, phrased as a question.`;
+
+    const chatMessages: { role: "user" | "assistant"; content: string }[] = historyOrdered.map((t) => ({
+      role: t.role === "tutor" ? ("assistant" as const) : ("user" as const),
+      content: t.content,
+    }));
+    chatMessages.push({ role: "user", content: "I'm stuck on this. Could you show me a worked example?" });
+
+    let full = "";
+    const stream = anthropic.messages.stream({ model: SOCRATIC_MODEL, max_tokens: 1024, system, messages: chatMessages });
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        full += event.delta.text;
+        res.write(`data: ${JSON.stringify({ content: event.delta.text })}\n\n`);
+      }
+    }
+
+    await db.insert(dialogueTurnsTable).values({
+      sessionId,
+      role: "tutor",
+      content: full,
+      beatId: session.currentBeatId ?? null,
+      reasoning: "worked example (scaffolding)",
+    });
+
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+  } catch (err) {
+    req.log.error({ err }, "worked-example error");
     res.write(`data: ${JSON.stringify({ error: "Generation failed", done: true })}\n\n`);
     res.end();
   }
