@@ -14,6 +14,7 @@ import {
   CheckCircle, Clock, AlertCircle, Play
 } from 'lucide-react';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
+import { CourseNextStep } from '@/components/CourseNextStep';
 
 // --- Types ---
 interface Course { id: string; title: string; description: string; status: string; competencyTags: string[]; nqfLevel?: number; }
@@ -145,8 +146,8 @@ export function CourseDetail() {
     enabled: !!courseId,
   });
   const { data: modules } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: activeTab === 'modules' || activeTab === 'overview' });
-  const { data: assignments } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<Assignment[]>(`/courses/${courseId}/assignments`), enabled: activeTab === 'assignments' });
-  const { data: discussions } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' });
+  const { data: assignments } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<Assignment[]>(`/courses/${courseId}/assignments`), enabled: activeTab === 'assignments' || activeTab === 'overview' });
+  const { data: discussions } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' || activeTab === 'overview' });
   const { data: announcements } = useQuery({ queryKey: ['announcements', courseId], queryFn: () => apiFetch<Announcement[]>(`/courses/${courseId}/announcements`), enabled: activeTab === 'announcements' || activeTab === 'overview' });
   const { data: myGrades } = useQuery({ queryKey: ['grades', courseId, 'me'], queryFn: () => apiFetch<{ grades: GradeEntry[]; totalEarned: number; totalPossible: number; overallPercent: number; }>(`/courses/${courseId}/gradebook/me`), enabled: activeTab === 'gradebook' && !isInstructor });
   const { data: events } = useQuery({ queryKey: ['events', courseId], queryFn: () => apiFetch<Event[]>(`/courses/${courseId}/events`), enabled: activeTab === 'calendar' });
@@ -158,6 +159,13 @@ export function CourseDetail() {
   const enrolMutation = useMutation({
     mutationFn: () => apiFetch(`/courses/${courseId}/enrol`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['enrolment', courseId] }),
+  });
+
+  // Retrieval-practice nudge starts a coach session on an already-completed module
+  // (a Socratic session over mastered material IS retrieval practice).
+  const recallMutation = useMutation({
+    mutationFn: (moduleId: string) => apiFetch<{ id: string }>('/sessions', { method: 'POST', body: JSON.stringify({ moduleId }) }),
+    onSuccess: (s) => navigate(`/learn/${s.id}`),
   });
 
   const joinGroupMutation = useMutation({
@@ -203,7 +211,9 @@ export function CourseDetail() {
 
       {/* Real completion, from beats actually viewed. Only shown to enrolled learners:
           an unenrolled visitor browsing the catalog has no progress to speak of. */}
-      {enrolment && progress && progress.totalBeats > 0 && (
+      {/* The focused learner Overview (CourseNextStep) already shows progress + next step,
+          so this header progress card is redundant there; keep it on the other tabs. */}
+      {enrolment && progress && progress.totalBeats > 0 && !(activeTab === 'overview' && !isInstructor) && (
         <div className="mb-6 rounded-lg border border-border bg-card p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-foreground">
@@ -278,7 +288,22 @@ export function CourseDetail() {
         {/* Tab content */}
         <div className="min-w-0">
         {/* OVERVIEW */}
-        {activeTab === 'overview' && (
+        {/* Learners get the cognitively-optimized single-primary-action view; staff keep
+            the informational overview (about + upcoming + quick links). */}
+        {activeTab === 'overview' && !isInstructor && enrolment && (
+          <CourseNextStep
+            courseTitle={course.title}
+            progress={progress as any}
+            modules={modules as any}
+            assignments={assignments as any}
+            discussions={discussions as any}
+            onOpenModule={(moduleId) => navigate(`/courses/${courseId}/modules/${moduleId}`)}
+            onStartRecall={(moduleId) => recallMutation.mutate(moduleId)}
+            onOpenAssignment={(aid) => navigate(`/courses/${courseId}/assignments/${aid}`)}
+            onOpenDiscussions={() => setTab('discussions')}
+          />
+        )}
+        {activeTab === 'overview' && (isInstructor || !enrolment) && (
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-6">
               <Card>
