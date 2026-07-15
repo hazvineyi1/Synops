@@ -10,5 +10,7 @@ export async function apiFetch<T = unknown>(path: string, init?: RequestInit): P
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as any).error ?? res.statusText);
   }
+  // 204 No Content (e.g. DELETE) has an empty body — res.json() would throw.
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
