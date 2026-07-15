@@ -8,8 +8,16 @@ import {
   partnersTable,
   organisationsTable,
 } from "@workspace/db";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, sql, count, inArray, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { isSuperAdmin, isFacilitator, isCoFacilitator } from "../lib/roles";
+import { learnerIdsForCoFacilitator } from "../lib/scope";
+
+const EMPTY_OVERVIEW = {
+  totalLearners: 0, activeEnrolments: 0, completions: 0, credentialsIssued: 0,
+  avgMastery: 0, enrolmentTrend: [] as { date: string; value: number }[],
+  completionTrend: [] as { date: string; value: number }[],
+};
 
 const router = Router();
 
@@ -17,14 +25,33 @@ const router = Router();
 router.get("/analytics/overview", requireAuth, async (req, res) => {
   const user = req.dbUser!;
 
-  // Scope based on role
-  let learnerFilter;
-  if (user.role === "super_admin") {
+  // Aggregate analytics are delivery-staff and above only (decision §4.2: learners see
+  // their own progress, not org/section aggregates).
+  if (!(isSuperAdmin(user.role) || isFacilitator(user.role) || isCoFacilitator(user.role))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  // Scope the learner set to the actor's tier.
+  let learnerFilter: SQL | undefined;
+  if (isSuperAdmin(user.role)) {
     learnerFilter = eq(usersTable.role, "learner");
-  } else if (user.partnerId) {
-    learnerFilter = and(eq(usersTable.partnerId, user.partnerId), eq(usersTable.role, "learner"));
+  } else if (isCoFacilitator(user.role)) {
+    // Co-facilitator: only learners in the section(s) they lead.
+    const ids = await learnerIdsForCoFacilitator(user.id);
+    if (ids.length === 0) { res.json(EMPTY_OVERVIEW); return; }
+    learnerFilter = and(inArray(usersTable.id, ids), eq(usersTable.role, "learner"));
   } else {
-    learnerFilter = and(eq(usersTable.organisationId, user.organisationId!), eq(usersTable.role, "learner"));
+    // Facilitator: own org (flatten §6). Transitional partner fallback until each
+    // partner_admin has an organisationId, then drop the partner branch.
+    if (user.organisationId) {
+      learnerFilter = and(eq(usersTable.organisationId, user.organisationId), eq(usersTable.role, "learner"));
+    } else if (user.partnerId) {
+      learnerFilter = and(eq(usersTable.partnerId, user.partnerId), eq(usersTable.role, "learner"));
+    } else {
+      res.json(EMPTY_OVERVIEW);
+      return;
+    }
   }
 
   const [totalLearners] = await db.select({ count: count() }).from(usersTable).where(learnerFilter);
@@ -52,6 +79,13 @@ router.get("/analytics/overview", requireAuth, async (req, res) => {
 
 // GET /analytics/activity
 router.get("/analytics/activity", requireAuth, async (req, res) => {
+  const user = req.dbUser!;
+  // Staff-only feed (decision §4.2). NOTE: the event list itself is not yet org/section
+  // filtered — follow-up is to scope the rows to the actor's learners as in /overview.
+  if (!(isSuperAdmin(user.role) || isFacilitator(user.role) || isCoFacilitator(user.role))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   // Build activity from sessions and credentials
   const recentSessions = await db
     .select()
@@ -89,6 +123,11 @@ router.get("/analytics/activity", requireAuth, async (req, res) => {
 
 // GET /analytics/competency-breakdown
 router.get("/analytics/competency-breakdown", requireAuth, async (req, res) => {
+  const user = req.dbUser!;
+  if (!(isSuperAdmin(user.role) || isFacilitator(user.role) || isCoFacilitator(user.role))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   // Simplified — in production compute from session scores
   res.json([
     { tag: "Financial Literacy", avgScore: 0.74, learnerCount: 12, masteredCount: 8 },

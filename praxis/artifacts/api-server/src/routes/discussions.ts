@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { discussionsTable, discussionRepliesTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq, asc, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canStaffActOnCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -59,11 +60,26 @@ router.get("/courses/:courseId/discussions/:discussionId", requireAuth, async (r
   });
 });
 
-// PATCH /discussions/:discussionId
+// PATCH /discussions/:discussionId — the author may edit their own text; moderation
+// flags (pin/close) are delivery-staff-only, scoped to the course (decision §4.2).
 router.patch("/discussions/:discussionId", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const discussion = await db.query.discussionsTable.findFirst({ where: eq(discussionsTable.id, req.params.discussionId) });
+  if (!discussion) { res.status(404).json({ error: "Discussion not found" }); return; }
+  const isStaff = await canStaffActOnCourse(actor, discussion.courseId);
+  const isAuthor = discussion.authorId === actor.id;
+  if (!isStaff && !isAuthor) { res.status(403).json({ error: "Forbidden" }); return; }
+
   const { title, body, isPinned, isClosed } = req.body;
+  const updates: Partial<typeof discussionsTable.$inferInsert> = { updatedAt: new Date() };
+  if (title !== undefined) updates.title = title;
+  if (body !== undefined) updates.body = body;
+  if (isStaff) {
+    if (isPinned !== undefined) updates.isPinned = isPinned;
+    if (isClosed !== undefined) updates.isClosed = isClosed;
+  }
   const [updated] = await db.update(discussionsTable)
-    .set({ title, body, isPinned, isClosed, updatedAt: new Date() })
+    .set(updates)
     .where(eq(discussionsTable.id, req.params.discussionId))
     .returning();
   res.json(updated);
@@ -105,8 +121,18 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
   res.status(201).json({ ...reply, author: toUserSnap(user) });
 });
 
-// DELETE /discussions/replies/:replyId
+// DELETE /discussions/replies/:replyId — the reply's author may delete their own; anyone
+// else needs delivery-staff moderation rights scoped to the course (decision §4.2).
 router.delete("/discussions/replies/:replyId", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const reply = await db.query.discussionRepliesTable.findFirst({ where: eq(discussionRepliesTable.id, req.params.replyId) });
+  if (!reply) { res.status(204).send(); return; }
+  let allowed = reply.authorId === actor.id;
+  if (!allowed) {
+    const discussion = await db.query.discussionsTable.findFirst({ where: eq(discussionsTable.id, reply.discussionId) });
+    if (discussion) allowed = await canStaffActOnCourse(actor, discussion.courseId);
+  }
+  if (!allowed) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(discussionRepliesTable).where(eq(discussionRepliesTable.id, req.params.replyId));
   res.status(204).send();
 });

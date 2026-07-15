@@ -6,6 +6,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canGradeInCourse, canStaffActOnCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -121,6 +122,14 @@ router.get("/assignments/:assignmentId/my-submission", requireAuth, async (req, 
 
 // GET /assignments/:assignmentId/submissions — instructor view
 router.get("/assignments/:assignmentId/submissions", requireAuth, async (req, res) => {
+  const assignment = await db.query.assignmentsTable.findFirst({
+    where: eq(assignmentsTable.id, req.params.assignmentId),
+  });
+  if (!assignment) { res.status(404).json({ error: "Assignment not found" }); return; }
+  if (!(await canStaffActOnCourse(req.dbUser!, assignment.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const rows = await db
     .select({ submission: assignmentSubmissionsTable, user: usersTable })
     .from(assignmentSubmissionsTable)
@@ -135,6 +144,21 @@ router.get("/assignments/:assignmentId/submissions", requireAuth, async (req, re
 
 // PATCH /assignment-submissions/:submissionId/grade
 router.patch("/assignment-submissions/:submissionId/grade", requireAuth, async (req, res) => {
+  // Grading is delivery staff only, scoped (decision §4.3): a Facilitator within the
+  // course's org, or a Co-facilitator only for learners in the section(s) they lead.
+  const submission = await db.query.assignmentSubmissionsTable.findFirst({
+    where: eq(assignmentSubmissionsTable.id, req.params.submissionId),
+  });
+  if (!submission) { res.status(404).json({ error: "Submission not found" }); return; }
+  const assignment = await db.query.assignmentsTable.findFirst({
+    where: eq(assignmentsTable.id, submission.assignmentId),
+  });
+  if (!assignment) { res.status(404).json({ error: "Assignment not found" }); return; }
+  if (!(await canGradeInCourse(req.dbUser!, assignment.courseId, submission.userId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   const { score, letterGrade, feedback, rubricAssessment } = req.body;
   const [updated] = await db.update(assignmentSubmissionsTable)
     .set({ score, letterGrade, feedback, rubricAssessment, gradedBy: req.userId, gradedAt: new Date(), status: "graded", updatedAt: new Date() })
