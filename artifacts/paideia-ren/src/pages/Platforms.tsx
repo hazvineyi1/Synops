@@ -33,7 +33,7 @@ export default function Platforms() {
             <p className="text-[18px] text-muted-foreground">Purpose-built platforms reflecting our rigorous standards.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="bg-background border border-border p-12 flex flex-col">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 rounded-[6px] bg-accent flex items-center justify-center text-white font-bold text-xl">T</div>
@@ -60,6 +60,21 @@ export default function Platforms() {
                 whole cohort.
               </p>
               <Link href="/products#coach" className="bg-accent text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-accent/90 transition-colors">
+                See it in action
+              </Link>
+            </div>
+
+            <div className="bg-background border border-border p-12 flex flex-col">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-[6px] bg-accent flex items-center justify-center text-white font-bold text-xl">P</div>
+                <h3 className="text-3xl font-bold text-foreground tracking-tight">Synops Praxis</h3>
+              </div>
+              <p className="text-[18px] text-muted-foreground leading-relaxed mb-8 flex-1">
+                The learning platform. Enrolled learners take courses, complete interactive activities and
+                hand them in, earn credentials, and get support, all under real access control. Scales from
+                one cohort to a whole workforce.
+              </p>
+              <Link href="/products#praxis" className="bg-primary text-white text-center font-bold px-6 py-3 rounded-[6px] hover:bg-primary/90 transition-colors">
                 See it in action
               </Link>
             </div>

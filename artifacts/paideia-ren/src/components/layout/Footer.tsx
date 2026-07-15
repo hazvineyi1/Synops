@@ -36,6 +36,7 @@ export function Footer() {
             <Link href="/products#teacher" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Teacher</Link>
             <Link href="/products#coach" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Coach</Link>
             <Link href="/products#builder" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Curriculum Builder</Link>
+            <Link href="/products#praxis" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Synops Praxis</Link>
             <Link href="/products#register-interest" className="text-[15px] text-muted-foreground hover:text-accent transition-colors mt-2">Request access</Link>
           </div>
 

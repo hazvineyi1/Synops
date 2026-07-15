@@ -137,6 +137,38 @@ const BUILDER_SAMPLES = [
   },
 ];
 
+const PRAXIS_SAMPLES = [
+  {
+    label: "Interactive activity",
+    prompt: "A learner opens an activity in their course and hands it in",
+    output: [
+      { h: "Runs in the browser", p: "The activity loads in a secure sandbox. The learner reads, interacts and completes it without leaving the course." },
+      { h: "Hands in a result", p: "On submit, the activity reports the learner's answer and a score straight to the platform. No file uploads, no email." },
+      { h: "Coach reviews it", p: "The submission appears in the coach's queue with the learner's name and result, ready to approve or return." },
+      { h: "Counts toward progress", p: "Every hand-in is recorded against the learner, feeding progress tracking and verifiable credentials." },
+    ],
+  },
+  {
+    label: "Support desk",
+    prompt: "A learner can't access a module and opens a support ticket",
+    output: [
+      { h: "Ticket opened", p: "The learner describes the issue and sets a priority. It routes to their organisation's support queue." },
+      { h: "Staff reply", p: "A coach or admin replies in the thread and the learner is notified. Internal notes stay staff-only." },
+      { h: "Tracked to resolution", p: "Status moves from open to pending to resolved, with a full history. Nothing gets lost in an inbox." },
+    ],
+  },
+  {
+    label: "Platform console",
+    prompt: "An administrator manages accounts across the whole platform",
+    output: [
+      { h: "Every account", p: "Search any user, view their sessions and login history, change roles, suspend or reactivate." },
+      { h: "Master resets", p: "Issue a one-time password reset link for a locked-out learner, without ever seeing their password." },
+      { h: "Impersonate safely", p: "View the platform as any user to reproduce a problem, with an unmissable banner and a full audit trail." },
+      { h: "Audit everything", p: "Every privileged action is logged, and login activity, including failures, is visible platform-wide." },
+    ],
+  },
+];
+
 function Sampler({
   samples,
   accent,
@@ -237,7 +269,7 @@ function ProductExplorer() {
     <section id="explore" className="py-16 px-6 bg-white border-b border-border scroll-mt-20">
       <div className="max-w-[1200px] mx-auto">
         {/* Product switcher */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-12">
           {PRODUCTS.map((x, i) => {
             const on = i === active;
             return (
@@ -294,6 +326,24 @@ function ProductExplorer() {
               <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-2">{p.scaleTitle}</h3>
               <p className="text-[15px] text-muted-foreground leading-relaxed">{p.scale}</p>
             </div>
+
+            {/* Live products link straight to the app; the app gates access itself. */}
+            {p.href && (
+              <div className="border-t border-border mt-5 pt-5">
+                <a
+                  href={p.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-accent text-white px-7 py-3.5 font-bold rounded-[6px] hover:bg-accent/90 transition-colors"
+                >
+                  {p.cta ?? "Open"} &rarr;
+                </a>
+                <p className="mt-3 text-[13.5px] text-muted-foreground leading-relaxed">
+                  Access is by enrolment. Enrolled learners sign in above; if your organisation
+                  is not yet set up, register your interest below.
+                </p>
+              </div>
+            )}
           </div>
 
           <Sampler samples={p.samples} accent={p.accent} />
@@ -303,7 +353,25 @@ function ProductExplorer() {
   );
 }
 
-const PRODUCTS = [
+type Product = {
+  slug: string;
+  short: string;
+  letter: string;
+  name: string;
+  tagline: string;
+  lead: string;
+  bulletsTitle: string;
+  bullets: string[];
+  scaleTitle: string;
+  scale: string;
+  samples: typeof TEACHER_SAMPLES;
+  accent: "accent" | "primary";
+  // Live products (e.g. Praxis) render a direct action button; private-beta ones don't.
+  href?: string;
+  cta?: string;
+};
+
+const PRODUCTS: Product[] = [
   {
     slug: "teacher",
     short: "For the people who teach.",
@@ -360,6 +428,29 @@ const PRODUCTS = [
     scale: "Start with a single program build. Expand to department, college and whole-institution curriculum mapping, with a live view of where every program outcome is introduced, practiced and assessed. Multi-tenant by design: isolated data, your branding, and central oversight across every course in development.",
     samples: BUILDER_SAMPLES,
     accent: "primary" as const,
+  },
+  {
+    slug: "praxis",
+    short: "For the institutions that deliver it.",
+    letter: "P",
+    name: "Synops Praxis",
+    tagline: "The learning platform where it all comes together",
+    lead: "A full learning management system for institutions and workforce training. Enrolled learners take courses, complete interactive activities and hand them in, earn verifiable credentials, and get help from a built-in support desk. Coaches review and grade; administrators run the whole platform. Praxis is where the curriculum you design and the coaching you provide actually reach learners, under one roof with real access control.",
+    bulletsTitle: "Why organisations run it",
+    bullets: [
+      "Enrolment-based access: learners sign in only once their organisation has enrolled and approved them.",
+      "Interactive HTML activities learners complete in-browser and hand in, sandboxed and gradable, with results recorded automatically.",
+      "A built-in helpdesk so learner questions and issues are tracked to resolution, not lost in email.",
+      "A super-admin console for impersonation, master password resets, login activity, audit trails and API keys.",
+    ],
+    scaleTitle: "Scales from one cohort to a workforce",
+    scale: "Multi-tenant by design: each organisation gets isolated data, its own branding, and role-based access from learner to coach to org and partner admin. Roll out to a single training cohort or an entire workforce, with the platform console giving central oversight of every account, session and credential.",
+    samples: PRAXIS_SAMPLES,
+    accent: "accent" as const,
+    // Praxis is live and enrolment-gated, so it links straight to sign-in rather than
+    // sitting behind the interest funnel. The LMS itself gates access.
+    href: "https://synops-production.up.railway.app/sign-in",
+    cta: "Sign in",
   },
 ];
 
@@ -426,11 +517,11 @@ export default function Products() {
             We don't just advise. We ship.
           </h1>
           <p className="text-[21px] text-white/80 leading-relaxed max-w-3xl mb-10">
-            Three platforms built from the same conviction: that good pedagogy should scale without being
-            diluted. One for the people who teach, one for the people who learn, and one for the teams who
-            design the curriculum itself. All are running today with real institutions. None are open to
-            the public yet. We onboard deliberately, so every partner gets the attention that makes a
-            rollout succeed.
+            Four platforms built from the same conviction: that good pedagogy should scale without being
+            diluted. One for the people who teach, one for the people who learn, one for the teams who
+            design the curriculum itself, and one that delivers it all to enrolled learners. All are
+            running today with real institutions. We onboard deliberately, so every partner gets the
+            attention that makes a rollout succeed.
           </p>
           <a
             href="#register-interest"
@@ -452,9 +543,9 @@ export default function Products() {
               Request access
             </h2>
             <p className="text-[19px] text-muted-foreground leading-relaxed">
-              All three products are in private beta and are not publicly available. Tell us who you are and
-              what you are trying to solve, and our team will contact you to arrange a walkthrough and
-              discuss a pilot.
+              Our platforms are onboarded by invitation, and access to Synops Praxis is by enrolment. Tell us
+              who you are and what you are trying to solve, and our team will contact you to arrange a
+              walkthrough and discuss a pilot.
             </p>
           </div>
 
@@ -505,6 +596,7 @@ export default function Products() {
                       <SelectItem value="Synops Teacher">Synops Teacher</SelectItem>
                       <SelectItem value="Synops Coach">Synops Coach</SelectItem>
                       <SelectItem value="Curriculum Builder">Curriculum Builder</SelectItem>
+                      <SelectItem value="Synops Praxis">Synops Praxis (LMS)</SelectItem>
                       <SelectItem value="More than one">More than one</SelectItem>
                       <SelectItem value="Not sure yet">Not sure yet</SelectItem>
                     </SelectContent>
