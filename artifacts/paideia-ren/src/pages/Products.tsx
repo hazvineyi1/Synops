@@ -244,18 +244,69 @@ function Sampler({
  * "See it in action" link from elsewhere on the site lands on the RIGHT product
  * instead of dumping the visitor at the top of the page on Synops Teacher.
  */
+/** The expandable detail body for one product (text column + sampler). */
+function ProductDetail({ p }: { p: Product }) {
+  return (
+    <div className="px-6 lg:px-8 py-8 border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-10 xl:gap-14 items-start">
+      <div>
+        <p className="text-[13px] font-bold uppercase tracking-wider text-accent mb-4">{p.tagline}</p>
+        <p className="text-[17px] text-muted-foreground leading-relaxed mb-7">{p.lead}</p>
+
+        <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-3">{p.bulletsTitle}</h3>
+        <ul className="space-y-2.5 mb-7">
+          {p.bullets.map((t) => (
+            <li key={t} className="flex gap-3 text-[15.5px] text-muted-foreground leading-relaxed">
+              <span className="text-accent font-bold mt-0.5 shrink-0">&rarr;</span>
+              <span>{t}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="border-t border-border pt-5">
+          <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-2">{p.scaleTitle}</h3>
+          <p className="text-[15px] text-muted-foreground leading-relaxed">{p.scale}</p>
+        </div>
+
+        {/* Live products link straight to the app; the app gates access itself. */}
+        {p.href && (
+          <div className="border-t border-border mt-5 pt-5">
+            <a
+              href={p.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block bg-accent text-white px-7 py-3.5 font-bold rounded-[6px] hover:bg-accent/90 transition-colors"
+            >
+              {p.cta ?? "Open"} &rarr;
+            </a>
+            <p className="mt-3 text-[13.5px] text-muted-foreground leading-relaxed">
+              Access is by enrolment. Enrolled learners sign in above; if your organisation
+              is not yet set up, register your interest below.
+            </p>
+          </div>
+        )}
+      </div>
+
+      <Sampler samples={p.samples} accent={p.accent} />
+    </div>
+  );
+}
+
 function ProductExplorer() {
-  const [active, setActive] = useState(0);
+  // Accordion: any number of products can be open at once, and all can be collapsed.
+  // Starts with the first product open so the page is not bare; every panel toggles.
+  const [open, setOpen] = useState<string[]>([PRODUCTS[0]!.slug]);
+
+  const toggle = (slug: string) =>
+    setOpen((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
 
   useEffect(() => {
     const applyHash = () => {
       const slug = window.location.hash.replace("#", "").toLowerCase();
-      const i = PRODUCTS.findIndex((p) => p.slug === slug);
-      if (i < 0) return;
-      setActive(i);
-      // Deep link should land ON the product, not at the top of the page.
+      if (!PRODUCTS.some((p) => p.slug === slug)) return;
+      // Open the linked product (leave others as they are) and land on it.
+      setOpen((prev) => (prev.includes(slug) ? prev : [...prev, slug]));
       window.requestAnimationFrame(() => {
-        document.getElementById("explore")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById(`product-${slug}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     };
     applyHash();
@@ -263,91 +314,78 @@ function ProductExplorer() {
     return () => window.removeEventListener("hashchange", applyHash);
   }, []);
 
-  const p = PRODUCTS[active]!;
-
   return (
     <section id="explore" className="py-16 px-6 bg-white border-b border-border scroll-mt-20">
-      <div className="max-w-[1200px] mx-auto">
-        {/* Product switcher */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-12">
-          {PRODUCTS.map((x, i) => {
-            const on = i === active;
-            return (
+      <div className="max-w-[1200px] mx-auto space-y-4">
+        <div className="flex items-center justify-end gap-4 mb-2">
+          <button
+            type="button"
+            onClick={() => setOpen(PRODUCTS.map((p) => p.slug))}
+            className="text-[13px] font-bold text-muted-foreground hover:text-accent transition-colors"
+          >
+            Expand all
+          </button>
+          <span className="text-border">|</span>
+          <button
+            type="button"
+            onClick={() => setOpen([])}
+            className="text-[13px] font-bold text-muted-foreground hover:text-accent transition-colors"
+          >
+            Collapse all
+          </button>
+        </div>
+
+        {PRODUCTS.map((x) => {
+          const isOpen = open.includes(x.slug);
+          return (
+            <div
+              key={x.slug}
+              id={`product-${x.slug}`}
+              className="border border-border rounded-[10px] overflow-hidden bg-white scroll-mt-24"
+            >
               <button
-                key={x.slug}
                 type="button"
+                aria-expanded={isOpen}
                 onClick={() => {
-                  setActive(i);
+                  toggle(x.slug);
                   window.history.replaceState(null, "", `#${x.slug}`);
                 }}
-                className={`text-left p-5 rounded-[8px] border transition-colors ${
-                  on
-                    ? "border-primary bg-primary text-white"
-                    : "border-border bg-white hover:bg-muted/50"
+                className={`w-full text-left px-6 py-5 flex items-center gap-4 transition-colors ${
+                  isOpen ? "bg-primary text-white" : "bg-white hover:bg-muted/50"
                 }`}
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <div
-                    className={`w-8 h-8 shrink-0 rounded-[5px] flex items-center justify-center font-bold text-[13px] ${
-                      on ? "bg-white text-primary" : "bg-primary text-white"
-                    }`}
-                  >
-                    {x.letter}
-                  </div>
-                  <div className={`font-bold text-[17px] ${on ? "text-white" : "text-primary"}`}>
-                    {x.name}
-                  </div>
-                </div>
-                <div className={`text-[13.5px] leading-snug ${on ? "text-white/70" : "text-muted-foreground"}`}>
-                  {x.short}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Selected product */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 xl:gap-14 items-start">
-          <div>
-            <p className="text-[13px] font-bold uppercase tracking-wider text-accent mb-4">{p.tagline}</p>
-            <p className="text-[17px] text-muted-foreground leading-relaxed mb-7">{p.lead}</p>
-
-            <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-3">{p.bulletsTitle}</h3>
-            <ul className="space-y-2.5 mb-7">
-              {p.bullets.map((t) => (
-                <li key={t} className="flex gap-3 text-[15.5px] text-muted-foreground leading-relaxed">
-                  <span className="text-accent font-bold mt-0.5 shrink-0">&rarr;</span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
-
-            <div className="border-t border-border pt-5">
-              <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-2">{p.scaleTitle}</h3>
-              <p className="text-[15px] text-muted-foreground leading-relaxed">{p.scale}</p>
-            </div>
-
-            {/* Live products link straight to the app; the app gates access itself. */}
-            {p.href && (
-              <div className="border-t border-border mt-5 pt-5">
-                <a
-                  href={p.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-accent text-white px-7 py-3.5 font-bold rounded-[6px] hover:bg-accent/90 transition-colors"
+                <div
+                  className={`w-9 h-9 shrink-0 rounded-[5px] flex items-center justify-center font-bold text-[14px] ${
+                    isOpen ? "bg-white text-primary" : "bg-primary text-white"
+                  }`}
                 >
-                  {p.cta ?? "Open"} &rarr;
-                </a>
-                <p className="mt-3 text-[13.5px] text-muted-foreground leading-relaxed">
-                  Access is by enrolment. Enrolled learners sign in above; if your organisation
-                  is not yet set up, register your interest below.
-                </p>
-              </div>
-            )}
-          </div>
+                  {x.letter}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`font-bold text-[18px] ${isOpen ? "text-white" : "text-primary"}`}>{x.name}</div>
+                  <div className={`text-[13.5px] leading-snug ${isOpen ? "text-white/70" : "text-muted-foreground"}`}>
+                    {x.short}
+                  </div>
+                </div>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
+                    isOpen ? "rotate-180 text-white/80" : "text-muted-foreground"
+                  }`}
+                >
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
 
-          <Sampler samples={p.samples} accent={p.accent} />
-        </div>
+              {isOpen && <ProductDetail p={x} />}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
