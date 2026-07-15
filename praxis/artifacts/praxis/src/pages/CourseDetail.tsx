@@ -155,6 +155,13 @@ export function CourseDetail() {
   const { data: roster } = useQuery({ queryKey: ['roster', courseId], queryFn: () => apiFetch<RosterEntry[]>(`/courses/${courseId}/roster`), enabled: activeTab === 'people' });
   const { data: groups } = useQuery({ queryKey: ['groups', courseId], queryFn: () => apiFetch<Group[]>(`/courses/${courseId}/groups`), enabled: activeTab === 'groups' });
   const { data: enrolment } = useQuery({ queryKey: ['enrolment', courseId, 'me'], queryFn: () => apiFetch<Enrolment | null>(`/courses/${courseId}/my-enrolment`) });
+  // Behavioural density recommendation (Focus vs Full view) — sets the DEFAULT only;
+  // the learner's explicit toggle choice always wins. Learners only.
+  const { data: densityRec } = useQuery({
+    queryKey: ['learn', 'density'],
+    queryFn: () => apiFetch<{ density: 'focus' | 'full' }>('/learn/density'),
+    enabled: !isInstructor,
+  });
 
   const enrolMutation = useMutation({
     mutationFn: () => apiFetch(`/courses/${courseId}/enrol`, { method: 'POST' }),
@@ -293,6 +300,7 @@ export function CourseDetail() {
         {activeTab === 'overview' && !isInstructor && enrolment && (
           <CourseNextStep
             courseTitle={course.title}
+            defaultDensity={densityRec?.density ?? 'focus'}
             progress={progress as any}
             modules={modules as any}
             assignments={assignments as any}

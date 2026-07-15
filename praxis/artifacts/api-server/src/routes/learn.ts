@@ -203,6 +203,50 @@ router.get("/learn/mastery", requireAuth, async (req, res) => {
   );
 });
 
+/**
+ * GET /learn/density — recommends Focus vs Full-view interface density from REAL
+ * behavioural signals (how many sessions the learner has had, and how many of their
+ * studied concepts currently sit below mastery), never from a self-reported label.
+ *
+ * IMPORTANT: the two thresholds below are THEORY-DERIVED STARTING GUESSES from the
+ * cognitive-load brief, not validated setpoints. They are exactly the numbers that
+ * should be run as a small multi-armed-bandit pilot before being trusted (see the brief,
+ * Section 7.5). Until then they set the DEFAULT density only; the client persists the
+ * learner's explicit choice, which always overrides this. This keeps the visible layout
+ * stable (it never flips under the learner once they've chosen) while the model updates
+ * underneath.
+ */
+router.get("/learn/density", requireAuth, async (req, res) => {
+  const sessions = await db
+    .select({ id: sessionsTable.id })
+    .from(sessionsTable)
+    .where(eq(sessionsTable.userId, req.userId!));
+
+  const mastery = await db
+    .select({ m: conceptMasteryTable.mastery })
+    .from(conceptMasteryTable)
+    .where(eq(conceptMasteryTable.userId, req.userId!));
+
+  const conceptsStudied = mastery.length;
+  const belowMastery = mastery.filter((r) => Number(r.m) < 0.5).length;
+  const lowMasteryRate = conceptsStudied > 0 ? belowMastery / conceptsStudied : 0;
+
+  const NEW_LEARNER_SESSIONS = 3; // pilot-tunable (brief 3.4 / 7.5)
+  const STRUGGLING_RATE = 0.3; // pilot-tunable
+
+  // New to the system, or currently struggling => Focus (protect working memory).
+  const focus = sessions.length < NEW_LEARNER_SESSIONS || lowMasteryRate > STRUGGLING_RATE;
+
+  res.json({
+    density: focus ? "focus" : "full",
+    signals: {
+      sessions: sessions.length,
+      conceptsStudied,
+      lowMasteryRate: Math.round(lowMasteryRate * 100) / 100,
+    },
+  });
+});
+
 // GET /learn/profile — coach personalisation
 router.get("/learn/profile", requireAuth, async (req, res) => {
   const u = req.dbUser!;

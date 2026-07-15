@@ -134,6 +134,16 @@ export function CourseNextStep({
     try { localStorage.setItem(DENSITY_KEY, d); } catch { /* ignore */ }
   };
 
+  // Follow the behavioural model's recommendation when it arrives (it loads async), but
+  // ONLY if the learner has not explicitly chosen a density. An explicit choice is
+  // persisted and always wins — the layout never flips under someone who set it.
+  React.useEffect(() => {
+    try {
+      if (localStorage.getItem(DENSITY_KEY)) return;
+    } catch { /* ignore */ }
+    setDensity(defaultDensity);
+  }, [defaultDensity]);
+
   // Ordered modules from progress; fall back to the catalog module list.
   const ordered = (progress?.modules ?? [])
     .slice()
