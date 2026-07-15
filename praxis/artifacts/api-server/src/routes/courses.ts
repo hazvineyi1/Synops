@@ -26,12 +26,16 @@ function toCourseResponse(c: typeof coursesTable.$inferSelect) {
 // GET /courses
 router.get("/courses", requireAuth, async (req, res) => {
   const user = req.dbUser!;
-  const tenantId = user.partnerId ?? user.organisationId ?? user.id;
-  const courses = await db
-    .select()
-    .from(coursesTable)
-    .where(eq(coursesTable.tenantId, tenantId))
-    .orderBy(desc(coursesTable.createdAt));
+  // Hub roles (super_admin, instructional_designer) author/oversee across every org, so
+  // they see the whole catalogue; everyone else is scoped to their partner/org tenant.
+  const seesAll = user.role === "super_admin" || user.role === "instructional_designer";
+  const courses = seesAll
+    ? await db.select().from(coursesTable).orderBy(desc(coursesTable.createdAt))
+    : await db
+        .select()
+        .from(coursesTable)
+        .where(eq(coursesTable.tenantId, user.partnerId ?? user.organisationId ?? user.id))
+        .orderBy(desc(coursesTable.createdAt));
   res.json(courses.map(toCourseResponse));
 });
 

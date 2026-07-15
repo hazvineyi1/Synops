@@ -96,8 +96,15 @@ export function canAccessOrg(
   return false;
 }
 
-/** Scope against a course, whose owning org is its `tenantId`. */
+/**
+ * Scope against a course. A course's `tenantId` may be either an organisation OR a
+ * partner — courses are frequently owned at the partner level and shared across that
+ * partner's organisations. So a user is in scope if EITHER their org or their partner
+ * matches the course's tenant.
+ */
 export function canAccessCourse(user: ScopedUser, course: { tenantId: string }): boolean {
   if (isSuperAdmin(user.role)) return true;
-  return !!user.organisationId && user.organisationId === course.tenantId;
+  if (user.organisationId && user.organisationId === course.tenantId) return true;
+  if (user.partnerId && user.partnerId === course.tenantId) return true;
+  return false;
 }

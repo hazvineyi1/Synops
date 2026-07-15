@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 import { eq, and, or, inArray, desc, type SQL } from "drizzle-orm";
 import { requireAuth, requireHub } from "../middlewares/requireAuth";
-import { isSuperAdmin, canAdministerOrg } from "../lib/roles";
+import { canAdministerOrg, canAccessCourse, hasHubAccess } from "../lib/roles";
 
 /**
  * Accreditation compliance (decision doc §10.4). Unit standards and their mapping to
@@ -89,7 +89,7 @@ router.get("/courses/:courseId/compliance-report", requireAuth, async (req, res)
   const user = req.dbUser!;
   const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, req.params.courseId) });
   if (!course) { res.status(404).json({ error: "Course not found" }); return; }
-  const allowed = isSuperAdmin(user.role) || (canAdministerOrg(user.role) && user.organisationId === course.tenantId);
+  const allowed = hasHubAccess(user.role) || (canAdministerOrg(user.role) && canAccessCourse(user, course));
   if (!allowed) { res.status(403).json({ error: "Forbidden" }); return; }
 
   const mods = await db.select({ id: modulesTable.id, title: modulesTable.title }).from(modulesTable).where(eq(modulesTable.courseId, req.params.courseId));
