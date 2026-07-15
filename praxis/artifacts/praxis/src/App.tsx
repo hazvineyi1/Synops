@@ -32,6 +32,7 @@ import { Reports } from '@/pages/Reports';
 import { CoachSettings } from '@/pages/CoachSettings';
 import { OrgMembers } from '@/pages/OrgMembers';
 import { SignInPage } from '@/pages/SignIn';
+import { RequestAccess } from '@/pages/RequestAccess';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
 import { PlatformConsole } from '@/pages/PlatformConsole';
@@ -147,6 +148,7 @@ function Routes() {
         <PublicRoute path="/sign-in" component={SignInPage} />
         <PublicRoute path="/forgot-password" component={ForgotPasswordPage} />
         <PublicRoute path="/reset-password" component={ResetPasswordPage} />
+        <PublicRoute path="/request-access" component={RequestAccess} />
 
         {/* Dev demo login. The server 404s this route in production. */}
         <PublicRoute path="/dev-login" component={DevLogin} />

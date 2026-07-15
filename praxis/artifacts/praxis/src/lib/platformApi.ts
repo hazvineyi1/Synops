@@ -26,6 +26,21 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 
 /* ── Types (mirror the server response shapes) ── */
 
+export interface AccessRequestRow {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  email: string;
+  organisationName: string | null;
+  requestedRole: string;
+  message: string | null;
+  status: string;
+  reviewerNote: string | null;
+  reviewedById: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
 export interface PlatformOverview {
   users: { total: number; active: number; suspended: number; invited: number; noPassword: number };
   partners: number;
@@ -164,6 +179,14 @@ export const platformApi = {
     if (params.since) q.set("since", String(params.since));
     return `${API}/platform/audit?${q.toString()}`;
   },
+
+  accessRequests: (status?: string) =>
+    req<AccessRequestRow[]>(`/platform/access-requests${status ? `?status=${status}` : ""}`),
+  reviewAccessRequest: (id: string, status: "approved" | "denied", note?: string) =>
+    req<AccessRequestRow>(`/platform/access-requests/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, note }),
+    }),
 
   listApiKeys: () => req<ApiKey[]>("/platform/api-keys"),
   createApiKey: (name: string, partnerId?: string | null) =>

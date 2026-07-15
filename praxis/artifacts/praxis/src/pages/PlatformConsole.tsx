@@ -44,6 +44,7 @@ const TABS = [
   { id: "users", label: "Users" },
   { id: "activity", label: "Login activity" },
   { id: "audit", label: "Audit log" },
+  { id: "access", label: "Access requests" },
   { id: "keys", label: "API keys" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -416,6 +417,66 @@ function ActivityTab() {
 
 /* ───────────────────────── Audit log ───────────────────────── */
 
+/* ───────────────────────── Access requests ───────────────────────── */
+
+function AccessRequestsTab() {
+  const qc = useQueryClient();
+  const [status, setStatus] = useState("pending");
+  const { data, isLoading } = useQuery({
+    queryKey: ["platform", "access-requests", status],
+    queryFn: () => platformApi.accessRequests(status || undefined),
+  });
+  const review = useMutation({
+    mutationFn: (v: { id: string; status: "approved" | "denied" }) => platformApi.reviewAccessRequest(v.id, v.status),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["platform", "access-requests"] }),
+  });
+
+  return (
+    <Card>
+      <div className="flex items-center gap-2 p-4 border-b border-border">
+        <select value={status} onChange={(e) => setStatus(e.target.value)} className="h-9 rounded-md border border-input bg-background px-2 text-sm">
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="denied">Denied</option>
+          <option value="">All</option>
+        </select>
+      </div>
+      <div className="divide-y divide-border">
+        {isLoading ? (
+          <div className="p-4 space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        ) : !data || data.length === 0 ? (
+          <div className="px-4 py-10 text-center text-muted-foreground">No {status || ""} requests.</div>
+        ) : (
+          data.map((r) => (
+            <div key={r.id} className="p-4 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="font-medium">
+                  {r.firstName} {r.lastName ?? ""}
+                  <span className="text-muted-foreground font-normal"> · {r.email}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {r.organisationName ?? "—"} · wants {roleLabel(r.requestedRole)} · {timeAgo(r.createdAt)}
+                </p>
+                {r.message && <p className="text-sm mt-1">{r.message}</p>}
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
+                {r.status === "pending" ? (
+                  <>
+                    <Button size="sm" onClick={() => review.mutate({ id: r.id, status: "approved" })} disabled={review.isPending}>Approve</Button>
+                    <Button size="sm" variant="outline" onClick={() => review.mutate({ id: r.id, status: "denied" })} disabled={review.isPending}>Deny</Button>
+                  </>
+                ) : (
+                  <Badge variant="secondary" className="capitalize">{r.status}</Badge>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </Card>
+  );
+}
+
 function AuditTab() {
   const [action, setAction] = useState("");
   const [resourceType, setResourceType] = useState("");
@@ -613,6 +674,7 @@ export function PlatformConsole() {
       {tab === "users" && <UsersTab onOpen={setSelected} />}
       {tab === "activity" && <ActivityTab />}
       {tab === "audit" && <AuditTab />}
+      {tab === "access" && <AccessRequestsTab />}
       {tab === "keys" && <ApiKeysTab />}
 
       <UserDialog user={selected} onClose={() => setSelected(null)} />

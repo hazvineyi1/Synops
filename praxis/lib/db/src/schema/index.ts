@@ -29,3 +29,4 @@ export * from "./whatsapp";
 export * from "./funder";
 export * from "./delivery";
 export * from "./compliance";
+export * from "./access_requests";
