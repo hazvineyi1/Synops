@@ -33,6 +33,7 @@ import supportRouter from "./support";
 import whatsappRouter from "./whatsapp";
 import funderRouter from "./funder";
 import deliveryRouter from "./delivery";
+import complianceRouter from "./compliance";
 import devRouter from "./dev";
 
 const router = Router();
@@ -71,6 +72,7 @@ router.use(supportRouter);
 router.use(whatsappRouter);
 router.use(funderRouter);
 router.use(deliveryRouter);
+router.use(complianceRouter);
 router.use(devRouter);
 
 export default router;

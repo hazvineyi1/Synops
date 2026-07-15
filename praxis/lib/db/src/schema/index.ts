@@ -28,3 +28,4 @@ export * from "./spaced_repetition";
 export * from "./whatsapp";
 export * from "./funder";
 export * from "./delivery";
+export * from "./compliance";
