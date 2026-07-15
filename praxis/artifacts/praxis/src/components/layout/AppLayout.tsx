@@ -25,6 +25,7 @@ import {
   LifeBuoy,
   Landmark,
   TrendingUp,
+  CalendarDays,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     if (role === 'learner') {
       items.push({ label: t('nav.today'),      href: '/dashboard',     icon: LayoutDashboard });
       items.push({ label: t('nav.myCourses'),  href: '/courses',       icon: BookOpen });
+      items.push({ label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays });
       items.push({ label: t('nav.credentials'),href: '/credentials',   icon: Award });
       items.push({ label: t('nav.myCoach'),    href: '/coach-settings',icon: Settings });
       items.push({ label: t('nav.help', 'Help'), href: '/support', icon: LifeBuoy });
@@ -75,6 +77,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       items.push({ label: t('nav.overview'),    href: '/dashboard',         icon: LayoutDashboard });
       items.push({ label: t('nav.learners'),    href: '/coach',             icon: Users });
       items.push({ label: t('nav.submissions'), href: '/coach/submissions', icon: FileText });
+      items.push({ label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays });
       items.push({ label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles });
       items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
     }
@@ -82,7 +85,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     if (role === 'org_admin') {
       items.push({ label: t('nav.overview'),       href: '/dashboard', icon: LayoutDashboard });
       items.push({ label: t('nav.members'),         href: '/org/members',icon: UserCog });
-      items.push({ label: t('nav.workforce'),       href: '/dashboard', icon: Users });
+      items.push({ label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays });
       items.push({ label: t('nav.reports'),         href: '/reports',   icon: FileText });
       items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
     }
