@@ -250,29 +250,33 @@ export function CourseDetail() {
         </div>
       )}
 
-      {/* Tab bar */}
-      <div className="border-b border-border mb-6 overflow-x-auto">
-        <div className="flex gap-0 min-w-max">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setTab(tab.id)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-              )}
-            >
-              <tab.icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Course sections: a vertical nav on desktop (every section visible, no
+          horizontal scrolling), wrapping to pills on mobile. Replaces the old
+          overflow-x tab strip, which hid half its tabs off-screen. */}
+      <div className="lg:grid lg:grid-cols-[210px_1fr] lg:gap-8">
+        <nav className="mb-6 lg:mb-0 lg:sticky lg:top-20 lg:self-start">
+          <div className="flex flex-wrap gap-2 lg:flex-col lg:gap-1">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setTab(tab.id)}
+                aria-current={activeTab === tab.id ? "page" : undefined}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors lg:w-full",
+                  activeTab === tab.id
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <tab.icon className="h-4 w-4 shrink-0" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </nav>
 
-      {/* Tab content */}
-      <div>
+        {/* Tab content */}
+        <div className="min-w-0">
         {/* OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="grid md:grid-cols-3 gap-6">
@@ -639,6 +643,7 @@ export function CourseDetail() {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Interactive Video Modal */}

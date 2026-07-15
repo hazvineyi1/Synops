@@ -4,20 +4,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Users, BookOpen, Award, TrendingUp, Building, FileText } from 'lucide-react';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { CoachHome } from '@/pages/CoachHome';
+import { LearnerHome } from '@/pages/LearnerHome';
 
 export function Dashboard() {
   const { data: user } = useGetMe();
 
   if (!user) return null;
 
-  // Learners get the coach-led "spine" home — the coach leads, no blank dashboard.
+  // Learners get the redesigned learner hub: courses + progress + what's due + what's
+  // new + the coach as a clear entry point, rather than a coach-only spine page.
   if (user.role === 'learner') {
-    return (
-      <div className="animate-in fade-in duration-500">
-        <CoachHome firstName={user.firstName} />
-      </div>
-    );
+    return <LearnerHome firstName={user.firstName} />;
   }
 
   return (
