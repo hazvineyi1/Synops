@@ -1,12 +1,7 @@
 import React, { useState } from "react";
+import { Redirect } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  Users as UsersIcon,
-  Building,
-  GraduationCap,
-  LogIn,
-  ShieldAlert,
-  KeyRound,
   Search,
   UserCog,
   Copy,
@@ -33,6 +28,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/SessionContext";
+import { AdminShell } from "@/components/layout/AdminShell";
 import {
   platformApi,
   type PlatformUserRow,
@@ -92,6 +88,17 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
 
 /* ───────────────────────────── Overview ───────────────────────────── */
 
+/** Stat card ported from Sokratify's SuperAdmin: white surface, serif value, warm labels. */
+function StatCard({ label, value, sub, accent = "hsl(60 5% 14%)" }: { label: string; value: React.ReactNode; sub?: string; accent?: string }) {
+  return (
+    <div className="rounded-lg p-5 flex flex-col gap-1" style={{ background: "#fff", border: "1px solid hsl(43 15% 90%)" }}>
+      <p className="text-2xl font-serif font-normal" style={{ color: accent }}>{value}</p>
+      <p className="text-xs font-medium" style={{ color: "hsl(43 10% 45%)" }}>{label}</p>
+      {sub && <p className="text-xs" style={{ color: "hsl(43 10% 58%)" }}>{sub}</p>}
+    </div>
+  );
+}
+
 function OverviewTab() {
   const { data, isLoading } = useQuery({
     queryKey: ["platform", "overview"],
@@ -101,36 +108,76 @@ function OverviewTab() {
   if (isLoading || !data) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
       </div>
     );
   }
 
-  const cards = [
-    { label: "Total users", value: data.users.total, icon: UsersIcon },
-    { label: "Active", value: data.users.active, icon: UsersIcon },
-    { label: "Suspended", value: data.users.suspended, icon: ShieldAlert },
-    { label: "No password set", value: data.users.noPassword, icon: KeyRound },
-    { label: "Partners", value: data.partners, icon: Building },
-    { label: "Organisations", value: data.organisations, icon: Building },
-    { label: "Enrolments", value: data.enrolments, icon: GraduationCap },
-    { label: "Logins (24h)", value: data.logins24h, icon: LogIn, sub: `${data.failedLogins24h} failed` },
-  ];
+  const failedAccent = data.failedLogins24h > 0 ? "hsl(0 65% 45%)" : "hsl(60 5% 14%)";
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((c) => (
-        <Card key={c.label}>
-          <CardContent className="pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">{c.label}</span>
-              <c.icon className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="text-3xl font-bold tracking-tight">{c.value}</div>
-            {c.sub && <div className="text-xs text-muted-foreground mt-1">{c.sub}</div>}
-          </CardContent>
-        </Card>
-      ))}
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Total users" value={data.users.total} sub={`${data.users.active} active`} />
+        <StatCard label="Partners" value={data.partners} />
+        <StatCard label="Organisations" value={data.organisations} />
+        <StatCard label="Enrolments" value={data.enrolments} />
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard label="Logins (24h)" value={data.logins24h} />
+        <StatCard label="Failed logins (24h)" value={data.failedLogins24h} accent={failedAccent} />
+        <StatCard label="Invited (no password)" value={data.users.noPassword} />
+        <StatCard label="Suspended" value={data.users.suspended} accent={data.users.suspended > 0 ? "hsl(0 65% 45%)" : "hsl(60 5% 14%)"} />
+
+        {/* Users-by-status breakdown, mirroring Sokratify's plan-breakdown card */}
+        <div className="rounded-lg p-5 col-span-2 lg:col-span-2" style={{ background: "#fff", border: "1px solid hsl(43 15% 90%)" }}>
+          <p className="text-xs font-medium mb-3" style={{ color: "hsl(43 10% 45%)" }}>Users by status</p>
+          <div className="space-y-2">
+            {([
+              ["Active", data.users.active, "hsl(145 45% 42%)"],
+              ["Invited", data.users.invited, "hsl(38 80% 50%)"],
+              ["Suspended", data.users.suspended, "hsl(0 65% 55%)"],
+            ] as const).map(([k, v, dot]) => {
+              const pct = data.users.total > 0 ? Math.round((Number(v) / data.users.total) * 100) : 0;
+              return (
+                <div key={k}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs flex items-center gap-2" style={{ color: "hsl(43 10% 45%)" }}>
+                      <span className="inline-block w-2 h-2 rounded-full" style={{ background: dot }} />
+                      {k}
+                    </span>
+                    <span className="text-sm font-medium" style={{ color: "hsl(60 5% 14%)" }}>{v}</span>
+                  </div>
+                  <div className="h-1 rounded-full overflow-hidden" style={{ background: "hsl(43 15% 92%)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: dot }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* System health, mirroring Sokratify's health card */}
+        <div className="rounded-lg p-5 col-span-2 lg:col-span-2" style={{ background: "#fff", border: "1px solid hsl(43 15% 90%)" }}>
+          <p className="text-xs font-medium mb-3" style={{ color: "hsl(43 10% 45%)" }}>System health</p>
+          <div className="space-y-2">
+            {([
+              ["Authentication", data.failedLogins24h === 0 ? "Healthy" : "Failed attempts logged", data.failedLogins24h === 0],
+              ["Accounts", data.users.suspended === 0 ? "None suspended" : `${data.users.suspended} suspended`, data.users.suspended === 0],
+              ["Onboarding", data.users.noPassword === 0 ? "All activated" : `${data.users.noPassword} pending`, data.users.noPassword === 0],
+            ] as const).map(([k, v, ok]) => (
+              <div key={k} className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: "hsl(43 10% 45%)" }}>{k}</span>
+                <span className="text-xs flex items-center gap-1.5" style={{ color: ok ? "hsl(145 45% 38%)" : "hsl(38 70% 42%)" }}>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: ok ? "hsl(145 45% 42%)" : "hsl(38 80% 50%)" }} />
+                  {v}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -724,33 +771,37 @@ function ApiKeysTab() {
 
 /* ───────────────────────────── Page ───────────────────────────── */
 
+const SECTION_SUBTITLE: Record<TabId, string> = {
+  overview: "Real-time stats across every tenant on the platform.",
+  users: "Search, impersonate, and manage every account.",
+  activity: "Recent sign-ins and failed attempts.",
+  audit: "Immutable record of administrative actions.",
+  access: "Review and approve inbound access requests.",
+  prompts: "Reusable Socratic system-prompt snippets, per organisation.",
+  keys: "Programmatic API keys for partner integrations.",
+};
+
 export function PlatformConsole() {
+  const { user } = useSession();
   const [tab, setTab] = useState<TabId>("overview");
   const [selected, setSelected] = useState<PlatformUserRow | null>(null);
 
+  // Belt-and-braces: every /platform/* endpoint is guarded by requireSuperAdmin, but keep
+  // non-super users out of the console shell entirely.
+  if (user && user.role !== "super_admin") {
+    return <Redirect to="/dashboard" />;
+  }
+
+  const activeLabel = TABS.find((t) => t.id === tab)?.label ?? "Platform";
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div>
-        <h1 className="text-3xl font-serif font-bold tracking-tight">Platform Console</h1>
-        <p className="text-muted-foreground">Manage every account, session, and key across the platform.</p>
-      </div>
-
-      <div className="flex gap-1 border-b border-border">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
+    <AdminShell
+      sections={TABS.map((t) => ({ id: t.id, label: t.label }))}
+      active={tab}
+      onSelect={(id) => setTab(id as TabId)}
+      title={tab === "overview" ? "Platform overview" : activeLabel}
+      subtitle={SECTION_SUBTITLE[tab]}
+    >
       {tab === "overview" && <OverviewTab />}
       {tab === "users" && <UsersTab onOpen={setSelected} />}
       {tab === "activity" && <ActivityTab />}
@@ -760,6 +811,6 @@ export function PlatformConsole() {
       {tab === "keys" && <ApiKeysTab />}
 
       <UserDialog user={selected} onClose={() => setSelected(null)} />
-    </div>
+    </AdminShell>
   );
 }
