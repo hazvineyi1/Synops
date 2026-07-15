@@ -34,6 +34,7 @@ export function Dashboard() {
       {user.role === 'partner_admin' && <PartnerAdminDashboard partnerId={user.partnerId!} />}
       {user.role === 'org_admin' && <OrgAdminDashboard />}
       {user.role === 'coach' && <CoachDashboard />}
+      {user.role === 'instructional_designer' && <InstructionalDesignerDashboard />}
     </div>
   );
 }
@@ -172,6 +173,29 @@ function CoachDashboard() {
   );
 }
 
+
+function InstructionalDesignerDashboard() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Link href="/studio">
+        <Card className="hover:bg-muted/30 transition-colors cursor-pointer h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-primary" />Studio</CardTitle>
+            <CardDescription>Author courses, modules and interactives for every organisation.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+      <Link href="/compliance">
+        <Card className="hover:bg-muted/30 transition-colors cursor-pointer h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />Compliance &amp; standards</CardTitle>
+            <CardDescription>Define QCTO/SETA unit standards and map them to content.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
+    </div>
+  );
+}
 
 function StatCard({ title, value, icon: Icon, trend }: { title: string, value: string | number, icon: any, trend?: string }) {
   return (

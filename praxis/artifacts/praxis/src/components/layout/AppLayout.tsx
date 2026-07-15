@@ -86,6 +86,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       items.push({ label: t('nav.overview'),       href: '/dashboard', icon: LayoutDashboard });
       items.push({ label: t('nav.members'),         href: '/org/members',icon: UserCog });
       items.push({ label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays });
+      items.push({ label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck });
       items.push({ label: t('nav.reports'),         href: '/reports',   icon: FileText });
       items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
     }
@@ -103,6 +104,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       items.push({ label: t('nav.overview'),         href: '/dashboard',      icon: LayoutDashboard });
       items.push({ label: t('nav.partners'),         href: '/admin/partners', icon: Building });
       items.push({ label: t('nav.funders', 'Funders'), href: '/admin/funders', icon: Landmark });
+      items.push({ label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck });
       items.push({ label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles });
       items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
       items.push({ label: t('nav.platformConsole', 'Platform'), href: '/platform', icon: ShieldCheck });
@@ -112,6 +114,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     // Funder / sponsor: a single read-only impact view, nothing else (decision §10.2).
     if (role === 'funder') {
       items.push({ label: t('nav.impact', 'Impact'), href: '/dashboard', icon: TrendingUp });
+      items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
+    }
+
+    // Instructional Designer: the Hub authoring roles — Studio + standards, off the
+    // delivery chain (decision §3 / §9).
+    if (role === 'instructional_designer') {
+      items.push({ label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard });
+      items.push({ label: t('nav.studio'), href: '/studio', icon: PenTool });
+      items.push({ label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck });
+      items.push({ label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles });
       items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
     }
 

@@ -38,6 +38,7 @@ import { PlatformConsole } from '@/pages/PlatformConsole';
 import { AdminFunders } from '@/pages/AdminFunders';
 import { Delivery } from '@/pages/Delivery';
 import { MyAttendance } from '@/pages/MyAttendance';
+import { Compliance } from '@/pages/Compliance';
 import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
 import { ActivityPlay } from '@/pages/ActivityPlay';
 import { Support } from '@/pages/Support';
@@ -185,6 +186,7 @@ function Routes() {
         <ProtectedRoute path="/admin/funders" component={AdminFunders} />
         <ProtectedRoute path="/delivery" component={Delivery} />
         <ProtectedRoute path="/my-attendance" component={MyAttendance} />
+        <ProtectedRoute path="/compliance" component={Compliance} />
         <ProtectedRoute path="/activities" component={ActivitiesAdmin} />
         <ProtectedRoute path="/support/:ticketId" component={Support} />
         <ProtectedRoute path="/support" component={Support} />
