@@ -12,6 +12,7 @@ import {
   GraduationCap,
   Sparkles,
   CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -83,6 +84,14 @@ interface PlanItem {
 interface CoachPlan {
   items: PlanItem[];
   rationale: string;
+}
+interface MasteryConcept {
+  moduleId: string;
+  moduleTitle: string;
+  courseId: string;
+  mastery: number;
+  reps: number;
+  due: boolean;
 }
 
 /* ── helpers ── */
@@ -179,6 +188,13 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
     queryKey: ["learn", "plan"],
     queryFn: () => apiFetch<CoachPlan>("/learn/plan"),
   });
+  // Spaced retrieval practice (cognitive-load brief §3.2): a low-stakes recall of ONE
+  // prior concept, keyed to the spaced-repetition schedule and to below-mastery concepts,
+  // placed in the primary flow but at deliberately low visual weight.
+  const { data: mastery } = useQuery({
+    queryKey: ["learn", "mastery"],
+    queryFn: () => apiFetch<MasteryConcept[]>("/learn/mastery"),
+  });
 
   const startSession = useMutation({
     mutationFn: (moduleId: string) =>
@@ -195,6 +211,11 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
   const news = (announcements ?? []).slice(0, 3);
   const recentCreds = (credentials ?? []).slice(0, 3);
   const nextUp = plan?.items?.find((i) => !i.done) ?? plan?.items?.[0];
+  // Prefer a concept that is due AND not yet mastered (needs the reinforcement most),
+  // and only surface something the learner has actually studied before (reps > 0).
+  const retrieval =
+    (mastery ?? []).filter((m) => m.due && m.reps > 0 && m.mastery < 0.8).sort((a, b) => a.mastery - b.mastery)[0] ??
+    (mastery ?? []).filter((m) => m.due && m.reps > 0)[0];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -289,6 +310,26 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
               </div>
             )}
           </section>
+
+          {/* Retrieval practice nudge — deliberately low visual weight (§3.2): quick,
+              optional, low-stakes, so it doesn't compete with the primary actions above,
+              but present in the flow so it isn't skipped by inattention. */}
+          {retrieval && (
+            <button
+              onClick={() => startSession.mutate(retrieval.moduleId)}
+              disabled={startSession.isPending}
+              className="w-full text-left rounded-xl border border-dashed border-border bg-muted/30 hover:bg-muted/50 transition-colors px-4 py-3 flex items-center gap-3"
+            >
+              <div className="h-8 w-8 shrink-0 rounded-lg bg-teal-500/10 text-teal-600 flex items-center justify-center">
+                <RotateCcw className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">Quick recall: {retrieval.moduleTitle}</p>
+                <p className="text-xs text-muted-foreground">A 30-second check to keep it fresh.</p>
+              </div>
+              <span className="text-xs font-semibold text-teal-600 shrink-0">Try it →</span>
+            </button>
+          )}
 
           {/* Due soon */}
           <section>

@@ -8,6 +8,21 @@ import { Link, useLocation } from 'wouter';
 import { BeatType } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
 
+// Functional colour map (cognitive-load brief §4): colour encodes the KIND of step so a
+// learner can tell what it is without reading the label. Content/reading = purple,
+// applied scenario = coral, structural framing = slate; current work falls back to teal.
+// Nothing here is red — red is reserved for genuine errors only.
+const BEAT_BADGE: Record<string, string> = {
+  title_card: 'text-slate-600 bg-slate-500/10',
+  close: 'text-slate-600 bg-slate-500/10',
+  points: 'text-purple-600 bg-purple-500/10',
+  compare: 'text-purple-600 bg-purple-500/10',
+  diagram: 'text-purple-600 bg-purple-500/10',
+  video: 'text-purple-600 bg-purple-500/10',
+  scenario: 'text-orange-600 bg-orange-500/10',
+};
+const beatBadge = (type: string): string => BEAT_BADGE[type] ?? 'text-teal-700 bg-teal-500/10';
+
 type DoneMeta = { scaffold?: boolean; grade?: number; mastered?: boolean; masteryScore?: number };
 
 // Generic SSE reader: streams text tokens, captures the final done-event metadata,
@@ -203,7 +218,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
       {/* Beat Context Strip */}
       {currentBeat && !isMastered && (
         <div className="bg-muted/50 border-b border-border px-4 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center gap-2 justify-center">
-          <span className="text-xs font-bold uppercase tracking-wider text-primary bg-primary/10 px-2 py-1 rounded-sm w-fit">
+          <span className={cn("text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm w-fit", beatBadge(currentBeat.type))}>
             {currentBeat.type.replace('_', ' ')}
           </span>
           <span className="text-sm font-medium text-foreground">{currentBeat.title}</span>
