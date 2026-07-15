@@ -8,7 +8,7 @@
  * analytics) can scope to them.
  */
 import { db } from "@workspace/db";
-import { courseGroupsTable, courseGroupMembersTable, coursesTable } from "@workspace/db";
+import { courseGroupsTable, courseGroupMembersTable, coursesTable, funderScopesTable } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import {
   isSuperAdmin,
@@ -20,6 +20,15 @@ import {
 
 /** A user identity that can be scope-checked against courses/sections. */
 export type StaffUser = ScopedUser & { id: string };
+
+/** Organisation ids a funder is authorised to see aggregate outcomes for (§10.2). */
+export async function funderOrgIds(funderId: string): Promise<string[]> {
+  const rows = await db
+    .select({ organisationId: funderScopesTable.organisationId })
+    .from(funderScopesTable)
+    .where(eq(funderScopesTable.funderId, funderId));
+  return [...new Set(rows.map((r) => r.organisationId))];
+}
 
 /** Group (section) ids this user leads. */
 export async function leaderGroupIds(userId: string): Promise<Set<string>> {

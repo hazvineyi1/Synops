@@ -11,6 +11,10 @@ export const userRoleEnum = pgEnum("user_role", [
   // Instructional Design Hub tier (decision doc §3). Hub-only authoring role, off the
   // delivery chain. Enum value added additively via migration-role-instructional-designer.sql.
   "instructional_designer",
+  // Funder / sponsor tier (decision doc §10.2). Read-only, aggregate outcomes scoped to
+  // funded orgs/programs; sits ALONGSIDE the delivery chain, never inside it. Added via
+  // migration-role-funder.sql.
+  "funder",
 ]);
 
 export const coachPersonalityEnum = pgEnum("coach_personality", [

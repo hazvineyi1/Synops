@@ -18,6 +18,7 @@ export const ROLE = {
   COACH: "coach",
   LEARNER: "learner",
   INSTRUCTIONAL_DESIGNER: "instructional_designer",
+  FUNDER: "funder",
 } as const;
 
 export type Role = (typeof ROLE)[keyof typeof ROLE];
@@ -36,6 +37,12 @@ export const isFacilitator = (r: string): boolean => r === ROLE.ORG_ADMIN || r =
 export const isCoFacilitator = (r: string): boolean => r === ROLE.COACH;
 export const isInstructionalDesigner = (r: string): boolean => r === ROLE.INSTRUCTIONAL_DESIGNER;
 export const isLearner = (r: string): boolean => r === ROLE.LEARNER;
+/**
+ * Funder / sponsor tier (decision doc §10.2). Deliberately excluded from every delivery
+ * and Hub predicate above — a funder gets read-only aggregate reporting via its own
+ * scoped endpoints and nothing else. It sits ALONGSIDE the hierarchy, not inside it.
+ */
+export const isFunder = (r: string): boolean => r === ROLE.FUNDER;
 
 /** Facilitator or above — may administer an organization's delivery layer. */
 export const canAdministerOrg = (r: string): boolean => isSuperAdmin(r) || isFacilitator(r);

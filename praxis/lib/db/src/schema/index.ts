@@ -26,3 +26,4 @@ export * from "./support";
 export * from "./media";
 export * from "./spaced_repetition";
 export * from "./whatsapp";
+export * from "./funder";

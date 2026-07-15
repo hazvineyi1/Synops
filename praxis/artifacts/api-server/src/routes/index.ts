@@ -31,6 +31,7 @@ import progressRouter from "./progress";
 import activitiesRouter from "./activities";
 import supportRouter from "./support";
 import whatsappRouter from "./whatsapp";
+import funderRouter from "./funder";
 import devRouter from "./dev";
 
 const router = Router();
@@ -67,6 +68,7 @@ router.use(progressRouter);
 router.use(activitiesRouter);
 router.use(supportRouter);
 router.use(whatsappRouter);
+router.use(funderRouter);
 router.use(devRouter);
 
 export default router;
