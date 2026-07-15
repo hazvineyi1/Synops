@@ -45,6 +45,7 @@ const TABS = [
   { id: "activity", label: "Login activity" },
   { id: "audit", label: "Audit log" },
   { id: "access", label: "Access requests" },
+  { id: "prompts", label: "Prompt templates" },
   { id: "keys", label: "API keys" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
@@ -417,6 +418,86 @@ function ActivityTab() {
 
 /* ───────────────────────── Audit log ───────────────────────── */
 
+/* ───────────────────────── Prompt templates ───────────────────────── */
+
+function PromptTemplatesTab() {
+  const qc = useQueryClient();
+  const { data: orgs } = useQuery({ queryKey: ["platform", "orgs"], queryFn: () => platformApi.orgOptions() });
+  const [orgId, setOrgId] = useState("");
+  const { data: templates } = useQuery({
+    queryKey: ["platform", "prompt-templates", orgId],
+    queryFn: () => platformApi.promptTemplates(orgId),
+    enabled: !!orgId,
+  });
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [promptText, setPromptText] = useState("");
+
+  const create = useMutation({
+    mutationFn: () => platformApi.createPromptTemplate(orgId, { title, category: category || undefined, promptText }),
+    onSuccess: () => {
+      setTitle("");
+      setCategory("");
+      setPromptText("");
+      qc.invalidateQueries({ queryKey: ["platform", "prompt-templates", orgId] });
+    },
+  });
+  const del = useMutation({
+    mutationFn: (id: string) => platformApi.deletePromptTemplate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["platform", "prompt-templates", orgId] }),
+  });
+
+  const selCls = "w-full h-10 rounded-md border border-input bg-background px-3 text-sm";
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-4">
+        <select value={orgId} onChange={(e) => setOrgId(e.target.value)} className={selCls}>
+          <option value="">Select an organisation…</option>
+          {(orgs ?? []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+        </select>
+      </Card>
+
+      {orgId && (
+        <>
+          <Card className="p-4 space-y-3">
+            <p className="font-medium text-sm">New template</p>
+            <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input placeholder="Category (optional)" value={category} onChange={(e) => setCategory(e.target.value)} />
+            <textarea
+              placeholder="Prompt text — a reusable Socratic system-prompt snippet for this organisation"
+              value={promptText}
+              onChange={(e) => setPromptText(e.target.value)}
+              rows={4}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <Button size="sm" onClick={() => create.mutate()} disabled={!title || !promptText || create.isPending}>Add template</Button>
+          </Card>
+
+          <Card className="divide-y divide-border">
+            {(templates ?? []).length === 0 ? (
+              <div className="px-4 py-10 text-center text-muted-foreground">No templates for this organisation yet.</div>
+            ) : (
+              (templates ?? []).map((t) => (
+                <div key={t.id} className="p-4 flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {t.title} <span className="text-xs text-muted-foreground font-normal">· {t.category}</span>
+                    </p>
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">{t.promptText}</p>
+                    {t.createdByName && <p className="text-xs text-muted-foreground/70 mt-1">by {t.createdByName}</p>}
+                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => del.mutate(t.id)} className="text-red-600 shrink-0">Delete</Button>
+                </div>
+              ))
+            )}
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ───────────────────────── Access requests ───────────────────────── */
 
 function AccessRequestsTab() {
@@ -675,6 +756,7 @@ export function PlatformConsole() {
       {tab === "activity" && <ActivityTab />}
       {tab === "audit" && <AuditTab />}
       {tab === "access" && <AccessRequestsTab />}
+      {tab === "prompts" && <PromptTemplatesTab />}
       {tab === "keys" && <ApiKeysTab />}
 
       <UserDialog user={selected} onClose={() => setSelected(null)} />

@@ -30,3 +30,4 @@ export * from "./funder";
 export * from "./delivery";
 export * from "./compliance";
 export * from "./access_requests";
+export * from "./prompt_templates";

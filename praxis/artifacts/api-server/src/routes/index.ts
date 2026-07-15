@@ -35,6 +35,7 @@ import funderRouter from "./funder";
 import deliveryRouter from "./delivery";
 import complianceRouter from "./compliance";
 import accessRequestsRouter from "./accessRequests";
+import promptTemplatesRouter from "./promptTemplates";
 import devRouter from "./dev";
 
 const router = Router();
@@ -75,6 +76,7 @@ router.use(funderRouter);
 router.use(deliveryRouter);
 router.use(complianceRouter);
 router.use(accessRequestsRouter);
+router.use(promptTemplatesRouter);
 router.use(devRouter);
 
 export default router;

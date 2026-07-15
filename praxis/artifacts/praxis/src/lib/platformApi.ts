@@ -41,6 +41,18 @@ export interface AccessRequestRow {
   createdAt: string;
 }
 
+export interface PromptTemplateRow {
+  id: string;
+  organisationId: string;
+  createdByName: string | null;
+  title: string;
+  category: string;
+  description: string;
+  promptText: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PlatformOverview {
   users: { total: number; active: number; suspended: number; invited: number; noPassword: number };
   partners: number;
@@ -187,6 +199,12 @@ export const platformApi = {
       method: "PATCH",
       body: JSON.stringify({ status, note }),
     }),
+
+  orgOptions: () => req<{ id: string; name: string }[]>("/organisations"),
+  promptTemplates: (orgId: string) => req<PromptTemplateRow[]>(`/orgs/${orgId}/prompt-templates`),
+  createPromptTemplate: (orgId: string, body: { title: string; category?: string; description?: string; promptText: string }) =>
+    req<PromptTemplateRow>(`/orgs/${orgId}/prompt-templates`, { method: "POST", body: JSON.stringify(body) }),
+  deletePromptTemplate: (id: string) => req<void>(`/prompt-templates/${id}`, { method: "DELETE" }),
 
   listApiKeys: () => req<ApiKey[]>("/platform/api-keys"),
   createApiKey: (name: string, partnerId?: string | null) =>
