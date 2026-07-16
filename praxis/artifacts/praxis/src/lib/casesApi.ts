@@ -29,6 +29,8 @@ export interface CaseRow {
   aiConstraints: string | null;
   guidingInstructions: string | null;
   aiPersona: string | null;
+  tutorName: string | null;
+  tutorAvatar: string | null;
   difficulty: "foundational" | "intermediate" | "advanced";
   bloomsLevel: string | null;
   promptLimit: number;
@@ -63,6 +65,10 @@ export interface CaseSessionRow {
   rubricScores: CaseRubricScore[];
   createdAt: string;
   completedAt: string | null;
+  // Present on session start + fetch so the runtime can show the tutor.
+  tutorName?: string | null;
+  tutorAvatar?: string | null;
+  caseTitle?: string | null;
 }
 
 export interface EmbedLink {

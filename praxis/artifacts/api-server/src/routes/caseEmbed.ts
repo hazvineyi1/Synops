@@ -74,6 +74,8 @@ router.get("/case-embed/:token", async (req, res) => {
     contextBlock: caseRow.contextBlock,
     difficulty: caseRow.difficulty,
     promptLimit: caseRow.promptLimit,
+    tutorName: caseRow.tutorName,
+    tutorAvatar: caseRow.tutorAvatar,
   });
 });
 

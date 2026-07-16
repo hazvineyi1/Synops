@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { casesApi, streamCaseTurn, type CaseMessage, type CaseSessionRow } from "@/lib/casesApi";
-import { ArrowLeft, Send, Sparkles, CheckCircle2, TrendingUp } from "lucide-react";
+import { TutorAvatar, tutorGender } from "@/components/TutorAvatar";
+import { useSpeech } from "@/lib/speech";
+import { ArrowLeft, Send, Sparkles, CheckCircle2, TrendingUp, Volume2, VolumeX } from "lucide-react";
 
 export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const sessionId = params?.sessionId ?? "";
@@ -23,6 +25,12 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const [analysis, setAnalysis] = useState<CaseSessionRow | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { speak, cancel, speaking, muted, setMuted, supported } = useSpeech();
+
+  const tutorName = data?.tutorName || "Your coach";
+  const tutorAvatar = data?.tutorAvatar || "f1";
+  const gender = tutorGender(tutorAvatar);
+  const spokeOpening = useRef(false);
 
   useEffect(() => {
     if (!data) return;
@@ -31,25 +39,34 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     setPromptLimit(data.promptLimit);
     setBudgetReached(data.promptCount >= data.promptLimit);
     if (data.status === "completed" && data.engagementNarrative) setAnalysis(data);
-  }, [data]);
+    // Speak the opening question once, when the session first loads.
+    if (!spokeOpening.current && data.status !== "completed") {
+      const lastTutor = [...(data.messages ?? [])].reverse().find((m) => m.role === "tutor");
+      if (lastTutor?.content) speak(lastTutor.content, tutorGender(data.tutorAvatar || "f1"));
+      spokeOpening.current = true;
+    }
+  }, [data, speak]);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, streaming]);
 
   const send = async () => {
     const text = input.trim();
     if (!text || streaming) return;
+    cancel(); // stop any in-progress speech before the next turn
     setInput("");
     setMessages((m) => [...m, { role: "learner", content: text }, { role: "tutor", content: "" }]);
     setStreaming(true);
+    let acc = "";
     await streamCaseTurn(
       `/case-sessions/${sessionId}/message`,
       { response: text },
-      (tok) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { ...c[c.length - 1], content: c[c.length - 1].content + tok }; return c; }),
+      (tok) => { acc += tok; setMessages((m) => { const c = [...m]; c[c.length - 1] = { ...c[c.length - 1], content: c[c.length - 1].content + tok }; return c; }); },
       (meta) => {
         setStreaming(false);
         if (meta.error) { toast({ title: "Something went wrong", description: meta.error, variant: "destructive" }); return; }
         if (typeof meta.promptCount === "number") setPromptCount(meta.promptCount);
         if (meta.budgetReached) setBudgetReached(true);
+        if (acc.trim()) speak(acc, gender); // the tutor "speaks" its question
       }
     );
   };
@@ -71,11 +88,23 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "hsl(43 30% 97%)" }}>
-      <header className="flex items-center justify-between px-4 h-14 border-b bg-white/80 backdrop-blur">
+      <header className="flex items-center justify-between px-4 h-16 border-b bg-white/80 backdrop-blur">
         <Link href="/cases"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1.5" /> Exit</Button></Link>
+        <div className="flex items-center gap-2.5">
+          <TutorAvatar avatar={tutorAvatar} size={40} speaking={speaking} ring />
+          <div className="leading-tight">
+            <p className="text-sm font-medium">{tutorName}</p>
+            <p className="text-[11px] text-muted-foreground">{speaking ? "speaking…" : "your Socratic coach"}</p>
+          </div>
+        </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">{promptCount} / {promptLimit} exchanges</span>
-          <div className="w-28 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "hsl(145 45% 42%)" : "hsl(222 47% 30%)" }} /></div>
+          {supported && (
+            <button onClick={() => setMuted(!muted)} title={muted ? "Unmute tutor" : "Mute tutor"} className="text-muted-foreground hover:text-foreground">
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+          )}
+          <span className="text-xs text-muted-foreground hidden sm:inline">{promptCount} / {promptLimit}</span>
+          <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "hsl(145 45% 42%)" : "hsl(222 47% 30%)" }} /></div>
         </div>
       </header>
 

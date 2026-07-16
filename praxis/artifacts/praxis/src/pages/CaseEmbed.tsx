@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { API } from "@/lib/api";
 import { streamCaseTurn, type CaseMessage, type CaseSessionRow } from "@/lib/casesApi";
 import { Button } from "@/components/ui/button";
-import { Send, Sparkles } from "lucide-react";
+import { Send, Sparkles, Volume2, VolumeX } from "lucide-react";
 import { AnalysisView } from "@/pages/CaseSession";
+import { TutorAvatar, tutorGender } from "@/components/TutorAvatar";
+import { useSpeech } from "@/lib/speech";
 
 interface PublicCase {
   token: string;
@@ -12,6 +14,8 @@ interface PublicCase {
   contextBlock: string;
   difficulty: string;
   promptLimit: number;
+  tutorName: string | null;
+  tutorAvatar: string | null;
 }
 
 /**
@@ -34,6 +38,10 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
   const [analysis, setAnalysis] = useState<CaseSessionRow | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { speak, cancel, speaking, muted, setMuted, supported } = useSpeech();
+  const tutorName = caseData?.tutorName || "Your coach";
+  const tutorAvatar = caseData?.tutorAvatar || "f1";
+  const gender = tutorGender(tutorAvatar);
 
   useEffect(() => {
     fetch(`${API}/case-embed/${token}`, { credentials: "include" })
@@ -53,6 +61,8 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
       setSessionId(d.sessionId);
       setMessages(d.messages ?? []);
       setPromptCount(d.promptCount ?? 0);
+      const opening = [...(d.messages ?? [])].reverse().find((m: CaseMessage) => m.role === "tutor");
+      if (opening?.content) speak(opening.content, gender);
     } catch (e) { setError(e instanceof Error ? e.message : "Could not start"); }
     finally { setStarting(false); }
   };
@@ -60,18 +70,21 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
   const send = async () => {
     const text = input.trim();
     if (!text || streaming || !sessionId) return;
+    cancel();
     setInput("");
     setMessages((m) => [...m, { role: "learner", content: text }, { role: "tutor", content: "" }]);
     setStreaming(true);
+    let acc = "";
     await streamCaseTurn(
       `/case-embed/${token}/chat`,
       { sessionId, response: text },
-      (tok) => setMessages((m) => { const c = [...m]; c[c.length - 1] = { ...c[c.length - 1], content: c[c.length - 1].content + tok }; return c; }),
+      (tok) => { acc += tok; setMessages((m) => { const c = [...m]; c[c.length - 1] = { ...c[c.length - 1], content: c[c.length - 1].content + tok }; return c; }); },
       (meta) => {
         setStreaming(false);
         if (meta.error) { setError(meta.error); return; }
         if (typeof meta.promptCount === "number") setPromptCount(meta.promptCount);
         if (meta.budgetReached) setBudgetReached(true);
+        if (acc.trim()) speak(acc, gender);
       }
     );
   };
@@ -120,11 +133,22 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
   const pct = Math.min(100, Math.round((promptCount / promptLimit) * 100));
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "hsl(43 30% 97%)" }}>
-      <header className="flex items-center justify-between px-4 h-14 border-b bg-white/80 backdrop-blur">
-        <span className="font-serif font-semibold text-sm truncate">{caseData.title}</span>
+      <header className="flex items-center justify-between px-4 h-16 border-b bg-white/80 backdrop-blur">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <TutorAvatar avatar={tutorAvatar} size={40} speaking={speaking} ring />
+          <div className="leading-tight min-w-0">
+            <p className="text-sm font-medium truncate">{tutorName}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{speaking ? "speaking…" : caseData.title}</p>
+          </div>
+        </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">{promptCount} / {promptLimit}</span>
-          <div className="w-24 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "hsl(145 45% 42%)" : "hsl(222 47% 30%)" }} /></div>
+          {supported && (
+            <button onClick={() => setMuted(!muted)} title={muted ? "Unmute tutor" : "Mute tutor"} className="text-muted-foreground hover:text-foreground">
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+          )}
+          <span className="text-xs text-muted-foreground hidden sm:inline">{promptCount} / {promptLimit}</span>
+          <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden"><div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "hsl(145 45% 42%)" : "hsl(222 47% 30%)" }} /></div>
         </div>
       </header>
 

@@ -15,6 +15,7 @@ import {
   type EmbedLink,
 } from "@/lib/casesApi";
 import { API } from "@/lib/api";
+import { AvatarPicker, TutorAvatar } from "@/components/TutorAvatar";
 import { ArrowLeft, Sparkles, Plus, Trash2, Copy, Link2, Play } from "lucide-react";
 
 type Tab = "case" | "rubric" | "share";
@@ -66,6 +67,8 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
       guidingInstructions: data.guidingInstructions ?? "",
       aiConstraints: data.aiConstraints ?? "",
       aiPersona: data.aiPersona ?? "",
+      tutorName: data.tutorName ?? "",
+      tutorAvatar: data.tutorAvatar ?? "",
       difficulty: data.difficulty,
       promptLimit: data.promptLimit,
       status: data.status,
@@ -157,6 +160,15 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
               ))}
             </div>
             <textarea className={inputCls} rows={2} value={form.aiPersona ?? ""} onChange={(e) => set("aiPersona", e.target.value)} placeholder="e.g. a pragmatic small-business finance mentor who thinks in cash flow, margins and runway" />
+          </Field>
+          <Field label="Tutor name & face" hint="Name the tutor and give it a face — learners see and hear it during the session. Pick a preset or upload your own.">
+            <div className="flex items-center gap-4">
+              <TutorAvatar avatar={form.tutorAvatar || "f1"} size={56} />
+              <Input className="max-w-xs" value={form.tutorName ?? ""} onChange={(e) => set("tutorName", e.target.value)} placeholder="e.g. Coach Naledi" />
+            </div>
+            <div className="mt-3">
+              <AvatarPicker value={form.tutorAvatar || null} onChange={(v) => set("tutorAvatar", v ?? "")} />
+            </div>
           </Field>
           <Field label="Context / fact pattern" hint="The scenario the learner works through. The AI grounds every question strictly in this.">
             <textarea className={inputCls} rows={6} value={form.contextBlock ?? ""} onChange={(e) => set("contextBlock", e.target.value)} />

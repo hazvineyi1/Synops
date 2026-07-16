@@ -78,6 +78,8 @@ function caseResponse(c: CaseScenario) {
     aiConstraints: c.aiConstraints,
     guidingInstructions: c.guidingInstructions,
     aiPersona: c.aiPersona,
+    tutorName: c.tutorName,
+    tutorAvatar: c.tutorAvatar,
     difficulty: c.difficulty,
     bloomsLevel: c.bloomsLevel,
     promptLimit: c.promptLimit,
@@ -160,6 +162,8 @@ router.post("/cases", requireAuth, async (req, res) => {
       aiConstraints: b.aiConstraints ?? null,
       guidingInstructions: b.guidingInstructions ?? null,
       aiPersona: b.aiPersona ?? null,
+      tutorName: b.tutorName ?? null,
+      tutorAvatar: b.tutorAvatar ?? null,
       difficulty: ["foundational", "intermediate", "advanced"].includes(b.difficulty) ? b.difficulty : "intermediate",
       bloomsLevel: b.bloomsLevel ?? null,
       promptLimit: Number.isFinite(b.promptLimit) ? Math.max(3, Math.min(20, Math.round(b.promptLimit))) : 8,
@@ -189,6 +193,8 @@ router.put("/cases/:id", requireAuth, async (req, res) => {
   assign("aiConstraints", b.aiConstraints);
   assign("guidingInstructions", b.guidingInstructions);
   assign("aiPersona", b.aiPersona);
+  assign("tutorName", b.tutorName);
+  assign("tutorAvatar", b.tutorAvatar);
   if (b.difficulty !== undefined && ["foundational", "intermediate", "advanced"].includes(b.difficulty)) up.difficulty = b.difficulty;
   assign("bloomsLevel", b.bloomsLevel);
   if (b.promptLimit !== undefined && Number.isFinite(b.promptLimit)) up.promptLimit = Math.max(3, Math.min(20, Math.round(b.promptLimit)));
@@ -241,6 +247,8 @@ router.post("/cases/:id/fork", requireAuth, async (req, res) => {
       aiConstraints: c.aiConstraints,
       guidingInstructions: c.guidingInstructions,
       aiPersona: c.aiPersona,
+      tutorName: c.tutorName,
+      tutorAvatar: c.tutorAvatar,
       difficulty: c.difficulty,
       bloomsLevel: c.bloomsLevel,
       promptLimit: c.promptLimit,
@@ -393,7 +401,7 @@ router.post("/cases/:id/sessions", requireAuth, async (req, res) => {
     .insert(caseSessionsTable)
     .values({ caseId: c.id, organisationId: c.organisationId, userId: u.id, learnerName: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email, messages, promptLimit: c.promptLimit, status: "in_progress" })
     .returning();
-  res.status(201).json(sessionResponse(s));
+  res.status(201).json({ ...sessionResponse(s), tutorName: c.tutorName, tutorAvatar: c.tutorAvatar, caseTitle: c.title });
 });
 
 // GET /case-sessions/my
@@ -417,11 +425,11 @@ router.get("/case-sessions/:id", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const s = await db.query.caseSessionsTable.findFirst({ where: eq(caseSessionsTable.id, req.params.id) });
   if (!s) { res.status(404).json({ error: "Not found" }); return; }
+  const cs = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, s.caseId) });
   if (s.userId !== u.id) {
-    const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, s.caseId) });
-    if (!c || !canManageCase(u, c)) { res.status(404).json({ error: "Not found" }); return; }
+    if (!cs || !canManageCase(u, cs)) { res.status(404).json({ error: "Not found" }); return; }
   }
-  res.json(sessionResponse(s));
+  res.json({ ...sessionResponse(s), tutorName: cs?.tutorName ?? null, tutorAvatar: cs?.tutorAvatar ?? null, caseTitle: cs?.title ?? null });
 });
 
 // POST /case-sessions/:id/message — SSE streaming Socratic turn.

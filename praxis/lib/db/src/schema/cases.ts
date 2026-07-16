@@ -51,6 +51,10 @@ export const caseScenariosTable = pgTable("case_scenarios", {
    * come from. Null = a neutral entrepreneurship mentor.
    */
   aiPersona: text("ai_persona"),
+  /** Tutor display name (e.g. "Coach Naledi"). Null = a default name. */
+  tutorName: text("tutor_name"),
+  /** Tutor face: a preset key (f1/f2/f3/m1/m2/m3) or a data:/https image URL for a custom upload. */
+  tutorAvatar: text("tutor_avatar"),
   difficulty: text("difficulty", { enum: ["foundational", "intermediate", "advanced"] }).notNull().default("intermediate"),
   bloomsLevel: text("blooms_level"),
   promptLimit: integer("prompt_limit").notNull().default(8),
