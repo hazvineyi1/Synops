@@ -33,9 +33,15 @@ export function appUrl(path: string): string {
   return `${base.replace(/\/$/, "")}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
-/** Send one email. Never throws; returns whether it was actually sent. */
-export async function sendMail(mail: Mail): Promise<boolean> {
-  if (!mailerConfigured()) return false;
+export interface SendResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+}
+
+/** Send one email. Never throws; returns whether it was actually sent (+ error detail). */
+export async function sendMail(mail: Mail): Promise<SendResult> {
+  if (!mailerConfigured()) return { ok: false, error: "Mailer not configured (RESEND_API_KEY + EMAIL_FROM)." };
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -52,13 +58,15 @@ export async function sendMail(mail: Mail): Promise<boolean> {
       }),
     });
     if (!res.ok) {
-      console.warn(`[mailer] Resend responded ${res.status}: ${await res.text().catch(() => "")}`);
-      return false;
+      const body = await res.text().catch(() => "");
+      console.warn(`[mailer] Resend responded ${res.status}: ${body}`);
+      return { ok: false, status: res.status, error: body.slice(0, 400) };
     }
-    return true;
+    return { ok: true, status: res.status };
   } catch (e) {
-    console.warn(`[mailer] send failed: ${(e as Error)?.message ?? e}`);
-    return false;
+    const error = (e as Error)?.message ?? String(e);
+    console.warn(`[mailer] send failed: ${error}`);
+    return { ok: false, error };
   }
 }
 

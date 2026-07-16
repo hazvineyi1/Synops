@@ -418,9 +418,10 @@ router.post("/gradebook/test-email", requireAuth, async (req, res) => {
     res.json({ configured: false, sent: false, message: "Set RESEND_API_KEY and EMAIL_FROM to enable email." });
     return;
   }
-  const to = u.email;
-  if (!to) { res.status(400).json({ error: "Your account has no email address." }); return; }
-  const sent = await sendMail({
+  const override = (typeof req.body?.to === "string" && req.body.to.trim()) || (typeof req.query.to === "string" && req.query.to.trim());
+  const to = override || u.email;
+  if (!to) { res.status(400).json({ error: "No recipient — pass a 'to' or set an email on your account." }); return; }
+  const r = await sendMail({
     to,
     subject: "Praxis email is working",
     html: emailShell({
@@ -430,7 +431,7 @@ router.post("/gradebook/test-email", requireAuth, async (req, res) => {
       ctaUrl: appUrl("/"),
     }),
   });
-  res.json({ configured: true, sent, to });
+  res.json({ configured: true, sent: r.ok, to, status: r.status, error: r.error, from: process.env.EMAIL_FROM });
 });
 
 // ── Learner marks a study-plan step done ────────────────────────────────────────
