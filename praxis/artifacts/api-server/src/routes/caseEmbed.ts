@@ -50,6 +50,7 @@ function ctx(c: CaseScenario, learnerName: string | null, turnCount: number): Ca
     focusAreas: c.focusAreas,
     aiConstraints: c.aiConstraints,
     guidingInstructions: c.guidingInstructions,
+    aiPersona: c.aiPersona,
     promptLimit: c.promptLimit,
     learnerName,
     turnCount,

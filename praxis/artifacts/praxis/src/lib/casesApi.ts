@@ -28,6 +28,7 @@ export interface CaseRow {
   focusAreas: string[];
   aiConstraints: string | null;
   guidingInstructions: string | null;
+  aiPersona: string | null;
   difficulty: "foundational" | "intermediate" | "advanced";
   bloomsLevel: string | null;
   promptLimit: number;

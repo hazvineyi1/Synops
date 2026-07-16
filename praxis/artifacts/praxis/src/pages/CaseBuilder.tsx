@@ -31,6 +31,18 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const inputCls = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
+// Convenience starting points for the AI persona — content-agnostic across entrepreneurship
+// skills. Authors can use one as-is, tweak it, or write their own from scratch.
+const PERSONA_PRESETS: { label: string; value: string }[] = [
+  { label: "Finance & cash flow", value: "a pragmatic small-business finance mentor who thinks in cash flow, margins and runway" },
+  { label: "Sales & customers", value: "a seasoned sales and customer-discovery coach who has closed and lost many deals" },
+  { label: "Marketing & growth", value: "a scrappy growth-marketing strategist focused on cheap, testable ways to reach customers" },
+  { label: "Operations & suppliers", value: "an operations mentor focused on process, suppliers and reliable on-time delivery" },
+  { label: "Business law & contracts", value: "a plain-language business-law advisor who helps founders reason about risk and agreements" },
+  { label: "Product & validation", value: "a product mentor focused on validating an idea and iterating before building" },
+  { label: "People & leadership", value: "a people-and-leadership coach who helps founders hire, delegate and lead a small team" },
+];
+
 export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
   const caseId = params?.caseId ?? "";
   const { user } = useSession();
@@ -53,6 +65,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
       focusAreas: data.focusAreas ?? [],
       guidingInstructions: data.guidingInstructions ?? "",
       aiConstraints: data.aiConstraints ?? "",
+      aiPersona: data.aiPersona ?? "",
       difficulty: data.difficulty,
       promptLimit: data.promptLimit,
       status: data.status,
@@ -128,6 +141,22 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
           <Field label="Title"><Input value={form.title ?? ""} onChange={(e) => set("title", e.target.value)} /></Field>
           <Field label="Learning objective" hint="What should the learner be able to reason about after this case?">
             <textarea className={inputCls} rows={2} value={form.learningObjective ?? ""} onChange={(e) => set("learningObjective", e.target.value)} />
+          </Field>
+          <Field label="AI persona" hint="Who the tutor is for this case — the expert lens its questions come from. Pick a starting point or write your own. Leave blank for a neutral entrepreneurship mentor.">
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {PERSONA_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => set("aiPersona", p.value)}
+                  className="text-xs px-2.5 py-1 rounded-full border transition-colors hover:bg-muted"
+                  style={{ borderColor: "hsl(43 15% 85%)", color: "hsl(43 10% 40%)" }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <textarea className={inputCls} rows={2} value={form.aiPersona ?? ""} onChange={(e) => set("aiPersona", e.target.value)} placeholder="e.g. a pragmatic small-business finance mentor who thinks in cash flow, margins and runway" />
           </Field>
           <Field label="Context / fact pattern" hint="The scenario the learner works through. The AI grounds every question strictly in this.">
             <textarea className={inputCls} rows={6} value={form.contextBlock ?? ""} onChange={(e) => set("contextBlock", e.target.value)} />

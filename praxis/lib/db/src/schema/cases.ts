@@ -45,6 +45,12 @@ export const caseScenariosTable = pgTable("case_scenarios", {
   focusAreas: text("focus_areas").array(),
   aiConstraints: text("ai_constraints"),
   guidingInstructions: text("guiding_instructions"),
+  /**
+   * Content-agnostic AI persona: WHO the tutor is for this case (e.g. "a pragmatic
+   * small-business finance mentor"). Sets the domain-expert lens the Socratic questions
+   * come from. Null = a neutral entrepreneurship mentor.
+   */
+  aiPersona: text("ai_persona"),
   difficulty: text("difficulty", { enum: ["foundational", "intermediate", "advanced"] }).notNull().default("intermediate"),
   bloomsLevel: text("blooms_level"),
   promptLimit: integer("prompt_limit").notNull().default(8),

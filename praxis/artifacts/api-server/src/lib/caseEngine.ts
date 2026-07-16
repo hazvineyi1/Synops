@@ -21,6 +21,8 @@ export interface CaseContext {
   focusAreas?: string[] | null;
   aiConstraints?: string | null;
   guidingInstructions?: string | null;
+  /** Domain-expert identity for the tutor (content-agnostic). Null = neutral mentor. */
+  aiPersona?: string | null;
   promptLimit?: number | null;
   // Learner personalisation — present for authenticated sessions, absent for embed.
   learnerName?: string | null;
@@ -48,10 +50,22 @@ function toSocraticContext(c: CaseContext): SocraticContext {
   };
 }
 
+/** A neutral, domain-agnostic default so a case with no persona still isn't "legal-flavoured". */
+const DEFAULT_PERSONA = "a pragmatic entrepreneurship mentor who has built and advised small businesses";
+
 /** Full system prompt for a case turn: shared Socratic rules + case-specific overlays. */
 export function buildCaseSystemPrompt(c: CaseContext, isOpening: boolean): string {
   let prompt = buildSocraticSystemPrompt(toSocraticContext(c), isOpening);
   const extra: string[] = [];
+
+  // Domain-expert identity — set FIRST so every question comes from the right professional
+  // lens (finance, sales, ops, marketing, law, etc.), while the Socratic rules above still
+  // bind. Content-agnostic: whatever the author supplies, or a neutral mentor by default.
+  const persona = c.aiPersona?.trim() || DEFAULT_PERSONA;
+  extra.push(
+    `EXPERT PERSONA - for this case you ARE ${persona}. Ask from that professional's expertise, judgement and vocabulary. This shapes WHAT you probe and HOW you frame it, but you still obey every Socratic rule above: questions only, never lecture, never give the answer.`
+  );
+
   if (c.focusAreas?.length) {
     extra.push("FOCUS AREAS (steer the learner's reasoning toward these, one at a time): " + c.focusAreas.join("; ") + ".");
   }

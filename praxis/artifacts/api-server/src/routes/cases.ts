@@ -77,6 +77,7 @@ function caseResponse(c: CaseScenario) {
     focusAreas: c.focusAreas ?? [],
     aiConstraints: c.aiConstraints,
     guidingInstructions: c.guidingInstructions,
+    aiPersona: c.aiPersona,
     difficulty: c.difficulty,
     bloomsLevel: c.bloomsLevel,
     promptLimit: c.promptLimit,
@@ -153,6 +154,7 @@ router.post("/cases", requireAuth, async (req, res) => {
       focusAreas: Array.isArray(b.focusAreas) ? b.focusAreas : null,
       aiConstraints: b.aiConstraints ?? null,
       guidingInstructions: b.guidingInstructions ?? null,
+      aiPersona: b.aiPersona ?? null,
       difficulty: ["foundational", "intermediate", "advanced"].includes(b.difficulty) ? b.difficulty : "intermediate",
       bloomsLevel: b.bloomsLevel ?? null,
       promptLimit: Number.isFinite(b.promptLimit) ? Math.max(3, Math.min(20, Math.round(b.promptLimit))) : 8,
@@ -181,6 +183,7 @@ router.put("/cases/:id", requireAuth, async (req, res) => {
   if (b.focusAreas !== undefined) up.focusAreas = Array.isArray(b.focusAreas) ? b.focusAreas : null;
   assign("aiConstraints", b.aiConstraints);
   assign("guidingInstructions", b.guidingInstructions);
+  assign("aiPersona", b.aiPersona);
   if (b.difficulty !== undefined && ["foundational", "intermediate", "advanced"].includes(b.difficulty)) up.difficulty = b.difficulty;
   assign("bloomsLevel", b.bloomsLevel);
   if (b.promptLimit !== undefined && Number.isFinite(b.promptLimit)) up.promptLimit = Math.max(3, Math.min(20, Math.round(b.promptLimit)));
@@ -224,6 +227,7 @@ router.post("/cases/:id/fork", requireAuth, async (req, res) => {
       focusAreas: c.focusAreas,
       aiConstraints: c.aiConstraints,
       guidingInstructions: c.guidingInstructions,
+      aiPersona: c.aiPersona,
       difficulty: c.difficulty,
       bloomsLevel: c.bloomsLevel,
       promptLimit: c.promptLimit,
@@ -353,6 +357,7 @@ function ctxFromCase(c: CaseScenario, learner: U | null, turnCount: number): Cas
     focusAreas: c.focusAreas,
     aiConstraints: c.aiConstraints,
     guidingInstructions: c.guidingInstructions,
+    aiPersona: c.aiPersona,
     promptLimit: c.promptLimit,
     learnerName: learner?.firstName ?? null,
     personality: (learner as unknown as { coachPersonality?: string } | null)?.coachPersonality ?? null,
