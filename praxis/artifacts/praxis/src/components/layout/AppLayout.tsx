@@ -206,6 +206,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
             { label: t('nav.learners', 'Coaching'), href: '/coach', icon: Users },
             { label: t('nav.submissions', 'Submissions'), href: '/coach/submissions', icon: FileText },
+            { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
             { label: t('nav.members', 'Org members'), href: '/org/members', icon: UserCog },
           ],
         },
