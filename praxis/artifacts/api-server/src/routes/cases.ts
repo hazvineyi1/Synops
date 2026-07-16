@@ -28,24 +28,37 @@ import { ensureQuestion } from "../lib/socraticEngine";
 
 const router = Router();
 
-type U = { id: string; role: string; organisationId?: string | null; firstName?: string | null; lastName?: string | null; email: string };
+type U = { id: string; role: string; organisationId?: string | null; partnerId?: string | null; firstName?: string | null; lastName?: string | null; email: string };
 
 /** Who may author cases: Hub roles (super admin + instructional designer) or a Facilitator. */
 function canAuthorCases(role: string): boolean {
   return hasHubAccess(role) || canAdministerOrg(role);
 }
 
-/** Author/manage scope for a specific case. */
-function canManageCase(user: U, c: CaseScenario): boolean {
-  if (hasHubAccess(user.role)) return true; // platform-wide authoring pool
-  if (canAdministerOrg(user.role) && !!c.organisationId && c.organisationId === user.organisationId) return true;
+/**
+ * A case's `organisationId` is a generic tenant id that may be an organisation OR a
+ * partner — exactly like a course's tenantId. Partner admins (transitional flatten) carry
+ * partnerId with a null organisationId, so a case they author is tenant-scoped to their
+ * partner. Scope checks therefore match EITHER the user's org or their partner.
+ */
+function userOwnsTenant(user: U, tenantId: string | null): boolean {
+  if (!tenantId) return false;
+  if (user.organisationId && tenantId === user.organisationId) return true;
+  if (user.partnerId && tenantId === user.partnerId) return true;
   return false;
 }
 
-/** Visible-to-run scope: a case is runnable if in the user's org OR a shared library. */
+/** Author/manage scope for a specific case. */
+function canManageCase(user: U, c: CaseScenario): boolean {
+  if (hasHubAccess(user.role)) return true; // platform-wide authoring pool
+  if (canAdministerOrg(user.role) && userOwnsTenant(user, c.organisationId)) return true;
+  return false;
+}
+
+/** Visible-to-run scope: a case is runnable if in the user's tenant OR a shared library. */
 function caseInScope(user: U, c: CaseScenario): boolean {
   if (hasHubAccess(user.role)) return true;
-  if (c.organisationId && c.organisationId === user.organisationId) return true;
+  if (userOwnsTenant(user, c.organisationId)) return true;
   if (c.isLibrary && !c.organisationId) return true;
   return false;
 }
@@ -90,6 +103,7 @@ router.get("/cases", requireAuth, async (req, res) => {
   } else {
     const conds: SQL[] = [and(eq(caseScenariosTable.isLibrary, true), isNull(caseScenariosTable.organisationId)) as SQL];
     if (u.organisationId) conds.unshift(eq(caseScenariosTable.organisationId, u.organisationId));
+    if (u.partnerId) conds.unshift(eq(caseScenariosTable.organisationId, u.partnerId));
     rows = await db
       .select()
       .from(caseScenariosTable)
@@ -122,7 +136,8 @@ router.post("/cases", requireAuth, async (req, res) => {
 
   // Hub authors may publish to the shared library (org null); facilitators author for their org.
   const isLibrary = hasHubAccess(u.role) && b.isLibrary === true;
-  const organisationId = isLibrary ? null : (u.organisationId ?? b.organisationId ?? null);
+  // Tenant = org if present, else partner (transitional flatten), else explicit body value.
+  const organisationId = isLibrary ? null : (u.organisationId ?? u.partnerId ?? b.organisationId ?? null);
 
   const [row] = await db
     .insert(caseScenariosTable)
@@ -198,7 +213,7 @@ router.post("/cases/:id/fork", requireAuth, async (req, res) => {
   const [row] = await db
     .insert(caseScenariosTable)
     .values({
-      organisationId: hasHubAccess(u.role) ? c.organisationId : (u.organisationId ?? null),
+      organisationId: hasHubAccess(u.role) ? c.organisationId : (u.organisationId ?? u.partnerId ?? null),
       moduleId: c.moduleId,
       createdBy: u.id,
       createdByName: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email,
