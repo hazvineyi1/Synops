@@ -42,6 +42,7 @@ export function CaseAssignDialog({ caseId, caseTitle, onClose }: { caseId: strin
 
   const assign = useMutation({
     mutationFn: () => casesApi.assign(caseId, {
+      tier, // super admins must specify the tier; other roles derive it server-side (ignored)
       targetIds: [...selected],
       groupId: group ?? undefined,
       dueDate: dueDate ? new Date(dueDate).toISOString() : null,
