@@ -82,7 +82,6 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
   const [bloom, setBloom] = useState<string>("");
   const [difficulty, setDifficulty] = useState<string>("");
   const [published, setPublished] = useState(false);
-  const [preview, setPreview] = useState(false);
 
   useEffect(() => {
     setTitle(activity?.title ?? seed?.title ?? "");
@@ -93,7 +92,6 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
     setBloom(activity?.bloomsLevel ?? seed?.bloomsLevel ?? "");
     setDifficulty(activity?.difficulty ?? seed?.difficulty ?? "");
     setPublished(activity?.published ?? false);
-    setPreview(false);
   }, [activity?.id, newMode, seed]);
 
   const isEmbed = source === "embed";
@@ -117,25 +115,12 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex gap-1">
-          <Button variant={preview ? "outline" : "default"} size="sm" onClick={() => setPreview(false)}><Pencil className="h-4 w-4 mr-1" />Edit</Button>
-          <Button variant={preview ? "default" : "outline"} size="sm" onClick={() => setPreview(true)}><Eye className="h-4 w-4 mr-1" />Preview</Button>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2"><Switch checked={published} onCheckedChange={setPublished} id="pub" /><Label htmlFor="pub" className="text-sm">Published</Label></div>
-          <Button size="sm" onClick={() => save.mutate()} disabled={!title.trim() || save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
-        </div>
+      <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center gap-2"><Switch checked={published} onCheckedChange={setPublished} id="pub" /><Label htmlFor="pub" className="text-sm">Published</Label></div>
+        <Button size="sm" onClick={() => save.mutate()} disabled={!title.trim() || save.isPending}>{save.isPending ? "Saving…" : "Save"}</Button>
       </div>
 
-      {preview ? (
-        <div className="space-y-2">
-          {instructions && <p className="text-muted-foreground text-sm">{instructions}</p>}
-          <ActivityPlayer html={parsed.html} embedUrl={parsed.embedUrl} disabled />
-          <p className="text-xs text-muted-foreground">Preview — submissions here are not recorded.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
+      <div className="space-y-3">
           <div>
             <Label className="text-sm">Title</Label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. UDL quick check" />
@@ -183,7 +168,6 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
             </div>
           </div>
         </div>
-      )}
     </div>
   );
 }
@@ -427,7 +411,7 @@ export function ActivitiesAdmin() {
   const [aiOpen, setAiOpen] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [assignFor, setAssignFor] = useState<Activity | null>(null);
-  const [rightTab, setRightTab] = useState<"edit" | "subs" | "share">("edit");
+  const [rightTab, setRightTab] = useState<"preview" | "edit" | "subs" | "share">("preview");
 
   const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
   const canAssign = !!user && CAN_ASSIGN.includes(user.role);
@@ -447,7 +431,7 @@ export function ActivitiesAdmin() {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {aiOpen && <AIGenerateDialog onClose={() => setAiOpen(false)} onUse={(g) => { setSeed({ title: g.title, instructions: g.instructions, html: renderActivity(g.type as InteractionType, g.spec as ActivitySpec), kind: g.type, bloomsLevel: g.bloomsLevel, difficulty: g.difficulty as Activity["difficulty"], source: "ai" }); setNewMode("html"); setCreating(true); setSelectedId(null); setRightTab("edit"); setAiOpen(false); }} />}
-      {builderOpen && <ActivityBuilder onClose={() => setBuilderOpen(false)} onCreated={(a) => { setBuilderOpen(false); setCreating(false); setSelectedId(a.id); setRightTab("edit"); }} />}
+      {builderOpen && <ActivityBuilder onClose={() => setBuilderOpen(false)} onCreated={(a) => { setBuilderOpen(false); setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} />}
       {assignFor && <ActivityAssignDialog activityId={assignFor.id} activityTitle={assignFor.title} onClose={() => setAssignFor(null)} />}
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -482,7 +466,7 @@ export function ActivitiesAdmin() {
           : (
             <div className="space-y-1">
               {activities.map((a) => (
-                <button key={a.id} onClick={() => { setCreating(false); setSelectedId(a.id); setRightTab("edit"); }}
+                <button key={a.id} onClick={() => { setCreating(false); setSelectedId(a.id); setRightTab("preview"); }}
                   className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${!creating && selectedId === a.id ? "bg-primary/10 text-primary" : "hover:bg-muted/60"}`}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-sm truncate">{a.title}</span>
@@ -499,33 +483,54 @@ export function ActivitiesAdmin() {
         </Card>
 
         <div>
-          {creating || selected ? (
+          {creating ? (
             <Card className="p-5">
-              {selected && (
-                <div className="flex items-center justify-between mb-4 border-b border-border pb-3 flex-wrap gap-2">
-                  <div className="flex gap-1">
-                    <Button variant={rightTab === "edit" ? "default" : "outline"} size="sm" onClick={() => setRightTab("edit")}><Pencil className="h-4 w-4 mr-1" />Editor</Button>
-                    <Button variant={rightTab === "subs" ? "default" : "outline"} size="sm" onClick={() => setRightTab("subs")}><Inbox className="h-4 w-4 mr-1" />Submissions</Button>
-                    <Button variant={rightTab === "share" ? "default" : "outline"} size="sm" onClick={() => setRightTab("share")}><Share2 className="h-4 w-4 mr-1" />Publish &amp; share</Button>
-                  </div>
-                  <div className="flex gap-2">
-                    {canAssign && selected.published && <Button variant="outline" size="sm" onClick={() => setAssignFor(selected)}><Share2 className="h-4 w-4 mr-1" />Assign</Button>}
-                    {selected.published && <Button variant="outline" size="sm" onClick={() => window.open(`/activities/${selected.id}/play`, "_blank")}><ExternalLink className="h-4 w-4 mr-1" /> Open as learner</Button>}
-                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => del.mutate(selected.id)}><Trash2 className="h-4 w-4" /></Button>
+              <Editor activity={null} newMode={newMode} seed={seed} onSaved={(a) => { setCreating(false); setNewMode(null); setSeed(null); setSelectedId(a.id); setRightTab("preview"); }} />
+            </Card>
+          ) : selected ? (
+            <Card className="p-5 space-y-4">
+              {/* Header: title + rigor chips + actions */}
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-lg leading-tight">{selected.title}</h2>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full border ${selected.published ? "text-emerald-700 border-emerald-500/30 bg-emerald-500/10" : "text-muted-foreground"}`}>{selected.published ? "Live" : "Draft"}</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{(selected.kind || "custom").replace("_", " ")}</span>
+                    {selected.bloomsLevel && <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-purple-500/10 text-purple-700 border-purple-500/30">{selected.bloomsLevel}</span>}
+                    {selected.difficulty && <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{selected.difficulty}</span>}
                   </div>
                 </div>
-              )}
+                <div className="flex gap-2 shrink-0">
+                  {canAssign && selected.published && <Button variant="outline" size="sm" onClick={() => setAssignFor(selected)}><Share2 className="h-4 w-4 mr-1" />Assign</Button>}
+                  {selected.published && <Button variant="outline" size="sm" onClick={() => window.open(`/activities/${selected.id}/play`, "_blank")}><ExternalLink className="h-4 w-4 mr-1" />Open as learner</Button>}
+                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => del.mutate(selected.id)}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+              </div>
 
-              {creating || rightTab === "edit" ? (
-                <Editor activity={selected} newMode={newMode} seed={seed} onSaved={(a) => { setCreating(false); setNewMode(null); setSeed(null); setSelectedId(a.id); }} />
-              ) : rightTab === "share" && selected ? (
+              {/* Tabs: Activity (rendered) is the default */}
+              <div className="flex gap-1 border-b border-border pb-2 flex-wrap">
+                <Button variant={rightTab === "preview" ? "default" : "ghost"} size="sm" onClick={() => setRightTab("preview")}><Eye className="h-4 w-4 mr-1" />Activity</Button>
+                <Button variant={rightTab === "edit" ? "default" : "ghost"} size="sm" onClick={() => setRightTab("edit")}><Pencil className="h-4 w-4 mr-1" />Edit</Button>
+                <Button variant={rightTab === "subs" ? "default" : "ghost"} size="sm" onClick={() => setRightTab("subs")}><Inbox className="h-4 w-4 mr-1" />Submissions</Button>
+                <Button variant={rightTab === "share" ? "default" : "ghost"} size="sm" onClick={() => setRightTab("share")}><Share2 className="h-4 w-4 mr-1" />Publish &amp; share</Button>
+              </div>
+
+              {rightTab === "preview" ? (
+                <div className="space-y-2">
+                  {selected.instructions && <p className="text-sm text-muted-foreground">{selected.instructions}</p>}
+                  <ActivityPlayer html={selected.html} embedUrl={selected.embedUrl} disabled />
+                  <p className="text-xs text-muted-foreground">Preview — submissions here are not recorded.</p>
+                </div>
+              ) : rightTab === "edit" ? (
+                <Editor activity={selected} newMode={null} seed={null} onSaved={(a) => { setSelectedId(a.id); setRightTab("preview"); }} />
+              ) : rightTab === "share" ? (
                 <PublishShare activity={selected} />
               ) : (
-                selected && <Submissions activityId={selected.id} />
+                <Submissions activityId={selected.id} />
               )}
             </Card>
           ) : (
-            <Card className="p-10 text-center text-muted-foreground">Select an activity to edit, or create a new one.</Card>
+            <Card className="p-10 text-center text-muted-foreground">Select an activity to preview, or create a new one.</Card>
           )}
         </div>
       </div>
