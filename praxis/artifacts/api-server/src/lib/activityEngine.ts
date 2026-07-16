@@ -53,9 +53,9 @@ const clampDiff = (d: unknown) => (typeof d === "string" && (DIFFICULTIES as rea
 /** Generate ONE activity of a given kind/level. Small + fast; never throws (returns null). */
 async function generateOne(content: string, kind: string, bloom: string, difficulty: string | null): Promise<GeneratedActivity | null> {
   const rigor = `Target Bloom's level: ${bloom}.${difficulty ? ` Target difficulty: ${difficulty}.` : ""}`;
-  const user = `Build ONE "${kind}" activity from the COURSE CONTENT below. ${rigor}\nReturn only the single JSON object.\n\n=== COURSE CONTENT ===\n${content.slice(0, 10000)}`;
+  const user = `Build ONE "${kind}" activity from the COURSE CONTENT below. ${rigor}\nKeep the HTML COMPACT (aim well under 200 lines) so it fits in one response: concise markup, share one small <style>, avoid huge inline SVGs, cap items at ~5-6. Return only the single JSON object.\n\n=== COURSE CONTENT ===\n${content.slice(0, 10000)}`;
   try {
-    const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 4000, system: SYSTEM, messages: [{ role: "user", content: user }] });
+    const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 6000, system: SYSTEM, messages: [{ role: "user", content: user }] });
     const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     const m = text.match(/\{[\s\S]*\}/);
     if (!m) return null;
