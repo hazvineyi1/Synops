@@ -134,6 +134,11 @@ router.post("/cases", requireAuth, async (req, res) => {
   if (!canAuthorCases(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
   const b = req.body ?? {};
   if (!b.title || typeof b.title !== "string") { res.status(400).json({ error: "title is required" }); return; }
+  // Every dialogue must be grounded: a published case cannot exist without a fact pattern.
+  if (b.status === "published" && !(b.contextBlock && String(b.contextBlock).trim())) {
+    res.status(400).json({ error: "A published case needs a context / fact pattern so the tutor has something to ground its questions in." });
+    return;
+  }
 
   // Hub authors may publish to the shared library (org null); facilitators author for their org.
   const isLibrary = hasHubAccess(u.role) && b.isLibrary === true;
@@ -189,6 +194,14 @@ router.put("/cases/:id", requireAuth, async (req, res) => {
   if (b.promptLimit !== undefined && Number.isFinite(b.promptLimit)) up.promptLimit = Math.max(3, Math.min(20, Math.round(b.promptLimit)));
   if (b.status !== undefined && ["draft", "published"].includes(b.status)) up.status = b.status;
   if (b.tags !== undefined) up.tags = Array.isArray(b.tags) ? b.tags : null;
+  // Publishing requires a fact pattern — check the effective value (incoming or existing).
+  if (up.status === "published") {
+    const effectiveContext = b.contextBlock !== undefined ? b.contextBlock : c.contextBlock;
+    if (!effectiveContext || !String(effectiveContext).trim()) {
+      res.status(400).json({ error: "A published case needs a context / fact pattern so the tutor has something to ground its questions in." });
+      return;
+    }
+  }
   const [row] = await db.update(caseScenariosTable).set(up).where(eq(caseScenariosTable.id, c.id)).returning();
   await logAudit(req, "case.update", "case", c.id, { title: row.title });
   res.json(caseResponse(row));
