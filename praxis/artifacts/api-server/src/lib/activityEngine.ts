@@ -43,50 +43,64 @@ GAMIFICATION: make it engaging — points, streaks, instant feedback, progress, 
 
 RIGOR: for each activity set an honest Bloom's level (one of: Remember, Understand, Apply, Analyze, Evaluate, Create) and a difficulty (one of: foundational, intermediate, advanced). Spread the set across DIFFERENT Bloom's levels so the menu ranges from recall to higher-order reasoning. Briefly justify the rigor in "rationale".
 
-VARIETY: use a mix of kinds from: quiz (MCQ with feedback), flashcards (flip to recall), drag_drop (order/sort items), matching (pair concepts), scenario (branching decision with consequences), hotspot (click the right region of an inline SVG). Choose kinds that genuinely fit the content.
+KIND: build the ONE kind of activity you are told to build: quiz (MCQ with feedback), flashcards (flip to recall), drag_drop (order/sort items), matching (pair concepts), scenario (branching decision with consequences), or hotspot (click the right region of an inline SVG).
 
-Return ONLY a strict JSON array (no prose, no code fences) of objects with EXACTLY these keys: "kind", "title", "instructions", "html", "bloomsLevel", "difficulty", "rationale". Escape the HTML properly as a JSON string.`;
+Return ONLY a single strict JSON object (no prose, no code fences, no array) with EXACTLY these keys: "kind", "title", "instructions", "html", "bloomsLevel", "difficulty", "rationale". Escape the HTML properly as a JSON string.`;
 
+const clampBloom = (b: unknown) => (typeof b === "string" && (BLOOMS as readonly string[]).includes(b) ? b : "Understand");
+const clampDiff = (d: unknown) => (typeof d === "string" && (DIFFICULTIES as readonly string[]).includes(d) ? d : "intermediate");
+
+/** Generate ONE activity of a given kind/level. Small + fast; never throws (returns null). */
+async function generateOne(content: string, kind: string, bloom: string, difficulty: string | null): Promise<GeneratedActivity | null> {
+  const rigor = `Target Bloom's level: ${bloom}.${difficulty ? ` Target difficulty: ${difficulty}.` : ""}`;
+  const user = `Build ONE "${kind}" activity from the COURSE CONTENT below. ${rigor}\nReturn only the single JSON object.\n\n=== COURSE CONTENT ===\n${content.slice(0, 10000)}`;
+  try {
+    const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 4000, system: SYSTEM, messages: [{ role: "user", content: user }] });
+    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const x = JSON.parse(m[0]) as Record<string, unknown>;
+    const html = typeof x.html === "string" ? x.html : "";
+    if (!html.trim()) return null;
+    return {
+      kind: typeof x.kind === "string" ? x.kind : kind,
+      title: typeof x.title === "string" ? x.title : "Untitled activity",
+      instructions: typeof x.instructions === "string" ? x.instructions : "",
+      html,
+      bloomsLevel: clampBloom(x.bloomsLevel ?? bloom),
+      difficulty: clampDiff(x.difficulty ?? difficulty),
+      rationale: typeof x.rationale === "string" ? x.rationale : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generate a MENU of activities. Each activity is produced in its OWN small, parallel call
+ * (one kind + Bloom's level per call) rather than one huge response — a single giant JSON
+ * array reliably overran the token budget and truncated. Fanning out keeps every call fast
+ * and well under the limit, and lets us deliberately spread the set across Bloom's levels.
+ */
 export async function generateActivities(
   content: string,
   opts?: { count?: number; kinds?: string[]; targetBloom?: string | null; targetDifficulty?: string | null }
 ): Promise<GeneratedActivity[]> {
   const count = Math.max(1, Math.min(6, opts?.count ?? 4));
-  const kindLine = opts?.kinds?.length ? `\nPrefer these kinds: ${opts.kinds.join(", ")}.` : "";
-  const rigorLine = opts?.targetBloom || opts?.targetDifficulty
-    ? `\nThe author is targeting ${[opts?.targetBloom && `Bloom's: ${opts.targetBloom}`, opts?.targetDifficulty && `difficulty: ${opts.targetDifficulty}`].filter(Boolean).join(", ")}; aim the set around that.`
-    : "";
+  const kindPool = opts?.kinds?.length ? opts.kinds : ["quiz", "flashcards", "matching", "scenario", "drag_drop", "hotspot"];
+  // Spread Bloom's from recall to higher-order (unless the author pinned a target).
+  const bloomOrder = opts?.targetBloom ? [opts.targetBloom] : ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"];
 
-  const user = `Create ${count} varied gamified activities from the COURSE CONTENT below.${kindLine}${rigorLine}\n\nReturn only the JSON array.\n\n=== COURSE CONTENT ===\n${content.slice(0, 12000)}`;
+  const plan = Array.from({ length: count }, (_, i) => ({
+    kind: kindPool[i % kindPool.length],
+    bloom: bloomOrder[i % bloomOrder.length],
+    difficulty: opts?.targetDifficulty ?? null,
+  }));
 
-  const msg = await anthropic.messages.create({
-    model: MODEL,
-    max_tokens: 8000,
-    system: SYSTEM,
-    messages: [{ role: "user", content: user }],
-  });
-  const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-  const m = text.match(/\[[\s\S]*\]/);
-  if (!m) throw new Error("The generator did not return any activities. Try again with more content.");
-  let arr: unknown;
-  try { arr = JSON.parse(m[0]); } catch { throw new Error("The generator returned malformed output. Please try again."); }
-  if (!Array.isArray(arr)) throw new Error("The generator did not return a list of activities.");
-
-  const clampBloom = (b: unknown) => (typeof b === "string" && (BLOOMS as readonly string[]).includes(b) ? b : "Understand");
-  const clampDiff = (d: unknown) => (typeof d === "string" && (DIFFICULTIES as readonly string[]).includes(d) ? d : "intermediate");
-
-  return arr
-    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
-    .map((x) => ({
-      kind: typeof x.kind === "string" ? x.kind : "quiz",
-      title: typeof x.title === "string" ? x.title : "Untitled activity",
-      instructions: typeof x.instructions === "string" ? x.instructions : "",
-      html: typeof x.html === "string" ? x.html : "",
-      bloomsLevel: clampBloom(x.bloomsLevel),
-      difficulty: clampDiff(x.difficulty),
-      rationale: typeof x.rationale === "string" ? x.rationale : "",
-    }))
-    .filter((a) => a.html.trim().length > 0);
+  const results = await Promise.all(plan.map((p) => generateOne(content, p.kind, p.bloom, p.difficulty)));
+  const ok = results.filter((r): r is GeneratedActivity => r !== null);
+  if (!ok.length) throw new Error("The generator could not produce activities from that content. Try again, or add more detail.");
+  return ok;
 }
 
 export { MODEL as ACTIVITY_MODEL };
