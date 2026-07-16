@@ -13,6 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/SessionContext";
 import { ActivityPlayer } from "@/components/ActivityPlayer";
 import { ActivityAssignDialog } from "@/components/ActivityAssignDialog";
+import { ActivityBuilder } from "@/components/ActivityBuilder";
+import { renderActivity, type InteractionType, type ActivitySpec } from "@/lib/activityTemplates";
 import { activitiesApi, type Activity, type ActivitySubmission, type GeneratedActivity, type MyActivityAssignment } from "@/lib/activitiesApi";
 
 const CAN_AUTHOR = ["super_admin", "instructional_designer", "org_admin", "partner_admin", "coach"];
@@ -234,7 +236,7 @@ function AIGenerateDialog({ onClose, onUse }: { onClose: () => void; onUse: (g: 
                     <div className="min-w-0">
                       <p className="font-medium text-sm truncate">{d.title}</p>
                       <div className="flex flex-wrap gap-1 mt-0.5">
-                        <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-white capitalize">{d.kind.replace("_", " ")}</span>
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-white capitalize">{d.type.replace("_", " ")}</span>
                         <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-purple-500/10 text-purple-700 border-purple-500/30">{d.bloomsLevel}</span>
                         <span className="text-[11px] px-1.5 py-0.5 rounded-full border bg-white capitalize">{d.difficulty}</span>
                       </div>
@@ -245,7 +247,7 @@ function AIGenerateDialog({ onClose, onUse }: { onClose: () => void; onUse: (g: 
                     </div>
                   </div>
                   {d.rationale && <p className="text-xs text-muted-foreground px-3 py-1.5">{d.rationale}</p>}
-                  {previewIdx === i && <div className="p-3"><ActivityPlayer html={d.html} disabled /></div>}
+                  {previewIdx === i && <div className="p-3"><ActivityPlayer html={renderActivity(d.type as InteractionType, d.spec as ActivitySpec)} disabled /></div>}
                 </div>
               ))}
             </div>
@@ -423,6 +425,7 @@ export function ActivitiesAdmin() {
   const [seed, setSeed] = useState<Partial<Activity> | null>(null);
   const [newMenu, setNewMenu] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
   const [assignFor, setAssignFor] = useState<Activity | null>(null);
   const [rightTab, setRightTab] = useState<"edit" | "subs" | "share">("edit");
 
@@ -443,7 +446,8 @@ export function ActivitiesAdmin() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {aiOpen && <AIGenerateDialog onClose={() => setAiOpen(false)} onUse={(g) => { setSeed({ title: g.title, instructions: g.instructions, html: g.html, kind: g.kind, bloomsLevel: g.bloomsLevel, difficulty: g.difficulty as Activity["difficulty"], source: "ai" }); setNewMode("html"); setCreating(true); setSelectedId(null); setRightTab("edit"); setAiOpen(false); }} />}
+      {aiOpen && <AIGenerateDialog onClose={() => setAiOpen(false)} onUse={(g) => { setSeed({ title: g.title, instructions: g.instructions, html: renderActivity(g.type as InteractionType, g.spec as ActivitySpec), kind: g.type, bloomsLevel: g.bloomsLevel, difficulty: g.difficulty as Activity["difficulty"], source: "ai" }); setNewMode("html"); setCreating(true); setSelectedId(null); setRightTab("edit"); setAiOpen(false); }} />}
+      {builderOpen && <ActivityBuilder onClose={() => setBuilderOpen(false)} onCreated={(a) => { setBuilderOpen(false); setCreating(false); setSelectedId(a.id); setRightTab("edit"); }} />}
       {assignFor && <ActivityAssignDialog activityId={assignFor.id} activityTitle={assignFor.title} onClose={() => setAssignFor(null)} />}
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -458,10 +462,12 @@ export function ActivitiesAdmin() {
             {newMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
-                <div className="absolute right-0 top-11 z-20 w-56 rounded-lg border bg-white shadow-lg p-1 text-sm">
-                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => startNew("html")}><Code2 className="h-4 w-4" /> Build HTML activity</button>
-                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => startNew("embed")}><Link2 className="h-4 w-4" /> Paste embed code</button>
+                <div className="absolute right-0 top-11 z-20 w-60 rounded-lg border bg-white shadow-lg p-1 text-sm">
+                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => { setNewMenu(false); setBuilderOpen(true); }}><Wand2 className="h-4 w-4" /> Build interactive <span className="ml-auto text-[10px] text-muted-foreground">quiz, cards, sort…</span></button>
                   <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => { setNewMenu(false); setAiOpen(true); }}><Sparkles className="h-4 w-4" /> Generate with AI</button>
+                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => startNew("embed")}><Link2 className="h-4 w-4" /> Paste embed code</button>
+                  <div className="my-1 border-t" />
+                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2 text-muted-foreground" onClick={() => startNew("html")}><Code2 className="h-4 w-4" /> Advanced (raw HTML)</button>
                 </div>
               </>
             )}

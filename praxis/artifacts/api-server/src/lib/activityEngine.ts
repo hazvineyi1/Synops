@@ -1,97 +1,81 @@
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 /**
- * AI activity generator. Given raw course content, produce a MENU of self-contained,
- * gamified interactive activities that run in the Praxis sandbox player, each labelled with
- * an AI-determined rigor (Bloom's level + difficulty).
+ * AI activity generator. Given raw course content, produce a MENU of interactive activities.
  *
- * Hard runtime contract (the sandbox the HTML runs in):
- *  - The HTML body runs inside a sandboxed iframe with NO network and an opaque origin. So
- *    everything must be self-contained: inline <style> + inline <script>, vanilla JS/CSS only,
- *    NO external CDNs/fonts/images/URLs.
- *  - When the learner finishes, the activity MUST call window.SynopsActivity.submit(payload, score)
- *    exactly once (score is 0..100). It may call SynopsActivity.resize(px) but auto-resize exists.
+ * Design: the model returns a small STRUCTURED SPEC per activity (a few questions / cards /
+ * pairs / steps / buckets) — NOT raw HTML. The frontend renders the spec through the shared
+ * activityTemplates engine, exactly like the no-code builder and the library. Returning a
+ * compact JSON spec (instead of a whole escaped HTML document) is far more reliable and lets
+ * the AI produce every interaction type, not just quizzes.
  */
 
 const MODEL = "claude-sonnet-4-6";
 
-export type ActivityKind = "quiz" | "flashcards" | "drag_drop" | "matching" | "scenario" | "hotspot";
-export const ACTIVITY_KINDS: ActivityKind[] = ["quiz", "flashcards", "drag_drop", "matching", "scenario", "hotspot"];
+export type ActivityType = "quiz" | "flashcards" | "matching" | "order" | "categorize";
+export const ACTIVITY_TYPES: ActivityType[] = ["quiz", "flashcards", "matching", "order", "categorize"];
 export const BLOOMS = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"] as const;
 export const DIFFICULTIES = ["foundational", "intermediate", "advanced"] as const;
 
 export interface GeneratedActivity {
-  kind: ActivityKind | string;
+  type: ActivityType;
   title: string;
   instructions: string;
-  html: string;
   bloomsLevel: string;
   difficulty: string;
   rationale: string;
+  spec: unknown;
 }
 
-const SYSTEM = `You are an expert instructional designer and front-end engineer. You turn raw course content into a SHORT, gamified, interactive learning activity that a learner completes in a hardened sandbox.
+const SPEC_SHAPE: Record<ActivityType, string> = {
+  quiz: '{"questions":[{"q":"question text","options":[{"t":"option","correct":true,"why":"why the right answer is right"},{"t":"option","correct":false}]}]}  (3-5 questions, 3-4 options each, exactly one correct, put the explanation in the correct option\'s "why")',
+  flashcards: '{"cards":[{"front":"prompt/term","back":"answer/definition"}]}  (4-6 cards)',
+  matching: '{"pairs":[{"left":"item","right":"its match"}]}  (4-6 pairs)',
+  order: '{"items":["step 1","step 2","step 3"]}  (4-6 items already IN THE CORRECT ORDER; the app shuffles them)',
+  categorize: '{"buckets":["Bucket A","Bucket B"],"items":[{"text":"item","bucket":"Bucket A"}]}  (2-3 buckets, 5-8 items; each item.bucket MUST be one of the buckets)',
+};
 
-ABSOLUTE RUNTIME CONSTRAINTS (breaking any of these makes the activity fail):
-- The HTML is placed inside a <body>. It must be SELF-CONTAINED: put all CSS in an inline <style> and all logic in an inline <script>. Use VANILLA JavaScript and CSS only.
-- NO external resources of any kind: no CDNs, no <script src>, no external fonts, no <img src="http...">, no fetch/XHR/network. The sandbox has NO network and an opaque origin, so anything external silently fails. If you need an image, draw it with inline SVG or CSS.
-- The host injects base styles (system font, white background, 20px padding). Do not fight them; you may add your own styles scoped to your elements.
-- When the learner has finished, call window.SynopsActivity.submit(payload, score) EXACTLY ONCE. payload is a small JSON object of what they did; score is a number 0..100 (percent correct / quality). Provide a visible "Submit" / "Finish" affordance that triggers it (or auto-submit at the end of the flow).
-- Keep each activity focused and reasonably small. Prefer clean, accessible markup (labels, buttons, keyboard-usable). Mobile friendly.
+const SYSTEM = `You are an expert instructional designer. You turn course content into a SHORT, engaging interactive activity of a specified type, grounded strictly in the provided content.
 
-GAMIFICATION: make it engaging — points, streaks, instant feedback, progress, a friendly result screen — without being childish. Keep it professional and on-topic to the content.
+Set an honest Bloom's level (Remember, Understand, Apply, Analyze, Evaluate, or Create) and difficulty (foundational, intermediate, advanced), and briefly justify the rigor in "rationale". Write clear, learner-friendly text. Keep it focused and on-topic.
 
-RIGOR: set an honest Bloom's level (one of: Remember, Understand, Apply, Analyze, Evaluate, Create) and a difficulty (one of: foundational, intermediate, advanced). Briefly justify the rigor.
+Return ONLY a single strict JSON object (no prose, no code fences) with EXACTLY these keys:
+"type", "title", "instructions", "bloomsLevel", "difficulty", "rationale", "spec"
+where "spec" matches the shape for the given type. Do not include any HTML.`;
 
-KIND: build the ONE kind of activity you are told to build: quiz (MCQ with feedback), flashcards (flip to recall), drag_drop (order/sort items), matching (pair concepts), scenario (branching decision with consequences), or hotspot (click the right region of an inline SVG).
+const clampBloom = (b: unknown, fb: string) => (typeof b === "string" && (BLOOMS as readonly string[]).includes(b) ? b : fb);
+const clampDiff = (d: unknown, fb: string | null) => (typeof d === "string" && (DIFFICULTIES as readonly string[]).includes(d) ? d : (fb ?? "intermediate"));
 
-OUTPUT FORMAT — this is critical. Return the activity using these EXACT labels, each on its own line, and put the RAW HTML last after the HTML: label (do NOT escape it, do NOT wrap it in JSON or code fences). Nothing before TITLE: and nothing after the HTML.
+/** Basic shape check so a malformed spec doesn't reach the renderer. */
+function specValid(type: ActivityType, s: unknown): boolean {
+  if (!s || typeof s !== "object") return false;
+  const o = s as Record<string, unknown>;
+  const arr = (x: unknown) => Array.isArray(x) && x.length > 0;
+  if (type === "quiz") return arr(o.questions);
+  if (type === "flashcards") return arr(o.cards);
+  if (type === "matching") return arr(o.pairs);
+  if (type === "order") return arr(o.items);
+  if (type === "categorize") return arr(o.buckets) && arr(o.items);
+  return false;
+}
 
-TITLE: <a short title>
-KIND: <the kind>
-BLOOM: <the Bloom's level>
-DIFFICULTY: <foundational|intermediate|advanced>
-RATIONALE: <one or two sentences justifying the rigor>
-INSTRUCTIONS: <one short line shown above the activity>
-HTML:
-<the raw, self-contained HTML here>`;
-
-const clampBloom = (b: unknown) => (typeof b === "string" && (BLOOMS as readonly string[]).includes(b) ? b : "Understand");
-const clampDiff = (d: unknown) => (typeof d === "string" && (DIFFICULTIES as readonly string[]).includes(d) ? d : "intermediate");
-
-/**
- * Generate ONE activity of a given kind/level. Small + fast; never throws (returns null).
- * Parses a LABEL-DELIMITED response (not JSON) so the raw HTML never has to be JSON-escaped —
- * models mis-escape big HTML strings constantly, which was silently dropping activities.
- */
-async function generateOne(content: string, kind: string, bloom: string, difficulty: string | null): Promise<GeneratedActivity | null> {
-  const rigor = `Target Bloom's level: ${bloom}.${difficulty ? ` Target difficulty: ${difficulty}.` : ""}`;
-  const user = `Build ONE "${kind}" activity from the COURSE CONTENT below. ${rigor}\nKeep the HTML compact (aim well under 200 lines). Use the exact label format from the system prompt; put the raw HTML after HTML:.\n\n=== COURSE CONTENT ===\n${content.slice(0, 10000)}`;
+async function generateOne(content: string, type: ActivityType, bloom: string, difficulty: string | null): Promise<GeneratedActivity | null> {
+  const user = `Build ONE "${type}" activity from the COURSE CONTENT below. Aim for Bloom's level ${bloom}${difficulty ? `, difficulty ${difficulty}` : ""}.\nThe "spec" must match this shape: ${SPEC_SHAPE[type]}\nReturn only the JSON object.\n\n=== COURSE CONTENT ===\n${content.slice(0, 10000)}`;
   try {
-    const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 6000, system: SYSTEM, messages: [{ role: "user", content: user }] });
+    const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 2500, system: SYSTEM, messages: [{ role: "user", content: user }] });
     const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-
-    // Split on the HTML: label — everything after it is the raw document.
-    const htmlSplit = text.split(/^\s*HTML:\s*$/m);
-    if (htmlSplit.length < 2) return null;
-    const head = htmlSplit[0];
-    let html = htmlSplit.slice(1).join("HTML:").trim();
-    // Strip accidental code fences if the model added them.
-    html = html.replace(/^```[a-z]*\s*/i, "").replace(/\s*```$/i, "").trim();
-    if (!html || !/[<]/.test(html)) return null;
-
-    const field = (label: string) => {
-      const m = head.match(new RegExp(`^\\s*${label}:\\s*(.+)$`, "im"));
-      return m ? m[1].trim() : "";
-    };
+    const m = text.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const x = JSON.parse(m[0]) as Record<string, unknown>;
+    if (!specValid(type, x.spec)) return null;
     return {
-      kind: field("KIND") || kind,
-      title: field("TITLE") || "Untitled activity",
-      instructions: field("INSTRUCTIONS"),
-      html,
-      bloomsLevel: clampBloom(field("BLOOM") || bloom),
-      difficulty: clampDiff(field("DIFFICULTY") || difficulty),
-      rationale: field("RATIONALE"),
+      type,
+      title: typeof x.title === "string" ? x.title : "Untitled activity",
+      instructions: typeof x.instructions === "string" ? x.instructions : "",
+      bloomsLevel: clampBloom(x.bloomsLevel, bloom),
+      difficulty: clampDiff(x.difficulty, difficulty),
+      rationale: typeof x.rationale === "string" ? x.rationale : "",
+      spec: x.spec,
     };
   } catch {
     return null;
@@ -99,27 +83,26 @@ async function generateOne(content: string, kind: string, bloom: string, difficu
 }
 
 /**
- * Generate a MENU of activities. Each activity is produced in its OWN small, parallel call
- * (one kind + Bloom's level per call) rather than one huge response — a single giant JSON
- * array reliably overran the token budget and truncated. Fanning out keeps every call fast
- * and well under the limit, and lets us deliberately spread the set across Bloom's levels.
+ * Generate a MENU of activities. Each is its own small, parallel call (one type + Bloom's
+ * level per call), spread across interaction types and Bloom's levels.
  */
 export async function generateActivities(
   content: string,
-  opts?: { count?: number; kinds?: string[]; targetBloom?: string | null; targetDifficulty?: string | null }
+  opts?: { count?: number; types?: string[]; targetBloom?: string | null; targetDifficulty?: string | null }
 ): Promise<GeneratedActivity[]> {
   const count = Math.max(1, Math.min(6, opts?.count ?? 4));
-  const kindPool = opts?.kinds?.length ? opts.kinds : ["quiz", "flashcards", "matching", "scenario", "drag_drop", "hotspot"];
-  // Spread Bloom's from recall to higher-order (unless the author pinned a target).
-  const bloomOrder = opts?.targetBloom ? [opts.targetBloom] : ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"];
+  const typePool = (opts?.types && opts.types.length ? opts.types : ["quiz", "flashcards", "matching", "order", "categorize"])
+    .filter((t): t is ActivityType => (ACTIVITY_TYPES as string[]).includes(t));
+  const pool = typePool.length ? typePool : ACTIVITY_TYPES;
+  const bloomOrder = opts?.targetBloom ? [opts.targetBloom] : ["Remember", "Understand", "Apply", "Analyze", "Evaluate"];
 
   const plan = Array.from({ length: count }, (_, i) => ({
-    kind: kindPool[i % kindPool.length],
+    type: pool[i % pool.length],
     bloom: bloomOrder[i % bloomOrder.length],
     difficulty: opts?.targetDifficulty ?? null,
   }));
 
-  const results = await Promise.all(plan.map((p) => generateOne(content, p.kind, p.bloom, p.difficulty)));
+  const results = await Promise.all(plan.map((p) => generateOne(content, p.type, p.bloom, p.difficulty)));
   const ok = results.filter((r): r is GeneratedActivity => r !== null);
   if (!ok.length) throw new Error("The generator could not produce activities from that content. Try again, or add more detail.");
   return ok;

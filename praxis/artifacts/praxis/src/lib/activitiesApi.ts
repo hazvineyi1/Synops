@@ -39,13 +39,13 @@ export interface Activity {
 }
 
 export interface GeneratedActivity {
-  kind: string;
+  type: string;
   title: string;
   instructions: string;
-  html: string;
   bloomsLevel: string;
   difficulty: string;
   rationale: string;
+  spec: unknown;
 }
 
 export interface ActivityEmbedLink {
@@ -132,8 +132,8 @@ export const activitiesApi = {
       body: JSON.stringify(input),
     }),
 
-  // AI generation — returns a menu of drafts (not persisted).
-  generate: (body: { content: string; count?: number; kinds?: string[]; targetBloom?: string | null; targetDifficulty?: string | null }) =>
+  // AI generation — returns a menu of spec-based drafts (not persisted).
+  generate: (body: { content: string; count?: number; types?: string[]; targetBloom?: string | null; targetDifficulty?: string | null }) =>
     req<{ activities: GeneratedActivity[] }>(`/activities/generate`, { method: "POST", body: JSON.stringify(body) }),
 
   // Public embed links (publish-out).

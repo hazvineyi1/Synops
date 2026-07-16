@@ -236,7 +236,7 @@ router.post("/activities/generate", requireAuth, requireAuthor, async (req, res)
   try {
     const activities = await generateActivities(content, {
       count: Number.isFinite(req.body?.count) ? req.body.count : 4,
-      kinds: Array.isArray(req.body?.kinds) ? req.body.kinds : undefined,
+      types: Array.isArray(req.body?.types) ? req.body.types : undefined,
       targetBloom: typeof req.body?.targetBloom === "string" ? req.body.targetBloom : null,
       targetDifficulty: typeof req.body?.targetDifficulty === "string" ? req.body.targetDifficulty : null,
     });
