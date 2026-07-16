@@ -192,7 +192,7 @@ function Routes() {
         <ProtectedRoute path="/activities" component={ActivitiesAdmin} />
         <ProtectedRoute path="/support/:ticketId" component={Support} />
         <ProtectedRoute path="/support" component={Support} />
-        <FocusRoute path="/platform" component={PlatformConsole} />
+        <ProtectedRoute path="/platform" component={PlatformConsole} />
         <ProtectedRoute path="/partner/theme" component={PartnerTheme} />
         <ProtectedRoute path="/reports" component={Reports} />
 

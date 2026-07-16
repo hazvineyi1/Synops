@@ -28,7 +28,52 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Sokratify theme: one dark-navy sidebar + warm off-white content across the
+ * whole app. The page content keeps the app's light surfaces (cards/text); only
+ * the shell chrome is dark, so every role — and the Platform Console — shares one
+ * cohesive look.
+ * ──────────────────────────────────────────────────────────────────────── */
+const SIDEBAR_BG = 'hsl(222 47% 11%)';
+const CONTENT_BG = 'hsl(43 30% 97%)';
+const HAIRLINE = 'rgba(255,255,255,0.07)';
+
+type NavItem = { label: string; href: string; icon: React.ElementType };
+type NavGroup = { heading?: string; items: NavItem[] };
+
+function ShellNavLink({
+  item,
+  active,
+  large,
+  onClick,
+}: {
+  item: NavItem;
+  active: boolean;
+  large?: boolean;
+  onClick?: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  const color = active
+    ? 'rgba(255,255,255,0.95)'
+    : hover
+      ? 'rgba(255,255,255,0.82)'
+      : 'rgba(255,255,255,0.5)';
+  const background = active ? 'rgba(255,255,255,0.10)' : hover ? 'rgba(255,255,255,0.05)' : 'transparent';
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-md font-medium transition-colors ${large ? 'px-4 py-3 text-base' : 'px-3 py-2.5 text-sm'}`}
+      style={{ background, color }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      <item.icon className={large ? 'h-5 w-5 shrink-0' : 'h-4 w-4 shrink-0'} />
+      {item.label}
+    </Link>
+  );
+}
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -50,7 +95,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-screen bg-background items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center" style={{ background: CONTENT_BG }}>
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="h-8 w-32 bg-muted rounded" />
           <div className="h-4 w-48 bg-muted rounded" />
@@ -61,91 +106,147 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const role = user.role;
 
-  const getNavItems = () => {
-    const items: { label: string; href: string; icon: React.ElementType }[] = [];
-
+  const getNavGroups = (): NavGroup[] => {
     if (role === 'learner') {
-      items.push({ label: t('nav.today'),      href: '/dashboard',     icon: LayoutDashboard });
-      items.push({ label: t('nav.myCourses'),  href: '/courses',       icon: BookOpen });
-      items.push({ label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays });
-      items.push({ label: t('nav.credentials'),href: '/credentials',   icon: Award });
-      items.push({ label: t('nav.myCoach'),    href: '/coach-settings',icon: Settings });
-      items.push({ label: t('nav.help', 'Help'), href: '/support', icon: LifeBuoy });
+      return [{
+        items: [
+          { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
+          { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
+          { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
+          { label: t('nav.credentials'), href: '/credentials', icon: Award },
+          { label: t('nav.myCoach'), href: '/coach-settings', icon: Settings },
+          { label: t('nav.help', 'Help'), href: '/support', icon: LifeBuoy },
+        ],
+      }];
     }
 
     if (role === 'coach') {
-      items.push({ label: t('nav.overview'),    href: '/dashboard',         icon: LayoutDashboard });
-      items.push({ label: t('nav.learners'),    href: '/coach',             icon: Users });
-      items.push({ label: t('nav.submissions'), href: '/coach/submissions', icon: FileText });
-      items.push({ label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays });
-      items.push({ label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles });
-      items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
+      return [{
+        items: [
+          { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
+          { label: t('nav.learners'), href: '/coach', icon: Users },
+          { label: t('nav.submissions'), href: '/coach/submissions', icon: FileText },
+          { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
+          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
+        ],
+      }];
     }
 
     if (role === 'org_admin') {
-      items.push({ label: t('nav.overview'),       href: '/dashboard', icon: LayoutDashboard });
-      items.push({ label: t('nav.members'),         href: '/org/members',icon: UserCog });
-      items.push({ label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays });
-      items.push({ label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck });
-      items.push({ label: t('nav.reports'),         href: '/reports',   icon: FileText });
-      items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
+      return [{
+        items: [
+          { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
+          { label: t('nav.members'), href: '/org/members', icon: UserCog },
+          { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
+          { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
+          { label: t('nav.reports'), href: '/reports', icon: FileText },
+          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
+        ],
+      }];
     }
 
     if (role === 'partner_admin') {
-      items.push({ label: t('nav.overview'),      href: '/dashboard',     icon: LayoutDashboard });
-      items.push({ label: t('nav.organisations'), href: '/dashboard',     icon: Building });
-      items.push({ label: t('nav.courseCatalog'), href: '/courses',       icon: BookOpen });
-      items.push({ label: t('nav.studio'),        href: '/studio',        icon: PenTool });
-      items.push({ label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles });
-      items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
+      return [{
+        items: [
+          { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
+          { label: t('nav.organisations'), href: '/dashboard', icon: Building },
+          { label: t('nav.courseCatalog'), href: '/courses', icon: BookOpen },
+          { label: t('nav.studio'), href: '/studio', icon: PenTool },
+          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
+        ],
+      }];
     }
 
+    // Super admin: full access to every surface the other roles have, grouped so
+    // the breadth stays scannable (decision: one grouped all-access sidebar).
     if (role === 'super_admin') {
-      items.push({ label: t('nav.overview'),         href: '/dashboard',      icon: LayoutDashboard });
-      items.push({ label: t('nav.partners'),         href: '/admin/partners', icon: Building });
-      items.push({ label: t('nav.funders', 'Funders'), href: '/admin/funders', icon: Landmark });
-      items.push({ label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck });
-      items.push({ label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles });
-      items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
-      items.push({ label: t('nav.platformConsole', 'Platform'), href: '/platform', icon: ShieldCheck });
-      items.push({ label: t('nav.platformSettings'), href: '/partner/theme',  icon: Settings });
+      return [
+        { items: [{ label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard }] },
+        {
+          heading: t('nav.groups.platform', 'Platform'),
+          items: [
+            { label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ShieldCheck },
+            { label: t('nav.platformSettings', 'Branding'), href: '/partner/theme', icon: Settings },
+          ],
+        },
+        {
+          heading: t('nav.groups.partners', 'Partners & Funders'),
+          items: [
+            { label: t('nav.partners'), href: '/admin/partners', icon: Building },
+            { label: t('nav.funders', 'Funders'), href: '/admin/funders', icon: Landmark },
+          ],
+        },
+        {
+          heading: t('nav.groups.curriculum', 'Curriculum'),
+          items: [
+            { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: BookOpen },
+            { label: t('nav.studio'), href: '/studio', icon: PenTool },
+            { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+          ],
+        },
+        {
+          heading: t('nav.groups.delivery', 'Delivery & Coaching'),
+          items: [
+            { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
+            { label: t('nav.learners', 'Coaching'), href: '/coach', icon: Users },
+            { label: t('nav.submissions', 'Submissions'), href: '/coach/submissions', icon: FileText },
+            { label: t('nav.members', 'Org members'), href: '/org/members', icon: UserCog },
+          ],
+        },
+        {
+          heading: t('nav.groups.quality', 'Quality & Reports'),
+          items: [
+            { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
+            { label: t('nav.reports'), href: '/reports', icon: FileText },
+            { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
+          ],
+        },
+      ];
     }
 
-    // Funder / sponsor: a single read-only impact view, nothing else (decision §10.2).
+    // Funder / sponsor: a single read-only impact view (decision §10.2).
     if (role === 'funder') {
-      items.push({ label: t('nav.impact', 'Impact'), href: '/dashboard', icon: TrendingUp });
-      items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
+      return [{
+        items: [
+          { label: t('nav.impact', 'Impact'), href: '/dashboard', icon: TrendingUp },
+          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
+        ],
+      }];
     }
 
-    // Instructional Designer: the Hub authoring roles — Studio + standards, off the
-    // delivery chain (decision §3 / §9).
+    // Instructional Designer: Hub authoring — Studio + standards (decision §3 / §9).
     if (role === 'instructional_designer') {
-      items.push({ label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard });
-      items.push({ label: t('nav.studio'), href: '/studio', icon: PenTool });
-      items.push({ label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck });
-      items.push({ label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles });
-      items.push({ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy });
+      return [{
+        items: [
+          { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
+          { label: t('nav.studio'), href: '/studio', icon: PenTool },
+          { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
+          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
+        ],
+      }];
     }
 
-    return items;
+    return [];
   };
 
-  const navItems = getNavItems();
-  const isNavActive = (href: string) =>
-    location === href || location.startsWith(href + '/');
+  const navGroups = getNavGroups();
+  const flatNav = navGroups.flatMap((g) => g.items);
+  const isNavActive = (href: string) => location === href || location.startsWith(href + '/');
+  const bottomItems = flatNav.slice(0, 4);
 
-  const bottomItems = navItems.slice(0, 4).map(item => ({
-    ...item,
-    isActive: isNavActive(item.href),
-  }));
+  const groupHeading = (text: string) => (
+    <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.32)' }}>
+      {text}
+    </p>
+  );
 
   return (
-    <div className="flex min-h-[100dvh] bg-background">
+    <div className="flex min-h-[100dvh]" style={{ background: CONTENT_BG }}>
 
-      {/* Impersonation banner. When a super_admin is viewing the app AS another user,
-          this must be impossible to miss -- it is the difference between "support is
-          looking at my account" and a silent account takeover. Fixed to the top,
-          full width, above everything. */}
+      {/* Impersonation banner — must be impossible to miss. */}
       {user.impersonating && (
         <div className="fixed inset-x-0 top-0 z-[60] bg-amber-500 text-amber-950 text-sm font-medium px-4 py-2 flex items-center justify-center gap-3 shadow-md">
           <span>
@@ -161,75 +262,61 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* ── Desktop sidebar ─────────────────────────────────── */}
-      <aside className="w-64 border-r border-border bg-card flex-shrink-0 flex-col hidden md:flex">
-        <div className="h-16 flex items-center px-6 border-b border-border">
-          <Link href="/dashboard" className="flex items-center gap-2 font-serif font-bold text-xl tracking-tight text-foreground">
-            <span className="bg-primary text-primary-foreground h-8 w-8 flex items-center justify-center rounded-sm">P</span>
+      <aside className="w-64 flex-shrink-0 flex-col hidden md:flex" style={{ background: SIDEBAR_BG }}>
+        <div className="h-16 flex items-center px-6" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
+          <Link href="/dashboard" className="flex items-center gap-2 font-serif font-bold text-xl tracking-tight" style={{ color: '#fff' }}>
+            <span className="h-8 w-8 flex items-center justify-center rounded-sm" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>P</span>
             Synops Praxis
           </Link>
         </div>
 
-        <nav className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
-          {navItems.map(item => (
-            <Link
-              key={item.href + item.label}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                isNavActive(item.href)
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-              }`}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {item.label}
-            </Link>
+        <nav className="flex-1 py-5 px-3 overflow-y-auto">
+          {navGroups.map((group, gi) => (
+            <div key={gi} className="mb-1 space-y-0.5">
+              {group.heading && groupHeading(group.heading)}
+              {group.items.map((item) => (
+                <ShellNavLink key={item.href + item.label} item={item} active={isNavActive(item.href)} />
+              ))}
+            </div>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-border space-y-1">
-          {/* Avatar + user info */}
+        <div className="p-4 space-y-1" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
           <div className="flex items-center gap-3 px-3 py-2 mb-2">
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarImage src={user.avatarUrl || undefined} />
-              <AvatarFallback className="bg-primary/10 text-primary">
+              <AvatarFallback style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>
                 {user.firstName?.[0] || user.email[0]}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium leading-none text-foreground truncate">
+              <span className="text-sm font-medium leading-none truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>
                 {user.firstName} {user.lastName}
               </span>
-              <span className="text-xs text-muted-foreground mt-1 uppercase tracking-wider">
+              <span className="text-xs mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>
                 {user.role.replace('_', ' ')}
               </span>
             </div>
           </div>
 
-          <Link
-            href="/notifications"
-            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-          >
-            <div className="relative">
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </div>
-            {t('nav.notifications')}
-            {unreadCount > 0 && (
-              <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </Link>
+          <ShellNavLink
+            item={{ label: t('nav.notifications'), href: '/notifications', icon: Bell }}
+            active={isNavActive('/notifications')}
+          />
+          {unreadCount > 0 && (
+            <span className="ml-3 inline-block bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+              {unreadCount > 9 ? '9+' : unreadCount} new
+            </span>
+          )}
 
-          <LanguageSwitcher variant="full" />
+          <div className="px-1"><LanguageSwitcher variant="full" /></div>
 
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
+            style={{ color: 'rgba(255,255,255,0.5)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
           >
             <LogOut className="h-4 w-4 shrink-0" />
             {t('nav.signOut')}
@@ -239,86 +326,69 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* ── Mobile full-screen menu drawer ─────────────────── */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex flex-col bg-background">
-          {/* Header */}
-          <div className="h-14 flex items-center justify-between px-5 border-b border-border shrink-0">
-            <span className="font-serif font-bold text-base">Synops Praxis</span>
+        <div className="fixed inset-0 z-50 md:hidden flex flex-col" style={{ background: SIDEBAR_BG }}>
+          <div className="h-14 flex items-center justify-between px-5 shrink-0" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
+            <span className="font-serif font-bold text-base" style={{ color: '#fff' }}>Synops Praxis</span>
             <button
               onClick={() => setMobileMenuOpen(false)}
-              className="p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              className="p-2 rounded-md"
+              style={{ color: 'rgba(255,255,255,0.6)' }}
               aria-label="Close menu"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* User info */}
-          <div className="px-5 py-4 border-b border-border shrink-0 flex items-center gap-3">
+          <div className="px-5 py-4 shrink-0 flex items-center gap-3" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
             <Avatar className="h-10 w-10 shrink-0">
               <AvatarImage src={user.avatarUrl || undefined} />
-              <AvatarFallback className="bg-primary/10 text-primary">
+              <AvatarFallback style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>
                 {user.firstName?.[0] || user.email[0]}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
+              <p className="text-sm font-medium truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>
                 {user.firstName} {user.lastName}
               </p>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">
+              <p className="text-xs uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>
                 {user.role.replace('_', ' ')}
               </p>
             </div>
           </div>
 
-          {/* Nav links */}
-          <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-            {navItems.map(item => (
-              <Link
-                key={item.href + item.label}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-colors ${
-                  isNavActive(item.href)
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                }`}
-              >
-                <item.icon className="h-5 w-5 shrink-0" />
-                {item.label}
-              </Link>
+          <nav className="flex-1 overflow-y-auto px-4 py-4">
+            {navGroups.map((group, gi) => (
+              <div key={gi} className="mb-1 space-y-0.5">
+                {group.heading && groupHeading(group.heading)}
+                {group.items.map((item) => (
+                  <ShellNavLink
+                    key={item.href + item.label}
+                    item={item}
+                    active={isNavActive(item.href)}
+                    large
+                    onClick={() => setMobileMenuOpen(false)}
+                  />
+                ))}
+              </div>
             ))}
 
-            <Link
-              href="/notifications"
+            <ShellNavLink
+              item={{ label: t('nav.notifications'), href: '/notifications', icon: Bell }}
+              active={isNavActive('/notifications')}
+              large
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-            >
-              <div className="relative">
-                <Bell className="h-5 w-5" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 h-4 w-4 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full">
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </div>
-              {t('nav.notifications')}
-              {unreadCount > 0 && (
-                <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </Link>
+            />
           </nav>
 
-          {/* Footer — language + sign out */}
-          <div className="px-4 pb-6 pt-2 border-t border-border shrink-0 space-y-1">
+          <div className="px-4 pb-6 pt-2 shrink-0 space-y-1" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
             <div className="flex items-center gap-3 px-4 py-3">
               <LanguageSwitcher variant="icon" />
-              <span className="text-sm font-medium text-muted-foreground">{t('language.label')}</span>
+              <span className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.6)' }}>{t('language.label')}</span>
             </div>
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg text-base font-medium"
+              style={{ color: 'rgba(255,255,255,0.6)' }}
             >
               <LogOut className="h-5 w-5 shrink-0" />
               {t('nav.signOut')}
@@ -330,22 +400,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* ── Main content ─────────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Mobile top header */}
-        <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:hidden shrink-0">
+        <header className="h-14 flex items-center justify-between px-4 md:hidden shrink-0" style={{ background: SIDEBAR_BG }}>
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-2 -ml-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            className="p-2 -ml-2 rounded-md"
+            style={{ color: 'rgba(255,255,255,0.7)' }}
             aria-label="Open menu"
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          <Link href="/dashboard" className="font-serif font-bold text-base text-foreground">
+          <Link href="/dashboard" className="font-serif font-bold text-base" style={{ color: '#fff' }}>
             Synops Praxis
           </Link>
 
           <div className="flex items-center gap-1">
             <LanguageSwitcher variant="icon" />
-            <Link href="/notifications" className="relative p-2 text-muted-foreground hover:text-foreground">
+            <Link href="/notifications" className="relative p-2" style={{ color: 'rgba(255,255,255,0.7)' }}>
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 h-4 w-4 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full">
@@ -365,24 +436,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* ── Mobile bottom tab bar ────────────────────────────── */}
-      <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden bg-card/95 backdrop-blur-md border-t border-border">
+      <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden" style={{ background: SIDEBAR_BG, borderTop: `1px solid ${HAIRLINE}` }}>
         <div className="flex items-stretch h-16">
-          {bottomItems.map(item => (
-            <Link
-              key={item.href + item.label}
-              href={item.href}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors ${
-                item.isActive ? 'text-primary' : 'text-muted-foreground'
-              }`}
-            >
-              <item.icon className={`h-5 w-5 ${item.isActive ? 'stroke-[2.5]' : 'stroke-[1.5]'}`} />
-              <span className="leading-none">{item.label}</span>
-            </Link>
-          ))}
+          {bottomItems.map((item) => {
+            const active = isNavActive(item.href);
+            return (
+              <Link
+                key={item.href + item.label}
+                href={item.href}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium"
+                style={{ color: active ? '#fff' : 'rgba(255,255,255,0.5)' }}
+              >
+                <item.icon className={`h-5 w-5 ${active ? 'stroke-[2.5]' : 'stroke-[1.5]'}`} />
+                <span className="leading-none">{item.label}</span>
+              </Link>
+            );
+          })}
 
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium"
+            style={{ color: 'rgba(255,255,255,0.5)' }}
           >
             <Menu className="h-5 w-5 stroke-[1.5]" />
             <span className="leading-none">{t('nav.more')}</span>

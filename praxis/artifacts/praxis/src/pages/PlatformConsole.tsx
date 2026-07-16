@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/SessionContext";
-import { AdminShell } from "@/components/layout/AdminShell";
 import {
   platformApi,
   type PlatformUserRow,
@@ -787,21 +786,38 @@ export function PlatformConsole() {
   const [selected, setSelected] = useState<PlatformUserRow | null>(null);
 
   // Belt-and-braces: every /platform/* endpoint is guarded by requireSuperAdmin, but keep
-  // non-super users out of the console shell entirely.
+  // non-super users out of the console entirely.
   if (user && user.role !== "super_admin") {
     return <Redirect to="/dashboard" />;
   }
 
-  const activeLabel = TABS.find((t) => t.id === tab)?.label ?? "Platform";
-
   return (
-    <AdminShell
-      sections={TABS.map((t) => ({ id: t.id, label: t.label }))}
-      active={tab}
-      onSelect={(id) => setTab(id as TabId)}
-      title={tab === "overview" ? "Platform overview" : activeLabel}
-      subtitle={SECTION_SUBTITLE[tab]}
-    >
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <div>
+        <h1 className="text-2xl font-serif font-bold tracking-tight" style={{ color: "hsl(60 5% 14%)" }}>
+          {tab === "overview" ? "Platform overview" : (TABS.find((t) => t.id === tab)?.label ?? "Platform")}
+        </h1>
+        <p className="text-sm mt-1" style={{ color: "hsl(43 10% 45%)" }}>{SECTION_SUBTITLE[tab]}</p>
+      </div>
+
+      {/* Section nav — kept as a tab bar so the console lives inside the one app shell. */}
+      <div className="flex gap-1 border-b" style={{ borderColor: "hsl(43 15% 88%)" }}>
+        {TABS.map((tItem) => (
+          <button
+            key={tItem.id}
+            onClick={() => setTab(tItem.id)}
+            className="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
+            style={
+              tab === tItem.id
+                ? { borderColor: "hsl(222 47% 20%)", color: "hsl(60 5% 14%)" }
+                : { borderColor: "transparent", color: "hsl(43 10% 50%)" }
+            }
+          >
+            {tItem.label}
+          </button>
+        ))}
+      </div>
+
       {tab === "overview" && <OverviewTab />}
       {tab === "users" && <UsersTab onOpen={setSelected} />}
       {tab === "activity" && <ActivityTab />}
@@ -811,6 +827,6 @@ export function PlatformConsole() {
       {tab === "keys" && <ApiKeysTab />}
 
       <UserDialog user={selected} onClose={() => setSelected(null)} />
-    </AdminShell>
+    </div>
   );
 }
