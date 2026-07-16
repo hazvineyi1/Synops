@@ -147,6 +147,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
+          { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
           { label: t('nav.reports'), href: '/reports', icon: FileText },
           { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],
@@ -208,6 +209,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           heading: t('nav.groups.quality', 'Quality & Reports'),
           items: [
             { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
+          { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
             { label: t('nav.reports'), href: '/reports', icon: FileText },
             { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
           ],
@@ -233,6 +235,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.studio'), href: '/studio', icon: PenTool },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
+          { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],

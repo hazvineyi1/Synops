@@ -37,6 +37,8 @@ async function buildAll() {
       "mammoth",
       "xlsx",
       "jszip",
+      "pdfkit",
+      "pdfkit/*",
       "sharp",
       "better-sqlite3",
       "sqlite3",

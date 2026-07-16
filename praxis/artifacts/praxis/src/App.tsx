@@ -45,6 +45,7 @@ import { AdminFunders } from '@/pages/AdminFunders';
 import { Delivery } from '@/pages/Delivery';
 import { MyAttendance } from '@/pages/MyAttendance';
 import { Compliance } from '@/pages/Compliance';
+import { Accreditation } from '@/pages/Accreditation';
 import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
 import { ActivityPlay } from '@/pages/ActivityPlay';
 import { ActivityEmbed } from '@/pages/ActivityEmbed';
@@ -203,6 +204,7 @@ function Routes() {
         <ProtectedRoute path="/delivery" component={Delivery} />
         <ProtectedRoute path="/my-attendance" component={MyAttendance} />
         <ProtectedRoute path="/compliance" component={Compliance} />
+        <ProtectedRoute path="/accreditation" component={Accreditation} />
         <ProtectedRoute path="/activities" component={ActivitiesAdmin} />
         <ProtectedRoute path="/support/:ticketId" component={Support} />
         <ProtectedRoute path="/support" component={Support} />
