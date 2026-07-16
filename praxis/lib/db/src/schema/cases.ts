@@ -55,6 +55,8 @@ export const caseScenariosTable = pgTable("case_scenarios", {
   tutorName: text("tutor_name"),
   /** Tutor face: a preset key (f1/f2/f3/m1/m2/m3) or a data:/https image URL for a custom upload. */
   tutorAvatar: text("tutor_avatar"),
+  /** Default dialogue language: en | zu (isiZulu) | xh (isiXhosa) | af (Afrikaans) | sn (Shona). */
+  language: text("language").notNull().default("en"),
   difficulty: text("difficulty", { enum: ["foundational", "intermediate", "advanced"] }).notNull().default("intermediate"),
   bloomsLevel: text("blooms_level"),
   promptLimit: integer("prompt_limit").notNull().default(8),
@@ -94,6 +96,8 @@ export const caseSessionsTable = pgTable("case_sessions", {
   embedLinkId: text("embed_link_id"),
   userId: text("user_id"),
   learnerName: text("learner_name"),
+  /** The language this attempt is running in (learner's choice; falls back to the case default). */
+  language: text("language"),
   messages: jsonb("messages").$type<CaseMessage[]>().notNull().default([]),
   promptCount: integer("prompt_count").notNull().default(0),
   promptLimit: integer("prompt_limit").notNull().default(8),

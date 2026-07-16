@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/SessionContext";
 import {
   casesApi,
+  LANGUAGES,
   type CaseInput,
   type RubricCriterion,
   type EmbedLink,
@@ -69,6 +70,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
       aiPersona: data.aiPersona ?? "",
       tutorName: data.tutorName ?? "",
       tutorAvatar: data.tutorAvatar ?? "",
+      language: data.language ?? "en",
       difficulty: data.difficulty,
       promptLimit: data.promptLimit,
       status: data.status,
@@ -169,6 +171,11 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
             <div className="mt-3">
               <AvatarPicker value={form.tutorAvatar || null} onChange={(v) => set("tutorAvatar", v ?? "")} />
             </div>
+          </Field>
+          <Field label="Language" hint="The language the tutor runs the dialogue in. Learners can also switch language during a session.">
+            <select className={`${inputCls} max-w-xs`} value={form.language ?? "en"} onChange={(e) => set("language", e.target.value)}>
+              {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+            </select>
           </Field>
           <Field label="Context / fact pattern" hint="The scenario the learner works through. The AI grounds every question strictly in this.">
             <textarea className={inputCls} rows={6} value={form.contextBlock ?? ""} onChange={(e) => set("contextBlock", e.target.value)} />

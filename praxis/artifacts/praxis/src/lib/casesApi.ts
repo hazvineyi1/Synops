@@ -1,5 +1,15 @@
 import { API, apiFetch } from "@/lib/api";
 
+/** Supported tutor dialogue languages. bcp47 is used to hint the browser speech voice. */
+export const LANGUAGES: { code: string; name: string; bcp47: string }[] = [
+  { code: "en", name: "English", bcp47: "en-ZA" },
+  { code: "zu", name: "isiZulu", bcp47: "zu-ZA" },
+  { code: "xh", name: "isiXhosa", bcp47: "xh-ZA" },
+  { code: "af", name: "Afrikaans", bcp47: "af-ZA" },
+  { code: "sn", name: "Shona", bcp47: "sn-ZW" },
+];
+export const bcp47 = (code?: string | null) => LANGUAGES.find((l) => l.code === code)?.bcp47 ?? "en-ZA";
+
 /**
  * Client for the authored-case / scenario vehicle (/cases, /case-sessions, /case-embed).
  * Added after the orval client was generated, so hand-written like platformApi.
@@ -31,6 +41,7 @@ export interface CaseRow {
   aiPersona: string | null;
   tutorName: string | null;
   tutorAvatar: string | null;
+  language: string;
   difficulty: "foundational" | "intermediate" | "advanced";
   bloomsLevel: string | null;
   promptLimit: number;
@@ -69,6 +80,9 @@ export interface CaseSessionRow {
   tutorName?: string | null;
   tutorAvatar?: string | null;
   caseTitle?: string | null;
+  language?: string | null;
+  contextBlock?: string | null;
+  learningObjective?: string | null;
 }
 
 export interface EmbedLink {

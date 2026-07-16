@@ -32,6 +32,9 @@ import { ensureQuestion } from "../lib/socraticEngine";
  */
 const router = Router();
 
+const LANGS = ["en", "zu", "xh", "af", "sn"];
+const validLang = (l: unknown): l is string => typeof l === "string" && LANGS.includes(l);
+
 async function resolveLink(token: string): Promise<{ link: CaseEmbedLink; caseRow: CaseScenario } | null> {
   const link = await db.query.caseEmbedLinksTable.findFirst({ where: eq(caseEmbedLinksTable.token, token) });
   if (!link || !link.isActive) return null;
@@ -41,7 +44,7 @@ async function resolveLink(token: string): Promise<{ link: CaseEmbedLink; caseRo
   return { link, caseRow };
 }
 
-function ctx(c: CaseScenario, learnerName: string | null, turnCount: number): CaseContext {
+function ctx(c: CaseScenario, learnerName: string | null, turnCount: number, language?: string | null): CaseContext {
   return {
     title: c.title,
     learningObjective: c.learningObjective,
@@ -51,6 +54,7 @@ function ctx(c: CaseScenario, learnerName: string | null, turnCount: number): Ca
     aiConstraints: c.aiConstraints,
     guidingInstructions: c.guidingInstructions,
     aiPersona: c.aiPersona,
+    language: language ?? c.language,
     promptLimit: c.promptLimit,
     learnerName,
     turnCount,
@@ -76,6 +80,7 @@ router.get("/case-embed/:token", async (req, res) => {
     promptLimit: caseRow.promptLimit,
     tutorName: caseRow.tutorName,
     tutorAvatar: caseRow.tutorAvatar,
+    language: caseRow.language,
   });
 });
 
@@ -85,12 +90,13 @@ router.post("/case-embed/:token/start", async (req, res) => {
   if (!resolved) { res.status(404).json({ error: "This link is not available." }); return; }
   const { link, caseRow } = resolved;
   const learnerName = typeof req.body?.learnerName === "string" && req.body.learnerName.trim() ? req.body.learnerName.trim().slice(0, 80) : null;
+  const lang = validLang(req.body?.language) ? req.body.language : caseRow.language;
 
-  const opening = await generateCaseOpening(ctx(caseRow, learnerName, 0));
+  const opening = await generateCaseOpening(ctx(caseRow, learnerName, 0, lang));
   const messages: CaseMessage[] = [{ role: "tutor", content: opening, at: new Date().toISOString() }];
   const [s] = await db
     .insert(caseSessionsTable)
-    .values({ caseId: caseRow.id, organisationId: caseRow.organisationId, embedLinkId: link.id, learnerName, messages, promptLimit: caseRow.promptLimit, status: "in_progress" })
+    .values({ caseId: caseRow.id, organisationId: caseRow.organisationId, embedLinkId: link.id, learnerName, language: lang, messages, promptLimit: caseRow.promptLimit, status: "in_progress" })
     .returning();
   res.status(201).json({ sessionId: s.id, messages, promptLimit: s.promptLimit, promptCount: 0 });
 });
@@ -107,6 +113,11 @@ router.post("/case-embed/:token/chat", async (req, res) => {
   if (!s || s.caseId !== caseRow.id) { res.status(404).json({ error: "Session not found" }); return; }
   if (s.status !== "in_progress") { res.status(400).json({ error: "Session completed" }); return; }
 
+  const lang = validLang(req.body?.language) ? req.body.language : (s.language ?? caseRow.language);
+  if (validLang(req.body?.language) && req.body.language !== s.language) {
+    await db.update(caseSessionsTable).set({ language: lang }).where(eq(caseSessionsTable.id, s.id));
+  }
+
   const learnerMsg: CaseMessage = { role: "learner", content: String(response), at: new Date().toISOString() };
   const history = [...(s.messages ?? []), learnerMsg];
 
@@ -116,7 +127,7 @@ router.post("/case-embed/:token/chat", async (req, res) => {
   res.flushHeaders();
 
   try {
-    const system = buildCaseSystemPrompt(ctx(caseRow, s.learnerName, s.promptCount), false);
+    const system = buildCaseSystemPrompt(ctx(caseRow, s.learnerName, s.promptCount, lang), false);
     const chat = history.map((m) => ({ role: m.role === "tutor" ? ("assistant" as const) : ("user" as const), content: m.content }));
 
     let full = "";
@@ -160,7 +171,7 @@ router.post("/case-embed/:token/analysis", async (req, res) => {
   }
   const rubric = await db.query.caseRubricsTable.findFirst({ where: eq(caseRubricsTable.caseId, caseRow.id) });
   const analysis = await generateCaseAnalysis(
-    { title: caseRow.title, learningObjective: caseRow.learningObjective, contextBlock: caseRow.contextBlock, focusAreas: caseRow.focusAreas },
+    { title: caseRow.title, learningObjective: caseRow.learningObjective, contextBlock: caseRow.contextBlock, focusAreas: caseRow.focusAreas, language: s.language ?? caseRow.language },
     s.messages ?? [],
     rubric ? { criteria: rubric.criteria } : null
   );

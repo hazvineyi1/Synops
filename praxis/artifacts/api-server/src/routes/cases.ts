@@ -28,6 +28,9 @@ import { ensureQuestion } from "../lib/socraticEngine";
 
 const router = Router();
 
+const LANGS = ["en", "zu", "xh", "af", "sn"];
+const validLang = (l: unknown): l is string => typeof l === "string" && LANGS.includes(l);
+
 type U = { id: string; role: string; organisationId?: string | null; partnerId?: string | null; firstName?: string | null; lastName?: string | null; email: string };
 
 /** Who may author cases: Hub roles (super admin + instructional designer) or a Facilitator. */
@@ -80,6 +83,7 @@ function caseResponse(c: CaseScenario) {
     aiPersona: c.aiPersona,
     tutorName: c.tutorName,
     tutorAvatar: c.tutorAvatar,
+    language: c.language,
     difficulty: c.difficulty,
     bloomsLevel: c.bloomsLevel,
     promptLimit: c.promptLimit,
@@ -164,6 +168,7 @@ router.post("/cases", requireAuth, async (req, res) => {
       aiPersona: b.aiPersona ?? null,
       tutorName: b.tutorName ?? null,
       tutorAvatar: b.tutorAvatar ?? null,
+      language: validLang(b.language) ? b.language : "en",
       difficulty: ["foundational", "intermediate", "advanced"].includes(b.difficulty) ? b.difficulty : "intermediate",
       bloomsLevel: b.bloomsLevel ?? null,
       promptLimit: Number.isFinite(b.promptLimit) ? Math.max(3, Math.min(20, Math.round(b.promptLimit))) : 8,
@@ -195,6 +200,7 @@ router.put("/cases/:id", requireAuth, async (req, res) => {
   assign("aiPersona", b.aiPersona);
   assign("tutorName", b.tutorName);
   assign("tutorAvatar", b.tutorAvatar);
+  if (validLang(b.language)) up.language = b.language;
   if (b.difficulty !== undefined && ["foundational", "intermediate", "advanced"].includes(b.difficulty)) up.difficulty = b.difficulty;
   assign("bloomsLevel", b.bloomsLevel);
   if (b.promptLimit !== undefined && Number.isFinite(b.promptLimit)) up.promptLimit = Math.max(3, Math.min(20, Math.round(b.promptLimit)));
@@ -249,6 +255,7 @@ router.post("/cases/:id/fork", requireAuth, async (req, res) => {
       aiPersona: c.aiPersona,
       tutorName: c.tutorName,
       tutorAvatar: c.tutorAvatar,
+      language: c.language,
       difficulty: c.difficulty,
       bloomsLevel: c.bloomsLevel,
       promptLimit: c.promptLimit,
@@ -355,6 +362,7 @@ function sessionResponse(s: typeof caseSessionsTable.$inferSelect) {
     id: s.id,
     caseId: s.caseId,
     status: s.status,
+    language: s.language,
     messages: s.messages,
     promptCount: s.promptCount,
     promptLimit: s.promptLimit,
@@ -369,7 +377,7 @@ function sessionResponse(s: typeof caseSessionsTable.$inferSelect) {
   };
 }
 
-function ctxFromCase(c: CaseScenario, learner: U | null, turnCount: number): CaseContext {
+function ctxFromCase(c: CaseScenario, learner: U | null, turnCount: number, language?: string | null): CaseContext {
   return {
     title: c.title,
     learningObjective: c.learningObjective,
@@ -379,6 +387,7 @@ function ctxFromCase(c: CaseScenario, learner: U | null, turnCount: number): Cas
     aiConstraints: c.aiConstraints,
     guidingInstructions: c.guidingInstructions,
     aiPersona: c.aiPersona,
+    language: language ?? c.language,
     promptLimit: c.promptLimit,
     learnerName: learner?.firstName ?? null,
     personality: (learner as unknown as { coachPersonality?: string } | null)?.coachPersonality ?? null,
@@ -395,13 +404,14 @@ router.post("/cases/:id/sessions", requireAuth, async (req, res) => {
   if (!c || !caseInScope(u, c)) { res.status(404).json({ error: "Not found" }); return; }
   if (c.status !== "published" && !canManageCase(u, c)) { res.status(403).json({ error: "This case is not published yet." }); return; }
 
-  const opening = await generateCaseOpening(ctxFromCase(c, req.dbUser as unknown as U, 0));
+  const lang = validLang(req.body?.language) ? req.body.language : c.language;
+  const opening = await generateCaseOpening(ctxFromCase(c, req.dbUser as unknown as U, 0, lang));
   const messages: CaseMessage[] = [{ role: "tutor", content: opening, at: new Date().toISOString() }];
   const [s] = await db
     .insert(caseSessionsTable)
-    .values({ caseId: c.id, organisationId: c.organisationId, userId: u.id, learnerName: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email, messages, promptLimit: c.promptLimit, status: "in_progress" })
+    .values({ caseId: c.id, organisationId: c.organisationId, userId: u.id, learnerName: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email, language: lang, messages, promptLimit: c.promptLimit, status: "in_progress" })
     .returning();
-  res.status(201).json({ ...sessionResponse(s), tutorName: c.tutorName, tutorAvatar: c.tutorAvatar, caseTitle: c.title });
+  res.status(201).json({ ...sessionResponse(s), tutorName: c.tutorName, tutorAvatar: c.tutorAvatar, caseTitle: c.title, contextBlock: c.contextBlock, learningObjective: c.learningObjective });
 });
 
 // GET /case-sessions/my
@@ -429,7 +439,7 @@ router.get("/case-sessions/:id", requireAuth, async (req, res) => {
   if (s.userId !== u.id) {
     if (!cs || !canManageCase(u, cs)) { res.status(404).json({ error: "Not found" }); return; }
   }
-  res.json({ ...sessionResponse(s), tutorName: cs?.tutorName ?? null, tutorAvatar: cs?.tutorAvatar ?? null, caseTitle: cs?.title ?? null });
+  res.json({ ...sessionResponse(s), tutorName: cs?.tutorName ?? null, tutorAvatar: cs?.tutorAvatar ?? null, caseTitle: cs?.title ?? null, contextBlock: cs?.contextBlock ?? null, learningObjective: cs?.learningObjective ?? null });
 });
 
 // POST /case-sessions/:id/message — SSE streaming Socratic turn.
@@ -443,6 +453,12 @@ router.post("/case-sessions/:id/message", requireAuth, async (req, res) => {
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, s.caseId) });
   if (!c) { res.status(404).json({ error: "Case not found" }); return; }
 
+  // Learner may switch language mid-session; persist the change for later turns + analysis.
+  const lang = validLang(req.body?.language) ? req.body.language : (s.language ?? c.language);
+  if (validLang(req.body?.language) && req.body.language !== s.language) {
+    await db.update(caseSessionsTable).set({ language: lang }).where(eq(caseSessionsTable.id, s.id));
+  }
+
   const learnerMsg: CaseMessage = { role: "learner", content: response, at: new Date().toISOString() };
   const history = [...(s.messages ?? []), learnerMsg];
 
@@ -452,7 +468,7 @@ router.post("/case-sessions/:id/message", requireAuth, async (req, res) => {
   res.flushHeaders();
 
   try {
-    const ctx = ctxFromCase(c, req.dbUser as unknown as U, s.promptCount);
+    const ctx = ctxFromCase(c, req.dbUser as unknown as U, s.promptCount, lang);
     const system = buildCaseSystemPrompt(ctx, false);
     const chat = history.map((m) => ({ role: m.role === "tutor" ? ("assistant" as const) : ("user" as const), content: m.content }));
 
@@ -497,7 +513,7 @@ router.post("/case-sessions/:id/complete", requireAuth, async (req, res) => {
   const rubric = await db.query.caseRubricsTable.findFirst({ where: eq(caseRubricsTable.caseId, c.id) });
 
   const analysis = await generateCaseAnalysis(
-    { title: c.title, learningObjective: c.learningObjective, contextBlock: c.contextBlock, focusAreas: c.focusAreas },
+    { title: c.title, learningObjective: c.learningObjective, contextBlock: c.contextBlock, focusAreas: c.focusAreas, language: s.language ?? c.language },
     s.messages ?? [],
     rubric ? { criteria: rubric.criteria } : null
   );

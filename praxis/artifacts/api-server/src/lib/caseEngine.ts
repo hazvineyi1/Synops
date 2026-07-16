@@ -13,6 +13,18 @@ import type { RubricCriterion, CaseMessage, CaseRubricScore } from "@workspace/d
 const MODEL = "claude-sonnet-4-6";
 const ANALYSIS_MODEL = "claude-sonnet-4-6";
 
+/** Supported dialogue languages. */
+export const LANG_NAMES: Record<string, string> = {
+  en: "English",
+  zu: "isiZulu",
+  xh: "isiXhosa",
+  af: "Afrikaans",
+  sn: "Shona",
+};
+export function languageName(code?: string | null): string {
+  return LANG_NAMES[code ?? "en"] ?? "English";
+}
+
 export interface CaseContext {
   title: string;
   learningObjective?: string | null;
@@ -23,6 +35,8 @@ export interface CaseContext {
   guidingInstructions?: string | null;
   /** Domain-expert identity for the tutor (content-agnostic). Null = neutral mentor. */
   aiPersona?: string | null;
+  /** Dialogue language code: en | zu | xh | af | sn. */
+  language?: string | null;
   promptLimit?: number | null;
   // Learner personalisation — present for authenticated sessions, absent for embed.
   learnerName?: string | null;
@@ -57,6 +71,15 @@ const DEFAULT_PERSONA = "a pragmatic entrepreneurship mentor who has built and a
 export function buildCaseSystemPrompt(c: CaseContext, isOpening: boolean): string {
   let prompt = buildSocraticSystemPrompt(toSocraticContext(c), isOpening);
   const extra: string[] = [];
+
+  // Language override — takes precedence over the base rule's "South African English".
+  const lang = c.language ?? "en";
+  if (lang !== "en") {
+    const name = languageName(lang);
+    extra.push(
+      `LANGUAGE - ABSOLUTE OVERRIDE: Conduct this ENTIRE session in ${name}. Every question you write MUST be in natural, fluent ${name}, ignoring any earlier instruction to use English. If the learner replies in another language, still ask your next question in ${name} unless they explicitly ask you to switch. All other Socratic rules still apply.`
+    );
+  }
 
   // Domain-expert identity — set FIRST so every question comes from the right professional
   // lens (finance, sales, ops, marketing, law, etc.), while the Socratic rules above still
@@ -133,10 +156,13 @@ function transcriptText(messages: CaseMessage[]): string {
  * rubric is supplied — awards points per criterion. Returns strict JSON.
  */
 export async function generateCaseAnalysis(
-  c: { title: string; learningObjective?: string | null; contextBlock: string; focusAreas?: string[] | null },
+  c: { title: string; learningObjective?: string | null; contextBlock: string; focusAreas?: string[] | null; language?: string | null },
   messages: CaseMessage[],
   rubric?: { criteria: RubricCriterion[] } | null
 ): Promise<CaseAnalysis> {
+  const langLine = c.language && c.language !== "en"
+    ? `\nWrite engagementNarrative, conceptsAddressed, reasoningStrengths, developmentAreas and every rubric note in ${languageName(c.language)} (the language of the dialogue). Keep the JSON keys exactly as given in English.`
+    : "";
   const rubricBlock =
     rubric?.criteria?.length
       ? `\n\nRUBRIC — award points per criterion (0..maxPoints) based ONLY on evidence in the transcript:\n` +
@@ -159,7 +185,7 @@ Return a SINGLE strict JSON object, no prose around it:
   "reasoningStrengths": [string],
   "developmentAreas": [string],
   "engagementScore": number (1-10, 10 = expert-level reasoning fully applied to the facts)${rubricShape}
-}${rubricBlock}`;
+}${rubricBlock}${langLine}`;
 
   try {
     const msg = await anthropic.messages.create({
