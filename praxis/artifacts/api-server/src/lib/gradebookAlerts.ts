@@ -1,0 +1,203 @@
+import { db } from "@workspace/db";
+import {
+  gradebookItemsTable,
+  gradebookAlertsTable,
+  coachPlansTable,
+  enrolmentsTable,
+  usersTable,
+  courseGroupsTable,
+  courseGroupMembersTable,
+  coursesTable,
+  notificationsTable,
+} from "@workspace/db";
+import { eq, and, inArray } from "drizzle-orm";
+import { recomputeLearnerAlert, REASON_LABEL, type AlertTransition } from "./gradebookEngine";
+import { generateStudyPlan } from "./studyPlanEngine";
+
+/**
+ * Off-track orchestration: recompute a learner's alert after a grade event and, when they
+ * NEWLY cross into off_track, auto-generate an adaptive study plan and raise in-app alerts
+ * to the learner, their section coach(es) and org admins. In-app only (email is deferred).
+ *
+ * Everything here is best-effort and wrapped so it can never break the grade-write path.
+ */
+
+const today = (): string => new Date().toISOString().slice(0, 10);
+
+/** Learner + the staff who should be told when that learner falls behind in a course. */
+async function offTrackStaff(courseId: string, learner: { id: string; organisationId?: string | null }): Promise<string[]> {
+  const staff = new Set<string>();
+  try {
+    // Section coaches: leaders of groups in this course that contain the learner.
+    const memberGroups = await db
+      .select({ groupId: courseGroupMembersTable.groupId })
+      .from(courseGroupMembersTable)
+      .innerJoin(courseGroupsTable, eq(courseGroupMembersTable.groupId, courseGroupsTable.id))
+      .where(and(eq(courseGroupMembersTable.userId, learner.id), eq(courseGroupsTable.courseId, courseId)));
+    const groupIds = [...new Set(memberGroups.map((g) => g.groupId))];
+    if (groupIds.length) {
+      const leaders = await db
+        .select({ userId: courseGroupMembersTable.userId })
+        .from(courseGroupMembersTable)
+        .where(and(inArray(courseGroupMembersTable.groupId, groupIds), eq(courseGroupMembersTable.role, "leader")));
+      leaders.forEach((l) => staff.add(l.userId));
+    }
+    // Org admins for the learner's organisation.
+    if (learner.organisationId) {
+      const admins = await db
+        .select({ id: usersTable.id })
+        .from(usersTable)
+        .where(
+          and(
+            eq(usersTable.organisationId, learner.organisationId),
+            inArray(usersTable.role, ["org_admin", "partner_admin"]),
+          ),
+        );
+      admins.forEach((a) => staff.add(a.id));
+    }
+  } catch {
+    /* best-effort */
+  }
+  staff.delete(learner.id);
+  return [...staff];
+}
+
+/** Handle a learner who just became off_track in a course: plan + notifications. */
+async function handleNewOffTrack(courseId: string, userId: string, transition: AlertTransition): Promise<void> {
+  const learner = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
+  const courseTitle = course?.title ?? "your course";
+  const reasonsText = (transition.reasons || []).map((r) => REASON_LABEL[r] || r).join("; ");
+
+  // Auto-generate an adaptive study plan from the learner's gaps.
+  let planCreated = false;
+  const plan = await generateStudyPlan({ courseId, userId, learnerName: learner?.firstName ?? null });
+  if (plan) {
+    try {
+      await db
+        .update(coachPlansTable)
+        .set({ status: "completed", updatedAt: new Date() })
+        .where(
+          and(
+            eq(coachPlansTable.userId, userId),
+            eq(coachPlansTable.courseId, courseId),
+            eq(coachPlansTable.source, "gradebook_alert"),
+            eq(coachPlansTable.status, "active"),
+          ),
+        );
+      const [row] = await db
+        .insert(coachPlansTable)
+        .values({
+          userId,
+          planDate: today(),
+          rationale: plan.rationale,
+          items: plan.items,
+          status: "active",
+          courseId,
+          source: "gradebook_alert",
+        })
+        .returning();
+      if (row) {
+        planCreated = true;
+        await db
+          .update(gradebookAlertsTable)
+          .set({ planId: row.id, notifiedAt: new Date(), updatedAt: new Date() })
+          .where(and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)));
+      }
+    } catch {
+      /* best-effort */
+    }
+  } else {
+    await db
+      .update(gradebookAlertsTable)
+      .set({ notifiedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)))
+      .catch(() => undefined);
+  }
+
+  // In-app notifications.
+  try {
+    await db.insert(notificationsTable).values({
+      userId,
+      type: "system",
+      title: planCreated ? "A study plan is ready to get you back on track" : "Let's get you back on track",
+      body: `In ${courseTitle} we noticed you're falling behind${reasonsText ? ` (${reasonsText.toLowerCase()})` : ""}.${planCreated ? " We've built a short personalised plan for you." : " Your coach has been notified."}`,
+      link: "/grades",
+      courseId,
+    });
+    const staffIds = await offTrackStaff(courseId, { id: userId, organisationId: learner?.organisationId ?? null });
+    const learnerName = [learner?.firstName, learner?.lastName].filter(Boolean).join(" ") || "A learner";
+    for (const sid of staffIds) {
+      await db.insert(notificationsTable).values({
+        userId: sid,
+        type: "system",
+        title: `${learnerName} may need support`,
+        body: `${learnerName} is off track in ${courseTitle}${reasonsText ? `: ${reasonsText.toLowerCase()}` : ""}.`,
+        link: `/courses/${courseId}/gradebook`,
+        courseId,
+        actorId: userId,
+      });
+    }
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * Called after any grade-affecting event. Resolves which course gradebooks the source feeds,
+ * recomputes the learner's alert in each, and orchestrates plan + notifications on a new
+ * off_track transition. Never throws.
+ */
+export async function onGradeEvent(opts: {
+  sourceType: "assignment" | "case" | "activity" | "manual";
+  sourceId?: string | null;
+  courseId?: string | null;
+  userId: string;
+  notify?: boolean; // default true; staff manual edits pass false to just refresh state
+}): Promise<void> {
+  const notify = opts.notify !== false;
+  try {
+    const courseIds = new Set<string>();
+    if (opts.courseId) courseIds.add(opts.courseId);
+    if (opts.sourceId) {
+      const items = await db
+        .select({ courseId: gradebookItemsTable.courseId })
+        .from(gradebookItemsTable)
+        .where(and(eq(gradebookItemsTable.sourceType, opts.sourceType), eq(gradebookItemsTable.sourceId, opts.sourceId)));
+      items.forEach((i) => courseIds.add(i.courseId));
+    }
+    for (const courseId of courseIds) {
+      const enrolled = await db.query.enrolmentsTable.findFirst({
+        where: and(eq(enrolmentsTable.courseId, courseId), eq(enrolmentsTable.userId, opts.userId)),
+      });
+      if (!enrolled) continue;
+      const transition = await recomputeLearnerAlert(courseId, opts.userId);
+      if (notify && transition.becameOffTrack) {
+        await handleNewOffTrack(courseId, opts.userId, transition);
+      }
+    }
+  } catch {
+    /* never break the caller */
+  }
+}
+
+/** Run the off-track sweep across a whole course (used by the manual scan endpoint). */
+export async function scanCourse(courseId: string): Promise<{ evaluated: number; offTrack: number; alerted: number }> {
+  let evaluated = 0;
+  let offTrack = 0;
+  let alerted = 0;
+  const learners = await db
+    .select({ userId: enrolmentsTable.userId })
+    .from(enrolmentsTable)
+    .where(eq(enrolmentsTable.courseId, courseId));
+  for (const l of learners) {
+    evaluated += 1;
+    const t = await recomputeLearnerAlert(courseId, l.userId);
+    if (t.status === "off_track") offTrack += 1;
+    if (t.becameOffTrack) {
+      alerted += 1;
+      await handleNewOffTrack(courseId, l.userId, t);
+    }
+  }
+  return { evaluated, offTrack, alerted };
+}

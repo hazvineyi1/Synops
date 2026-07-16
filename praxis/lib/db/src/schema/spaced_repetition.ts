@@ -55,8 +55,13 @@ export const coachPlansTable = pgTable("coach_plans", {
   planDate: date("plan_date").notNull(),
   rationale: text("rationale").notNull().default(""),
   // [{ moduleId, moduleTitle, courseId, kind: 'review'|'new'|'weak', reason, done }]
+  // Gradebook-generated remediation plans store StudyPlanItem[] (schema/gradebook.ts) here.
   items: jsonb("items").notNull().default([]),
   status: coachPlanStatusEnum("coach_plan_status").notNull().default("active"),
+  // Which course a gradebook-triggered plan targets (null for the daily Coach spine).
+  courseId: text("course_id"),
+  // Origin: "coach" (daily spine) | "gradebook_alert" (off-track remediation).
+  source: text("source").notNull().default("coach"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

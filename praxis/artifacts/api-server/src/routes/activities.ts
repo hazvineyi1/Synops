@@ -21,6 +21,7 @@ import { isSuperAdmin, hasHubAccess, canAdministerOrg, isInstructionalDesigner }
 import { logAudit } from "../lib/audit";
 import { generateActivities } from "../lib/activityEngine";
 import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
+import { onGradeEvent } from "../lib/gradebookAlerts";
 
 const router = Router();
 
@@ -310,6 +311,9 @@ router.post("/activities/:id/submit", requireAuth, async (req, res) => {
     .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(activityAssignmentsTable.userId, req.userId!), eq(activityAssignmentsTable.activityId, activity.id), eq(activityAssignmentsTable.tier, "learner"), ne(activityAssignmentsTable.status, "revoked")));
 
+  // Refresh gradebook off-track state wherever this activity is a graded column.
+  void onGradeEvent({ sourceType: "activity", sourceId: activity.id, userId: req.userId! });
+
   res.status(201).json(submissionResponse(row));
 });
 
@@ -379,6 +383,8 @@ router.patch(
       res.status(404).json({ error: "Submission not found" });
       return;
     }
+    // A reviewed score can move a learner on/off track — refresh their gradebook alert.
+    void onGradeEvent({ sourceType: "activity", sourceId: row.activityId, userId: row.userId });
     res.json(submissionResponse(row));
   },
 );

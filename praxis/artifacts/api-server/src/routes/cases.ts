@@ -35,6 +35,7 @@ import {
   type CaseContext,
 } from "../lib/caseEngine";
 import { ensureQuestion } from "../lib/socraticEngine";
+import { onGradeEvent } from "../lib/gradebookAlerts";
 
 const router = Router();
 
@@ -651,6 +652,9 @@ router.post("/case-sessions/:id/complete", requireAuth, async (req, res) => {
   await db.update(caseAssignmentsTable)
     .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(caseAssignmentsTable.userId, u.id), eq(caseAssignmentsTable.caseId, s.caseId), eq(caseAssignmentsTable.tier, "learner"), ne(caseAssignmentsTable.status, "revoked")));
+
+  // Refresh gradebook off-track state (+ auto plan / alerts) wherever this case is graded.
+  void onGradeEvent({ sourceType: "case", sourceId: s.caseId, userId: u.id });
 
   res.json(sessionResponse(updated));
 });

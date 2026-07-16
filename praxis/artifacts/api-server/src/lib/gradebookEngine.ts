@@ -1,0 +1,398 @@
+import { db } from "@workspace/db";
+import {
+  gradebookItemsTable,
+  gradebookCellsTable,
+  gradebookAlertsTable,
+  assignmentsTable,
+  gradebookEntriesTable,
+  caseSessionsTable,
+  caseRubricsTable,
+  interactiveActivitiesTable,
+  activitySubmissionsTable,
+  type GradebookItem,
+} from "@workspace/db";
+import { eq, and, inArray } from "drizzle-orm";
+
+/**
+ * Gradebook aggregation engine.
+ *
+ * Turns four independent score sources into one gradebook:
+ *  - assignments        -> gradebook_entries.score / assignment.points_possible
+ *  - cases              -> best completed case_session (rubric total, else engagement/10)
+ *  - interactive acts   -> best activity_submission.score / activity.max_score
+ *  - manual columns     -> gradebook_cells.manual_score / item.points_possible
+ *
+ * A column is either a default assignment column (no registry row) or a `gradebook_items`
+ * row (case / activity / manual, or an assignment OVERRIDE that recategorises/excludes it).
+ * Everything is read fresh, so the gradebook can never drift from the underlying grades.
+ *
+ * Grading: overall mastery = sum(earned) / sum(possible) over INCLUDED SUMMATIVE columns
+ * (formative folded in only when the caller asks). Off-track is multi-signal (mastery low,
+ * summative trend down, or a missing overdue summative).
+ */
+
+const PASS = 0.7; // below this overall fraction => "mastery_low"
+const AT_RISK = 0.8; // [PASS, AT_RISK) with no harder signal => "at_risk"
+
+export interface GradebookColumn {
+  key: string; // stable client key
+  itemId: string | null; // gradebook_items.id, or null for a default assignment column
+  sourceType: "assignment" | "case" | "activity" | "manual";
+  sourceId: string | null;
+  title: string;
+  category: string;
+  itemType: "formative" | "summative";
+  pointsPossible: number;
+  dueDate: string | null;
+  includeInGrade: boolean;
+  editable: boolean; // can staff type a score directly into the cell?
+  position: number;
+}
+
+export interface CellValue {
+  fraction: number | null; // 0..1 of the column, or null if no score yet
+  earned: number | null; // fraction * pointsPossible
+  note: string | null;
+}
+
+export interface LearnerComputed {
+  overallPercent: number | null; // 0..100
+  band: "good" | "warn" | "low" | "none";
+  trend: { dir: "up" | "down" | "flat" | "none"; label: string };
+  cells: Record<string, CellValue>; // keyed by column.key
+}
+
+export interface OffTrackResult {
+  status: "on_track" | "at_risk" | "off_track";
+  reasons: string[]; // mastery_low | trend_down | missing_summative
+  masteryPct: number | null;
+}
+
+const num = (v: unknown): number | null =>
+  v === null || v === undefined || v === "" ? null : Number(v);
+
+/** Build the ordered set of gradebook columns for a course. */
+export async function getCourseColumns(courseId: string): Promise<GradebookColumn[]> {
+  const [items, assignments] = await Promise.all([
+    db.select().from(gradebookItemsTable).where(eq(gradebookItemsTable.courseId, courseId)),
+    db
+      .select()
+      .from(assignmentsTable)
+      .where(and(eq(assignmentsTable.courseId, courseId), eq(assignmentsTable.published, true))),
+  ]);
+
+  const overrideByAssignment = new Map<string, GradebookItem>();
+  const standalone: GradebookItem[] = [];
+  for (const it of items) {
+    if (it.sourceType === "assignment" && it.sourceId) overrideByAssignment.set(it.sourceId, it);
+    else standalone.push(it);
+  }
+
+  const columns: GradebookColumn[] = [];
+
+  // Assignments: included by default; a matching registry row overrides / excludes them.
+  for (const a of assignments) {
+    const ov = overrideByAssignment.get(a.id);
+    if (ov && !ov.includeInGrade) continue; // explicitly excluded
+    columns.push({
+      key: `assignment:${a.id}`,
+      itemId: ov?.id ?? null,
+      sourceType: "assignment",
+      sourceId: a.id,
+      title: ov?.title || a.title,
+      category: ov?.category || "Assignments",
+      itemType: (ov?.itemType as "formative" | "summative") ?? "summative",
+      pointsPossible: Number(a.pointsPossible), // native assignment weight is authoritative
+      dueDate: (ov?.dueDate ?? a.dueDate)?.toISOString?.() ?? null,
+      includeInGrade: ov?.includeInGrade ?? true,
+      editable: true, // assignment cells are directly editable (writes gradebook_entries)
+      position: ov?.position ?? a.position ?? 0,
+    });
+  }
+
+  // Cases / activities / manual: exist only as registry rows.
+  for (const it of standalone) {
+    columns.push({
+      key: `item:${it.id}`,
+      itemId: it.id,
+      sourceType: it.sourceType as "case" | "activity" | "manual",
+      sourceId: it.sourceId,
+      title: it.title,
+      category: it.category,
+      itemType: it.itemType as "formative" | "summative",
+      pointsPossible: Number(it.pointsPossible),
+      dueDate: it.dueDate?.toISOString() ?? null,
+      includeInGrade: it.includeInGrade,
+      editable: it.sourceType === "manual", // only manual columns take a typed score
+      position: it.position,
+    });
+  }
+
+  columns.sort(
+    (a, b) =>
+      a.category.localeCompare(b.category) || a.position - b.position || a.title.localeCompare(b.title),
+  );
+  return columns;
+}
+
+interface ScoreData {
+  // fraction 0..1 per (userId -> columnKey)
+  fractions: Map<string, Map<string, number>>;
+  notes: Map<string, Map<string, string>>; // userId -> columnKey -> note
+}
+
+/** Batch-read every learner's score + note for the given columns. */
+export async function getScoreData(
+  columns: GradebookColumn[],
+  userIds: string[],
+): Promise<ScoreData> {
+  const fractions = new Map<string, Map<string, number>>();
+  const notes = new Map<string, Map<string, string>>();
+  const setFrac = (uid: string, key: string, f: number) => {
+    if (!fractions.has(uid)) fractions.set(uid, new Map());
+    fractions.get(uid)!.set(key, f);
+  };
+  const setNote = (uid: string, key: string, n: string) => {
+    if (!notes.has(uid)) notes.set(uid, new Map());
+    notes.get(uid)!.set(key, n);
+  };
+  if (userIds.length === 0 || columns.length === 0) return { fractions, notes };
+
+  const uSet = new Set(userIds);
+  const assignmentIds = columns.filter((c) => c.sourceType === "assignment").map((c) => c.sourceId!);
+  const caseIds = columns.filter((c) => c.sourceType === "case").map((c) => c.sourceId!);
+  const activityIds = columns.filter((c) => c.sourceType === "activity").map((c) => c.sourceId!);
+  const itemIds = columns.filter((c) => c.itemId).map((c) => c.itemId!);
+
+  // Column lookup by source id for score attribution.
+  const colByAssignment = new Map(columns.filter((c) => c.sourceType === "assignment").map((c) => [c.sourceId!, c]));
+  const colByCase = new Map(columns.filter((c) => c.sourceType === "case").map((c) => [c.sourceId!, c]));
+  const colByActivity = new Map(columns.filter((c) => c.sourceType === "activity").map((c) => [c.sourceId!, c]));
+  const manualColByItem = new Map(columns.filter((c) => c.sourceType === "manual" && c.itemId).map((c) => [c.itemId!, c]));
+
+  await Promise.all([
+    // Assignments — gradebook_entries hold the canonical score.
+    (async () => {
+      if (assignmentIds.length === 0) return;
+      const rows = await db
+        .select()
+        .from(gradebookEntriesTable)
+        .where(inArray(gradebookEntriesTable.assignmentId, assignmentIds));
+      for (const r of rows) {
+        if (!uSet.has(r.userId)) continue;
+        const col = colByAssignment.get(r.assignmentId);
+        if (!col) continue;
+        const s = num(r.score);
+        if (s !== null && col.pointsPossible > 0) setFrac(r.userId, col.key, Math.max(0, Math.min(1, s / col.pointsPossible)));
+      }
+    })(),
+    // Cases — best completed session (rubric total, else engagement/10).
+    (async () => {
+      if (caseIds.length === 0) return;
+      const [sessions, rubrics] = await Promise.all([
+        db.select().from(caseSessionsTable).where(inArray(caseSessionsTable.caseId, caseIds)),
+        db.select().from(caseRubricsTable).where(inArray(caseRubricsTable.caseId, caseIds)),
+      ]);
+      const hasRubric = new Set(rubrics.map((r) => r.caseId));
+      for (const s of sessions) {
+        if (!s.userId || !uSet.has(s.userId) || s.status !== "completed") continue;
+        const col = colByCase.get(s.caseId);
+        if (!col) continue;
+        let frac: number | null = null;
+        const rs = s.rubricScores;
+        if (Array.isArray(rs) && rs.length > 0) {
+          const earned = rs.reduce((t, x) => t + (Number(x.points) || 0), 0);
+          const poss = rs.reduce((t, x) => t + (Number(x.maxPoints) || 0), 0);
+          if (poss > 0) frac = earned / poss;
+        }
+        if (frac === null && s.engagementScore !== null && s.engagementScore !== undefined) {
+          frac = Math.max(0, Math.min(1, Number(s.engagementScore) / 10)); // engagement is 0..10
+        }
+        if (frac === null) continue;
+        const prev = fractions.get(s.userId)?.get(col.key);
+        if (prev === undefined || frac > prev) setFrac(s.userId, col.key, frac); // best attempt
+        void hasRubric;
+      }
+    })(),
+    // Activities — best submission score / activity max.
+    (async () => {
+      if (activityIds.length === 0) return;
+      const [subs, acts] = await Promise.all([
+        db.select().from(activitySubmissionsTable).where(inArray(activitySubmissionsTable.activityId, activityIds)),
+        db.select().from(interactiveActivitiesTable).where(inArray(interactiveActivitiesTable.id, activityIds)),
+      ]);
+      const maxById = new Map(acts.map((a) => [a.id, Number(a.maxScore) || 100]));
+      for (const sub of subs) {
+        if (!uSet.has(sub.userId)) continue;
+        const col = colByActivity.get(sub.activityId);
+        if (!col) continue;
+        const s = num(sub.score);
+        if (s === null) continue;
+        const max = maxById.get(sub.activityId) || 100;
+        const frac = max > 0 ? Math.max(0, Math.min(1, s / max)) : 0;
+        const prev = fractions.get(sub.userId)?.get(col.key);
+        if (prev === undefined || frac > prev) setFrac(sub.userId, col.key, frac); // best attempt
+      }
+    })(),
+    // Manual scores + per-cell notes (any item that has a registry row).
+    (async () => {
+      if (itemIds.length === 0) return;
+      const cells = await db.select().from(gradebookCellsTable).where(inArray(gradebookCellsTable.itemId, itemIds));
+      const colByItem = new Map(columns.filter((c) => c.itemId).map((c) => [c.itemId!, c]));
+      for (const c of cells) {
+        if (!uSet.has(c.userId)) continue;
+        const col = colByItem.get(c.itemId);
+        if (!col) continue;
+        if (c.note) setNote(c.userId, col.key, c.note);
+        const manualCol = manualColByItem.get(c.itemId);
+        if (manualCol) {
+          const ms = num(c.manualScore);
+          if (ms !== null && manualCol.pointsPossible > 0)
+            setFrac(c.userId, manualCol.key, Math.max(0, Math.min(1, ms / manualCol.pointsPossible)));
+        }
+      }
+    })(),
+  ]);
+
+  return { fractions, notes };
+}
+
+/** Compute one learner's row from their raw fractions. */
+export function computeLearner(
+  columns: GradebookColumn[],
+  userFractions: Map<string, number> | undefined,
+  userNotes: Map<string, string> | undefined,
+  includeFormative: boolean,
+): LearnerComputed {
+  const cells: Record<string, CellValue> = {};
+  let earned = 0;
+  let possible = 0;
+  const summativeSeries: number[] = [];
+
+  for (const col of columns) {
+    const frac = userFractions?.get(col.key) ?? null;
+    cells[col.key] = {
+      fraction: frac,
+      earned: frac === null ? null : frac * col.pointsPossible,
+      note: userNotes?.get(col.key) ?? null,
+    };
+    const counts = col.includeInGrade && (col.itemType === "summative" || includeFormative);
+    if (counts && frac !== null) {
+      earned += frac * col.pointsPossible;
+      possible += col.pointsPossible;
+    }
+    if (col.includeInGrade && col.itemType === "summative" && frac !== null) summativeSeries.push(frac);
+  }
+
+  const overall = possible > 0 ? (earned / possible) * 100 : null;
+  const band: LearnerComputed["band"] =
+    overall === null ? "none" : overall >= 90 ? "good" : overall >= 70 ? "warn" : "low";
+
+  return { overallPercent: overall, band, trend: trendOf(summativeSeries), cells };
+}
+
+function trendOf(series: number[]): LearnerComputed["trend"] {
+  if (series.length < 2) return { dir: "none", label: "Not enough data" };
+  const mid = Math.ceil(series.length / 2);
+  const early = series.slice(0, mid);
+  const recent = series.slice(mid);
+  if (recent.length === 0) return { dir: "none", label: "Not enough data" };
+  const avg = (a: number[]) => a.reduce((s, x) => s + x, 0) / a.length;
+  const diff = avg(recent) - avg(early);
+  if (diff >= 0.05) return { dir: "up", label: "Improving" };
+  if (diff <= -0.05) return { dir: "down", label: "Check-in suggested" };
+  return { dir: "flat", label: "Steady" };
+}
+
+/** Multi-signal off-track evaluation for one learner. */
+export function evaluateOffTrack(
+  columns: GradebookColumn[],
+  computed: LearnerComputed,
+): OffTrackResult {
+  const reasons: string[] = [];
+  const overallFrac = computed.overallPercent === null ? null : computed.overallPercent / 100;
+
+  if (overallFrac !== null && overallFrac < PASS) reasons.push("mastery_low");
+  if (computed.trend.dir === "down") reasons.push("trend_down");
+
+  const now = Date.now();
+  const missingOverdue = columns.some((c) => {
+    if (!c.includeInGrade || c.itemType !== "summative") return false;
+    if (!c.dueDate || new Date(c.dueDate).getTime() >= now) return false;
+    return (computed.cells[c.key]?.fraction ?? null) === null;
+  });
+  if (missingOverdue) reasons.push("missing_summative");
+
+  let status: OffTrackResult["status"] = "on_track";
+  if (reasons.length > 0) status = "off_track";
+  else if (overallFrac !== null && overallFrac < AT_RISK) status = "at_risk";
+
+  return { status, reasons, masteryPct: computed.overallPercent };
+}
+
+export interface AlertTransition {
+  previousStatus: string | null;
+  status: OffTrackResult["status"];
+  reasons: string[];
+  masteryPct: number | null;
+  alertId: string | null;
+  becameOffTrack: boolean;
+}
+
+/**
+ * Recompute and persist one learner's alert for a course. Pure state update — it never
+ * sends notifications or generates a plan (the caller orchestrates those). NEVER throws:
+ * it is called from inside grade-write paths and must not break them.
+ */
+export async function recomputeLearnerAlert(courseId: string, userId: string): Promise<AlertTransition> {
+  const empty: AlertTransition = {
+    previousStatus: null,
+    status: "on_track",
+    reasons: [],
+    masteryPct: null,
+    alertId: null,
+    becameOffTrack: false,
+  };
+  try {
+    const columns = await getCourseColumns(courseId);
+    const { fractions, notes } = await getScoreData(columns, [userId]);
+    const computed = computeLearner(columns, fractions.get(userId), notes.get(userId), false);
+    const evalR = evaluateOffTrack(columns, computed);
+
+    const existing = await db.query.gradebookAlertsTable.findFirst({
+      where: and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)),
+    });
+    const previousStatus = existing?.status ?? null;
+    const becameOffTrack = evalR.status === "off_track" && previousStatus !== "off_track";
+    const masteryStr = evalR.masteryPct === null ? null : String(Math.round(evalR.masteryPct * 100) / 100);
+
+    if (existing) {
+      const [row] = await db
+        .update(gradebookAlertsTable)
+        .set({
+          status: evalR.status,
+          reasons: evalR.reasons,
+          masteryPct: masteryStr,
+          resolvedAt: evalR.status === "on_track" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(gradebookAlertsTable.id, existing.id))
+        .returning();
+      return { previousStatus, status: evalR.status, reasons: evalR.reasons, masteryPct: evalR.masteryPct, alertId: row?.id ?? existing.id, becameOffTrack };
+    }
+    const [row] = await db
+      .insert(gradebookAlertsTable)
+      .values({ courseId, userId, status: evalR.status, reasons: evalR.reasons, masteryPct: masteryStr })
+      .returning();
+    return { previousStatus, status: evalR.status, reasons: evalR.reasons, masteryPct: evalR.masteryPct, alertId: row?.id ?? null, becameOffTrack };
+  } catch {
+    return empty;
+  }
+}
+
+/** Human-readable reason labels for UI + notifications. */
+export const REASON_LABEL: Record<string, string> = {
+  mastery_low: "Overall mastery below 70%",
+  trend_down: "Recent summative scores trending down",
+  missing_summative: "A graded assessment is overdue and not submitted",
+};

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket, Upload, ArrowLeft } from "lucide-react";
+import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket, Upload, ArrowLeft, BookOpenCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +14,7 @@ import { useSession } from "@/context/SessionContext";
 import { ActivityPlayer } from "@/components/ActivityPlayer";
 import { ActivityAssignDialog } from "@/components/ActivityAssignDialog";
 import { ActivityBuilder } from "@/components/ActivityBuilder";
+import { AddToGradebookDialog } from "@/components/AddToGradebookDialog";
 import { renderActivity, type InteractionType, type ActivitySpec } from "@/lib/activityTemplates";
 import { activitiesApi, type Activity, type ActivitySubmission, type GeneratedActivity, type MyActivityAssignment } from "@/lib/activitiesApi";
 
@@ -545,6 +546,11 @@ export function ActivitiesAdmin() {
                     ? <Button size="sm" onClick={() => setPublish.mutate({ id: selected.id, published: true })} disabled={setPublish.isPending}><Rocket className="h-4 w-4 mr-1" />{setPublish.isPending ? "Publishing…" : "Publish"}</Button>
                     : <Button size="sm" variant="outline" onClick={() => setPublish.mutate({ id: selected.id, published: false })} disabled={setPublish.isPending}>Unpublish</Button>}
                   {canAssign && selected.published && <Button variant="outline" size="sm" onClick={() => setAssignFor(selected)}><Share2 className="h-4 w-4 mr-1" />Assign</Button>}
+                  {canAssign && selected.published && (
+                    <AddToGradebookDialog sourceType="activity" sourceId={selected.id} title={selected.title}>
+                      <Button variant="outline" size="sm"><BookOpenCheck className="h-4 w-4 mr-1" />Add to gradebook</Button>
+                    </AddToGradebookDialog>
+                  )}
                   {selected.published && <Button variant="outline" size="sm" onClick={() => window.open(`/activities/${selected.id}/play`, "_blank")}><ExternalLink className="h-4 w-4 mr-1" />Open as learner</Button>}
                   <Button variant="ghost" size="sm" className="text-red-600" onClick={() => del.mutate(selected.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>

@@ -7,6 +7,7 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canGradeInCourse, canStaffActOnCourse } from "../lib/scope";
+import { onGradeEvent } from "../lib/gradebookAlerts";
 
 const router = Router();
 
@@ -177,9 +178,12 @@ router.patch("/assignment-submissions/:submissionId/grade", requireAuth, async (
     title: "Your assignment has been graded",
     body: `Score: ${score} — ${feedback?.slice(0, 80) ?? "View feedback in gradebook"}`,
     link: `/assignments/${updated.assignmentId}`,
-    courseId: (await db.query.assignmentsTable.findFirst({ where: (a, { eq }) => eq(a.id, updated.assignmentId) }))?.courseId ?? null,
+    courseId: assignment.courseId,
     actorId: req.userId,
   });
+
+  // Refresh the learner's unified-gradebook off-track state (+ auto plan / alerts).
+  void onGradeEvent({ sourceType: "assignment", sourceId: updated.assignmentId, courseId: assignment.courseId, userId: updated.userId });
 
   res.json(updated);
 });

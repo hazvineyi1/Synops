@@ -48,6 +48,7 @@ import { Compliance } from '@/pages/Compliance';
 import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
 import { ActivityPlay } from '@/pages/ActivityPlay';
 import { ActivityEmbed } from '@/pages/ActivityEmbed';
+import { MyGrades } from '@/pages/MyGrades';
 import { Support } from '@/pages/Support';
 
 // Layout
@@ -183,6 +184,7 @@ function Routes() {
           component={DiscussionThread}
         />
         <ProtectedRoute path="/courses/:courseId/gradebook" component={CourseGradebook} />
+        <ProtectedRoute path="/grades" component={MyGrades} />
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />
         <ProtectedRoute path="/courses/:courseId" component={CourseDetail} />
         <ProtectedRoute path="/courses" component={Courses} />

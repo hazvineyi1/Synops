@@ -113,6 +113,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         items: [
           { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
+          { label: t('nav.myGrades', 'My grades'), href: '/grades', icon: TrendingUp },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
@@ -253,7 +254,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-[100dvh]" style={{ background: CONTENT_BG }}>
+    <div className="flex h-[100dvh] overflow-hidden" style={{ background: CONTENT_BG }}>
 
       {/* Impersonation banner — must be impossible to miss. */}
       {user.impersonating && (
@@ -279,7 +280,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </Link>
         </div>
 
-        <nav className="flex-1 py-5 px-3 overflow-y-auto">
+        <nav className="flex-1 py-5 px-3 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.25) transparent" }}>
           {navGroups.map((group, gi) => (
             <div key={gi} className="mb-1 space-y-0.5">
               {group.heading && groupHeading(group.heading)}

@@ -9,7 +9,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/SessionContext";
 import { casesApi, type CaseRow, type MyAssignmentRow } from "@/lib/casesApi";
 import { CaseAssignDialog } from "@/components/CaseAssignDialog";
-import { Plus, Play, Pencil, BookOpen, Layers, Share2, CalendarClock, Clock, CheckCircle2 } from "lucide-react";
+import { AddToGradebookDialog } from "@/components/AddToGradebookDialog";
+import { Plus, Play, Pencil, BookOpen, Layers, Share2, CalendarClock, Clock, CheckCircle2, BookOpenCheck } from "lucide-react";
 
 const CAN_AUTHOR = ["super_admin", "instructional_designer", "org_admin", "partner_admin"];
 // Roles that can distribute a case one tier down the chain (same set as authors).
@@ -117,6 +118,13 @@ export function Cases() {
                     <Button size="sm" variant="outline" onClick={() => setAssignFor({ id: c.id, title: c.title })} title="Assign to partners / orgs / learners">
                       <Share2 className="h-4 w-4 mr-1.5" /> Assign
                     </Button>
+                  )}
+                  {canAssign && c.status === "published" && (
+                    <AddToGradebookDialog sourceType="case" sourceId={c.id} title={c.title}>
+                      <Button size="sm" variant="outline" title="Add this case to a course gradebook">
+                        <BookOpenCheck className="h-4 w-4 mr-1.5" /> Gradebook
+                      </Button>
+                    </AddToGradebookDialog>
                   )}
                 </div>
               </CardContent>
