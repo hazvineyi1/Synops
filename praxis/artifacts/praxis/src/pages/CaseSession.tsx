@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,13 +7,14 @@ import { useToast } from "@/hooks/use-toast";
 import { casesApi, streamCaseTurn, LANGUAGES, type CaseMessage, type CaseSessionRow } from "@/lib/casesApi";
 import { TutorAvatar, tutorGender } from "@/components/TutorAvatar";
 import { useSpeech } from "@/lib/speech";
-import { ArrowLeft, Send, Sparkles, CheckCircle2, TrendingUp, BookOpen, Settings2 } from "lucide-react";
+import { ArrowLeft, Send, Sparkles, CheckCircle2, TrendingUp, BookOpen, Settings2, Loader2 } from "lucide-react";
 
 export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const sessionId = params?.sessionId ?? "";
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["case-session", sessionId], queryFn: () => casesApi.getSession(sessionId), enabled: !!sessionId });
 
   const [messages, setMessages] = useState<CaseMessage[]>([]);
@@ -25,6 +26,10 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const [analysis, setAnalysis] = useState<CaseSessionRow | null>(null);
   const [analysing, setAnalysing] = useState(false);
   const [lang, setLang] = useState<string>("en");
+  // Facts live in local state so a mid-session language switch can re-render them instantly.
+  const [factsCtx, setFactsCtx] = useState<string>("");
+  const [factsObj, setFactsObj] = useState<string | null>(null);
+  const [switching, setSwitching] = useState(false);
   const [factsOpen, setFactsOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [animate, setAnimateState] = useState<boolean>(() => { try { return localStorage.getItem("tutorAnimate") !== "0"; } catch { return true; } });
@@ -44,6 +49,8 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     setPromptLimit(data.promptLimit);
     setBudgetReached(data.promptCount >= data.promptLimit);
     setLang(data.language ?? "en");
+    setFactsCtx(data.contextBlock ?? "");
+    setFactsObj(data.learningObjective ?? null);
     if (data.status === "completed" && data.engagementNarrative) setAnalysis(data);
     // Speak the opening question once, when the session first loads.
     if (!spokeOpening.current && data.status !== "completed") {
@@ -77,6 +84,32 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     );
   };
 
+  // Switch language mid-conversation: re-translate the facts + every prior tutor turn and
+  // re-render the whole thread in the new language. Subsequent turns follow automatically.
+  const changeLanguage = async (next: string) => {
+    if (next === lang || switching || streaming) return;
+    const prev = lang;
+    cancel(); // stop any speech in the old language
+    setLang(next);
+    setSwitching(true);
+    try {
+      const r = await casesApi.setSessionLanguage(sessionId, next);
+      setMessages(r.messages);
+      setFactsCtx(r.contextBlock ?? "");
+      setFactsObj(r.learningObjective ?? null);
+      // Keep the cache consistent so a refetch/reload shows the switched language.
+      qc.setQueryData<CaseSessionRow>(["case-session", sessionId], (old) =>
+        old ? { ...old, language: next, messages: r.messages, contextBlock: r.contextBlock, learningObjective: r.learningObjective } : old);
+      const lastTutor = [...r.messages].reverse().find((m) => m.role === "tutor");
+      if (lastTutor?.content) speak(lastTutor.content, gender, next);
+    } catch (e) {
+      setLang(prev);
+      toast({ title: "Could not switch language", description: e instanceof Error ? e.message : "", variant: "destructive" });
+    } finally {
+      setSwitching(false);
+    }
+  };
+
   const finish = async () => {
     setAnalysing(true);
     try { const r = await casesApi.completeSession(sessionId); setAnalysis(r); }
@@ -98,11 +131,13 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
         <p className="text-sm font-semibold flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> The situation</p>
         <button onClick={() => setFactsOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">Minimise</button>
       </div>
-      {data.learningObjective && (
-        <p className="text-xs rounded-md px-2.5 py-1.5" style={{ background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>Goal: {data.learningObjective}</p>
+      {factsObj && (
+        <p className="text-xs rounded-md px-2.5 py-1.5" style={{ background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>Goal: {factsObj}</p>
       )}
-      <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{data.contextBlock || "No background was provided for this case."}</p>
-      <p className="text-[11px] text-muted-foreground pt-1">The coach's questions are grounded in these facts — refer back any time.</p>
+      <p className={`text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 transition-opacity ${switching ? "opacity-40" : ""}`}>{factsCtx || "No background was provided for this case."}</p>
+      {switching
+        ? <p className="text-[11px] text-muted-foreground pt-1 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Switching the conversation into {LANGUAGES.find((l) => l.code === lang)?.name}…</p>
+        : <p className="text-[11px] text-muted-foreground pt-1">The coach's questions are grounded in these facts — refer back any time.</p>}
     </div>
   );
 
@@ -123,9 +158,12 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
           <button onClick={() => setFactsOpen((o) => !o)} title="Case facts" className={`inline-flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border transition-colors ${factsOpen ? "bg-muted border-transparent" : "hover:bg-muted"}`}>
             <BookOpen className="h-3.5 w-3.5" /><span className="hidden sm:inline">Facts</span>
           </button>
-          <select value={lang} onChange={(e) => setLang(e.target.value)} title="Language" className="text-xs rounded-md border border-input bg-background px-1.5 py-1.5">
-            {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
-          </select>
+          <div className="relative inline-flex items-center">
+            <select value={lang} onChange={(e) => void changeLanguage(e.target.value)} disabled={switching || streaming} title="Language — switches the whole conversation" className="text-xs rounded-md border border-input bg-background px-1.5 py-1.5 disabled:opacity-60">
+              {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+            </select>
+            {switching && <Loader2 className="h-3.5 w-3.5 ml-1 animate-spin text-muted-foreground" />}
+          </div>
           <div className="relative">
             <button onClick={() => setSettingsOpen((o) => !o)} title="Voice & tutor settings" className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"><Settings2 className="h-4 w-4" /></button>
             {settingsOpen && (

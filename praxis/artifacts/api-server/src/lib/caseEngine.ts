@@ -322,4 +322,34 @@ export async function translateCaseFacts(
   return { objective: objective ?? null, context };
 }
 
+/**
+ * Translate an ordered list of strings (e.g. the tutor's prior turns) into `langCode` in a
+ * SINGLE call. Order and length are preserved so callers can zip the result back onto the
+ * original messages. On any failure the originals are returned unchanged (never throws).
+ */
+export async function translateTexts(texts: string[], langCode: string): Promise<string[]> {
+  if (!texts.length) return [];
+  const name = languageName(langCode);
+  const system = `You are a professional translator. Translate EACH string in the given JSON array into natural, fluent ${name}. Keep people's names, numbers and currency amounts (e.g. R80,000) exactly as they are. These are a Socratic coach's questions — keep the questioning tone. Preserve the array order and length EXACTLY (one translation per input, same index). Return ONLY a strict JSON array of the translated strings and nothing else.`;
+  try {
+    const msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 3000,
+      system,
+      messages: [{ role: "user", content: JSON.stringify(texts) + "\n\nReturn only the JSON array." }],
+    });
+    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const m = text.match(/\[[\s\S]*\]/);
+    if (m) {
+      const arr = JSON.parse(m[0]);
+      if (Array.isArray(arr) && arr.length === texts.length) {
+        return arr.map((x, i) => (x == null ? texts[i] : String(x)));
+      }
+    }
+  } catch {
+    // fall through to originals
+  }
+  return texts;
+}
+
 export { MODEL as CASE_MODEL };

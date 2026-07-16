@@ -22,6 +22,7 @@ import {
   generateCaseAnalysis,
   generateRubricDraft,
   translateCaseFacts,
+  translateTexts,
   CASE_MODEL,
   type CaseContext,
 } from "../lib/caseEngine";
@@ -468,6 +469,58 @@ router.get("/case-sessions/:id", requireAuth, async (req, res) => {
     contextBlock: s.translatedContext ?? cs?.contextBlock ?? null,
     learningObjective: s.translatedObjective ?? cs?.learningObjective ?? null,
   });
+});
+
+// POST /case-sessions/:id/language — switch the language of a live session. Everything the
+// system produced (the fact pattern + every prior tutor turn) is re-translated into the new
+// language and persisted, so the whole conversation reads in the chosen language immediately;
+// subsequent turns are generated in it too. The learner's own typed messages are left exactly
+// as they wrote them (translating a person's own reasoning could distort the end analysis).
+router.post("/case-sessions/:id/language", requireAuth, async (req, res) => {
+  const u = req.dbUser! as U;
+  const lang = validLang(req.body?.language) ? req.body.language : null;
+  if (!lang) { res.status(400).json({ error: "invalid language" }); return; }
+  const s = await db.query.caseSessionsTable.findFirst({ where: eq(caseSessionsTable.id, req.params.id) });
+  if (!s || s.userId !== u.id) { res.status(404).json({ error: "Not found" }); return; }
+  if (s.status !== "in_progress") { res.status(400).json({ error: "Session already completed" }); return; }
+  const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, s.caseId) });
+  if (!c) { res.status(404).json({ error: "Case not found" }); return; }
+
+  const src = (s.messages ?? []) as CaseMessage[];
+
+  // No-op fast path: already in this language — return the current view unchanged.
+  if (lang === (s.language ?? c.language)) {
+    res.json({
+      language: lang,
+      messages: src,
+      contextBlock: s.translatedContext ?? c.contextBlock,
+      learningObjective: s.translatedObjective ?? c.learningObjective,
+    });
+    return;
+  }
+
+  // Re-translate the fact pattern (or revert to the authored originals when back to default).
+  const facts = lang !== c.language
+    ? await translateCaseFacts(c.learningObjective, c.contextBlock, lang)
+    : { objective: c.learningObjective, context: c.contextBlock };
+
+  // Re-translate every tutor turn in one call; zip back by index. Learner turns untouched.
+  const tutorIdx = src.map((m, i) => (m.role === "tutor" ? i : -1)).filter((i) => i >= 0);
+  const translated = tutorIdx.length ? await translateTexts(tutorIdx.map((i) => src[i].content), lang) : [];
+  const newMessages = src.map((m) => ({ ...m }));
+  tutorIdx.forEach((i, k) => { if (translated[k]) newMessages[i].content = translated[k]; });
+
+  await db
+    .update(caseSessionsTable)
+    .set({
+      language: lang,
+      translatedContext: lang !== c.language ? facts.context : null,
+      translatedObjective: lang !== c.language ? facts.objective : null,
+      messages: newMessages,
+    })
+    .where(eq(caseSessionsTable.id, s.id));
+
+  res.json({ language: lang, messages: newMessages, contextBlock: facts.context, learningObjective: facts.objective });
 });
 
 // POST /case-sessions/:id/message — SSE streaming Socratic turn.

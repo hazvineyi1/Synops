@@ -135,6 +135,12 @@ export const casesApi = {
     apiFetch<CaseSessionRow>(`/cases/${caseId}/sessions`, { method: "POST", body: JSON.stringify(body ?? {}) }),
   mySessions: () => apiFetch<CaseSessionRow[]>(`/case-sessions/my`),
   getSession: (id: string) => apiFetch<CaseSessionRow>(`/case-sessions/${id}`),
+  // Switch a live session's language: re-translates the facts + every prior tutor turn.
+  setSessionLanguage: (id: string, language: string) =>
+    apiFetch<{ language: string; messages: CaseMessage[]; contextBlock: string | null; learningObjective: string | null }>(
+      `/case-sessions/${id}/language`,
+      { method: "POST", body: JSON.stringify({ language }) }
+    ),
   completeSession: (id: string) => apiFetch<CaseSessionRow>(`/case-sessions/${id}/complete`, { method: "POST" }),
   caseSessions: (caseId: string) => apiFetch<CaseSessionRow[]>(`/cases/${caseId}/sessions`),
 
