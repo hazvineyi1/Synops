@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket, Upload } from "lucide-react";
+import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket, Upload, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -472,6 +472,7 @@ export function ActivitiesAdmin() {
   if (user && !canAuthor) return <LearnerActivities />;
 
   const selected = creating ? null : activities?.find((a) => a.id === selectedId) ?? null;
+  const detailActive = creating || !!selected; // on mobile: show list OR detail, not both
 
   const del = useMutation({
     mutationFn: (id: string) => activitiesApi.remove(id),
@@ -517,30 +518,41 @@ export function ActivitiesAdmin() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
-        <Card className="p-2 h-fit">
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
+        <Card className={`p-2 h-fit ${detailActive ? "hidden lg:block" : "block"}`}>
           {isLoading ? <div className="p-4 text-sm text-muted-foreground">Loading…</div>
-          : !activities || activities.length === 0 ? <div className="p-4 text-sm text-muted-foreground">No activities yet. Create one.</div>
+          : !activities || activities.length === 0 ? <div className="p-8 text-sm text-muted-foreground text-center">No activities yet.<br />Use “New activity” or “Generate with AI”.</div>
           : (
             <div className="space-y-1">
-              {activities.map((a) => (
-                <button key={a.id} onClick={() => { setCreating(false); setSelectedId(a.id); setRightTab("preview"); }}
-                  className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${!creating && selectedId === a.id ? "bg-primary/10 text-primary" : "hover:bg-muted/60"}`}>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sm truncate">{a.title}</span>
-                    {a.published ? <span className="text-[10px] text-emerald-600 border border-emerald-500/30 rounded-full px-1.5">live</span> : <span className="text-[10px] text-muted-foreground border border-border rounded-full px-1.5">draft</span>}
-                  </div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {a.source !== "html" && <span className="text-[10px] px-1.5 rounded-full border bg-muted capitalize">{a.source === "ai" ? "AI" : a.source}</span>}
-                    {a.bloomsLevel && <span className="text-[10px] px-1.5 rounded-full border bg-purple-500/10 text-purple-700 border-purple-500/30">{a.bloomsLevel}</span>}
-                  </div>
-                </button>
-              ))}
+              {activities.map((a) => {
+                const active = !creating && selectedId === a.id;
+                return (
+                  <button key={a.id} onClick={() => { setCreating(false); setSelectedId(a.id); setRightTab("preview"); }}
+                    className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${active ? "bg-primary/5 border-primary/30" : "border-transparent hover:bg-muted/60"}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-medium text-sm leading-snug">{a.title}</span>
+                      {a.published
+                        ? <span className="shrink-0 text-[10px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-1.5 py-0.5">Live</span>
+                        : <span className="shrink-0 text-[10px] text-muted-foreground border border-border rounded-full px-1.5 py-0.5">Draft</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{a.source === "ai" ? "AI" : a.source === "embed" ? "Embed" : (a.kind || "custom").replace("_", " ")}</span>
+                      {a.bloomsLevel && <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-purple-500/10 text-purple-700 border-purple-500/30">{a.bloomsLevel}</span>}
+                      {a.difficulty && <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{a.difficulty}</span>}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
         </Card>
 
-        <div>
+        <div className={detailActive ? "block" : "hidden lg:block"}>
+          {detailActive && (
+            <button onClick={() => { setCreating(false); setSelectedId(null); }} className="lg:hidden mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> All activities
+            </button>
+          )}
           {creating ? (
             <Card className="p-5">
               <Editor activity={null} newMode={newMode} seed={seed} onSaved={(a) => { setCreating(false); setNewMode(null); setSeed(null); setSelectedId(a.id); setRightTab("preview"); }} />
