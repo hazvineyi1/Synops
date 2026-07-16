@@ -72,7 +72,7 @@ function SuperAdminDashboard() {
                     <p className="text-sm text-muted-foreground">{partner.learnerCount || 0} learners &middot; {partner.status}</p>
                   </div>
                 </div>
-                <Link href={`/admin/partners/${partner.id}`}>
+                <Link href="/admin/partners">
                   <Button variant="outline" size="sm">Manage</Button>
                 </Link>
               </div>
