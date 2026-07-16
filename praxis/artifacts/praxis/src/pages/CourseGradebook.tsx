@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/context/SessionContext";
+import { GradebookLearnerDialog } from "@/components/GradebookLearnerDialog";
 import { ChevronRight, MessageSquare, Plus, RefreshCw, TrendingDown, TrendingUp, Minus, AlertTriangle, Mail } from "lucide-react";
 
 const bandCell = (f: number | null) =>
@@ -34,6 +35,7 @@ export function CourseGradebook() {
   const { user } = useSession();
   const [groupId, setGroupId] = useState<string>("");
   const [includeFormative, setIncludeFormative] = useState(false);
+  const [drillUser, setDrillUser] = useState<string | null>(null);
 
   const { data: course } = useQuery({ queryKey: ["course", courseId], queryFn: () => apiFetch<any>(`/courses/${courseId}`) });
   const groups = useQuery({
@@ -231,7 +233,11 @@ export function CourseGradebook() {
                     <td className="sticky left-0 z-10 border-r border-border bg-background px-4 py-2">
                       <div className="flex items-center gap-2">
                         <div className="min-w-0">
-                          <div className="truncate font-medium text-foreground">
+                          <button
+                            onClick={() => setDrillUser(l.userId)}
+                            title="View full breakdown"
+                            className="max-w-full truncate text-left font-medium text-foreground hover:text-primary hover:underline"
+                          >
                             {l.user?.firstName} {l.user?.lastName}
                             {l.alert.status === "off_track" && (
                               <span title={(l.alert.reasonLabels ?? l.alert.reasons).join("; ")}>
@@ -241,7 +247,7 @@ export function CourseGradebook() {
                             {l.alert.status === "at_risk" && (
                               <span title="At risk"><AlertTriangle className="ml-1 inline h-3.5 w-3.5 text-amber-500" /></span>
                             )}
-                          </div>
+                          </button>
                           <div className="mt-0.5 flex items-center gap-1.5">
                             <span className={cn("rounded-full px-2 py-0.5 font-mono text-[11px]", pillBand(ov.band))}>
                               {ov.pct == null ? "no grades" : `${Math.round(ov.pct)}%`}
@@ -307,6 +313,8 @@ export function CourseGradebook() {
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Needs support (below 70%)</span>
         <span className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-red-600" /> Off track — a study plan has been generated and the learner + coach notified</span>
       </div>
+
+      <GradebookLearnerDialog courseId={courseId} userId={drillUser} onClose={() => setDrillUser(null)} />
     </div>
   );
 }

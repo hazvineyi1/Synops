@@ -18,7 +18,7 @@ import {
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isSuperAdmin, isCoFacilitator, canAdministerOrg, canAccessCourse, canAccessOrg, type ScopedUser } from "../lib/roles";
-import { canStaffActOnCourse, leaderCourseIds, learnerIdsForCoFacilitator } from "../lib/scope";
+import { canStaffActOnCourse, leaderCourseIds, learnerIdsForCoFacilitator, canGradeInCourse } from "../lib/scope";
 import { partnersTable, organisationsTable, courseGroupsTable } from "@workspace/db";
 import {
   getCourseColumns,
@@ -265,6 +265,46 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
     grades,
     totalEarned: Math.round(totalEarned * 10) / 10,
     totalPossible: Math.round(totalPossible * 10) / 10,
+    overallPercent: computed.overallPercent,
+    band: computed.band,
+    trend: computed.trend,
+    cells: computed.cells,
+    alert: alert ? { status: alert.status, reasons: alert.reasons, reasonLabels: (alert.reasons || []).map((r) => REASON_LABEL[r] || r) } : { status: "on_track", reasons: [], reasonLabels: [] },
+    plan: plan ? { id: plan.id, rationale: plan.rationale, items: plan.items, createdAt: plan.createdAt } : null,
+  });
+});
+
+// GET /courses/:courseId/gradebook/learner/:userId — staff drill-in on one learner.
+router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (req, res) => {
+  const { courseId, userId } = req.params;
+  const actor = req.dbUser as U;
+  if (!(await canGradeInCourse(actor, courseId, userId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const columns = await getCourseColumns(courseId);
+  const scoreData = await getScoreData(columns, [userId]);
+  const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false);
+
+  const alert = await db.query.gradebookAlertsTable.findFirst({
+    where: and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)),
+  });
+  const plan = alert?.planId
+    ? await db.query.coachPlansTable.findFirst({ where: eq(coachPlansTable.id, alert.planId) })
+    : await db.query.coachPlansTable.findFirst({
+        where: and(
+          eq(coachPlansTable.userId, userId),
+          eq(coachPlansTable.courseId, courseId),
+          eq(coachPlansTable.source, "gradebook_alert"),
+          eq(coachPlansTable.status, "active"),
+        ),
+        orderBy: [desc(coachPlansTable.createdAt)],
+      });
+  const user = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
+
+  res.json({
+    user: user ? { id: user.id, firstName: user.firstName, lastName: user.lastName, email: user.email } : null,
+    columns,
     overallPercent: computed.overallPercent,
     band: computed.band,
     trend: computed.trend,

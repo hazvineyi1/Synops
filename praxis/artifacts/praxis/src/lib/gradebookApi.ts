@@ -80,6 +80,10 @@ export interface MeGradebook {
   plan: StudyPlan | null;
 }
 
+export interface LearnerDetail extends MeGradebook {
+  user: { id: string; firstName: string | null; lastName: string | null; email: string } | null;
+}
+
 export interface MineCourse {
   courseId: string;
   courseTitle: string;
@@ -115,6 +119,8 @@ export const gradebookApi = {
   matrix: (courseId: string, groupId?: string | null) =>
     apiFetch<GradebookMatrix>(`/courses/${courseId}/gradebook${groupId ? `?groupId=${groupId}` : ""}`),
   me: (courseId: string) => apiFetch<MeGradebook>(`/courses/${courseId}/gradebook/me`),
+  learner: (courseId: string, userId: string) =>
+    apiFetch<LearnerDetail>(`/courses/${courseId}/gradebook/learner/${userId}`),
   mine: () => apiFetch<{ courses: MineCourse[] }>(`/gradebook/mine`),
 
   createItem: (courseId: string, body: ItemInput) =>
