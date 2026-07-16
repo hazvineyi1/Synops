@@ -13,6 +13,7 @@ import {
 import { eq, and, inArray } from "drizzle-orm";
 import { recomputeLearnerAlert, REASON_LABEL, type AlertTransition } from "./gradebookEngine";
 import { generateStudyPlan } from "./studyPlanEngine";
+import { mailerConfigured, sendMail, appUrl, emailShell } from "./mailer";
 
 /**
  * Off-track orchestration: recompute a learner's alert after a grade event and, when they
@@ -115,7 +116,10 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
       .catch(() => undefined);
   }
 
-  // In-app notifications.
+  const learnerName = [learner?.firstName, learner?.lastName].filter(Boolean).join(" ") || "A learner";
+  const staffIds = await offTrackStaff(courseId, { id: userId, organisationId: learner?.organisationId ?? null });
+
+  // In-app notifications (always on).
   try {
     await db.insert(notificationsTable).values({
       userId,
@@ -125,8 +129,6 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
       link: "/grades",
       courseId,
     });
-    const staffIds = await offTrackStaff(courseId, { id: userId, organisationId: learner?.organisationId ?? null });
-    const learnerName = [learner?.firstName, learner?.lastName].filter(Boolean).join(" ") || "A learner";
     for (const sid of staffIds) {
       await db.insert(notificationsTable).values({
         userId: sid,
@@ -140,6 +142,47 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
     }
   } catch {
     /* best-effort */
+  }
+
+  // Email reports (only when a mail sender is configured; safe no-op otherwise).
+  if (mailerConfigured()) {
+    try {
+      const reasonPhrase = reasonsText ? ` (${reasonsText.toLowerCase()})` : "";
+      if (learner?.email) {
+        await sendMail({
+          to: learner.email,
+          subject: planCreated ? `Your study plan for ${courseTitle} is ready` : `Let's get you back on track in ${courseTitle}`,
+          html: emailShell({
+            heading: "Let's get you back on track",
+            bodyHtml: `Hi ${learner.firstName || "there"}, in <strong>${courseTitle}</strong> we noticed you're falling behind${reasonPhrase}. ${planCreated ? "We've built a short, personalised plan to help you catch up — work through it a step at a time." : "Your coach has been notified and will help you catch up."}`,
+            ctaLabel: planCreated ? "View my study plan" : "View my grades",
+            ctaUrl: appUrl("/grades"),
+          }),
+        });
+      }
+      if (staffIds.length) {
+        const staff = await db
+          .select({ id: usersTable.id, email: usersTable.email })
+          .from(usersTable)
+          .where(inArray(usersTable.id, staffIds));
+        const gradebookUrl = appUrl(`/courses/${courseId}/gradebook`);
+        for (const s of staff) {
+          if (!s.email) continue;
+          await sendMail({
+            to: s.email,
+            subject: `${learnerName} may need support in ${courseTitle}`,
+            html: emailShell({
+              heading: `${learnerName} is off track`,
+              bodyHtml: `<strong>${learnerName}</strong> is off track in <strong>${courseTitle}</strong>${reasonsText ? `: ${reasonsText.toLowerCase()}` : ""}.${planCreated ? " An adaptive study plan has been generated for them automatically." : ""}`,
+              ctaLabel: "Open the gradebook",
+              ctaUrl: gradebookUrl,
+            }),
+          });
+        }
+      }
+    } catch {
+      /* best-effort */
+    }
   }
 }
 

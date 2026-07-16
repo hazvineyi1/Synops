@@ -7,7 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { ChevronRight, MessageSquare, Plus, RefreshCw, TrendingDown, TrendingUp, Minus, AlertTriangle } from "lucide-react";
+import { useSession } from "@/context/SessionContext";
+import { ChevronRight, MessageSquare, Plus, RefreshCw, TrendingDown, TrendingUp, Minus, AlertTriangle, Mail } from "lucide-react";
 
 const bandCell = (f: number | null) =>
   f === null
@@ -30,6 +31,7 @@ const pillBand = (band: string) =>
 export function CourseGradebook() {
   const { courseId } = useParams<{ courseId: string }>();
   const qc = useQueryClient();
+  const { user } = useSession();
   const [groupId, setGroupId] = useState<string>("");
   const [includeFormative, setIncludeFormative] = useState(false);
 
@@ -56,6 +58,18 @@ export function CourseGradebook() {
     mutationFn: (b: { title: string; pointsPossible: number; itemType: "formative" | "summative"; category: string }) =>
       gradebookApi.createItem(courseId, { sourceType: "manual", ...b }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["gradebook", courseId] }),
+  });
+  const testEmail = useMutation({
+    mutationFn: () => gradebookApi.testEmail(),
+    onSuccess: (r) =>
+      window.alert(
+        r.sent
+          ? `Test email sent to ${r.to}. Check your inbox.`
+          : r.configured
+            ? "Email is configured but the send failed — check the Resend key and the EMAIL_FROM sender domain."
+            : "Email isn't configured yet. Set RESEND_API_KEY and EMAIL_FROM in Railway, then try again.",
+      ),
+    onError: (e: any) => window.alert(e?.message ?? "Test failed"),
   });
 
   // Group columns by category, preserving order.
@@ -164,6 +178,11 @@ export function CourseGradebook() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => scan.mutate()} disabled={scan.isPending}>
             <RefreshCw className={cn("h-4 w-4", scan.isPending && "animate-spin")} /> Check who's off track
           </Button>
+          {user?.role === "super_admin" && (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => testEmail.mutate()} disabled={testEmail.isPending}>
+              <Mail className="h-4 w-4" /> Test email
+            </Button>
+          )}
         </div>
       </div>
 

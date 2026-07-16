@@ -26,6 +26,7 @@ import {
   REASON_LABEL,
 } from "../lib/gradebookEngine";
 import { onGradeEvent, scanCourse } from "../lib/gradebookAlerts";
+import { mailerConfigured, sendMail, appUrl, emailShell } from "../lib/mailer";
 
 const router = Router();
 
@@ -407,6 +408,29 @@ router.post("/courses/:courseId/gradebook/scan", requireAuth, async (req, res) =
   if (!(await requireStaffOnCourse(req, res, courseId))) return;
   const summary = await scanCourse(courseId);
   res.json(summary);
+});
+
+// POST /gradebook/test-email — super-admin sends a sample off-track email to themselves.
+router.post("/gradebook/test-email", requireAuth, async (req, res) => {
+  const u = req.dbUser as U & { email?: string };
+  if (!isSuperAdmin(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!mailerConfigured()) {
+    res.json({ configured: false, sent: false, message: "Set RESEND_API_KEY and EMAIL_FROM to enable email." });
+    return;
+  }
+  const to = u.email;
+  if (!to) { res.status(400).json({ error: "Your account has no email address." }); return; }
+  const sent = await sendMail({
+    to,
+    subject: "Praxis email is working",
+    html: emailShell({
+      heading: "Email delivery is set up",
+      bodyHtml: "This is a test of Praxis off-track email reports. If you can read this, learners, coaches and org admins will receive their alerts by email.",
+      ctaLabel: "Open Praxis",
+      ctaUrl: appUrl("/"),
+    }),
+  });
+  res.json({ configured: true, sent, to });
 });
 
 // ── Learner marks a study-plan step done ────────────────────────────────────────

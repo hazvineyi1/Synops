@@ -138,6 +138,9 @@ export const gradebookApi = {
   scan: (courseId: string) =>
     apiFetch<{ evaluated: number; offTrack: number; alerted: number }>(`/courses/${courseId}/gradebook/scan`, { method: "POST" }),
 
+  testEmail: () =>
+    apiFetch<{ configured: boolean; sent: boolean; to?: string; message?: string }>(`/gradebook/test-email`, { method: "POST" }),
+
   markPlanItem: (planId: string, index: number, done: boolean) =>
     apiFetch<{ id: string; items: StudyPlanItem[]; status: string }>(`/study-plans/${planId}/items/${index}`, {
       method: "PATCH",
