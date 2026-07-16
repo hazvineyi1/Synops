@@ -30,10 +30,10 @@ export interface GeneratedActivity {
   rationale: string;
 }
 
-const SYSTEM = `You are an expert instructional designer and front-end engineer. You turn raw course content into a set of SHORT, gamified, interactive learning activities that a learner completes in a hardened sandbox.
+const SYSTEM = `You are an expert instructional designer and front-end engineer. You turn raw course content into a SHORT, gamified, interactive learning activity that a learner completes in a hardened sandbox.
 
 ABSOLUTE RUNTIME CONSTRAINTS (breaking any of these makes the activity fail):
-- Each "html" value is placed inside a <body>. It must be SELF-CONTAINED: put all CSS in an inline <style> and all logic in an inline <script>. Use VANILLA JavaScript and CSS only.
+- The HTML is placed inside a <body>. It must be SELF-CONTAINED: put all CSS in an inline <style> and all logic in an inline <script>. Use VANILLA JavaScript and CSS only.
 - NO external resources of any kind: no CDNs, no <script src>, no external fonts, no <img src="http...">, no fetch/XHR/network. The sandbox has NO network and an opaque origin, so anything external silently fails. If you need an image, draw it with inline SVG or CSS.
 - The host injects base styles (system font, white background, 20px padding). Do not fight them; you may add your own styles scoped to your elements.
 - When the learner has finished, call window.SynopsActivity.submit(payload, score) EXACTLY ONCE. payload is a small JSON object of what they did; score is a number 0..100 (percent correct / quality). Provide a visible "Submit" / "Finish" affordance that triggers it (or auto-submit at the end of the flow).
@@ -41,35 +41,57 @@ ABSOLUTE RUNTIME CONSTRAINTS (breaking any of these makes the activity fail):
 
 GAMIFICATION: make it engaging — points, streaks, instant feedback, progress, a friendly result screen — without being childish. Keep it professional and on-topic to the content.
 
-RIGOR: for each activity set an honest Bloom's level (one of: Remember, Understand, Apply, Analyze, Evaluate, Create) and a difficulty (one of: foundational, intermediate, advanced). Spread the set across DIFFERENT Bloom's levels so the menu ranges from recall to higher-order reasoning. Briefly justify the rigor in "rationale".
+RIGOR: set an honest Bloom's level (one of: Remember, Understand, Apply, Analyze, Evaluate, Create) and a difficulty (one of: foundational, intermediate, advanced). Briefly justify the rigor.
 
 KIND: build the ONE kind of activity you are told to build: quiz (MCQ with feedback), flashcards (flip to recall), drag_drop (order/sort items), matching (pair concepts), scenario (branching decision with consequences), or hotspot (click the right region of an inline SVG).
 
-Return ONLY a single strict JSON object (no prose, no code fences, no array) with EXACTLY these keys: "kind", "title", "instructions", "html", "bloomsLevel", "difficulty", "rationale". Escape the HTML properly as a JSON string.`;
+OUTPUT FORMAT — this is critical. Return the activity using these EXACT labels, each on its own line, and put the RAW HTML last after the HTML: label (do NOT escape it, do NOT wrap it in JSON or code fences). Nothing before TITLE: and nothing after the HTML.
+
+TITLE: <a short title>
+KIND: <the kind>
+BLOOM: <the Bloom's level>
+DIFFICULTY: <foundational|intermediate|advanced>
+RATIONALE: <one or two sentences justifying the rigor>
+INSTRUCTIONS: <one short line shown above the activity>
+HTML:
+<the raw, self-contained HTML here>`;
 
 const clampBloom = (b: unknown) => (typeof b === "string" && (BLOOMS as readonly string[]).includes(b) ? b : "Understand");
 const clampDiff = (d: unknown) => (typeof d === "string" && (DIFFICULTIES as readonly string[]).includes(d) ? d : "intermediate");
 
-/** Generate ONE activity of a given kind/level. Small + fast; never throws (returns null). */
+/**
+ * Generate ONE activity of a given kind/level. Small + fast; never throws (returns null).
+ * Parses a LABEL-DELIMITED response (not JSON) so the raw HTML never has to be JSON-escaped —
+ * models mis-escape big HTML strings constantly, which was silently dropping activities.
+ */
 async function generateOne(content: string, kind: string, bloom: string, difficulty: string | null): Promise<GeneratedActivity | null> {
   const rigor = `Target Bloom's level: ${bloom}.${difficulty ? ` Target difficulty: ${difficulty}.` : ""}`;
-  const user = `Build ONE "${kind}" activity from the COURSE CONTENT below. ${rigor}\nKeep the HTML COMPACT (aim well under 200 lines) so it fits in one response: concise markup, share one small <style>, avoid huge inline SVGs, cap items at ~5-6. Return only the single JSON object.\n\n=== COURSE CONTENT ===\n${content.slice(0, 10000)}`;
+  const user = `Build ONE "${kind}" activity from the COURSE CONTENT below. ${rigor}\nKeep the HTML compact (aim well under 200 lines). Use the exact label format from the system prompt; put the raw HTML after HTML:.\n\n=== COURSE CONTENT ===\n${content.slice(0, 10000)}`;
   try {
     const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 6000, system: SYSTEM, messages: [{ role: "user", content: user }] });
     const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-    const m = text.match(/\{[\s\S]*\}/);
-    if (!m) return null;
-    const x = JSON.parse(m[0]) as Record<string, unknown>;
-    const html = typeof x.html === "string" ? x.html : "";
-    if (!html.trim()) return null;
+
+    // Split on the HTML: label — everything after it is the raw document.
+    const htmlSplit = text.split(/^\s*HTML:\s*$/m);
+    if (htmlSplit.length < 2) return null;
+    const head = htmlSplit[0];
+    let html = htmlSplit.slice(1).join("HTML:").trim();
+    // Strip accidental code fences if the model added them.
+    html = html.replace(/^```[a-z]*\s*/i, "").replace(/\s*```$/i, "").trim();
+    if (!html || !/[<]/.test(html)) return null;
+
+    const field = (label: string) => {
+      const m = head.match(new RegExp(`^\\s*${label}:\\s*(.+)$`, "im"));
+      return m ? m[1].trim() : "";
+    };
     return {
-      kind: typeof x.kind === "string" ? x.kind : kind,
-      title: typeof x.title === "string" ? x.title : "Untitled activity",
-      instructions: typeof x.instructions === "string" ? x.instructions : "",
+      kind: field("KIND") || kind,
+      title: field("TITLE") || "Untitled activity",
+      instructions: field("INSTRUCTIONS"),
       html,
-      bloomsLevel: clampBloom(x.bloomsLevel ?? bloom),
-      difficulty: clampDiff(x.difficulty ?? difficulty),
-      rationale: typeof x.rationale === "string" ? x.rationale : "",
+      bloomsLevel: clampBloom(field("BLOOM") || bloom),
+      difficulty: clampDiff(field("DIFFICULTY") || difficulty),
+      rationale: field("RATIONALE"),
     };
   } catch {
     return null;
