@@ -27,6 +27,7 @@ import {
   TrendingUp,
   CalendarDays,
   Layers,
+  ClipboardList,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -130,6 +131,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.learners'), href: '/coach', icon: Users },
           { label: t('nav.submissions'), href: '/coach/submissions', icon: FileText },
+          { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
           { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
@@ -143,6 +145,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         items: [
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.members'), href: '/org/members', icon: UserCog },
+          { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
           { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
@@ -160,6 +163,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.organisations'), href: '/dashboard', icon: Building },
           { label: t('nav.courseCatalog'), href: '/courses', icon: BookOpen },
+          { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
           { label: t('nav.studio'), href: '/studio', icon: PenTool },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },

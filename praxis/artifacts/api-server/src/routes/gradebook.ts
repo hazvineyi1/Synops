@@ -17,8 +17,9 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { isSuperAdmin, canAdministerOrg, canAccessCourse, type ScopedUser } from "../lib/roles";
-import { canStaffActOnCourse, leaderCourseIds } from "../lib/scope";
+import { isSuperAdmin, isCoFacilitator, canAdministerOrg, canAccessCourse, canAccessOrg, type ScopedUser } from "../lib/roles";
+import { canStaffActOnCourse, leaderCourseIds, learnerIdsForCoFacilitator } from "../lib/scope";
+import { partnersTable, organisationsTable, courseGroupsTable } from "@workspace/db";
 import {
   getCourseColumns,
   getScoreData,
@@ -64,7 +65,14 @@ router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
       .from(enrolmentsTable)
       .where(eq(enrolmentsTable.courseId, courseId));
   }
-  const userIds = [...new Set(learnerRows.map((r) => r.userId))];
+  let userIds = [...new Set(learnerRows.map((r) => r.userId))];
+
+  // A Co-facilitator (coach) is limited to learners in the section(s) they lead here.
+  const actor = req.dbUser as U;
+  if (isCoFacilitator(actor.role)) {
+    const mine = new Set(await learnerIdsForCoFacilitator(actor.id));
+    userIds = userIds.filter((id) => mine.has(id));
+  }
 
   const [users, scoreData, alerts] = await Promise.all([
     userIds.length
@@ -97,6 +105,110 @@ router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
   const classAverage = withScores.length ? Math.round(withScores.reduce((a, b) => a + b, 0) / withScores.length) : null;
 
   res.json({ columns, learners, classAverage });
+});
+
+// ── Hierarchy navigation (browse down to a course gradebook, scoped by role) ──────
+// GET /gradebook/nav — the entry level for this actor.
+router.get("/gradebook/nav", requireAuth, async (req, res) => {
+  const u = req.dbUser as U;
+  if (isSuperAdmin(u.role)) { res.json({ level: "partners" }); return; }
+  if (u.role === "partner_admin") { res.json({ level: "organisations", partnerId: u.partnerId ?? null }); return; }
+  if (u.role === "org_admin") { res.json({ level: "courses", organisationId: u.organisationId ?? null }); return; }
+  if (isCoFacilitator(u.role)) { res.json({ level: "courses", coach: true }); return; }
+  res.json({ level: "none" });
+});
+
+// GET /gradebook/nav/partners — super_admin only.
+router.get("/gradebook/nav/partners", requireAuth, async (req, res) => {
+  const u = req.dbUser as U;
+  if (!isSuperAdmin(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const partners = await db.select({ id: partnersTable.id, name: partnersTable.name }).from(partnersTable).orderBy(partnersTable.name);
+  const orgs = await db.select({ partnerId: organisationsTable.partnerId }).from(organisationsTable);
+  const count = new Map<string, number>();
+  orgs.forEach((o) => count.set(o.partnerId, (count.get(o.partnerId) ?? 0) + 1));
+  res.json(partners.map((p) => ({ id: p.id, name: p.name, orgCount: count.get(p.id) ?? 0 })));
+});
+
+// GET /gradebook/nav/organisations?partnerId= — super (any/all), partner_admin (own partner).
+router.get("/gradebook/nav/organisations", requireAuth, async (req, res) => {
+  const u = req.dbUser as U;
+  const partnerId = typeof req.query.partnerId === "string" ? req.query.partnerId : null;
+  let rows;
+  if (isSuperAdmin(u.role)) {
+    rows = partnerId
+      ? await db.select().from(organisationsTable).where(eq(organisationsTable.partnerId, partnerId))
+      : await db.select().from(organisationsTable);
+  } else if (u.role === "partner_admin" && u.partnerId) {
+    rows = await db.select().from(organisationsTable).where(eq(organisationsTable.partnerId, u.partnerId));
+  } else {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  res.json(rows.map((o) => ({ id: o.id, name: o.name, partnerId: o.partnerId })));
+});
+
+// GET /gradebook/nav/courses?organisationId= — courses (with cohorts) the actor can grade.
+router.get("/gradebook/nav/courses", requireAuth, async (req, res) => {
+  const u = req.dbUser as U;
+  const organisationId = typeof req.query.organisationId === "string" ? req.query.organisationId : null;
+
+  let courses: (typeof coursesTable.$inferSelect)[] = [];
+  if (isCoFacilitator(u.role)) {
+    const led = await leaderCourseIds(u.id);
+    courses = led.size ? await db.select().from(coursesTable).where(inArray(coursesTable.id, [...led])) : [];
+  } else if (isSuperAdmin(u.role) || u.role === "partner_admin" || u.role === "org_admin") {
+    let tenantIds: string[] | null = null; // null => super_admin, all courses
+    if (organisationId) {
+      const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, organisationId) });
+      if (!org) { res.json([]); return; }
+      if (!isSuperAdmin(u.role) && !canAccessOrg(u, org)) { res.status(403).json({ error: "Forbidden" }); return; }
+      tenantIds = [org.id, org.partnerId];
+    } else if (u.role === "org_admin") {
+      if (!u.organisationId) { res.json([]); return; }
+      const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, u.organisationId) });
+      tenantIds = org ? [org.id, org.partnerId] : [u.organisationId];
+    } else if (u.role === "partner_admin") {
+      if (!u.partnerId) { res.json([]); return; }
+      tenantIds = [u.partnerId];
+    }
+    courses =
+      tenantIds === null
+        ? await db.select().from(coursesTable)
+        : tenantIds.length
+          ? await db.select().from(coursesTable).where(inArray(coursesTable.tenantId, tenantIds))
+          : [];
+  } else {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  const courseIds = courses.map((c) => c.id);
+  const [groups, enrols] = await Promise.all([
+    courseIds.length ? db.select().from(courseGroupsTable).where(inArray(courseGroupsTable.courseId, courseIds)) : Promise.resolve([]),
+    courseIds.length ? db.select({ courseId: enrolmentsTable.courseId, userId: enrolmentsTable.userId }).from(enrolmentsTable).where(inArray(enrolmentsTable.courseId, courseIds)) : Promise.resolve([]),
+  ]);
+  const groupsByCourse = new Map<string, { id: string; name: string }[]>();
+  for (const g of groups as any[]) {
+    if (!groupsByCourse.has(g.courseId)) groupsByCourse.set(g.courseId, []);
+    groupsByCourse.get(g.courseId)!.push({ id: g.id, name: g.name });
+  }
+  const learnersByCourse = new Map<string, Set<string>>();
+  for (const e of enrols as any[]) {
+    if (!learnersByCourse.has(e.courseId)) learnersByCourse.set(e.courseId, new Set());
+    learnersByCourse.get(e.courseId)!.add(e.userId);
+  }
+
+  res.json(
+    courses
+      .map((c) => ({
+        id: c.id,
+        title: c.title,
+        status: c.status,
+        learnerCount: learnersByCourse.get(c.id)?.size ?? 0,
+        cohorts: groupsByCourse.get(c.id) ?? [],
+      }))
+      .sort((a, b) => a.title.localeCompare(b.title)),
+  );
 });
 
 // ── Learner self-view ───────────────────────────────────────────────────────────
