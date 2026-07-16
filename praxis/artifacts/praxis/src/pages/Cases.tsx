@@ -115,7 +115,7 @@ export function Cases() {
                   )}
                   {canAssign && c.status === "published" && (
                     <Button size="sm" variant="outline" onClick={() => setAssignFor({ id: c.id, title: c.title })} title="Assign to partners / orgs / learners">
-                      <Share2 className="h-4 w-4" />
+                      <Share2 className="h-4 w-4 mr-1.5" /> Assign
                     </Button>
                   )}
                 </div>
