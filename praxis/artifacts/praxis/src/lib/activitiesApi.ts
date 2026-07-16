@@ -135,6 +135,9 @@ export const activitiesApi = {
   // AI generation — returns a menu of spec-based drafts (not persisted).
   generate: (body: { content: string; count?: number; types?: string[]; targetBloom?: string | null; targetDifficulty?: string | null }) =>
     req<{ activities: GeneratedActivity[] }>(`/activities/generate`, { method: "POST", body: JSON.stringify(body) }),
+  // Extract text from an uploaded document (base64) or a URL, for the generator.
+  extract: (body: { url?: string; filename?: string; dataBase64?: string }) =>
+    req<{ text: string; chars: number }>(`/activities/extract`, { method: "POST", body: JSON.stringify(body) }),
 
   // Public embed links (publish-out).
   embedLinks: (id: string) => req<ActivityEmbedLink[]>(`/activities/${id}/embed-links`),

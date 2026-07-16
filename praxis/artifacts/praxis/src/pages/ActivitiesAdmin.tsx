@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket } from "lucide-react";
+import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -179,12 +179,34 @@ function AIGenerateDialog({ onClose, onUse }: { onClose: () => void; onUse: (g: 
   const [count, setCount] = useState(4);
   const [drafts, setDrafts] = useState<GeneratedActivity[]>([]);
   const [previewIdx, setPreviewIdx] = useState<number | null>(null);
+  const [url, setUrl] = useState("");
+  const [showUrl, setShowUrl] = useState(false);
 
   const gen = useMutation({
     mutationFn: () => activitiesApi.generate({ content, count }),
     onSuccess: (r) => { setDrafts(r.activities); if (!r.activities.length) toast({ title: "No activities came back", description: "Try adding more content.", variant: "destructive" }); },
     onError: (e) => toast({ title: "Generation failed", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
+
+  const extract = useMutation({
+    mutationFn: (body: { url?: string; filename?: string; dataBase64?: string }) => activitiesApi.extract(body),
+    onSuccess: (r) => { setContent(r.text); toast({ title: `Imported ${r.chars.toLocaleString()} characters`, description: "Review the text below, then Generate." }); },
+    onError: (e) => toast({ title: "Could not import", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+
+  const onFile = (file?: File) => {
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) { toast({ title: "File too large", description: "Max 20MB.", variant: "destructive" }); return; }
+    const e = (file.name.split(".").pop() || "").toLowerCase();
+    const reader = new FileReader();
+    if (["txt", "md", "markdown", "csv", "tsv", "json", "log"].includes(e)) {
+      reader.onload = () => { setContent(String(reader.result || "")); toast({ title: "File loaded" }); };
+      reader.readAsText(file);
+    } else {
+      reader.onload = () => { const b64 = String(reader.result || "").split(",")[1] || ""; extract.mutate({ filename: file.name, dataBase64: b64 }); };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -196,8 +218,28 @@ function AIGenerateDialog({ onClose, onUse }: { onClose: () => void; onUse: (g: 
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <Label className="text-sm">Paste your course content</Label>
-            <Textarea value={content} onChange={(e) => setContent(e.target.value)} className="h-40 text-sm" placeholder="Paste a lesson, notes, a reading, learning outcomes… the AI turns it into gamified activities and decides the rigor." />
+            <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+              <Label className="text-sm">Course content</Label>
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-md border hover:bg-muted cursor-pointer">
+                  <Upload className="h-3.5 w-3.5" /> Upload file
+                  <input type="file" className="hidden" accept=".txt,.md,.csv,.tsv,.json,.pdf,.docx,.xlsx,.xls,.pptx,.html,.htm" onChange={(e) => onFile(e.target.files?.[0])} />
+                </label>
+                <button type="button" onClick={() => setShowUrl((v) => !v)} className={`inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-md border transition-colors ${showUrl ? "bg-muted" : "hover:bg-muted"}`}>
+                  <Link2 className="h-3.5 w-3.5" /> From URL
+                </button>
+              </div>
+            </div>
+            {showUrl && (
+              <div className="flex gap-2 mb-2">
+                <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…  or a Google Doc / Sheet share link" onKeyDown={(e) => { if (e.key === "Enter" && url.trim()) extract.mutate({ url }); }} />
+                <Button size="sm" variant="outline" onClick={() => extract.mutate({ url })} disabled={!url.trim() || extract.isPending}>{extract.isPending ? "Fetching…" : "Fetch"}</Button>
+              </div>
+            )}
+            <Textarea value={content} onChange={(e) => setContent(e.target.value)} className="h-40 text-sm" placeholder="Paste a lesson, notes, a reading, learning outcomes… or use Upload file / From URL above. The AI turns it into gamified activities and decides the rigor." />
+            {extract.isPending
+              ? <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Reading your document…</p>
+              : <p className="text-[11px] text-muted-foreground mt-1">Supports PDF, Word, PowerPoint, Excel, text, HTML, and Google Docs / Sheets links.</p>}
           </div>
           <div className="flex items-center gap-3">
             <Label className="text-sm">How many</Label>

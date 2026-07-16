@@ -36,7 +36,7 @@ app.use(
 // third-party identity provider only lets you do indirectly, through its API.
 app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "25mb" })); // large enough for base64-encoded document uploads (activity content extraction)
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);

@@ -20,6 +20,7 @@ import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { isSuperAdmin, hasHubAccess, canAdministerOrg, isInstructionalDesigner } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 import { generateActivities } from "../lib/activityEngine";
+import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
 
 const router = Router();
 
@@ -228,6 +229,30 @@ router.delete("/activities/:id", requireAuth, requireAuthor, async (req, res) =>
 });
 
 /* ─────────────────────────── AI generation ─────────────────────────── */
+
+/** POST /activities/extract — pull plain text from an uploaded document or a URL, so the AI
+ *  generator can work from real course material (PDF/Word/PowerPoint/Excel/text/Google Docs). */
+router.post("/activities/extract", requireAuth, requireAuthor, async (req, res) => {
+  const { url, filename, dataBase64 } = req.body ?? {};
+  try {
+    let text = "";
+    if (typeof dataBase64 === "string" && dataBase64) {
+      const buf = Buffer.from(dataBase64, "base64");
+      if (buf.length > 20 * 1024 * 1024) { res.status(400).json({ error: "That file is too large (max 20MB)." }); return; }
+      text = await extractFromBuffer(String(filename || "file.txt"), buf);
+    } else if (typeof url === "string" && url.trim()) {
+      text = await extractFromUrl(url);
+    } else {
+      res.status(400).json({ error: "Provide a file or a URL." });
+      return;
+    }
+    await logAudit(req, "activity.extract", "activity", "-", { source: dataBase64 ? "file" : "url", chars: text.length });
+    res.json({ text, chars: text.length });
+  } catch (err) {
+    req.log?.error({ err }, "activity extract error");
+    res.status(422).json({ error: err instanceof Error ? err.message : "Could not read that content." });
+  }
+});
 
 /** POST /activities/generate — AI proposes a menu of gamified activities (not persisted). */
 router.post("/activities/generate", requireAuth, requireAuthor, async (req, res) => {
