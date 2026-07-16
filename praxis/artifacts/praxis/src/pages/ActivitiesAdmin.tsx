@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2 } from "lucide-react";
+import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -259,13 +259,23 @@ function PublishShare({ activity }: { activity: Activity }) {
     mutationFn: (linkId: string) => activitiesApi.revokeEmbedLink(activity.id, linkId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["activity-embed-links", activity.id] }),
   });
+  const pub = useMutation({
+    mutationFn: () => activitiesApi.update(activity.id, { published: true }),
+    onSuccess: () => { toast({ title: "Published" }); qc.invalidateQueries({ queryKey: ["activities"] }); },
+    onError: (e) => toast({ title: "Could not publish", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const publicUrl = (token: string) => `${origin}/a/${token}`;
   const snippet = (token: string) => `<iframe src="${publicUrl(token)}" width="100%" height="600" style="border:0" allowfullscreen></iframe>`;
   const copy = (text: string, key: string) => { navigator.clipboard?.writeText(text); setCopied(key); setTimeout(() => setCopied(null), 1500); };
 
-  if (!activity.published) return <p className="text-sm text-muted-foreground">Publish this activity to get a shareable / embeddable link.</p>;
+  if (!activity.published) return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">This activity is a draft. Publish it to get a shareable / embeddable link and to assign it.</p>
+      <Button size="sm" onClick={() => pub.mutate()} disabled={pub.isPending}><Rocket className="h-4 w-4 mr-1.5" />{pub.isPending ? "Publishing…" : "Publish now"}</Button>
+    </div>
+  );
 
   return (
     <div className="space-y-3">
@@ -426,6 +436,12 @@ export function ActivitiesAdmin() {
     onSuccess: () => { toast({ title: "Activity deleted" }); setSelectedId(null); qc.invalidateQueries({ queryKey: ["activities"] }); },
   });
 
+  const setPublish = useMutation({
+    mutationFn: (v: { id: string; published: boolean }) => activitiesApi.update(v.id, { published: v.published }),
+    onSuccess: (a) => { toast({ title: a.published ? "Published — now shareable and assignable" : "Unpublished" }); qc.invalidateQueries({ queryKey: ["activities"] }); },
+    onError: (e) => toast({ title: "Could not update", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+
   const startNew = (mode: NewMode) => { setSeed(null); setNewMode(mode); setCreating(true); setSelectedId(null); setRightTab("edit"); setNewMenu(false); };
 
   return (
@@ -501,6 +517,9 @@ export function ActivitiesAdmin() {
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  {!selected.published
+                    ? <Button size="sm" onClick={() => setPublish.mutate({ id: selected.id, published: true })} disabled={setPublish.isPending}><Rocket className="h-4 w-4 mr-1" />{setPublish.isPending ? "Publishing…" : "Publish"}</Button>
+                    : <Button size="sm" variant="outline" onClick={() => setPublish.mutate({ id: selected.id, published: false })} disabled={setPublish.isPending}>Unpublish</Button>}
                   {canAssign && selected.published && <Button variant="outline" size="sm" onClick={() => setAssignFor(selected)}><Share2 className="h-4 w-4 mr-1" />Assign</Button>}
                   {selected.published && <Button variant="outline" size="sm" onClick={() => window.open(`/activities/${selected.id}/play`, "_blank")}><ExternalLink className="h-4 w-4 mr-1" />Open as learner</Button>}
                   <Button variant="ghost" size="sm" className="text-red-600" onClick={() => del.mutate(selected.id)}><Trash2 className="h-4 w-4" /></Button>
