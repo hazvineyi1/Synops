@@ -64,7 +64,7 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
               )}
             </div>
 
-            <ActivityPlayer html={activity.html} onSubmit={(r) => submit.mutate(r)} />
+            <ActivityPlayer html={activity.html} embedUrl={activity.embedUrl} onSubmit={(r) => submit.mutate(r)} />
 
             {submit.isPending && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

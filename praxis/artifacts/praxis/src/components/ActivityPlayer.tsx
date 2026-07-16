@@ -25,6 +25,12 @@ export interface ActivityPlayerHandleResult {
 
 interface Props {
   html: string;
+  /**
+   * External embed URL (source="embed"). When set, we render a normal cross-origin iframe to
+   * that URL instead of the sandboxed srcdoc — third-party embeds (Genially, Google Forms,
+   * YouTube, H5P) need to run on their OWN origin. There is no results bridge for these.
+   */
+  embedUrl?: string | null;
   /** Called when the activity hands in a result. */
   onSubmit?: (result: ActivityPlayerHandleResult) => void;
   /** Preview mode: still renders + relays, but the host may ignore submissions. */
@@ -68,12 +74,13 @@ function buildDoc(html: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${BASE_STYLES}${BRIDGE}</head><body>${html}</body></html>`;
 }
 
-export function ActivityPlayer({ html, onSubmit, disabled, className }: Props) {
+export function ActivityPlayer({ html, embedUrl, onSubmit, disabled, className }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [height, setHeight] = useState(480);
   const doc = useMemo(() => buildDoc(html), [html]);
 
   useEffect(() => {
+    if (embedUrl) return; // external embeds have no results bridge
     function handle(e: MessageEvent) {
       // Authenticate by source: only messages from OUR iframe are trusted.
       if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
@@ -91,7 +98,24 @@ export function ActivityPlayer({ html, onSubmit, disabled, className }: Props) {
     }
     window.addEventListener("message", handle);
     return () => window.removeEventListener("message", handle);
-  }, [onSubmit, disabled]);
+  }, [onSubmit, disabled, embedUrl]);
+
+  // External embed: cross-origin iframe to the third-party origin (no results bridge).
+  if (embedUrl) {
+    return (
+      <iframe
+        title="Embedded activity"
+        src={embedUrl}
+        // The URL runs on ITS OWN origin (not Praxis), so allow-same-origin here is safe and
+        // required for most embeds to function. It can never touch the Praxis parent.
+        sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-popups-to-escape-sandbox"
+        allow="fullscreen; autoplay; encrypted-media; picture-in-picture"
+        referrerPolicy="no-referrer"
+        className={className ?? "w-full rounded-lg border border-border bg-white"}
+        style={{ height: 600 }}
+      />
+    );
+  }
 
   return (
     <iframe

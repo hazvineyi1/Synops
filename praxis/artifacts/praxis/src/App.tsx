@@ -47,6 +47,7 @@ import { MyAttendance } from '@/pages/MyAttendance';
 import { Compliance } from '@/pages/Compliance';
 import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
 import { ActivityPlay } from '@/pages/ActivityPlay';
+import { ActivityEmbed } from '@/pages/ActivityEmbed';
 import { Support } from '@/pages/Support';
 
 // Layout
@@ -161,6 +162,7 @@ function Routes() {
         {/* Public */}
         <PublicRoute path="/verify/:credentialId" component={Verify} />
         <PublicRoute path="/c/:token" component={CaseEmbed} />
+        <PublicRoute path="/a/:token" component={ActivityEmbed} />
 
         {/* Full-screen focus routes */}
         <FocusRoute path="/learn/:sessionId" component={LearnSession} />
