@@ -9,7 +9,9 @@ import {
   caseRubricsTable,
   interactiveActivitiesTable,
   activitySubmissionsTable,
+  gradebookSettingsTable,
   type GradebookItem,
+  type LetterBand,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 
@@ -58,6 +60,7 @@ export interface CellValue {
 export interface LearnerComputed {
   overallPercent: number | null; // 0..100
   band: "good" | "warn" | "low" | "none";
+  letterGrade: string | null;
   trend: { dir: "up" | "down" | "flat" | "none"; label: string };
   cells: Record<string, CellValue>; // keyed by column.key
 }
@@ -70,6 +73,80 @@ export interface OffTrackResult {
 
 const num = (v: unknown): number | null =>
   v === null || v === undefined || v === "" ? null : Number(v);
+
+// ── Grading settings (weighting + letter bands) ─────────────────────────────────
+export interface GradebookSettings {
+  weightingEnabled: boolean;
+  summativeWeight: number;
+  formativeWeight: number;
+  categoryWeights: Record<string, number>;
+  lettersEnabled: boolean;
+  letterBands: LetterBand[];
+}
+export const DEFAULT_BANDS: LetterBand[] = [
+  { label: "A", min: 90 }, { label: "B", min: 80 }, { label: "C", min: 70 }, { label: "D", min: 60 }, { label: "F", min: 0 },
+];
+export const DEFAULT_SETTINGS: GradebookSettings = {
+  weightingEnabled: false, summativeWeight: 100, formativeWeight: 0, categoryWeights: {}, lettersEnabled: false, letterBands: DEFAULT_BANDS,
+};
+
+export async function getGradebookSettings(courseId: string): Promise<GradebookSettings> {
+  try {
+    const row = await db.query.gradebookSettingsTable.findFirst({ where: eq(gradebookSettingsTable.courseId, courseId) });
+    if (!row) return DEFAULT_SETTINGS;
+    return {
+      weightingEnabled: row.weightingEnabled,
+      summativeWeight: row.summativeWeight,
+      formativeWeight: row.formativeWeight,
+      categoryWeights: (row.categoryWeights as Record<string, number>) ?? {},
+      lettersEnabled: row.lettersEnabled,
+      letterBands: row.letterBands?.length ? row.letterBands : DEFAULT_BANDS,
+    };
+  } catch {
+    // Table not migrated yet — fall back to defaults so the gradebook keeps working.
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export function letterFor(pct: number | null, bands: LetterBand[]): string | null {
+  if (pct === null || !bands.length) return null;
+  const sorted = [...bands].sort((a, b) => b.min - a.min);
+  for (const b of sorted) if (pct >= b.min) return b.label;
+  return sorted[sorted.length - 1]?.label ?? null;
+}
+
+/** Hierarchical weighted overall: category avg -> category-weighted within a type bucket -> type split. */
+function weightedOverall(columns: GradebookColumn[], fracs: Map<string, number> | undefined, s: GradebookSettings): number | null {
+  const bucketAvg = (type: "summative" | "formative"): number | null => {
+    const cats = new Map<string, { earned: number; possible: number }>();
+    for (const col of columns) {
+      if (!col.includeInGrade || col.itemType !== type) continue;
+      const f = fracs?.get(col.key);
+      if (f == null) continue;
+      const c = cats.get(col.category) ?? { earned: 0, possible: 0 };
+      c.earned += f * col.pointsPossible;
+      c.possible += col.pointsPossible;
+      cats.set(col.category, c);
+    }
+    if (cats.size === 0) return null;
+    let wSum = 0;
+    let wAvg = 0;
+    for (const [cat, v] of cats) {
+      const catAvg = v.possible > 0 ? v.earned / v.possible : 0;
+      const w = s.categoryWeights[cat] ?? 1;
+      wAvg += catAvg * w;
+      wSum += w;
+    }
+    return wSum > 0 ? wAvg / wSum : null;
+  };
+  const sAvg = s.summativeWeight > 0 ? bucketAvg("summative") : null;
+  const fAvg = s.formativeWeight > 0 ? bucketAvg("formative") : null;
+  let num2 = 0;
+  let den = 0;
+  if (sAvg != null) { num2 += sAvg * s.summativeWeight; den += s.summativeWeight; }
+  if (fAvg != null) { num2 += fAvg * s.formativeWeight; den += s.formativeWeight; }
+  return den > 0 ? (num2 / den) * 100 : null;
+}
 
 /** Build the ordered set of gradebook columns for a course. */
 export async function getCourseColumns(courseId: string): Promise<GradebookColumn[]> {
@@ -263,6 +340,7 @@ export function computeLearner(
   userFractions: Map<string, number> | undefined,
   userNotes: Map<string, string> | undefined,
   includeFormative: boolean,
+  settings?: GradebookSettings,
 ): LearnerComputed {
   const cells: Record<string, CellValue> = {};
   let earned = 0;
@@ -284,11 +362,16 @@ export function computeLearner(
     if (col.includeInGrade && col.itemType === "summative" && frac !== null) summativeSeries.push(frac);
   }
 
-  const overall = possible > 0 ? (earned / possible) * 100 : null;
+  const overall = settings?.weightingEnabled
+    ? weightedOverall(columns, userFractions, settings)
+    : possible > 0
+      ? (earned / possible) * 100
+      : null;
   const band: LearnerComputed["band"] =
     overall === null ? "none" : overall >= 90 ? "good" : overall >= 70 ? "warn" : "low";
+  const letterGrade = settings?.lettersEnabled ? letterFor(overall, settings.letterBands) : null;
 
-  return { overallPercent: overall, band, trend: trendOf(summativeSeries), cells };
+  return { overallPercent: overall, band, letterGrade, trend: trendOf(summativeSeries), cells };
 }
 
 function trendOf(series: number[]): LearnerComputed["trend"] {

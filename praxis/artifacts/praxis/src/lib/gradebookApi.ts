@@ -37,11 +37,22 @@ export interface AlertSummary {
   reasonLabels?: string[];
 }
 
+export interface LetterBand { label: string; min: number }
+export interface GradebookSettings {
+  weightingEnabled: boolean;
+  summativeWeight: number;
+  formativeWeight: number;
+  categoryWeights: Record<string, number>;
+  lettersEnabled: boolean;
+  letterBands: LetterBand[];
+}
+
 export interface MatrixLearner {
   userId: string;
   user: { id: string; firstName: string | null; lastName: string | null; email: string } | null;
   overallPercent: number | null;
   band: "good" | "warn" | "low" | "none";
+  letterGrade?: string | null;
   trend: Trend;
   alert: AlertSummary;
   cells: Record<string, CellValue>;
@@ -51,6 +62,7 @@ export interface GradebookMatrix {
   columns: GradebookColumn[];
   learners: MatrixLearner[];
   classAverage: number | null;
+  settings: GradebookSettings;
 }
 
 export interface StudyPlanItem {
@@ -74,10 +86,12 @@ export interface MeGradebook {
   columns: GradebookColumn[];
   overallPercent: number | null;
   band: "good" | "warn" | "low" | "none";
+  letterGrade?: string | null;
   trend: Trend;
   cells: Record<string, CellValue>;
   alert: AlertSummary;
   plan: StudyPlan | null;
+  settings?: GradebookSettings;
 }
 
 export interface LearnerDetail extends MeGradebook {
@@ -119,6 +133,9 @@ export const gradebookApi = {
   matrix: (courseId: string, groupId?: string | null) =>
     apiFetch<GradebookMatrix>(`/courses/${courseId}/gradebook${groupId ? `?groupId=${groupId}` : ""}`),
   me: (courseId: string) => apiFetch<MeGradebook>(`/courses/${courseId}/gradebook/me`),
+  settings: (courseId: string) => apiFetch<GradebookSettings>(`/courses/${courseId}/gradebook/settings`),
+  saveSettings: (courseId: string, body: GradebookSettings) =>
+    apiFetch<GradebookSettings>(`/courses/${courseId}/gradebook/settings`, { method: "PUT", body: JSON.stringify(body) }),
   learner: (courseId: string, userId: string) =>
     apiFetch<LearnerDetail>(`/courses/${courseId}/gradebook/learner/${userId}`),
   mine: () => apiFetch<{ courses: MineCourse[] }>(`/gradebook/mine`),

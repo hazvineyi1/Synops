@@ -177,6 +177,12 @@ function OverviewBar({ me }: { me: MeGradebook }) {
           </div>
           <div className="text-xs text-muted-foreground">Overall mastery</div>
         </div>
+        {me.letterGrade && (
+          <div>
+            <div className="text-3xl font-bold text-foreground">{me.letterGrade}</div>
+            <div className="text-xs text-muted-foreground">Grade</div>
+          </div>
+        )}
         <div className="flex items-center gap-1.5 text-sm">
           {me.trend.dir === "up" && <TrendingUp className="h-4 w-4 text-green-600" />}
           {me.trend.dir === "down" && <TrendingDown className="h-4 w-4 text-amber-600" />}

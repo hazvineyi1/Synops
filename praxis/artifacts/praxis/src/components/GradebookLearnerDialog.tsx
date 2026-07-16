@@ -55,6 +55,12 @@ export function GradebookLearnerDialog({ courseId, userId, onClose }: { courseId
                 </div>
                 <div className="text-xs text-muted-foreground">Overall mastery</div>
               </div>
+              {d.letterGrade && (
+                <div>
+                  <div className="text-3xl font-bold text-foreground">{d.letterGrade}</div>
+                  <div className="text-xs text-muted-foreground">Grade</div>
+                </div>
+              )}
               <span className={cn("rounded-full px-2 py-0.5 font-mono text-xs", pillBand(d.band))}>{d.band === "none" ? "no grades" : d.band}</span>
               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 {d.trend.dir === "up" && <TrendingUp className="h-4 w-4 text-green-600" />}

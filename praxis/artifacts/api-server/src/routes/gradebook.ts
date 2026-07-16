@@ -24,8 +24,11 @@ import {
   getCourseColumns,
   getScoreData,
   computeLearner,
+  getGradebookSettings,
+  DEFAULT_BANDS,
   REASON_LABEL,
 } from "../lib/gradebookEngine";
+import { gradebookSettingsTable, type LetterBand } from "@workspace/db";
 import { onGradeEvent, scanCourse } from "../lib/gradebookAlerts";
 import { mailerConfigured, sendMail, appUrl, emailShell } from "../lib/mailer";
 
@@ -51,6 +54,7 @@ router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
   const groupId = typeof req.query.groupId === "string" ? req.query.groupId : null;
 
   const columns = await getCourseColumns(courseId);
+  const settings = await getGradebookSettings(courseId);
 
   // Roster (optionally limited to a cohort/section).
   let learnerRows: { userId: string }[];
@@ -87,7 +91,7 @@ router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
   const alertByUser = new Map(alerts.map((a) => [a.userId, a]));
 
   const learners = userIds.map((uid) => {
-    const computed = computeLearner(columns, scoreData.fractions.get(uid), scoreData.notes.get(uid), false);
+    const computed = computeLearner(columns, scoreData.fractions.get(uid), scoreData.notes.get(uid), false, settings);
     const u = userById.get(uid);
     const alert = alertByUser.get(uid);
     return {
@@ -95,6 +99,7 @@ router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
       user: u ? { id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email } : null,
       overallPercent: computed.overallPercent,
       band: computed.band,
+      letterGrade: computed.letterGrade,
       trend: computed.trend,
       alert: alert ? { status: alert.status, reasons: alert.reasons } : { status: "on_track", reasons: [] },
       cells: computed.cells,
@@ -104,7 +109,49 @@ router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
   const withScores = learners.map((l) => l.overallPercent).filter((v): v is number => v !== null);
   const classAverage = withScores.length ? Math.round(withScores.reduce((a, b) => a + b, 0) / withScores.length) : null;
 
-  res.json({ columns, learners, classAverage });
+  res.json({ columns, learners, classAverage, settings });
+});
+
+// ── Grading settings (weighting + letter bands) ─────────────────────────────────
+// GET /courses/:courseId/gradebook/settings
+router.get("/courses/:courseId/gradebook/settings", requireAuth, async (req, res) => {
+  const { courseId } = req.params;
+  if (!(await requireStaffOnCourse(req, res, courseId))) return;
+  res.json(await getGradebookSettings(courseId));
+});
+
+// PUT /courses/:courseId/gradebook/settings
+router.put("/courses/:courseId/gradebook/settings", requireAuth, async (req, res) => {
+  const { courseId } = req.params;
+  if (!(await requireStaffOnCourse(req, res, courseId))) return;
+  const b = req.body ?? {};
+  const bands: LetterBand[] = Array.isArray(b.letterBands)
+    ? b.letterBands
+        .filter((x: any) => x && typeof x.label === "string")
+        .map((x: any) => ({ label: String(x.label).slice(0, 16), min: Math.max(0, Math.min(100, Number(x.min) || 0)) }))
+    : DEFAULT_BANDS;
+  const catWeights: Record<string, number> = {};
+  if (b.categoryWeights && typeof b.categoryWeights === "object") {
+    for (const [k, v] of Object.entries(b.categoryWeights)) {
+      const n = Number(v);
+      if (!Number.isNaN(n) && n >= 0) catWeights[k] = n;
+    }
+  }
+  const values = {
+    courseId,
+    weightingEnabled: Boolean(b.weightingEnabled),
+    summativeWeight: Math.max(0, Math.min(100, Number(b.summativeWeight ?? 100))),
+    formativeWeight: Math.max(0, Math.min(100, Number(b.formativeWeight ?? 0))),
+    categoryWeights: catWeights,
+    lettersEnabled: Boolean(b.lettersEnabled),
+    letterBands: bands.length ? bands : DEFAULT_BANDS,
+    updatedBy: req.userId!,
+    updatedAt: new Date(),
+  };
+  const existing = await db.query.gradebookSettingsTable.findFirst({ where: eq(gradebookSettingsTable.courseId, courseId) });
+  if (existing) await db.update(gradebookSettingsTable).set(values).where(eq(gradebookSettingsTable.id, existing.id));
+  else await db.insert(gradebookSettingsTable).values(values);
+  res.json(await getGradebookSettings(courseId));
 });
 
 // ── Hierarchy navigation (browse down to a course gradebook, scoped by role) ──────
@@ -258,8 +305,9 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
   const { courseId } = req.params;
   const userId = req.userId!;
   const columns = await getCourseColumns(courseId);
+  const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
-  const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false);
+  const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
 
   const alert = await db.query.gradebookAlertsTable.findFirst({
     where: and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)),
@@ -308,10 +356,12 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
     totalPossible: Math.round(totalPossible * 10) / 10,
     overallPercent: computed.overallPercent,
     band: computed.band,
+    letterGrade: computed.letterGrade,
     trend: computed.trend,
     cells: computed.cells,
     alert: alert ? { status: alert.status, reasons: alert.reasons, reasonLabels: (alert.reasons || []).map((r) => REASON_LABEL[r] || r) } : { status: "on_track", reasons: [], reasonLabels: [] },
     plan: plan ? { id: plan.id, rationale: plan.rationale, items: plan.items, createdAt: plan.createdAt } : null,
+    settings,
   });
 });
 
@@ -324,8 +374,9 @@ router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (r
     return;
   }
   const columns = await getCourseColumns(courseId);
+  const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
-  const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false);
+  const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
 
   const alert = await db.query.gradebookAlertsTable.findFirst({
     where: and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)),
@@ -348,10 +399,12 @@ router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (r
     columns,
     overallPercent: computed.overallPercent,
     band: computed.band,
+    letterGrade: computed.letterGrade,
     trend: computed.trend,
     cells: computed.cells,
     alert: alert ? { status: alert.status, reasons: alert.reasons, reasonLabels: (alert.reasons || []).map((r) => REASON_LABEL[r] || r) } : { status: "on_track", reasons: [], reasonLabels: [] },
     plan: plan ? { id: plan.id, rationale: plan.rationale, items: plan.items, createdAt: plan.createdAt } : null,
+    settings,
   });
 });
 

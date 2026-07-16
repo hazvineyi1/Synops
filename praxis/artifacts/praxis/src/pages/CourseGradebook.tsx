@@ -9,7 +9,8 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/context/SessionContext";
 import { GradebookLearnerDialog } from "@/components/GradebookLearnerDialog";
-import { ChevronRight, MessageSquare, Plus, RefreshCw, TrendingDown, TrendingUp, Minus, AlertTriangle, Mail } from "lucide-react";
+import { GradebookSettingsDialog } from "@/components/GradebookSettingsDialog";
+import { ChevronRight, MessageSquare, Plus, RefreshCw, TrendingDown, TrendingUp, Minus, AlertTriangle, Mail, SlidersHorizontal } from "lucide-react";
 
 const bandCell = (f: number | null) =>
   f === null
@@ -36,6 +37,7 @@ export function CourseGradebook() {
   const [groupId, setGroupId] = useState<string>("");
   const [includeFormative, setIncludeFormative] = useState(false);
   const [drillUser, setDrillUser] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const { data: course } = useQuery({ queryKey: ["course", courseId], queryFn: () => apiFetch<any>(`/courses/${courseId}`) });
   const groups = useQuery({
@@ -88,8 +90,20 @@ export function CourseGradebook() {
 
   const flatCols = data?.columns ?? [];
 
-  // Client-side overall so the formative toggle updates instantly.
-  function overallFor(l: MatrixLearner): { pct: number | null; band: string } {
+  function letterFromBands(pct: number | null): string | null {
+    const st = data?.settings;
+    if (!st?.lettersEnabled || pct == null || !st.letterBands?.length) return null;
+    const sorted = [...st.letterBands].sort((a, b) => b.min - a.min);
+    for (const b of sorted) if (pct >= b.min) return b.label;
+    return sorted[sorted.length - 1]?.label ?? null;
+  }
+
+  // Client-side overall so the formative toggle updates instantly. When weighted grading is on,
+  // use the server-computed values directly (the toggle is disabled).
+  function overallFor(l: MatrixLearner): { pct: number | null; band: string; letter: string | null } {
+    if (data?.settings?.weightingEnabled) {
+      return { pct: l.overallPercent, band: l.band, letter: l.letterGrade ?? null };
+    }
     let earned = 0;
     let possible = 0;
     for (const c of flatCols) {
@@ -100,9 +114,9 @@ export function CourseGradebook() {
       earned += cell.fraction * c.pointsPossible;
       possible += c.pointsPossible;
     }
-    if (possible === 0) return { pct: null, band: "none" };
+    if (possible === 0) return { pct: null, band: "none", letter: null };
     const pct = (earned / possible) * 100;
-    return { pct, band: pct >= 90 ? "good" : pct >= 70 ? "warn" : "low" };
+    return { pct, band: pct >= 90 ? "good" : pct >= 70 ? "warn" : "low", letter: letterFromBands(pct) };
   }
 
   const classAvg = useMemo(() => {
@@ -170,8 +184,8 @@ export function CourseGradebook() {
           </select>
         )}
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Switch checked={includeFormative} onCheckedChange={setIncludeFormative} />
-          Count practice (formative) work
+          <Switch checked={includeFormative} onCheckedChange={setIncludeFormative} disabled={!!data?.settings?.weightingEnabled} />
+          {data?.settings?.weightingEnabled ? "Weighted grading on" : "Count practice (formative) work"}
         </label>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="outline" size="sm" className="gap-1.5" onClick={addManualItem}>
@@ -179,6 +193,9 @@ export function CourseGradebook() {
           </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => scan.mutate()} disabled={scan.isPending}>
             <RefreshCw className={cn("h-4 w-4", scan.isPending && "animate-spin")} /> Check who's off track
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSettingsOpen(true)}>
+            <SlidersHorizontal className="h-4 w-4" /> Settings
           </Button>
           {user?.role === "super_admin" && (
             <Button variant="outline" size="sm" className="gap-1.5" onClick={() => testEmail.mutate()} disabled={testEmail.isPending}>
@@ -292,6 +309,7 @@ export function CourseGradebook() {
                       <span className={cn("rounded px-2 py-0.5 text-sm font-bold", pillBand(ov.band))}>
                         {ov.pct == null ? "—" : `${Math.round(ov.pct)}%`}
                       </span>
+                      {ov.letter && <div className="mt-0.5 text-xs font-bold text-foreground">{ov.letter}</div>}
                     </td>
                   </tr>
                 );
@@ -315,6 +333,7 @@ export function CourseGradebook() {
       </div>
 
       <GradebookLearnerDialog courseId={courseId} userId={drillUser} onClose={() => setDrillUser(null)} />
+      <GradebookSettingsDialog courseId={courseId} categories={[...new Set((data?.columns ?? []).map((c) => c.category))]} open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }

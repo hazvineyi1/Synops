@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, numeric, integer, boolean, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, numeric, integer, boolean, jsonb, unique } from "drizzle-orm/pg-core";
 
 /**
  * Unified gradebook — the layer that pulls every graded thing in a course into one place.
@@ -111,6 +111,34 @@ export const gradebookAlertsTable = pgTable(
 );
 
 export type GradebookAlert = typeof gradebookAlertsTable.$inferSelect;
+
+export interface LetterBand { label: string; min: number }
+
+/**
+ * Per-course grading configuration: category + type weighting, and letter-grade bands.
+ * Absent row => defaults (points-based, no letters). weighting is hierarchical: a category's
+ * average is points-based within the category; categories are weighted by category_weights
+ * inside each type bucket; the two buckets blend by summative_weight / formative_weight.
+ */
+export const gradebookSettingsTable = pgTable(
+  "gradebook_settings",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    courseId: text("course_id").notNull(),
+    weightingEnabled: boolean("weighting_enabled").notNull().default(false),
+    summativeWeight: integer("summative_weight").notNull().default(100),
+    formativeWeight: integer("formative_weight").notNull().default(0),
+    categoryWeights: jsonb("category_weights").$type<Record<string, number>>().notNull().default({}),
+    lettersEnabled: boolean("letters_enabled").notNull().default(false),
+    letterBands: jsonb("letter_bands").$type<LetterBand[]>().notNull().default([]),
+    updatedBy: text("updated_by"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({ courseUnique: unique().on(t.courseId) }),
+);
+
+export type GradebookSettingsRow = typeof gradebookSettingsTable.$inferSelect;
 
 /** Shape stored in coach_plans.items for gradebook-generated adaptive study plans. */
 export interface StudyPlanItem {
