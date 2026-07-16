@@ -518,47 +518,17 @@ export function ActivitiesAdmin() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
-        <Card className={`p-2 h-fit ${detailActive ? "hidden lg:block" : "block"}`}>
-          {isLoading ? <div className="p-4 text-sm text-muted-foreground">Loading…</div>
-          : !activities || activities.length === 0 ? <div className="p-8 text-sm text-muted-foreground text-center">No activities yet.<br />Use “New activity” or “Generate with AI”.</div>
-          : (
-            <div className="space-y-1">
-              {activities.map((a) => {
-                const active = !creating && selectedId === a.id;
-                return (
-                  <button key={a.id} onClick={() => { setCreating(false); setSelectedId(a.id); setRightTab("preview"); }}
-                    className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${active ? "bg-primary/5 border-primary/30" : "border-transparent hover:bg-muted/60"}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-medium text-sm leading-snug">{a.title}</span>
-                      {a.published
-                        ? <span className="shrink-0 text-[10px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-1.5 py-0.5">Live</span>
-                        : <span className="shrink-0 text-[10px] text-muted-foreground border border-border rounded-full px-1.5 py-0.5">Draft</span>}
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{a.source === "ai" ? "AI" : a.source === "embed" ? "Embed" : (a.kind || "custom").replace("_", " ")}</span>
-                      {a.bloomsLevel && <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-purple-500/10 text-purple-700 border-purple-500/30">{a.bloomsLevel}</span>}
-                      {a.difficulty && <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{a.difficulty}</span>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        <div className={detailActive ? "block" : "hidden lg:block"}>
-          {detailActive && (
-            <button onClick={() => { setCreating(false); setSelectedId(null); }} className="lg:hidden mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> All activities
-            </button>
-          )}
+      {detailActive ? (
+        <div>
+          <button onClick={() => { setCreating(false); setSelectedId(null); }} className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> All activities
+          </button>
           {creating ? (
-            <Card className="p-5">
+            <Card className="p-5 max-w-4xl">
               <Editor activity={null} newMode={newMode} seed={seed} onSaved={(a) => { setCreating(false); setNewMode(null); setSeed(null); setSelectedId(a.id); setRightTab("preview"); }} />
             </Card>
           ) : selected ? (
-            <Card className="p-5 space-y-4">
+            <Card className="p-5 space-y-4 max-w-4xl">
               {/* Header: title + rigor chips + actions */}
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div className="min-w-0">
@@ -602,11 +572,32 @@ export function ActivitiesAdmin() {
                 <Submissions activityId={selected.id} />
               )}
             </Card>
-          ) : (
-            <Card className="p-10 text-center text-muted-foreground">Select an activity to preview, or create a new one.</Card>
-          )}
+          ) : null}
         </div>
-      </div>
+      ) : isLoading ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <Card key={i} className="h-32" />)}</div>
+      ) : !activities || activities.length === 0 ? (
+        <Card className="p-12 text-center text-muted-foreground">No activities yet — use “New activity” or “Generate with AI” to make one.</Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {activities.map((a) => (
+            <Card key={a.id} onClick={() => { setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} className="p-4 cursor-pointer border hover:border-primary/40 hover:shadow-sm transition-colors flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-sm leading-snug">{a.title}</h3>
+                {a.published
+                  ? <span className="shrink-0 text-[10px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-1.5 py-0.5">Live</span>
+                  : <span className="shrink-0 text-[10px] text-muted-foreground border border-border rounded-full px-1.5 py-0.5">Draft</span>}
+              </div>
+              {a.instructions && <p className="text-xs text-muted-foreground line-clamp-2">{a.instructions}</p>}
+              <div className="flex flex-wrap gap-1 mt-auto pt-1">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{a.source === "ai" ? "AI" : a.source === "embed" ? "Embed" : (a.kind || "custom").replace("_", " ")}</span>
+                {a.bloomsLevel && <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-purple-500/10 text-purple-700 border-purple-500/30">{a.bloomsLevel}</span>}
+                {a.difficulty && <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{a.difficulty}</span>}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
