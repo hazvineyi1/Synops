@@ -82,62 +82,118 @@ export function TutorAvatar({ avatar, size = 56, speaking = false, ring = false 
   );
 }
 
-/** Preset picker + custom image upload (resized client-side to a small data URL). */
-export function AvatarPicker({ value, onChange }: { value?: string | null; onChange: (v: string | null) => void }) {
+export interface SavedFigure { id: string; name: string; image: string }
+
+/**
+ * Preset picker + a saved-figures library (photorealistic uploads that are stored, reused
+ * and deletable) + one-off custom upload. `figures`, `onSaveFigure` and `onDeleteFigure`
+ * wire the reusable library; omit them for a presets-plus-upload-only picker.
+ */
+export function AvatarPicker({
+  value,
+  onChange,
+  figures = [],
+  onSaveFigure,
+  onDeleteFigure,
+}: {
+  value?: string | null;
+  onChange: (v: string | null) => void;
+  figures?: SavedFigure[];
+  onSaveFigure?: (name: string, image: string) => void;
+  onDeleteFigure?: (id: string) => void;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const handleFile = (file: File) => {
+  const resizeToDataUrl = (file: File, cb: (dataUrl: string) => void) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const S = 200;
+        const S = 256;
         const canvas = document.createElement("canvas");
         canvas.width = S; canvas.height = S;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
-        // cover-crop to square
-        const scale = Math.max(S / img.width, S / img.height);
+        const scale = Math.max(S / img.width, S / img.height); // cover-crop to square
         const w = img.width * scale, h = img.height * scale;
         ctx.drawImage(img, (S - w) / 2, (S - h) / 2, w, h);
-        onChange(canvas.toDataURL("image/jpeg", 0.85));
+        cb(canvas.toDataURL("image/jpeg", 0.85));
       };
       img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   };
 
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {AVATAR_PRESETS.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          onClick={() => onChange(p.id)}
-          title={`${p.label} (${p.gender})`}
-          className="rounded-full transition-transform hover:scale-105"
-          style={{ outline: value === p.id ? "3px solid hsl(222 47% 30%)" : "2px solid transparent", outlineOffset: 2 }}
-        >
-          <TutorAvatar avatar={p.id} size={44} />
-        </button>
-      ))}
+  const handleFile = (file: File) => {
+    resizeToDataUrl(file, (dataUrl) => {
+      onChange(dataUrl); // use it on this case immediately
+      if (onSaveFigure) {
+        const name = window.prompt("Name this face to save it to your reusable library (leave blank to use it just this once):", "");
+        if (name && name.trim()) onSaveFigure(name.trim().slice(0, 80), dataUrl);
+      }
+    });
+  };
 
-      {/* Custom uploaded avatar preview (if a data/url value is set) */}
-      {isImageAvatar(value) && (
-        <span className="rounded-full" style={{ outline: "3px solid hsl(222 47% 30%)", outlineOffset: 2 }}>
-          <TutorAvatar avatar={value} size={44} />
-        </span>
+  const swatch = (selected: boolean): React.CSSProperties => ({
+    outline: selected ? "3px solid hsl(222 47% 30%)" : "2px solid transparent",
+    outlineOffset: 2,
+    borderRadius: "50%",
+  });
+
+  return (
+    <div className="space-y-3">
+      {/* Saved figures library */}
+      {figures.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-1.5">Saved faces</p>
+          <div className="flex flex-wrap items-center gap-2">
+            {figures.map((f) => (
+              <div key={f.id} className="relative group">
+                <button type="button" onClick={() => onChange(f.image)} title={f.name} style={swatch(value === f.image)} className="block transition-transform hover:scale-105">
+                  <TutorAvatar avatar={f.image} size={44} />
+                </button>
+                {onDeleteFigure && (
+                  <button
+                    type="button"
+                    onClick={() => { if (window.confirm(`Delete the saved face "${f.name}"? Cases already using it keep their copy.`)) onDeleteFigure(f.id); }}
+                    title="Delete saved face"
+                    className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    x
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => fileRef.current?.click()}
-        className="h-11 w-11 rounded-full border-2 border-dashed flex items-center justify-center text-xs text-muted-foreground hover:bg-muted"
-        title="Upload a custom face"
-      >
-        +
-      </button>
-      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+      {/* Presets + one-off upload */}
+      <div>
+        {figures.length > 0 && <p className="text-xs text-muted-foreground mb-1.5">Illustrated presets</p>}
+        <div className="flex flex-wrap items-center gap-2">
+          {AVATAR_PRESETS.map((p) => (
+            <button key={p.id} type="button" onClick={() => onChange(p.id)} title={`${p.label} (${p.gender})`} className="transition-transform hover:scale-105" style={swatch(value === p.id)}>
+              <TutorAvatar avatar={p.id} size={44} />
+            </button>
+          ))}
+
+          {/* Show the current custom value if it isn't already one of the saved figures */}
+          {isImageAvatar(value) && !figures.some((f) => f.image === value) && (
+            <span style={swatch(true)} className="inline-block"><TutorAvatar avatar={value} size={44} /></span>
+          )}
+
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="h-11 w-11 rounded-full border-2 border-dashed flex items-center justify-center text-lg text-muted-foreground hover:bg-muted"
+            title="Upload a photo"
+          >
+            +
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ""; }} />
+        </div>
+      </div>
     </div>
   );
 }

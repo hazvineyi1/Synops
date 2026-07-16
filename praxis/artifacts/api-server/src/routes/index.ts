@@ -38,6 +38,7 @@ import accessRequestsRouter from "./accessRequests";
 import promptTemplatesRouter from "./promptTemplates";
 import casesRouter from "./cases";
 import caseEmbedRouter from "./caseEmbed";
+import tutorFiguresRouter from "./tutorFigures";
 import devRouter from "./dev";
 
 const router = Router();
@@ -81,6 +82,7 @@ router.use(accessRequestsRouter);
 router.use(promptTemplatesRouter);
 router.use(casesRouter);
 router.use(caseEmbedRouter);
+router.use(tutorFiguresRouter);
 router.use(devRouter);
 
 export default router;

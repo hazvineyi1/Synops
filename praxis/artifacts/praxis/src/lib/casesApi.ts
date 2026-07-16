@@ -95,6 +95,15 @@ export interface EmbedLink {
   createdAt: string;
 }
 
+export interface TutorFigureRow {
+  id: string;
+  name: string;
+  image: string;
+  gender: "female" | "male" | null;
+  organisationId: string | null;
+  createdAt: string;
+}
+
 export interface UnitStandardRow {
   id: string;
   code: string;
@@ -129,6 +138,11 @@ export const casesApi = {
   caseSessions: (caseId: string) => apiFetch<CaseSessionRow[]>(`/cases/${caseId}/sessions`),
 
   unitStandards: () => apiFetch<UnitStandardRow[]>(`/compliance/unit-standards`),
+
+  tutorFigures: () => apiFetch<TutorFigureRow[]>(`/tutor-figures`),
+  createTutorFigure: (body: { name: string; image: string; gender?: string | null }) =>
+    apiFetch<TutorFigureRow>(`/tutor-figures`, { method: "POST", body: JSON.stringify(body) }),
+  deleteTutorFigure: (id: string) => apiFetch<void>(`/tutor-figures/${id}`, { method: "DELETE" }),
 };
 
 export type SSEDone = { promptCount?: number; promptLimit?: number; budgetReached?: boolean; error?: string };

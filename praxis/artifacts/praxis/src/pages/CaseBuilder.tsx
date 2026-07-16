@@ -80,6 +80,16 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
   }, [data]);
 
   const { data: standards } = useQuery({ queryKey: ["unit-standards"], queryFn: () => casesApi.unitStandards() });
+  const { data: figures } = useQuery({ queryKey: ["tutor-figures"], queryFn: () => casesApi.tutorFigures() });
+  const saveFigure = useMutation({
+    mutationFn: (b: { name: string; image: string }) => casesApi.createTutorFigure(b),
+    onSuccess: (fig) => { qc.invalidateQueries({ queryKey: ["tutor-figures"] }); set("tutorAvatar", fig.image); toast({ title: "Face saved to your library" }); },
+    onError: (e: Error) => toast({ title: "Could not save face", description: e.message, variant: "destructive" }),
+  });
+  const deleteFigure = useMutation({
+    mutationFn: (id: string) => casesApi.deleteTutorFigure(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tutor-figures"] }),
+  });
 
   const set = <K extends keyof CaseInput>(k: K, v: CaseInput[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -169,7 +179,13 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
               <Input className="max-w-xs" value={form.tutorName ?? ""} onChange={(e) => set("tutorName", e.target.value)} placeholder="e.g. Coach Naledi" />
             </div>
             <div className="mt-3">
-              <AvatarPicker value={form.tutorAvatar || null} onChange={(v) => set("tutorAvatar", v ?? "")} />
+              <AvatarPicker
+                value={form.tutorAvatar || null}
+                onChange={(v) => set("tutorAvatar", v ?? "")}
+                figures={figures ?? []}
+                onSaveFigure={(name, image) => saveFigure.mutate({ name, image })}
+                onDeleteFigure={(id) => deleteFigure.mutate(id)}
+              />
             </div>
           </Field>
           <Field label="Language" hint="The language the tutor runs the dialogue in. Learners can also switch language during a session.">

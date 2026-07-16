@@ -382,7 +382,9 @@ function ctxFromCase(c: CaseScenario, learner: U | null, turnCount: number, lang
     title: c.title,
     learningObjective: c.learningObjective,
     contextBlock: c.contextBlock,
-    openingQuestion: c.openingQuestion,
+    // The authored opener is written in the case's default language; if the learner chose a
+    // different language, drop it so the engine generates the opener in that language.
+    openingQuestion: (language && language !== c.language) ? null : c.openingQuestion,
     focusAreas: c.focusAreas,
     aiConstraints: c.aiConstraints,
     guidingInstructions: c.guidingInstructions,

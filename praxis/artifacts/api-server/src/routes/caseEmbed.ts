@@ -49,7 +49,8 @@ function ctx(c: CaseScenario, learnerName: string | null, turnCount: number, lan
     title: c.title,
     learningObjective: c.learningObjective,
     contextBlock: c.contextBlock,
-    openingQuestion: c.openingQuestion,
+    // Drop the authored opener when the learner chose a language other than the case default.
+    openingQuestion: (language && language !== c.language) ? null : c.openingQuestion,
     focusAreas: c.focusAreas,
     aiConstraints: c.aiConstraints,
     guidingInstructions: c.guidingInstructions,
