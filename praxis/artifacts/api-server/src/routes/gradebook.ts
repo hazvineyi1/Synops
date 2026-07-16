@@ -118,15 +118,38 @@ router.get("/gradebook/nav", requireAuth, async (req, res) => {
   res.json({ level: "none" });
 });
 
+// Cheap health rollup from persisted gradebook_alerts (masteryPct + off-track status).
+type RollupInput = { userId: string; status: string; masteryPct: string | null };
+function rollup(rows: RollupInput[]) {
+  const learners = new Set(rows.map((r) => r.userId));
+  const off = new Set(rows.filter((r) => r.status === "off_track").map((r) => r.userId));
+  const risk = new Set(rows.filter((r) => r.status === "at_risk").map((r) => r.userId));
+  const m = rows.map((r) => r.masteryPct).filter((v): v is string => v != null).map(Number).filter((n) => !Number.isNaN(n));
+  const avgMastery = m.length ? Math.round((m.reduce((s, x) => s + x, 0) / m.length) * 10) / 10 : null;
+  return { learnersEvaluated: learners.size, offTrack: off.size, atRisk: risk.size, avgMastery };
+}
+
 // GET /gradebook/nav/partners — super_admin only.
 router.get("/gradebook/nav/partners", requireAuth, async (req, res) => {
   const u = req.dbUser as U;
   if (!isSuperAdmin(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
-  const partners = await db.select({ id: partnersTable.id, name: partnersTable.name }).from(partnersTable).orderBy(partnersTable.name);
-  const orgs = await db.select({ partnerId: organisationsTable.partnerId }).from(organisationsTable);
+  const [partners, orgs, alertRows] = await Promise.all([
+    db.select({ id: partnersTable.id, name: partnersTable.name }).from(partnersTable).orderBy(partnersTable.name),
+    db.select({ id: organisationsTable.id, partnerId: organisationsTable.partnerId }).from(organisationsTable),
+    db.select({ userId: gradebookAlertsTable.userId, status: gradebookAlertsTable.status, masteryPct: gradebookAlertsTable.masteryPct, org: usersTable.organisationId })
+      .from(gradebookAlertsTable).leftJoin(usersTable, eq(gradebookAlertsTable.userId, usersTable.id)),
+  ]);
+  const orgToPartner = new Map(orgs.map((o) => [o.id, o.partnerId]));
   const count = new Map<string, number>();
   orgs.forEach((o) => count.set(o.partnerId, (count.get(o.partnerId) ?? 0) + 1));
-  res.json(partners.map((p) => ({ id: p.id, name: p.name, orgCount: count.get(p.id) ?? 0 })));
+  const byPartner = new Map<string, RollupInput[]>();
+  for (const r of alertRows) {
+    const p = r.org ? orgToPartner.get(r.org) : null;
+    if (!p) continue;
+    if (!byPartner.has(p)) byPartner.set(p, []);
+    byPartner.get(p)!.push(r);
+  }
+  res.json(partners.map((p) => ({ id: p.id, name: p.name, orgCount: count.get(p.id) ?? 0, ...rollup(byPartner.get(p.id) ?? []) })));
 });
 
 // GET /gradebook/nav/organisations?partnerId= — super (any/all), partner_admin (own partner).
@@ -144,7 +167,18 @@ router.get("/gradebook/nav/organisations", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  res.json(rows.map((o) => ({ id: o.id, name: o.name, partnerId: o.partnerId })));
+  const orgIds = rows.map((o) => o.id);
+  const alertRows = orgIds.length
+    ? await db.select({ userId: gradebookAlertsTable.userId, status: gradebookAlertsTable.status, masteryPct: gradebookAlertsTable.masteryPct, org: usersTable.organisationId })
+        .from(gradebookAlertsTable).leftJoin(usersTable, eq(gradebookAlertsTable.userId, usersTable.id)).where(inArray(usersTable.organisationId, orgIds))
+    : [];
+  const byOrg = new Map<string, RollupInput[]>();
+  for (const r of alertRows) {
+    if (!r.org) continue;
+    if (!byOrg.has(r.org)) byOrg.set(r.org, []);
+    byOrg.get(r.org)!.push(r);
+  }
+  res.json(rows.map((o) => ({ id: o.id, name: o.name, partnerId: o.partnerId, ...rollup(byOrg.get(o.id) ?? []) })));
 });
 
 // GET /gradebook/nav/courses?organisationId= — courses (with cohorts) the actor can grade.
@@ -183,9 +217,10 @@ router.get("/gradebook/nav/courses", requireAuth, async (req, res) => {
   }
 
   const courseIds = courses.map((c) => c.id);
-  const [groups, enrols] = await Promise.all([
+  const [groups, enrols, alertRows] = await Promise.all([
     courseIds.length ? db.select().from(courseGroupsTable).where(inArray(courseGroupsTable.courseId, courseIds)) : Promise.resolve([]),
     courseIds.length ? db.select({ courseId: enrolmentsTable.courseId, userId: enrolmentsTable.userId }).from(enrolmentsTable).where(inArray(enrolmentsTable.courseId, courseIds)) : Promise.resolve([]),
+    courseIds.length ? db.select({ courseId: gradebookAlertsTable.courseId, userId: gradebookAlertsTable.userId, status: gradebookAlertsTable.status, masteryPct: gradebookAlertsTable.masteryPct }).from(gradebookAlertsTable).where(inArray(gradebookAlertsTable.courseId, courseIds)) : Promise.resolve([]),
   ]);
   const groupsByCourse = new Map<string, { id: string; name: string }[]>();
   for (const g of groups as any[]) {
@@ -197,6 +232,11 @@ router.get("/gradebook/nav/courses", requireAuth, async (req, res) => {
     if (!learnersByCourse.has(e.courseId)) learnersByCourse.set(e.courseId, new Set());
     learnersByCourse.get(e.courseId)!.add(e.userId);
   }
+  const alertsByCourse = new Map<string, RollupInput[]>();
+  for (const r of alertRows as any[]) {
+    if (!alertsByCourse.has(r.courseId)) alertsByCourse.set(r.courseId, []);
+    alertsByCourse.get(r.courseId)!.push(r);
+  }
 
   res.json(
     courses
@@ -206,6 +246,7 @@ router.get("/gradebook/nav/courses", requireAuth, async (req, res) => {
         status: c.status,
         learnerCount: learnersByCourse.get(c.id)?.size ?? 0,
         cohorts: groupsByCourse.get(c.id) ?? [],
+        ...rollup(alertsByCourse.get(c.id) ?? []),
       }))
       .sort((a, b) => a.title.localeCompare(b.title)),
   );
