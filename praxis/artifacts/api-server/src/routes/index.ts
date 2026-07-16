@@ -36,6 +36,8 @@ import deliveryRouter from "./delivery";
 import complianceRouter from "./compliance";
 import accessRequestsRouter from "./accessRequests";
 import promptTemplatesRouter from "./promptTemplates";
+import casesRouter from "./cases";
+import caseEmbedRouter from "./caseEmbed";
 import devRouter from "./dev";
 
 const router = Router();
@@ -77,6 +79,8 @@ router.use(deliveryRouter);
 router.use(complianceRouter);
 router.use(accessRequestsRouter);
 router.use(promptTemplatesRouter);
+router.use(casesRouter);
+router.use(caseEmbedRouter);
 router.use(devRouter);
 
 export default router;

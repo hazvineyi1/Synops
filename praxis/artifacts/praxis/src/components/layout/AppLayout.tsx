@@ -26,6 +26,7 @@ import {
   Landmark,
   TrendingUp,
   CalendarDays,
+  Layers,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -112,6 +113,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         items: [
           { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
+          { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
           { label: t('nav.credentials'), href: '/credentials', icon: Award },
           { label: t('nav.myCoach'), href: '/coach-settings', icon: Settings },
@@ -127,6 +129,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.learners'), href: '/coach', icon: Users },
           { label: t('nav.submissions'), href: '/coach/submissions', icon: FileText },
           { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
+          { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],
@@ -139,6 +142,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.members'), href: '/org/members', icon: UserCog },
           { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
+          { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
           { label: t('nav.reports'), href: '/reports', icon: FileText },
           { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
@@ -153,6 +157,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.organisations'), href: '/dashboard', icon: Building },
           { label: t('nav.courseCatalog'), href: '/courses', icon: BookOpen },
           { label: t('nav.studio'), href: '/studio', icon: PenTool },
+          { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],
@@ -183,6 +188,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: BookOpen },
             { label: t('nav.studio'), href: '/studio', icon: PenTool },
+            { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
             { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           ],
         },
@@ -222,6 +228,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         items: [
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.studio'), href: '/studio', icon: PenTool },
+          { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },

@@ -36,6 +36,10 @@ import { RequestAccess } from '@/pages/RequestAccess';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
 import { PlatformConsole } from '@/pages/PlatformConsole';
+import { Cases } from '@/pages/Cases';
+import { CaseBuilder } from '@/pages/CaseBuilder';
+import { CaseSession } from '@/pages/CaseSession';
+import { CaseEmbed } from '@/pages/CaseEmbed';
 import { AdminFunders } from '@/pages/AdminFunders';
 import { Delivery } from '@/pages/Delivery';
 import { MyAttendance } from '@/pages/MyAttendance';
@@ -155,9 +159,11 @@ function Routes() {
 
         {/* Public */}
         <PublicRoute path="/verify/:credentialId" component={Verify} />
+        <PublicRoute path="/c/:token" component={CaseEmbed} />
 
         {/* Full-screen focus routes */}
         <FocusRoute path="/learn/:sessionId" component={LearnSession} />
+        <FocusRoute path="/case-run/:sessionId" component={CaseSession} />
         <FocusRoute path="/activities/:activityId/play" component={ActivityPlay} />
 
         {/* App layout routes */}
@@ -177,6 +183,8 @@ function Routes() {
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />
         <ProtectedRoute path="/courses/:courseId" component={CourseDetail} />
         <ProtectedRoute path="/courses" component={Courses} />
+        <ProtectedRoute path="/cases/:caseId/edit" component={CaseBuilder} />
+        <ProtectedRoute path="/cases" component={Cases} />
         <ProtectedRoute path="/notifications" component={NotificationsPage} />
         <ProtectedRoute path="/assess/:assessmentId" component={Assess} />
         <ProtectedRoute path="/credentials" component={Credentials} />

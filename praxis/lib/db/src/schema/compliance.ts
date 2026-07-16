@@ -35,7 +35,7 @@ export type UnitStandard = typeof unitStandardsTable.$inferSelect;
 export const unitStandardMappingsTable = pgTable("unit_standard_mappings", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   unitStandardId: text("unit_standard_id").notNull(),
-  targetType: text("target_type", { enum: ["course", "module", "assessment"] }).notNull(),
+  targetType: text("target_type", { enum: ["course", "module", "assessment", "case"] }).notNull(),
   targetId: text("target_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
