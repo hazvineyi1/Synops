@@ -16,6 +16,7 @@ import {
   buildCaseSystemPrompt,
   generateCaseOpening,
   generateCaseAnalysis,
+  translateCaseFacts,
   CASE_MODEL,
   type CaseContext,
 } from "../lib/caseEngine";
@@ -94,12 +95,20 @@ router.post("/case-embed/:token/start", async (req, res) => {
   const lang = validLang(req.body?.language) ? req.body.language : caseRow.language;
 
   const opening = await generateCaseOpening(ctx(caseRow, learnerName, 0, lang));
+  const facts = lang !== caseRow.language
+    ? await translateCaseFacts(caseRow.learningObjective, caseRow.contextBlock, lang)
+    : { objective: caseRow.learningObjective, context: caseRow.contextBlock };
   const messages: CaseMessage[] = [{ role: "tutor", content: opening, at: new Date().toISOString() }];
   const [s] = await db
     .insert(caseSessionsTable)
-    .values({ caseId: caseRow.id, organisationId: caseRow.organisationId, embedLinkId: link.id, learnerName, language: lang, messages, promptLimit: caseRow.promptLimit, status: "in_progress" })
+    .values({
+      caseId: caseRow.id, organisationId: caseRow.organisationId, embedLinkId: link.id, learnerName, language: lang,
+      translatedContext: lang !== caseRow.language ? facts.context : null,
+      translatedObjective: lang !== caseRow.language ? facts.objective : null,
+      messages, promptLimit: caseRow.promptLimit, status: "in_progress",
+    })
     .returning();
-  res.status(201).json({ sessionId: s.id, messages, promptLimit: s.promptLimit, promptCount: 0 });
+  res.status(201).json({ sessionId: s.id, messages, promptLimit: s.promptLimit, promptCount: 0, contextBlock: facts.context, learningObjective: facts.objective });
 });
 
 // POST /case-embed/:token/chat — SSE Socratic turn for an embed session.

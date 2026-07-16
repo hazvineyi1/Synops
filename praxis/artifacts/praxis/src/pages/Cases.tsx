@@ -31,12 +31,6 @@ export function Cases() {
     queryFn: () => casesApi.list(filter === "all" ? undefined : filter),
   });
 
-  const start = useMutation({
-    mutationFn: (caseId: string) => casesApi.startSession(caseId),
-    onSuccess: (s) => navigate(`/case-run/${s.id}`),
-    onError: (e: Error) => toast({ title: "Could not start", description: e.message, variant: "destructive" }),
-  });
-
   const create = useMutation({
     mutationFn: () => casesApi.create({ title: "Untitled case" }),
     onSuccess: (c) => { qc.invalidateQueries({ queryKey: ["cases"] }); navigate(`/cases/${c.id}/edit`); },
@@ -98,7 +92,7 @@ export function Cases() {
                 </div>
                 <div className="flex gap-2 pt-2">
                   {c.status === "published" && (
-                    <Button size="sm" className="flex-1" onClick={() => start.mutate(c.id)} disabled={start.isPending}>
+                    <Button size="sm" className="flex-1" onClick={() => navigate(`/cases/${c.id}/begin`)}>
                       <Play className="h-4 w-4 mr-1.5" /> Start
                     </Button>
                   )}

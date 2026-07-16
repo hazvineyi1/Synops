@@ -291,4 +291,35 @@ Return only the JSON.`,
   return { criteria: [], totalPoints: 100 };
 }
 
+/**
+ * Translate a case's fact pattern + learning objective into the session language so the
+ * learner reads the situation in their own language. Names, numbers and currency are kept
+ * as-is. Falls back to the original text if translation fails.
+ */
+export async function translateCaseFacts(
+  objective: string | null | undefined,
+  context: string,
+  langCode: string
+): Promise<{ objective: string | null; context: string }> {
+  const name = languageName(langCode);
+  const system = `You are a professional translator. Translate the given case-study text into natural, fluent ${name}. Keep people's names, numbers and currency amounts (e.g. R80,000) exactly as they are. Do not add any commentary or notes. Return a SINGLE strict JSON object and nothing else: {"objective": string|null, "context": string}.`;
+  try {
+    const msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 1600,
+      system,
+      messages: [{ role: "user", content: JSON.stringify({ objective: objective ?? null, context }) + "\n\nReturn only the JSON." }],
+    });
+    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const m = text.match(/\{[\s\S]*\}/);
+    if (m) {
+      const p = JSON.parse(m[0]);
+      return { objective: p.objective ? String(p.objective) : null, context: p.context ? String(p.context) : context };
+    }
+  } catch {
+    // fall through to originals
+  }
+  return { objective: objective ?? null, context };
+}
+
 export { MODEL as CASE_MODEL };

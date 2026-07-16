@@ -21,6 +21,7 @@ import {
   generateCaseOpening,
   generateCaseAnalysis,
   generateRubricDraft,
+  translateCaseFacts,
   CASE_MODEL,
   type CaseContext,
 } from "../lib/caseEngine";
@@ -407,13 +408,31 @@ router.post("/cases/:id/sessions", requireAuth, async (req, res) => {
   if (c.status !== "published" && !canManageCase(u, c)) { res.status(403).json({ error: "This case is not published yet." }); return; }
 
   const lang = validLang(req.body?.language) ? req.body.language : c.language;
-  const opening = await generateCaseOpening(ctxFromCase(c, req.dbUser as unknown as U, 0, lang));
+  // The learner may enter their name on the pre-start screen; else use their account name.
+  const enteredName = typeof req.body?.learnerName === "string" && req.body.learnerName.trim()
+    ? req.body.learnerName.trim().slice(0, 80)
+    : ([u.firstName, u.lastName].filter(Boolean).join(" ") || u.email);
+
+  const ctx = ctxFromCase(c, req.dbUser as unknown as U, 0, lang);
+  ctx.learnerName = enteredName;
+  const opening = await generateCaseOpening(ctx);
+
+  // Translate the fact pattern into the session language when it differs from the default.
+  const facts = lang !== c.language
+    ? await translateCaseFacts(c.learningObjective, c.contextBlock, lang)
+    : { objective: c.learningObjective, context: c.contextBlock };
+
   const messages: CaseMessage[] = [{ role: "tutor", content: opening, at: new Date().toISOString() }];
   const [s] = await db
     .insert(caseSessionsTable)
-    .values({ caseId: c.id, organisationId: c.organisationId, userId: u.id, learnerName: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email, language: lang, messages, promptLimit: c.promptLimit, status: "in_progress" })
+    .values({
+      caseId: c.id, organisationId: c.organisationId, userId: u.id, learnerName: enteredName, language: lang,
+      translatedContext: lang !== c.language ? facts.context : null,
+      translatedObjective: lang !== c.language ? facts.objective : null,
+      messages, promptLimit: c.promptLimit, status: "in_progress",
+    })
     .returning();
-  res.status(201).json({ ...sessionResponse(s), tutorName: c.tutorName, tutorAvatar: c.tutorAvatar, caseTitle: c.title, contextBlock: c.contextBlock, learningObjective: c.learningObjective });
+  res.status(201).json({ ...sessionResponse(s), tutorName: c.tutorName, tutorAvatar: c.tutorAvatar, caseTitle: c.title, contextBlock: facts.context, learningObjective: facts.objective });
 });
 
 // GET /case-sessions/my
@@ -441,7 +460,14 @@ router.get("/case-sessions/:id", requireAuth, async (req, res) => {
   if (s.userId !== u.id) {
     if (!cs || !canManageCase(u, cs)) { res.status(404).json({ error: "Not found" }); return; }
   }
-  res.json({ ...sessionResponse(s), tutorName: cs?.tutorName ?? null, tutorAvatar: cs?.tutorAvatar ?? null, caseTitle: cs?.title ?? null, contextBlock: cs?.contextBlock ?? null, learningObjective: cs?.learningObjective ?? null });
+  res.json({
+    ...sessionResponse(s),
+    tutorName: cs?.tutorName ?? null,
+    tutorAvatar: cs?.tutorAvatar ?? null,
+    caseTitle: cs?.title ?? null,
+    contextBlock: s.translatedContext ?? cs?.contextBlock ?? null,
+    learningObjective: s.translatedObjective ?? cs?.learningObjective ?? null,
+  });
 });
 
 // POST /case-sessions/:id/message — SSE streaming Socratic turn.
@@ -471,6 +497,7 @@ router.post("/case-sessions/:id/message", requireAuth, async (req, res) => {
 
   try {
     const ctx = ctxFromCase(c, req.dbUser as unknown as U, s.promptCount, lang);
+    if (s.learnerName) ctx.learnerName = s.learnerName;
     const system = buildCaseSystemPrompt(ctx, false);
     const chat = history.map((m) => ({ role: m.role === "tutor" ? ("assistant" as const) : ("user" as const), content: m.content }));
 

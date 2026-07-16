@@ -47,6 +47,7 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
   useEffect(() => { if (caseData?.language) setLang(caseData.language); }, [caseData?.language]);
   const [factsOpen, setFactsOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [factsTx, setFactsTx] = useState<{ context: string; objective: string | null } | null>(null);
   const [animate, setAnimateState] = useState<boolean>(() => { try { return localStorage.getItem("tutorAnimate") !== "0"; } catch { return true; } });
   const setAnimate = (v: boolean) => { setAnimateState(v); try { localStorage.setItem("tutorAnimate", v ? "1" : "0"); } catch { /* ignore */ } };
 
@@ -68,6 +69,7 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
       setSessionId(d.sessionId);
       setMessages(d.messages ?? []);
       setPromptCount(d.promptCount ?? 0);
+      if (d.contextBlock) setFactsTx({ context: d.contextBlock, objective: d.learningObjective ?? null });
       const opening = [...(d.messages ?? [])].reverse().find((m: CaseMessage) => m.role === "tutor");
       if (opening?.content) speak(opening.content, gender, lang);
     } catch (e) { setError(e instanceof Error ? e.message : "Could not start"); }
@@ -151,10 +153,10 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
         <p className="text-sm font-semibold flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> The situation</p>
         <button onClick={() => setFactsOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">Minimise</button>
       </div>
-      {caseData.learningObjective && (
-        <p className="text-xs rounded-md px-2.5 py-1.5" style={{ background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>Goal: {caseData.learningObjective}</p>
+      {(factsTx?.objective ?? caseData.learningObjective) && (
+        <p className="text-xs rounded-md px-2.5 py-1.5" style={{ background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>Goal: {factsTx?.objective ?? caseData.learningObjective}</p>
       )}
-      <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{caseData.contextBlock || "No background provided."}</p>
+      <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{factsTx?.context ?? caseData.contextBlock ?? "No background provided."}</p>
       <p className="text-[11px] text-muted-foreground pt-1">The coach's questions are grounded in these facts — refer back any time.</p>
     </div>
   );

@@ -98,6 +98,9 @@ export const caseSessionsTable = pgTable("case_sessions", {
   learnerName: text("learner_name"),
   /** The language this attempt is running in (learner's choice; falls back to the case default). */
   language: text("language"),
+  /** Fact pattern + objective translated into the session language (cached at start). */
+  translatedContext: text("translated_context"),
+  translatedObjective: text("translated_objective"),
   messages: jsonb("messages").$type<CaseMessage[]>().notNull().default([]),
   promptCount: integer("prompt_count").notNull().default(0),
   promptLimit: integer("prompt_limit").notNull().default(8),

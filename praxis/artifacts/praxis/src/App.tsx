@@ -38,6 +38,7 @@ import { ResetPasswordPage } from '@/pages/ResetPassword';
 import { PlatformConsole } from '@/pages/PlatformConsole';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
+import { CaseBegin } from '@/pages/CaseBegin';
 import { CaseSession } from '@/pages/CaseSession';
 import { CaseEmbed } from '@/pages/CaseEmbed';
 import { AdminFunders } from '@/pages/AdminFunders';
@@ -184,6 +185,7 @@ function Routes() {
         <ProtectedRoute path="/courses/:courseId" component={CourseDetail} />
         <ProtectedRoute path="/courses" component={Courses} />
         <ProtectedRoute path="/cases/:caseId/edit" component={CaseBuilder} />
+        <ProtectedRoute path="/cases/:caseId/begin" component={CaseBegin} />
         <ProtectedRoute path="/cases" component={Cases} />
         <ProtectedRoute path="/notifications" component={NotificationsPage} />
         <ProtectedRoute path="/assess/:assessmentId" component={Assess} />

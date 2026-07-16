@@ -131,7 +131,8 @@ export const casesApi = {
   createEmbedLink: (id: string, body: { label?: string; expiresAt?: string | null }) => apiFetch<EmbedLink>(`/cases/${id}/embed-links`, { method: "POST", body: JSON.stringify(body) }),
   revokeEmbedLink: (id: string, linkId: string) => apiFetch<void>(`/cases/${id}/embed-links/${linkId}`, { method: "DELETE" }),
 
-  startSession: (caseId: string) => apiFetch<CaseSessionRow>(`/cases/${caseId}/sessions`, { method: "POST" }),
+  startSession: (caseId: string, body?: { learnerName?: string; language?: string }) =>
+    apiFetch<CaseSessionRow>(`/cases/${caseId}/sessions`, { method: "POST", body: JSON.stringify(body ?? {}) }),
   mySessions: () => apiFetch<CaseSessionRow[]>(`/case-sessions/my`),
   getSession: (id: string) => apiFetch<CaseSessionRow>(`/case-sessions/${id}`),
   completeSession: (id: string) => apiFetch<CaseSessionRow>(`/case-sessions/${id}/complete`, { method: "POST" }),
