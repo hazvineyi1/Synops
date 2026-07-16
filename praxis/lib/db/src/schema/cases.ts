@@ -145,3 +145,41 @@ export const caseLinkAccessTable = pgTable("case_link_access", {
 });
 
 export type CaseLinkAccess = typeof caseLinkAccessTable.$inferSelect;
+
+/**
+ * Case distribution / assignment chain: Partner -> Organisation -> Learner.
+ *
+ * Distribution is EXPLICIT at each tier. A Hub author (super admin / instructional designer)
+ * grants a case to a partner; that partner_admin then grants it down to specific organisations
+ * under their partner; each org_admin then grants it to individual learners (or a whole course
+ * group / cohort, expanded to one row per member). Nothing appears at a tier until the tier
+ * above deliberately passes it on — enforced in routes by requiring an upstream grant to exist
+ * (super admins bypass, since they hold all-tier access).
+ *
+ * One row = one grant to one recipient at one tier:
+ *  - tier="partner":      partnerId set (the recipient partner).
+ *  - tier="organisation": organisationId set (recipient org); partnerId = its parent partner.
+ *  - tier="learner":      userId set (recipient learner); organisationId = their org; groupId
+ *                         optionally records the cohort the grant came from.
+ * `parentAssignmentId` links a grant to the upstream grant it derives from (chain provenance).
+ * `status` rolls up from case_sessions: assigned -> in_progress (first turn) -> completed.
+ */
+export const caseAssignmentsTable = pgTable("case_assignments", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  caseId: text("case_id").notNull(),
+  tier: text("tier", { enum: ["partner", "organisation", "learner"] }).notNull(),
+  partnerId: text("partner_id"),
+  organisationId: text("organisation_id"),
+  userId: text("user_id"),
+  groupId: text("group_id"),
+  parentAssignmentId: text("parent_assignment_id"),
+  assignedBy: text("assigned_by").notNull(),
+  assignedByName: text("assigned_by_name"),
+  status: text("status", { enum: ["assigned", "in_progress", "completed", "revoked"] }).notNull().default("assigned"),
+  dueDate: timestamp("due_date"),
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type CaseAssignment = typeof caseAssignmentsTable.$inferSelect;

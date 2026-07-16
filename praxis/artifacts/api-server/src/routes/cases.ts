@@ -6,14 +6,22 @@ import {
   caseRubricsTable,
   caseSessionsTable,
   caseEmbedLinksTable,
+  caseAssignmentsTable,
   unitStandardMappingsTable,
+  organisationsTable,
+  partnersTable,
+  usersTable,
+  coursesTable,
+  courseGroupsTable,
+  courseGroupMembersTable,
   type CaseScenario,
+  type CaseAssignment,
   type RubricCriterion,
   type CaseMessage,
 } from "@workspace/db";
-import { eq, and, or, isNull, desc, type SQL } from "drizzle-orm";
+import { eq, and, or, isNull, ne, inArray, desc, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { isSuperAdmin, hasHubAccess, canAdministerOrg } from "../lib/roles";
+import { isSuperAdmin, hasHubAccess, canAdministerOrg, isInstructionalDesigner } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import {
@@ -118,6 +126,24 @@ router.get("/cases", requireAuth, async (req, res) => {
       .from(caseScenariosTable)
       .where(conds.length > 1 ? or(...conds) : conds[0])
       .orderBy(desc(caseScenariosTable.updatedAt));
+
+    // Also surface cases reached through the distribution chain (learner/org/partner grants),
+    // even if the case sits outside the user's tenant (e.g. a platform-library case a Hub
+    // author pushed down to this org). Additive to tenant + library visibility above.
+    const accessConds: SQL[] = [];
+    if (u.id) accessConds.push(and(eq(caseAssignmentsTable.userId, u.id), eq(caseAssignmentsTable.tier, "learner")) as SQL);
+    if (u.organisationId) accessConds.push(and(eq(caseAssignmentsTable.organisationId, u.organisationId), eq(caseAssignmentsTable.tier, "organisation")) as SQL);
+    if (u.partnerId) accessConds.push(and(eq(caseAssignmentsTable.partnerId, u.partnerId), eq(caseAssignmentsTable.tier, "partner")) as SQL);
+    if (accessConds.length) {
+      const grants = await db.select({ caseId: caseAssignmentsTable.caseId }).from(caseAssignmentsTable)
+        .where(and(ne(caseAssignmentsTable.status, "revoked"), or(...accessConds)));
+      const have = new Set(rows.map((r) => r.id));
+      const missing = [...new Set(grants.map((g) => g.caseId))].filter((id) => !have.has(id));
+      if (missing.length) {
+        const extra = await db.select().from(caseScenariosTable).where(inArray(caseScenariosTable.id, missing));
+        rows = [...rows, ...extra];
+      }
+    }
     // Non-authors only see published cases.
     if (!canAuthorCases(u.role)) rows = rows.filter((c) => c.status === "published");
   }
@@ -130,7 +156,7 @@ router.get("/cases/:id", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
   if (!c) { res.status(404).json({ error: "Not found" }); return; }
-  if (!caseInScope(u, c)) { res.status(404).json({ error: "Not found" }); return; }
+  if (!caseInScope(u, c) && !(await hasAssignmentAccess(u, c.id))) { res.status(404).json({ error: "Not found" }); return; }
   if (c.status !== "published" && !canManageCase(u, c)) { res.status(404).json({ error: "Not found" }); return; }
   const rubric = await db.query.caseRubricsTable.findFirst({ where: eq(caseRubricsTable.caseId, c.id) });
   res.json({ ...caseResponse(c), rubric: rubric ? { criteria: rubric.criteria, totalPoints: rubric.totalPoints } : null, canManage: canManageCase(u, c) });
@@ -405,7 +431,8 @@ function ctxFromCase(c: CaseScenario, learner: U | null, turnCount: number, lang
 router.post("/cases/:id/sessions", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
-  if (!c || !caseInScope(u, c)) { res.status(404).json({ error: "Not found" }); return; }
+  if (!c) { res.status(404).json({ error: "Not found" }); return; }
+  if (!caseInScope(u, c) && !(await hasAssignmentAccess(u, c.id))) { res.status(404).json({ error: "Not found" }); return; }
   if (c.status !== "published" && !canManageCase(u, c)) { res.status(403).json({ error: "This case is not published yet." }); return; }
 
   const lang = validLang(req.body?.language) ? req.body.language : c.language;
@@ -574,6 +601,11 @@ router.post("/case-sessions/:id/message", requireAuth, async (req, res) => {
     const newCount = s.promptCount + 1;
     await db.update(caseSessionsTable).set({ messages: newMessages, promptCount: newCount }).where(eq(caseSessionsTable.id, s.id));
 
+    // Roll a learner's assignment from "assigned" to "in_progress" on their first real turn.
+    await db.update(caseAssignmentsTable)
+      .set({ status: "in_progress", updatedAt: new Date() })
+      .where(and(eq(caseAssignmentsTable.userId, u.id), eq(caseAssignmentsTable.caseId, s.caseId), eq(caseAssignmentsTable.tier, "learner"), eq(caseAssignmentsTable.status, "assigned")));
+
     const budgetReached = newCount >= (s.promptLimit ?? 8);
     res.write(`data: ${JSON.stringify({ done: true, promptCount: newCount, promptLimit: s.promptLimit, budgetReached })}\n\n`);
     res.end();
@@ -614,7 +646,251 @@ router.post("/case-sessions/:id/complete", requireAuth, async (req, res) => {
     })
     .where(eq(caseSessionsTable.id, s.id))
     .returning();
+
+  // Mark the learner's assignment complete so admin progress + compliance reporting roll up.
+  await db.update(caseAssignmentsTable)
+    .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(caseAssignmentsTable.userId, u.id), eq(caseAssignmentsTable.caseId, s.caseId), eq(caseAssignmentsTable.tier, "learner"), ne(caseAssignmentsTable.status, "revoked")));
+
   res.json(sessionResponse(updated));
+});
+
+/* ───────────────────────────── Distribution / assignment chain ─────────────────────────────
+ * Partner -> Organisation -> Learner, explicit at each tier. A Hub author seeds the chain by
+ * granting to partners; a partner_admin passes it to orgs under their partner; an org_admin
+ * passes it to learners (individually or by cohort). Each downward step requires an active
+ * upstream grant to exist (super admins bypass, holding all-tier access).
+ * ────────────────────────────────────────────────────────────────────────────────────────── */
+
+const TIERS = ["partner", "organisation", "learner"] as const;
+type Tier = (typeof TIERS)[number];
+const isTier = (x: unknown): x is Tier => typeof x === "string" && (TIERS as readonly string[]).includes(x);
+
+/** The tier a non-super-admin actor distributes at, derived from their role. */
+function roleTier(role: string): Tier | null {
+  if (isInstructionalDesigner(role)) return "partner"; // Hub author seeds the chain
+  if (role === "partner_admin") return "organisation";
+  if (role === "org_admin") return "learner";
+  return null;
+}
+
+/** Active (non-revoked) grants for a case — used for chain enforcement + dedup. */
+async function activeAssignments(caseId: string): Promise<CaseAssignment[]> {
+  return db.select().from(caseAssignmentsTable).where(and(eq(caseAssignmentsTable.caseId, caseId), ne(caseAssignmentsTable.status, "revoked")));
+}
+
+/** Does this user have run access to a case via an active assignment (learner/org/partner tier)? */
+async function hasAssignmentAccess(u: U, caseId: string): Promise<boolean> {
+  const conds: SQL[] = [];
+  if (u.id) conds.push(and(eq(caseAssignmentsTable.userId, u.id), eq(caseAssignmentsTable.tier, "learner")) as SQL);
+  if (u.organisationId) conds.push(and(eq(caseAssignmentsTable.organisationId, u.organisationId), eq(caseAssignmentsTable.tier, "organisation")) as SQL);
+  if (u.partnerId) conds.push(and(eq(caseAssignmentsTable.partnerId, u.partnerId), eq(caseAssignmentsTable.tier, "partner")) as SQL);
+  if (!conds.length) return false;
+  const row = await db.select().from(caseAssignmentsTable)
+    .where(and(eq(caseAssignmentsTable.caseId, caseId), ne(caseAssignmentsTable.status, "revoked"), or(...conds)))
+    .limit(1);
+  return row.length > 0;
+}
+
+function assignmentResponse(a: CaseAssignment) {
+  return {
+    id: a.id,
+    caseId: a.caseId,
+    tier: a.tier,
+    partnerId: a.partnerId,
+    organisationId: a.organisationId,
+    userId: a.userId,
+    groupId: a.groupId,
+    status: a.status,
+    dueDate: a.dueDate?.toISOString() ?? null,
+    assignedByName: a.assignedByName,
+    assignedAt: a.assignedAt.toISOString(),
+    completedAt: a.completedAt?.toISOString() ?? null,
+  };
+}
+
+// GET /cases/:id/assign/targets — the eligible recipients for the actor's next tier, each
+// flagged if already assigned; learner tier also returns the org's cohorts (course groups).
+router.get("/cases/:id/assign/targets", requireAuth, async (req, res) => {
+  const u = req.dbUser! as U;
+  const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
+  if (!c) { res.status(404).json({ error: "Not found" }); return; }
+  const superA = isSuperAdmin(u.role);
+  const tier: Tier | null = superA ? (isTier(req.query.tier) ? req.query.tier : "partner") : roleTier(u.role);
+  if (!tier) { res.status(403).json({ error: "Your role cannot assign cases." }); return; }
+  const existing = await activeAssignments(c.id);
+
+  if (tier === "partner") {
+    const partners = await db.select().from(partnersTable).orderBy(partnersTable.name);
+    const set = new Set(existing.filter((a) => a.tier === "partner").map((a) => a.partnerId));
+    res.json({ tier, targets: partners.map((p) => ({ id: p.id, name: p.name, alreadyAssigned: set.has(p.id) })), groups: [] });
+    return;
+  }
+  if (tier === "organisation") {
+    const partnerId = superA ? (typeof req.query.partnerId === "string" ? req.query.partnerId : null) : (u.partnerId ?? null);
+    const orgs = partnerId
+      ? await db.select().from(organisationsTable).where(eq(organisationsTable.partnerId, partnerId)).orderBy(organisationsTable.name)
+      : (superA ? await db.select().from(organisationsTable).orderBy(organisationsTable.name) : []);
+    const set = new Set(existing.filter((a) => a.tier === "organisation").map((a) => a.organisationId));
+    res.json({ tier, targets: orgs.map((o) => ({ id: o.id, name: o.name, alreadyAssigned: set.has(o.id) })), groups: [] });
+    return;
+  }
+  // learner tier
+  const orgId = superA ? (typeof req.query.organisationId === "string" ? req.query.organisationId : (u.organisationId ?? null)) : (u.organisationId ?? u.partnerId ?? null);
+  const learners = orgId
+    ? await db.select().from(usersTable).where(and(eq(usersTable.organisationId, orgId), eq(usersTable.role, "learner"))).orderBy(usersTable.firstName)
+    : [];
+  const set = new Set(existing.filter((a) => a.tier === "learner").map((a) => a.userId));
+  let groups: { id: string; name: string; courseTitle: string | null; memberCount: number }[] = [];
+  if (orgId) {
+    const courses = await db.select().from(coursesTable).where(eq(coursesTable.tenantId, orgId));
+    const courseIds = courses.map((cc) => cc.id);
+    if (courseIds.length) {
+      const cgs = await db.select().from(courseGroupsTable).where(inArray(courseGroupsTable.courseId, courseIds));
+      const titleById = new Map(courses.map((cc) => [cc.id, cc.title]));
+      const gm = cgs.length ? await db.select().from(courseGroupMembersTable).where(inArray(courseGroupMembersTable.groupId, cgs.map((g) => g.id))) : [];
+      const counts = new Map<string, number>();
+      gm.forEach((m) => counts.set(m.groupId, (counts.get(m.groupId) ?? 0) + 1));
+      groups = cgs.map((g) => ({ id: g.id, name: g.name, courseTitle: titleById.get(g.courseId) ?? null, memberCount: counts.get(g.id) ?? 0 }));
+    }
+  }
+  res.json({ tier, targets: learners.map((l) => ({ id: l.id, name: [l.firstName, l.lastName].filter(Boolean).join(" ") || l.email, alreadyAssigned: set.has(l.id) })), groups });
+});
+
+// POST /cases/:id/assign — grant a case down one tier of the chain.
+router.post("/cases/:id/assign", requireAuth, async (req, res) => {
+  const u = req.dbUser! as U;
+  const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
+  if (!c) { res.status(404).json({ error: "Not found" }); return; }
+
+  const superA = isSuperAdmin(u.role);
+  const tier: Tier | null = superA ? (isTier(req.body?.tier) ? req.body.tier : null) : roleTier(u.role);
+  if (!tier) { res.status(403).json({ error: superA ? "Specify a tier: partner, organisation or learner." : "Your role cannot assign cases." }); return; }
+
+  const targetIds: string[] = Array.isArray(req.body?.targetIds) ? req.body.targetIds.filter((x: unknown) => typeof x === "string") : [];
+  const groupId: string | null = typeof req.body?.groupId === "string" ? req.body.groupId : null;
+  const dueDate = req.body?.dueDate ? new Date(req.body.dueDate) : null;
+
+  const existing = await activeAssignments(c.id);
+  const assignerName = [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email;
+  const rows: (typeof caseAssignmentsTable.$inferInsert)[] = [];
+  let skipped = 0;
+
+  if (tier === "partner") {
+    if (!hasHubAccess(u.role)) { res.status(403).json({ error: "Only Hub roles assign to partners." }); return; }
+    const partners = targetIds.length ? await db.select().from(partnersTable).where(inArray(partnersTable.id, targetIds)) : [];
+    const already = new Set(existing.filter((a) => a.tier === "partner").map((a) => a.partnerId));
+    for (const p of partners) {
+      if (already.has(p.id)) { skipped++; continue; }
+      rows.push({ caseId: c.id, tier: "partner", partnerId: p.id, assignedBy: u.id, assignedByName: assignerName, dueDate });
+    }
+  } else if (tier === "organisation") {
+    const partnerId = superA ? (typeof req.body?.partnerId === "string" ? req.body.partnerId : null) : (u.partnerId ?? null);
+    if (!superA) {
+      const upstream = existing.some((a) => a.tier === "partner" && a.partnerId === partnerId);
+      if (!partnerId || !upstream) { res.status(403).json({ error: "This case has not been assigned to your partner yet." }); return; }
+    }
+    const orgs = targetIds.length ? await db.select().from(organisationsTable).where(inArray(organisationsTable.id, targetIds)) : [];
+    const parent = existing.find((a) => a.tier === "partner" && a.partnerId === partnerId);
+    const already = new Set(existing.filter((a) => a.tier === "organisation").map((a) => a.organisationId));
+    for (const o of orgs) {
+      if (!superA && o.partnerId !== partnerId) { skipped++; continue; }
+      if (already.has(o.id)) { skipped++; continue; }
+      rows.push({ caseId: c.id, tier: "organisation", organisationId: o.id, partnerId: o.partnerId, parentAssignmentId: parent?.id ?? null, assignedBy: u.id, assignedByName: assignerName, dueDate });
+    }
+  } else {
+    const orgId = superA ? (typeof req.body?.organisationId === "string" ? req.body.organisationId : (u.organisationId ?? null)) : (u.organisationId ?? u.partnerId ?? null);
+    if (!superA) {
+      const upstream = existing.some((a) => a.tier === "organisation" && a.organisationId === orgId);
+      if (!orgId || !upstream) { res.status(403).json({ error: "This case has not been assigned to your organisation yet." }); return; }
+    }
+    const learnerIds = new Set<string>(targetIds);
+    if (groupId) {
+      const members = await db.select().from(courseGroupMembersTable).where(eq(courseGroupMembersTable.groupId, groupId));
+      members.forEach((m) => learnerIds.add(m.userId));
+    }
+    const ids = Array.from(learnerIds);
+    const learners = ids.length ? await db.select().from(usersTable).where(inArray(usersTable.id, ids)) : [];
+    const parent = existing.find((a) => a.tier === "organisation" && a.organisationId === orgId);
+    const already = new Set(existing.filter((a) => a.tier === "learner").map((a) => a.userId));
+    for (const l of learners) {
+      if (l.role !== "learner") { skipped++; continue; }
+      if (!superA && l.organisationId !== orgId) { skipped++; continue; }
+      if (already.has(l.id)) { skipped++; continue; }
+      rows.push({ caseId: c.id, tier: "learner", userId: l.id, organisationId: l.organisationId ?? orgId, groupId: groupId ?? null, parentAssignmentId: parent?.id ?? null, assignedBy: u.id, assignedByName: assignerName, dueDate });
+    }
+  }
+
+  if (!rows.length) { res.status(200).json({ created: 0, skipped, assignments: [] }); return; }
+  const inserted = await db.insert(caseAssignmentsTable).values(rows).returning();
+  await logAudit(req, "case.assign", "case", c.id, { tier, created: inserted.length, skipped });
+  res.status(201).json({ created: inserted.length, skipped, assignments: inserted.map(assignmentResponse) });
+});
+
+// GET /cases/:id/assignments — grants on this case within the actor's scope, with target names.
+router.get("/cases/:id/assignments", requireAuth, async (req, res) => {
+  const u = req.dbUser! as U;
+  const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
+  if (!c) { res.status(404).json({ error: "Not found" }); return; }
+  let all = await db.select().from(caseAssignmentsTable).where(eq(caseAssignmentsTable.caseId, c.id)).orderBy(desc(caseAssignmentsTable.assignedAt));
+  if (!hasHubAccess(u.role)) {
+    all = all.filter((a) =>
+      (!!u.partnerId && a.partnerId === u.partnerId) ||
+      (!!u.organisationId && a.organisationId === u.organisationId));
+  }
+  const partnerIds = [...new Set(all.map((a) => a.partnerId).filter(Boolean))] as string[];
+  const orgIds = [...new Set(all.map((a) => a.organisationId).filter(Boolean))] as string[];
+  const userIds = [...new Set(all.map((a) => a.userId).filter(Boolean))] as string[];
+  const [ps, os, us] = await Promise.all([
+    partnerIds.length ? db.select().from(partnersTable).where(inArray(partnersTable.id, partnerIds)) : Promise.resolve([]),
+    orgIds.length ? db.select().from(organisationsTable).where(inArray(organisationsTable.id, orgIds)) : Promise.resolve([]),
+    userIds.length ? db.select().from(usersTable).where(inArray(usersTable.id, userIds)) : Promise.resolve([]),
+  ]);
+  const pN = new Map(ps.map((p) => [p.id, p.name]));
+  const oN = new Map(os.map((o) => [o.id, o.name]));
+  const uN = new Map(us.map((x) => [x.id, [x.firstName, x.lastName].filter(Boolean).join(" ") || x.email]));
+  res.json(all.map((a) => ({
+    ...assignmentResponse(a),
+    targetName: a.tier === "partner" ? (pN.get(a.partnerId!) ?? null) : a.tier === "organisation" ? (oN.get(a.organisationId!) ?? null) : (uN.get(a.userId!) ?? null),
+  })));
+});
+
+// GET /case-assignments/my — the current learner's assigned cases (+ due date + status).
+router.get("/case-assignments/my", requireAuth, async (req, res) => {
+  const u = req.dbUser! as U;
+  const rows = await db.select().from(caseAssignmentsTable)
+    .where(and(eq(caseAssignmentsTable.userId, u.id), eq(caseAssignmentsTable.tier, "learner"), ne(caseAssignmentsTable.status, "revoked")))
+    .orderBy(desc(caseAssignmentsTable.assignedAt));
+  const caseIds = [...new Set(rows.map((r) => r.caseId))];
+  const cs = caseIds.length ? await db.select().from(caseScenariosTable).where(inArray(caseScenariosTable.id, caseIds)) : [];
+  const byId = new Map(cs.map((cc) => [cc.id, cc]));
+  res.json(rows
+    .map((a) => {
+      const cc = byId.get(a.caseId);
+      return { ...assignmentResponse(a), caseTitle: cc?.title ?? null, learningObjective: cc?.learningObjective ?? null, difficulty: cc?.difficulty ?? null, caseStatus: cc?.status ?? null };
+    })
+    .filter((r) => r.caseTitle));
+});
+
+// DELETE /case-assignments/:id — revoke a grant (soft) and cascade-revoke its descendants.
+router.delete("/case-assignments/:id", requireAuth, async (req, res) => {
+  const u = req.dbUser! as U;
+  const a = await db.query.caseAssignmentsTable.findFirst({ where: eq(caseAssignmentsTable.id, req.params.id) });
+  if (!a) { res.status(204).send(); return; }
+  const can = hasHubAccess(u.role)
+    || (!!u.partnerId && a.partnerId === u.partnerId)
+    || (!!u.organisationId && a.organisationId === u.organisationId);
+  if (!can) { res.status(403).json({ error: "Forbidden" }); return; }
+  const revoke = new Set<string>([a.id]);
+  let frontier = [a.id];
+  for (let depth = 0; depth < 3 && frontier.length; depth++) {
+    const kids = await db.select().from(caseAssignmentsTable).where(inArray(caseAssignmentsTable.parentAssignmentId, frontier));
+    frontier = kids.map((k) => k.id).filter((id) => !revoke.has(id));
+    frontier.forEach((id) => revoke.add(id));
+  }
+  await db.update(caseAssignmentsTable).set({ status: "revoked", updatedAt: new Date() }).where(inArray(caseAssignmentsTable.id, Array.from(revoke)));
+  await logAudit(req, "case.assign_revoke", "case", a.caseId, { assignmentId: a.id, revoked: revoke.size });
+  res.status(204).send();
 });
 
 export default router;

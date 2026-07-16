@@ -115,6 +115,42 @@ export interface UnitStandardRow {
 
 export type CaseInput = Partial<Omit<CaseRow, "id" | "createdAt" | "updatedAt" | "createdBy" | "createdByName">>;
 
+/* ── Distribution / assignment chain (Partner -> Organisation -> Learner) ── */
+export type AssignTier = "partner" | "organisation" | "learner";
+export interface AssignTarget { id: string; name: string; alreadyAssigned: boolean }
+export interface AssignCohort { id: string; name: string; courseTitle: string | null; memberCount: number }
+export interface AssignTargets { tier: AssignTier; targets: AssignTarget[]; groups: AssignCohort[] }
+
+export interface CaseAssignmentRow {
+  id: string;
+  caseId: string;
+  tier: AssignTier;
+  partnerId: string | null;
+  organisationId: string | null;
+  userId: string | null;
+  groupId: string | null;
+  status: "assigned" | "in_progress" | "completed" | "revoked";
+  dueDate: string | null;
+  assignedByName: string | null;
+  assignedAt: string;
+  completedAt: string | null;
+  targetName?: string | null;
+}
+export interface MyAssignmentRow extends CaseAssignmentRow {
+  caseTitle: string | null;
+  learningObjective: string | null;
+  difficulty: string | null;
+  caseStatus: string | null;
+}
+export interface AssignBody {
+  tier?: AssignTier;
+  targetIds?: string[];
+  groupId?: string;
+  dueDate?: string | null;
+  partnerId?: string;
+  organisationId?: string;
+}
+
 export const casesApi = {
   list: (status?: string) => apiFetch<CaseRow[]>(`/cases${status ? `?status=${status}` : ""}`),
   get: (id: string) => apiFetch<CaseDetail>(`/cases/${id}`),
@@ -145,6 +181,13 @@ export const casesApi = {
   caseSessions: (caseId: string) => apiFetch<CaseSessionRow[]>(`/cases/${caseId}/sessions`),
 
   unitStandards: () => apiFetch<UnitStandardRow[]>(`/compliance/unit-standards`),
+
+  // Distribution / assignment chain.
+  assignTargets: (id: string, tier?: AssignTier) => apiFetch<AssignTargets>(`/cases/${id}/assign/targets${tier ? `?tier=${tier}` : ""}`),
+  assign: (id: string, body: AssignBody) => apiFetch<{ created: number; skipped: number; assignments: CaseAssignmentRow[] }>(`/cases/${id}/assign`, { method: "POST", body: JSON.stringify(body) }),
+  caseAssignments: (id: string) => apiFetch<CaseAssignmentRow[]>(`/cases/${id}/assignments`),
+  revokeAssignment: (assignmentId: string) => apiFetch<void>(`/case-assignments/${assignmentId}`, { method: "DELETE" }),
+  myAssignments: () => apiFetch<MyAssignmentRow[]>(`/case-assignments/my`),
 
   tutorFigures: () => apiFetch<TutorFigureRow[]>(`/tutor-figures`),
   createTutorFigure: (body: { name: string; image: string; gender?: string | null }) =>
