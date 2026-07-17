@@ -168,10 +168,10 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // they're catching up on (if remedial), the module's premise, and the situation for the
   // current step. Composed from the session + module + current beat.
   const factPattern = {
-    focus: ((session as unknown as { remedialFocus?: string | null }).remedialFocus) || null,
-    description: moduleData?.description || '',
-    scenario: currentBeat?.scenario || currentBeat?.narration || '',
-    bullets: (currentBeat?.bulletPoints ?? []) as string[],
+    focus: sanitizePlain(((session as unknown as { remedialFocus?: string | null }).remedialFocus) || '') || null,
+    description: sanitizePlain(moduleData?.description || ''),
+    scenario: sanitizePlain(currentBeat?.scenario || currentBeat?.narration || ''),
+    bullets: ((currentBeat?.bulletPoints ?? []) as string[]).map((b) => sanitizePlain(b)),
   };
   const hasFacts = !!(factPattern.focus || factPattern.description || factPattern.scenario || factPattern.bullets.length);
 
