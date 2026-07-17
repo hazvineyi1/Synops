@@ -1,13 +1,28 @@
 import React from 'react';
 import { useListCoachLearners, useGetLearnerPresession } from '@workspace/api-client-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { FileText, AlertCircle, Activity, Award } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { FileText, AlertCircle, Activity, Award, AlertTriangle, Sparkles, Send, Plus, CheckCircle2, Circle, Loader2, LifeBuoy } from 'lucide-react';
 import { Link } from 'wouter';
+
+interface PlanItem { kind: string; title: string; why: string; category: string | null; done: boolean; }
+interface CoachAssist { summary: string; talkingPoints: string[]; sessionFocus: string; suggestedMessage: string; }
+interface Intervention {
+  alertId: string; courseId: string; courseTitle: string; userId: string;
+  learnerName: string; learnerEmail: string | null;
+  status: 'off_track' | 'at_risk' | 'on_track';
+  reasons: string[]; masteryPct: number | null;
+  plan: { planId: string; rationale: string | null; items: PlanItem[]; done: number; total: number } | null;
+  coachNote: string | null; coachAssist: CoachAssist | null; coachAssistAt: string | null;
+  resolvedAt: string | null; updatedAt: string;
+}
 
 export function CoachLearners() {
   const { data: learners, isLoading } = useListCoachLearners();
@@ -19,6 +34,9 @@ export function CoachLearners() {
         <p className="text-muted-foreground">Monitor readiness scores and intervene when competency gaps emerge.</p>
       </div>
 
+      <InterventionsSection />
+
+      <h2 className="text-lg font-bold pt-2">All learners</h2>
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -182,6 +200,257 @@ function PreSessionDialog({ userId, name }: { userId: string, name: string }) {
         ) : (
           <div className="py-12 text-center text-muted-foreground">Brief unavailable.</div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const STATUS_STYLE: Record<string, string> = {
+  off_track: 'text-red-700 bg-red-50 border-red-200',
+  at_risk: 'text-amber-700 bg-amber-50 border-amber-200',
+  on_track: 'text-green-700 bg-green-50 border-green-200',
+};
+const STATUS_LABEL: Record<string, string> = { off_track: 'Off track', at_risk: 'At risk', on_track: 'On track' };
+
+/** The heart of the coach: learners the system has flagged, with their adaptive plan to work. */
+function InterventionsSection() {
+  const { data: items, isLoading } = useQuery<Intervention[]>({
+    queryKey: ['coach-interventions'],
+    queryFn: () => apiFetch<Intervention[]>('/coach/interventions'),
+  });
+
+  if (isLoading) return <Skeletonish />;
+  if (!items || items.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="py-10 text-center">
+          <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto mb-3 opacity-70" />
+          <h3 className="font-serif font-bold text-lg">Nobody needs intervention right now</h3>
+          <p className="text-muted-foreground text-sm mt-1">When a learner falls behind, they'll appear here with a ready-made plan to work through together.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <LifeBuoy className="h-5 w-5 text-primary" />
+        <h2 className="text-lg font-bold">Needs your attention</h2>
+        <Badge variant="outline" className="ml-1">{items.length}</Badge>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {items.map((iv) => <InterventionCard key={iv.alertId} iv={iv} />)}
+      </div>
+    </div>
+  );
+}
+
+function Skeletonish() {
+  return <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{[1, 2].map(i => <div key={i} className="h-40 bg-muted rounded-xl animate-pulse" />)}</div>;
+}
+
+function InterventionCard({ iv }: { iv: Intervention }) {
+  const [open, setOpen] = React.useState(false);
+  const pct = iv.plan && iv.plan.total ? Math.round((iv.plan.done / iv.plan.total) * 100) : 0;
+  return (
+    <Card className="border-0 shadow-md">
+      <CardContent className="p-5 space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-bold">{iv.learnerName}</p>
+            <p className="text-xs text-muted-foreground">{iv.courseTitle}</p>
+          </div>
+          <span className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wide border ${STATUS_STYLE[iv.status]}`}>
+            {STATUS_LABEL[iv.status]}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {iv.reasons.map((r, i) => (
+            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">{r}</span>
+          ))}
+          {iv.masteryPct != null && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">Mastery {Math.round(iv.masteryPct)}%</span>
+          )}
+        </div>
+        {iv.plan && (
+          <div className="space-y-1">
+            <div className="flex justify-between text-xs text-muted-foreground"><span>Plan progress</span><span>{iv.plan.done}/{iv.plan.total}</span></div>
+            <Progress value={pct} className="h-1.5" />
+          </div>
+        )}
+        <Button className="w-full" onClick={() => setOpen(true)}>
+          <LifeBuoy className="h-4 w-4 mr-2" /> Open intervention
+        </Button>
+      </CardContent>
+      {open && <InterventionDialog iv={iv} onClose={() => setOpen(false)} />}
+    </Card>
+  );
+}
+
+function InterventionDialog({ iv, onClose }: { iv: Intervention; onClose: () => void }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [note, setNote] = React.useState(iv.coachNote ?? '');
+  const [nudge, setNudge] = React.useState('');
+  const [stepTitle, setStepTitle] = React.useState('');
+  const [assist, setAssist] = React.useState<CoachAssist | null>(iv.coachAssist);
+  const [assisting, setAssisting] = React.useState(false);
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['coach-interventions'] });
+  const base = `/coach/interventions/${iv.alertId}`;
+
+  const toggleStep = useMutation({
+    mutationFn: (index: number) => apiFetch(`${base}/plan/toggle`, { method: 'POST', body: JSON.stringify({ index, done: !iv.plan!.items[index].done }) }),
+    onSuccess: invalidate,
+  });
+  const addStep = useMutation({
+    mutationFn: () => apiFetch(`${base}/plan/step`, { method: 'POST', body: JSON.stringify({ title: stepTitle }) }),
+    onSuccess: () => { setStepTitle(''); invalidate(); },
+  });
+  const saveNote = useMutation({
+    mutationFn: () => apiFetch(`${base}/note`, { method: 'PATCH', body: JSON.stringify({ note }) }),
+    onSuccess: () => { invalidate(); toast({ title: 'Note saved' }); },
+  });
+  const resolve = useMutation({
+    mutationFn: () => apiFetch(`${base}/resolve`, { method: 'POST', body: JSON.stringify({ resolved: true }) }),
+    onSuccess: () => { invalidate(); toast({ title: 'Marked resolved', description: `${iv.learnerName} cleared from your intervention list.` }); onClose(); },
+  });
+  const sendNudge = useMutation({
+    mutationFn: () => apiFetch(`${base}/nudge`, { method: 'POST', body: JSON.stringify({ message: nudge }) }),
+    onSuccess: (r: any) => { setNudge(''); toast({ title: 'Nudge sent', description: r?.emailed ? 'Delivered in-app and by email.' : 'Delivered in-app.' }); },
+  });
+
+  const runAssist = async () => {
+    setAssisting(true);
+    try {
+      const a = await apiFetch<CoachAssist>(`${base}/assist`, { method: 'POST', body: '{}' });
+      setAssist(a);
+      if (!nudge) setNudge(a.suggestedMessage);
+    } catch {
+      toast({ title: 'Could not generate guidance', variant: 'destructive' });
+    } finally { setAssisting(false); }
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-2xl flex items-center gap-2">
+            {iv.learnerName}
+            <span className={`text-xs font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${STATUS_STYLE[iv.status]}`}>{STATUS_LABEL[iv.status]}</span>
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">{iv.courseTitle}{iv.masteryPct != null ? ` · Mastery ${Math.round(iv.masteryPct)}%` : ''}</p>
+        </DialogHeader>
+
+        <div className="space-y-6 pt-2">
+          {/* Why flagged */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5 mb-1"><AlertTriangle className="h-3.5 w-3.5" /> Why flagged</p>
+            <p className="text-sm text-amber-900">{iv.reasons.join(' · ') || 'Below expected progress.'}</p>
+          </div>
+
+          {/* Adaptive plan */}
+          <div>
+            <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-2">Adaptive plan</h4>
+            {iv.plan?.rationale && <p className="text-sm text-muted-foreground mb-3 italic">{iv.plan.rationale}</p>}
+            <div className="space-y-2">
+              {(iv.plan?.items ?? []).map((it, i) => (
+                <button
+                  key={i}
+                  onClick={() => toggleStep.mutate(i)}
+                  className="w-full text-left flex items-start gap-3 p-3 rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors"
+                >
+                  {it.done ? <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" /> : <Circle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />}
+                  <div>
+                    <p className={`text-sm font-medium ${it.done ? 'line-through text-muted-foreground' : ''}`}>{it.title}</p>
+                    <p className="text-xs text-muted-foreground">{it.why}</p>
+                  </div>
+                </button>
+              ))}
+              {(!iv.plan || iv.plan.items.length === 0) && <p className="text-sm text-muted-foreground italic">No plan steps yet — add one below.</p>}
+            </div>
+            <div className="flex gap-2 mt-3">
+              <input
+                value={stepTitle}
+                onChange={(e) => setStepTitle(e.target.value)}
+                placeholder="Add a step (e.g. Redo the pricing worksheet)"
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <Button variant="outline" disabled={!stepTitle.trim() || addStep.isPending} onClick={() => addStep.mutate()}>
+                <Plus className="h-4 w-4 mr-1" /> Add
+              </Button>
+            </div>
+          </div>
+
+          {/* AI coaching guidance */}
+          <div className="rounded-xl border border-border p-4 bg-muted/20">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-primary" /> Coaching guidance</h4>
+              <Button size="sm" variant="outline" onClick={runAssist} disabled={assisting}>
+                {assisting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {assist ? 'Regenerate' : 'Generate'}
+              </Button>
+            </div>
+            {assist ? (
+              <div className="space-y-3 text-sm">
+                <p>{assist.summary}</p>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Session focus</p>
+                  <p className="font-medium">{assist.sessionFocus}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Talking points</p>
+                  <ul className="space-y-1">
+                    {assist.talkingPoints.map((p, i) => <li key={i} className="flex gap-2"><span className="text-primary">•</span><span>{p}</span></li>)}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Generate personalised talking points and a ready-to-send message for {iv.learnerName.split(' ')[0]}.</p>
+            )}
+          </div>
+
+          {/* Coach note */}
+          <div>
+            <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-2">Your note</h4>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="Private notes on this intervention…"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <div className="flex justify-end mt-2">
+              <Button size="sm" variant="outline" disabled={saveNote.isPending} onClick={() => saveNote.mutate()}>Save note</Button>
+            </div>
+          </div>
+
+          {/* Nudge the learner */}
+          <div>
+            <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5"><Send className="h-4 w-4" /> Nudge {iv.learnerName.split(' ')[0]}</h4>
+            <textarea
+              value={nudge}
+              onChange={(e) => setNudge(e.target.value)}
+              rows={3}
+              placeholder="Send an encouraging message (in-app, and email if enabled)…"
+              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <div className="flex justify-between items-center mt-2">
+              {assist && <button className="text-xs text-primary hover:underline" onClick={() => setNudge(assist.suggestedMessage)}>Use suggested message</button>}
+              <div className="flex-1" />
+              <Button size="sm" disabled={!nudge.trim() || sendNudge.isPending} onClick={() => sendNudge.mutate()}>
+                <Send className="h-4 w-4 mr-1.5" /> Send nudge
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center pt-2 border-t border-border">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button variant="secondary" disabled={resolve.isPending} onClick={() => resolve.mutate()}>
+              <CheckCircle2 className="h-4 w-4 mr-1.5" /> Mark back on track
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

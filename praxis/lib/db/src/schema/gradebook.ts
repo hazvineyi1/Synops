@@ -82,6 +82,14 @@ export const gradebookCellsTable = pgTable(
 
 export type GradebookCell = typeof gradebookCellsTable.$inferSelect;
 
+/** AI-generated coaching guidance for an at-risk learner (cached on the alert). */
+export interface CoachAssist {
+  summary: string;
+  talkingPoints: string[];
+  sessionFocus: string;
+  suggestedMessage: string;
+}
+
 /**
  * Off-track state per (course, learner). Recomputed whenever a score changes and on demand.
  * `status` transitions on_track -> at_risk -> off_track drive in-app notifications (we only
@@ -101,6 +109,11 @@ export const gradebookAlertsTable = pgTable(
     planId: text("plan_id"),
     /** Last time an off_track in-app alert was sent to the learner/staff. */
     notifiedAt: timestamp("notified_at"),
+    /** Coach's private working note on this intervention. */
+    coachNote: text("coach_note"),
+    /** Cached AI coaching talking points (see CoachAssist). */
+    coachAssist: jsonb("coach_assist").$type<CoachAssist>(),
+    coachAssistAt: timestamp("coach_assist_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     resolvedAt: timestamp("resolved_at"),
