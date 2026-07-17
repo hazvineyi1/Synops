@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGetSession, useGetModule } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Send, Sparkles } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { BeatType } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
@@ -98,6 +98,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // the backend flags `scaffold` on the done event. We surface a gentle, opt-in offer
   // of a worked example rather than another question (the worked-example effect).
   const [showScaffold, setShowScaffold] = useState(false);
+  // Guidance + context panels — both available at all times via the sticky bar, each minimisable.
+  const [showHow, setShowHow] = useState(true);
+  const [showFacts, setShowFacts] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Local state for turns to optimistically append user message and streaming tutor message
@@ -125,6 +128,17 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   const isMastered = session.masteryScore >= 0.8;
 
   const currentBeat = moduleData?.beats?.find(b => b.id === session.currentBeatId);
+
+  // The "fact pattern": the context the learner should be able to see at all times — what
+  // they're catching up on (if remedial), the module's premise, and the situation for the
+  // current step. Composed from the session + module + current beat.
+  const factPattern = {
+    focus: ((session as unknown as { remedialFocus?: string | null }).remedialFocus) || null,
+    description: moduleData?.description || '',
+    scenario: currentBeat?.scenario || currentBeat?.narration || '',
+    bullets: (currentBeat?.bulletPoints ?? []) as string[],
+  };
+  const hasFacts = !!(factPattern.focus || factPattern.description || factPattern.scenario || factPattern.bullets.length);
 
   const handleSend = async () => {
     if (!inputValue.trim() || isStreaming) return;
@@ -215,27 +229,88 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
         </div>
       </header>
 
-      {/* Beat Context Strip */}
-      {currentBeat && !isMastered && (
-        <div className="bg-muted/50 border-b border-border px-4 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center gap-2 justify-center">
-          <span className={cn("text-xs font-bold uppercase tracking-wider px-2 py-1 rounded-sm w-fit", beatBadge(currentBeat.type))}>
-            {currentBeat.type.replace('_', ' ')}
-          </span>
-          <span className="text-sm font-medium text-foreground">{currentBeat.title}</span>
+      {/* Guidance + context bar — sticky under the header so instructions and the fact pattern
+          are reachable at all times. Each panel can be minimised or expanded during the session. */}
+      {!isMastered && (
+        <div className="shrink-0 sticky top-14 z-10 border-b border-border bg-muted/40">
+          <div className="mx-auto max-w-3xl px-4 py-2 flex flex-wrap items-center gap-2">
+            {currentBeat?.title && (
+              <span className="text-sm font-medium text-foreground truncate">{currentBeat.title}</span>
+            )}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setShowHow(v => !v)}
+                aria-expanded={showHow}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/40"
+              >
+                <Info className="h-3.5 w-3.5" /> How this works
+                {showHow ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                onClick={() => setShowFacts(v => !v)}
+                aria-expanded={showFacts}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/40"
+              >
+                <FileText className="h-3.5 w-3.5" /> Fact pattern
+                {showFacts ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </div>
+
+          {/* How this works — expectations, mastery, and time to complete */}
+          {showHow && (
+            <div className="border-t border-border bg-background">
+              <div className="mx-auto max-w-3xl grid gap-3 px-4 py-3 text-sm sm:grid-cols-3">
+                <div className="flex gap-2">
+                  <MessageCircleQuestion className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-semibold text-foreground">What to do</p>
+                    <p className="text-muted-foreground">Your coach asks guiding questions. Answer in your own words and explain your reasoning — there's no single right wording, and the coach won't hand you the answer.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Target className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-semibold text-foreground">What mastery looks like</p>
+                    <p className="text-muted-foreground">Move the Mastery bar to 80% by reasoning clearly and applying the idea to new situations. Reach 80% and you've mastered it — and earn your credential.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-semibold text-foreground">How long it takes</p>
+                    <p className="text-muted-foreground">About 10–15 minutes. Your progress saves as you go, so you can pause and pick up where you left off.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Fact pattern — the situation/context, available throughout */}
+          {showFacts && (
+            <div className="border-t border-border bg-amber-50/40 dark:bg-amber-950/10">
+              <div className="mx-auto max-w-3xl px-4 py-3 text-sm">
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Fact pattern — the context for this session</p>
+                {factPattern.focus && (
+                  <p className="mb-2 text-foreground"><span className="font-medium">You're catching up on:</span> {factPattern.focus}</p>
+                )}
+                {factPattern.description && <p className="mb-2 text-muted-foreground">{factPattern.description}</p>}
+                {factPattern.scenario && <p className="whitespace-pre-wrap text-foreground">{factPattern.scenario}</p>}
+                {factPattern.bullets.length > 0 && (
+                  <ul className="mt-2 list-disc space-y-0.5 pl-5 text-muted-foreground">
+                    {factPattern.bullets.map((b, i) => <li key={i}>{b}</li>)}
+                  </ul>
+                )}
+                {!hasFacts && <p className="text-muted-foreground">Your coach will set the scene as you begin.</p>}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Main Dialogue Area */}
       <main className="flex-1 overflow-y-auto px-4 py-8 flex justify-center">
         <div className="w-full max-w-3xl space-y-6">
-          {/* Initial Module Context if any */}
-          {moduleData?.description && localTurns.length === 0 && (
-            <div className="text-center space-y-4 py-12">
-              <h2 className="text-2xl font-serif font-bold">{moduleData.title}</h2>
-              <p className="text-muted-foreground max-w-xl mx-auto">{moduleData.description}</p>
-            </div>
-          )}
-
           <AnimatePresence initial={false}>
             {localTurns.map((turn, idx) => (
               <motion.div
