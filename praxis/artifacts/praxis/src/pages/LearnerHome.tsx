@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { courseAccent } from "@/lib/courseColor";
+import { StatCard, SectionTitle } from "@/components/StatCard";
 
 /**
  * Learner hub.
@@ -134,41 +135,6 @@ function timeAgo(iso: string): string {
   if (s < 3600) return `${Math.max(1, Math.floor(s / 60))}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
-}
-
-/* ── small pieces ── */
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  tint,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: React.ReactNode;
-  tint: string;
-}) {
-  return (
-    <Card className="p-4 flex items-center gap-3.5">
-      <div className={cn("h-11 w-11 shrink-0 rounded-xl flex items-center justify-center", tint)}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <div className="min-w-0">
-        <div className="text-2xl font-bold tracking-tight leading-none">{value}</div>
-        <div className="text-xs text-muted-foreground mt-1 truncate">{label}</div>
-      </div>
-    </Card>
-  );
-}
-
-function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-lg font-serif font-semibold tracking-tight">{children}</h2>
-      {action}
-    </div>
-  );
 }
 
 /* ── page ── */

@@ -12,6 +12,7 @@ import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/SessionContext";
 import { ActivityPlayer } from "@/components/ActivityPlayer";
+import { PageHeader } from "@/components/PageHeader";
 import { ActivityAssignDialog } from "@/components/ActivityAssignDialog";
 import { ActivityBuilder } from "@/components/ActivityBuilder";
 import { AddToGradebookDialog } from "@/components/AddToGradebookDialog";
@@ -415,10 +416,7 @@ function LearnerActivities() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div>
-        <h1 className="text-3xl font-serif font-bold tracking-tight">Activities</h1>
-        <p className="text-muted-foreground">Interactive activities assigned to you.</p>
-      </div>
+      <PageHeader title="Activities" icon={Sparkles} subtitle="Interactive activities assigned to you." />
       {isLoading ? <Skeletons /> : rows.length === 0 ? (
         <Card className="p-10 text-center text-muted-foreground">Nothing assigned yet. Check back soon.</Card>
       ) : (
