@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { gradebookApi, type GradebookColumn, type MeGradebook } from "@/lib/gradebookApi";
 import { apiFetch } from "@/lib/api";
 import { CoachThread } from "@/components/CoachThread";
+import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -67,10 +68,8 @@ export function MyGrades() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">My grades &amp; progress</h1>
-        <p className="text-sm text-muted-foreground">Your mastery across every assignment, case and activity — and a plan when you need one.</p>
-      </div>
+      <PageHeader title="My grades & progress" icon={TrendingUp} subtitle="Your mastery across every assignment, case and activity — and a plan when you need one." />
+
 
       <div className="flex flex-wrap gap-2">
         {courses.map((c) => (

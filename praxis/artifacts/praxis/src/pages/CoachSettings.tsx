@@ -10,6 +10,8 @@ import {
   type CoachPersonality,
 } from "@/lib/coachApi";
 import { Switch } from "@/components/ui/switch";
+import { PageHeader } from "@/components/PageHeader";
+import { Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Check, MessageCircle, Sparkles } from "lucide-react";
@@ -45,12 +47,7 @@ export function CoachSettings() {
 
   return (
     <div className="space-y-8 max-w-3xl">
-      <div>
-        <h1 className="text-3xl font-serif font-bold tracking-tight">Your coach</h1>
-        <p className="text-muted-foreground mt-1">
-          Shape how your coach questions you. Changes apply to your next exchange, here and on WhatsApp.
-        </p>
-      </div>
+      <PageHeader title="Your coach" icon={Sparkles} subtitle="Shape how your coach questions you. Changes apply to your next exchange, here and on WhatsApp." />
 
       {/* Personality */}
       <section className="space-y-3">

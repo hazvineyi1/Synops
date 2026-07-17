@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { CalendarDays, Clock, MapPin } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 
 type Row = {
   id: string;
@@ -40,10 +41,11 @@ export function MyAttendance() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-4xl font-serif font-bold tracking-tight">My sessions</h1>
-        <p className="text-muted-foreground">Your in-person, virtual and mentoring sessions{totalHours > 0 ? ` — ${totalHours} coaching hours so far` : ''}.</p>
-      </div>
+      <PageHeader
+        title="My sessions"
+        icon={CalendarDays}
+        subtitle={`Your in-person, virtual and mentoring sessions${totalHours > 0 ? ` — ${totalHours} coaching hours so far` : ''}.`}
+      />
 
       {isLoading ? (
         <div className="space-y-3 animate-pulse">{[1, 2, 3].map((i) => <div key={i} className="h-20 bg-muted rounded-xl" />)}</div>

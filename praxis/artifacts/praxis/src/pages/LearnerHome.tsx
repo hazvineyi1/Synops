@@ -13,6 +13,8 @@ import {
   Sparkles,
   CheckCircle2,
   RotateCcw,
+  LifeBuoy,
+  MessageSquare,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -92,6 +94,12 @@ interface MasteryConcept {
   mastery: number;
   reps: number;
   due: boolean;
+}
+interface MyIntervention {
+  alertId: string;
+  courseId: string;
+  courseTitle: string;
+  status: "off_track" | "at_risk";
 }
 
 /* ── helpers ── */
@@ -195,6 +203,10 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
     queryKey: ["learn", "mastery"],
     queryFn: () => apiFetch<MasteryConcept[]>("/learn/mastery"),
   });
+  const { data: interventions } = useQuery({
+    queryKey: ["my-interventions"],
+    queryFn: () => apiFetch<MyIntervention[]>("/my/interventions"),
+  });
 
   const startSession = useMutation({
     mutationFn: (moduleId: string) =>
@@ -217,6 +229,9 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
     (mastery ?? []).filter((m) => m.due && m.reps > 0 && m.mastery < 0.8).sort((a, b) => a.mastery - b.mastery)[0] ??
     (mastery ?? []).filter((m) => m.due && m.reps > 0)[0];
 
+  const flagged = interventions ?? [];
+  const offTrack = flagged.some((i) => i.status === "off_track");
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Greeting */}
@@ -230,6 +245,37 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
             : "Ready when you are. Explore your courses to get started."}
         </p>
       </div>
+
+      {/* Needs your attention — a flagged learner sees their off-track status + a route to the
+          plan and their coach, front and centre, before anything else. */}
+      {flagged.length > 0 && (
+        <Card className={cn("p-4 sm:p-5", offTrack ? "border-red-200 bg-red-50/70 dark:bg-red-950/20" : "border-amber-200 bg-amber-50/70 dark:bg-amber-950/20")}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className={cn("h-11 w-11 shrink-0 rounded-xl flex items-center justify-center", offTrack ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600")}>
+              <LifeBuoy className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">
+                {offTrack ? "Let's get you back on track" : "A little push will keep you on track"}
+                {" in "}
+                {flagged[0].courseTitle}
+                {flagged.length > 1 ? ` +${flagged.length - 1} more` : ""}
+              </p>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Your coach has built a plan to help — work through it, and message your coach any time.
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button onClick={() => navigate("/grades")}>
+                View my plan <ArrowRight className="h-4 w-4 ml-1.5" />
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/grades")}>
+                <MessageSquare className="h-4 w-4 mr-1.5" /> Coach
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Gamification / at-a-glance strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -3,6 +3,7 @@ import { useListCredentials, useGetBrandTheme } from '@workspace/api-client-reac
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, Calendar, Clock, Copy, ExternalLink, Award, Download } from 'lucide-react';
+import { PageHeader } from '@/components/PageHeader';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,10 +32,7 @@ export function Credentials() {
 
   return (
     <div className="space-y-8 animate-in fade-in">
-      <div className="flex flex-col gap-2 mb-10">
-        <h1 className="text-4xl font-serif font-bold tracking-tight">My Credentials</h1>
-        <p className="text-muted-foreground">Digital proof of your mastered competencies.</p>
-      </div>
+      <PageHeader title="My Credentials" icon={Award} subtitle="Digital proof of your mastered competencies." />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {credentials?.map(cred => {

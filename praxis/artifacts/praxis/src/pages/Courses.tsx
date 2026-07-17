@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { courseAccent } from "@/lib/courseColor";
+import { PageHeader } from "@/components/PageHeader";
 
 /**
  * My Courses.
@@ -49,16 +50,11 @@ export function Courses() {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-3xl font-serif font-bold tracking-tight">
-          {hasEnrolled ? "My Courses" : "Course Catalog"}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {hasEnrolled
-            ? "Pick up a course in progress, or explore something new."
-            : "Browse available programs and begin your mastery journey."}
-        </p>
-      </div>
+      <PageHeader
+        title={hasEnrolled ? "My Courses" : "Course Catalog"}
+        icon={BookOpen}
+        subtitle={hasEnrolled ? "Pick up a course in progress, or explore something new." : "Browse available programs and begin your mastery journey."}
+      />
 
       {/* Enrolled */}
       {hasEnrolled && (
