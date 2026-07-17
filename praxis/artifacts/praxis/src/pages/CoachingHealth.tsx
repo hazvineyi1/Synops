@@ -1,10 +1,11 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { Activity, AlertTriangle, LifeBuoy, CheckCircle2, Users, UserCog, ArrowRight } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Activity, AlertTriangle, LifeBuoy, CheckCircle2, Users, UserCog, ArrowRight, Mail, Loader2 } from 'lucide-react';
 
 interface CoachRow { coachId: string; name: string; sectionsLed: number; learners: number; flagged: number; resolved: number }
 interface Health {
@@ -13,13 +14,28 @@ interface Health {
 }
 
 export function CoachingHealth() {
+  const { toast } = useToast();
   const { data, isLoading } = useQuery<Health>({ queryKey: ['coaching-health'], queryFn: () => apiFetch<Health>('/coaching/health') });
+  const digest = useMutation({
+    mutationFn: () => apiFetch<{ sent: boolean; configured: boolean; to?: string; message?: string }>('/coaching/health/digest', { method: 'POST', body: '{}' }),
+    onSuccess: (r) => {
+      if (!r.configured) toast({ title: 'Email not configured', description: r.message ?? 'Set up email delivery to send digests.', variant: 'destructive' });
+      else if (r.sent) toast({ title: 'Digest sent', description: `Emailed to ${r.to}.` });
+      else toast({ title: 'Could not send', variant: 'destructive' });
+    },
+    onError: () => toast({ title: 'Could not send the digest', variant: 'destructive' }),
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-serif font-bold tracking-tight flex items-center gap-3"><Activity className="h-8 w-8 text-primary" /> Coaching health</h1>
-        <p className="text-muted-foreground">How your coaches are keeping learners on track — who's flagged, who's slipping through, and how quickly interventions get resolved.</p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-4xl font-serif font-bold tracking-tight flex items-center gap-3"><Activity className="h-8 w-8 text-primary" /> Coaching health</h1>
+          <p className="text-muted-foreground">How your coaches are keeping learners on track — who's flagged, who's slipping through, and how quickly interventions get resolved.</p>
+        </div>
+        <Button variant="outline" className="shrink-0" disabled={digest.isPending} onClick={() => digest.mutate()}>
+          {digest.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />} Email me this summary
+        </Button>
       </div>
 
       {isLoading || !data ? (

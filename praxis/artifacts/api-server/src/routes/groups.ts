@@ -11,7 +11,12 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, or, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { canAdministerOrg, canAccessCourse, isSuperAdmin, type ScopedUser } from "../lib/roles";
+import { canAdministerOrg, canAccessCourse, type ScopedUser } from "../lib/roles";
+import { computeCoachingHealth, type CoachingHealth } from "../lib/coachingHealth";
+import { mailerConfigured, sendMail, appUrl, emailShell, type EmailBrand } from "../lib/mailer";
+import { resolveEmailBrand } from "../lib/emailBrand";
+
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const router = Router();
 
@@ -139,99 +144,56 @@ async function canManageCourseSections(user: ScopedUser, courseId: string): Prom
   return canAccessCourse(user, course);
 }
 
-// GET /coaching/health — org/partner-wide coaching effectiveness for facilitators: how many
-// learners are flagged, how many are slipping through unassigned, per-coach load, and resolution
-// rate. The management layer over the matching + intervention flow.
+// GET /coaching/health — org/partner-wide coaching effectiveness (facilitator-scoped). The
+// management layer over the matching + intervention flow. Aggregation lives in lib/coachingHealth
+// so the dashboard and the digest email share one source of truth.
 router.get("/coaching/health", requireAuth, async (req, res) => {
   const user = req.dbUser as ScopedUser & { id: string; organisationId?: string | null; partnerId?: string | null };
   if (!canAdministerOrg(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  res.json(await computeCoachingHealth(user));
+});
 
-  // Resolve the tenant's courses (super = all; partner_admin = partner + its orgs; org_admin = org).
-  let courseRows: Array<{ id: string; title: string }>;
-  if (isSuperAdmin(user.role)) {
-    courseRows = await db.select({ id: coursesTable.id, title: coursesTable.title }).from(coursesTable);
-  } else {
-    const tenantIds = new Set<string>();
-    if (user.role === "partner_admin" && user.partnerId) {
-      tenantIds.add(user.partnerId);
-      const orgs = await db.select({ id: organisationsTable.id }).from(organisationsTable).where(eq(organisationsTable.partnerId, user.partnerId));
-      orgs.forEach((o) => tenantIds.add(o.id));
-    } else if (user.organisationId) {
-      tenantIds.add(user.organisationId);
-    } else if (user.partnerId) {
-      tenantIds.add(user.partnerId);
-    }
-    courseRows = tenantIds.size
-      ? await db.select({ id: coursesTable.id, title: coursesTable.title }).from(coursesTable).where(inArray(coursesTable.tenantId, [...tenantIds]))
-      : [];
-  }
-  const courseIds = courseRows.map((c) => c.id);
-  const empty = { summary: { flaggedLearners: 0, offTrack: 0, atRisk: 0, unassignedFlagged: 0, activeInterventions: 0, resolvedTotal: 0, resolutionRate: null as number | null, coaches: 0, courses: 0 }, coaches: [] as unknown[] };
-  if (!courseIds.length) { res.json(empty); return; }
+/** Compose the branded coaching-health digest email. */
+function healthDigestHtml(health: CoachingHealth, brand: EmailBrand, appLink: string): string {
+  const s = health.summary;
+  const rate = s.resolutionRate == null ? "-" : `${s.resolutionRate}%`;
+  const stat = (n: number | string, label: string, color?: string) =>
+    `<td style="padding:0 18px 0 0"><div style="font-size:22px;font-weight:800${color ? `;color:${color}` : ""}">${n}</div><div style="font-size:11px;color:#8a9995;text-transform:uppercase;letter-spacing:1px">${label}</div></td>`;
+  const topCoaches = health.coaches.filter((c) => c.flagged > 0).slice(0, 5);
+  const rows = topCoaches
+    .map((c) => `<tr><td style="padding:4px 0">${escapeHtml(c.name)}</td><td style="padding:4px 0;text-align:right;color:#b91c1c;font-weight:600">${c.flagged} flagged</td><td style="padding:4px 0;text-align:right;color:#4b5b57">${c.learners} learners</td></tr>`)
+    .join("");
+  const body =
+    `<p>Here's your current coaching snapshot.</p>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 14px"><tr>` +
+    stat(s.flaggedLearners, "Flagged") +
+    stat(s.unassignedFlagged, "Unassigned", "#b91c1c") +
+    stat(rate, "Resolved") +
+    `</tr></table>` +
+    (s.unassignedFlagged > 0
+      ? `<p style="color:#b91c1c"><strong>${s.unassignedFlagged}</strong> flagged learner${s.unassignedFlagged === 1 ? " is" : "s are"} slipping through with no coach assigned — match them so someone owns the intervention.</p>`
+      : `<p>Every flagged learner has a coach assigned.</p>`) +
+    (rows ? `<p style="margin-top:12px;font-weight:600">Coaches with flagged learners</p><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;font-size:14px">${rows}</table>` : "");
+  return emailShell({ brand, heading: "Coaching health", bodyHtml: body, ctaLabel: "Open coaching health", ctaUrl: appLink });
+}
 
-  // Sections + members → who coaches whom.
-  const groups = await db.select().from(courseGroupsTable).where(inArray(courseGroupsTable.courseId, courseIds));
-  const groupIds = groups.map((g) => g.id);
-  const groupCourse = new Map(groups.map((g) => [g.id, g.courseId]));
-  const memberRows = groupIds.length ? await db.select().from(courseGroupMembersTable).where(inArray(courseGroupMembersTable.groupId, groupIds)) : [];
-  const groupLeader = new Map<string, string>();
-  const coachSections = new Map<string, number>();
-  for (const m of memberRows) if (m.role === "leader") { groupLeader.set(m.groupId, m.userId); coachSections.set(m.userId, (coachSections.get(m.userId) ?? 0) + 1); }
-  const leaderOf = new Map<string, string>(); // `${courseId}:${learnerId}` -> coachId
-  const coachLearners = new Map<string, Set<string>>();
-  for (const m of memberRows) if (m.role === "member") {
-    const leader = groupLeader.get(m.groupId);
-    if (!leader) continue;
-    leaderOf.set(`${groupCourse.get(m.groupId)}:${m.userId}`, leader);
-    const set = coachLearners.get(leader) ?? new Set<string>();
-    set.add(m.userId);
-    coachLearners.set(leader, set);
-  }
-
-  // Alerts across the tenant's courses.
-  const alerts = await db
-    .select({ userId: gradebookAlertsTable.userId, courseId: gradebookAlertsTable.courseId, status: gradebookAlertsTable.status, resolvedAt: gradebookAlertsTable.resolvedAt })
-    .from(gradebookAlertsTable)
-    .where(inArray(gradebookAlertsTable.courseId, courseIds));
-
-  let offTrack = 0, atRisk = 0, resolvedTotal = 0, unassignedFlagged = 0;
-  const flaggedLearners = new Set<string>();
-  const coachFlagged = new Map<string, number>();
-  const coachResolved = new Map<string, number>();
-  for (const a of alerts) {
-    const leader = leaderOf.get(`${a.courseId}:${a.userId}`);
-    if (a.resolvedAt) {
-      resolvedTotal++;
-      if (leader) coachResolved.set(leader, (coachResolved.get(leader) ?? 0) + 1);
-      continue;
-    }
-    if (a.status === "off_track" || a.status === "at_risk") {
-      if (a.status === "off_track") offTrack++; else atRisk++;
-      flaggedLearners.add(a.userId);
-      if (leader) coachFlagged.set(leader, (coachFlagged.get(leader) ?? 0) + 1);
-      else unassignedFlagged++;
-    }
-  }
-  const activeInterventions = offTrack + atRisk;
-  const resolutionRate = resolvedTotal + activeInterventions > 0 ? Math.round((resolvedTotal / (resolvedTotal + activeInterventions)) * 100) : null;
-
-  const coachIds = [...coachSections.keys()];
-  const coachUsers = coachIds.length ? await db.select().from(usersTable).where(inArray(usersTable.id, coachIds)) : [];
-  const coaches = coachUsers
-    .map((c) => ({
-      coachId: c.id,
-      name: fullName(c),
-      sectionsLed: coachSections.get(c.id) ?? 0,
-      learners: coachLearners.get(c.id)?.size ?? 0,
-      flagged: coachFlagged.get(c.id) ?? 0,
-      resolved: coachResolved.get(c.id) ?? 0,
-    }))
-    .sort((a, b) => b.flagged - a.flagged || b.learners - a.learners);
-
-  res.json({
-    summary: { flaggedLearners: flaggedLearners.size, offTrack, atRisk, unassignedFlagged, activeInterventions, resolvedTotal, resolutionRate, coaches: coaches.length, courses: courseIds.length },
-    coaches,
+// POST /coaching/health/digest — email the caller (an admin) the current coaching snapshot. This is
+// the on-demand path; a scheduled weekly send is a Railway cron hitting this endpoint.
+router.post("/coaching/health/digest", requireAuth, async (req, res) => {
+  const user = req.dbUser as ScopedUser & { id: string; email?: string; organisationId?: string | null; partnerId?: string | null };
+  if (!canAdministerOrg(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!mailerConfigured()) { res.json({ configured: false, sent: false, message: "Set RESEND_API_KEY + EMAIL_FROM to enable email." }); return; }
+  const to = (typeof req.body?.to === "string" && req.body.to.trim()) || user.email;
+  if (!to) { res.status(400).json({ error: "No recipient email on your account." }); return; }
+  const health = await computeCoachingHealth(user);
+  const brand = await resolveEmailBrand(user.partnerId ?? null);
+  const r = await sendMail({
+    to,
+    fromName: brand.senderName ?? brand.displayName,
+    subject: `Coaching health - ${health.summary.flaggedLearners} flagged, ${health.summary.unassignedFlagged} unassigned`,
+    html: healthDigestHtml(health, brand, appUrl("/coaching/health")),
   });
+  res.json({ configured: true, sent: r.ok, to, error: r.error });
 });
 
 // GET /courses/:courseId/groups
