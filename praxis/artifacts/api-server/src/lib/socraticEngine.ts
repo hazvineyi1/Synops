@@ -348,14 +348,15 @@ export interface AnswerOptions {
  */
 export async function generateAnswerOptions(question: string, ctx: SocraticContext): Promise<AnswerOptions> {
   const concept = ctx.beatTitle ?? ctx.moduleTitle ?? "this concept";
-  const system = `You turn a coaching question into answer choices a learner can select.
+  const system = `You turn a coaching question into answer choices a learner can select instead of typing.
 Concept: "${concept}".${ctx.narration ? " Context: " + ctx.narration : ""}
 Return ONLY JSON: {"mode": "single" | "multi" | "free", "options": [string, ...]}.
 Rules:
-- PREFER giving options. Most questions should be "single" (choose the best one) or "multi" (pick all that apply, when several answers are each valid).
-- Use "free" ONLY when the question truly needs the learner's own words: it asks them to explain in their own words, give a personal example, summarise, or reflect. Then return an empty options array.
-- For single or multi, give 4 or 5 SHORT options, a handful of words each. Include a mix: one or two strong directions and some weaker or common-misconception choices, so the pick is meaningful.
-- Plain text only. No letter or number prefixes, no markdown, no asterisks, no em or en dashes. Workplace-authentic South African English.`;
+- DEFAULT TO OPTIONS. The learner should mostly pick, not type. Aim to give options for roughly four out of every five questions.
+- Even for open "how / why / what would you" reasoning questions, write 4 to 5 candidate answers, explanations or stances the learner can choose between. Include one or two strong directions and some weaker or common-misconception choices so the pick is meaningful.
+- Use "single" when one answer is best; use "multi" (pick all that apply) when several answers are each valid at once.
+- Use "free" ONLY when the question is a genuinely personal reflection or example unique to this learner (for example "tell me about a time you..."), or when you honestly cannot write at least 4 distinct plausible choices. Then return an empty options array. Do NOT choose free just because the question is open ended.
+- Options are SHORT, a handful of words each. Plain text only: no letter or number prefixes, no markdown, no asterisks, no em or en dashes. Workplace-authentic South African English.`;
   const fallback: AnswerOptions = { mode: "free", options: [] };
   try {
     const msg = await anthropic.messages.create({
