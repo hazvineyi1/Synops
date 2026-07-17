@@ -5,6 +5,8 @@ import { apiFetch } from "@/lib/api";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { useCoachProfile, useUpdateCoachProfile, useWhatsappStatus } from "@/lib/coachApi";
 import { cn } from "@/lib/utils";
 import {
   LifeBuoy, BookOpen, MessageSquare, TrendingUp, ArrowRight, ArrowLeft,
@@ -80,6 +82,9 @@ export function CoachHub() {
   const progress = useQuery({ queryKey: ["coach", "progress"], queryFn: () => apiFetch<Progress>("/learn/coach/progress") });
   const game = useQuery({ queryKey: ["coach", "game"], queryFn: () => apiFetch<Gamification>("/learn/coach/gamification") });
   const materials = useQuery({ queryKey: ["coach", "materials"], queryFn: () => apiFetch<{ materials: UploadMaterial[] }>("/learn/coach/materials/list") });
+  const coachProfile = useCoachProfile();
+  const updateProfile = useUpdateCoachProfile();
+  const waStatus = useWhatsappStatus();
 
   const startSession = useMutation({
     mutationFn: (v: { moduleId: string; remedialFocus?: string | null }) =>
@@ -238,6 +243,28 @@ export function CoachHub() {
           </div>
         )}
       </section>
+
+      {/* Coach on WhatsApp — opt in/out right here, no separate settings page. */}
+      {coachProfile.data && (
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/60 p-4 dark:bg-emerald-950/15">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600"><MessageSquare className="h-5 w-5" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-foreground">Coach on WhatsApp</p>
+            <p className="text-sm text-muted-foreground">
+              {coachProfile.data.whatsappOptIn
+                ? (waStatus.data?.configured
+                    ? "You're opted in. Your coach can reach you on WhatsApp with questions and nudges."
+                    : "You're opted in. WhatsApp activates once it's connected for your organisation.")
+                : "Answer your coach's questions and get nudges right in WhatsApp."}
+            </p>
+          </div>
+          <Switch
+            checked={coachProfile.data.whatsappOptIn}
+            disabled={updateProfile.isPending}
+            onCheckedChange={(v) => updateProfile.mutate({ whatsappOptIn: v })}
+          />
+        </div>
+      )}
 
       {/* The chosen section renders here — no separate tab bar, the cards above are the nav */}
       {section && (
