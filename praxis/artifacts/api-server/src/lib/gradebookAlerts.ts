@@ -15,6 +15,7 @@ import { recomputeLearnerAlert, REASON_LABEL, type AlertTransition } from "./gra
 import { generateStudyPlan } from "./studyPlanEngine";
 import { mailerConfigured, sendMail, appUrl, emailShell } from "./mailer";
 import { resolveEmailBrand } from "./emailBrand";
+import { coachPushConfigured, pushCatchUpToCoach } from "./coachPush";
 
 /**
  * Off-track orchestration: recompute a learner's alert after a grade event and, when they
@@ -115,6 +116,25 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
       .set({ notifiedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)))
       .catch(() => undefined);
+  }
+
+  // Push the off-track learner into The Coach (the standalone AI study-coach app) so it provisions
+  // them and sets up a ready-to-use catch-up plan they can open in the coach conversation. The gap
+  // is the weak categories (or the off-track reasons); the content is the remedial plan's steps.
+  // Best-effort, fire-and-forget; a safe no-op until COACH_API_URL + COACH_API_KEY are configured.
+  if (plan && learner?.email && coachPushConfigured()) {
+    const gapCats = [...new Set((plan.items.map((i) => i.category).filter(Boolean)) as string[])];
+    const gap = gapCats.length
+      ? `${courseTitle}: ${gapCats.join(", ")}`
+      : `${courseTitle}${reasonsText ? ` (${reasonsText.toLowerCase()})` : ""}`;
+    void pushCatchUpToCoach({
+      learnerEmail: learner.email,
+      learnerName: [learner.firstName, learner.lastName].filter(Boolean).join(" ") || null,
+      examName: courseTitle,
+      gap,
+      planRationale: plan.rationale,
+      content: plan.items.map((i) => ({ title: i.title, body: i.why })).filter((c) => c.title && c.body),
+    });
   }
 
   const learnerName = [learner?.firstName, learner?.lastName].filter(Boolean).join(" ") || "A learner";
