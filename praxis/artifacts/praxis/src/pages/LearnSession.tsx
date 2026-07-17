@@ -139,6 +139,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // Selectable answer options: what the learner has picked, and whether they chose to type instead.
   const [selected, setSelected] = useState<string[]>([]);
   const [typeOwn, setTypeOwn] = useState(false);
+  // True briefly when the learner tries to send while the coach is still replying, so we can flag
+  // it (shake + notice) instead of silently dropping the message.
+  const [sendBlocked, setSendBlocked] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Local state for turns to optimistically append user message and streaming tutor message
@@ -196,7 +199,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   const lastTurn = localTurns[localTurns.length - 1];
   const activeOptions: string[] = (lastTurn && lastTurn.role === 'tutor' && Array.isArray(lastTurn.options)) ? lastTurn.options : [];
   const activeMode: string = (lastTurn && lastTurn.role === 'tutor' && lastTurn.selectMode) ? lastTurn.selectMode : 'free';
-  const showOptions = !isStreaming && !isMastered && activeOptions.length >= 2 && activeMode !== 'free' && !typeOwn;
+  // Only show options when the learner has NOT started typing, so switching modes never hides (and
+  // loses) text they were partway through writing.
+  const showOptions = !isStreaming && !isMastered && activeOptions.length >= 2 && activeMode !== 'free' && !typeOwn && !inputValue.trim();
 
   function toggleSelect(opt: string) {
     if (activeMode === 'multi') {
@@ -215,9 +220,16 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
   const handleSend = async (explicit?: string) => {
     const userMessage = (explicit ?? inputValue).trim();
-    if (!userMessage || isStreaming) return;
+    if (!userMessage) return;
+    // Coach still replying: keep the learner's text and flag it, never drop it silently.
+    if (isStreaming) {
+      setSendBlocked(true);
+      setTimeout(() => setSendBlocked(false), 2500);
+      return;
+    }
 
     if (explicit === undefined) setInputValue('');
+    setSendBlocked(false);
     setIsStreaming(true);
     setStreamingText('');
     setShowScaffold(false);
@@ -552,14 +564,21 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             </div>
           ) : (
             <div>
-              <div className="relative">
+              <motion.div
+                className="relative"
+                animate={sendBlocked ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
+                transition={{ duration: 0.4 }}
+              >
                 <textarea
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={isMastered ? "Session completed." : "Type your response..."}
-                  disabled={isStreaming || isMastered}
-                  className="w-full resize-none rounded-xl border border-input bg-card px-4 py-4 pr-14 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[60px] max-h-[200px]"
+                  placeholder={isMastered ? "Session completed." : isStreaming ? "Your coach is replying, keep typing if you like…" : "Type your response..."}
+                  disabled={isMastered}
+                  className={cn(
+                    "w-full resize-none rounded-xl border bg-card px-4 py-4 pr-14 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[60px] max-h-[200px]",
+                    sendBlocked ? "border-amber-400" : "border-input"
+                  )}
                   rows={1}
                   style={{ height: 'auto' }}
                 />
@@ -568,15 +587,23 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                   className="absolute right-2 top-[50%] -translate-y-[50%] h-10 w-10 rounded-lg"
                   disabled={!inputValue.trim() || isStreaming || isMastered}
                   onClick={() => handleSend()}
+                  title={isStreaming ? "Your coach is still replying" : "Send"}
                 >
-                  <Send className="h-4 w-4" />
+                  {isStreaming ? <span className="h-2 w-2 rounded-full bg-current animate-pulse" /> : <Send className="h-4 w-4" />}
                 </Button>
+              </motion.div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                {typeOwn && activeOptions.length >= 2 && activeMode !== 'free' && !isMastered ? (
+                  <button onClick={() => { setTypeOwn(false); setInputValue(''); }} className="text-xs font-medium text-primary hover:underline">
+                    Back to answer choices
+                  </button>
+                ) : <span />}
+                {sendBlocked ? (
+                  <span className="text-xs font-medium text-amber-600">Your coach is still replying. Your message is kept, send it in a moment.</span>
+                ) : isStreaming ? (
+                  <span className="text-xs text-muted-foreground">Your coach is replying…</span>
+                ) : <span />}
               </div>
-              {typeOwn && activeOptions.length >= 2 && activeMode !== 'free' && !isMastered && (
-                <button onClick={() => { setTypeOwn(false); setInputValue(''); }} className="mt-2 text-xs font-medium text-primary hover:underline">
-                  Back to answer choices
-                </button>
-              )}
             </div>
           )}
         </div>

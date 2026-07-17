@@ -221,23 +221,40 @@ export interface CheckpointGrade {
  * checkpoint). This replaces the old response-length heuristic and drives
  * both SM-2 scheduling and PraxisMark issuance.
  */
+// A refusal, give-up, or empty non-answer demonstrates no reasoning and must never earn credit,
+// regardless of how many words it uses. Deterministic so it can't be graded leniently by the AI.
+function isDisengaged(resp: string): boolean {
+  const t = (resp || "").trim().toLowerCase();
+  if (!t) return true;
+  const words = t.replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  if (words.length <= 2 && /^(ok|okay|yes|no|sure|maybe|fine|k|idk|dunno|dk|nope|yeah|nah|meh|whatever)$/.test(words.join(" "))) return true;
+  if (/\b(i\s*give\s*up|give\s*up|i\s*quit|want\s*to\s*quit|gonna\s*quit|not\s*good\s*at\s*this|can'?t\s*do\s*this|i\s*don'?t\s*want\s*to|no\s*idea|i\s*don'?t\s*know)\b/.test(t) && words.length < 16) return true;
+  return false;
+}
+
 export async function gradeCheckpoint(
   ctx: SocraticContext,
   learnerResponse: string,
   recentHistory: { role: string; content: string }[]
 ): Promise<CheckpointGrade> {
+  // Refusals / give-ups / empty non-answers are grade 0 up front, so they never raise mastery.
+  if (isDisengaged(learnerResponse)) {
+    return { grade: 0, reasoning: "Disengaged or gave up; no reasoning demonstrated." };
+  }
+
   const transcript = recentHistory
     .map((t) => `${t.role === "tutor" ? "COACH" : "LEARNER"}: ${t.content}`)
     .join("\n");
 
   const system = `You are a strict but fair assessor of demonstrated understanding on the concept "${ctx.beatTitle ?? ctx.moduleTitle ?? "this concept"}".
-Grade ONLY the learner's demonstrated reasoning, not their writing length or confidence.
+Grade ONLY the learner's demonstrated reasoning, not their writing length, politeness or confidence.
 Return a single JSON object: {"grade": 0|1|2|3, "reasoning": "one short sentence"}.
 Rubric:
-0 = no understanding, off-topic, disengaged ("idk", "ok"), or a guess with no reasoning.
+0 = no understanding, off-topic, disengaged or refusing ("idk", "ok", "I give up", "I quit", "I'm not good at this"), or a guess with no reasoning. Length does NOT rescue a non-answer.
 1 = a relevant idea but shaky, incomplete or partly wrong reasoning.
 2 = solid, correct reasoning that applies the concept, minor gaps allowed.
 3 = clear mastery: correct, applied to the situation, and able to justify why.
+Be strict: only give 2 or 3 when the learner has actually explained real reasoning about the concept.
 Source content for reference: ${ctx.narration ?? ""} ${ctx.scenario ?? ""}`.trim();
 
   try {
