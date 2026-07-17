@@ -247,7 +247,7 @@ export function CoachHub() {
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600"><MessageSquare className="h-5 w-5" /></span>
         <div className="min-w-0 flex-1">
           <p className="font-medium text-foreground">Prefer WhatsApp? Coach from your phone</p>
-          <p className="text-sm text-muted-foreground">Answer your coach's questions and get nudges right in WhatsApp. Switch it on in My Coach.</p>
+          <p className="text-sm text-muted-foreground">Answer your coach's questions and get nudges right in WhatsApp. Tap here to switch it on and tune your coach.</p>
         </div>
         <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600" />
       </button>

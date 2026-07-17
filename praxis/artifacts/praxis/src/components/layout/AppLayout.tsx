@@ -127,7 +127,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
           { label: t('nav.credentials'), href: '/credentials', icon: Award },
-          { label: t('nav.myCoach'), href: '/coach-settings', icon: Settings },
           { label: t('nav.help', 'Help'), href: '/support', icon: LifeBuoy },
         ],
       }];
