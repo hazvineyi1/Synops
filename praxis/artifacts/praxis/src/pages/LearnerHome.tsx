@@ -406,40 +406,35 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
 
         {/* Right column */}
         <div className="space-y-6">
-          {/* Coach next session — leads with catch-up when the learner is behind. */}
-          <Card className={cn("p-5", plan?.catchUp?.active ? "bg-gradient-to-br from-amber-500/10 to-transparent border-amber-300/50" : "bg-gradient-to-br from-primary/5 to-transparent border-primary/20")}>
-            <div className="flex items-center gap-2 mb-3">
-              {plan?.catchUp?.active ? <LifeBuoy className="h-4 w-4 text-amber-600" /> : <Sparkles className="h-4 w-4 text-primary" />}
-              <h2 className="font-serif font-semibold">{plan?.catchUp?.active ? "Catch up with your coach" : "Your coach"}</h2>
-            </div>
-            {nextUp ? (
-              <>
-                {plan?.catchUp?.active && nextUp.remedial ? (
-                  <p className="text-sm text-amber-700 dark:text-amber-400 mb-1 font-medium">Let's rebuild this together</p>
-                ) : (
+          {/* Coach next session for on-track learners. Off-track learners already get the attention
+              banner above (which opens the Coach hub), so we do not duplicate a catch-up card here. */}
+          {!plan?.catchUp?.active && (
+            <Card className="p-5 bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h2 className="font-serif font-semibold">Your coach</h2>
+              </div>
+              {nextUp ? (
+                <>
                   <p className="text-sm text-muted-foreground mb-1">Next in your path</p>
-                )}
-                <p className="font-medium leading-snug mb-1">{nextUp.moduleTitle}</p>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{nextUp.reason}</p>
-                <Button
-                  className="w-full"
-                  onClick={() => (plan?.catchUp?.active && nextUp.remedial ? startCatchUp(nextUp) : launchItem(nextUp))}
-                  disabled={startSession.isPending}
-                >
-                  {startSession.isPending ? "Starting…" : plan?.catchUp?.active && nextUp.remedial ? "Start catch-up" : "Start session"}
-                </Button>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Your coach builds a personalised path as you learn. Start a course to get going.
-                </p>
-                <Button variant="outline" className="w-full" onClick={() => navigate("/courses")}>
-                  Browse courses
-                </Button>
-              </>
-            )}
-          </Card>
+                  <p className="font-medium leading-snug mb-1">{nextUp.moduleTitle}</p>
+                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{nextUp.reason}</p>
+                  <Button className="w-full" onClick={() => launchItem(nextUp)} disabled={startSession.isPending}>
+                    {startSession.isPending ? "Starting…" : "Start session"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Your coach builds a personalised path as you learn. Start a course to get going.
+                  </p>
+                  <Button variant="outline" className="w-full" onClick={() => navigate("/courses")}>
+                    Browse courses
+                  </Button>
+                </>
+              )}
+            </Card>
+          )}
 
           {/* What's new */}
           <Card className="p-5">
