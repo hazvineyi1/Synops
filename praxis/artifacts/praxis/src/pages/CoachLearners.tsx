@@ -64,7 +64,14 @@ export function CoachLearners() {
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium text-foreground">{learner.firstName} {learner.lastName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground">{learner.firstName} {learner.lastName}</p>
+                            {(() => {
+                              const st = (learner as any).status as string | undefined;
+                              if (!st || st === 'on_track') return null;
+                              return <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${st === 'off_track' ? 'text-red-700 bg-red-50 border-red-200' : 'text-amber-700 bg-amber-50 border-amber-200'}`}>{st === 'off_track' ? 'Off track' : 'At risk'}</span>;
+                            })()}
+                          </div>
                           <p className="text-xs text-muted-foreground">{learner.email}</p>
                         </div>
                       </div>

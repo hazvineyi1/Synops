@@ -16,7 +16,7 @@ import {
 import { eq, and, or, desc, sql, inArray, isNull } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { isSuperAdmin, canAdministerOrg, isCoFacilitator } from "../lib/roles";
-import { leaderCourseIds, coFacLeadsLearnerInCourse, canGradeInCourse, type StaffUser } from "../lib/scope";
+import { leaderCourseIds, coFacLeadsLearnerInCourse, canGradeInCourse, learnerIdsForCoFacilitator, type StaffUser } from "../lib/scope";
 import { REASON_LABEL } from "../lib/gradebookEngine";
 import { generateCoachAssist } from "../lib/coachAssist";
 import { mailerConfigured, sendMail, appUrl, emailShell } from "../lib/mailer";
@@ -263,61 +263,89 @@ router.post("/coach/interventions/:alertId/nudge", requireAuth, async (req, res)
   res.json({ sent: true, emailed });
 });
 
-// GET /coach/learners
+const OFFTRACK_RANK: Record<string, number> = { off_track: 0, at_risk: 1, on_track: 2 };
 
-// GET /coach/learners
+// GET /coach/learners — the caller's learners with a REAL readiness signal from the gradebook.
+// Scope: a coach sees only learners in the sections they lead; a facilitator sees their org/partner;
+// super_admin sees all. Status + top gaps come from unresolved gradebook alerts, not a session ratio.
 router.get("/coach/learners", requireAuth, async (req, res) => {
-  const user = req.dbUser!;
-  // Get learners in the same org (or partner if coach doesn't have org)
-  const learners = await db
-    .select()
-    .from(usersTable)
-    .where(
-      user.organisationId
-        ? and(eq(usersTable.organisationId, user.organisationId), eq(usersTable.role, "learner"))
-        : and(eq(usersTable.partnerId, user.partnerId!), eq(usersTable.role, "learner"))
-    );
+  const user = req.dbUser as StaffUser & { id: string; organisationId?: string | null; partnerId?: string | null };
+
+  let learners: Array<typeof usersTable.$inferSelect> = [];
+  if (isCoFacilitator(user.role)) {
+    const ids = await learnerIdsForCoFacilitator(user.id);
+    learners = ids.length ? await db.select().from(usersTable).where(inArray(usersTable.id, ids)) : [];
+  } else if (isSuperAdmin(user.role)) {
+    learners = await db.select().from(usersTable).where(eq(usersTable.role, "learner"));
+  } else if (canAdministerOrg(user.role)) {
+    learners = await db
+      .select()
+      .from(usersTable)
+      .where(
+        user.organisationId
+          ? and(eq(usersTable.organisationId, user.organisationId), eq(usersTable.role, "learner"))
+          : and(eq(usersTable.partnerId, user.partnerId!), eq(usersTable.role, "learner")),
+      );
+  } else {
+    res.json([]);
+    return;
+  }
+
+  const learnerIds = learners.map((l) => l.id);
+  // One query for all unresolved alerts across these learners.
+  const alerts = learnerIds.length
+    ? await db
+        .select({ userId: gradebookAlertsTable.userId, status: gradebookAlertsTable.status, reasons: gradebookAlertsTable.reasons, masteryPct: gradebookAlertsTable.masteryPct })
+        .from(gradebookAlertsTable)
+        .where(and(inArray(gradebookAlertsTable.userId, learnerIds), isNull(gradebookAlertsTable.resolvedAt)))
+    : [];
+  const alertsByUser = new Map<string, typeof alerts>();
+  for (const a of alerts) {
+    const arr = alertsByUser.get(a.userId) ?? [];
+    arr.push(a);
+    alertsByUser.set(a.userId, arr);
+  }
 
   const summaries = await Promise.all(
     learners.map(async (l) => {
-      const [activeSessionCount] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(sessionsTable)
-        .where(and(eq(sessionsTable.userId, l.id), eq(sessionsTable.status, "active")));
-      const [completedCount] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(sessionsTable)
-        .where(and(eq(sessionsTable.userId, l.id), eq(sessionsTable.status, "mastered")));
       const [credentialCount] = await db
         .select({ count: sql<number>`count(*)` })
         .from(credentialsTable)
         .where(eq(credentialsTable.userId, l.id));
       const lastSession = await db
-        .select()
+        .select({ createdAt: sessionsTable.createdAt })
         .from(sessionsTable)
         .where(eq(sessionsTable.userId, l.id))
         .orderBy(desc(sessionsTable.createdAt))
         .limit(1);
 
-      const completions = Number(completedCount.count);
-      const total = completions + Number(activeSessionCount.count);
-      const readinessScore = total > 0 ? completions / total : 0;
+      const mine = alertsByUser.get(l.id) ?? [];
+      // Worst current status across the learner's courses.
+      const status = mine.reduce<"off_track" | "at_risk" | "on_track">(
+        (worst, a) => (OFFTRACK_RANK[a.status] < OFFTRACK_RANK[worst] ? (a.status as any) : worst),
+        "on_track",
+      );
+      const topGaps = [...new Set(mine.flatMap((a) => (a.reasons || []).map((r) => REASON_LABEL[r as keyof typeof REASON_LABEL] || r)))];
+      // Readiness from mastery when we have it, else a neutral 1 for on-track learners.
+      const masteries = mine.map((a) => (a.masteryPct != null ? Number(a.masteryPct) / 100 : null)).filter((v): v is number => v != null);
+      const readinessScore = masteries.length ? Math.min(...masteries) : status === "on_track" ? 1 : 0.5;
 
       return {
         userId: l.id,
         email: l.email,
         firstName: l.firstName,
         lastName: l.lastName,
-        activeEnrolments: Number(activeSessionCount.count),
-        completions,
+        status,
+        flaggedCourses: mine.filter((a) => a.status !== "on_track").length,
         credentialsEarned: Number(credentialCount.count),
         lastActivityAt: lastSession[0]?.createdAt.toISOString() ?? null,
         readinessScore,
-        topGaps: [],
+        topGaps,
       };
-    })
+    }),
   );
 
+  summaries.sort((a, b) => OFFTRACK_RANK[a.status] - OFFTRACK_RANK[b.status] || a.readinessScore - b.readinessScore);
   res.json(summaries);
 });
 
