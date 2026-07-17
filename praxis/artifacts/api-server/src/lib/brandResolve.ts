@@ -62,10 +62,11 @@ export function normaliseHost(host?: string | null): string {
  */
 export async function resolvePublicBrandByHost(host?: string | null): Promise<PublicBrand> {
   const h = normaliseHost(host);
-  if (!h) return DEFAULT_PUBLIC_BRAND;
   try {
-    const t = await db.query.brandThemesTable.findFirst({ where: eq(brandThemesTable.customDomain, h) });
-    return toPublicBrand(t);
+    const t = h ? await db.query.brandThemesTable.findFirst({ where: eq(brandThemesTable.customDomain, h) }) : null;
+    // A custom-domain match wins; otherwise fall back to the platform theme (not the bare default),
+    // so the login page on the app's own domain still reflects the configured platform brand.
+    return t ? toPublicBrand(t) : await resolvePublicBrand(null);
   } catch {
     return DEFAULT_PUBLIC_BRAND;
   }
