@@ -268,7 +268,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
       {/* Guidance + context bar — sticky under the header so instructions and the fact pattern
           are reachable at all times. Each panel can be minimised or expanded during the session. */}
       {!isMastered && (
-        <div className="shrink-0 sticky top-14 z-10 border-b border-border bg-muted/40">
+        <div className="shrink-0 sticky top-14 z-10 border-b border-border bg-muted">
           <div className="mx-auto max-w-3xl px-4 py-2 flex flex-wrap items-center gap-2">
             {currentBeat?.title && (
               <span className="text-sm font-medium text-foreground truncate">{currentBeat.title}</span>
@@ -324,7 +324,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
           {/* Fact pattern — the situation/context, available throughout */}
           {showFacts && (
-            <div className="border-t border-border bg-amber-50/40 dark:bg-amber-950/10">
+            <div className="border-t border-border bg-amber-50 dark:bg-amber-950/30">
               <div className="mx-auto max-w-3xl px-4 py-3 text-sm">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Fact pattern: the context for this session</p>
                 {factPattern.focus && (
