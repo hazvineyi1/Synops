@@ -115,6 +115,7 @@ router.get("/learn/coach/overview", requireAuth, async (req, res) => {
 
   res.json({
     active: outPlans.length > 0,
+    learnerName: (req.dbUser as { firstName?: string } | undefined)?.firstName ?? null,
     plans: outPlans,
     materialCount,
     gapCount: gapSet.size,

@@ -40,7 +40,7 @@ interface RecentSession {
   remedialFocus: string | null; status: string; masteryScore: number | null; createdAt: string | null;
 }
 interface Overview {
-  active: boolean; plans: Plan[]; materialCount: number; gapCount: number; gaps: string[];
+  active: boolean; learnerName: string | null; plans: Plan[]; materialCount: number; gapCount: number; gaps: string[];
   recentSessions: RecentSession[];
 }
 interface MaterialDetail {
@@ -99,9 +99,9 @@ export function CoachHub() {
   const data = overview.data;
   if (!data?.active) {
     return (
-      <div className="space-y-5">
+      <div className="mx-auto max-w-3xl space-y-6">
         <PageHeader title="Coach" icon={LifeBuoy} subtitle="Your remedial coach — the materials, tutor and progress to bridge your gaps." />
-        <div className="rounded-xl border border-border bg-background p-10 text-center">
+        <div className="rounded-2xl border border-border bg-background p-10 text-center">
           <GraduationCap className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
           <h2 className="text-lg font-semibold text-foreground">You're on track — nothing to catch up on</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
@@ -116,56 +116,77 @@ export function CoachHub() {
   const primaryPlan = data.plans[0];
   if (practice) {
     return (
-      <div className="space-y-5">
-        <PageHeader title="Coach" icon={LifeBuoy} subtitle="Your remedial coach — practice built from your class to close the gap." />
+      <div className="mx-auto max-w-3xl space-y-6">
+        <PageHeader title="Coach" icon={LifeBuoy} subtitle="Practice built from your class to close the gap." />
         <CoachPractice planId={practice.planId} category={practice.category} onBack={() => { setPractice(null); game.refetch(); }} onNavigate={navigate} onGame={() => game.refetch()} />
       </div>
     );
   }
 
-  return (
-    <div className="space-y-5">
-      <PageHeader title="Coach" icon={LifeBuoy} subtitle="Your remedial coach — the materials, tutor and progress to bridge your gaps." />
+  const name = data.learnerName || "there";
+  const whyReferred = primaryPlan?.rationale
+    || `You've been finding ${data.gaps.join(", ") || "a few things"} tricky lately, so your coach has pulled together everything you need to catch up. Nothing here counts against you — it's just support to get you back on track.`;
 
-      {/* Gap summary + gamification + practice CTA */}
-      <div className="rounded-xl border border-amber-300/60 bg-gradient-to-br from-amber-500/10 to-transparent p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex min-w-0 flex-1 items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><Target className="h-5 w-5" /></div>
-            <div className="min-w-0">
-              <p className="font-semibold text-foreground">Let's bridge {data.gapCount === 1 ? "this gap" : `these ${data.gapCount} gaps`}</p>
-              <p className="text-sm text-muted-foreground">
-                {data.gaps.length ? <>Focusing on <span className="font-medium text-foreground">{data.gaps.join(", ")}</span>. </> : null}
-                {data.materialCount} {data.materialCount === 1 ? "material" : "materials"} in your plan.
-              </p>
-            </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <div className="flex items-center gap-3 rounded-lg bg-background/70 px-3 py-1.5 text-sm">
-              <span className="flex items-center gap-1 font-medium text-amber-600" title="Points earned"><Zap className="h-4 w-4" /> {game.data?.xp ?? 0}</span>
-              <span className="flex items-center gap-1 font-medium text-orange-600" title="Day streak"><Flame className="h-4 w-4" /> {game.data?.streak ?? 0}</span>
-            </div>
-            {primaryPlan && data.gaps[0] && (
-              <Button onClick={() => setPractice({ planId: primaryPlan.planId, category: data.gaps[0] })}>
-                <Dumbbell className="mr-1.5 h-4 w-4" /> Practice
-              </Button>
-            )}
-          </div>
+  return (
+    <div className="mx-auto max-w-4xl space-y-8">
+      {/* Welcome + why you're here */}
+      <section className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-transparent p-6 sm:p-8">
+        <div className="flex items-center gap-2 text-primary">
+          <LifeBuoy className="h-4 w-4" />
+          <span className="text-xs font-semibold uppercase tracking-wide">Your Coach</span>
+        </div>
+        <h1 className="mt-3 font-serif text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+          Welcome, {name}. Let's get you back on track.
+        </h1>
+        <div className="mt-5 rounded-xl border border-border bg-background/70 p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Why you're here</p>
+          <p className="mt-2 leading-relaxed text-foreground">{whyReferred}</p>
+        </div>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+          {primaryPlan && data.gaps[0] && (
+            <Button size="lg" onClick={() => setPractice({ planId: primaryPlan.planId, category: data.gaps[0] })}>
+              <Dumbbell className="mr-2 h-4 w-4" /> Start practising
+            </Button>
+          )}
+          <span className="text-sm text-muted-foreground">A session takes about 10 minutes, and your progress saves as you go.</span>
+        </div>
+      </section>
+
+      {/* At-a-glance stats */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard icon={Zap} tone="text-amber-600" label="Points earned" value={game.data?.xp ?? 0} />
+        <StatCard icon={Flame} tone="text-orange-600" label="Day streak" value={game.data?.streak ?? 0} />
+        <StatCard icon={BookOpen} tone="text-primary" label={data.materialCount === 1 ? "Material" : "Materials"} value={data.materialCount} />
+        <StatCard icon={Target} tone="text-red-600" label={data.gapCount === 1 ? "Gap to close" : "Gaps to close"} value={data.gapCount} />
+      </section>
+
+      {/* How your coach works — full instructions */}
+      <section>
+        <h2 className="text-lg font-semibold text-foreground">How your Coach works</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Four ways to close your gap — use them in any order. Practice is the quickest win.</p>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <HowCard icon={Dumbbell} step="1" title="Practice" text="Flashcards and quick quizzes built from your own class content. Flip a card and rate how well you knew it, then answer questions to lock the ideas in. You earn points and build a daily streak as you go." />
+          <HowCard icon={BookOpen} step="2" title="Materials" text="The exact things to review to close your gap - the case studies, activities and lessons your coach chose for you. Open any one to read it, then jump into practice or a coaching session." />
+          <HowCard icon={MessageSquare} step="3" title="Tutor" text="A one-on-one coaching session. Your coach asks guiding questions and works through the tricky parts with you, step by step, focused only on what you're catching up on." />
+          <HowCard icon={TrendingUp} step="4" title="Progress" text="Watch your understanding grow - see how well you know each concept and which gaps are still open, so you always know what to do next." />
         </div>
         {data.gaps.length > 1 && (
-          <div className="mt-3 flex flex-wrap gap-2 pl-12">
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">Jump straight to a gap:</span>
             {data.gaps.map((g) => {
               const pl = data.plans.find((p) => p.gaps.includes(g)) ?? primaryPlan;
               return (
                 <button key={g} onClick={() => pl && setPractice({ planId: pl.planId, category: g })}
-                  className="rounded-full border border-amber-300/60 bg-background px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-300">
+                  className="rounded-full border border-amber-300/60 bg-background px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-300">
                   Practice: {g}
                 </button>
               );
             })}
           </div>
         )}
-      </div>
+      </section>
+
+      <h2 className="text-lg font-semibold text-foreground">Explore your coach</h2>
 
       <Tabs defaultValue="materials">
         <TabsList>
@@ -186,6 +207,7 @@ export function CoachHub() {
             />
           ) : (
             <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">The exact materials your coach picked to close your gap. Tap any one to read it, then practise it or start a coaching session.</p>
               {allItems.map((it) => {
                 const meta = typeMeta[it.refType ?? "review"] ?? typeMeta.review;
                 const Icon = meta.icon;
@@ -274,6 +296,7 @@ export function CoachHub() {
 
         {/* ── Progress ──────────────────────────────── */}
         <TabsContent value="progress" className="mt-4 space-y-4">
+          <p className="text-sm text-muted-foreground">How well you know each concept, and which gaps are still open.</p>
           {progress.isLoading ? (
             <Skeleton className="h-40" />
           ) : !progress.data?.hasData ? (
@@ -467,6 +490,15 @@ function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planI
         <ModeBtn active={mode === "methods"} onClick={() => setMode("methods")} icon={Layers} label="More ways" />
       </div>
 
+      {/* How this mode works */}
+      <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+        {mode === "flashcards"
+          ? "Read the question, tap the card to reveal the answer, then rate how well you knew it. Your rating decides when the card comes back — and every review earns points."
+          : mode === "quiz"
+          ? "Pick an answer and tap Check. You'll see whether you're right and a short explanation either way. Correct answers earn more points."
+          : "Other activities from your course that target this gap. Open any one to give it a go."}
+      </p>
+
       {/* Flashcards */}
       {mode === "flashcards" && (
         cards.length === 0 ? (
@@ -606,6 +638,29 @@ function Done({ text, onRestart }: { text: string; onRestart: () => void }) {
       <Trophy className="mx-auto mb-3 h-9 w-9 text-green-600" />
       <p className="font-medium text-foreground">{text}</p>
       <Button className="mt-4" variant="outline" onClick={onRestart}><RotateCcw className="mr-1.5 h-4 w-4" /> Go again</Button>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, tone, label, value }: { icon: any; tone: string; label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border bg-background p-4">
+      <Icon className={cn("h-5 w-5", tone)} />
+      <div className="mt-2 text-2xl font-bold leading-none text-foreground">{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function HowCard({ icon: Icon, step, title, text }: { icon: any; step: string; title: string; text: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background p-5">
+      <div className="flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div>
+        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step {step}</span>
+      </div>
+      <h3 className="mt-3 font-semibold text-foreground">{title}</h3>
+      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{text}</p>
     </div>
   );
 }
