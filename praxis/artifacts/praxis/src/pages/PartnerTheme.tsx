@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, Palette } from 'lucide-react';
+import { Save, Loader2, Palette, Globe, CheckCircle2, Clock } from 'lucide-react';
 
 type Form = Partial<BrandTheme>;
 
@@ -40,8 +40,12 @@ export function PartnerTheme() {
       fontFamily: theme.fontFamily || '',
       credentialTitle: theme.credentialTitle || 'PraxisMark',
       emailSenderName: theme.emailSenderName || '',
+      customDomain: theme.customDomain || '',
     });
   }, [theme]);
+
+  const domain = (form.customDomain || '').trim().toLowerCase();
+  const domainLive = !!domain && typeof window !== 'undefined' && window.location.hostname === domain;
 
   const save = useMutation({
     mutationFn: () => apiFetch<BrandTheme>('/brand/theme', { method: 'PUT', body: JSON.stringify(form) }),
@@ -107,6 +111,42 @@ export function PartnerTheme() {
               <div className="pt-6">
                 <Button onClick={() => save.mutate()} disabled={save.isPending} className="w-full">
                   <Save className="h-4 w-4 mr-2" /> {save.isPending ? 'Saving…' : 'Save branding'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-primary" /> Custom domain</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Serve the whole platform on your own address — e.g. <span className="font-mono">learn.youracademy.com</span>. Learners never see a Synops URL; even the sign-in page carries your branding.
+              </p>
+              <div className="space-y-2">
+                <Label>Domain</Label>
+                <Input
+                  value={form.customDomain || ''}
+                  onChange={(e) => upd({ customDomain: e.target.value })}
+                  placeholder="learn.youracademy.com"
+                  className="font-mono"
+                />
+                {domain && (
+                  <div className={`flex items-center gap-2 text-xs font-medium ${domainLive ? 'text-green-600' : 'text-amber-600'}`}>
+                    {domainLive ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                    {domainLive ? 'Live — this domain is serving the platform now.' : 'Saved. Finish the two setup steps below, then it goes live (TLS can take a few minutes).'}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-2">
+                <p className="font-bold text-foreground uppercase tracking-wider text-[11px]">Two steps to go live</p>
+                <p><span className="font-bold text-foreground">1.</span> Add the domain to the Praxis service in Railway (Settings → Networking → Custom Domain). Railway issues the TLS certificate and shows you a <span className="font-mono">CNAME</span> target.</p>
+                <p><span className="font-bold text-foreground">2.</span> At your domain registrar, add a <span className="font-mono">CNAME</span> record for the subdomain pointing to that Railway target. Save it here — done.</p>
+              </div>
+              <div className="pt-2">
+                <Button onClick={() => save.mutate()} disabled={save.isPending} variant="outline" className="w-full">
+                  <Save className="h-4 w-4 mr-2" /> {save.isPending ? 'Saving…' : 'Save domain'}
                 </Button>
               </div>
             </CardContent>

@@ -1,14 +1,20 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useSession } from "@/context/SessionContext";
+import { usePublicBrandByHost } from "@/context/ThemeProvider";
 
 export function SignInPage() {
   const { signIn } = useSession();
+  const { data: brand } = usePublicBrandByHost();
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const brandName = brand?.displayName || "Synops Praxis";
+  const brandLogo = brand?.logoUrl || null;
+  const brandPrimary = brand?.primaryColor || null;
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,10 +34,19 @@ export function SignInPage() {
     <div className="min-h-[100dvh] flex items-center justify-center bg-slate-950 px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-8">
-          <div className="h-9 w-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white">
-            P
-          </div>
-          <span className="text-lg font-semibold text-white tracking-tight">Synops Praxis</span>
+          {brandLogo ? (
+            <img src={brandLogo} alt={brandName} className="h-9 max-w-[180px] object-contain" />
+          ) : (
+            <>
+              <div
+                className="h-9 w-9 rounded-lg flex items-center justify-center font-bold text-white"
+                style={{ backgroundColor: brandPrimary || "#4f46e5" }}
+              >
+                {brandName.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-lg font-semibold text-white tracking-tight">{brandName}</span>
+            </>
+          )}
         </div>
 
         <h1 className="text-2xl font-bold text-white mb-1">Sign in</h1>

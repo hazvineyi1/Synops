@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { brandThemesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
+import { resolvePublicBrandByHost, normaliseHost } from "../lib/brandResolve";
 
 const router = Router();
 
@@ -71,6 +72,15 @@ async function upsertTheme(tenantId: string, tenantType: TenantType, body: any) 
   const [created] = await db.insert(brandThemesTable).values({ ...fields, tenantId, tenantType }).returning();
   return created;
 }
+
+// GET /brand/public — PUBLIC branding for a hostname (custom domains). No auth: this powers the
+// pre-auth/login page theming on a partner's custom domain. Uses the Host header, or an explicit
+// ?host= override (useful for previews). Returns the platform default for the app's own domains.
+router.get("/brand/public", async (req, res) => {
+  const host = (typeof req.query.host === "string" && req.query.host) || req.headers.host || "";
+  const brand = await resolvePublicBrandByHost(normaliseHost(host));
+  res.json(brand);
+});
 
 // GET /brand/theme — the caller's own tenant theme (any authenticated user; used to render branding).
 router.get("/brand/theme", requireAuth, async (req, res) => {

@@ -34,6 +34,22 @@ export function useBrandTheme() {
   });
 }
 
+/**
+ * Public branding resolved from the current hostname. Only runs when signed out — on a partner's
+ * custom domain this themes the login/marketing pages before any session exists. On the app's own
+ * domain the endpoint returns the platform default, so nothing changes.
+ */
+export function usePublicBrandByHost() {
+  const { user } = useSession();
+  const host = typeof window !== "undefined" ? window.location.hostname : "";
+  return useQuery({
+    queryKey: ["brand-public", host],
+    queryFn: () => apiFetch<Partial<BrandTheme>>(`/brand/public?host=${encodeURIComponent(host)}`),
+    enabled: !user,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
 export function hexToHsl(hex: string): { h: number; s: number; l: number } | null {
   let h = hex.replace("#", "").trim();
   if (h.length === 3) h = h.split("").map((c) => c + c).join("");
@@ -61,7 +77,12 @@ export function hexToHsl(hex: string): { h: number; s: number; l: number } | nul
 
 /** Side-effect-only component: applies the current tenant theme to the document. Renders nothing. */
 export function ThemeApplier() {
-  const { data: theme } = useBrandTheme();
+  const { user } = useSession();
+  const { data: authed } = useBrandTheme();
+  const { data: publik } = usePublicBrandByHost();
+  // Signed in → the caller's tenant theme. Signed out → branding resolved from the hostname
+  // (custom domains), so a partner's login page carries their identity too.
+  const theme = (user ? authed : publik) as Partial<BrandTheme> | undefined;
 
   useEffect(() => {
     if (!theme) return;
