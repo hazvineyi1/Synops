@@ -792,51 +792,53 @@ function ProgressPanel({ gaps, concepts, onPractise }: {
         <MiniStat tone="text-primary" label="Concepts practised" value={concepts.length} />
       </div>
 
-      <div>
-        <h3 className="mb-2 text-sm font-semibold text-foreground">Areas that still need closing</h3>
-        {gaps.length === 0 ? (
-          <div className="rounded-xl border border-green-300/60 bg-green-50/50 p-6 text-center dark:bg-green-950/10">
-            <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-600" />
-            <p className="font-medium text-foreground">Every area is closed — superb work.</p>
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {gaps.map((g, i) => (
-              <div key={i} className="flex flex-col rounded-xl border border-amber-300/60 bg-amber-50/60 p-4 dark:bg-amber-950/15">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><Target className="h-4 w-4" /></span>
-                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Open</span>
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-foreground">Areas that still need closing</h3>
+          {gaps.length === 0 ? (
+            <div className="rounded-xl border border-green-300/60 bg-green-50/50 p-6 text-center dark:bg-green-950/10">
+              <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-600" />
+              <p className="font-medium text-foreground">Every area is closed, superb work.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {gaps.map((g, i) => (
+                <div key={i} className="flex flex-col rounded-xl border border-amber-300/60 bg-amber-50/60 p-4 dark:bg-amber-950/15">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><Target className="h-4 w-4" /></span>
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Open</span>
+                  </div>
+                  <p className="mt-2 font-medium text-foreground">{g.category}</p>
+                  <p className="text-xs text-muted-foreground">{g.courseTitle}</p>
+                  <Button size="sm" className="mt-3 self-start" onClick={() => onPractise(g.category)}>
+                    <Dumbbell className="mr-1.5 h-4 w-4" /> Practise to close this
+                  </Button>
                 </div>
-                <p className="mt-2 font-medium text-foreground">{g.category}</p>
-                <p className="text-xs text-muted-foreground">{g.courseTitle}</p>
-                <Button size="sm" className="mt-3 self-start" onClick={() => onPractise(g.category)}>
-                  <Dumbbell className="mr-1.5 h-4 w-4" /> Practise to close this
-                </Button>
-              </div>
-            ))}
+              ))}
+            </div>
+          )}
+        </div>
+
+        {concepts.length > 0 && (
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-foreground">How well you know each concept</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {concepts.map((c) => {
+                const pct = Math.round(c.mastery * 100);
+                return (
+                  <div key={c.moduleId} className="flex flex-col items-center rounded-xl border border-border bg-background p-4 text-center">
+                    <MasteryRing pct={pct} />
+                    <p className="mt-2 line-clamp-2 text-sm font-medium text-foreground">{c.moduleTitle}</p>
+                    {c.due
+                      ? <span className="mt-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] uppercase text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Review due</span>
+                      : <span className="mt-1 text-[11px] text-muted-foreground">{pct >= 80 ? "Strong" : pct >= 50 ? "Building" : "Needs work"}</span>}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
-
-      {concepts.length > 0 && (
-        <div>
-          <h3 className="mb-2 text-sm font-semibold text-foreground">How well you know each concept</h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {concepts.map((c) => {
-              const pct = Math.round(c.mastery * 100);
-              return (
-                <div key={c.moduleId} className="flex flex-col items-center rounded-xl border border-border bg-background p-4 text-center">
-                  <MasteryRing pct={pct} />
-                  <p className="mt-2 line-clamp-2 text-sm font-medium text-foreground">{c.moduleTitle}</p>
-                  {c.due
-                    ? <span className="mt-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] uppercase text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Review due</span>
-                    : <span className="mt-1 text-[11px] text-muted-foreground">{pct >= 80 ? "Strong" : pct >= 50 ? "Building" : "Needs work"}</span>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
