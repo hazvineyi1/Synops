@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { gradebookApi, type GradebookColumn, type MeGradebook } from "@/lib/gradebookApi";
+import { apiFetch } from "@/lib/api";
+import { CoachThread } from "@/components/CoachThread";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Sparkles, TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Sparkles, TrendingDown, TrendingUp, Minus, MessageSquare } from "lucide-react";
+
+interface MyIntervention { alertId: string; courseId: string; courseTitle: string; status: string }
 
 const pillBand = (band: string) =>
   band === "good"
@@ -29,6 +33,9 @@ export function MyGrades() {
     queryFn: () => gradebookApi.me(courseId),
     enabled: !!courseId,
   });
+
+  const interventions = useQuery<MyIntervention[]>({ queryKey: ["my-interventions"], queryFn: () => apiFetch<MyIntervention[]>("/my/interventions") });
+  const myAlert = interventions.data?.find((i) => i.courseId === courseId);
 
   const markItem = useMutation({
     mutationFn: (v: { planId: string; index: number; done: boolean }) => gradebookApi.markPlanItem(v.planId, v.index, v.done),
@@ -122,6 +129,17 @@ export function MyGrades() {
                   );
                 })}
               </ol>
+            </div>
+          )}
+
+          {myAlert && (
+            <div className="rounded-xl border border-border bg-background p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-primary" />
+                <h2 className="font-semibold text-foreground">Message your coach</h2>
+              </div>
+              <p className="mb-3 text-sm text-muted-foreground">Your coach is here to help. Ask a question or let them know how you're getting on — they'll get a notification.</p>
+              <CoachThread alertId={myAlert.alertId} />
             </div>
           )}
 

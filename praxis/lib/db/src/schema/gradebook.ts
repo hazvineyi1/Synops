@@ -153,6 +153,18 @@ export const gradebookSettingsTable = pgTable(
 
 export type GradebookSettingsRow = typeof gradebookSettingsTable.$inferSelect;
 
+/** Two-way coach <-> learner conversation attached to an intervention (gradebook alert). */
+export const coachMessagesTable = pgTable("coach_messages", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  alertId: text("alert_id").notNull(),
+  fromUserId: text("from_user_id").notNull(),
+  fromRole: text("from_role", { enum: ["coach", "learner"] }).notNull().default("coach"),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type CoachMessage = typeof coachMessagesTable.$inferSelect;
+
 /** Shape stored in coach_plans.items for gradebook-generated adaptive study plans. */
 export interface StudyPlanItem {
   kind: "case" | "activity" | "review";

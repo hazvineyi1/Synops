@@ -9,8 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, AlertCircle, Activity, Award, AlertTriangle, Sparkles, Send, Plus, CheckCircle2, Circle, Loader2, LifeBuoy } from 'lucide-react';
+import { FileText, AlertCircle, Activity, Award, AlertTriangle, Sparkles, Send, Plus, CheckCircle2, Circle, Loader2, LifeBuoy, MessageSquare } from 'lucide-react';
 import { Link } from 'wouter';
+import { CoachThread } from '@/components/CoachThread';
 
 interface PlanItem { kind: string; title: string; why: string; category: string | null; done: boolean; }
 interface CoachAssist { summary: string; talkingPoints: string[]; sessionFocus: string; suggestedMessage: string; }
@@ -432,23 +433,10 @@ function InterventionDialog({ iv, onClose }: { iv: Intervention; onClose: () => 
             </div>
           </div>
 
-          {/* Nudge the learner */}
+          {/* Two-way conversation */}
           <div>
-            <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5"><Send className="h-4 w-4" /> Nudge {iv.learnerName.split(' ')[0]}</h4>
-            <textarea
-              value={nudge}
-              onChange={(e) => setNudge(e.target.value)}
-              rows={3}
-              placeholder="Send an encouraging message (in-app, and email if enabled)…"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            <div className="flex justify-between items-center mt-2">
-              {assist && <button className="text-xs text-primary hover:underline" onClick={() => setNudge(assist.suggestedMessage)}>Use suggested message</button>}
-              <div className="flex-1" />
-              <Button size="sm" disabled={!nudge.trim() || sendNudge.isPending} onClick={() => sendNudge.mutate()}>
-                <Send className="h-4 w-4 mr-1.5" /> Send nudge
-              </Button>
-            </div>
+            <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5"><MessageSquare className="h-4 w-4" /> Conversation with {iv.learnerName.split(' ')[0]}</h4>
+            <CoachThread alertId={iv.alertId} suggested={assist?.suggestedMessage} />
           </div>
 
           <div className="flex justify-between items-center pt-2 border-t border-border">

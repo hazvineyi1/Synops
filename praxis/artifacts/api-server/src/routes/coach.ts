@@ -10,6 +10,9 @@ import {
   coachPlansTable,
   coursesTable,
   notificationsTable,
+  coachMessagesTable,
+  courseGroupsTable,
+  courseGroupMembersTable,
   type StudyPlanItem,
   type CoachAssist,
 } from "@workspace/db";
@@ -261,6 +264,97 @@ router.post("/coach/interventions/:alertId/nudge", requireAuth, async (req, res)
     }
   }
   res.json({ sent: true, emailed });
+});
+
+// ── Coach <-> learner conversation on an intervention ───────────────────────────
+const coachName = (u: { firstName: string | null; lastName: string | null; email: string } | null | undefined) =>
+  u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email : "Someone";
+
+/** The coaches leading the learner's section(s) in a course — recipients when a learner replies. */
+async function sectionLeadersFor(courseId: string, learnerId: string): Promise<string[]> {
+  const memberGroups = await db
+    .select({ groupId: courseGroupMembersTable.groupId })
+    .from(courseGroupMembersTable)
+    .innerJoin(courseGroupsTable, eq(courseGroupMembersTable.groupId, courseGroupsTable.id))
+    .where(and(eq(courseGroupMembersTable.userId, learnerId), eq(courseGroupsTable.courseId, courseId)));
+  const gids = [...new Set(memberGroups.map((g) => g.groupId))];
+  if (!gids.length) return [];
+  const leaders = await db
+    .select({ userId: courseGroupMembersTable.userId })
+    .from(courseGroupMembersTable)
+    .where(and(inArray(courseGroupMembersTable.groupId, gids), eq(courseGroupMembersTable.role, "leader")));
+  return [...new Set(leaders.map((l) => l.userId))];
+}
+
+// GET /my/interventions — the caller's OWN active interventions (learner-facing), so a learner can
+// find and open the conversation with their coach from /grades.
+router.get("/my/interventions", requireAuth, async (req, res) => {
+  const rows = await db
+    .select({ a: gradebookAlertsTable, c: coursesTable })
+    .from(gradebookAlertsTable)
+    .leftJoin(coursesTable, eq(gradebookAlertsTable.courseId, coursesTable.id))
+    .where(and(eq(gradebookAlertsTable.userId, req.userId!), isNull(gradebookAlertsTable.resolvedAt)));
+  res.json(
+    rows
+      .filter((r) => r.a.status !== "on_track")
+      .map((r) => ({ alertId: r.a.id, courseId: r.a.courseId, courseTitle: r.c?.title ?? "Course", status: r.a.status })),
+  );
+});
+
+// GET /coach-thread/:alertId — the conversation. Readable by the learner it's about or a coach/
+// facilitator who can act on that course.
+router.get("/coach-thread/:alertId", requireAuth, async (req, res) => {
+  const alert = await db.query.gradebookAlertsTable.findFirst({ where: eq(gradebookAlertsTable.id, req.params.alertId) });
+  if (!alert) { res.status(404).json({ error: "Not found" }); return; }
+  const me = req.dbUser!;
+  const isLearner = alert.userId === me.id;
+  if (!isLearner && !(await canGradeInCourse(me as StaffUser, alert.courseId, alert.userId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const rows = await db
+    .select({ m: coachMessagesTable, u: usersTable })
+    .from(coachMessagesTable)
+    .leftJoin(usersTable, eq(coachMessagesTable.fromUserId, usersTable.id))
+    .where(eq(coachMessagesTable.alertId, alert.id))
+    .orderBy(coachMessagesTable.createdAt);
+  res.json({
+    role: isLearner ? "learner" : "coach",
+    messages: rows.map((r) => ({ id: r.m.id, fromRole: r.m.fromRole, fromName: coachName(r.u), body: r.m.body, createdAt: r.m.createdAt.toISOString(), mine: r.m.fromUserId === me.id })),
+  });
+});
+
+// POST /coach-thread/:alertId — post a message; notifies the other party (in-app + branded email
+// when the coach messages the learner).
+router.post("/coach-thread/:alertId", requireAuth, async (req, res) => {
+  const alert = await db.query.gradebookAlertsTable.findFirst({ where: eq(gradebookAlertsTable.id, req.params.alertId) });
+  if (!alert) { res.status(404).json({ error: "Not found" }); return; }
+  const me = req.dbUser!;
+  const body = typeof req.body?.body === "string" ? req.body.body.trim().slice(0, 4000) : "";
+  if (!body) { res.status(400).json({ error: "Message required" }); return; }
+  const isLearner = alert.userId === me.id;
+  if (!isLearner && !(await canGradeInCourse(me as StaffUser, alert.courseId, alert.userId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const fromRole: "coach" | "learner" = isLearner ? "learner" : "coach";
+  const [msg] = await db.insert(coachMessagesTable).values({ alertId: alert.id, fromUserId: me.id, fromRole, body }).returning();
+
+  const myName = coachName(me);
+  try {
+    if (fromRole === "coach") {
+      await db.insert(notificationsTable).values({ userId: alert.userId, type: "system", title: `New message from ${myName}`, body: body.slice(0, 140), link: "/grades", courseId: alert.courseId, actorId: me.id });
+      if (mailerConfigured()) {
+        const learner = await db.query.usersTable.findFirst({ where: eq(usersTable.id, alert.userId) });
+        if (learner?.email) {
+          const brand = await resolveEmailBrand(learner.partnerId);
+          await sendMail({ to: learner.email, fromName: brand.senderName ?? brand.displayName, subject: `New message from ${myName}`, html: emailShell({ brand, heading: `A message from ${myName}`, bodyHtml: body.replace(/</g, "&lt;"), ctaLabel: "Open my plan", ctaUrl: appUrl("/grades") }) }).catch(() => undefined);
+        }
+      }
+    } else {
+      const leaders = await sectionLeadersFor(alert.courseId, alert.userId);
+      for (const lid of leaders) {
+        await db.insert(notificationsTable).values({ userId: lid, type: "system", title: `${myName} replied`, body: body.slice(0, 140), link: "/coach", courseId: alert.courseId, actorId: me.id });
+      }
+    }
+  } catch {
+    /* best-effort */
+  }
+  res.status(201).json({ id: msg.id, fromRole, fromName: myName, body: msg.body, createdAt: msg.createdAt.toISOString(), mine: true });
 });
 
 const OFFTRACK_RANK: Record<string, number> = { off_track: 0, at_risk: 1, on_track: 2 };
