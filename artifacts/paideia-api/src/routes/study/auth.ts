@@ -20,6 +20,7 @@ import {
 import { requireStudyUser } from "../../middlewares/auth.js";
 import { rateLimit } from "../../middlewares/rateLimit.js";
 import { sendEmail, isEmailConfigured, passwordResetEmail, coachBaseUrl } from "../../lib/email.js";
+import { verifyEntryToken } from "../../lib/learnerEntry.js";
 
 const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -275,6 +276,38 @@ router.post("/stop-impersonating", requireStudyUser, async (req, res) => {
 router.post("/logout", async (_req, res) => {
   res.clearCookie(STUDY_SESSION_COOKIE, { path: "/", sameSite: "lax" });
   res.json({ success: true });
+});
+
+// POST /study/auth/enter { token }
+// Exchanges a signed magic-link token (minted by the /api/v1/catch-up integration for
+// a learner pushed in from an external LMS) for a normal study session cookie. This is
+// how a pushed learner "signs in" without a password. The token is stateless and
+// self-verifying (HMAC over userId+expiry); after exchange the learner is an ordinary
+// signed-in Coach user. Rate limited to blunt token brute-forcing.
+router.post("/enter", rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), async (req, res) => {
+  const token = typeof req.body?.token === "string" ? req.body.token : "";
+  const userId = verifyEntryToken(token);
+  if (!userId) {
+    res.status(401).json({ error: "This study link is invalid or has expired." });
+    return;
+  }
+  const [user] = await db
+    .select({ id: studyUsersTable.id, suspended: studyUsersTable.suspended })
+    .from(studyUsersTable)
+    .where(eq(studyUsersTable.id, userId))
+    .limit(1);
+  if (!user || user.suspended) {
+    res.status(401).json({ error: "This study link is invalid or has expired." });
+    return;
+  }
+  const sessionToken = newSessionToken();
+  await db.insert(studySessionsTable).values({
+    token: sessionToken,
+    userId: user.id,
+    expiresAt: studySessionExpiry(),
+  });
+  res.cookie(STUDY_SESSION_COOKIE, sessionToken, cookieOptions());
+  res.json({ ok: true });
 });
 
 // POST /study/auth/forgot-password { email }

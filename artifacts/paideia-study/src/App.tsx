@@ -138,6 +138,38 @@ function RootLanding() {
   return isUsAudience() ? <StudyLandingUS /> : <StudyLanding />;
 }
 
+// Magic-link entry for a learner pushed in from an external LMS (Praxis). Reads the
+// ?token=, exchanges it for a study session cookie, then hard-navigates to the Coach so
+// the auth context re-hydrates from the new cookie. No password, no manual sign-in.
+function EnterFromLink() {
+  const [, setLoc] = useLocation();
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("token");
+    if (!token) {
+      setLoc("/login");
+      return;
+    }
+    fetch("/api/study/auth/enter", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad link"))))
+      .then(() => {
+        // Full reload (not client nav) so StudyAuthProvider refetches /auth/me with the cookie.
+        window.location.href = `${import.meta.env.BASE_URL.replace(/\/$/, "")}/coach`;
+      })
+      .catch(() => setLoc("/login"));
+  }, [setLoc]);
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full" />
+      <p className="text-sm text-muted-foreground">Opening your catch-up plan…</p>
+    </div>
+  );
+}
+
 function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -145,6 +177,7 @@ function Router() {
       <Route path="/" component={RootLanding} />
       <Route path="/login" component={StudyLogin} />
       <Route path="/signup" component={StudySignup} />
+      <Route path="/enter" component={EnterFromLink} />
       <Route path="/forgot-password" component={StudyForgotPassword} />
       <Route path="/reset-password" component={StudyResetPassword} />
       <Route path="/privacy" component={StudyPrivacy} />
