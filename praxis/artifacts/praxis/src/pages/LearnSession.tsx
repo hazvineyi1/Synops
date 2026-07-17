@@ -162,6 +162,17 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   const masteryPercentage = Math.round((session.masteryScore || 0) * 100);
   const isMastered = session.masteryScore >= 0.8;
 
+  // The mastery meter grows and intensifies as the discussion progresses, so the learner can feel
+  // the needle move: width, bar height, number size and colour all scale with the score.
+  const mp = masteryPercentage;
+  const masteryTier = mp >= 80 ? 3 : mp >= 50 ? 2 : mp >= 20 ? 1 : 0;
+  const meterWidth = 176 + Math.round((mp / 100) * 184); // 176px -> 360px as it fills
+  const masteryBarColor = mp >= 80 ? 'bg-green-500' : mp >= 50 ? 'bg-primary' : mp >= 20 ? 'bg-amber-500' : 'bg-muted-foreground/60';
+  const masteryBarHeight = ['h-2', 'h-2.5', 'h-3', 'h-4'][masteryTier];
+  const masteryNumClass = ['text-base text-foreground', 'text-lg text-amber-600', 'text-2xl text-primary', 'text-3xl text-green-600'][masteryTier];
+  const masteryTextColor = mp >= 80 ? 'text-green-600' : mp >= 50 ? 'text-primary' : mp >= 20 ? 'text-amber-600' : 'text-muted-foreground';
+  const masteryCaption = mp >= 80 ? 'Mastered' : mp >= 50 ? 'Almost there' : mp >= 20 ? 'Building' : 'Getting started';
+
   const currentBeat = moduleData?.beats?.find(b => b.id === session.currentBeatId);
 
   // The "fact pattern": the context the learner should be able to see at all times — what
@@ -254,14 +265,20 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             <h1 className="font-serif font-bold text-lg">{moduleData?.title || 'Loading Module...'}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-4 w-48 sm:w-64">
-          <div className="flex-1">
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-muted-foreground font-medium uppercase tracking-wider">Mastery</span>
-              <span className="font-bold">{masteryPercentage}%</span>
+        <div className="flex items-center gap-3 transition-all duration-500" style={{ width: meterWidth, maxWidth: '62vw' }}>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mastery</span>
+              <span className={cn("text-[10px] sm:text-xs font-medium transition-colors", masteryTextColor)}>{masteryCaption}</span>
             </div>
-            <Progress value={masteryPercentage} className="h-2" />
+            <div className={cn("w-full overflow-hidden rounded-full bg-muted transition-all duration-500", masteryBarHeight)}>
+              <div
+                className={cn("h-full rounded-full transition-all duration-700 ease-out", masteryBarColor, mp >= 80 && "shadow-[0_0_14px_2px] shadow-green-500/50")}
+                style={{ width: `${mp}%` }}
+              />
+            </div>
           </div>
+          <span className={cn("font-bold tabular-nums leading-none transition-all duration-500", masteryNumClass)}>{mp}%</span>
         </div>
       </header>
 
