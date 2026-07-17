@@ -15,6 +15,7 @@ export interface SocraticContext {
   accommodations?: string[] | null;
   turnCount: number; // exchanges so far
   promptBudget?: number; // soft budget of exchanges
+  remedialFocus?: string | null; // when the learner is catching up: the weak area to rebuild
 }
 
 // ── Coach personalities (Coach-inspired) — voice & pressure only.
@@ -136,6 +137,13 @@ export function buildSocraticSystemPrompt(ctx: SocraticContext, isOpening: boole
     .filter(Boolean)
     .join("\n");
   if (contextBlock) parts.push("CONTEXT (ground every question strictly in this):\n" + contextBlock);
+
+  if (ctx.remedialFocus) {
+    parts.push(
+      "REMEDIAL FOCUS: this learner recently fell behind and is here to catch up on a specific weak area: " +
+        `"${ctx.remedialFocus}". Concentrate every question on rebuilding exactly this. Frame it as normal, expected catch-up work, never as failure or a deficiency. Be extra patient and start from the foundations of this area before extending.`
+    );
+  }
 
   if (isOpening) {
     const greet = ctx.learnerName

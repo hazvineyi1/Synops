@@ -7,7 +7,9 @@ import {
   coachPlansTable,
   usersTable,
   sessionsTable,
+  coursesTable,
   type CoachPlanItem,
+  type StudyPlanItem,
 } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -153,10 +155,57 @@ async function getOrCreatePlan(user: typeof usersTable.$inferSelect, force = fal
   return created;
 }
 
-// GET /learn/plan — today's coach-led plan (the spine)
+/**
+ * The learner's active off-track remedial plans (source='gradebook_alert') mapped into coach-plan
+ * items, so the AI coach can lead with catch-up work. Read-time only — never persisted into the
+ * daily source='coach' row, keeping the two sources cleanly separated in storage.
+ */
+async function getRemedialCatchUp(userId: string) {
+  const rows = await db
+    .select({ p: coachPlansTable, courseTitle: coursesTable.title })
+    .from(coachPlansTable)
+    .leftJoin(coursesTable, eq(coachPlansTable.courseId, coursesTable.id))
+    .where(and(eq(coachPlansTable.userId, userId), eq(coachPlansTable.source, "gradebook_alert"), eq(coachPlansTable.status, "active")))
+    .orderBy(desc(coachPlansTable.updatedAt));
+  if (!rows.length) return null;
+
+  const items: any[] = [];
+  let rationale = "";
+  for (const r of rows) {
+    const its = (Array.isArray(r.p.items) ? r.p.items : []) as StudyPlanItem[];
+    if (!rationale && r.p.rationale) rationale = r.p.rationale;
+    for (const it of its) {
+      if (it.done) continue; // only open catch-up work leads the path
+      items.push({
+        moduleId: it.refType === "module" ? it.refId : null,
+        moduleTitle: it.title,
+        courseId: r.p.courseId,
+        courseTitle: r.courseTitle ?? null,
+        kind: "catchup",
+        reason: it.why,
+        done: false,
+        remedial: true,
+        refType: it.refType,
+        refId: it.refId,
+        category: it.category,
+        planId: r.p.id,
+      });
+    }
+  }
+  if (!items.length) return null;
+  return { items, rationale, courseTitle: rows[0].courseTitle ?? null };
+}
+
+// GET /learn/plan — today's coach-led plan (the spine), with any off-track catch-up work led first.
 router.get("/learn/plan", requireAuth, async (req, res) => {
   const plan = await getOrCreatePlan(req.dbUser!);
-  res.json(plan);
+  const remedial = await getRemedialCatchUp(req.dbUser!.id);
+  const spine = (Array.isArray(plan.items) ? plan.items : []) as CoachPlanItem[];
+  res.json({
+    ...plan,
+    items: remedial ? [...remedial.items, ...spine] : spine,
+    catchUp: remedial ? { active: true, rationale: remedial.rationale, courseTitle: remedial.courseTitle } : { active: false },
+  });
 });
 
 // POST /learn/plan/regenerate — negotiate / rebuild today's plan

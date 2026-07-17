@@ -16,6 +16,8 @@ export const sessionsTable = pgTable("sessions", {
   masteryScore: numeric("mastery_score", { precision: 5, scale: 4 }).notNull().default("0"),
   currentBeatId: text("current_beat_id"),
   turnCount: integer("turn_count").notNull().default(0),
+  /** When launched from a catch-up (off-track) plan item: the weak area the coach concentrates on. */
+  remedialFocus: text("remedial_focus"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
 });

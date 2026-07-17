@@ -51,6 +51,9 @@ router.get("/sessions", requireAuth, async (req, res) => {
 // POST /sessions
 router.post("/sessions", requireAuth, async (req, res) => {
   const { moduleId } = req.body;
+  const remedialFocus = typeof req.body?.remedialFocus === "string" && req.body.remedialFocus.trim()
+    ? req.body.remedialFocus.trim().slice(0, 300)
+    : null;
   if (!moduleId || typeof moduleId !== "string") {
     res.status(400).json({ error: "moduleId required" });
     return;
@@ -94,6 +97,7 @@ router.post("/sessions", requireAuth, async (req, res) => {
       status: "active",
       masteryScore: "0",
       currentBeatId: firstBeat?.id ?? null,
+      remedialFocus,
     })
     .returning();
 
@@ -115,6 +119,7 @@ router.post("/sessions", requireAuth, async (req, res) => {
         accommodations: learner.accommodations,
         turnCount: 0,
         promptBudget: PROMPT_BUDGET,
+        remedialFocus,
       };
       tutorOpening = await generateSocraticTurn(
         ctx,
@@ -227,6 +232,7 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       accommodations: learner.accommodations,
       turnCount: exchangeCount,
       promptBudget: PROMPT_BUDGET,
+      remedialFocus: session.remedialFocus,
     };
     const systemPrompt = buildSocraticSystemPrompt(socraticCtx, false);
 

@@ -77,16 +77,21 @@ interface Credential {
   masteryScore: number;
 }
 interface PlanItem {
-  moduleId: string;
+  moduleId: string | null;
   moduleTitle: string;
   courseId: string;
   kind: string;
   reason: string;
   done: boolean;
+  remedial?: boolean;
+  refType?: "case" | "activity" | "module" | null;
+  refId?: string | null;
+  category?: string | null;
 }
 interface CoachPlan {
   items: PlanItem[];
   rationale: string;
+  catchUp?: { active: boolean; rationale?: string; courseTitle?: string | null };
 }
 interface MasteryConcept {
   moduleId: string;
@@ -175,10 +180,19 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
   });
 
   const startSession = useMutation({
-    mutationFn: (moduleId: string) =>
-      apiFetch<{ id: string }>("/sessions", { method: "POST", body: JSON.stringify({ moduleId }) }),
+    mutationFn: (v: { moduleId: string; remedialFocus?: string | null }) =>
+      apiFetch<{ id: string }>("/sessions", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: (s) => navigate(`/learn/${s.id}`),
   });
+
+  // Launch a plan item the right way: a catch-up case/activity opens its player; a module (daily or
+  // remedial 'review') starts a Socratic session, carrying the weak area as the session's focus.
+  const launchItem = (it: PlanItem) => {
+    if (it.remedial && it.refType === "case" && it.refId) return navigate(`/cases/${it.refId}/begin`);
+    if (it.remedial && it.refType === "activity" && it.refId) return navigate(`/activities/${it.refId}/play`);
+    if (it.moduleId) return startSession.mutate({ moduleId: it.moduleId, remedialFocus: it.remedial ? it.category || it.moduleTitle : null });
+    return navigate("/grades");
+  };
 
   const courses = prog?.courses ?? [];
   const inProgress = courses.filter((c) => c.status !== "completed").sort((a, b) => b.percent - a.percent);
@@ -328,7 +342,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
               but present in the flow so it isn't skipped by inattention. */}
           {retrieval && (
             <button
-              onClick={() => startSession.mutate(retrieval.moduleId)}
+              onClick={() => startSession.mutate({ moduleId: retrieval.moduleId })}
               disabled={startSession.isPending}
               className="w-full text-left rounded-xl border border-dashed border-border bg-muted/30 hover:bg-muted/50 transition-colors px-4 py-3 flex items-center gap-3"
             >
@@ -383,23 +397,27 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
 
         {/* Right column */}
         <div className="space-y-6">
-          {/* Coach next session */}
-          <Card className="p-5 bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+          {/* Coach next session — leads with catch-up when the learner is behind. */}
+          <Card className={cn("p-5", plan?.catchUp?.active ? "bg-gradient-to-br from-amber-500/10 to-transparent border-amber-300/50" : "bg-gradient-to-br from-primary/5 to-transparent border-primary/20")}>
             <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <h2 className="font-serif font-semibold">Your coach</h2>
+              {plan?.catchUp?.active ? <LifeBuoy className="h-4 w-4 text-amber-600" /> : <Sparkles className="h-4 w-4 text-primary" />}
+              <h2 className="font-serif font-semibold">{plan?.catchUp?.active ? "Catch up with your coach" : "Your coach"}</h2>
             </div>
             {nextUp ? (
               <>
-                <p className="text-sm text-muted-foreground mb-1">Next in your path</p>
+                {plan?.catchUp?.active && nextUp.remedial ? (
+                  <p className="text-sm text-amber-700 dark:text-amber-400 mb-1 font-medium">Let's rebuild this together</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground mb-1">Next in your path</p>
+                )}
                 <p className="font-medium leading-snug mb-1">{nextUp.moduleTitle}</p>
                 <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{nextUp.reason}</p>
                 <Button
                   className="w-full"
-                  onClick={() => startSession.mutate(nextUp.moduleId)}
+                  onClick={() => launchItem(nextUp)}
                   disabled={startSession.isPending}
                 >
-                  {startSession.isPending ? "Starting…" : "Start session"}
+                  {startSession.isPending ? "Starting…" : plan?.catchUp?.active && nextUp.remedial ? "Start catch-up" : "Start session"}
                 </Button>
               </>
             ) : (
