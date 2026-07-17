@@ -255,8 +255,8 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
               </p>
             </div>
             <div className="flex gap-2 shrink-0">
-              <Button onClick={() => navigate("/grades")}>
-                View my plan <ArrowRight className="h-4 w-4 ml-1.5" />
+              <Button onClick={() => navigate("/coach-hub")}>
+                Open my coach <ArrowRight className="h-4 w-4 ml-1.5" />
               </Button>
               <Button variant="outline" onClick={() => (aiCoachUrl ? openAiCoach() : navigate("/grades"))}>
                 <MessageSquare className="h-4 w-4 mr-1.5" /> Coach

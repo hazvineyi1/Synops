@@ -33,6 +33,7 @@ import { AdminPartners } from '@/pages/AdminPartners';
 import { PartnerTheme } from '@/pages/PartnerTheme';
 import { Reports } from '@/pages/Reports';
 import { CoachSettings } from '@/pages/CoachSettings';
+import { CoachHub } from '@/pages/CoachHub';
 import { OrgMembers } from '@/pages/OrgMembers';
 import { SignInPage } from '@/pages/SignIn';
 import { RequestAccess } from '@/pages/RequestAccess';
@@ -189,6 +190,7 @@ function Routes() {
         />
         <ProtectedRoute path="/courses/:courseId/gradebook" component={CourseGradebook} />
         <ProtectedRoute path="/grades" component={MyGrades} />
+        <ProtectedRoute path="/coach-hub" component={CoachHub} />
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />
         <ProtectedRoute path="/courses/:courseId" component={CourseDetail} />

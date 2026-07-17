@@ -29,6 +29,7 @@ import {
   CalendarDays,
   Layers,
   ClipboardList,
+  GraduationCap,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -119,6 +120,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
           { label: t('nav.myGrades', 'My grades'), href: '/grades', icon: TrendingUp },
+          { label: t('nav.coach', 'Coach'), href: '/coach-hub', icon: GraduationCap },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
