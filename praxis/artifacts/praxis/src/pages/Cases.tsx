@@ -101,7 +101,7 @@ export function Cases() {
                   {c.isLibrary && <span className="text-xs px-2 py-0.5 rounded-full border bg-blue-500/10 text-blue-700 border-blue-500/30 inline-flex items-center gap-1"><BookOpen className="h-3 w-3" /> Library</span>}
                   <span className="text-xs px-2 py-0.5 rounded-full border bg-muted text-muted-foreground">{c.promptLimit} prompts</span>
                 </div>
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   {c.status === "published" && (
                     <Button size="sm" className="flex-1" onClick={() => navigate(`/cases/${c.id}/begin`)}>
                       <Play className="h-4 w-4 mr-1.5" /> Start
