@@ -149,6 +149,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         items: [
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.members'), href: '/org/members', icon: UserCog },
+          { label: t('nav.coaching', 'Coaching'), href: '/coaching/sections', icon: Users },
           { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
           { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
@@ -167,6 +168,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.organisations'), href: '/dashboard', icon: Building },
           { label: t('nav.courseCatalog'), href: '/courses', icon: BookOpen },
+          { label: t('nav.coaching', 'Coaching'), href: '/coaching/sections', icon: Users },
           { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
           { label: t('nav.studio'), href: '/studio', icon: PenTool },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
@@ -209,6 +211,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
             { label: t('nav.learners', 'Coaching'), href: '/coach', icon: Users },
+            { label: t('nav.coachingSections', 'Sections'), href: '/coaching/sections', icon: UserCog },
             { label: t('nav.submissions', 'Submissions'), href: '/coach/submissions', icon: FileText },
             { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
             { label: t('nav.members', 'Org members'), href: '/org/members', icon: UserCog },

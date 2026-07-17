@@ -26,6 +26,7 @@ import { Assess } from '@/pages/Assess';
 import { Credentials } from '@/pages/Credentials';
 import { Verify } from '@/pages/Verify';
 import { CoachLearners } from '@/pages/CoachLearners';
+import { CoachingMatching } from '@/pages/CoachingMatching';
 import { CoachSubmissions } from '@/pages/CoachSubmissions';
 import { AdminPartners } from '@/pages/AdminPartners';
 import { PartnerTheme } from '@/pages/PartnerTheme';
@@ -199,6 +200,7 @@ function Routes() {
         <ProtectedRoute path="/credentials" component={Credentials} />
         <ProtectedRoute path="/coach-settings" component={CoachSettings} />
         <ProtectedRoute path="/coach/submissions" component={CoachSubmissions} />
+        <ProtectedRoute path="/coaching/sections" component={CoachingMatching} />
         <ProtectedRoute path="/coach" component={CoachLearners} />
         <ProtectedRoute path="/org/members" component={OrgMembers} />
         <ProtectedRoute path="/admin/partners" component={AdminPartners} />
