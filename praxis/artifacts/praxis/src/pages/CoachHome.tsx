@@ -85,13 +85,6 @@ export function CoachHome({ firstName }: { firstName?: string | null }) {
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {meta.label}
               </span>
-              <button
-                onClick={() => setLocation("/coach-settings")}
-                className="text-muted-foreground/60 hover:text-foreground transition-colors"
-                aria-label="Coach settings"
-              >
-                <Settings2 className="h-3.5 w-3.5" />
-              </button>
             </div>
             <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-tight mb-3">
               {greeting()}{firstName ? `, ${firstName}` : ""}.

@@ -239,19 +239,6 @@ export function CoachHub() {
         )}
       </section>
 
-      {/* Coach on WhatsApp — a genuinely handy channel, surfaced here instead of only in settings. */}
-      <button
-        onClick={() => navigate("/coach-settings?focus=whatsapp")}
-        className="flex w-full items-center gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/60 p-4 text-left transition hover:border-emerald-400 dark:bg-emerald-950/15"
-      >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600"><MessageSquare className="h-5 w-5" /></span>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-foreground">Prefer WhatsApp? Coach from your phone</p>
-          <p className="text-sm text-muted-foreground">Answer your coach's questions and get nudges right in WhatsApp. Tap here to switch it on and tune your coach.</p>
-        </div>
-        <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600" />
-      </button>
-
       {/* The chosen section renders here — no separate tab bar, the cards above are the nav */}
       {section && (
         <div ref={sectionRef} className="scroll-mt-4">
