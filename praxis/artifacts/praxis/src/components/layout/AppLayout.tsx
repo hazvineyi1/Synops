@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
+import { useBrandTheme } from '@/context/ThemeProvider';
 import { DevRoleSwitcher } from '@/components/DevRoleSwitcher';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import {
@@ -80,6 +81,9 @@ function ShellNavLink({
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const { user, loading, signOut } = useSession();
+  const { data: brand } = useBrandTheme();
+  const brandName = brand?.displayName || 'Synops Praxis';
+  const brandLogo = brand?.logoUrl || null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
 
@@ -283,8 +287,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="w-64 flex-shrink-0 flex-col hidden md:flex" style={{ background: SIDEBAR_BG }}>
         <div className="h-16 flex items-center px-6" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
           <Link href="/dashboard" className="flex items-center gap-2 font-serif font-bold text-xl tracking-tight" style={{ color: '#fff' }}>
-            <span className="h-8 w-8 flex items-center justify-center rounded-sm" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>P</span>
-            Synops Praxis
+            {brandLogo ? (
+              <img src={brandLogo} alt="" className="h-8 w-8 rounded-sm object-contain" />
+            ) : (
+              <span className="h-8 w-8 flex items-center justify-center rounded-sm" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>{brandName.charAt(0).toUpperCase()}</span>
+            )}
+            {brandName}
           </Link>
         </div>
 
@@ -346,7 +354,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex flex-col" style={{ background: SIDEBAR_BG }}>
           <div className="h-14 flex items-center justify-between px-5 shrink-0" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
-            <span className="font-serif font-bold text-base" style={{ color: '#fff' }}>Synops Praxis</span>
+            <span className="font-serif font-bold text-base" style={{ color: '#fff' }}>{brandName}</span>
             <button
               onClick={() => setMobileMenuOpen(false)}
               className="p-2 rounded-md"
@@ -429,7 +437,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
 
           <Link href="/dashboard" className="font-serif font-bold text-base" style={{ color: '#fff' }}>
-            Synops Praxis
+            {brandName}
           </Link>
 
           <div className="flex items-center gap-1">

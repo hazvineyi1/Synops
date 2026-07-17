@@ -2,9 +2,11 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { brandThemesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireAuth, requireRole } from "../middlewares/requireAuth";
 
 const router = Router();
+
+type TenantType = "platform" | "partner" | "organisation";
 
 function toThemeResponse(t: typeof brandThemesTable.$inferSelect) {
   return {
@@ -25,68 +27,77 @@ function toThemeResponse(t: typeof brandThemesTable.$inferSelect) {
   };
 }
 
-// GET /brand/theme
+async function getOrCreateTheme(tenantId: string, tenantType: TenantType) {
+  const theme = await db.query.brandThemesTable.findFirst({ where: eq(brandThemesTable.tenantId, tenantId) });
+  if (theme) return theme;
+  const [created] = await db
+    .insert(brandThemesTable)
+    .values({
+      tenantId,
+      tenantType,
+      displayName: "Synops Praxis",
+      primaryColor: "#1a1f36",
+      secondaryColor: "#3b82f6",
+      accentColor: "#10b981",
+      credentialTitle: "PraxisMark",
+    })
+    .returning();
+  return created;
+}
+
+function bodyFields(body: any) {
+  return {
+    displayName: body.displayName,
+    primaryColor: body.primaryColor,
+    secondaryColor: body.secondaryColor,
+    accentColor: body.accentColor,
+    logoUrl: body.logoUrl,
+    faviconUrl: body.faviconUrl,
+    fontFamily: body.fontFamily,
+    credentialTitle: body.credentialTitle,
+    emailSenderName: body.emailSenderName,
+    customDomain: body.customDomain,
+    updatedAt: new Date(),
+  };
+}
+
+async function upsertTheme(tenantId: string, tenantType: TenantType, body: any) {
+  const existing = await db.query.brandThemesTable.findFirst({ where: eq(brandThemesTable.tenantId, tenantId) });
+  const fields = bodyFields(body);
+  if (existing) {
+    const [updated] = await db.update(brandThemesTable).set(fields).where(eq(brandThemesTable.tenantId, tenantId)).returning();
+    return updated;
+  }
+  const [created] = await db.insert(brandThemesTable).values({ ...fields, tenantId, tenantType }).returning();
+  return created;
+}
+
+// GET /brand/theme — the caller's own tenant theme (any authenticated user; used to render branding).
 router.get("/brand/theme", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   const tenantId = user.partnerId ?? "platform";
-  let theme = await db.query.brandThemesTable.findFirst({
-    where: eq(brandThemesTable.tenantId, tenantId),
-  });
-  if (!theme) {
-    // Return default platform theme
-    const [created] = await db
-      .insert(brandThemesTable)
-      .values({
-        tenantId,
-        tenantType: user.partnerId ? "partner" : "platform",
-        displayName: "Synops Praxis",
-        primaryColor: "#1a1f36",
-        secondaryColor: "#3b82f6",
-        accentColor: "#10b981",
-        credentialTitle: "PraxisMark",
-      })
-      .returning();
-    theme = created;
-  }
+  const theme = await getOrCreateTheme(tenantId, user.partnerId ? "partner" : "platform");
   res.json(toThemeResponse(theme));
 });
 
-// PUT /brand/theme
-router.put("/brand/theme", requireAuth, async (req, res) => {
+// PUT /brand/theme — edit the caller's own tenant theme. White-label control is top-tier only.
+router.put("/brand/theme", requireAuth, requireRole("super_admin", "partner_admin"), async (req, res) => {
   const user = req.dbUser!;
   const tenantId = user.partnerId ?? "platform";
-  const existing = await db.query.brandThemesTable.findFirst({
-    where: eq(brandThemesTable.tenantId, tenantId),
-  });
+  const theme = await upsertTheme(tenantId, user.partnerId ? "partner" : "platform", req.body);
+  res.json(toThemeResponse(theme));
+});
 
-  const fields = {
-    displayName: req.body.displayName,
-    primaryColor: req.body.primaryColor,
-    secondaryColor: req.body.secondaryColor,
-    accentColor: req.body.accentColor,
-    logoUrl: req.body.logoUrl,
-    faviconUrl: req.body.faviconUrl,
-    fontFamily: req.body.fontFamily,
-    credentialTitle: req.body.credentialTitle,
-    emailSenderName: req.body.emailSenderName,
-    customDomain: req.body.customDomain,
-    updatedAt: new Date(),
-  };
+// GET /brand/partner/:partnerId — a specific partner's theme (super_admin manages any partner).
+router.get("/brand/partner/:partnerId", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const theme = await getOrCreateTheme(req.params.partnerId, "partner");
+  res.json(toThemeResponse(theme));
+});
 
-  if (existing) {
-    const [updated] = await db
-      .update(brandThemesTable)
-      .set(fields)
-      .where(eq(brandThemesTable.tenantId, tenantId))
-      .returning();
-    res.json(toThemeResponse(updated));
-  } else {
-    const [created] = await db
-      .insert(brandThemesTable)
-      .values({ ...fields, tenantId, tenantType: user.partnerId ? "partner" : "platform" })
-      .returning();
-    res.json(toThemeResponse(created));
-  }
+// PUT /brand/partner/:partnerId — edit a specific partner's theme (super_admin only).
+router.put("/brand/partner/:partnerId", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const theme = await upsertTheme(req.params.partnerId, "partner", req.body);
+  res.json(toThemeResponse(theme));
 });
 
 export default router;

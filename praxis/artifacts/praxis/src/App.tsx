@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SessionProvider, useSession } from '@/context/SessionContext';
+import { ThemeApplier } from '@/context/ThemeProvider';
 
 // Pages
 import NotFound from '@/pages/not-found';
@@ -225,6 +226,7 @@ function App() {
     <TooltipProvider>
       <WouterRouter base={basePath}>
         <SessionProvider>
+          <ThemeApplier />
           <Routes />
         </SessionProvider>
       </WouterRouter>
