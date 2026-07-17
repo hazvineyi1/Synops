@@ -182,6 +182,7 @@ router.get("/sessions/:sessionId", requireAuth, async (req, res) => {
 // POST /sessions/:sessionId/respond — SSE streaming Socratic response
 router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
   const { response, beatId } = req.body;
+  const isSelection = req.body?.isSelection === true;
   const { sessionId } = req.params;
 
   const session = await db.query.sessionsTable.findFirst({
@@ -302,6 +303,7 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       learnerResponse: response,
       historyOrdered,
       tutorReply: fullResponse,
+      isSelection,
     });
 
     const masteryDelta = result.newMastery - Number(session.masteryScore);

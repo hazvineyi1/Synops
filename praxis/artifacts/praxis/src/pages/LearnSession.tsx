@@ -220,11 +220,11 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
     if (selected.length === 0) return;
     // Preserve the order the options were presented in for multi-select.
     const ordered = activeOptions.filter((o) => selected.includes(o));
-    handleSend(activeMode === 'multi' ? ordered.join('; ') : ordered[0]);
+    handleSend(activeMode === 'multi' ? ordered.join('; ') : ordered[0], true);
     setSelected([]);
   }
 
-  const handleSend = async (explicit?: string) => {
+  const handleSend = async (explicit?: string, isSelection?: boolean) => {
     const userMessage = (explicit ?? inputValue).trim();
     if (!userMessage) return;
     // Coach still replying: keep the learner's text and flag it, never drop it silently.
@@ -252,7 +252,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
     await streamSSE(
       `/api/sessions/${sessionId}/respond`,
-      { response: userMessage, beatId: session.currentBeatId || '' },
+      { response: userMessage, beatId: session.currentBeatId || '', isSelection: !!isSelection },
       (token) => {
         setStreamingText(prev => prev + token);
       },

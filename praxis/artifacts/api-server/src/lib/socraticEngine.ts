@@ -235,7 +235,8 @@ function isDisengaged(resp: string): boolean {
 export async function gradeCheckpoint(
   ctx: SocraticContext,
   learnerResponse: string,
-  recentHistory: { role: string; content: string }[]
+  recentHistory: { role: string; content: string }[],
+  isSelection = false
 ): Promise<CheckpointGrade> {
   // Refusals / give-ups / empty non-answers are grade 0 up front, so they never raise mastery.
   if (isDisengaged(learnerResponse)) {
@@ -246,7 +247,17 @@ export async function gradeCheckpoint(
     .map((t) => `${t.role === "tutor" ? "COACH" : "LEARNER"}: ${t.content}`)
     .join("\n");
 
-  const system = `You are a strict but fair assessor of demonstrated understanding on the concept "${ctx.beatTitle ?? ctx.moduleTitle ?? "this concept"}".
+  const cap = isSelection ? 2 : 3;
+  const system = isSelection
+    ? `You are assessing a learner who SELECTED an answer from multiple choices for the concept "${ctx.beatTitle ?? ctx.moduleTitle ?? "this concept"}". Grade the CORRECTNESS of the choice they picked, not its length.
+Return a single JSON object: {"grade": 0|1|2, "reasoning": "one short sentence"}.
+Rubric:
+0 = the choice is wrong, a misconception, or off-topic.
+1 = the choice is partly right or a weak fit.
+2 = the choice is correct and on point.
+Do NOT give 3: recognising a good answer is not the same as explaining it, and mastery requires the learner to justify their reasoning in their own words.
+Source content for reference: ${ctx.narration ?? ""} ${ctx.scenario ?? ""}`.trim()
+    : `You are a strict but fair assessor of demonstrated understanding on the concept "${ctx.beatTitle ?? ctx.moduleTitle ?? "this concept"}".
 Grade ONLY the learner's demonstrated reasoning, not their writing length, politeness or confidence.
 Return a single JSON object: {"grade": 0|1|2|3, "reasoning": "one short sentence"}.
 Rubric:
@@ -275,13 +286,14 @@ Source content for reference: ${ctx.narration ?? ""} ${ctx.scenario ?? ""}`.trim
     const match = text.match(/\{[\s\S]*\}/);
     if (match) {
       const parsed = JSON.parse(match[0]);
-      const g = Math.max(0, Math.min(3, Math.round(Number(parsed.grade))));
+      const g = Math.max(0, Math.min(cap, Math.round(Number(parsed.grade))));
       return { grade: g as 0 | 1 | 2 | 3, reasoning: String(parsed.reasoning ?? "") };
     }
   } catch {
     // fall through to a conservative default
   }
-  // Conservative fallback if grading fails: treat as shaky, not mastery.
+  // Conservative fallback if grading fails.
+  if (isSelection) return { grade: 1, reasoning: "Selected answer (grader unavailable)." };
   const words = learnerResponse.trim().split(/\s+/).filter(Boolean).length;
   return { grade: words > 25 ? 2 : words > 5 ? 1 : 0, reasoning: "Fallback length-based estimate." };
 }

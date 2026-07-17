@@ -32,11 +32,13 @@ export async function applyCheckpoint(opts: {
   learnerResponse: string;
   historyOrdered: { role: string; content: string }[];
   tutorReply: string;
+  isSelection?: boolean;
 }): Promise<CheckpointResult> {
   const { userId, session, socraticCtx, learnerResponse, historyOrdered } = opts;
 
-  // AI grading happens outside the transaction (it's a network call).
-  const grade = await gradeCheckpoint(socraticCtx, learnerResponse, historyOrdered);
+  // AI grading happens outside the transaction (it's a network call). When the learner picked a
+  // multiple-choice option, grade the correctness of the choice (recognition), capped below mastery.
+  const grade = await gradeCheckpoint(socraticCtx, learnerResponse, historyOrdered, opts.isSelection ?? false);
   const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, session.moduleId) });
 
   // Everything that mutates state runs in one transaction so a partial
