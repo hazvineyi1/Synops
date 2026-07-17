@@ -101,7 +101,9 @@ export async function applyCheckpoint(opts: {
       });
 
     const newMastery = sm2.mastery;
-    const nowMastered = newMastery >= MASTERY_THRESHOLD && grade.grade >= 3;
+    // Certify once the bar reaches 0.8 on a turn that is at least solid (not a stumble/refusal), so
+    // the visible meter and the credential agree instead of the bar looking full but not certifying.
+    const nowMastered = newMastery >= MASTERY_THRESHOLD && grade.grade >= 2;
     const freshTurnCount = Number(session.turnCount) + 2;
     const alreadyMastered = session.status === "mastered";
 
