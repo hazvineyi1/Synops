@@ -241,7 +241,7 @@ export function CoachHub() {
 
       {/* Coach on WhatsApp — a genuinely handy channel, surfaced here instead of only in settings. */}
       <button
-        onClick={() => navigate("/coach-settings")}
+        onClick={() => navigate("/coach-settings?focus=whatsapp")}
         className="flex w-full items-center gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/60 p-4 text-left transition hover:border-emerald-400 dark:bg-emerald-950/15"
       >
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600"><MessageSquare className="h-5 w-5" /></span>

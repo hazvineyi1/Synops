@@ -22,6 +22,17 @@ export function CoachSettings() {
   const update = useUpdateCoachProfile();
   const { toast } = useToast();
 
+  // When arrived from the "Coach on WhatsApp" hub card (?focus=whatsapp), jump straight to the
+  // WhatsApp section instead of landing at the top of the settings page.
+  React.useEffect(() => {
+    if (!profile) return;
+    try {
+      if (new URLSearchParams(window.location.search).get("focus") === "whatsapp") {
+        setTimeout(() => document.getElementById("coach-whatsapp")?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+      }
+    } catch { /* ignore */ }
+  }, [profile]);
+
   if (isLoading || !profile) {
     return (
       <div className="space-y-6 animate-pulse">
@@ -132,7 +143,7 @@ export function CoachSettings() {
       </section>
 
       {/* WhatsApp */}
-      <section className="space-y-3">
+      <section id="coach-whatsapp" className="space-y-3 scroll-mt-4">
         <SectionHeading icon={MessageCircle} title="WhatsApp coaching" hint="Opt in to answer your coach's questions from WhatsApp and get nudges before your credentials expire." />
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="flex items-center justify-between gap-4">
