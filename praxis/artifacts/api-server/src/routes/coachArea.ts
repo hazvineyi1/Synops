@@ -5,6 +5,7 @@ import {
   coursesTable,
   conceptMasteryTable,
   sessionsTable,
+  dialogueTurnsTable,
   modulesTable,
   beatsTable,
   caseScenariosTable,
@@ -14,11 +15,12 @@ import {
   remedialQuestionsTable,
   type StudyPlanItem,
 } from "@workspace/db";
-import { eq, and, inArray, asc, desc, gt } from "drizzle-orm";
+import { eq, and, inArray, asc, desc, gt, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isDue, sm2Update } from "../lib/sm2";
 import { ensureRemediationSet, createUploadSet, getUploadSets, bumpGamification, getGamification } from "../lib/remediationEngine";
 import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
+import { generateSocraticTurn, type SocraticContext } from "../lib/socraticEngine";
 
 /**
  * The in-LMS "Coach" area for off-track learners: a native, remedial-scoped surface
@@ -400,6 +402,86 @@ router.post("/learn/coach/materials/add", requireAuth, async (req, res) => {
 // GET /learn/coach/materials/list — the practice sets the learner built from their own uploads.
 router.get("/learn/coach/materials/list", requireAuth, async (req, res) => {
   res.json({ materials: await getUploadSets(req.userId!) });
+});
+
+// POST /learn/coach/tutor { moduleId?, remedialFocus? } — start a one-on-one coaching session for
+// the remedial learner. Because they are on an ACTIVE off-track plan for the course, they are
+// entitled to coach on it even without a standard course enrolment row (the generic POST /sessions
+// gate would otherwise 403 with "Not enrolled"). Defaults to the remedial course's first published
+// module that has content, so the Tutor action always connects to a real session.
+router.post("/learn/coach/tutor", requireAuth, async (req, res) => {
+  const userId = req.userId!;
+  const plans = await activeRemedialPlans(userId);
+  if (plans.length === 0) {
+    res.status(403).json({ error: "You don't have an active remedial plan." });
+    return;
+  }
+  const remedialFocus = typeof req.body?.remedialFocus === "string" && req.body.remedialFocus.trim()
+    ? req.body.remedialFocus.trim().slice(0, 300)
+    : null;
+  const courseIds = new Set(plans.map(({ p }) => p.courseId).filter(Boolean) as string[]);
+  const requestedId = typeof req.body?.moduleId === "string" ? req.body.moduleId : "";
+
+  // Use the requested module only if it's published and inside one of the learner's remedial
+  // courses; otherwise fall back to that course's first published module with a beat.
+  let module: typeof modulesTable.$inferSelect | null = null;
+  if (requestedId) {
+    const [m] = await db.select().from(modulesTable).where(eq(modulesTable.id, requestedId)).limit(1);
+    if (m && m.status === "published" && (!m.courseId || courseIds.has(m.courseId))) module = m;
+  }
+  if (!module) {
+    const courseId = plans[0].p.courseId;
+    if (courseId) {
+      const [m] = await db
+        .select()
+        .from(modulesTable)
+        .where(and(eq(modulesTable.courseId, courseId), eq(modulesTable.status, "published"), gt(modulesTable.beatCount, 0)))
+        .orderBy(asc(modulesTable.order))
+        .limit(1);
+      module = m ?? null;
+    }
+  }
+  if (!module) {
+    res.status(422).json({ error: "There's no coachable content published for your course yet — try Practice instead." });
+    return;
+  }
+
+  const [firstBeat] = await db.select().from(beatsTable).where(eq(beatsTable.moduleId, module.id)).orderBy(asc(beatsTable.order)).limit(1);
+  if (!firstBeat) {
+    res.status(422).json({ error: "There's no coachable content published for your course yet — try Practice instead." });
+    return;
+  }
+
+  const [session] = await db
+    .insert(sessionsTable)
+    .values({ moduleId: module.id, userId, status: "active", masteryScore: "0", currentBeatId: firstBeat.id, remedialFocus })
+    .returning({ id: sessionsTable.id });
+
+  const learner = req.dbUser!;
+  let opening: string;
+  try {
+    const ctx: SocraticContext = {
+      beatTitle: firstBeat.title,
+      beatType: firstBeat.type,
+      narration: firstBeat.narration,
+      scenario: firstBeat.scenario,
+      bulletPoints: firstBeat.bulletPoints,
+      learnerName: learner.firstName,
+      personality: learner.coachPersonality,
+      learningStyle: learner.learningStyle,
+      accommodations: learner.accommodations,
+      turnCount: 0,
+      promptBudget: 8,
+      remedialFocus,
+    };
+    opening = await generateSocraticTurn(ctx, [{ role: "user", content: "I'm ready to begin. Ask me the first question." }], true);
+  } catch {
+    opening = `Let's think about this together. ${firstBeat.narration ?? ""} In your own words, how would you apply this idea in your work tomorrow?`;
+  }
+  await db.insert(dialogueTurnsTable).values({ sessionId: session.id, role: "tutor", content: opening, beatId: firstBeat.id });
+  await db.update(sessionsTable).set({ turnCount: sql`${sessionsTable.turnCount} + 1` }).where(eq(sessionsTable.id, session.id));
+
+  res.status(201).json({ id: session.id });
 });
 
 // POST /learn/coach/flashcard/:id/review { grade: 0-3 } — grade a flashcard, advance its SM-2

@@ -81,6 +81,15 @@ export function CoachHub() {
       apiFetch<{ id: string }>("/sessions", { method: "POST", body: JSON.stringify(v) }),
     onSuccess: (s) => navigate(`/learn/${s.id}`),
   });
+  const [tutorError, setTutorError] = useState<string | null>(null);
+  // Tutor uses a remedial-scoped start that doesn't require a standard course enrolment (an off-track
+  // learner is entitled to coach on the course they're behind on), so it always connects.
+  const startCoachTutor = useMutation({
+    mutationFn: (v: { moduleId?: string; remedialFocus?: string | null }) =>
+      apiFetch<{ id: string }>("/learn/coach/tutor", { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: (s) => navigate(`/learn/${s.id}`),
+    onError: (e: unknown) => setTutorError(e instanceof Error ? e.message : "Couldn't start a coaching session. Try Practice instead."),
+  });
 
   const allItems = useMemo(() => (overview.data?.plans ?? []).flatMap((p) => p.items.map((it) => ({ ...it, plan: p }))), [overview.data]);
   const weakestModule = useMemo(() => {
@@ -100,13 +109,11 @@ export function CoachHub() {
     const moduleId = weakestModule?.moduleId ?? overview.data?.tutorModuleId ?? null;
     if (moduleId) return startSession.mutate({ moduleId, remedialFocus: it.category || it.title });
   }
-  // Picking "Tutor" always starts a coaching session — on the top gap if there is one, otherwise
-  // straight on the remedial course's first module so it never dead-ends.
+  // Picking "Tutor" always starts a coaching session focused on the learner's top gap. The server
+  // chooses a coachable module in the remedial course and skips the enrolment gate, so it connects.
   const startTutor = () => {
-    const it = allItems.find((i) => !i.done) ?? allItems[0];
-    if (it) return launchItem(it);
-    const moduleId = weakestModule?.moduleId ?? overview.data?.tutorModuleId ?? null;
-    if (moduleId) startSession.mutate({ moduleId, remedialFocus: overview.data?.gaps[0] ?? null });
+    setTutorError(null);
+    startCoachTutor.mutate({ remedialFocus: overview.data?.gaps[0] ?? null });
   };
 
   if (overview.isLoading) {
@@ -179,9 +186,9 @@ export function CoachHub() {
             text="Flashcards and quick quizzes built from your own class content. Flip a card and rate how well you knew it, then answer questions to lock the ideas in. You earn points and build a daily streak as you go."
             onClick={() => primaryPlan && data.gaps[0] && setPractice({ kind: "gap", planId: primaryPlan.planId, category: data.gaps[0] })}
             disabled={!primaryPlan || !data.gaps[0]} />
-          <ActionCard icon={MessageSquare} title="Tutor" cta="Begin a coaching session"
+          <ActionCard icon={MessageSquare} title="Tutor" cta={startCoachTutor.isPending ? "Starting your session…" : "Begin a coaching session"}
             text="Start a one-on-one coaching session right now. Your coach asks guiding questions and works through the tricky parts with you, step by step, focused only on what you're catching up on."
-            onClick={startTutor} disabled={startSession.isPending || (allItems.length === 0 && !data.tutorModuleId)} />
+            onClick={startTutor} disabled={startCoachTutor.isPending} />
           <ActionCard icon={Upload} title="Materials" cta="Add & practise your content"
             text="Bring in your own study material — a PDF, Word or PowerPoint file, notes, or a link — and the coach turns it into flashcards and a quiz you can practise straight away."
             onClick={() => showSection("materials")} />
@@ -189,6 +196,7 @@ export function CoachHub() {
             text="Watch your understanding grow - see how well you know each concept and which gaps are still open, so you always know what to do next."
             onClick={() => showSection("progress")} />
         </div>
+        {tutorError && <p className="mt-3 text-sm text-red-600">{tutorError}</p>}
         {data.gaps.length > 1 && (
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">Or jump straight to a gap:</span>
