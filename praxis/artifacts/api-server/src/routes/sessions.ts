@@ -15,6 +15,7 @@ import {
   ensureQuestion,
   generateSocraticTurn,
   generateWorkedExample,
+  generateAnswerOptions,
   SOCRATIC_MODEL,
   type SocraticContext,
 } from "../lib/socraticEngine";
@@ -106,22 +107,22 @@ router.post("/sessions", requireAuth, async (req, res) => {
   // rule so it honours the learner's coach personality and accommodations.
   if (firstBeat) {
     const learner = req.dbUser!;
+    const ctx: SocraticContext = {
+      beatTitle: firstBeat.title,
+      beatType: firstBeat.type,
+      narration: firstBeat.narration,
+      scenario: firstBeat.scenario,
+      bulletPoints: firstBeat.bulletPoints,
+      learnerName: learner.firstName,
+      personality: learner.coachPersonality,
+      learningStyle: learner.learningStyle,
+      accommodations: learner.accommodations,
+      turnCount: 0,
+      promptBudget: PROMPT_BUDGET,
+      remedialFocus,
+    };
     let tutorOpening: string;
     try {
-      const ctx: SocraticContext = {
-        beatTitle: firstBeat.title,
-        beatType: firstBeat.type,
-        narration: firstBeat.narration,
-        scenario: firstBeat.scenario,
-        bulletPoints: firstBeat.bulletPoints,
-        learnerName: learner.firstName,
-        personality: learner.coachPersonality,
-        learningStyle: learner.learningStyle,
-        accommodations: learner.accommodations,
-        turnCount: 0,
-        promptBudget: PROMPT_BUDGET,
-        remedialFocus,
-      };
       tutorOpening = await generateSocraticTurn(
         ctx,
         [{ role: "user", content: "I'm ready to begin. Ask me the first question." }],
@@ -130,11 +131,14 @@ router.post("/sessions", requireAuth, async (req, res) => {
     } catch {
       tutorOpening = `Let's think about this together. ${firstBeat.narration} In your own words, how would you apply this idea in your work tomorrow?`;
     }
+    const opts = await generateAnswerOptions(tutorOpening, ctx);
     await db.insert(dialogueTurnsTable).values({
       sessionId: session.id,
       role: "tutor",
       content: tutorOpening,
       beatId: firstBeat.id,
+      options: opts.options.length ? opts.options : null,
+      selectMode: opts.mode,
     });
     await db
       .update(sessionsTable)
@@ -168,6 +172,8 @@ router.get("/sessions/:sessionId", requireAuth, async (req, res) => {
       beatId: t.beatId,
       reasoning: t.reasoning,
       masteryDelta: t.masteryDelta ? Number(t.masteryDelta) : null,
+      options: t.options ?? null,
+      selectMode: t.selectMode ?? null,
       createdAt: t.createdAt.toISOString(),
     })),
   });
@@ -310,6 +316,13 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       recentTutor.length === 2 && recentTutor.every((t) => Number(t.masteryDelta ?? 0) <= 0);
     const scaffold = result.grade <= 1 && priorTwoStruggled;
 
+    // Selectable answer choices for the NEW question, so the learner can pick instead of typing.
+    // Skipped once mastered (the session is over).
+    let answerOpts = { mode: "free" as string, options: [] as string[] };
+    if (!result.mastered) {
+      try { answerOpts = await generateAnswerOptions(fullResponse, socraticCtx); } catch { /* leave as free */ }
+    }
+
     // Save tutor turn
     await db.insert(dialogueTurnsTable).values({
       sessionId,
@@ -318,9 +331,11 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       beatId: beatId ?? null,
       reasoning: result.reasoning,
       masteryDelta: masteryDelta.toFixed(4),
+      options: answerOpts.options.length ? answerOpts.options : null,
+      selectMode: answerOpts.mode,
     });
 
-    res.write(`data: ${JSON.stringify({ done: true, masteryScore: result.newMastery, grade: result.grade, mastered: result.mastered, scaffold })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true, masteryScore: result.newMastery, grade: result.grade, mastered: result.mastered, scaffold, options: answerOpts.options, selectMode: answerOpts.mode })}\n\n`);
     res.end();
   } catch (err) {
     req.log.error({ err }, "Session respond error");

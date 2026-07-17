@@ -336,4 +336,48 @@ Rules:
   }
 }
 
+export interface AnswerOptions {
+  mode: "single" | "multi" | "free";
+  options: string[];
+}
+
+/**
+ * Turn a coach question into selectable answer choices so the learner can pick instead of typing.
+ * Most questions get 4-5 short options (single choice, or pick-all-that-apply); questions that
+ * genuinely need the learner's own words come back as mode "free" with no options.
+ */
+export async function generateAnswerOptions(question: string, ctx: SocraticContext): Promise<AnswerOptions> {
+  const concept = ctx.beatTitle ?? ctx.moduleTitle ?? "this concept";
+  const system = `You turn a coaching question into answer choices a learner can select.
+Concept: "${concept}".${ctx.narration ? " Context: " + ctx.narration : ""}
+Return ONLY JSON: {"mode": "single" | "multi" | "free", "options": [string, ...]}.
+Rules:
+- PREFER giving options. Most questions should be "single" (choose the best one) or "multi" (pick all that apply, when several answers are each valid).
+- Use "free" ONLY when the question truly needs the learner's own words: it asks them to explain in their own words, give a personal example, summarise, or reflect. Then return an empty options array.
+- For single or multi, give 4 or 5 SHORT options, a handful of words each. Include a mix: one or two strong directions and some weaker or common-misconception choices, so the pick is meaningful.
+- Plain text only. No letter or number prefixes, no markdown, no asterisks, no em or en dashes. Workplace-authentic South African English.`;
+  const fallback: AnswerOptions = { mode: "free", options: [] };
+  try {
+    const msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 400,
+      system,
+      messages: [{ role: "user", content: `Coaching question:\n"${question}"\n\nReturn only the JSON.` }],
+    });
+    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+    const parsed = JSON.parse(match[0]) as { mode?: unknown; options?: unknown };
+    const mode = parsed.mode === "single" || parsed.mode === "multi" ? parsed.mode : "free";
+    if (mode === "free") return { mode: "free", options: [] };
+    const options = Array.isArray(parsed.options)
+      ? (parsed.options as unknown[]).map((o) => sanitizePlain(String(o))).filter(Boolean).slice(0, 5)
+      : [];
+    if (options.length < 2) return fallback; // not enough to choose from, fall back to typing
+    return { mode, options };
+  } catch {
+    return fallback;
+  }
+}
+
 export { MODEL as SOCRATIC_MODEL };

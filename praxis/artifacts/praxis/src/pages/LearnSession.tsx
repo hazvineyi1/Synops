@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGetSession, useGetModule } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Send, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion, Lightbulb, ChevronRight, PencilLine } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion, Lightbulb, ChevronRight, PencilLine, Check } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { BeatType } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
@@ -136,6 +136,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // Guidance + context panels — both available at all times via the sticky bar, each minimisable.
   const [showHow, setShowHow] = useState(true);
   const [showFacts, setShowFacts] = useState(true);
+  // Selectable answer options: what the learner has picked, and whether they chose to type instead.
+  const [selected, setSelected] = useState<string[]>([]);
+  const [typeOwn, setTypeOwn] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Local state for turns to optimistically append user message and streaming tutor message
@@ -146,6 +149,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
       setLocalTurns(session.turns);
     }
   }, [session?.turns]);
+
+  // A fresh question resets the selection and the "type my own" toggle.
+  useEffect(() => { setSelected([]); setTypeOwn(false); }, [localTurns.length]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -186,11 +192,32 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   };
   const hasFacts = !!(factPattern.focus || factPattern.description || factPattern.scenario || factPattern.bullets.length);
 
-  const handleSend = async () => {
-    if (!inputValue.trim() || isStreaming) return;
-    
-    const userMessage = inputValue;
-    setInputValue('');
+  // The current (latest) coach question and its selectable answer choices, if any.
+  const lastTurn = localTurns[localTurns.length - 1];
+  const activeOptions: string[] = (lastTurn && lastTurn.role === 'tutor' && Array.isArray(lastTurn.options)) ? lastTurn.options : [];
+  const activeMode: string = (lastTurn && lastTurn.role === 'tutor' && lastTurn.selectMode) ? lastTurn.selectMode : 'free';
+  const showOptions = !isStreaming && !isMastered && activeOptions.length >= 2 && activeMode !== 'free' && !typeOwn;
+
+  function toggleSelect(opt: string) {
+    if (activeMode === 'multi') {
+      setSelected((s) => (s.includes(opt) ? s.filter((x) => x !== opt) : [...s, opt]));
+    } else {
+      setSelected([opt]);
+    }
+  }
+  function submitSelection() {
+    if (selected.length === 0) return;
+    // Preserve the order the options were presented in for multi-select.
+    const ordered = activeOptions.filter((o) => selected.includes(o));
+    handleSend(activeMode === 'multi' ? ordered.join('; ') : ordered[0]);
+    setSelected([]);
+  }
+
+  const handleSend = async (explicit?: string) => {
+    const userMessage = (explicit ?? inputValue).trim();
+    if (!userMessage || isStreaming) return;
+
+    if (explicit === undefined) setInputValue('');
     setIsStreaming(true);
     setStreamingText('');
     setShowScaffold(false);
@@ -481,29 +508,77 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
         </div>
       </main>
 
-      {/* Input Area */}
+      {/* Input Area — selectable answer choices for most questions, with a "type my own" escape;
+          free-text box when the coach asks for the learner's own words (or they choose to write). */}
       <footer className="shrink-0 bg-background border-t border-border p-4 pb-safe">
-        <div className="max-w-3xl mx-auto relative">
-          <textarea
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isMastered ? "Session completed." : "Type your response..."}
-            disabled={isStreaming || isMastered}
-            className="w-full resize-none rounded-xl border border-input bg-card px-4 py-4 pr-14 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[60px] max-h-[200px]"
-            rows={1}
-            style={{
-              height: 'auto',
-            }}
-          />
-          <Button 
-            size="icon" 
-            className="absolute right-2 top-[50%] -translate-y-[50%] h-10 w-10 rounded-lg"
-            disabled={!inputValue.trim() || isStreaming || isMastered}
-            onClick={handleSend}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+        <div className="max-w-3xl mx-auto">
+          {showOptions ? (
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {activeMode === 'multi' ? 'Pick all that apply' : 'Choose your answer'}
+                </p>
+                <button onClick={() => setTypeOwn(true)} className="text-xs font-medium text-primary hover:underline">
+                  I'd rather write my answer
+                </button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {activeOptions.map((opt, i) => {
+                  const on = selected.includes(opt);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => toggleSelect(opt)}
+                      className={cn(
+                        "flex items-start gap-2.5 rounded-xl border-2 p-3 text-left text-sm transition",
+                        on ? "border-primary bg-primary/5" : "border-border bg-card hover:border-primary/40 hover:bg-muted/40"
+                      )}
+                    >
+                      <span className={cn(
+                        "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center border text-[10px]",
+                        activeMode === 'multi' ? "rounded-[4px]" : "rounded-full",
+                        on ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50"
+                      )}>
+                        {on && <Check className="h-3 w-3" />}
+                      </span>
+                      <span className="text-foreground">{sanitizePlain(opt)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Button className="mt-3 w-full sm:w-auto" size="lg" disabled={selected.length === 0} onClick={submitSelection}>
+                Submit answer <Send className="ml-1.5 h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <div>
+              <div className="relative">
+                <textarea
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isMastered ? "Session completed." : "Type your response..."}
+                  disabled={isStreaming || isMastered}
+                  className="w-full resize-none rounded-xl border border-input bg-card px-4 py-4 pr-14 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[60px] max-h-[200px]"
+                  rows={1}
+                  style={{ height: 'auto' }}
+                />
+                <Button
+                  size="icon"
+                  className="absolute right-2 top-[50%] -translate-y-[50%] h-10 w-10 rounded-lg"
+                  disabled={!inputValue.trim() || isStreaming || isMastered}
+                  onClick={() => handleSend()}
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+              {typeOwn && activeOptions.length >= 2 && activeMode !== 'free' && !isMastered && (
+                <button onClick={() => { setTypeOwn(false); setInputValue(''); }} className="mt-2 text-xs font-medium text-primary hover:underline">
+                  Back to answer choices
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <p className="text-center text-xs text-muted-foreground mt-3">
           The tutor will not provide answers, only questions to guide your reasoning.

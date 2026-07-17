@@ -20,7 +20,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { isDue, sm2Update } from "../lib/sm2";
 import { ensureRemediationSet, createUploadSet, getUploadSets, bumpGamification, getGamification } from "../lib/remediationEngine";
 import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
-import { generateSocraticTurn, type SocraticContext } from "../lib/socraticEngine";
+import { generateSocraticTurn, generateAnswerOptions, type SocraticContext } from "../lib/socraticEngine";
 
 /**
  * The in-LMS "Coach" area for off-track learners: a native, remedial-scoped surface
@@ -458,27 +458,28 @@ router.post("/learn/coach/tutor", requireAuth, async (req, res) => {
     .returning({ id: sessionsTable.id });
 
   const learner = req.dbUser!;
+  const ctx: SocraticContext = {
+    beatTitle: firstBeat.title,
+    beatType: firstBeat.type,
+    narration: firstBeat.narration,
+    scenario: firstBeat.scenario,
+    bulletPoints: firstBeat.bulletPoints,
+    learnerName: learner.firstName,
+    personality: learner.coachPersonality,
+    learningStyle: learner.learningStyle,
+    accommodations: learner.accommodations,
+    turnCount: 0,
+    promptBudget: 8,
+    remedialFocus,
+  };
   let opening: string;
   try {
-    const ctx: SocraticContext = {
-      beatTitle: firstBeat.title,
-      beatType: firstBeat.type,
-      narration: firstBeat.narration,
-      scenario: firstBeat.scenario,
-      bulletPoints: firstBeat.bulletPoints,
-      learnerName: learner.firstName,
-      personality: learner.coachPersonality,
-      learningStyle: learner.learningStyle,
-      accommodations: learner.accommodations,
-      turnCount: 0,
-      promptBudget: 8,
-      remedialFocus,
-    };
     opening = await generateSocraticTurn(ctx, [{ role: "user", content: "I'm ready to begin. Ask me the first question." }], true);
   } catch {
     opening = `Let's think about this together. ${firstBeat.narration ?? ""} In your own words, how would you apply this idea in your work tomorrow?`;
   }
-  await db.insert(dialogueTurnsTable).values({ sessionId: session.id, role: "tutor", content: opening, beatId: firstBeat.id });
+  const openingOpts = await generateAnswerOptions(opening, ctx);
+  await db.insert(dialogueTurnsTable).values({ sessionId: session.id, role: "tutor", content: opening, beatId: firstBeat.id, options: openingOpts.options.length ? openingOpts.options : null, selectMode: openingOpts.mode });
   await db.update(sessionsTable).set({ turnCount: sql`${sessionsTable.turnCount} + 1` }).where(eq(sessionsTable.id, session.id));
 
   res.status(201).json({ id: session.id });

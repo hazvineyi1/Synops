@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, numeric, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, numeric, integer, pgEnum, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -40,6 +40,10 @@ export const dialogueTurnsTable = pgTable("dialogue_turns", {
   beatId: text("beat_id"),
   reasoning: text("reasoning"),
   masteryDelta: numeric("mastery_delta", { precision: 5, scale: 4 }),
+  // For tutor questions: selectable answer choices the learner can pick instead of typing, plus the
+  // mode ("single" = choose one, "multi" = pick all that apply, "free" = write your own).
+  options: jsonb("options").$type<string[]>(),
+  selectMode: text("select_mode"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
