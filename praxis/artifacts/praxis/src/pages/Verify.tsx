@@ -1,10 +1,20 @@
 import React from 'react';
 import { useVerifyCredential } from '@workspace/api-client-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { CheckCircle2, XCircle, Shield, Award, Calendar, Check, ExternalLink } from 'lucide-react';
+import { CheckCircle2, XCircle, Shield, Award, Calendar, Check, ExternalLink, Download } from 'lucide-react';
 import { isPast } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Link } from 'wouter';
+import { hexToHsl } from '@/context/ThemeProvider';
+
+interface VerifyBrand {
+  displayName?: string | null;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  accentColor?: string | null;
+  credentialTitle?: string | null;
+}
 
 export function Verify({ params }: { params: { credentialId: string } }) {
   const { credentialId } = params;
@@ -52,10 +62,39 @@ export function Verify({ params }: { params: { credentialId: string } }) {
 
   const masteryPct = Math.round((verification.masteryScore || 0) * 100);
 
+  // Tenant branding arrives on the (public) verify response; the generated type doesn't know
+  // about it yet, hence the cast. This is the only channel for branding a public page.
+  const brand = (verification as any).brand as VerifyBrand | undefined;
+  const certificateUrl =
+    ((verification as any).certificateUrl as string | undefined) ||
+    `/api/credentials/${credentialId}/certificate.pdf`;
+  const brandName = brand?.displayName || verification.partnerName || 'Synops Praxis';
+  const markTitle = brand?.credentialTitle || 'PraxisMark';
+
+  // Reflect the tenant primary colour by overriding the CSS vars on this page's root, so the
+  // existing text-primary/bg-primary utilities recolour (ThemeApplier doesn't run on public routes).
+  const hsl = brand?.primaryColor ? hexToHsl(brand.primaryColor) : null;
+  const brandStyle = hsl
+    ? ({
+        ['--primary']: `${hsl.h} ${hsl.s}% ${hsl.l}%`,
+        ['--ring']: `${hsl.h} ${hsl.s}% ${hsl.l}%`,
+        ['--primary-foreground']: hsl.l > 62 ? '222 47% 11%' : '0 0% 100%',
+      } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div className="min-h-screen bg-muted/30 flex flex-col items-center py-12 px-4 sm:px-6">
+    <div className="min-h-screen bg-muted/30 flex flex-col items-center py-12 px-4 sm:px-6" style={brandStyle}>
       <div className="w-full max-w-2xl space-y-8 animate-in slide-in-from-bottom-8 duration-700">
-        
+
+        {/* Issuer wordmark */}
+        <div className="flex flex-col items-center gap-2">
+          {brand?.logoUrl ? (
+            <img src={brand.logoUrl} alt={brandName} className="h-10 max-w-[220px] object-contain" />
+          ) : (
+            <span className="text-lg font-serif font-bold text-primary">{brandName}</span>
+          )}
+        </div>
+
         {/* Verification Status Banner */}
         <div className={`p-6 rounded-2xl flex items-center gap-4 text-white shadow-lg ${
           valid ? 'bg-green-600' : isRevoked ? 'bg-slate-700' : 'bg-destructive'
@@ -78,13 +117,18 @@ export function Verify({ params }: { params: { credentialId: string } }) {
         {/* Main Credential Card */}
         <Card className="overflow-hidden border-0 shadow-xl bg-card">
           <div className="h-32 bg-primary/5 flex items-center justify-center border-b border-border">
-            <Award className="h-16 w-16 text-primary opacity-20" />
+            {brand?.logoUrl ? (
+              <img src={brand.logoUrl} alt={brandName} className="h-14 max-w-[240px] object-contain opacity-90" />
+            ) : (
+              <Award className="h-16 w-16 text-primary opacity-20" />
+            )}
           </div>
-          
+
           <div className="px-8 py-10 -mt-16 relative">
-            <div className="h-24 w-24 bg-card rounded-full border-4 border-card shadow-md flex items-center justify-center mx-auto mb-6">
+            <div className="h-24 w-24 bg-card rounded-full border-4 border-card shadow-md flex items-center justify-center mx-auto mb-4">
               <Shield className={`h-10 w-10 ${valid ? 'text-primary' : 'text-muted-foreground'}`} />
             </div>
+            <p className="text-center text-xs font-bold text-primary uppercase tracking-[0.2em] mb-6">{markTitle}</p>
 
             <div className="text-center space-y-6">
               <div>
@@ -119,6 +163,12 @@ export function Verify({ params }: { params: { credentialId: string } }) {
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-8 flex justify-center">
+              <Button onClick={() => window.open(certificateUrl, '_blank')}>
+                <Download className="h-4 w-4 mr-2" /> Download certificate (PDF)
+              </Button>
             </div>
           </div>
         </Card>
@@ -158,7 +208,7 @@ export function Verify({ params }: { params: { credentialId: string } }) {
         <div className="text-center pb-12">
           <Link href="/">
             <Button variant="outline" className="bg-background">
-              Learn about Synops Praxis <ExternalLink className="h-4 w-4 ml-2" />
+              Learn about {brandName} <ExternalLink className="h-4 w-4 ml-2" />
             </Button>
           </Link>
         </div>

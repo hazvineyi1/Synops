@@ -2,7 +2,7 @@ import React from 'react';
 import { useListCredentials, useGetBrandTheme } from '@workspace/api-client-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, Calendar, Clock, Copy, ExternalLink, Award } from 'lucide-react';
+import { ShieldCheck, Calendar, Clock, Copy, ExternalLink, Award, Download } from 'lucide-react';
 import { formatDistanceToNow, isPast } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
@@ -126,11 +126,14 @@ export function Credentials() {
                   </div>
                   
                   {/* Action overlay on hover (desktop) or fixed (mobile) */}
-                  <div className="mt-4 flex gap-3 w-full">
-                    <Button variant="outline" className="flex-1 bg-card hover:bg-muted" onClick={() => copyToClipboard(`/verify/${cred.id}`)}>
+                  <div className="mt-4 flex flex-wrap gap-3 w-full">
+                    <Button className="flex-1 min-w-[140px]" onClick={() => window.open(`/api/credentials/${cred.id}/certificate.pdf`, '_blank')}>
+                      <Download className="h-4 w-4 mr-2" /> Certificate
+                    </Button>
+                    <Button variant="outline" className="flex-1 min-w-[120px] bg-card hover:bg-muted" onClick={() => copyToClipboard(`/verify/${cred.id}`)}>
                       <Copy className="h-4 w-4 mr-2" /> Copy Link
                     </Button>
-                    <Button variant="secondary" className="flex-1" onClick={() => window.open(`/verify/${cred.id}`, '_blank')}>
+                    <Button variant="secondary" className="flex-1 min-w-[120px]" onClick={() => window.open(`/verify/${cred.id}`, '_blank')}>
                       <ExternalLink className="h-4 w-4 mr-2" /> Verify Page
                     </Button>
                   </div>
