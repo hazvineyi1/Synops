@@ -91,7 +91,7 @@ interface PlanItem {
 interface CoachPlan {
   items: PlanItem[];
   rationale: string;
-  catchUp?: { active: boolean; rationale?: string; courseTitle?: string | null };
+  catchUp?: { active: boolean; rationale?: string; courseTitle?: string | null; coachUrl?: string | null };
 }
 interface MasteryConcept {
   moduleId: string;
@@ -194,6 +194,15 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
     return navigate("/grades");
   };
 
+  // The off-track learner's remedial plan is pushed to the AI study coach (The Coach app), which
+  // returns a signed magic link. When present, catch-up entry points open the AI coach straight onto
+  // the plan; otherwise we fall back to the in-app Socratic session so nothing breaks pre-integration.
+  const aiCoachUrl = plan?.catchUp?.coachUrl ?? null;
+  const openAiCoach = () => {
+    if (aiCoachUrl) window.open(aiCoachUrl, "_blank", "noopener,noreferrer");
+  };
+  const startCatchUp = (it: PlanItem) => (aiCoachUrl ? openAiCoach() : launchItem(it));
+
   const courses = prog?.courses ?? [];
   const inProgress = courses.filter((c) => c.status !== "completed").sort((a, b) => b.percent - a.percent);
   const upcoming = (dueSoon ?? [])
@@ -249,7 +258,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
               <Button onClick={() => navigate("/grades")}>
                 View my plan <ArrowRight className="h-4 w-4 ml-1.5" />
               </Button>
-              <Button variant="outline" onClick={() => navigate("/grades")}>
+              <Button variant="outline" onClick={() => (aiCoachUrl ? openAiCoach() : navigate("/grades"))}>
                 <MessageSquare className="h-4 w-4 mr-1.5" /> Coach
               </Button>
             </div>
@@ -414,7 +423,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                 <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{nextUp.reason}</p>
                 <Button
                   className="w-full"
-                  onClick={() => launchItem(nextUp)}
+                  onClick={() => (plan?.catchUp?.active && nextUp.remedial ? startCatchUp(nextUp) : launchItem(nextUp))}
                   disabled={startSession.isPending}
                 >
                   {startSession.isPending ? "Starting…" : plan?.catchUp?.active && nextUp.remedial ? "Start catch-up" : "Start session"}

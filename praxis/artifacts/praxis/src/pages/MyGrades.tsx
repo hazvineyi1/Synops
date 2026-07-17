@@ -103,6 +103,14 @@ export function MyGrades() {
                 <h2 className="font-semibold text-foreground">Your personalised study plan</h2>
               </div>
               <p className="mb-3 text-sm text-muted-foreground">{me.data.plan.rationale}</p>
+              {me.data.plan.coachUrl && (
+                <Button
+                  className="mb-3 w-full sm:w-auto gap-1.5"
+                  onClick={() => window.open(me.data!.plan!.coachUrl!, "_blank", "noopener,noreferrer")}
+                >
+                  <MessageSquare className="h-4 w-4" /> Open your AI coach <ArrowRight className="h-4 w-4" />
+                </Button>
+              )}
               <ol className="space-y-2">
                 {me.data.plan.items.map((it, idx) => {
                   const href = it.kind === "case" && it.refId ? `/cases/${it.refId}/begin` : it.kind === "activity" && it.refId ? `/activities/${it.refId}/play` : null;

@@ -80,6 +80,8 @@ export interface StudyPlan {
   rationale: string;
   items: StudyPlanItem[];
   createdAt: string;
+  // Magic-link URL into the AI study coach (The Coach app) for this pushed remedial plan, if any.
+  coachUrl?: string | null;
 }
 
 export interface MeGradebook {

@@ -193,7 +193,10 @@ async function getRemedialCatchUp(userId: string) {
     }
   }
   if (!items.length) return null;
-  return { items, rationale, courseTitle: rows[0].courseTitle ?? null };
+  // The magic-link URL The Coach returned for this learner's pushed plan (most-recent active row),
+  // so the learner can open the AI coach straight onto the remedial work. Null until pushed/configured.
+  const coachUrl = rows.find((r) => r.p.coachUrl)?.p.coachUrl ?? null;
+  return { items, rationale, courseTitle: rows[0].courseTitle ?? null, coachUrl };
 }
 
 // GET /learn/plan — today's coach-led plan (the spine), with any off-track catch-up work led first.
@@ -204,7 +207,9 @@ router.get("/learn/plan", requireAuth, async (req, res) => {
   res.json({
     ...plan,
     items: remedial ? [...remedial.items, ...spine] : spine,
-    catchUp: remedial ? { active: true, rationale: remedial.rationale, courseTitle: remedial.courseTitle } : { active: false },
+    catchUp: remedial
+      ? { active: true, rationale: remedial.rationale, courseTitle: remedial.courseTitle, coachUrl: remedial.coachUrl }
+      : { active: false },
   });
 });
 

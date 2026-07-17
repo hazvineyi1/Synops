@@ -433,7 +433,7 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
     trend: computed.trend,
     cells: computed.cells,
     alert: alert ? { status: alert.status, reasons: alert.reasons, reasonLabels: (alert.reasons || []).map((r) => REASON_LABEL[r] || r) } : { status: "on_track", reasons: [], reasonLabels: [] },
-    plan: plan ? { id: plan.id, rationale: plan.rationale, items: plan.items, createdAt: plan.createdAt } : null,
+    plan: plan ? { id: plan.id, rationale: plan.rationale, items: plan.items, createdAt: plan.createdAt, coachUrl: plan.coachUrl ?? null } : null,
     settings,
   });
 });
@@ -476,7 +476,7 @@ router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (r
     trend: computed.trend,
     cells: computed.cells,
     alert: alert ? { status: alert.status, reasons: alert.reasons, reasonLabels: (alert.reasons || []).map((r) => REASON_LABEL[r] || r) } : { status: "on_track", reasons: [], reasonLabels: [] },
-    plan: plan ? { id: plan.id, rationale: plan.rationale, items: plan.items, createdAt: plan.createdAt } : null,
+    plan: plan ? { id: plan.id, rationale: plan.rationale, items: plan.items, createdAt: plan.createdAt, coachUrl: plan.coachUrl ?? null } : null,
     settings,
   });
 });

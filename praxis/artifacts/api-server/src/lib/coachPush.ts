@@ -23,7 +23,9 @@ export interface CatchUpPush {
   planRationale?: string | null;
 }
 
-export async function pushCatchUpToCoach(input: CatchUpPush): Promise<{ ok: boolean; status?: number; error?: string }> {
+export async function pushCatchUpToCoach(
+  input: CatchUpPush,
+): Promise<{ ok: boolean; status?: number; error?: string; coachUrl?: string | null }> {
   if (!coachPushConfigured()) return { ok: false, error: "Coach push not configured (COACH_API_URL + COACH_API_KEY)." };
   if (!input.learnerEmail || !input.content?.length) return { ok: false, error: "learnerEmail + content required." };
   try {
@@ -42,7 +44,9 @@ export async function pushCatchUpToCoach(input: CatchUpPush): Promise<{ ok: bool
       console.warn(`[coachPush] The Coach responded ${res.status}: ${body.slice(0, 300)}`);
       return { ok: false, status: res.status, error: body.slice(0, 300) };
     }
-    return { ok: true, status: res.status };
+    // The Coach returns { ok, coachUrl, ... } — the magic link the learner opens to work the plan.
+    const data = (await res.json().catch(() => ({}))) as { coachUrl?: string };
+    return { ok: true, status: res.status, coachUrl: typeof data?.coachUrl === "string" ? data.coachUrl : null };
   } catch (e) {
     const error = (e as Error)?.message ?? String(e);
     console.warn(`[coachPush] push failed: ${error}`);

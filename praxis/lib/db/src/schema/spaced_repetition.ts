@@ -62,6 +62,9 @@ export const coachPlansTable = pgTable("coach_plans", {
   courseId: text("course_id"),
   // Origin: "coach" (daily spine) | "gradebook_alert" (off-track remediation).
   source: text("source").notNull().default("coach"),
+  // For gradebook_alert plans pushed to The Coach (AI study-coach app): the returned magic-link URL
+  // the learner opens to work the remedial plan inside the AI coach. Null until pushed/configured.
+  coachUrl: text("coach_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -74,6 +74,7 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
 
   // Auto-generate an adaptive study plan from the learner's gaps.
   let planCreated = false;
+  let planRow: { id: string } | undefined;
   const plan = await generateStudyPlan({ courseId, userId, learnerName: learner?.firstName ?? null });
   if (plan) {
     try {
@@ -102,6 +103,7 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
         .returning();
       if (row) {
         planCreated = true;
+        planRow = row;
         await db
           .update(gradebookAlertsTable)
           .set({ planId: row.id, notifiedAt: new Date(), updatedAt: new Date() })
@@ -127,6 +129,8 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
     const gap = gapCats.length
       ? `${courseTitle}: ${gapCats.join(", ")}`
       : `${courseTitle}${reasonsText ? ` (${reasonsText.toLowerCase()})` : ""}`;
+    // Fire-and-forget so the grade path stays fast; when The Coach replies with the learner's
+    // magic-link URL, persist it on the plan row so "Start catch-up" opens the AI coach directly.
     void pushCatchUpToCoach({
       learnerEmail: learner.email,
       learnerName: [learner.firstName, learner.lastName].filter(Boolean).join(" ") || null,
@@ -134,7 +138,17 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
       gap,
       planRationale: plan.rationale,
       content: plan.items.map((i) => ({ title: i.title, body: i.why })).filter((c) => c.title && c.body),
-    });
+    })
+      .then(async (pushed) => {
+        if (pushed.ok && pushed.coachUrl && planRow) {
+          await db
+            .update(coachPlansTable)
+            .set({ coachUrl: pushed.coachUrl, updatedAt: new Date() })
+            .where(eq(coachPlansTable.id, planRow.id))
+            .catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
   }
 
   const learnerName = [learner?.firstName, learner?.lastName].filter(Boolean).join(" ") || "A learner";
