@@ -740,17 +740,20 @@ router.post("/gradebook/test-email", requireAuth, async (req, res) => {
   const override = (typeof req.body?.to === "string" && req.body.to.trim()) || (typeof req.query.to === "string" && req.query.to.trim());
   const to = override || u.email;
   if (!to) { res.status(400).json({ error: "No recipient — pass a 'to' or set an email on your account." }); return; }
+  const brand = await resolveEmailBrand((u as any).partnerId ?? null);
   const r = await sendMail({
     to,
-    subject: "Praxis email is working",
+    fromName: brand.senderName ?? brand.displayName,
+    subject: `${brand.displayName} email is working`,
     html: emailShell({
+      brand,
       heading: "Email delivery is set up",
-      bodyHtml: "This is a test of Praxis off-track email reports. If you can read this, learners, coaches and org admins will receive their alerts by email.",
-      ctaLabel: "Open Praxis",
+      bodyHtml: `This is a test of ${brand.displayName} off-track email reports. If you can read this, learners, coaches and org admins will receive their alerts by email — branded with this tenant's logo, colour and sender name.`,
+      ctaLabel: `Open ${brand.displayName}`,
       ctaUrl: appUrl("/"),
     }),
   });
-  res.json({ configured: true, sent: r.ok, to, status: r.status, error: r.error, from: process.env.EMAIL_FROM });
+  res.json({ configured: true, sent: r.ok, to, status: r.status, error: r.error, from: brand.senderName ?? brand.displayName });
 });
 
 // ── Learner marks a study-plan step done ────────────────────────────────────────

@@ -14,6 +14,7 @@ import { eq, and, inArray } from "drizzle-orm";
 import { recomputeLearnerAlert, REASON_LABEL, type AlertTransition } from "./gradebookEngine";
 import { generateStudyPlan } from "./studyPlanEngine";
 import { mailerConfigured, sendMail, appUrl, emailShell } from "./mailer";
+import { resolveEmailBrand } from "./emailBrand";
 
 /**
  * Off-track orchestration: recompute a learner's alert after a grade event and, when they
@@ -149,10 +150,13 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
     try {
       const reasonPhrase = reasonsText ? ` (${reasonsText.toLowerCase()})` : "";
       if (learner?.email) {
+        const brand = await resolveEmailBrand(learner.partnerId);
         await sendMail({
           to: learner.email,
+          fromName: brand.senderName ?? brand.displayName,
           subject: planCreated ? `Your study plan for ${courseTitle} is ready` : `Let's get you back on track in ${courseTitle}`,
           html: emailShell({
+            brand,
             heading: "Let's get you back on track",
             bodyHtml: `Hi ${learner.firstName || "there"}, in <strong>${courseTitle}</strong> we noticed you're falling behind${reasonPhrase}. ${planCreated ? "We've built a short, personalised plan to help you catch up — work through it a step at a time." : "Your coach has been notified and will help you catch up."}`,
             ctaLabel: planCreated ? "View my study plan" : "View my grades",
@@ -162,16 +166,19 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
       }
       if (staffIds.length) {
         const staff = await db
-          .select({ id: usersTable.id, email: usersTable.email })
+          .select({ id: usersTable.id, email: usersTable.email, partnerId: usersTable.partnerId })
           .from(usersTable)
           .where(inArray(usersTable.id, staffIds));
         const gradebookUrl = appUrl(`/courses/${courseId}/gradebook`);
         for (const s of staff) {
           if (!s.email) continue;
+          const brand = await resolveEmailBrand(s.partnerId);
           await sendMail({
             to: s.email,
+            fromName: brand.senderName ?? brand.displayName,
             subject: `${learnerName} may need support in ${courseTitle}`,
             html: emailShell({
+              brand,
               heading: `${learnerName} is off track`,
               bodyHtml: `<strong>${learnerName}</strong> is off track in <strong>${courseTitle}</strong>${reasonsText ? `: ${reasonsText.toLowerCase()}` : ""}.${planCreated ? " An adaptive study plan has been generated for them automatically." : ""}`,
               ctaLabel: "Open the gradebook",
