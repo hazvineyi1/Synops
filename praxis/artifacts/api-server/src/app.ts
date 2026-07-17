@@ -6,6 +6,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import router from "./routes";
+import { registerPwa } from "./pwa";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
@@ -40,6 +41,10 @@ app.use(express.json({ limit: "25mb" })); // large enough for base64-encoded doc
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+// Branded PWA manifest + icon, resolved by hostname. Registered before the SPA catch-all so the
+// browser's /manifest.webmanifest and /pwa-icon.svg requests reach these, not index.html.
+registerPwa(app);
 
 // ── Serve the built SPA (production single-service on Railway) ──
 // The web app builds to artifacts/praxis/dist/public. This bundle runs from

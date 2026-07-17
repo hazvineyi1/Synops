@@ -112,6 +112,20 @@ export function ThemeApplier() {
       }
       link.href = theme.faviconUrl;
     }
+
+    // PWA/browser chrome: colour the address bar + installed title bar, and the iOS home-screen
+    // app name, to match the tenant. (The manifest itself is resolved by hostname server-side.)
+    const setMeta = (name: string, content: string) => {
+      let m = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+      if (!m) {
+        m = document.createElement("meta");
+        m.name = name;
+        document.head.appendChild(m);
+      }
+      m.content = content;
+    };
+    if (theme.primaryColor) setMeta("theme-color", theme.primaryColor);
+    if (theme.displayName) setMeta("apple-mobile-web-app-title", theme.displayName);
   }, [theme]);
 
   return null;
