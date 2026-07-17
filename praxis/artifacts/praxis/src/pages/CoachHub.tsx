@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiFetch } from "@/lib/api";
@@ -65,6 +65,9 @@ export function CoachHub() {
   const [, navigate] = useLocation();
   const [selected, setSelected] = useState<Item | null>(null);
   const [practice, setPractice] = useState<{ planId: string; category: string } | null>(null);
+  const [tab, setTab] = useState<string>("materials");
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const goTab = (t: string) => { setTab(t); setTimeout(() => tabsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); };
 
   const overview = useQuery({ queryKey: ["coach", "overview"], queryFn: () => apiFetch<Overview>("/learn/coach/overview") });
   const progress = useQuery({ queryKey: ["coach", "progress"], queryFn: () => apiFetch<Progress>("/learn/coach/progress") });
@@ -142,14 +145,7 @@ export function CoachHub() {
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Why you're here</p>
           <p className="mt-2 leading-relaxed text-foreground">{whyReferred}</p>
         </div>
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          {primaryPlan && data.gaps[0] && (
-            <Button size="lg" onClick={() => setPractice({ planId: primaryPlan.planId, category: data.gaps[0] })}>
-              <Dumbbell className="mr-2 h-4 w-4" /> Start practising
-            </Button>
-          )}
-          <span className="text-sm text-muted-foreground">A session takes about 10 minutes, and your progress saves as you go.</span>
-        </div>
+        <p className="mt-4 text-sm text-muted-foreground">Pick one of the four ways below to get started — a session takes about 10 minutes, and your progress saves as you go.</p>
       </section>
 
       {/* At-a-glance stats */}
@@ -160,19 +156,28 @@ export function CoachHub() {
         <StatCard icon={Target} tone="text-red-600" label={data.gapCount === 1 ? "Gap to close" : "Gaps to close"} value={data.gapCount} />
       </section>
 
-      {/* How your coach works — full instructions */}
+      {/* Ways to close your gap — the instructions ARE the actions */}
       <section>
-        <h2 className="text-lg font-semibold text-foreground">How your Coach works</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Four ways to close your gap — use them in any order. Practice is the quickest win.</p>
+        <h2 className="text-lg font-semibold text-foreground">What would you like to do?</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Four ways to close your gap. Practice is the quickest win — but any of these helps.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <HowCard icon={Dumbbell} step="1" title="Practice" text="Flashcards and quick quizzes built from your own class content. Flip a card and rate how well you knew it, then answer questions to lock the ideas in. You earn points and build a daily streak as you go." />
-          <HowCard icon={BookOpen} step="2" title="Materials" text="The exact things to review to close your gap - the case studies, activities and lessons your coach chose for you. Open any one to read it, then jump into practice or a coaching session." />
-          <HowCard icon={MessageSquare} step="3" title="Tutor" text="A one-on-one coaching session. Your coach asks guiding questions and works through the tricky parts with you, step by step, focused only on what you're catching up on." />
-          <HowCard icon={TrendingUp} step="4" title="Progress" text="Watch your understanding grow - see how well you know each concept and which gaps are still open, so you always know what to do next." />
+          <ActionCard icon={Dumbbell} primary title="Practice" cta="Start practising"
+            text="Flashcards and quick quizzes built from your own class content. Flip a card and rate how well you knew it, then answer questions to lock the ideas in. You earn points and build a daily streak as you go."
+            onClick={() => primaryPlan && data.gaps[0] && setPractice({ planId: primaryPlan.planId, category: data.gaps[0] })}
+            disabled={!primaryPlan || !data.gaps[0]} />
+          <ActionCard icon={BookOpen} title="Materials" cta="Browse materials"
+            text="The exact things to review to close your gap - the case studies, activities and lessons your coach chose for you. Open any one to read it, then jump into practice or a coaching session."
+            onClick={() => goTab("materials")} />
+          <ActionCard icon={MessageSquare} title="Tutor" cta="Start a session"
+            text="A one-on-one coaching session. Your coach asks guiding questions and works through the tricky parts with you, step by step, focused only on what you're catching up on."
+            onClick={() => goTab("tutor")} />
+          <ActionCard icon={TrendingUp} title="Progress" cta="See my progress"
+            text="Watch your understanding grow - see how well you know each concept and which gaps are still open, so you always know what to do next."
+            onClick={() => goTab("progress")} />
         </div>
         {data.gaps.length > 1 && (
           <div className="mt-5 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">Jump straight to a gap:</span>
+            <span className="text-sm text-muted-foreground">Or jump straight to a gap:</span>
             {data.gaps.map((g) => {
               const pl = data.plans.find((p) => p.gaps.includes(g)) ?? primaryPlan;
               return (
@@ -186,9 +191,7 @@ export function CoachHub() {
         )}
       </section>
 
-      <h2 className="text-lg font-semibold text-foreground">Explore your coach</h2>
-
-      <Tabs defaultValue="materials">
+      <Tabs value={tab} onValueChange={setTab} ref={tabsRef as any}>
         <TabsList>
           <TabsTrigger value="materials"><BookOpen className="mr-1.5 h-4 w-4" /> Materials</TabsTrigger>
           <TabsTrigger value="tutor"><MessageSquare className="mr-1.5 h-4 w-4" /> Tutor</TabsTrigger>
@@ -652,15 +655,25 @@ function StatCard({ icon: Icon, tone, label, value }: { icon: any; tone: string;
   );
 }
 
-function HowCard({ icon: Icon, step, title, text }: { icon: any; step: string; title: string; text: string }) {
+function ActionCard({ icon: Icon, title, text, cta, primary, onClick, disabled }: { icon: any; title: string; text: string; cta: string; primary?: boolean; onClick: () => void; disabled?: boolean }) {
   return (
-    <div className="rounded-xl border border-border bg-background p-5">
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "group flex h-full flex-col rounded-xl border p-5 text-left transition disabled:pointer-events-none disabled:opacity-60",
+        primary ? "border-primary bg-primary/5 hover:bg-primary/10" : "border-border bg-background hover:border-primary/40",
+      )}
+    >
       <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></div>
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step {step}</span>
+        <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", primary ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary")}>
+          <Icon className="h-4 w-4" />
+        </div>
+        <h3 className="font-semibold text-foreground">{title}</h3>
+        {primary && <span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Start here</span>}
       </div>
-      <h3 className="mt-3 font-semibold text-foreground">{title}</h3>
-      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{text}</p>
-    </div>
+      <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{text}</p>
+      <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary">{cta} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" /></span>
+    </button>
   );
 }
