@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, or, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { canAdministerOrg, canAccessCourse, type ScopedUser } from "../lib/roles";
+import { canAdministerOrg, canAccessCourse, isSuperAdmin, type ScopedUser } from "../lib/roles";
 
 const router = Router();
 
@@ -138,6 +138,101 @@ async function canManageCourseSections(user: ScopedUser, courseId: string): Prom
   if (!course) return false;
   return canAccessCourse(user, course);
 }
+
+// GET /coaching/health — org/partner-wide coaching effectiveness for facilitators: how many
+// learners are flagged, how many are slipping through unassigned, per-coach load, and resolution
+// rate. The management layer over the matching + intervention flow.
+router.get("/coaching/health", requireAuth, async (req, res) => {
+  const user = req.dbUser as ScopedUser & { id: string; organisationId?: string | null; partnerId?: string | null };
+  if (!canAdministerOrg(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  // Resolve the tenant's courses (super = all; partner_admin = partner + its orgs; org_admin = org).
+  let courseRows: Array<{ id: string; title: string }>;
+  if (isSuperAdmin(user.role)) {
+    courseRows = await db.select({ id: coursesTable.id, title: coursesTable.title }).from(coursesTable);
+  } else {
+    const tenantIds = new Set<string>();
+    if (user.role === "partner_admin" && user.partnerId) {
+      tenantIds.add(user.partnerId);
+      const orgs = await db.select({ id: organisationsTable.id }).from(organisationsTable).where(eq(organisationsTable.partnerId, user.partnerId));
+      orgs.forEach((o) => tenantIds.add(o.id));
+    } else if (user.organisationId) {
+      tenantIds.add(user.organisationId);
+    } else if (user.partnerId) {
+      tenantIds.add(user.partnerId);
+    }
+    courseRows = tenantIds.size
+      ? await db.select({ id: coursesTable.id, title: coursesTable.title }).from(coursesTable).where(inArray(coursesTable.tenantId, [...tenantIds]))
+      : [];
+  }
+  const courseIds = courseRows.map((c) => c.id);
+  const empty = { summary: { flaggedLearners: 0, offTrack: 0, atRisk: 0, unassignedFlagged: 0, activeInterventions: 0, resolvedTotal: 0, resolutionRate: null as number | null, coaches: 0, courses: 0 }, coaches: [] as unknown[] };
+  if (!courseIds.length) { res.json(empty); return; }
+
+  // Sections + members → who coaches whom.
+  const groups = await db.select().from(courseGroupsTable).where(inArray(courseGroupsTable.courseId, courseIds));
+  const groupIds = groups.map((g) => g.id);
+  const groupCourse = new Map(groups.map((g) => [g.id, g.courseId]));
+  const memberRows = groupIds.length ? await db.select().from(courseGroupMembersTable).where(inArray(courseGroupMembersTable.groupId, groupIds)) : [];
+  const groupLeader = new Map<string, string>();
+  const coachSections = new Map<string, number>();
+  for (const m of memberRows) if (m.role === "leader") { groupLeader.set(m.groupId, m.userId); coachSections.set(m.userId, (coachSections.get(m.userId) ?? 0) + 1); }
+  const leaderOf = new Map<string, string>(); // `${courseId}:${learnerId}` -> coachId
+  const coachLearners = new Map<string, Set<string>>();
+  for (const m of memberRows) if (m.role === "member") {
+    const leader = groupLeader.get(m.groupId);
+    if (!leader) continue;
+    leaderOf.set(`${groupCourse.get(m.groupId)}:${m.userId}`, leader);
+    const set = coachLearners.get(leader) ?? new Set<string>();
+    set.add(m.userId);
+    coachLearners.set(leader, set);
+  }
+
+  // Alerts across the tenant's courses.
+  const alerts = await db
+    .select({ userId: gradebookAlertsTable.userId, courseId: gradebookAlertsTable.courseId, status: gradebookAlertsTable.status, resolvedAt: gradebookAlertsTable.resolvedAt })
+    .from(gradebookAlertsTable)
+    .where(inArray(gradebookAlertsTable.courseId, courseIds));
+
+  let offTrack = 0, atRisk = 0, resolvedTotal = 0, unassignedFlagged = 0;
+  const flaggedLearners = new Set<string>();
+  const coachFlagged = new Map<string, number>();
+  const coachResolved = new Map<string, number>();
+  for (const a of alerts) {
+    const leader = leaderOf.get(`${a.courseId}:${a.userId}`);
+    if (a.resolvedAt) {
+      resolvedTotal++;
+      if (leader) coachResolved.set(leader, (coachResolved.get(leader) ?? 0) + 1);
+      continue;
+    }
+    if (a.status === "off_track" || a.status === "at_risk") {
+      if (a.status === "off_track") offTrack++; else atRisk++;
+      flaggedLearners.add(a.userId);
+      if (leader) coachFlagged.set(leader, (coachFlagged.get(leader) ?? 0) + 1);
+      else unassignedFlagged++;
+    }
+  }
+  const activeInterventions = offTrack + atRisk;
+  const resolutionRate = resolvedTotal + activeInterventions > 0 ? Math.round((resolvedTotal / (resolvedTotal + activeInterventions)) * 100) : null;
+
+  const coachIds = [...coachSections.keys()];
+  const coachUsers = coachIds.length ? await db.select().from(usersTable).where(inArray(usersTable.id, coachIds)) : [];
+  const coaches = coachUsers
+    .map((c) => ({
+      coachId: c.id,
+      name: fullName(c),
+      sectionsLed: coachSections.get(c.id) ?? 0,
+      learners: coachLearners.get(c.id)?.size ?? 0,
+      flagged: coachFlagged.get(c.id) ?? 0,
+      resolved: coachResolved.get(c.id) ?? 0,
+    }))
+    .sort((a, b) => b.flagged - a.flagged || b.learners - a.learners);
+
+  res.json({
+    summary: { flaggedLearners: flaggedLearners.size, offTrack, atRisk, unassignedFlagged, activeInterventions, resolvedTotal, resolutionRate, coaches: coaches.length, courses: courseIds.length },
+    coaches,
+  });
+});
 
 // GET /courses/:courseId/groups
 router.get("/courses/:courseId/groups", requireAuth, async (req, res) => {
