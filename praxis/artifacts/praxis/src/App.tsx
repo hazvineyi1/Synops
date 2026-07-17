@@ -150,7 +150,6 @@ function PublicRoute({
 
 function Routes() {
   return (
-    <QueryClientProvider client={queryClient}>
       <Switch>
         <Route path="/" component={HomeRedirect} />
 
@@ -217,21 +216,22 @@ function Routes() {
 
         <Route component={NotFound} />
       </Switch>
-    </QueryClientProvider>
   );
 }
 
 function App() {
   return (
-    <TooltipProvider>
-      <WouterRouter base={basePath}>
-        <SessionProvider>
-          <ThemeApplier />
-          <Routes />
-        </SessionProvider>
-      </WouterRouter>
-      <Toaster />
-    </TooltipProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={basePath}>
+          <SessionProvider>
+            <ThemeApplier />
+            <Routes />
+          </SessionProvider>
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
