@@ -6,25 +6,44 @@ import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
 
-function toUserResponse(u: typeof usersTable.$inferSelect) {
-  return { id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName, avatarUrl: u.avatarUrl, role: u.role };
+function toUserResponse(u: typeof usersTable.$inferSelect, showEmail: boolean) {
+  return {
+    id: u.id,
+    // POPIA: a learner's email is personal information. Peers on the same course have
+    // no lawful basis to see each other's contact details, so we only expose an email
+    // to facilitators (or to the learner viewing their own row). Everyone else gets null.
+    email: showEmail ? u.email : null,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    avatarUrl: u.avatarUrl,
+    role: u.role,
+  };
 }
+
+// Roles that legitimately need learner contact details / grades (course staff).
+const FACILITATOR_ROLES = ["coach", "org_admin", "partner_admin", "super_admin"];
 
 // GET /courses/:courseId/roster
 router.get("/courses/:courseId/roster", requireAuth, async (req, res) => {
+  const isFacilitator = FACILITATOR_ROLES.includes(req.dbUser?.role ?? "");
   const rows = await db
     .select({ enrolment: enrolmentsTable, user: usersTable })
     .from(enrolmentsTable)
     .leftJoin(usersTable, eq(enrolmentsTable.userId, usersTable.id))
     .where(eq(enrolmentsTable.courseId, req.params.courseId));
-  res.json(rows.map(r => ({
-    enrolmentId: r.enrolment.id,
-    status: r.enrolment.status,
-    role: r.enrolment.role,
-    finalGrade: r.enrolment.finalGrade,
-    enrolledAt: r.enrolment.enrolledAt,
-    user: r.user ? toUserResponse(r.user) : null,
-  })));
+  res.json(rows.map(r => {
+    // Facilitators see everyone's details; a learner sees only their own.
+    const canSee = isFacilitator || r.user?.id === req.userId;
+    return {
+      enrolmentId: r.enrolment.id,
+      status: r.enrolment.status,
+      role: r.enrolment.role,
+      // A classmate's grade is private too -- redact it for peers.
+      finalGrade: canSee ? r.enrolment.finalGrade : null,
+      enrolledAt: r.enrolment.enrolledAt,
+      user: r.user ? toUserResponse(r.user, canSee) : null,
+    };
+  }));
 });
 
 // POST /courses/:courseId/enrol — enroll self

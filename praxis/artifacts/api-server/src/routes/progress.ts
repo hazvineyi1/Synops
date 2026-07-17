@@ -6,6 +6,7 @@ import {
   modulesTable,
   coursesTable,
   enrolmentsTable,
+  credentialsTable,
 } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -119,6 +120,31 @@ async function courseProgress(userId: string, courseId: string) {
 }
 
 /**
+ * Module ids the learner holds a VALID credential for, grouped by course.
+ *
+ * Credentials come from DEMONSTRATED MASTERY in a coaching session -- a fundamentally
+ * different signal from beats-viewed content progress. The two used to be conflated in
+ * the UI (a certified-but-unread module showed as "up next / 0%" while the dashboard
+ * counted a credential), which read as a contradiction. We surface the credential flag
+ * ALONGSIDE the content percentage -- never merged into it -- so the UI can say
+ * "Certified" honestly without claiming the content was read.
+ */
+async function certifiedModules(userId: string) {
+  const rows = await db
+    .select({ moduleId: credentialsTable.moduleId, courseId: modulesTable.courseId })
+    .from(credentialsTable)
+    .innerJoin(modulesTable, eq(credentialsTable.moduleId, modulesTable.id))
+    .where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.status, "valid")));
+
+  const byCourse = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!byCourse.has(r.courseId)) byCourse.set(r.courseId, new Set());
+    byCourse.get(r.courseId)!.add(r.moduleId);
+  }
+  return byCourse;
+}
+
+/**
  * Flip the enrolment to completed when every published beat has been viewed.
  * Only ever moves an ACTIVE enrolment forward -- never resurrects a withdrawn one,
  * and never un-completes (completedAt is written once).
@@ -198,6 +224,12 @@ router.get("/progress/course/:courseId", requireAuth, async (req, res) => {
   const totalBy = new Map(beatCounts.map((r) => [r.moduleId, r.total]));
   const viewedBy = new Map(viewedCounts.map((r) => [r.moduleId, r.viewed]));
 
+  // Credential/mastery is a separate signal from content progress -- surfaced alongside
+  // it (see certifiedModules) so a mastered-but-unread module reads as "Mastered", not
+  // "up next / 0%".
+  const certByCourse = await certifiedModules(userId);
+  const certSet = certByCourse.get(courseId) ?? new Set<string>();
+
   const modules = mods.map((m) => {
     const total = totalBy.get(m.id) ?? 0;
     const viewed = Math.min(viewedBy.get(m.id) ?? 0, total);
@@ -209,11 +241,12 @@ router.get("/progress/course/:courseId", requireAuth, async (req, res) => {
       totalBeats: total,
       percent: total > 0 ? Math.round((viewed / total) * 100) : 0,
       complete: total > 0 && viewed >= total,
+      certified: certSet.has(m.id),
     };
   });
 
   const summary = await courseProgress(userId, courseId);
-  res.json({ ...summary, modules });
+  res.json({ ...summary, certified: certSet.size > 0, modules });
 });
 
 /**
@@ -235,12 +268,18 @@ router.get("/progress/me", requireAuth, async (req, res) => {
     .leftJoin(coursesTable, eq(enrolmentsTable.courseId, coursesTable.id))
     .where(eq(enrolmentsTable.userId, userId));
 
+  const certByCourse = await certifiedModules(userId);
+
   const courses = await Promise.all(
     enrolments.map(async (e) => ({
       ...(await courseProgress(userId, e.courseId)),
       title: e.title,
       status: e.status,
       completedAt: e.completedAt,
+      // A course is "certified" if the learner holds a valid credential for any of its
+      // modules. Kept distinct from percent (content viewed) so the UI never conflates
+      // "understanding demonstrated" with "content consumed".
+      certified: certByCourse.has(e.courseId),
     })),
   );
 

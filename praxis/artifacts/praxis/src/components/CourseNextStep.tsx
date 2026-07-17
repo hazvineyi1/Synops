@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ArrowRight,
   Sliders,
+  Award,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +46,8 @@ interface ModuleProgress {
   totalBeats: number;
   percent: number;
   complete: boolean;
+  /** Learner holds a valid credential for this module (mastery, not content viewed). */
+  certified?: boolean;
 }
 interface CourseProgress {
   percent: number;
@@ -150,11 +153,19 @@ export function CourseNextStep({
     .sort((a, b) => a.order - b.order);
   const metaById = new Map((modules ?? []).map((m) => [m.id, m]));
 
+  // A module is "settled" for pathing if its content is complete OR the learner has
+  // demonstrated mastery (credential). Without this, a certified-but-unread module was
+  // wrongly surfaced as "Step 1 / recommended next / 0%" -- the credential/progress
+  // contradiction. Certified modules are treated as done so the path points at genuinely
+  // outstanding work; the credential count is shown separately below.
+  const isSettled = (m: ModuleProgress) => m.complete || !!m.certified;
+
   const totalSteps = ordered.length || modules?.length || 0;
-  const currentIndex = ordered.findIndex((m) => !m.complete);
+  const currentIndex = ordered.findIndex((m) => !isSettled(m));
   const current = currentIndex >= 0 ? ordered[currentIndex] : undefined;
-  const completed = ordered.filter((m) => m.complete);
+  const completed = ordered.filter(isSettled);
   const recallModule = completed[completed.length - 1]; // most recently finished
+  const certifiedCount = ordered.filter((m) => m.certified).length;
 
   const pct = progress?.percent ?? 0;
   const paceLabel = pct >= 100 ? "complete" : pct >= 60 ? "on pace" : pct > 0 ? "keep going" : "just getting started";
@@ -321,6 +332,15 @@ export function CourseNextStep({
           {pct}% · {paceLabel}
         </span>
       </div>
+
+      {/* Credentials are a SEPARATE signal from content progress (mastery demonstrated in
+          coaching, not beats viewed). Shown distinctly so the two never get conflated. */}
+      {certifiedCount > 0 && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
+          <Award className="h-3.5 w-3.5 shrink-0" />
+          {certifiedCount} of {totalSteps} module{totalSteps === 1 ? "" : "s"} mastered · credential earned
+        </div>
+      )}
     </div>
   );
 }

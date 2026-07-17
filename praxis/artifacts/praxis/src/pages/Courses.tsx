@@ -2,7 +2,7 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useListCourses } from "@workspace/api-client-react";
-import { BookOpen, ArrowRight, CheckCircle2, Layers } from "lucide-react";
+import { BookOpen, ArrowRight, CheckCircle2, Layers, Award } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,8 @@ interface CourseProgress {
   status: string;
   viewedBeats: number;
   totalBeats: number;
+  /** Holds a valid credential for a module in this course (mastery, not content %). */
+  certified?: boolean;
 }
 interface ProgressMe {
   courses: CourseProgress[];
@@ -64,7 +66,12 @@ export function Courses() {
             {enrolled.map((c) => {
               const a = courseAccent(c.courseId);
               const m = meta.get(c.courseId);
-              const done = c.percent >= 100 || c.status === "completed";
+              // "done" means the CONTENT is fully viewed -- a beats-based fact. It is
+              // deliberately NOT tied to enrolment status or credentials: a learner can
+              // hold a credential (mastery) at 0% content viewed, and the card must not
+              // claim the content is finished when it isn't. Certification is shown as
+              // its own badge below.
+              const done = c.percent >= 100;
               return (
                 <Card
                   key={c.courseId}
@@ -79,9 +86,16 @@ export function Courses() {
                       <h3 className="font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                         {c.title}
                       </h3>
-                      {m?.nqfLevel && (
-                        <span className="text-xs text-muted-foreground">NQF Level {m.nqfLevel}</span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                        {m?.nqfLevel && (
+                          <span className="text-xs text-muted-foreground">NQF Level {m.nqfLevel}</span>
+                        )}
+                        {c.certified && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 text-[11px] font-semibold px-2 py-0.5">
+                            <Award className="h-3 w-3" /> Certified
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 

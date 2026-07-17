@@ -24,13 +24,13 @@ interface Assignment { id: string; title: string; description?: string; dueDate?
 interface Discussion { id: string; title: string; body: string; isPinned?: boolean; replyCount: number; createdAt: string; author?: { firstName: string; lastName: string; }; }
 interface Announcement { id: string; title: string; body: string; pinned?: boolean; createdAt: string; author?: { firstName: string; lastName: string; }; }
 interface GradeEntry { assignmentId: string; assignmentTitle: string; dueDate?: string; pointsPossible: number; score: number | null; letterGrade?: string; missing: boolean; late: boolean; }
-interface RosterEntry { enrolmentId: string; user: { id: string; firstName: string; lastName: string; email: string; }; enrolmentStatus: string; }
+interface RosterEntry { enrolmentId: string; user: { id: string; firstName: string; lastName: string; email: string | null; role?: string; }; enrolmentStatus: string; }
 interface Group { id: string; name: string; description?: string; members: { userId: string; role: string; user: { firstName: string; lastName: string; }; }[]; }
 interface Page { id: string; title: string; slug: string; body: string; published: boolean; updatedAt: string; frontPage?: boolean; author?: { firstName: string; lastName: string; }; }
 interface Event { id: string; title: string; type: string; startDate: string; color?: string; linkedAssignmentId?: string; }
 interface Enrolment { id: string; status: string; }
-interface ModuleProgress { moduleId: string; title: string; order: number; viewedBeats: number; totalBeats: number; percent: number; complete: boolean; }
-interface CourseProgress { courseId: string; viewedBeats: number; totalBeats: number; percent: number; modules: ModuleProgress[]; }
+interface ModuleProgress { moduleId: string; title: string; order: number; viewedBeats: number; totalBeats: number; percent: number; complete: boolean; certified?: boolean; }
+interface CourseProgress { courseId: string; viewedBeats: number; totalBeats: number; percent: number; certified?: boolean; modules: ModuleProgress[]; }
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: BookOpen },
@@ -249,17 +249,23 @@ export function CourseDetail() {
               {progress.modules.map((m) => (
                 <span
                   key={m.moduleId}
-                  title={`${m.title}: ${m.viewedBeats}/${m.totalBeats}`}
+                  title={
+                    m.certified && !m.complete
+                      ? `${m.title}: Mastered — review the material`
+                      : `${m.title}: ${m.viewedBeats}/${m.totalBeats}`
+                  }
                   className={cn(
                     'text-[11px] px-2 py-0.5 rounded-full border',
                     m.complete
                       ? 'border-green-600/40 bg-green-600/10 text-green-700'
-                      : m.percent > 0
-                        ? 'border-primary/40 bg-primary/10 text-primary'
-                        : 'border-border text-muted-foreground',
+                      : m.certified
+                        ? 'border-amber-500/40 bg-amber-500/10 text-amber-700'
+                        : m.percent > 0
+                          ? 'border-primary/40 bg-primary/10 text-primary'
+                          : 'border-border text-muted-foreground',
                   )}
                 >
-                  {m.complete ? '✓ ' : ''}{m.title}
+                  {m.complete ? '✓ ' : m.certified ? '★ ' : ''}{m.title}
                 </span>
               ))}
             </div>
@@ -610,7 +616,10 @@ export function CourseDetail() {
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Name</th>
-                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Email</th>
+                        {/* Contact details are shown to course staff only. Learners never see
+                            each other's email addresses (POPIA: no lawful basis). */}
+                        {isInstructor && <th className="text-left py-2 px-3 font-medium text-muted-foreground">Email</th>}
+                        <th className="text-left py-2 px-3 font-medium text-muted-foreground">Role</th>
                         <th className="text-left py-2 px-3 font-medium text-muted-foreground">Status</th>
                       </tr>
                     </thead>
@@ -618,7 +627,8 @@ export function CourseDetail() {
                       {roster.map((r) => (
                         <tr key={r.enrolmentId} className="border-b border-border/50 hover:bg-muted/30">
                           <td className="py-2.5 px-3 font-medium">{r.user?.firstName} {r.user?.lastName}</td>
-                          <td className="py-2.5 px-3 text-muted-foreground">{r.user?.email}</td>
+                          {isInstructor && <td className="py-2.5 px-3 text-muted-foreground">{r.user?.email ?? '—'}</td>}
+                          <td className="py-2.5 px-3 text-muted-foreground capitalize">{r.user?.role === 'learner' ? 'Learner' : (r.user?.role?.replace('_', ' ') ?? 'Learner')}</td>
                           <td className="py-2.5 px-3">
                             <Badge variant={r.enrolmentStatus === 'completed' ? 'default' : r.enrolmentStatus === 'active' ? 'secondary' : 'outline'} className="text-xs">
                               {r.enrolmentStatus}
@@ -629,6 +639,9 @@ export function CourseDetail() {
                     </tbody>
                   </table>
                 </div>
+                {!isInstructor && (
+                  <p className="mt-3 text-xs text-muted-foreground">Classmates' email addresses are private and shown to course staff only.</p>
+                )}
               </>
             )}
           </div>
