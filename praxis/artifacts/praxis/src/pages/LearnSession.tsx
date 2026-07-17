@@ -142,6 +142,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // True briefly when the learner tries to send while the coach is still replying, so we can flag
   // it (shake + notice) instead of silently dropping the message.
   const [sendBlocked, setSendBlocked] = useState(false);
+  // Live mastery from the last graded turn (so the bar moves immediately) + a brief "+N%" gain badge.
+  const [liveMastery, setLiveMastery] = useState<number | null>(null);
+  const [masteryGain, setMasteryGain] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Local state for turns to optimistically append user message and streaming tutor message
@@ -168,8 +171,11 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
     </div>
   );
 
-  const masteryPercentage = Math.round((session.masteryScore || 0) * 100);
-  const isMastered = session.masteryScore >= 0.8;
+  // Use the live score from the last graded turn so the bar moves the moment grading finishes,
+  // before the full session refetch lands.
+  const effMastery = liveMastery != null ? liveMastery : (session.masteryScore || 0);
+  const masteryPercentage = Math.round(effMastery * 100);
+  const isMastered = effMastery >= 0.8;
 
   // The mastery meter grows and intensifies as the discussion progresses, so the learner can feel
   // the needle move: width, bar height, number size and colour all scale with the score.
@@ -251,6 +257,13 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
         setStreamingText(prev => prev + token);
       },
       (meta) => {
+        // Move the mastery bar immediately from the graded done-event, before the refetch lands.
+        if (typeof meta.masteryScore === 'number') {
+          const prevPct = Math.round((session.masteryScore || 0) * 100);
+          const newPct = Math.round(meta.masteryScore * 100);
+          setLiveMastery(meta.masteryScore);
+          if (newPct > prevPct) { setMasteryGain(newPct - prevPct); setTimeout(() => setMasteryGain(null), 2800); }
+        }
         // When complete, refetch the session to get the real turns and updated mastery/beat
         refetchSession().then(() => {
           setIsStreaming(false);
@@ -317,7 +330,19 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
               />
             </div>
           </div>
-          <span className={cn("font-bold tabular-nums leading-none transition-all duration-500", masteryNumClass)}>{mp}%</span>
+          <div className="relative flex items-center">
+            <span className={cn("font-bold tabular-nums leading-none transition-all duration-500", masteryNumClass)}>{mp}%</span>
+            {masteryGain != null && (
+              <motion.span
+                initial={{ opacity: 0, y: 8, scale: 0.8 }}
+                animate={{ opacity: 1, y: -2, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute -top-4 right-0 whitespace-nowrap rounded-full bg-green-500/15 px-1.5 py-0.5 text-[10px] font-bold text-green-600"
+              >
+                +{masteryGain}%
+              </motion.span>
+            )}
+          </div>
         </div>
       </header>
 
@@ -502,7 +527,8 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
           {/* Mastery Achieved Banner */}
           {isMastered && (
-            <div className="mt-8 mb-4 p-8 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
+            <div className="relative overflow-hidden mt-8 mb-4 p-8 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
+              <Confetti />
               <div className="h-16 w-16 bg-primary rounded-full flex items-center justify-center mb-4 text-primary-foreground shadow-lg">
                 <Sparkles className="h-8 w-8" />
               </div>
@@ -611,6 +637,33 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           The tutor will not provide answers, only questions to guide your reasoning.
         </p>
       </footer>
+    </div>
+  );
+}
+
+// Sound-free celebration burst shown once when a gap is closed (mastery reached). Dependency-free.
+function Confetti() {
+  const [pieces] = useState(() =>
+    Array.from({ length: 26 }, (_, i) => ({
+      id: i,
+      x: (Math.random() * 2 - 1) * 240,
+      y: 120 + Math.random() * 150,
+      rot: Math.random() * 540 - 270,
+      delay: Math.random() * 0.15,
+      color: ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'][i % 5],
+    }))
+  );
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center">
+      {pieces.map((p) => (
+        <motion.span
+          key={p.id}
+          initial={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
+          animate={{ opacity: 0, x: p.x, y: p.y, rotate: p.rot }}
+          transition={{ duration: 1.5, delay: p.delay, ease: 'easeOut' }}
+          style={{ position: 'absolute', top: 8, width: 8, height: 8, borderRadius: 2, background: p.color }}
+        />
+      ))}
     </div>
   );
 }

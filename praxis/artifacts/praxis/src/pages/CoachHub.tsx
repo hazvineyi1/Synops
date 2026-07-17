@@ -71,6 +71,11 @@ export function CoachHub() {
   const sectionRef = useRef<HTMLDivElement>(null);
   const showSection = (s: "materials" | "progress") => { setSection(s); setSelected(null); setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); };
 
+  // First-visit onboarding: explain how the four paths interlock, shown once per browser.
+  const [showIntro, setShowIntro] = useState(false);
+  useEffect(() => { try { if (!localStorage.getItem("coach-intro-seen")) setShowIntro(true); } catch { /* ignore */ } }, []);
+  const dismissIntro = () => { setShowIntro(false); try { localStorage.setItem("coach-intro-seen", "1"); } catch { /* ignore */ } };
+
   const overview = useQuery({ queryKey: ["coach", "overview"], queryFn: () => apiFetch<Overview>("/learn/coach/overview") });
   const progress = useQuery({ queryKey: ["coach", "progress"], queryFn: () => apiFetch<Progress>("/learn/coach/progress") });
   const game = useQuery({ queryKey: ["coach", "game"], queryFn: () => apiFetch<Gamification>("/learn/coach/gamification") });
@@ -153,6 +158,27 @@ export function CoachHub() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
+      {/* First-visit onboarding — how the four paths interlock. Dismissible, shown once. */}
+      {showIntro && (
+        <section className="rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div>
+                <p className="font-semibold text-foreground">New here? Here's how your Coach works</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Four ways to close your gap, and they work together: <span className="font-medium text-foreground">Practice</span> for quick flashcards and quizzes, <span className="font-medium text-foreground">Tutor</span> for a one-on-one coaching chat, <span className="font-medium text-foreground">Materials</span> to turn your own study content into practice, and <span className="font-medium text-foreground">Progress</span> to see what's left. Start with Practice for the quickest win.
+                </p>
+              </div>
+            </div>
+            <button onClick={dismissIntro} className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="Dismiss">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <Button size="sm" className="mt-3" onClick={dismissIntro}>Got it</Button>
+        </section>
+      )}
+
       {/* Welcome + why you're here */}
       <section className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-transparent p-6 sm:p-8">
         <div className="flex items-center gap-2 text-primary">
@@ -212,6 +238,19 @@ export function CoachHub() {
           </div>
         )}
       </section>
+
+      {/* Coach on WhatsApp — a genuinely handy channel, surfaced here instead of only in settings. */}
+      <button
+        onClick={() => navigate("/coach-settings")}
+        className="flex w-full items-center gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/60 p-4 text-left transition hover:border-emerald-400 dark:bg-emerald-950/15"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600"><MessageSquare className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-foreground">Prefer WhatsApp? Coach from your phone</p>
+          <p className="text-sm text-muted-foreground">Answer your coach's questions and get nudges right in WhatsApp. Switch it on in My Coach.</p>
+        </div>
+        <ArrowRight className="h-4 w-4 shrink-0 text-emerald-600" />
+      </button>
 
       {/* The chosen section renders here — no separate tab bar, the cards above are the nav */}
       {section && (
