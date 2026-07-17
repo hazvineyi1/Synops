@@ -9,11 +9,15 @@ import {
   beatsTable,
   caseScenariosTable,
   interactiveActivitiesTable,
+  remedialSetsTable,
+  remedialFlashcardsTable,
+  remedialQuestionsTable,
   type StudyPlanItem,
 } from "@workspace/db";
 import { eq, and, inArray, asc, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { isDue } from "../lib/sm2";
+import { isDue, sm2Update } from "../lib/sm2";
+import { ensureRemediationSet, bumpGamification, getGamification } from "../lib/remediationEngine";
 
 /**
  * The in-LMS "Coach" area for off-track learners: a native, remedial-scoped surface
@@ -245,6 +249,126 @@ router.get("/learn/coach/progress", requireAuth, async (req, res) => {
   }
 
   res.json({ hasData: concepts.length > 0 || gaps.length > 0, concepts, gaps });
+});
+
+// GET /learn/coach/practice?planId=&category= — the adaptive, multi-modal practice for one gap:
+// flashcards + knowledge questions generated (once) from the learner's OWN course content, plus
+// the course cases/activities that target the gap, plus gamification. Addressed by name.
+router.get("/learn/coach/practice", requireAuth, async (req, res) => {
+  const userId = req.userId!;
+  const planId = String(req.query.planId ?? "");
+  const category = String(req.query.category ?? "");
+  if (!category) {
+    res.status(400).json({ error: "category is required." });
+    return;
+  }
+  const firstName = (req.dbUser as { firstName?: string } | undefined)?.firstName ?? null;
+
+  const plans = await activeRemedialPlans(userId);
+  const match = plans.find(({ p }) => (planId ? p.id === planId : true) && planItems(p).some((i) => i.category === category));
+  if (!match) {
+    res.status(404).json({ error: "That gap is not in your remedial plan." });
+    return;
+  }
+  const courseId = match.p.courseId;
+
+  let set: { setId: string; status: string };
+  try {
+    set = await ensureRemediationSet({ userId, planId: match.p.id, courseId, category, learnerName: firstName });
+  } catch {
+    res.status(500).json({ error: "Could not build your practice set. Please try again." });
+    return;
+  }
+
+  const [flashRows, qRows] = await Promise.all([
+    db.select().from(remedialFlashcardsTable).where(eq(remedialFlashcardsTable.setId, set.setId)).orderBy(asc(remedialFlashcardsTable.order)),
+    db.select().from(remedialQuestionsTable).where(eq(remedialQuestionsTable.setId, set.setId)).orderBy(asc(remedialQuestionsTable.order)),
+  ]);
+
+  const flashcards = flashRows.map((f) => ({ id: f.id, front: f.front, back: f.back, hint: f.hint, mastery: f.mastery, due: isDue(f.dueDate) }));
+  const questions = qRows.map((q) => ({
+    id: q.id,
+    prompt: q.prompt,
+    options: q.options,
+    difficulty: q.difficulty,
+    // Only reveal the answer + explanation once the learner has attempted it.
+    answered: q.attempts > 0 ? { choice: q.lastChoice, correct: q.lastCorrect, correctIndex: q.correctIndex, explanation: q.explanation } : null,
+  }));
+
+  // "Different methods": the course cases/activities on this learner's plan that target the gap.
+  const methods = planItems(match.p)
+    .filter((it) => it.category === category && (it.refType === "case" || it.refType === "activity") && it.refId)
+    .map((it) => ({ title: it.title, type: it.refType, path: it.refType === "case" ? `/cases/${it.refId}/begin` : `/activities/${it.refId}/play` }));
+
+  const gamification = await getGamification(userId);
+  const name = firstName || "there";
+  const intro = set.status === "empty"
+    ? `${name}, let's rebuild ${category} together — start a coaching session and we'll work through it step by step.`
+    : `${name}, here's your practice to close ${category}. Flip through the cards, test yourself, and watch your streak grow.`;
+
+  res.json({
+    setId: set.setId,
+    status: set.status,
+    category,
+    courseTitle: match.courseTitle ?? "Your course",
+    learnerName: name,
+    intro,
+    flashcards,
+    questions,
+    methods,
+    gamification,
+  });
+});
+
+// POST /learn/coach/flashcard/:id/review { grade: 0-3 } — grade a flashcard, advance its SM-2
+// schedule, award XP + streak. The learner experiences this as Again/Hard/Good/Easy.
+router.post("/learn/coach/flashcard/:id/review", requireAuth, async (req, res) => {
+  const userId = req.userId!;
+  const grade = Math.max(0, Math.min(3, Number(req.body?.grade)));
+  if (!Number.isFinite(grade)) {
+    res.status(400).json({ error: "grade (0-3) is required." });
+    return;
+  }
+  const [card] = await db.select().from(remedialFlashcardsTable).where(eq(remedialFlashcardsTable.id, req.params.id)).limit(1);
+  if (!card || card.userId !== userId) {
+    res.status(404).json({ error: "Card not found." });
+    return;
+  }
+  const next = sm2Update(card.mastery, card.ef, card.interval, card.reps, grade);
+  await db
+    .update(remedialFlashcardsTable)
+    .set({ mastery: next.mastery, ef: next.ef, interval: next.interval, reps: next.reps, dueDate: next.dueDate, lastReviewedAt: new Date() })
+    .where(eq(remedialFlashcardsTable.id, card.id));
+  const gamification = await bumpGamification(userId, grade >= 2 ? 6 : 3);
+  res.json({ mastery: next.mastery, due: next.dueDate, gamification });
+});
+
+// POST /learn/coach/question/:id/answer { choice } — check a knowledge question, reveal the
+// answer + explanation, award XP + streak.
+router.post("/learn/coach/question/:id/answer", requireAuth, async (req, res) => {
+  const userId = req.userId!;
+  const choice = Number(req.body?.choice);
+  const [q] = await db.select().from(remedialQuestionsTable).where(eq(remedialQuestionsTable.id, req.params.id)).limit(1);
+  if (!q || q.userId !== userId) {
+    res.status(404).json({ error: "Question not found." });
+    return;
+  }
+  if (!Number.isInteger(choice) || choice < 0 || choice >= (q.options as string[]).length) {
+    res.status(400).json({ error: "A valid choice index is required." });
+    return;
+  }
+  const correct = choice === q.correctIndex;
+  await db
+    .update(remedialQuestionsTable)
+    .set({ attempts: q.attempts + 1, lastChoice: choice, lastCorrect: correct })
+    .where(eq(remedialQuestionsTable.id, q.id));
+  const gamification = await bumpGamification(userId, correct ? 10 : 3);
+  res.json({ correct, correctIndex: q.correctIndex, explanation: q.explanation, gamification });
+});
+
+// GET /learn/coach/gamification — the learner's XP + streak for the Coach header.
+router.get("/learn/coach/gamification", requireAuth, async (req, res) => {
+  res.json(await getGamification(req.userId!));
 });
 
 export default router;

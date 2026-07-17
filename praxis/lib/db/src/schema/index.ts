@@ -25,6 +25,7 @@ export * from "./interactive_activities";
 export * from "./support";
 export * from "./media";
 export * from "./spaced_repetition";
+export * from "./remediation";
 export * from "./whatsapp";
 export * from "./funder";
 export * from "./delivery";

@@ -10,7 +10,20 @@ import { cn } from "@/lib/utils";
 import {
   LifeBuoy, BookOpen, MessageSquare, TrendingUp, ArrowRight, ArrowLeft,
   Sparkles, CheckCircle2, Circle, Target, Layers, Play, GraduationCap, Clock,
+  Flame, Zap, Brain, RotateCcw, Check, X, Dumbbell, Trophy,
 } from "lucide-react";
+
+interface Gamification { xp: number; streak: number; longestStreak: number }
+interface PracticeFlash { id: string; front: string; back: string; hint: string | null; mastery: number; due: boolean }
+interface PracticeQuestion {
+  id: string; prompt: string; options: string[]; difficulty: string;
+  answered: { choice: number; correct: boolean; correctIndex: number; explanation: string | null } | null;
+}
+interface PracticeMethod { title: string; type: string; path: string }
+interface PracticeData {
+  setId: string; status: string; category: string; courseTitle: string; learnerName: string; intro: string;
+  flashcards: PracticeFlash[]; questions: PracticeQuestion[]; methods: PracticeMethod[]; gamification: Gamification;
+}
 
 interface Item {
   index: number;
@@ -51,9 +64,11 @@ const typeMeta: Record<string, { label: string; icon: any }> = {
 export function CoachHub() {
   const [, navigate] = useLocation();
   const [selected, setSelected] = useState<Item | null>(null);
+  const [practice, setPractice] = useState<{ planId: string; category: string } | null>(null);
 
   const overview = useQuery({ queryKey: ["coach", "overview"], queryFn: () => apiFetch<Overview>("/learn/coach/overview") });
   const progress = useQuery({ queryKey: ["coach", "progress"], queryFn: () => apiFetch<Progress>("/learn/coach/progress") });
+  const game = useQuery({ queryKey: ["coach", "game"], queryFn: () => apiFetch<Gamification>("/learn/coach/gamification") });
 
   const startSession = useMutation({
     mutationFn: (v: { moduleId: string; remedialFocus?: string | null }) =>
@@ -98,22 +113,58 @@ export function CoachHub() {
     );
   }
 
+  const primaryPlan = data.plans[0];
+  if (practice) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Coach" icon={LifeBuoy} subtitle="Your remedial coach — practice built from your class to close the gap." />
+        <CoachPractice planId={practice.planId} category={practice.category} onBack={() => { setPractice(null); game.refetch(); }} onNavigate={navigate} onGame={() => game.refetch()} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <PageHeader title="Coach" icon={LifeBuoy} subtitle="Your remedial coach — the materials, tutor and progress to bridge your gaps." />
 
-      {/* Gap summary */}
+      {/* Gap summary + gamification + practice CTA */}
       <div className="rounded-xl border border-amber-300/60 bg-gradient-to-br from-amber-500/10 to-transparent p-4">
-        <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><Target className="h-5 w-5" /></div>
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground">Let's bridge {data.gapCount === 1 ? "this gap" : `these ${data.gapCount} gaps`}</p>
-            <p className="text-sm text-muted-foreground">
-              {data.gaps.length ? <>Focusing on <span className="font-medium text-foreground">{data.gaps.join(", ")}</span>. </> : null}
-              {data.materialCount} {data.materialCount === 1 ? "material" : "materials"} in your plan.
-            </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><Target className="h-5 w-5" /></div>
+            <div className="min-w-0">
+              <p className="font-semibold text-foreground">Let's bridge {data.gapCount === 1 ? "this gap" : `these ${data.gapCount} gaps`}</p>
+              <p className="text-sm text-muted-foreground">
+                {data.gaps.length ? <>Focusing on <span className="font-medium text-foreground">{data.gaps.join(", ")}</span>. </> : null}
+                {data.materialCount} {data.materialCount === 1 ? "material" : "materials"} in your plan.
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <div className="flex items-center gap-3 rounded-lg bg-background/70 px-3 py-1.5 text-sm">
+              <span className="flex items-center gap-1 font-medium text-amber-600" title="Points earned"><Zap className="h-4 w-4" /> {game.data?.xp ?? 0}</span>
+              <span className="flex items-center gap-1 font-medium text-orange-600" title="Day streak"><Flame className="h-4 w-4" /> {game.data?.streak ?? 0}</span>
+            </div>
+            {primaryPlan && data.gaps[0] && (
+              <Button onClick={() => setPractice({ planId: primaryPlan.planId, category: data.gaps[0] })}>
+                <Dumbbell className="mr-1.5 h-4 w-4" /> Practice
+              </Button>
+            )}
           </div>
         </div>
+        {data.gaps.length > 1 && (
+          <div className="mt-3 flex flex-wrap gap-2 pl-12">
+            {data.gaps.map((g) => {
+              const pl = data.plans.find((p) => p.gaps.includes(g)) ?? primaryPlan;
+              return (
+                <button key={g} onClick={() => pl && setPractice({ planId: pl.planId, category: g })}
+                  className="rounded-full border border-amber-300/60 bg-background px-3 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-300">
+                  Practice: {g}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="materials">
@@ -126,7 +177,13 @@ export function CoachHub() {
         {/* ── Materials ─────────────────────────────── */}
         <TabsContent value="materials" className="mt-4">
           {selected ? (
-            <MaterialReader item={selected} onBack={() => setSelected(null)} onLaunch={launchItem} launching={startSession.isPending} />
+            <MaterialReader
+              item={selected}
+              onBack={() => setSelected(null)}
+              onLaunch={launchItem}
+              launching={startSession.isPending}
+              onPractice={selected.category ? () => setPractice({ planId: (selected as any).plan?.planId ?? primaryPlan?.planId, category: selected.category! }) : undefined}
+            />
           ) : (
             <div className="space-y-3">
               {allItems.map((it) => {
@@ -271,7 +328,7 @@ export function CoachHub() {
   );
 }
 
-function MaterialReader({ item, onBack, onLaunch, launching }: { item: Item; onBack: () => void; onLaunch: (it: Item) => void; launching: boolean }) {
+function MaterialReader({ item, onBack, onLaunch, launching, onPractice }: { item: Item; onBack: () => void; onLaunch: (it: Item) => void; launching: boolean; onPractice?: () => void }) {
   const detail = useQuery({
     queryKey: ["coach", "material", item.refType, item.refId, item.index],
     queryFn: () => apiFetch<MaterialDetail>(`/learn/coach/material?refType=${item.refType ?? "review"}&refId=${item.refId ?? ""}`),
@@ -309,12 +366,246 @@ function MaterialReader({ item, onBack, onLaunch, launching }: { item: Item; onB
         )}
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <Button onClick={() => onLaunch(item)} disabled={launching}>
+          {onPractice && (
+            <Button onClick={onPractice}>
+              <Dumbbell className="mr-1.5 h-4 w-4" /> Practice this gap
+            </Button>
+          )}
+          <Button variant={onPractice ? "outline" : "default"} onClick={() => onLaunch(item)} disabled={launching}>
             {launching ? "Starting…" : d?.launch ? (d.launch.type === "activity" ? "Open activity" : "Start case") : "Start a coaching session"}
             <ArrowRight className="ml-1.5 h-4 w-4" />
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const GRADES = [
+  { grade: 0, label: "Again", cls: "border-red-300 text-red-700 hover:bg-red-50" },
+  { grade: 1, label: "Hard", cls: "border-amber-300 text-amber-700 hover:bg-amber-50" },
+  { grade: 2, label: "Good", cls: "border-emerald-300 text-emerald-700 hover:bg-emerald-50" },
+  { grade: 3, label: "Easy", cls: "border-green-400 text-green-700 hover:bg-green-50" },
+];
+
+function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planId: string; category: string; onBack: () => void; onNavigate: (path: string) => void; onGame: () => void }) {
+  const q = useQuery({
+    queryKey: ["coach", "practice", planId, category],
+    queryFn: () => apiFetch<PracticeData>(`/learn/coach/practice?planId=${encodeURIComponent(planId)}&category=${encodeURIComponent(category)}`),
+  });
+  const [mode, setMode] = useState<"flashcards" | "quiz" | "methods">("flashcards");
+  const [game, setGame] = useState<Gamification | null>(null);
+  const [fIdx, setFIdx] = useState(0);
+  const [flipped, setFlipped] = useState(false);
+  const [qIdx, setQIdx] = useState(0);
+  const [choice, setChoice] = useState<number | null>(null);
+  const [revealed, setRevealed] = useState<{ correct: boolean; correctIndex: number; explanation: string | null } | null>(null);
+  const [correctCount, setCorrectCount] = useState(0);
+
+  const review = useMutation({
+    mutationFn: (v: { id: string; grade: number }) =>
+      apiFetch<{ gamification: Gamification }>(`/learn/coach/flashcard/${v.id}/review`, { method: "POST", body: JSON.stringify({ grade: v.grade }) }),
+    onSuccess: (r) => { setGame(r.gamification); onGame(); },
+  });
+  const answer = useMutation({
+    mutationFn: (v: { id: string; choice: number }) =>
+      apiFetch<{ correct: boolean; correctIndex: number; explanation: string | null; gamification: Gamification }>(`/learn/coach/question/${v.id}/answer`, { method: "POST", body: JSON.stringify({ choice: v.choice }) }),
+    onSuccess: (r) => { setRevealed({ correct: r.correct, correctIndex: r.correctIndex, explanation: r.explanation }); setGame(r.gamification); onGame(); if (r.correct) setCorrectCount((c) => c + 1); },
+  });
+
+  if (q.isLoading) return <Skeleton className="h-64" />;
+  const d = q.data;
+  if (!d) return null;
+  const g = game ?? d.gamification;
+  const cards = d.flashcards;
+  const questions = d.questions;
+
+  function rate(grade: number) {
+    const card = cards[fIdx];
+    if (card) review.mutate({ id: card.id, grade });
+    setFlipped(false);
+    setFIdx((i) => i + 1);
+  }
+  function submitAnswer() {
+    if (choice == null) return;
+    const question = questions[qIdx];
+    if (question) answer.mutate({ id: question.id, choice });
+  }
+  function nextQuestion() {
+    setChoice(null);
+    setRevealed(null);
+    setQIdx((i) => i + 1);
+  }
+
+  return (
+    <div className="space-y-4">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Back to coach
+      </button>
+
+      {/* Personalised header + gamification */}
+      <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-transparent p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"><Dumbbell className="h-5 w-5" /></div>
+            <div>
+              <h2 className="font-semibold text-foreground">Practice: {d.category}</h2>
+              <p className="text-sm text-muted-foreground">{d.intro}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-3 rounded-lg bg-background/70 px-3 py-1.5 text-sm">
+            <span className="flex items-center gap-1 font-medium text-amber-600"><Zap className="h-4 w-4" /> {g.xp} XP</span>
+            <span className="flex items-center gap-1 font-medium text-orange-600"><Flame className="h-4 w-4" /> {g.streak}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Mode switch */}
+      <div className="flex flex-wrap gap-2">
+        <ModeBtn active={mode === "flashcards"} onClick={() => setMode("flashcards")} icon={Brain} label={`Flashcards (${cards.length})`} />
+        <ModeBtn active={mode === "quiz"} onClick={() => setMode("quiz")} icon={CheckCircle2} label={`Knowledge check (${questions.length})`} />
+        <ModeBtn active={mode === "methods"} onClick={() => setMode("methods")} icon={Layers} label="More ways" />
+      </div>
+
+      {/* Flashcards */}
+      {mode === "flashcards" && (
+        cards.length === 0 ? (
+          <Empty text="No flashcards for this gap yet — try the Knowledge check or work through it with your coach." />
+        ) : fIdx >= cards.length ? (
+          <Done text={`Nice work, ${d.learnerName}! You've been through all ${cards.length} cards.`} onRestart={() => { setFIdx(0); setFlipped(false); }} />
+        ) : (
+          <div>
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Card {fIdx + 1} of {cards.length}</span>
+              <span>Tap the card to flip</span>
+            </div>
+            <button
+              onClick={() => setFlipped((f) => !f)}
+              className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-2xl border-2 border-border bg-background p-6 text-center transition hover:border-primary/40"
+            >
+              {!flipped ? (
+                <>
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Question</span>
+                  <p className="mt-2 text-lg font-medium text-foreground">{cards[fIdx].front}</p>
+                  {cards[fIdx].hint && <p className="mt-3 text-xs text-muted-foreground">Hint: {cards[fIdx].hint}</p>}
+                </>
+              ) : (
+                <>
+                  <span className="text-[11px] uppercase tracking-wide text-primary">Answer</span>
+                  <p className="mt-2 text-base text-foreground">{cards[fIdx].back}</p>
+                </>
+              )}
+            </button>
+            {flipped && (
+              <div className="mt-3">
+                <p className="mb-2 text-center text-xs text-muted-foreground">How well did you know it?</p>
+                <div className="grid grid-cols-4 gap-2">
+                  {GRADES.map((gr) => (
+                    <button key={gr.grade} onClick={() => rate(gr.grade)} disabled={review.isPending}
+                      className={cn("rounded-lg border py-2 text-sm font-medium transition disabled:opacity-60", gr.cls)}>
+                      {gr.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      )}
+
+      {/* Quiz */}
+      {mode === "quiz" && (
+        questions.length === 0 ? (
+          <Empty text="No knowledge questions for this gap yet — try the Flashcards or your coach." />
+        ) : qIdx >= questions.length ? (
+          <Done text={`Done, ${d.learnerName}! You got ${correctCount} of ${questions.length} right. Every attempt builds mastery.`} onRestart={() => { setQIdx(0); setChoice(null); setRevealed(null); setCorrectCount(0); }} />
+        ) : (
+          <div className="rounded-xl border border-border bg-background p-5">
+            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
+              <span>Question {qIdx + 1} of {questions.length}</span>
+              <span className="uppercase">{questions[qIdx].difficulty}</span>
+            </div>
+            <p className="mb-4 font-medium text-foreground">{questions[qIdx].prompt}</p>
+            <div className="space-y-2">
+              {questions[qIdx].options.map((opt, i) => {
+                const isChosen = choice === i;
+                const isCorrect = revealed && i === revealed.correctIndex;
+                const isWrongChosen = revealed && isChosen && i !== revealed.correctIndex;
+                return (
+                  <button key={i} disabled={!!revealed} onClick={() => setChoice(i)}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg border p-3 text-left text-sm transition",
+                      isCorrect ? "border-green-400 bg-green-50 dark:bg-green-950/20" :
+                      isWrongChosen ? "border-red-400 bg-red-50 dark:bg-red-950/20" :
+                      isChosen ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
+                    )}>
+                    <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px]", isCorrect ? "border-green-500 text-green-600" : isWrongChosen ? "border-red-500 text-red-600" : "border-muted-foreground text-muted-foreground")}>
+                      {isCorrect ? <Check className="h-3 w-3" /> : isWrongChosen ? <X className="h-3 w-3" /> : String.fromCharCode(65 + i)}
+                    </span>
+                    <span className="text-foreground">{opt}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {revealed ? (
+              <div className="mt-4">
+                <p className={cn("text-sm font-medium", revealed.correct ? "text-green-600" : "text-red-600")}>
+                  {revealed.correct ? "Correct!" : "Not quite."}
+                </p>
+                {revealed.explanation && <p className="mt-1 text-sm text-muted-foreground">{revealed.explanation}</p>}
+                <Button className="mt-3" onClick={nextQuestion}>Next <ArrowRight className="ml-1.5 h-4 w-4" /></Button>
+              </div>
+            ) : (
+              <Button className="mt-4" onClick={submitAnswer} disabled={choice == null || answer.isPending}>Check answer</Button>
+            )}
+          </div>
+        )
+      )}
+
+      {/* Methods */}
+      {mode === "methods" && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">Other ways to close this gap:</p>
+          {d.methods.map((m, i) => (
+            <button key={i} onClick={() => onNavigate(m.path)}
+              className="flex w-full items-center gap-3 rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary/40">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                {m.type === "case" ? <Layers className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium text-foreground">{m.title}</div>
+                <div className="text-xs text-muted-foreground">{m.type === "case" ? "Case study" : "Interactive activity"}</div>
+              </div>
+              <Play className="h-4 w-4 text-primary" />
+            </button>
+          ))}
+          {d.methods.length === 0 && <Empty text="No extra activities matched this gap — your flashcards, quiz and coach have you covered." />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModeBtn({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: any; label: string }) {
+  return (
+    <button onClick={onClick}
+      className={cn("flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition",
+        active ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40")}>
+      <Icon className="h-4 w-4" /> {label}
+    </button>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return <div className="rounded-xl border border-border bg-background p-8 text-center text-sm text-muted-foreground">{text}</div>;
+}
+
+function Done({ text, onRestart }: { text: string; onRestart: () => void }) {
+  return (
+    <div className="rounded-xl border border-green-300/60 bg-green-50/50 p-8 text-center dark:bg-green-950/10">
+      <Trophy className="mx-auto mb-3 h-9 w-9 text-green-600" />
+      <p className="font-medium text-foreground">{text}</p>
+      <Button className="mt-4" variant="outline" onClick={onRestart}><RotateCcw className="mr-1.5 h-4 w-4" /> Go again</Button>
     </div>
   );
 }
