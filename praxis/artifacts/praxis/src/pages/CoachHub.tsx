@@ -464,8 +464,8 @@ function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planI
   }
 
   return (
-    <div className="space-y-4">
-      <button onClick={onBack} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+    <div className="space-y-6">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back to coach
       </button>
 
@@ -486,58 +486,91 @@ function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planI
         </div>
       </div>
 
-      {/* Mode switch */}
-      <div className="flex flex-wrap gap-2">
-        <ModeBtn active={mode === "flashcards"} onClick={() => setMode("flashcards")} icon={Brain} label={`Flashcards (${cards.length})`} />
-        <ModeBtn active={mode === "quiz"} onClick={() => setMode("quiz")} icon={CheckCircle2} label={`Knowledge check (${questions.length})`} />
-        <ModeBtn active={mode === "methods"} onClick={() => setMode("methods")} icon={Layers} label="More ways" />
+      {/* Mode switch — a clear segmented control so it reads as tappable tabs */}
+      <div>
+        <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Choose an activity</p>
+        <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/40 p-1">
+          <ModeBtn active={mode === "flashcards"} onClick={() => setMode("flashcards")} icon={Brain} label={`Flashcards (${cards.length})`} />
+          <ModeBtn active={mode === "quiz"} onClick={() => setMode("quiz")} icon={CheckCircle2} label={`Quiz (${questions.length})`} />
+          <ModeBtn active={mode === "methods"} onClick={() => setMode("methods")} icon={Layers} label="More ways" />
+        </div>
       </div>
 
-      {/* How this mode works */}
-      <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-        {mode === "flashcards"
-          ? "Read the question, tap the card to reveal the answer, then rate how well you knew it. Your rating decides when the card comes back — and every review earns points."
-          : mode === "quiz"
-          ? "Pick an answer and tap Check. You'll see whether you're right and a short explanation either way. Correct answers earn more points."
-          : "Other activities from your course that target this gap. Open any one to give it a go."}
-      </p>
+      {/* How this mode works — numbered so it's obvious how to navigate */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <p className="text-sm font-semibold text-foreground">How this works</p>
+        <ol className="mt-2 space-y-1 text-sm text-muted-foreground">
+          {mode === "flashcards" ? (
+            <>
+              <li><span className="font-medium text-foreground">1.</span> Read the question on the card.</li>
+              <li><span className="font-medium text-foreground">2.</span> Tap the card (or the <span className="font-medium text-foreground">Show answer</span> button) to reveal the answer.</li>
+              <li><span className="font-medium text-foreground">3.</span> Rate how well you knew it — that schedules when the card comes back, and earns you points.</li>
+            </>
+          ) : mode === "quiz" ? (
+            <>
+              <li><span className="font-medium text-foreground">1.</span> Tap an answer to select it.</li>
+              <li><span className="font-medium text-foreground">2.</span> Press <span className="font-medium text-foreground">Check answer</span> to see if you're right, with a short explanation.</li>
+              <li><span className="font-medium text-foreground">3.</span> Press <span className="font-medium text-foreground">Next</span> to move on. Correct answers earn more points.</li>
+            </>
+          ) : (
+            <li>These are other activities from your course that target this gap. Tap any card to open and try it.</li>
+          )}
+        </ol>
+      </div>
 
       {/* Flashcards */}
       {mode === "flashcards" && (
         cards.length === 0 ? (
-          <Empty text="No flashcards for this gap yet — try the Knowledge check or work through it with your coach." />
+          <Empty text="No flashcards for this gap yet — try the Quiz or work through it with your coach." />
         ) : fIdx >= cards.length ? (
           <Done text={`Nice work, ${d.learnerName}! You've been through all ${cards.length} cards.`} onRestart={() => { setFIdx(0); setFlipped(false); }} />
         ) : (
-          <div>
-            <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span>Card {fIdx + 1} of {cards.length}</span>
-              <span>Tap the card to flip</span>
+          <div className="space-y-4">
+            {/* Progress bar */}
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-sm">
+                <span className="font-medium text-foreground">Card {fIdx + 1} of {cards.length}</span>
+                <span className="text-muted-foreground">{Math.round((fIdx / cards.length) * 100)}% through</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(fIdx / cards.length) * 100}%` }} />
+              </div>
             </div>
+
+            {/* The card — clearly interactive: dashed accent border, hover lift, a 'tap to flip' pill */}
             <button
               onClick={() => setFlipped((f) => !f)}
-              className="flex min-h-[180px] w-full flex-col items-center justify-center rounded-2xl border-2 border-border bg-background p-6 text-center transition hover:border-primary/40"
+              className="group relative flex min-h-[240px] w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-primary/25 bg-background p-8 text-center shadow-sm transition hover:border-primary/50 hover:shadow-md"
             >
+              <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
+                <RotateCcw className="h-3 w-3" /> {flipped ? "Answer — tap for question" : "Tap to flip"}
+              </span>
               {!flipped ? (
                 <>
-                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Question</span>
-                  <p className="mt-2 text-lg font-medium text-foreground">{cards[fIdx].front}</p>
-                  {cards[fIdx].hint && <p className="mt-3 text-xs text-muted-foreground">Hint: {cards[fIdx].hint}</p>}
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Question</span>
+                  <p className="mt-3 text-xl font-medium leading-snug text-foreground">{cards[fIdx].front}</p>
+                  {cards[fIdx].hint && <p className="mt-4 text-sm text-muted-foreground">Hint: {cards[fIdx].hint}</p>}
                 </>
               ) : (
                 <>
-                  <span className="text-[11px] uppercase tracking-wide text-primary">Answer</span>
-                  <p className="mt-2 text-base text-foreground">{cards[fIdx].back}</p>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-primary">Answer</span>
+                  <p className="mt-3 text-lg leading-snug text-foreground">{cards[fIdx].back}</p>
                 </>
               )}
             </button>
-            {flipped && (
-              <div className="mt-3">
-                <p className="mb-2 text-center text-xs text-muted-foreground">How well did you know it?</p>
-                <div className="grid grid-cols-4 gap-2">
+
+            {/* Explicit next action */}
+            {!flipped ? (
+              <Button className="w-full" size="lg" onClick={() => setFlipped(true)}>
+                <RotateCcw className="mr-2 h-4 w-4" /> Show answer
+              </Button>
+            ) : (
+              <div className="rounded-xl border border-border bg-background p-4">
+                <p className="mb-3 text-center text-sm font-medium text-foreground">How well did you know it? Tap one to go to the next card.</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {GRADES.map((gr) => (
                     <button key={gr.grade} onClick={() => rate(gr.grade)} disabled={review.isPending}
-                      className={cn("rounded-lg border py-2 text-sm font-medium transition disabled:opacity-60", gr.cls)}>
+                      className={cn("rounded-lg border-2 py-2.5 text-sm font-semibold transition hover:brightness-95 disabled:opacity-60", gr.cls)}>
                       {gr.label}
                     </button>
                   ))}
@@ -560,8 +593,9 @@ function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planI
               <span>Question {qIdx + 1} of {questions.length}</span>
               <span className="uppercase">{questions[qIdx].difficulty}</span>
             </div>
-            <p className="mb-4 font-medium text-foreground">{questions[qIdx].prompt}</p>
-            <div className="space-y-2">
+            <p className="mb-1 text-lg font-medium leading-snug text-foreground">{questions[qIdx].prompt}</p>
+            <p className="mb-3 text-xs text-muted-foreground">{revealed ? "" : "Tap an answer below, then press Check answer."}</p>
+            <div className="space-y-2.5">
               {questions[qIdx].options.map((opt, i) => {
                 const isChosen = choice === i;
                 const isCorrect = revealed && i === revealed.correctIndex;
@@ -569,10 +603,10 @@ function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planI
                 return (
                   <button key={i} disabled={!!revealed} onClick={() => setChoice(i)}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-lg border p-3 text-left text-sm transition",
+                      "flex w-full items-center gap-3 rounded-lg border-2 p-3.5 text-left text-sm transition disabled:cursor-default",
                       isCorrect ? "border-green-400 bg-green-50 dark:bg-green-950/20" :
                       isWrongChosen ? "border-red-400 bg-red-50 dark:bg-red-950/20" :
-                      isChosen ? "border-primary bg-primary/5" : "border-border hover:border-primary/40",
+                      isChosen ? "border-primary bg-primary/5" : "cursor-pointer border-border hover:border-primary/50 hover:bg-muted/40",
                     )}>
                     <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px]", isCorrect ? "border-green-500 text-green-600" : isWrongChosen ? "border-red-500 text-red-600" : "border-muted-foreground text-muted-foreground")}>
                       {isCorrect ? <Check className="h-3 w-3" /> : isWrongChosen ? <X className="h-3 w-3" /> : String.fromCharCode(65 + i)}
@@ -583,15 +617,17 @@ function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planI
               })}
             </div>
             {revealed ? (
-              <div className="mt-4">
-                <p className={cn("text-sm font-medium", revealed.correct ? "text-green-600" : "text-red-600")}>
-                  {revealed.correct ? "Correct!" : "Not quite."}
+              <div className="mt-5 rounded-xl border border-border bg-muted/40 p-4">
+                <p className={cn("text-sm font-semibold", revealed.correct ? "text-green-600" : "text-red-600")}>
+                  {revealed.correct ? "Correct!" : "Not quite — here's why."}
                 </p>
                 {revealed.explanation && <p className="mt-1 text-sm text-muted-foreground">{revealed.explanation}</p>}
-                <Button className="mt-3" onClick={nextQuestion}>Next <ArrowRight className="ml-1.5 h-4 w-4" /></Button>
+                <Button className="mt-3 w-full sm:w-auto" size="lg" onClick={nextQuestion}>
+                  {qIdx + 1 < questions.length ? "Next question" : "Finish"} <ArrowRight className="ml-1.5 h-4 w-4" />
+                </Button>
               </div>
             ) : (
-              <Button className="mt-4" onClick={submitAnswer} disabled={choice == null || answer.isPending}>Check answer</Button>
+              <Button className="mt-5 w-full sm:w-auto" size="lg" onClick={submitAnswer} disabled={choice == null || answer.isPending}>Check answer</Button>
             )}
           </div>
         )
@@ -624,8 +660,8 @@ function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planI
 function ModeBtn({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: any; label: string }) {
   return (
     <button onClick={onClick}
-      className={cn("flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition",
-        active ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40")}>
+      className={cn("flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
+        active ? "bg-background text-primary shadow-sm ring-1 ring-primary/20" : "text-muted-foreground hover:bg-background/60 hover:text-foreground")}>
       <Icon className="h-4 w-4" /> {label}
     </button>
   );
