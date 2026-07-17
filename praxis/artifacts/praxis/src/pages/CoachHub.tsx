@@ -10,6 +10,7 @@ import {
   LifeBuoy, BookOpen, MessageSquare, TrendingUp, ArrowRight, ArrowLeft,
   Sparkles, CheckCircle2, Circle, Target, Layers, Play, GraduationCap, Clock,
   Flame, Zap, Brain, RotateCcw, Check, X, Dumbbell, Trophy,
+  Upload, Link2, FileText, Plus, Loader2, Music, Video,
 } from "lucide-react";
 
 interface Gamification { xp: number; streak: number; longestStreak: number }
@@ -40,8 +41,10 @@ interface RecentSession {
 }
 interface Overview {
   active: boolean; learnerName: string | null; plans: Plan[]; materialCount: number; gapCount: number; gaps: string[];
-  recentSessions: RecentSession[];
+  recentSessions: RecentSession[]; tutorModuleId: string | null;
 }
+interface UploadMaterial { setId: string; title: string; status: string; createdAt: string | null }
+type PracticeTarget = { kind: "gap"; planId: string; category: string } | { kind: "set"; setId: string };
 interface MaterialDetail {
   refType: string; refId: string; title: string; why: string; category: string | null;
   sections: Array<{ heading: string; body: string }>; concepts: string[];
@@ -63,7 +66,7 @@ const typeMeta: Record<string, { label: string; icon: any }> = {
 export function CoachHub() {
   const [, navigate] = useLocation();
   const [selected, setSelected] = useState<Item | null>(null);
-  const [practice, setPractice] = useState<{ planId: string; category: string } | null>(null);
+  const [practice, setPractice] = useState<PracticeTarget | null>(null);
   const [section, setSection] = useState<"materials" | "progress" | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const showSection = (s: "materials" | "progress") => { setSection(s); setSelected(null); setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0); };
@@ -71,6 +74,7 @@ export function CoachHub() {
   const overview = useQuery({ queryKey: ["coach", "overview"], queryFn: () => apiFetch<Overview>("/learn/coach/overview") });
   const progress = useQuery({ queryKey: ["coach", "progress"], queryFn: () => apiFetch<Progress>("/learn/coach/progress") });
   const game = useQuery({ queryKey: ["coach", "game"], queryFn: () => apiFetch<Gamification>("/learn/coach/gamification") });
+  const materials = useQuery({ queryKey: ["coach", "materials"], queryFn: () => apiFetch<{ materials: UploadMaterial[] }>("/learn/coach/materials/list") });
 
   const startSession = useMutation({
     mutationFn: (v: { moduleId: string; remedialFocus?: string | null }) =>
@@ -91,10 +95,19 @@ export function CoachHub() {
     if (it.refType === "case" && it.refId) return navigate(`/cases/${it.refId}/begin`);
     if (it.refType === "activity" && it.refId) return navigate(`/activities/${it.refId}/play`);
     if (it.refType === "module" && it.refId) return startSession.mutate({ moduleId: it.refId, remedialFocus: it.category || it.title });
-    if (weakestModule) return startSession.mutate({ moduleId: weakestModule.moduleId, remedialFocus: it.category || it.title });
+    // A ref-less "review" step: start a coaching session on the module the learner is weakest on,
+    // or — before any concept mastery exists — on the course's first published module (tutorModuleId).
+    const moduleId = weakestModule?.moduleId ?? overview.data?.tutorModuleId ?? null;
+    if (moduleId) return startSession.mutate({ moduleId, remedialFocus: it.category || it.title });
   }
-  // Picking "Tutor" starts a coaching session straight away on the top gap — no extra step.
-  const startTutor = () => { const it = allItems.find((i) => !i.done) ?? allItems[0]; if (it) launchItem(it); };
+  // Picking "Tutor" always starts a coaching session — on the top gap if there is one, otherwise
+  // straight on the remedial course's first module so it never dead-ends.
+  const startTutor = () => {
+    const it = allItems.find((i) => !i.done) ?? allItems[0];
+    if (it) return launchItem(it);
+    const moduleId = weakestModule?.moduleId ?? overview.data?.tutorModuleId ?? null;
+    if (moduleId) startSession.mutate({ moduleId, remedialFocus: overview.data?.gaps[0] ?? null });
+  };
 
   if (overview.isLoading) {
     return <div className="space-y-4"><Skeleton className="h-9 w-56" /><Skeleton className="h-40" /></div>;
@@ -122,7 +135,7 @@ export function CoachHub() {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
         <PageHeader title="Coach" icon={LifeBuoy} subtitle="Practice built from your class to close the gap." />
-        <CoachPractice planId={practice.planId} category={practice.category} onBack={() => { setPractice(null); game.refetch(); }} onNavigate={navigate} onGame={() => game.refetch()} />
+        <CoachPractice target={practice} onBack={() => { setPractice(null); game.refetch(); }} onNavigate={navigate} onGame={() => game.refetch()} />
       </div>
     );
   }
@@ -164,13 +177,13 @@ export function CoachHub() {
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <ActionCard icon={Dumbbell} primary title="Practice" cta="Start practising"
             text="Flashcards and quick quizzes built from your own class content. Flip a card and rate how well you knew it, then answer questions to lock the ideas in. You earn points and build a daily streak as you go."
-            onClick={() => primaryPlan && data.gaps[0] && setPractice({ planId: primaryPlan.planId, category: data.gaps[0] })}
+            onClick={() => primaryPlan && data.gaps[0] && setPractice({ kind: "gap", planId: primaryPlan.planId, category: data.gaps[0] })}
             disabled={!primaryPlan || !data.gaps[0]} />
           <ActionCard icon={MessageSquare} title="Tutor" cta="Begin a coaching session"
             text="Start a one-on-one coaching session right now. Your coach asks guiding questions and works through the tricky parts with you, step by step, focused only on what you're catching up on."
-            onClick={startTutor} disabled={startSession.isPending || allItems.length === 0} />
-          <ActionCard icon={BookOpen} title="Materials" cta="Browse materials"
-            text="The exact things to review to close your gap - the case studies, activities and lessons your coach chose for you. Open any one to read it, then jump into practice or a coaching session."
+            onClick={startTutor} disabled={startSession.isPending || (allItems.length === 0 && !data.tutorModuleId)} />
+          <ActionCard icon={Upload} title="Materials" cta="Add & practise your content"
+            text="Bring in your own study material — a PDF, Word or PowerPoint file, notes, or a link — and the coach turns it into flashcards and a quiz you can practise straight away."
             onClick={() => showSection("materials")} />
           <ActionCard icon={TrendingUp} title="Progress" cta="See my progress"
             text="Watch your understanding grow - see how well you know each concept and which gaps are still open, so you always know what to do next."
@@ -182,7 +195,7 @@ export function CoachHub() {
             {data.gaps.map((g) => {
               const pl = data.plans.find((p) => p.gaps.includes(g)) ?? primaryPlan;
               return (
-                <button key={g} onClick={() => pl && setPractice({ planId: pl.planId, category: g })}
+                <button key={g} onClick={() => pl && setPractice({ kind: "gap", planId: pl.planId, category: g })}
                   className="rounded-full border border-amber-300/60 bg-background px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:text-amber-300">
                   Practice: {g}
                 </button>
@@ -196,105 +209,37 @@ export function CoachHub() {
       {section && (
         <div ref={sectionRef} className="scroll-mt-4">
           {section === "materials" && (
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                <h2 className="text-lg font-semibold text-foreground">Your materials</h2>
-              </div>
-              {selected ? (
-                <MaterialReader
-                  item={selected}
-                  onBack={() => setSelected(null)}
-                  onLaunch={launchItem}
-                  launching={startSession.isPending}
-                  onPractice={selected.category ? () => setPractice({ planId: (selected as any).plan?.planId ?? primaryPlan?.planId, category: selected.category! }) : undefined}
-                />
-              ) : (
-                <>
-                  <p className="text-sm text-muted-foreground">The exact materials your coach picked to close your gap. Tap any one to read it, then practise it or start a coaching session.</p>
-                  {allItems.map((it) => {
-                    const meta = typeMeta[it.refType ?? "review"] ?? typeMeta.review;
-                    const Icon = meta.icon;
-                    return (
-                      <button
-                        key={`${it.plan.planId}-${it.index}`}
-                        onClick={() => setSelected(it)}
-                        className="flex w-full items-center gap-3 rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary/40"
-                      >
-                        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", it.done ? "bg-green-500/15 text-green-600" : "bg-primary/10 text-primary")}>
-                          {it.done ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className={cn("font-medium text-foreground", it.done && "line-through opacity-60")}>{it.title}</span>
-                            <span className="rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide bg-muted text-muted-foreground">{meta.label}</span>
-                          </div>
-                          <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{it.why}</p>
-                          {it.category && <p className="mt-1 text-xs text-amber-600">Targets: {it.category}</p>}
-                        </div>
-                        <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      </button>
-                    );
-                  })}
-                </>
-              )}
-            </section>
+            <MaterialsPanel
+              data={materials.data?.materials ?? []}
+              loading={materials.isLoading}
+              onRefetch={() => { materials.refetch(); overview.refetch(); }}
+              onPractise={(setId) => setPractice({ kind: "set", setId })}
+            />
           )}
 
           {section === "progress" && (
-            <section className="space-y-4">
+            <section className="space-y-5">
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-semibold text-foreground">Your progress</h2>
               </div>
-              <p className="text-sm text-muted-foreground">How well you know each concept, and which gaps are still open.</p>
               {progress.isLoading ? (
                 <Skeleton className="h-40" />
               ) : !progress.data?.hasData ? (
                 <div className="rounded-xl border border-border bg-background p-10 text-center">
                   <TrendingUp className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
                   <h3 className="text-base font-semibold text-foreground">Your progress will build here</h3>
-                  <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">As you work through the practice and coaching sessions, your mastery of each concept — and how much of the gap is closed — shows up here.</p>
+                  <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">As you work through the practice and coaching sessions, which gaps are closed — and how much of each is done — shows up here.</p>
                 </div>
               ) : (
-                <>
-                  {progress.data.gaps.length > 0 && (
-                    <div>
-                      <h3 className="mb-2 text-sm font-semibold text-foreground">Areas to close</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {progress.data.gaps.map((g, i) => (
-                          <span key={i} className="rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-1.5 text-sm text-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
-                            {g.category} <span className="text-xs opacity-70">· {g.courseTitle}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {progress.data.concepts.length > 0 && (
-                    <div>
-                      <h3 className="mb-2 text-sm font-semibold text-foreground">Concept mastery</h3>
-                      <div className="space-y-2">
-                        {progress.data.concepts.map((c) => {
-                          const pct = Math.round(c.mastery * 100);
-                          return (
-                            <div key={c.moduleId} className="rounded-lg border border-border bg-background p-3">
-                              <div className="mb-1.5 flex items-center justify-between gap-2">
-                                <span className="min-w-0 truncate text-sm font-medium text-foreground">{c.moduleTitle}</span>
-                                <span className="flex items-center gap-2">
-                                  {c.due && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] uppercase text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Due</span>}
-                                  <span className={cn("font-mono text-xs", pct >= 80 ? "text-green-600" : pct >= 50 ? "text-amber-600" : "text-red-600")}>{pct}%</span>
-                                </span>
-                              </div>
-                              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                                <div className={cn("h-full rounded-full", pct >= 80 ? "bg-green-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500")} style={{ width: `${pct}%` }} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </>
+                <ProgressPanel
+                  gaps={progress.data.gaps}
+                  concepts={progress.data.concepts}
+                  onPractise={(category) => {
+                    const pl = data.plans.find((p) => p.gaps.includes(category)) ?? primaryPlan;
+                    if (pl) setPractice({ kind: "gap", planId: pl.planId, category });
+                  }}
+                />
               )}
             </section>
           )}
@@ -364,10 +309,13 @@ const GRADES = [
   { grade: 3, label: "Easy", cls: "border-green-400 text-green-700 hover:bg-green-50" },
 ];
 
-function CoachPractice({ planId, category, onBack, onNavigate, onGame }: { planId: string; category: string; onBack: () => void; onNavigate: (path: string) => void; onGame: () => void }) {
+function CoachPractice({ target, onBack, onNavigate, onGame }: { target: PracticeTarget; onBack: () => void; onNavigate: (path: string) => void; onGame: () => void }) {
+  const url = target.kind === "set"
+    ? `/learn/coach/practice?setId=${encodeURIComponent(target.setId)}`
+    : `/learn/coach/practice?planId=${encodeURIComponent(target.planId)}&category=${encodeURIComponent(target.category)}`;
   const q = useQuery({
-    queryKey: ["coach", "practice", planId, category],
-    queryFn: () => apiFetch<PracticeData>(`/learn/coach/practice?planId=${encodeURIComponent(planId)}&category=${encodeURIComponent(category)}`),
+    queryKey: ["coach", "practice", target.kind === "set" ? target.setId : `${target.planId}:${target.category}`],
+    queryFn: () => apiFetch<PracticeData>(url),
   });
   const [mode, setMode] = useState<"flashcards" | "quiz" | "methods">("flashcards");
   const [game, setGame] = useState<Gamification | null>(null);
@@ -663,5 +611,247 @@ function ActionCard({ icon: Icon, title, text, cta, primary, onClick, disabled }
       <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{text}</p>
       <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary">{cta} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" /></span>
     </button>
+  );
+}
+
+const ACCEPT = ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.odt,.txt,.md,.csv,.html,.htm";
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => { const s = String(reader.result); resolve(s.slice(s.indexOf(",") + 1)); };
+    reader.onerror = () => reject(new Error("Could not read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Learner brings their OWN study material (a document, a link, or pasted notes); the coach turns
+// it into a fresh flashcards + quiz set they can practise immediately.
+function MaterialsPanel({ data, loading, onRefetch, onPractise }: { data: UploadMaterial[]; loading: boolean; onRefetch: () => void; onPractise: (setId: string) => void }) {
+  const [tab, setTab] = useState<"file" | "link" | "text">("file");
+  const [file, setFile] = useState<File | null>(null);
+  const [url, setUrl] = useState("");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState<{ setId: string; title: string; flashcards: number; questions: number } | null>(null);
+
+  async function submit() {
+    setBusy(true); setError(null); setAdded(null);
+    try {
+      let body: Record<string, unknown>;
+      if (tab === "file") {
+        if (!file) { setError("Choose a file to add first."); setBusy(false); return; }
+        if (file.size > 20 * 1024 * 1024) { setError("That file is too large (max 20MB)."); setBusy(false); return; }
+        body = { filename: file.name, dataBase64: await fileToBase64(file) };
+      } else if (tab === "link") {
+        if (!url.trim()) { setError("Paste a link first."); setBusy(false); return; }
+        body = { url: url.trim() };
+      } else {
+        if (text.trim().length < 40) { setError("Paste a bit more text — at least a paragraph."); setBusy(false); return; }
+        body = { text: text.trim() };
+      }
+      const r = await apiFetch<{ setId: string; title: string; flashcards: number; questions: number }>(
+        "/learn/coach/materials/add", { method: "POST", body: JSON.stringify(body) });
+      setAdded(r);
+      setFile(null); setUrl(""); setText("");
+      onRefetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read that content. Try a different file or link.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <section className="space-y-5">
+      <div className="flex items-center gap-2">
+        <Upload className="h-5 w-5 text-primary" />
+        <h2 className="text-lg font-semibold text-foreground">Add your own study material</h2>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        Bring in anything you're studying — a document, a link, or your own notes — and your coach turns it
+        into flashcards and a quiz you can practise straight away. Nothing is shared; it's just for you.
+      </p>
+
+      <div className="rounded-2xl border border-border bg-background p-4 sm:p-5">
+        {/* Source picker */}
+        <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/40 p-1">
+          <SourceBtn active={tab === "file"} onClick={() => setTab("file")} icon={FileText} label="Document" />
+          <SourceBtn active={tab === "link"} onClick={() => setTab("link")} icon={Link2} label="Link" />
+          <SourceBtn active={tab === "text"} onClick={() => setTab("text")} icon={Plus} label="Paste notes" />
+        </div>
+
+        <div className="mt-4">
+          {tab === "file" && (
+            <div>
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-8 text-center transition hover:border-primary/50">
+                <Upload className="mb-2 h-6 w-6 text-primary" />
+                <span className="text-sm font-medium text-foreground">{file ? file.name : "Choose a file to upload"}</span>
+                <span className="mt-1 text-xs text-muted-foreground">PDF, Word, PowerPoint, Excel, ODT, or text — up to 20MB</span>
+                <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); setAdded(null); }} />
+              </label>
+            </div>
+          )}
+          {tab === "link" && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Paste a link to an article, a Google Doc/Slides, or any web page</label>
+              <input type="url" value={url} onChange={(e) => { setUrl(e.target.value); setError(null); setAdded(null); }}
+                placeholder="https://…"
+                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/50" />
+            </div>
+          )}
+          {tab === "text" && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">Paste your notes or any text you want to study</label>
+              <textarea value={text} onChange={(e) => { setText(e.target.value); setError(null); setAdded(null); }} rows={6}
+                placeholder="Paste a paragraph or more…"
+                className="mt-1 w-full resize-y rounded-lg border border-border bg-background px-3 py-2.5 text-sm outline-none focus:border-primary/50" />
+            </div>
+          )}
+        </div>
+
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {added && (
+          <div className="mt-3 flex flex-col gap-2 rounded-lg border border-green-300/60 bg-green-50/60 p-3 dark:bg-green-950/15 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-foreground">
+              <span className="font-medium">“{added.title}”</span> is ready — {added.flashcards} flashcards and {added.questions} questions.
+            </p>
+            <Button size="sm" className="self-start sm:self-auto" onClick={() => onPractise(added.setId)}>
+              <Dumbbell className="mr-1.5 h-4 w-4" /> Practise it now
+            </Button>
+          </div>
+        )}
+
+        <Button className="mt-4" onClick={submit} disabled={busy}>
+          {busy ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Building your practice…</> : <><Sparkles className="mr-1.5 h-4 w-4" /> Turn it into practice</>}
+        </Button>
+      </div>
+
+      {/* Audio & video — flagged as coming next so expectations are clear */}
+      <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/20 p-4">
+        <div className="flex gap-1.5 text-muted-foreground"><Music className="h-5 w-5" /><Video className="h-5 w-5" /></div>
+        <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Audio & video</span> — lecture recordings and clips are coming soon. For now, documents, links and notes are supported.</p>
+      </div>
+
+      {/* Previously added materials */}
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-foreground">Materials you've added</h3>
+        {loading ? (
+          <Skeleton className="h-20" />
+        ) : data.length === 0 ? (
+          <p className="rounded-xl border border-border bg-background p-6 text-center text-sm text-muted-foreground">Nothing yet — add a document, link or notes above to build your first practice set.</p>
+        ) : (
+          <div className="space-y-2">
+            {data.map((m) => (
+              <div key={m.setId} className="flex items-center gap-3 rounded-xl border border-border bg-background p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-5 w-5" /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground">{m.title}</p>
+                  <p className="text-xs text-muted-foreground">{m.status === "ready" ? "Practice ready" : "No practice could be built from this"}</p>
+                </div>
+                <Button size="sm" variant="outline" disabled={m.status !== "ready"} onClick={() => onPractise(m.setId)}>
+                  <Dumbbell className="mr-1.5 h-4 w-4" /> Practise
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function SourceBtn({ active, onClick, icon: Icon, label }: { active: boolean; onClick: () => void; icon: any; label: string }) {
+  return (
+    <button onClick={onClick}
+      className={cn("flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition",
+        active ? "bg-background text-primary shadow-sm ring-1 ring-primary/20" : "text-muted-foreground hover:bg-background/60 hover:text-foreground")}>
+      <Icon className="h-4 w-4" /> {label}
+    </button>
+  );
+}
+
+// Progress made simple and visual: what's still open (cards you can close), then a ring per concept.
+function ProgressPanel({ gaps, concepts, onPractise }: {
+  gaps: Array<{ category: string; courseId: string | null; courseTitle: string }>;
+  concepts: Array<{ moduleId: string; moduleTitle: string; courseId: string | null; mastery: number; reps: number; due: boolean }>;
+  onPractise: (category: string) => void;
+}) {
+  const mastered = concepts.filter((c) => c.mastery >= 0.8).length;
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-3 gap-3">
+        <MiniStat tone="text-red-600" label={gaps.length === 1 ? "Area still open" : "Areas still open"} value={gaps.length} />
+        <MiniStat tone="text-green-600" label="Concepts mastered" value={mastered} />
+        <MiniStat tone="text-primary" label="Concepts practised" value={concepts.length} />
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-foreground">Areas that still need closing</h3>
+        {gaps.length === 0 ? (
+          <div className="rounded-xl border border-green-300/60 bg-green-50/50 p-6 text-center dark:bg-green-950/10">
+            <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-green-600" />
+            <p className="font-medium text-foreground">Every area is closed — superb work.</p>
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {gaps.map((g, i) => (
+              <div key={i} className="flex flex-col rounded-xl border border-amber-300/60 bg-amber-50/60 p-4 dark:bg-amber-950/15">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600"><Target className="h-4 w-4" /></span>
+                  <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Open</span>
+                </div>
+                <p className="mt-2 font-medium text-foreground">{g.category}</p>
+                <p className="text-xs text-muted-foreground">{g.courseTitle}</p>
+                <Button size="sm" className="mt-3 self-start" onClick={() => onPractise(g.category)}>
+                  <Dumbbell className="mr-1.5 h-4 w-4" /> Practise to close this
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {concepts.length > 0 && (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold text-foreground">How well you know each concept</h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {concepts.map((c) => {
+              const pct = Math.round(c.mastery * 100);
+              return (
+                <div key={c.moduleId} className="flex flex-col items-center rounded-xl border border-border bg-background p-4 text-center">
+                  <MasteryRing pct={pct} />
+                  <p className="mt-2 line-clamp-2 text-sm font-medium text-foreground">{c.moduleTitle}</p>
+                  {c.due
+                    ? <span className="mt-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] uppercase text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">Review due</span>
+                    : <span className="mt-1 text-[11px] text-muted-foreground">{pct >= 80 ? "Strong" : pct >= 50 ? "Building" : "Needs work"}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ tone, label, value }: { tone: string; label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border bg-background p-4 text-center">
+      <div className={cn("text-2xl font-bold leading-none", tone)}>{value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function MasteryRing({ pct }: { pct: number }) {
+  const r = 26; const circ = 2 * Math.PI * r; const off = circ - (pct / 100) * circ;
+  const color = pct >= 80 ? "#16a34a" : pct >= 50 ? "#d97706" : "#dc2626";
+  return (
+    <div className="relative h-16 w-16">
+      <svg viewBox="0 0 64 64" className="h-16 w-16 -rotate-90">
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" className="stroke-muted" />
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" stroke={color} strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={off} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-foreground">{pct}%</span>
+    </div>
   );
 }

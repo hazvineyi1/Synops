@@ -18,6 +18,10 @@ export const remedialSetsTable = pgTable(
     courseId: text("course_id"),
     category: text("category").notNull(),
     learnerName: text("learner_name"),
+    // "class" = generated from the learner's course content; "upload" = from a document/link the
+    // learner added themselves. title is the display name (esp. for uploads).
+    source: text("source").notNull().default("class"),
+    title: text("title"),
     // "ready" once content is generated; "empty" if the course had no usable content.
     status: text("status").notNull().default("ready"),
     createdAt: timestamp("created_at").notNull().defaultNow(),

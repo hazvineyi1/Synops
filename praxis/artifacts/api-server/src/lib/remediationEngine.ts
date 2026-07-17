@@ -8,7 +8,7 @@ import {
   remedialQuestionsTable,
   coachGamificationTable,
 } from "@workspace/db";
-import { eq, and, inArray, asc } from "drizzle-orm";
+import { eq, and, inArray, asc, desc } from "drizzle-orm";
 
 /**
  * Adaptive, multi-modal remediation. For a learner's gap (a gradebook category on their
@@ -88,19 +88,29 @@ export async function ensureRemediationSet(opts: {
   if (existing[0]) return { setId: existing[0].id, status: existing[0].status };
 
   const { digest } = courseId ? await courseDigest(courseId, category) : { digest: "" };
+  const { flashcards, questions } = await generateItems(digest, category);
+  const status = flashcards.length || questions.length ? "ready" : "empty";
+  const [set] = await db
+    .insert(remedialSetsTable)
+    .values({ userId, planId, courseId, category, learnerName, status })
+    .returning({ id: remedialSetsTable.id });
+  await storeItems(set.id, userId, flashcards, questions);
+  return { setId: set.id, status };
+}
 
+/** Ask the model for flashcards + MCQs grounded ONLY in `digest`; deterministic fallback. */
+async function generateItems(digest: string, targetGap: string): Promise<{ flashcards: GenFlash[]; questions: GenQ[] }> {
   let flashcards: GenFlash[] = [];
   let questions: GenQ[] = [];
-
   if (digest.trim().length >= 120) {
     try {
       const system =
-        "You are a warm, expert learning coach creating remedial practice for a learner who fell behind on a topic. " +
-        "Using ONLY the course content provided, create study material that rebuilds understanding of the target gap. " +
+        "You are a warm, expert learning coach creating study practice from a piece of learning material. " +
+        "Using ONLY the material provided, create practice that rebuilds understanding of the target topic. " +
         "Return STRICT JSON only: {\"flashcards\":[{\"front\":string,\"back\":string,\"hint\":string}], \"questions\":[{\"prompt\":string,\"options\":[string,string,string,string],\"correctIndex\":0,\"explanation\":string,\"difficulty\":\"easy|medium|hard\"}]}. " +
         "Make 8 flashcards (clear question on front, concise answer on back, short optional hint) and 6 multiple-choice questions (exactly 4 options each, one correct, a one-sentence explanation). " +
-        "Ground every item in the provided content; do not invent facts outside it. Use plain South African English. No markdown, no lists in fields.";
-      const payload = { targetGap: category, courseContent: digest };
+        "Ground every item in the provided material; do not invent facts outside it. Use plain South African English. No markdown, no lists in fields.";
+      const payload = { targetTopic: targetGap, material: digest };
       const msg = await anthropic.messages.create({
         model: MODEL,
         max_tokens: 2600,
@@ -131,26 +141,55 @@ export async function ensureRemediationSet(opts: {
       /* fall through to deterministic cards */
     }
   }
-
   if (flashcards.length === 0) flashcards = fallbackFlashcards(digest);
+  return { flashcards, questions };
+}
 
-  const status = flashcards.length || questions.length ? "ready" : "empty";
-  const [set] = await db
-    .insert(remedialSetsTable)
-    .values({ userId, planId, courseId, category, learnerName, status })
-    .returning({ id: remedialSetsTable.id });
-
+/** Persist generated flashcards + questions for a set. */
+async function storeItems(setId: string, userId: string, flashcards: GenFlash[], questions: GenQ[]): Promise<void> {
   if (flashcards.length) {
     await db.insert(remedialFlashcardsTable).values(
-      flashcards.map((f, i) => ({ setId: set.id, userId, front: f.front, back: f.back, hint: f.hint ?? null, order: i })),
+      flashcards.map((f, i) => ({ setId, userId, front: f.front, back: f.back, hint: f.hint ?? null, order: i })),
     );
   }
   if (questions.length) {
     await db.insert(remedialQuestionsTable).values(
-      questions.map((q, i) => ({ setId: set.id, userId, prompt: q.prompt, options: q.options, correctIndex: q.correctIndex, explanation: q.explanation ?? null, difficulty: q.difficulty ?? "medium", order: i })),
+      questions.map((q, i) => ({ setId, userId, prompt: q.prompt, options: q.options, correctIndex: q.correctIndex, explanation: q.explanation ?? null, difficulty: q.difficulty ?? "medium", order: i })),
     );
   }
-  return { setId: set.id, status };
+}
+
+/** Turn a document/link the learner uploaded (already extracted to text) into a practice set. */
+export async function createUploadSet(opts: {
+  userId: string; planId: string | null; courseId: string | null; title: string; text: string; learnerName?: string | null;
+}): Promise<{ setId: string; status: string; flashcards: number; questions: number }> {
+  const { flashcards, questions } = await generateItems(opts.text, opts.title);
+  const status = flashcards.length || questions.length ? "ready" : "empty";
+  const [set] = await db
+    .insert(remedialSetsTable)
+    .values({
+      userId: opts.userId,
+      planId: opts.planId,
+      courseId: opts.courseId,
+      category: opts.title.slice(0, 120),
+      title: opts.title.slice(0, 200),
+      source: "upload",
+      learnerName: opts.learnerName ?? null,
+      status,
+    })
+    .returning({ id: remedialSetsTable.id });
+  await storeItems(set.id, opts.userId, flashcards, questions);
+  return { setId: set.id, status, flashcards: flashcards.length, questions: questions.length };
+}
+
+/** The practice sets a learner created from their own uploads, newest first. */
+export async function getUploadSets(userId: string): Promise<Array<{ setId: string; title: string; status: string; createdAt: string | null }>> {
+  const rows = await db
+    .select({ id: remedialSetsTable.id, title: remedialSetsTable.title, status: remedialSetsTable.status, createdAt: remedialSetsTable.createdAt })
+    .from(remedialSetsTable)
+    .where(and(eq(remedialSetsTable.userId, userId), eq(remedialSetsTable.source, "upload")))
+    .orderBy(desc(remedialSetsTable.createdAt));
+  return rows.map((r) => ({ setId: r.id, title: r.title ?? "Your material", status: r.status, createdAt: r.createdAt?.toISOString() ?? null }));
 }
 
 /** Add XP and update the learner's daily streak. Returns the new gamification state. */

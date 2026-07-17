@@ -14,10 +14,11 @@ import {
   remedialQuestionsTable,
   type StudyPlanItem,
 } from "@workspace/db";
-import { eq, and, inArray, asc, desc } from "drizzle-orm";
+import { eq, and, inArray, asc, desc, gt } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isDue, sm2Update } from "../lib/sm2";
-import { ensureRemediationSet, bumpGamification, getGamification } from "../lib/remediationEngine";
+import { ensureRemediationSet, createUploadSet, getUploadSets, bumpGamification, getGamification } from "../lib/remediationEngine";
+import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
 
 /**
  * The in-LMS "Coach" area for off-track learners: a native, remedial-scoped surface
@@ -113,6 +114,20 @@ router.get("/learn/coach/overview", requireAuth, async (req, res) => {
       createdAt: s.createdAt?.toISOString() ?? null,
     }));
 
+  // A published module in the remedial course the learner can start a coaching session on, so
+  // the Tutor action always connects to a real session even before any concept mastery exists.
+  let tutorModuleId: string | null = null;
+  const remedialCourseId = plans[0]?.p.courseId ?? null;
+  if (remedialCourseId) {
+    const mods = await db
+      .select({ id: modulesTable.id })
+      .from(modulesTable)
+      .where(and(eq(modulesTable.courseId, remedialCourseId), eq(modulesTable.status, "published"), gt(modulesTable.beatCount, 0)))
+      .orderBy(asc(modulesTable.order))
+      .limit(1);
+    tutorModuleId = mods[0]?.id ?? null;
+  }
+
   res.json({
     active: outPlans.length > 0,
     learnerName: (req.dbUser as { firstName?: string } | undefined)?.firstName ?? null,
@@ -121,6 +136,7 @@ router.get("/learn/coach/overview", requireAuth, async (req, res) => {
     gapCount: gapSet.size,
     gaps: [...gapSet],
     recentSessions,
+    tutorModuleId,
   });
 });
 
@@ -252,38 +268,65 @@ router.get("/learn/coach/progress", requireAuth, async (req, res) => {
   res.json({ hasData: concepts.length > 0 || gaps.length > 0, concepts, gaps });
 });
 
-// GET /learn/coach/practice?planId=&category= — the adaptive, multi-modal practice for one gap:
-// flashcards + knowledge questions generated (once) from the learner's OWN course content, plus
-// the course cases/activities that target the gap, plus gamification. Addressed by name.
+// GET /learn/coach/practice?planId=&category=  OR  ?setId=
+// The adaptive, multi-modal practice: flashcards + knowledge questions (generated once) from the
+// learner's own course content for a gap, OR a set the learner built by uploading their own
+// material (setId). Plus any course cases/activities for a gap, plus gamification, by name.
 router.get("/learn/coach/practice", requireAuth, async (req, res) => {
   const userId = req.userId!;
+  const setIdParam = String(req.query.setId ?? "");
   const planId = String(req.query.planId ?? "");
   const category = String(req.query.category ?? "");
-  if (!category) {
-    res.status(400).json({ error: "category is required." });
-    return;
-  }
   const firstName = (req.dbUser as { firstName?: string } | undefined)?.firstName ?? null;
+  const name = firstName || "there";
 
-  const plans = await activeRemedialPlans(userId);
-  const match = plans.find(({ p }) => (planId ? p.id === planId : true) && planItems(p).some((i) => i.category === category));
-  if (!match) {
-    res.status(404).json({ error: "That gap is not in your remedial plan." });
-    return;
-  }
-  const courseId = match.p.courseId;
+  let setId: string;
+  let status: string;
+  let displayCategory: string;
+  let methods: Array<{ title: string; type: string; path: string }> = [];
 
-  let set: { setId: string; status: string };
-  try {
-    set = await ensureRemediationSet({ userId, planId: match.p.id, courseId, category, learnerName: firstName });
-  } catch {
-    res.status(500).json({ error: "Could not build your practice set. Please try again." });
-    return;
+  if (setIdParam) {
+    // Open a specific set the learner owns (e.g. one they built from an uploaded document/link).
+    const [row] = await db
+      .select({ id: remedialSetsTable.id, owner: remedialSetsTable.userId, status: remedialSetsTable.status, title: remedialSetsTable.title, category: remedialSetsTable.category })
+      .from(remedialSetsTable)
+      .where(eq(remedialSetsTable.id, setIdParam))
+      .limit(1);
+    if (!row || row.owner !== userId) {
+      res.status(404).json({ error: "Practice set not found." });
+      return;
+    }
+    setId = row.id;
+    status = row.status;
+    displayCategory = row.title ?? row.category;
+  } else {
+    if (!category) {
+      res.status(400).json({ error: "category or setId is required." });
+      return;
+    }
+    const plans = await activeRemedialPlans(userId);
+    const match = plans.find(({ p }) => (planId ? p.id === planId : true) && planItems(p).some((i) => i.category === category));
+    if (!match) {
+      res.status(404).json({ error: "That gap is not in your remedial plan." });
+      return;
+    }
+    try {
+      const s = await ensureRemediationSet({ userId, planId: match.p.id, courseId: match.p.courseId, category, learnerName: firstName });
+      setId = s.setId;
+      status = s.status;
+    } catch {
+      res.status(500).json({ error: "Could not build your practice set. Please try again." });
+      return;
+    }
+    displayCategory = category;
+    methods = planItems(match.p)
+      .filter((it) => it.category === category && (it.refType === "case" || it.refType === "activity") && it.refId)
+      .map((it) => ({ title: it.title, type: it.refType as string, path: it.refType === "case" ? `/cases/${it.refId}/begin` : `/activities/${it.refId}/play` }));
   }
 
   const [flashRows, qRows] = await Promise.all([
-    db.select().from(remedialFlashcardsTable).where(eq(remedialFlashcardsTable.setId, set.setId)).orderBy(asc(remedialFlashcardsTable.order)),
-    db.select().from(remedialQuestionsTable).where(eq(remedialQuestionsTable.setId, set.setId)).orderBy(asc(remedialQuestionsTable.order)),
+    db.select().from(remedialFlashcardsTable).where(eq(remedialFlashcardsTable.setId, setId)).orderBy(asc(remedialFlashcardsTable.order)),
+    db.select().from(remedialQuestionsTable).where(eq(remedialQuestionsTable.setId, setId)).orderBy(asc(remedialQuestionsTable.order)),
   ]);
 
   const flashcards = flashRows.map((f) => ({ id: f.id, front: f.front, back: f.back, hint: f.hint, mastery: f.mastery, due: isDue(f.dueDate) }));
@@ -292,33 +335,71 @@ router.get("/learn/coach/practice", requireAuth, async (req, res) => {
     prompt: q.prompt,
     options: q.options,
     difficulty: q.difficulty,
-    // Only reveal the answer + explanation once the learner has attempted it.
     answered: q.attempts > 0 ? { choice: q.lastChoice, correct: q.lastCorrect, correctIndex: q.correctIndex, explanation: q.explanation } : null,
   }));
 
-  // "Different methods": the course cases/activities on this learner's plan that target the gap.
-  const methods = planItems(match.p)
-    .filter((it) => it.category === category && (it.refType === "case" || it.refType === "activity") && it.refId)
-    .map((it) => ({ title: it.title, type: it.refType, path: it.refType === "case" ? `/cases/${it.refId}/begin` : `/activities/${it.refId}/play` }));
-
   const gamification = await getGamification(userId);
-  const name = firstName || "there";
-  const intro = set.status === "empty"
-    ? `${name}, let's rebuild ${category} together — start a coaching session and we'll work through it step by step.`
-    : `${name}, here's your practice to close ${category}. Flip through the cards, test yourself, and watch your streak grow.`;
+  const intro = status === "empty"
+    ? `${name}, this one's a little thin — try a coaching session or add more content.`
+    : `${name}, here's your practice for ${displayCategory}. Flip through the cards, test yourself, and watch your streak grow.`;
 
-  res.json({
-    setId: set.setId,
-    status: set.status,
-    category,
-    courseTitle: match.courseTitle ?? "Your course",
-    learnerName: name,
-    intro,
-    flashcards,
-    questions,
-    methods,
-    gamification,
-  });
+  res.json({ setId, status, category: displayCategory, courseTitle: "", learnerName: name, intro, flashcards, questions, methods, gamification });
+});
+
+// POST /learn/coach/materials/add { url } | { filename, dataBase64 } | { title, text }
+// The learner brings in their OWN study material (a document or a link). We extract the text and
+// generate a fresh flashcards + quiz practice set from it, added to their materials.
+router.post("/learn/coach/materials/add", requireAuth, async (req, res) => {
+  const userId = req.userId!;
+  const firstName = (req.dbUser as { firstName?: string } | undefined)?.firstName ?? null;
+  const body = req.body ?? {};
+  const url = typeof body.url === "string" ? body.url.trim() : "";
+  const filename = typeof body.filename === "string" ? body.filename : "";
+  const dataBase64 = typeof body.dataBase64 === "string" ? body.dataBase64 : "";
+  const pastedText = typeof body.text === "string" ? body.text : "";
+  let title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "";
+
+  try {
+    let text = "";
+    if (dataBase64) {
+      const buf = Buffer.from(dataBase64, "base64");
+      if (buf.length > 20 * 1024 * 1024) { res.status(400).json({ error: "That file is too large (max 20MB)." }); return; }
+      text = await extractFromBuffer(filename || "file.txt", buf);
+      if (!title) title = filename || "Uploaded document";
+    } else if (url) {
+      text = await extractFromUrl(url);
+      if (!title) { try { title = new URL(url.startsWith("http") ? url : "https://" + url).hostname.replace(/^www\./, ""); } catch { title = "Link"; } }
+    } else if (pastedText.trim().length >= 40) {
+      text = pastedText.trim();
+      if (!title) title = "Pasted notes";
+    } else {
+      res.status(400).json({ error: "Add a document, a link, or paste some text." });
+      return;
+    }
+    if (text.trim().length < 40) {
+      res.status(422).json({ error: "There was not enough readable text in that to build practice from." });
+      return;
+    }
+
+    const plans = await activeRemedialPlans(userId);
+    const result = await createUploadSet({
+      userId,
+      planId: plans[0]?.p.id ?? null,
+      courseId: plans[0]?.p.courseId ?? null,
+      title,
+      text,
+      learnerName: firstName,
+    });
+    res.status(201).json({ setId: result.setId, title, flashcards: result.flashcards, questions: result.questions, status: result.status });
+  } catch (err) {
+    req.log?.warn({ err }, "coach material add failed");
+    res.status(422).json({ error: err instanceof Error ? err.message : "Could not read that content." });
+  }
+});
+
+// GET /learn/coach/materials/list — the practice sets the learner built from their own uploads.
+router.get("/learn/coach/materials/list", requireAuth, async (req, res) => {
+  res.json({ materials: await getUploadSets(req.userId!) });
 });
 
 // POST /learn/coach/flashcard/:id/review { grade: 0-3 } — grade a flashcard, advance its SM-2
