@@ -29,6 +29,7 @@ import {
   REASON_LABEL,
 } from "../lib/gradebookEngine";
 import { gradebookSettingsTable, type LetterBand } from "@workspace/db";
+import { buildGradebookWorkbook, buildGradebookCsv, type GbExportReport } from "../lib/gradebookExport";
 import { onGradeEvent, scanCourse } from "../lib/gradebookAlerts";
 import { mailerConfigured, sendMail, appUrl, emailShell } from "../lib/mailer";
 
@@ -152,6 +153,78 @@ router.put("/courses/:courseId/gradebook/settings", requireAuth, async (req, res
   if (existing) await db.update(gradebookSettingsTable).set(values).where(eq(gradebookSettingsTable.id, existing.id));
   else await db.insert(gradebookSettingsTable).values(values);
   res.json(await getGradebookSettings(courseId));
+});
+
+// ── Matrix export (Excel / CSV) ─────────────────────────────────────────────────
+async function buildExportReport(actor: U, courseId: string, groupId: string | null): Promise<GbExportReport> {
+  const columns = await getCourseColumns(courseId);
+  const settings = await getGradebookSettings(courseId);
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
+
+  let cohortName: string | null = null;
+  let learnerRows: { userId: string }[];
+  if (groupId) {
+    const g = await db.query.courseGroupsTable.findFirst({ where: eq(courseGroupsTable.id, groupId) });
+    cohortName = g?.name ?? null;
+    learnerRows = await db.select({ userId: courseGroupMembersTable.userId }).from(courseGroupMembersTable)
+      .where(and(eq(courseGroupMembersTable.groupId, groupId), eq(courseGroupMembersTable.role, "member")));
+  } else {
+    learnerRows = await db.select({ userId: enrolmentsTable.userId }).from(enrolmentsTable).where(eq(enrolmentsTable.courseId, courseId));
+  }
+  let userIds = [...new Set(learnerRows.map((r) => r.userId))];
+  if (isCoFacilitator(actor.role)) {
+    const mine = new Set(await learnerIdsForCoFacilitator(actor.id));
+    userIds = userIds.filter((id) => mine.has(id));
+  }
+
+  const [users, scoreData] = await Promise.all([
+    userIds.length ? db.select().from(usersTable).where(inArray(usersTable.id, userIds)) : Promise.resolve([]),
+    getScoreData(columns, userIds),
+  ]);
+  const userById = new Map(users.map((u) => [u.id, u]));
+
+  const learners = userIds
+    .map((uid) => {
+      const computed = computeLearner(columns, scoreData.fractions.get(uid), scoreData.notes.get(uid), false, settings);
+      const u = userById.get(uid);
+      const name = [u?.firstName, u?.lastName].filter(Boolean).join(" ") || u?.email || "Unknown";
+      return { name, email: u?.email ?? "", cells: computed.cells, overallPercent: computed.overallPercent, letterGrade: computed.letterGrade };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return {
+    courseTitle: course?.title ?? "Course",
+    cohortName,
+    generatedAt: new Date().toISOString(),
+    lettersEnabled: settings.lettersEnabled,
+    columns: columns.map((c) => ({ key: c.key, title: c.title, category: c.category, itemType: c.itemType, pointsPossible: c.pointsPossible })),
+    learners,
+  };
+}
+
+const gbSlug = (s: string) => (s || "course").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "course";
+
+// GET /courses/:courseId/gradebook/export.xlsx
+router.get("/courses/:courseId/gradebook/export.xlsx", requireAuth, async (req, res) => {
+  const { courseId } = req.params;
+  if (!(await requireStaffOnCourse(req, res, courseId))) return;
+  const groupId = typeof req.query.groupId === "string" ? req.query.groupId : null;
+  const report = await buildExportReport(req.dbUser as U, courseId, groupId);
+  const buf = await buildGradebookWorkbook(report);
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="gradebook-${gbSlug(report.courseTitle)}.xlsx"`);
+  res.end(buf);
+});
+
+// GET /courses/:courseId/gradebook/export.csv
+router.get("/courses/:courseId/gradebook/export.csv", requireAuth, async (req, res) => {
+  const { courseId } = req.params;
+  if (!(await requireStaffOnCourse(req, res, courseId))) return;
+  const groupId = typeof req.query.groupId === "string" ? req.query.groupId : null;
+  const report = await buildExportReport(req.dbUser as U, courseId, groupId);
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename="gradebook-${gbSlug(report.courseTitle)}.csv"`);
+  res.send(buildGradebookCsv(report));
 });
 
 // ── Hierarchy navigation (browse down to a course gradebook, scoped by role) ──────

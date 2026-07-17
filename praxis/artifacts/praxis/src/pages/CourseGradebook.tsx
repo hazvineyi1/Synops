@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API } from "@/lib/api";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { gradebookApi, type GradebookColumn, type GradebookMatrix, type MatrixLearner } from "@/lib/gradebookApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { useSession } from "@/context/SessionContext";
 import { GradebookLearnerDialog } from "@/components/GradebookLearnerDialog";
 import { GradebookSettingsDialog } from "@/components/GradebookSettingsDialog";
-import { ChevronRight, MessageSquare, Plus, RefreshCw, TrendingDown, TrendingUp, Minus, AlertTriangle, Mail, SlidersHorizontal } from "lucide-react";
+import { ChevronRight, MessageSquare, Plus, RefreshCw, TrendingDown, TrendingUp, Minus, AlertTriangle, Mail, SlidersHorizontal, Download } from "lucide-react";
 
 const bandCell = (f: number | null) =>
   f === null
@@ -38,6 +39,7 @@ export function CourseGradebook() {
   const [includeFormative, setIncludeFormative] = useState(false);
   const [drillUser, setDrillUser] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const exportUrl = (fmt: "xlsx" | "csv") => `${API}/courses/${courseId}/gradebook/export.${fmt}${groupId ? `?groupId=${groupId}` : ""}`;
 
   const { data: course } = useQuery({ queryKey: ["course", courseId], queryFn: () => apiFetch<any>(`/courses/${courseId}`) });
   const groups = useQuery({
@@ -194,6 +196,15 @@ export function CourseGradebook() {
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => scan.mutate()} disabled={scan.isPending}>
             <RefreshCw className={cn("h-4 w-4", scan.isPending && "animate-spin")} /> Check who's off track
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5"><Download className="h-4 w-4" /> Export</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => window.open(exportUrl("xlsx"), "_blank")}>Excel (.xlsx)</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => window.open(exportUrl("csv"), "_blank")}>CSV (.csv)</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSettingsOpen(true)}>
             <SlidersHorizontal className="h-4 w-4" /> Settings
           </Button>
