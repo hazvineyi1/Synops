@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGetSession, useGetModule } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Send, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion, Lightbulb, ChevronRight, PencilLine } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { BeatType } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,41 @@ const BEAT_BADGE: Record<string, string> = {
   scenario: 'text-orange-600 bg-orange-500/10',
 };
 const beatBadge = (type: string): string => BEAT_BADGE[type] ?? 'text-teal-700 bg-teal-500/10';
+
+// The chat renders raw text (no markdown parser), so strip every asterisk, em/en dash and
+// divider before display. Belt-and-braces with the server-side sanitiser.
+function sanitizePlain(text: string): string {
+  return (text || '')
+    .replace(/—/g, ', ')
+    .replace(/–/g, '-')
+    .replace(/^\s*[-*_]{3,}\s*$/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`{1,3}([^`]*)`{1,3}/g, '$1')
+    .replace(/^#{1,6}\s*/gm, '')
+    .replace(/\*/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+interface WorkedExample {
+  intro: string;
+  situation: string;
+  steps: { heading: string; detail: string }[];
+  tryPrompt: string;
+}
+// A tutor turn is a worked example when its reasoning marks it so.
+function isWorkedTurn(turn: { role?: string; reasoning?: string | null }): boolean {
+  const r = (turn.reasoning || '').toLowerCase();
+  return turn.role === 'tutor' && (r === 'worked_example' || r.includes('worked example'));
+}
+function parseWorked(content: string): WorkedExample | null {
+  try {
+    const w = JSON.parse(content);
+    if (w && typeof w === 'object' && Array.isArray(w.steps)) return w as WorkedExample;
+  } catch { /* legacy prose worked example */ }
+  return null;
+}
 
 type DoneMeta = { scaffold?: boolean; grade?: number; mastered?: boolean; masteryScore?: number };
 
@@ -177,26 +212,27 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
     );
   };
 
-  // Deliberate scaffolding: fetch one worked example, then let the learner try again.
+  // Deliberate scaffolding: fetch ONE structured worked example, which then renders as its own
+  // interactive card (a distinct box) in the transcript. Not streamed — it comes back as JSON.
   const handleWorkedExample = async () => {
     if (isStreaming) return;
     setShowScaffold(false);
     setIsStreaming(true);
     setStreamingText('');
-
-    await streamSSE(
-      `/api/sessions/${sessionId}/worked-example`,
-      {},
-      (token) => {
-        setStreamingText(prev => prev + token);
-      },
-      () => {
-        refetchSession().then(() => {
-          setIsStreaming(false);
-          setStreamingText('');
-        });
-      }
-    );
+    try {
+      await fetch(`/api/sessions/${sessionId}/worked-example`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: '{}',
+      });
+    } catch (e) {
+      console.error('worked-example error', e);
+    } finally {
+      await refetchSession();
+      setIsStreaming(false);
+      setStreamingText('');
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -265,21 +301,21 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                   <MessageCircleQuestion className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <div>
                     <p className="font-semibold text-foreground">What to do</p>
-                    <p className="text-muted-foreground">Your coach asks guiding questions. Answer in your own words and explain your reasoning — there's no single right wording, and the coach won't hand you the answer.</p>
+                    <p className="text-muted-foreground">Your coach asks guiding questions. Answer in your own words and explain your reasoning; there's no single right wording, and the coach won't hand you the answer.</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <Target className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <div>
                     <p className="font-semibold text-foreground">What mastery looks like</p>
-                    <p className="text-muted-foreground">Move the Mastery bar to 80% by reasoning clearly and applying the idea to new situations. Reach 80% and you've mastered it — and earn your credential.</p>
+                    <p className="text-muted-foreground">Move the Mastery bar to 80% by reasoning clearly and applying the idea to new situations. Reach 80% and you've mastered it, and earned your credential.</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                   <div>
                     <p className="font-semibold text-foreground">How long it takes</p>
-                    <p className="text-muted-foreground">About 10–15 minutes. Your progress saves as you go, so you can pause and pick up where you left off.</p>
+                    <p className="text-muted-foreground">About 10 to 15 minutes. Your progress saves as you go, so you can pause and pick up where you left off.</p>
                   </div>
                 </div>
               </div>
@@ -290,7 +326,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           {showFacts && (
             <div className="border-t border-border bg-amber-50/40 dark:bg-amber-950/10">
               <div className="mx-auto max-w-3xl px-4 py-3 text-sm">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Fact pattern — the context for this session</p>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Fact pattern: the context for this session</p>
                 {factPattern.focus && (
                   <p className="mb-2 text-foreground"><span className="font-medium">You're catching up on:</span> {factPattern.focus}</p>
                 )}
@@ -312,29 +348,45 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
       <main className="flex-1 overflow-y-auto px-4 py-8 flex justify-center">
         <div className="w-full max-w-3xl space-y-6">
           <AnimatePresence initial={false}>
-            {localTurns.map((turn, idx) => (
-              <motion.div
-                key={turn.id || idx}
-                initial={{ opacity: 0, y: 12, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-                className={cn(
-                  "flex w-full",
-                  turn.role === 'learner' ? "justify-end" : "justify-start"
-                )}
-              >
-                <div 
+            {localTurns.map((turn, idx) => {
+              // Worked examples render as their own distinct, interactive card.
+              if (isWorkedTurn(turn)) {
+                return (
+                  <motion.div
+                    key={turn.id || idx}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, ease: 'easeOut' }}
+                    className="w-full"
+                  >
+                    <WorkedExampleCard data={parseWorked(turn.content)} raw={turn.content} />
+                  </motion.div>
+                );
+              }
+              return (
+                <motion.div
+                  key={turn.id || idx}
+                  initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
                   className={cn(
-                    "max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed whitespace-pre-wrap",
-                    turn.role === 'learner' 
-                      ? "bg-primary text-primary-foreground rounded-tr-sm" 
-                      : "bg-card border border-border shadow-sm rounded-tl-sm text-foreground"
+                    "flex w-full",
+                    turn.role === 'learner' ? "justify-end" : "justify-start"
                   )}
                 >
-                  {turn.content}
-                </div>
-              </motion.div>
-            ))}
+                  <div
+                    className={cn(
+                      "max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed whitespace-pre-wrap",
+                      turn.role === 'learner'
+                        ? "bg-primary text-primary-foreground rounded-tr-sm"
+                        : "bg-card border border-border shadow-sm rounded-tl-sm text-foreground"
+                    )}
+                  >
+                    {turn.role === 'tutor' ? sanitizePlain(turn.content) : turn.content}
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
 
           {/* Streaming active message */}
@@ -345,7 +397,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
               className="flex w-full justify-start"
              >
               <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed whitespace-pre-wrap bg-card border border-border shadow-sm rounded-tl-sm text-foreground relative">
-                {streamingText || (
+                {streamingText ? sanitizePlain(streamingText) : (
                   <span className="inline-flex gap-1 items-center">
                     <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />
                     <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.15s]" />
@@ -367,7 +419,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
               className="rounded-2xl border border-orange-200 bg-orange-50 p-5 sm:p-6 dark:border-orange-900/40 dark:bg-orange-950/20"
             >
               <p className="text-sm font-semibold text-orange-900 dark:text-orange-200">
-                This one is genuinely tricky — that's normal.
+                This one is genuinely tricky, and that's completely normal.
               </p>
               <p className="mt-1 text-sm text-orange-800/90 dark:text-orange-200/80">
                 Want me to walk through one worked example first? Then you can try a similar one yourself.
@@ -440,6 +492,88 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           The tutor will not provide answers, only questions to guide your reasoning.
         </p>
       </footer>
+    </div>
+  );
+}
+
+// Interactive worked example: a distinct box that reveals the reasoning one step at a time, then
+// hands back to the dialogue with a "Now you try" prompt. Falls back to a plain box for legacy
+// (pre-structured) worked examples so they still render distinctly.
+function WorkedExampleCard({ data, raw }: { data: WorkedExample | null; raw?: string }) {
+  const [revealed, setRevealed] = useState(1);
+
+  if (!data) {
+    return (
+      <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 p-5 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+        <div className="mb-2 flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+          <Lightbulb className="h-4 w-4" />
+          <span className="text-xs font-bold uppercase tracking-wide">Worked example</span>
+        </div>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{sanitizePlain(raw || '')}</p>
+      </div>
+    );
+  }
+
+  const total = data.steps.length;
+  const allShown = revealed >= total;
+
+  return (
+    <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50/40 p-5 sm:p-6 dark:border-indigo-900/40 dark:bg-indigo-950/15">
+      <div className="mb-3 flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+        <Lightbulb className="h-4 w-4" />
+        <span className="text-xs font-bold uppercase tracking-wide">Worked example</span>
+      </div>
+      <p className="text-sm text-foreground">{data.intro}</p>
+      <p className="mt-1 text-xs text-muted-foreground">Seeing the reasoning worked through once makes the next one easier to do yourself. Step through it, then try one below.</p>
+
+      <div className="mt-4 rounded-xl border border-border bg-background p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">The situation</p>
+        <p className="mt-1 text-sm text-foreground">{data.situation}</p>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {data.steps.slice(0, revealed).map((s, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+            className="rounded-xl border border-indigo-200/70 bg-background p-3 dark:border-indigo-900/30"
+          >
+            <div className="flex items-center gap-2">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-[11px] font-bold text-white">{i + 1}</span>
+              <span className="text-sm font-semibold text-foreground">{s.heading}</span>
+            </div>
+            <p className="mt-1 pl-7 text-sm leading-relaxed text-muted-foreground">{s.detail}</p>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <div className="flex gap-1">
+          {data.steps.map((_, i) => (
+            <span key={i} className={cn("h-1.5 w-6 rounded-full transition-colors", i < revealed ? "bg-indigo-500" : "bg-indigo-200 dark:bg-indigo-900/40")} />
+          ))}
+        </div>
+        {!allShown ? (
+          <Button size="sm" onClick={() => setRevealed(r => Math.min(total, r + 1))}>
+            Next step <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        ) : (
+          <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">All steps shown</span>
+        )}
+      </div>
+
+      {allShown && (
+        <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
+          <div className="mb-1 flex items-center gap-2 text-primary">
+            <PencilLine className="h-4 w-4" />
+            <span className="text-xs font-bold uppercase tracking-wide">Now you try</span>
+          </div>
+          <p className="text-sm text-foreground">{data.tryPrompt}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Type your answer in the box below to keep going.</p>
+        </div>
+      )}
     </div>
   );
 }

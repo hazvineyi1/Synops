@@ -14,6 +14,7 @@ import {
   buildSocraticSystemPrompt,
   ensureQuestion,
   generateSocraticTurn,
+  generateWorkedExample,
   SOCRATIC_MODEL,
   type SocraticContext,
 } from "../lib/socraticEngine";
@@ -220,6 +221,19 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
   try {
     const learner = req.dbUser!;
     const exchangeCount = Math.floor(Number(session.turnCount) / 2);
+
+    // Adaptive cadence signal: read how the learner has actually been doing on recent graded
+    // turns (masteryDelta per tutor turn). Two non-positive deltas in a row => struggling; a
+    // strong last delta => thriving. This is fed to the coach so it genuinely changes pace.
+    const tutorDeltas = historyOrdered.filter((t) => t.role === "tutor").map((t) => Number(t.masteryDelta ?? 0));
+    const lastTwo = tutorDeltas.slice(-2);
+    const recentPerformance: "struggling" | "steady" | "thriving" =
+      lastTwo.length >= 2 && lastTwo.every((d) => d <= 0)
+        ? "struggling"
+        : tutorDeltas.length > 0 && tutorDeltas[tutorDeltas.length - 1] >= 0.12
+        ? "thriving"
+        : "steady";
+
     const socraticCtx: SocraticContext = {
       beatTitle: beat?.title,
       beatType: beat?.type,
@@ -233,13 +247,17 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       turnCount: exchangeCount,
       promptBudget: PROMPT_BUDGET,
       remedialFocus: session.remedialFocus,
+      recentPerformance,
     };
     const systemPrompt = buildSocraticSystemPrompt(socraticCtx, false);
 
+    // Worked-example turns are stored as JSON; give the model a plain summary instead of the JSON.
+    const asContext = (t: { role: string; content: string; reasoning?: string | null }) =>
+      t.reasoning === "worked_example" ? "[The coach walked through a worked example to illustrate the idea.]" : t.content;
     const chatMessages: { role: "user" | "assistant"; content: string }[] = [
       ...historyOrdered.map(t => ({
         role: t.role === "tutor" ? ("assistant" as const) : ("user" as const),
-        content: t.content,
+        content: asContext(t),
       })),
       { role: "user", content: response },
     ];
@@ -337,52 +355,38 @@ router.post("/sessions/:sessionId/worked-example", requireAuth, async (req, res)
     .where(eq(dialogueTurnsTable.sessionId, sessionId))
     .orderBy(desc(dialogueTurnsTable.createdAt))
     .limit(8);
-  const historyOrdered = history.reverse();
-
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
+  const historyOrdered = history
+    .reverse()
+    .map((t) => ({ role: t.role, content: t.reasoning === "worked_example" ? "[earlier worked example]" : t.content }));
 
   try {
     const learner = req.dbUser!;
-    const system = `You are a patient learning coach helping ${learner.firstName ?? "a learner"}. They have found this concept tricky a few times, so instead of another question you will give ONE short worked example.
-Concept: ${beat?.title ?? "the current concept"}.${beat?.narration ? " Context: " + beat.narration : ""}
-Rules:
-- Work through a SINGLE concrete example step by step, showing the reasoning at each step.
-- Keep it short and plain; no jargon they have not met.
-- Frame the difficulty as completely normal, never evaluative or discouraging.
-- End by inviting them to try one similar example themselves, phrased as a question.`;
+    const worked = await generateWorkedExample(
+      {
+        beatTitle: beat?.title,
+        narration: beat?.narration,
+        scenario: beat?.scenario,
+        moduleTitle: null,
+        learnerName: learner.firstName,
+        turnCount: 0,
+      },
+      historyOrdered
+    );
 
-    const chatMessages: { role: "user" | "assistant"; content: string }[] = historyOrdered.map((t) => ({
-      role: t.role === "tutor" ? ("assistant" as const) : ("user" as const),
-      content: t.content,
-    }));
-    chatMessages.push({ role: "user", content: "I'm stuck on this. Could you show me a worked example?" });
-
-    let full = "";
-    const stream = anthropic.messages.stream({ model: SOCRATIC_MODEL, max_tokens: 1024, system, messages: chatMessages });
-    for await (const event of stream) {
-      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        full += event.delta.text;
-        res.write(`data: ${JSON.stringify({ content: event.delta.text })}\n\n`);
-      }
-    }
-
+    // Persist as a structured turn: content is the JSON, reasoning marks it as a worked example so
+    // the UI renders it in its own interactive box and the model gets a plain summary in context.
     await db.insert(dialogueTurnsTable).values({
       sessionId,
       role: "tutor",
-      content: full,
+      content: JSON.stringify(worked),
       beatId: session.currentBeatId ?? null,
-      reasoning: "worked example (scaffolding)",
+      reasoning: "worked_example",
     });
 
-    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-    res.end();
+    res.json({ workedExample: worked });
   } catch (err) {
     req.log.error({ err }, "worked-example error");
-    res.write(`data: ${JSON.stringify({ error: "Generation failed", done: true })}\n\n`);
-    res.end();
+    res.status(500).json({ error: "Could not build a worked example. Please try again." });
   }
 });
 

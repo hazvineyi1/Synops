@@ -16,6 +16,7 @@ export interface SocraticContext {
   turnCount: number; // exchanges so far
   promptBudget?: number; // soft budget of exchanges
   remedialFocus?: string | null; // when the learner is catching up: the weak area to rebuild
+  recentPerformance?: "struggling" | "steady" | "thriving"; // drives adaptive cadence
 }
 
 // ── Coach personalities (Coach-inspired) — voice & pressure only.
@@ -69,9 +70,27 @@ function cleanDashes(text: string): string {
   return text.replace(/\u2014/g, " - ").replace(/\u2013/g, "-");
 }
 
+// Strip every asterisk, em/en dash, divider line and stray markdown so learner-facing text is
+// always clean plain prose (the chat renders raw text, it does not parse markdown).
+export function sanitizePlain(text: string): string {
+  return (text || "")
+    .replace(/\u2014/g, ", ")            // em dash -> comma
+    .replace(/\u2013/g, "-")             // en dash -> hyphen
+    .replace(/^\s*[-*_]{3,}\s*$/gm, "")  // divider lines --- *** ___
+    .replace(/\*\*([^*]+)\*\*/g, "$1")   // bold
+    .replace(/\*([^*]+)\*/g, "$1")       // italic
+    .replace(/`{1,3}([^`]*)`{1,3}/g, "$1") // inline/code fences
+    .replace(/^#{1,6}\s*/gm, "")         // headings
+    .replace(/^\s*[-*]\s+/gm, "")        // list bullets
+    .replace(/\*/g, "")                  // any remaining asterisks
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 // Ensure every emitted turn ends on a question so the dialogue never stalls.
 export function ensureQuestion(text: string): string {
-  const trimmed = cleanDashes(text).replace(/\s+$/, "");
+  const trimmed = sanitizePlain(text).replace(/\s+$/, "");
   if (!trimmed) {
     return "Take a moment with this - what is the first thing that stands out to you, and why?";
   }
@@ -116,6 +135,18 @@ export function buildSocraticSystemPrompt(ctx: SocraticContext, isOpening: boole
   );
   parts.push(PERSONALITIES[ctx.personality ?? "socratic_mentor"] ?? PERSONALITIES.socratic_mentor);
   parts.push(baseRules(ctx.turnCount, budget));
+
+  // Adaptive cadence: react to how the learner is actually doing on recent turns, not just the
+  // static "simplify if they struggle" instruction. This genuinely changes pace and grain size.
+  if (ctx.recentPerformance === "struggling") {
+    parts.push(
+      "ADAPTIVE CADENCE - the learner has struggled on the last couple of turns. Change your pace deliberately: take ONE very small, concrete step; anchor it in a familiar, everyday workplace example; lower the difficulty; and warm your tone. Offer a gentle hint shaped as a question rather than a fresh challenge, and never stack ideas. Do not add new complexity until they regain their footing."
+    );
+  } else if (ctx.recentPerformance === "thriving") {
+    parts.push(
+      "ADAPTIVE CADENCE - the learner is reasoning well. Raise the challenge: extend the idea to a new situation, ask them to justify or generalise their reasoning, or introduce a realistic complication that tests the edges of their understanding."
+    );
+  }
 
   if (ctx.learningStyle && VARK[ctx.learningStyle]) {
     parts.push(VARK[ctx.learningStyle]);
@@ -236,6 +267,73 @@ Source content for reference: ${ctx.narration ?? ""} ${ctx.scenario ?? ""}`.trim
   // Conservative fallback if grading fails: treat as shaky, not mastery.
   const words = learnerResponse.trim().split(/\s+/).filter(Boolean).length;
   return { grade: words > 25 ? 2 : words > 5 ? 1 : 0, reasoning: "Fallback length-based estimate." };
+}
+
+export interface WorkedExample {
+  intro: string;
+  situation: string;
+  steps: { heading: string; detail: string }[];
+  tryPrompt: string;
+}
+
+/**
+ * Structured, interactive worked example (the scaffolding bump). Returns clean plain-text fields
+ * the UI can reveal one step at a time, then hand back to the dialogue with `tryPrompt`. Every
+ * field is sanitised so no markdown, asterisks or em dashes ever reach the learner.
+ */
+export async function generateWorkedExample(
+  ctx: SocraticContext,
+  history: { role: string; content: string }[]
+): Promise<WorkedExample> {
+  const concept = ctx.beatTitle ?? ctx.moduleTitle ?? "this concept";
+  const system = `You are a patient learning coach helping ${ctx.learnerName ?? "a learner"} who has found "${concept}" tricky a few times. Instead of another question, give ONE short worked example that models the reasoning, then invite them to try a similar one.
+${ctx.narration ? "Context: " + ctx.narration : ""}${ctx.scenario ? " Scenario: " + ctx.scenario : ""}
+Return ONLY a JSON object of this exact shape:
+{"intro": string, "situation": string, "steps": [{"heading": string, "detail": string}], "tryPrompt": string}
+Rules:
+- intro: one warm sentence framing the difficulty as completely normal.
+- situation: one or two plain sentences setting a single concrete, realistic workplace scenario.
+- steps: 2 to 4 short steps that each move the reasoning forward by one idea. heading is 2 to 5 words; detail is 1 to 3 plain sentences that show the thinking out loud.
+- tryPrompt: one question inviting the learner to try a similar example themselves.
+- PLAIN TEXT ONLY in every field. No markdown, no asterisks, no bullet characters, no em dashes or en dashes, no heading symbols. Short workplace-authentic South African English.`;
+
+  const messages = history.map((t) => ({
+    role: t.role === "tutor" ? ("assistant" as const) : ("user" as const),
+    content: t.content,
+  }));
+  messages.push({ role: "user", content: "I'm stuck on this. Could you show me a worked example, then let me try one?" });
+
+  const fallback: WorkedExample = {
+    intro: "This one is genuinely tricky, and that is completely normal. Let us walk through one together.",
+    situation: `Picture a real moment at work where "${concept}" would come up.`,
+    steps: [
+      { heading: "Start with the goal", detail: "Name what a good outcome looks like here before doing anything else." },
+      { heading: "Work it through", detail: "Take one concrete step toward that outcome and say why it helps." },
+    ],
+    tryPrompt: "Now you try: how would you handle a similar situation of your own, and why?",
+  };
+
+  try {
+    const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 900, system, messages });
+    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+    const parsed = JSON.parse(match[0]) as { intro?: unknown; situation?: unknown; steps?: unknown; tryPrompt?: unknown };
+    const steps = Array.isArray(parsed.steps)
+      ? (parsed.steps as Array<{ heading?: unknown; detail?: unknown }>)
+          .filter((s) => s?.heading && s?.detail)
+          .slice(0, 4)
+          .map((s) => ({ heading: sanitizePlain(String(s.heading)), detail: sanitizePlain(String(s.detail)) }))
+      : [];
+    return {
+      intro: sanitizePlain(String(parsed.intro ?? "")) || fallback.intro,
+      situation: sanitizePlain(String(parsed.situation ?? "")) || fallback.situation,
+      steps: steps.length ? steps : fallback.steps,
+      tryPrompt: sanitizePlain(String(parsed.tryPrompt ?? "")) || fallback.tryPrompt,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export { MODEL as SOCRATIC_MODEL };
