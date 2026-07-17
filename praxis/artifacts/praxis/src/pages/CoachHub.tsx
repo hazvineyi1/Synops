@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiFetch } from "@/lib/api";
@@ -345,6 +345,21 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
     onSuccess: (r) => { setRevealed({ correct: r.correct, correctIndex: r.correctIndex, explanation: r.explanation }); setGame(r.gamification); onGame(); if (r.correct) setCorrectCount((c) => c + 1); },
   });
 
+  // Resume where the learner left off: persist the flashcard + quiz position per set so re-entering
+  // Practice does not restart at card 1 (matches the "your progress saves as you go" promise).
+  const setId = q.data?.setId;
+  useEffect(() => {
+    if (!setId) return;
+    try {
+      const f = parseInt(localStorage.getItem(`coachp:${setId}:f`) ?? "0", 10);
+      const qi = parseInt(localStorage.getItem(`coachp:${setId}:q`) ?? "0", 10);
+      if (Number.isFinite(f) && f > 0) setFIdx(f);
+      if (Number.isFinite(qi) && qi > 0) setQIdx(qi);
+    } catch { /* localStorage unavailable */ }
+  }, [setId]);
+  useEffect(() => { if (setId) { try { localStorage.setItem(`coachp:${setId}:f`, String(fIdx)); } catch { /* ignore */ } } }, [setId, fIdx]);
+  useEffect(() => { if (setId) { try { localStorage.setItem(`coachp:${setId}:q`, String(qIdx)); } catch { /* ignore */ } } }, [setId, qIdx]);
+
   if (q.isLoading) return <Skeleton className="h-64" />;
   const d = q.data;
   if (!d) return null;
@@ -682,9 +697,9 @@ function MaterialsPanel({ data, loading, onRefetch, onPractise }: { data: Upload
       <div className="rounded-2xl border border-border bg-background p-4 sm:p-5">
         {/* Source picker */}
         <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/40 p-1">
-          <SourceBtn active={tab === "file"} onClick={() => setTab("file")} icon={FileText} label="Document" />
-          <SourceBtn active={tab === "link"} onClick={() => setTab("link")} icon={Link2} label="Link" />
-          <SourceBtn active={tab === "text"} onClick={() => setTab("text")} icon={Plus} label="Paste notes" />
+          <SourceBtn active={tab === "file"} onClick={() => { setTab("file"); setError(null); setAdded(null); }} icon={FileText} label="Document" />
+          <SourceBtn active={tab === "link"} onClick={() => { setTab("link"); setError(null); setAdded(null); }} icon={Link2} label="Link" />
+          <SourceBtn active={tab === "text"} onClick={() => { setTab("text"); setError(null); setAdded(null); }} icon={Plus} label="Paste notes" />
         </div>
 
         <div className="mt-4">

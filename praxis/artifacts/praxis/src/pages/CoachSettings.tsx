@@ -90,10 +90,15 @@ export function CoachSettings() {
                 key={opt.value}
                 onClick={() => save({ learningStyle: active ? null : opt.value })}
                 className={cn(
-                  "rounded-xl border p-3 text-center transition-colors",
+                  "relative rounded-xl border p-3 text-center transition-colors",
                   active ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
                 )}
               >
+                {active && (
+                  <span className="absolute top-2 right-2 h-5 w-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
                 <p className="font-medium text-sm">{opt.label}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{opt.hint}</p>
               </button>

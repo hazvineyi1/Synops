@@ -82,8 +82,10 @@ function ShellNavLink({
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const { user, loading, signOut } = useSession();
-  const { data: brand } = useBrandTheme();
-  const brandName = brand?.displayName || 'Synops Praxis';
+  const { data: brand, isLoading: brandLoading } = useBrandTheme();
+  // While the tenant brand is still resolving, show nothing rather than flashing a default brand
+  // name; once resolved use the tenant's name, falling back to a neutral product name.
+  const brandName = brand?.displayName || (brandLoading ? '' : 'Praxis');
   const brandLogo = brand?.logoUrl || null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
