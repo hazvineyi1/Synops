@@ -28,7 +28,7 @@ export function CoachSettings() {
     if (!profile) return;
     try {
       if (new URLSearchParams(window.location.search).get("focus") === "whatsapp") {
-        setTimeout(() => document.getElementById("coach-whatsapp")?.scrollIntoView({ behavior: "smooth", block: "center" }), 80);
+        setTimeout(() => document.getElementById("coach-whatsapp")?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
       }
     } catch { /* ignore */ }
   }, [profile]);
