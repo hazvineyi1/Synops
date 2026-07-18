@@ -8,11 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useGetMe } from '@workspace/api-client-react';
+import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import {
   ChevronLeft, ChevronRight, CheckCircle, BookOpen, List,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
-  Users, Layers, Target, Compass, Info,
+  Users, Layers, Target, Compass, Info, Save, Settings,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1207,6 +1210,52 @@ function SectionHead({ title, sub }: { title: string; sub?: string }) {
   );
 }
 
+// Instructor-only authoring panel for a module's learning objectives + delivery modality.
+// Self-contained draft + dirty tracking; keyed by the saved values so it resets on save.
+function ModuleSettingsEditor({ initialObjectives, initialModality, saving, onSave }: {
+  initialObjectives: string[];
+  initialModality: 'async' | 'sync' | 'hybrid';
+  saving: boolean;
+  onSave: (patch: { objectives: string[]; modality: 'async' | 'sync' | 'hybrid' }) => void;
+}) {
+  const [obj, setObj] = useState<string[]>(initialObjectives.length ? initialObjectives : ['']);
+  const [modality, setModality] = useState<'async' | 'sync' | 'hybrid'>(initialModality);
+  const clean = obj.map((s) => s.trim()).filter(Boolean);
+  const dirty = JSON.stringify(clean) !== JSON.stringify(initialObjectives) || modality !== initialModality;
+
+  return (
+    <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/[0.03] p-5 space-y-4">
+      <div className="flex items-center gap-2">
+        <Settings className="h-4 w-4 text-primary" />
+        <h3 className="font-serif font-semibold">Module settings</h3>
+        <Badge variant="outline" className="text-[10px] ml-1">Instructor</Badge>
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Learning objectives</p>
+        <ObjectivesEditor value={obj} onChange={setObj} />
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Delivery modality</p>
+        <div className="max-w-xs">
+          <Select value={modality} onValueChange={(v) => setModality(v as 'async' | 'sync' | 'hybrid')}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="async">Self-paced (asynchronous)</SelectItem>
+              <SelectItem value="sync">Live class (synchronous)</SelectItem>
+              <SelectItem value="hybrid">Hybrid (live + self-paced)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <Button size="sm" disabled={!dirty || saving} onClick={() => onSave({ objectives: clean, modality })}>
+          <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving...' : 'Save module settings'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function ModuleHubView({
   mod, allBeats, course, courseId, moduleId, navigate, isLoading,
 }: {
@@ -1247,6 +1296,16 @@ function ModuleHubView({
       body: JSON.stringify({ moduleId }),
     }),
     onSuccess: (s) => navigate(`/learn/${s.id}`),
+  });
+
+  // Instructor authoring: role gate + persist module objectives/modality.
+  const { data: me } = useGetMe();
+  const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(me?.role ?? '');
+  const qc = useQueryClient();
+  const saveModule = useMutation({
+    mutationFn: (patch: { objectives: string[]; modality: 'async' | 'sync' | 'hybrid' }) =>
+      apiFetch(`/modules/${moduleId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['module-detail', moduleId] }),
   });
 
   const videoBeats        = allBeats.filter(b => b.type === 'video' || !!b.videoUrl);
@@ -1364,6 +1423,15 @@ function ModuleHubView({
         {/* OVERVIEW */}
         {tab === 'overview' && (
           <div className="space-y-6">
+            {isInstructor && (
+              <ModuleSettingsEditor
+                key={JSON.stringify([mod?.objectives ?? [], mod?.modality ?? 'async'])}
+                initialObjectives={mod?.objectives ?? []}
+                initialModality={(mod?.modality ?? 'async') as 'async' | 'sync' | 'hybrid'}
+                saving={saveModule.isPending}
+                onSave={(patch) => saveModule.mutate(patch)}
+              />
+            )}
             <div>
               <SectionHead title="What you'll be able to do" sub="The learning objectives for this module." />
               {objectives.length > 0 ? (

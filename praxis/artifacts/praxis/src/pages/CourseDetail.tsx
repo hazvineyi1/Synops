@@ -11,8 +11,9 @@ import { cn } from '@/lib/utils';
 import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, Pin,
-  CheckCircle, Clock, AlertCircle, Play, Target
+  CheckCircle, Clock, AlertCircle, Play, Target, Save
 } from 'lucide-react';
+import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { CourseNextStep } from '@/components/CourseNextStep';
 
@@ -156,6 +157,35 @@ function MonthGrid({ events, cursor, onCursor }: {
   );
 }
 
+// Instructor-only editor for course-level learning objectives. Self-contained draft +
+// dirty tracking; the parent supplies the initial value and the save handler. Keying the
+// element by the saved value (see usage) resets the draft after a successful save.
+function CourseObjectivesCard({ initial, saving, onSave }: {
+  initial: string[];
+  saving: boolean;
+  onSave: (objectives: string[]) => void;
+}) {
+  const [draft, setDraft] = useState<string[]>(initial.length ? initial : ['']);
+  const clean = draft.map((s) => s.trim()).filter(Boolean);
+  const dirty = JSON.stringify(clean) !== JSON.stringify(initial);
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">Course learning objectives</CardTitle>
+        <p className="text-xs text-muted-foreground">Shown to learners on the course overview.</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <ObjectivesEditor value={draft} onChange={setDraft} />
+        <div className="flex justify-end">
+          <Button size="sm" disabled={!dirty || saving} onClick={() => onSave(clean)}>
+            <Save className="h-4 w-4 mr-2" /> {saving ? 'Saving...' : 'Save objectives'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 const LESSON_TYPE_META: Record<string, { icon: React.ElementType; label: string; color: string }> = {
   socratic: { icon: MessageSquare, label: 'Socratic',   color: 'text-violet-600' },
   video:    { icon: Play,          label: 'Video',      color: 'text-blue-600'   },
@@ -267,6 +297,13 @@ export function CourseDetail() {
   const joinGroupMutation = useMutation({
     mutationFn: (groupId: string) => apiFetch(`/groups/${groupId}/join`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['groups', courseId] }),
+  });
+
+  // Instructor authoring: persist course-level learning objectives.
+  const saveCourse = useMutation({
+    mutationFn: (patch: { objectives: string[] }) =>
+      apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['course', courseId] }),
   });
 
   // Course structure = published modules in order, each annotated with the learner's
@@ -561,6 +598,15 @@ export function CourseDetail() {
                   <p className="text-muted-foreground leading-relaxed">{course.description}</p>
                 </CardContent>
               </Card>
+              {/* Instructor: edit course learning objectives (authoring). */}
+              {isInstructor && (
+                <CourseObjectivesCard
+                  key={JSON.stringify(course.objectives ?? [])}
+                  initial={course.objectives ?? []}
+                  saving={saveCourse.isPending}
+                  onSave={(objectives) => saveCourse.mutate({ objectives })}
+                />
+              )}
               {/* Front page content */}
               {pages?.find(p => p.frontPage) && (
                 <Card>
