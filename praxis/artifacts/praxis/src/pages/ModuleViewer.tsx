@@ -1182,6 +1182,19 @@ const MODALITY_META: Record<string, { label: string; sub: string; icon: React.El
   hybrid: { label: 'Hybrid',     sub: 'Live + self-paced', icon: Layers, cls: 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-300/50' },
 };
 
+// Per-tab colour identity. Each tab has its own coloured rectangular border; the active
+// tab fills with its colour so it is obviously the section being worked in.
+const TAB_COLOR: Record<HubTab, { border: string; text: string; activeBg: string }> = {
+  overview:    { border: 'border-indigo-300 dark:border-indigo-800',   text: 'text-indigo-700 dark:text-indigo-300',   activeBg: 'bg-indigo-600' },
+  structure:   { border: 'border-slate-300 dark:border-slate-700',     text: 'text-slate-700 dark:text-slate-300',     activeBg: 'bg-slate-600' },
+  video:       { border: 'border-blue-300 dark:border-blue-800',       text: 'text-blue-700 dark:text-blue-300',       activeBg: 'bg-blue-600' },
+  readings:    { border: 'border-emerald-300 dark:border-emerald-800', text: 'text-emerald-700 dark:text-emerald-300', activeBg: 'bg-emerald-600' },
+  complete:    { border: 'border-violet-300 dark:border-violet-800',   text: 'text-violet-700 dark:text-violet-300',   activeBg: 'bg-violet-600' },
+  participate: { border: 'border-sky-300 dark:border-sky-800',         text: 'text-sky-700 dark:text-sky-300',         activeBg: 'bg-sky-600' },
+  assignments: { border: 'border-amber-300 dark:border-amber-800',     text: 'text-amber-700 dark:text-amber-300',     activeBg: 'bg-amber-600' },
+  workshop:    { border: 'border-rose-300 dark:border-rose-800',       text: 'text-rose-700 dark:text-rose-300',       activeBg: 'bg-rose-600' },
+};
+
 function EmptyState({ icon: Icon, title, note }: { icon: React.ElementType; title: string; note?: string }) {
   return (
     <div className="rounded-2xl border-2 border-dashed border-border bg-muted/10 py-14 px-6 text-center">
@@ -1391,29 +1404,31 @@ function ModuleHubView({
         </div>
       </div>
 
-      {/* Tab bar. Pills that WRAP onto a second row rather than scrolling horizontally --
-          every section stays visible with no slider. */}
+      {/* Tab bar. Rectangular, colour-coded tabs in an aligned grid (2 cols on mobile,
+          4 on desktop) -- no horizontal scroll. Each tab carries its own coloured border;
+          the active tab fills with its colour so the current section is obvious. */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <div className="flex flex-wrap gap-2 border-b border-border pb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {TABS.map((t) => {
             const active = tab === t.id;
+            const c = TAB_COLOR[t.id];
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                  'flex items-center justify-center gap-2 rounded-md border-2 px-3 py-2.5 text-sm font-medium transition-colors',
                   active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+                    ? cn(c.activeBg, 'border-transparent text-white shadow-sm')
+                    : cn(c.border, c.text, 'bg-card hover:bg-muted/40'),
                 )}
               >
                 <t.icon className="h-4 w-4 shrink-0" />
                 {t.label}
                 {typeof t.count === 'number' && t.count > 0 && (
                   <span className={cn('rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
-                    active ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-background text-muted-foreground')}>{t.count}</span>
+                    active ? 'bg-white/25 text-white' : 'bg-muted text-muted-foreground')}>{t.count}</span>
                 )}
               </button>
             );
