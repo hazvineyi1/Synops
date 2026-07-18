@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { enrolmentsTable, usersTable, coursesTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canStaffActOnCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -62,16 +63,41 @@ router.post("/courses/:courseId/enrol", requireAuth, async (req, res) => {
 });
 
 // POST /courses/:courseId/roster — admin enrols a user
+/**
+ * POST /courses/:courseId/roster — enrol a learner.
+ *
+ * STAFF ONLY. This previously had no authorisation check beyond being logged in, which
+ * meant any authenticated user could enrol ANY user into ANY course on the platform --
+ * including courses in another organisation entirely -- simply by posting a userId.
+ * Enrolment drives progress, gradebooks and credentials, so it is not a self-service action.
+ */
 router.post("/courses/:courseId/roster", requireAuth, async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
   const { userId, role = "student" } = req.body;
+  if (!userId) { res.status(400).json({ error: "userId is required" }); return; }
+
+  // Enrolling the same person twice would give them two progress rows and double-count
+  // them in every roster and report.
+  const existing = await db.query.enrolmentsTable.findFirst({
+    where: and(eq(enrolmentsTable.userId, userId), eq(enrolmentsTable.courseId, req.params.courseId)),
+  });
+  if (existing) { res.status(409).json({ error: "That learner is already enrolled on this course." }); return; }
+
   const [enrolment] = await db.insert(enrolmentsTable).values({
     userId, courseId: req.params.courseId, status: "active", role,
   }).returning();
   res.status(201).json(enrolment);
 });
 
-// DELETE /courses/:courseId/roster/:userId
+// DELETE /courses/:courseId/roster/:userId — staff only, for the same reason as above.
+// Un-enrolling someone destroys their access to the course; it was previously open to
+// any authenticated caller.
 router.delete("/courses/:courseId/roster/:userId", requireAuth, async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
   await db.delete(enrolmentsTable).where(
     and(eq(enrolmentsTable.userId, req.params.userId), eq(enrolmentsTable.courseId, req.params.courseId))
   );

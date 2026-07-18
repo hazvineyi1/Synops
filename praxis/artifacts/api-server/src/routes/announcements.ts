@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { announcementsTable, usersTable, notificationsTable, enrolmentsTable } from "@workspace/db";
 import { eq, desc, or, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canStaffActOnCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -37,8 +38,20 @@ router.get("/courses/:courseId/announcements", requireAuth, async (req, res) => 
 });
 
 // POST /courses/:courseId/announcements
+/**
+ * POST /courses/:courseId/announcements — STAFF ONLY.
+ *
+ * This writes a notification to every enrolled learner on the course. It had no
+ * authorisation check, so any authenticated user could push a message to the whole cohort.
+ */
 router.post("/courses/:courseId/announcements", requireAuth, async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
   const { title, body, pinned } = req.body;
+  if (!title?.trim() || !body?.trim()) {
+    res.status(400).json({ error: "Title and message are both required." }); return;
+  }
   const [ann] = await db.insert(announcementsTable).values({
     courseId: req.params.courseId,
     authorId: req.userId!,

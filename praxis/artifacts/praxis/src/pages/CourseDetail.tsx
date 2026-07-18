@@ -20,6 +20,204 @@ import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { CourseNextStep } from '@/components/CourseNextStep';
 
 /**
+ * Shared shell for the small instructor "create X" forms on this page.
+ *
+ * These four controls (announcement, page, learner, group) all shipped as buttons with no
+ * onClick -- they looked like features and did nothing. One shell keeps them consistent and
+ * makes the next one cheap.
+ */
+function CreatePanel({ icon: Icon, title, open, onOpen, onCancel, onSubmit, submitLabel, busy, disabled, error, children }: {
+  icon: React.ElementType;
+  title: string;
+  open: boolean;
+  onOpen: () => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+  submitLabel: string;
+  busy: boolean;
+  disabled: boolean;
+  error: string | null;
+  children: React.ReactNode;
+}) {
+  if (!open) {
+    return (
+      <div className="flex justify-end mb-4">
+        <Button size="sm" className="gap-2" onClick={onOpen}>
+          <Plus className="h-4 w-4" /> {title}
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <Card className="mb-4 border-dashed border-primary/30">
+      <CardContent className="pt-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-sm">{title}</span>
+        </div>
+        {children}
+        {error && <p className="text-xs text-rose-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+          <Button size="sm" disabled={disabled || busy} onClick={onSubmit}>
+            {busy ? 'Saving...' : submitLabel}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+const fieldCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm';
+
+/** Post an announcement. Notifies every enrolled learner, so it is staff-gated server-side. */
+function NewAnnouncement({ courseId }: { courseId: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ title: '', body: '', pinned: false });
+  const [error, setError] = useState<string | null>(null);
+  const m = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}/announcements`, { method: 'POST', body: JSON.stringify(f) }),
+    onSuccess: () => { setOpen(false); setError(null); setF({ title: '', body: '', pinned: false });
+      qc.invalidateQueries({ queryKey: ['announcements', courseId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not post that announcement.'),
+  });
+  return (
+    <CreatePanel icon={Megaphone} title="New Announcement" open={open}
+      onOpen={() => setOpen(true)} onCancel={() => { setOpen(false); setError(null); }}
+      onSubmit={() => m.mutate()} submitLabel="Post announcement" busy={m.isPending}
+      disabled={!f.title.trim() || !f.body.trim()} error={error}>
+      <input className={fieldCls} placeholder="Announcement title" value={f.title}
+        onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} />
+      <Textarea rows={4} className="text-sm resize-none" placeholder="What do your learners need to know?"
+        value={f.body} onChange={(e) => setF((p) => ({ ...p, body: e.target.value }))} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={f.pinned} onChange={(e) => setF((p) => ({ ...p, pinned: e.target.checked }))} />
+        Pin to the top
+      </label>
+      <p className="text-xs text-muted-foreground">Every enrolled learner is notified.</p>
+    </CreatePanel>
+  );
+}
+
+/** Create a course page. Slug is derived server-side from the title. */
+function NewPage({ courseId }: { courseId: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ title: '', body: '', published: true });
+  const [error, setError] = useState<string | null>(null);
+  const m = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}/pages`, { method: 'POST', body: JSON.stringify(f) }),
+    onSuccess: () => { setOpen(false); setError(null); setF({ title: '', body: '', published: true });
+      qc.invalidateQueries({ queryKey: ['pages', courseId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not create that page.'),
+  });
+  return (
+    <CreatePanel icon={FileText} title="New Page" open={open}
+      onOpen={() => setOpen(true)} onCancel={() => { setOpen(false); setError(null); }}
+      onSubmit={() => m.mutate()} submitLabel="Create page" busy={m.isPending}
+      disabled={!f.title.trim()} error={error}>
+      <input className={fieldCls} placeholder="Page title" value={f.title}
+        onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} />
+      <Textarea rows={6} className="text-sm resize-none" placeholder="Page content"
+        value={f.body} onChange={(e) => setF((p) => ({ ...p, body: e.target.value }))} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={f.published} onChange={(e) => setF((p) => ({ ...p, published: e.target.checked }))} />
+        Publish immediately
+      </label>
+    </CreatePanel>
+  );
+}
+
+/**
+ * Enrol a learner from the organisation onto this course.
+ *
+ * Picks from org members rather than accepting a raw id, and hides anyone already on the
+ * roster so the obvious mistake (enrolling the same person twice) cannot be made from here.
+ */
+function AddLearner({ courseId, orgId, enrolledIds }: { courseId: string; orgId?: string | null; enrolledIds: Set<string> }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [userId, setUserId] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const { data: members } = useQuery({
+    queryKey: ['org-members', orgId],
+    queryFn: () => apiFetch<{ id: string; firstName?: string; lastName?: string; role?: string }[]>(`/organisations/${orgId}/members`),
+    enabled: open && !!orgId,
+  });
+  const candidates = (members ?? []).filter((u) => !enrolledIds.has(u.id));
+
+  const m = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}/roster`, { method: 'POST', body: JSON.stringify({ userId, role: 'student' }) }),
+    onSuccess: () => { setOpen(false); setError(null); setUserId('');
+      qc.invalidateQueries({ queryKey: ['roster', courseId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not enrol that learner.'),
+  });
+
+  return (
+    <CreatePanel icon={Users} title="Add Learner" open={open}
+      onOpen={() => setOpen(true)} onCancel={() => { setOpen(false); setError(null); }}
+      onSubmit={() => m.mutate()} submitLabel="Enrol learner" busy={m.isPending}
+      disabled={!userId} error={error}>
+      {!orgId ? (
+        <p className="text-sm text-muted-foreground">
+          Your account is not attached to an organisation, so there is no member list to choose from.
+        </p>
+      ) : candidates.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {members ? 'Everyone in your organisation is already enrolled on this course.' : 'Loading members...'}
+        </p>
+      ) : (
+        <Select value={userId} onValueChange={setUserId}>
+          <SelectTrigger className="text-sm"><SelectValue placeholder="Choose someone to enrol" /></SelectTrigger>
+          <SelectContent>
+            {candidates.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.id}{u.role ? ` — ${u.role}` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </CreatePanel>
+  );
+}
+
+/** Create a project/study group. This route was already staff-gated server-side. */
+function NewGroup({ courseId }: { courseId: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ name: '', description: '', maxMembers: 5 });
+  const [error, setError] = useState<string | null>(null);
+  const m = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}/groups`, {
+      method: 'POST',
+      body: JSON.stringify({ name: f.name, description: f.description || null, maxMembers: Number(f.maxMembers) || null }),
+    }),
+    onSuccess: () => { setOpen(false); setError(null); setF({ name: '', description: '', maxMembers: 5 });
+      qc.invalidateQueries({ queryKey: ['groups', courseId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not create that group.'),
+  });
+  return (
+    <CreatePanel icon={UsersRound} title="New Group" open={open}
+      onOpen={() => setOpen(true)} onCancel={() => { setOpen(false); setError(null); }}
+      onSubmit={() => m.mutate()} submitLabel="Create group" busy={m.isPending}
+      disabled={!f.name.trim()} error={error}>
+      <input className={fieldCls} placeholder="Group name" value={f.name}
+        onChange={(e) => setF((p) => ({ ...p, name: e.target.value }))} />
+      <input className={fieldCls} placeholder="What is this group for? (optional)" value={f.description}
+        onChange={(e) => setF((p) => ({ ...p, description: e.target.value }))} />
+      <div className="max-w-[180px]">
+        <label className="text-xs text-muted-foreground">Maximum members</label>
+        <input type="number" min={2} className={fieldCls} value={f.maxMembers}
+          onChange={(e) => setF((p) => ({ ...p, maxMembers: Number(e.target.value) }))} />
+      </div>
+    </CreatePanel>
+  );
+}
+
+/**
  * Create a discussion.
  *
  * The backend has supported this for a long time but no UI ever called it -- the New
@@ -921,11 +1119,7 @@ export function CourseDetail() {
         {/* ANNOUNCEMENTS */}
         {activeTab === 'announcements' && (
           <div className="space-y-3">
-            {isInstructor && (
-              <div className="flex justify-end mb-4">
-                <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> New Announcement</Button>
-              </div>
-            )}
+            {isInstructor && <NewAnnouncement courseId={courseId} />}
             {!announcements && <Skeleton className="h-32" />}
             {announcements?.length === 0 && <div className="text-center text-muted-foreground py-12">No announcements yet.</div>}
             {announcements?.map((a) => (
@@ -1050,11 +1244,7 @@ export function CourseDetail() {
         {/* PAGES */}
         {activeTab === 'pages' && (
           <div className="space-y-4">
-            {isInstructor && (
-              <div className="flex justify-end mb-4">
-                <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> New Page</Button>
-              </div>
-            )}
+            {isInstructor && <NewPage courseId={courseId} />}
             {selectedPage ? (
               <div>
                 <Button variant="ghost" size="sm" className="mb-4" onClick={() => setSelectedPage(null)}>← Back to Pages</Button>
@@ -1094,10 +1284,14 @@ export function CourseDetail() {
             {!roster && <Skeleton className="h-48" />}
             {roster && (
               <>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm text-muted-foreground">{roster.length} enrolled</div>
-                  {isInstructor && <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add Learner</Button>}
-                </div>
+                <div className="text-sm text-muted-foreground mb-2">{roster.length} enrolled</div>
+                {isInstructor && (
+                  <AddLearner
+                    courseId={courseId}
+                    orgId={(user as { organisationId?: string | null } | undefined)?.organisationId}
+                    enrolledIds={new Set(roster.map((r) => r.user?.id).filter(Boolean) as string[])}
+                  />
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -1137,11 +1331,7 @@ export function CourseDetail() {
         {/* GROUPS */}
         {activeTab === 'groups' && (
           <div className="space-y-4">
-            {isInstructor && (
-              <div className="flex justify-end mb-4">
-                <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> New Group</Button>
-              </div>
-            )}
+            {isInstructor && <NewGroup courseId={courseId} />}
             {!groups && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[1,2].map(i => <Skeleton key={i} className="h-32" />)}</div>}
             {groups?.length === 0 && <div className="text-center text-muted-foreground py-12">No groups yet.</div>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

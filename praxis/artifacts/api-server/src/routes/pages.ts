@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { coursePagesTable, usersTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canStaffActOnCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -18,8 +19,14 @@ router.get("/courses/:courseId/pages", requireAuth, async (req, res) => {
 });
 
 // POST /courses/:courseId/pages
+// POST /courses/:courseId/pages — STAFF ONLY. Course pages are instructional content
+// shown to every learner; this previously accepted any authenticated caller.
 router.post("/courses/:courseId/pages", requireAuth, async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
   const { title, body, published, frontPage, position } = req.body;
+  if (!title?.trim()) { res.status(400).json({ error: "A page title is required." }); return; }
   const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   const [page] = await db.insert(coursePagesTable).values({
     courseId: req.params.courseId, authorId: req.userId!, title, slug,
