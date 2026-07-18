@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { moduleReadingsTable, modulesTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { requireAuth, requireCoFacilitatorOrAbove } from "../middlewares/requireAuth";
+import { canParticipateInCourse } from "../lib/scope";
 import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
 
 const router = Router();
@@ -118,6 +119,12 @@ router.post("/modules/:moduleId/readings", requireAuth, requireCoFacilitatorOrAb
 
 // GET /modules/:moduleId/readings — metadata list (no content).
 router.get("/modules/:moduleId/readings", requireAuth, async (req, res) => {
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!mod) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await canParticipateInCourse(req.dbUser!, mod.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const rows = await db
     .select()
     .from(moduleReadingsTable)
@@ -132,6 +139,11 @@ router.get("/readings/:id", requireAuth, async (req, res) => {
     where: eq(moduleReadingsTable.id, req.params.id),
   });
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  // Returns the full parsed text of the uploaded document -- the reading itself.
+  if (row.courseId && !(await canParticipateInCourse(req.dbUser!, row.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   res.json({ ...toRow(row), content: row.content ?? "" });
 });
 

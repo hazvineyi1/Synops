@@ -3,12 +3,16 @@ import { db } from "@workspace/db";
 import { coursePagesTable, usersTable } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { canStaffActOnCourse } from "../lib/scope";
+import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 
 const router = Router();
 
 // GET /courses/:courseId/pages
 router.get("/courses/:courseId/pages", requireAuth, async (req, res) => {
+  if (!(await canParticipateInCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const rows = await db
     .select({ page: coursePagesTable, author: usersTable })
     .from(coursePagesTable)
@@ -38,6 +42,11 @@ router.post("/courses/:courseId/pages", requireAuth, async (req, res) => {
 // GET /courses/:courseId/pages/:pageIdOrSlug
 router.get("/courses/:courseId/pages/:pageIdOrSlug", requireAuth, async (req, res) => {
   const { courseId, pageIdOrSlug } = req.params;
+  if (!(await canParticipateInCourse(req.dbUser!, courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   const byId = await db.query.coursePagesTable.findFirst({
     where: and(eq(coursePagesTable.courseId, courseId), eq(coursePagesTable.id, pageIdOrSlug)),
   });
@@ -50,6 +59,8 @@ router.get("/courses/:courseId/pages/:pageIdOrSlug", requireAuth, async (req, re
 
 // PATCH /courses/:courseId/pages/:pageId
 router.patch("/courses/:courseId/pages/:pageId", requireAuth, async (req, res) => {
+  // POST was staff-gated; edit and delete were not. Gate to the course's staff.
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const { title, body, published, frontPage, position } = req.body;
   const [updated] = await db.update(coursePagesTable)
     .set({ title, body, published, frontPage, position, updatedAt: new Date() })
@@ -60,6 +71,7 @@ router.patch("/courses/:courseId/pages/:pageId", requireAuth, async (req, res) =
 
 // DELETE /courses/:courseId/pages/:pageId
 router.delete("/courses/:courseId/pages/:pageId", requireAuth, async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(coursePagesTable).where(eq(coursePagesTable.id, req.params.pageId));
   res.status(204).send();
 });

@@ -6,13 +6,31 @@ import {
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { canGradeInCourse, canStaffActOnCourse } from "../lib/scope";
+import { canGradeInCourse, canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 import { onGradeEvent } from "../lib/gradebookAlerts";
 import { extractFromBuffer } from "../lib/extractText";
 import { generateAssignmentGrade } from "../lib/assignmentEngine";
 import type { AssignmentCriterionScore } from "@workspace/db";
 
 const router = Router();
+
+/**
+ * Course-scoped guards for this file.
+ *
+ * The grading routes were gated when they were written; the authoring and reading routes
+ * were not, so any authenticated user could create, edit or delete assignments on any
+ * course on the platform, and read any course's assignment list and rubrics.
+ */
+async function staffOn(req: any, res: any, courseId: string): Promise<boolean> {
+  if (await canStaffActOnCourse(req.dbUser!, courseId)) return true;
+  res.status(403).json({ error: "Forbidden" });
+  return false;
+}
+async function participantOn(req: any, res: any, courseId: string): Promise<boolean> {
+  if (await canParticipateInCourse(req.dbUser!, courseId)) return true;
+  res.status(403).json({ error: "Forbidden" });
+  return false;
+}
 
 /**
  * Everything that happens when a submission actually becomes graded.
@@ -135,6 +153,7 @@ function toAssignmentResponse(a: typeof assignmentsTable.$inferSelect) {
  * submissions, never anyone else's.
  */
 router.get("/courses/:courseId/assignments", requireAuth, async (req, res) => {
+  if (!(await participantOn(req, res, req.params.courseId))) return;
   const assignments = await db.select().from(assignmentsTable)
     .where(eq(assignmentsTable.courseId, req.params.courseId))
     .orderBy(assignmentsTable.position);
@@ -153,6 +172,7 @@ router.get("/courses/:courseId/assignments", requireAuth, async (req, res) => {
 
 // POST /courses/:courseId/assignments
 router.post("/courses/:courseId/assignments", requireAuth, async (req, res) => {
+  if (!(await staffOn(req, res, req.params.courseId))) return;
   const { title, description, instructions, submissionType, dueDate, pointsPossible, published, position } = req.body;
   const [assignment] = await db.insert(assignmentsTable).values({
     courseId: req.params.courseId, title, description, instructions,
@@ -179,11 +199,15 @@ router.post("/courses/:courseId/assignments", requireAuth, async (req, res) => {
 router.get("/assignments/:assignmentId", requireAuth, async (req, res) => {
   const assignment = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, req.params.assignmentId) });
   if (!assignment) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await participantOn(req, res, assignment.courseId))) return;
   res.json(toAssignmentResponse(assignment));
 });
 
 // PATCH /assignments/:assignmentId
 router.patch("/assignments/:assignmentId", requireAuth, async (req, res) => {
+  const existing = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, req.params.assignmentId) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await staffOn(req, res, existing.courseId))) return;
   const { title, description, instructions, dueDate, pointsPossible, published, position } = req.body;
   const [updated] = await db.update(assignmentsTable)
     .set({ title, description, instructions, dueDate: dueDate ? new Date(dueDate) : undefined, pointsPossible, published, position, updatedAt: new Date() })
@@ -194,6 +218,9 @@ router.patch("/assignments/:assignmentId", requireAuth, async (req, res) => {
 
 // DELETE /assignments/:assignmentId
 router.delete("/assignments/:assignmentId", requireAuth, async (req, res) => {
+  const existing = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, req.params.assignmentId) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await staffOn(req, res, existing.courseId))) return;
   await db.delete(assignmentsTable).where(eq(assignmentsTable.id, req.params.assignmentId));
   res.status(204).send();
 });
@@ -218,6 +245,13 @@ router.post("/assignments/:assignmentId/submit", requireAuth, async (req, res) =
   const { body: submissionBody, url, fileUrls, filename, dataBase64 } = req.body;
   const assignment = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, req.params.assignmentId) });
   if (!assignment) { res.status(404).json({ error: "Not found" }); return; }
+
+  // FOUND BY TESTING THIS FEATURE LIVE: a learner from one organisation submitted work to
+  // another organisation's course, because this route only ever checked that the assignment
+  // EXISTED. Submitting is participation, so the caller must be on the course. Nothing bad
+  // came of the test only because that learner had no gradebook row for the score to land
+  // in -- which is luck, not a guard.
+  if (!(await participantOn(req, res, assignment.courseId))) return;
 
   // Parse an uploaded document to text before anything is written, so a bad file fails the
   // submission outright rather than half-saving it.
@@ -389,12 +423,17 @@ router.post("/assignment-submissions/:submissionId/confirm-ai-grade", requireAut
 
 // Rubrics
 router.get("/courses/:courseId/rubrics", requireAuth, async (req, res) => {
+  if (!(await participantOn(req, res, req.params.courseId))) return;
   const rubrics = await db.select().from(rubricsTable).where(eq(rubricsTable.courseId, req.params.courseId));
   res.json(rubrics);
 });
 
 router.post("/rubrics", requireAuth, async (req, res) => {
   const { courseId, title, criteria, totalPoints } = req.body;
+  // courseId arrives in the BODY here, so it is caller-supplied and must be checked before
+  // anything is written -- otherwise a rubric can be planted on any course by asking.
+  if (!courseId) { res.status(400).json({ error: "courseId is required" }); return; }
+  if (!(await staffOn(req, res, courseId))) return;
   const [rubric] = await db.insert(rubricsTable).values({ courseId, title, criteria: criteria ?? [], totalPoints: totalPoints ?? 100 }).returning();
   res.status(201).json(rubric);
 });

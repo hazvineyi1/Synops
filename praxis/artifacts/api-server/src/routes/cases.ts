@@ -12,6 +12,7 @@ import {
   partnersTable,
   usersTable,
   coursesTable,
+  modulesTable,
   courseGroupsTable,
   courseGroupMembersTable,
   type CaseScenario,
@@ -21,6 +22,7 @@ import {
 } from "@workspace/db";
 import { eq, and, or, isNull, ne, inArray, desc, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canParticipateInCourse } from "../lib/scope";
 import { isSuperAdmin, hasHubAccess, canAdministerOrg, isInstructionalDesigner } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
@@ -435,6 +437,21 @@ router.post("/cases/:id/sessions", requireAuth, async (req, res) => {
   if (!c) { res.status(404).json({ error: "Not found" }); return; }
   if (!caseInScope(u, c) && !(await hasAssignmentAccess(u, c.id))) { res.status(404).json({ error: "Not found" }); return; }
   if (c.status !== "published" && !canManageCase(u, c)) { res.status(403).json({ error: "This case is not published yet." }); return; }
+
+  // caseInScope() is a TENANT check -- it says the case belongs to your organisation, which
+  // is not the same as saying you are on the course that teaches it. When the case is homed
+  // in a module, the course applies. Library cases with no module stay open to the tenant,
+  // which is what a shared library is for. Fixing it here also closes the follow-on session
+  // routes (message/complete/language), since those only verify the session is yours.
+  if (c.moduleId) {
+    const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, c.moduleId) });
+    // Fail CLOSED on a dangling moduleId: if the case claims a module that no longer exists
+    // we cannot prove the caller belongs, so we deny rather than wave them through.
+    if (!mod || !(await canParticipateInCourse(req.dbUser!, mod.courseId))) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+  }
 
   const lang = validLang(req.body?.language) ? req.body.language : c.language;
   // The learner may enter their name on the pre-start screen; else use their account name.

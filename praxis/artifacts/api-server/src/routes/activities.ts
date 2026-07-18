@@ -17,6 +17,7 @@ import {
 } from "@workspace/db";
 import { eq, and, or, ne, inArray, desc, isNull, type SQL } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
+import { canParticipateInCourse } from "../lib/scope";
 import { isSuperAdmin, hasHubAccess, canAdministerOrg, isInstructionalDesigner } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 import { generateActivities } from "../lib/activityEngine";
@@ -299,6 +300,14 @@ router.post("/activities/:id/submit", requireAuth, async (req, res) => {
     .limit(1);
   if (!activity || !activity.published) {
     res.status(404).json({ error: "Activity not found" });
+    return;
+  }
+  // Being published makes an activity visible to its COURSE, not to the whole platform.
+  // This route writes a gradebook result, so an unenrolled submitter perturbs a cohort's
+  // grades. Activities that are deliberately course-less (standalone library items) keep
+  // working -- there is no course to be enrolled on.
+  if (activity.courseId && !(await canParticipateInCourse(req.dbUser!, activity.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 

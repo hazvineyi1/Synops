@@ -15,6 +15,7 @@ import {
   funderScopesTable,
   deliverySessionsTable,
   attendanceRecordsTable,
+  enrolmentsTable,
 } from "@workspace/db";
 import { eq, and, inArray } from "drizzle-orm";
 import {
@@ -22,6 +23,7 @@ import {
   isCoFacilitator,
   canAdministerOrg,
   canAccessCourse,
+  hasHubAccess,
   type ScopedUser,
 } from "./roles";
 
@@ -133,11 +135,50 @@ export async function coFacLeadsLearnerInCourse(
  */
 export async function canStaffActOnCourse(user: StaffUser, courseId: string): Promise<boolean> {
   if (isSuperAdmin(user.role)) return true;
+  // Hub roles (Instructional Designers) are cross-organisation content authors -- the
+  // catalogue is listed to them and the authoring routes' requireRole lists include them.
+  // Omitting them here 403s the ID tier out of the entire authoring surface it is meant to
+  // own, which is a hard lockout, so they are granted the same course-staff access as an
+  // admin. (Found in review before shipping, not in production.)
+  if (hasHubAccess(user.role)) return true;
   const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
   if (!course) return false;
   if (canAdministerOrg(user.role) && canAccessCourse(user, course)) return true;
   if (isCoFacilitator(user.role)) return leadsCourse(user.id, courseId);
   return false;
+}
+
+/**
+ * Is this user actually ON this course as a learner?
+ *
+ * The counterpart to canStaffActOnCourse: that answers "may this person act on the course",
+ * this answers "does this course belong to this learner at all". Deliberately checks the
+ * enrolment row and nothing else -- being in the same organisation is not enrolment, and
+ * treating it as such is how a learner ends up submitting work to a course they never took.
+ */
+export async function isEnrolledInCourse(userId: string, courseId: string): Promise<boolean> {
+  const row = await db.query.enrolmentsTable.findFirst({
+    where: and(eq(enrolmentsTable.userId, userId), eq(enrolmentsTable.courseId, courseId)),
+  });
+  if (!row) return false;
+  // A row is not enough: the status matters. active = in the course now; completed = finished
+  // it and may still review. withdrawn and waitlisted must NOT count -- a withdrawn learner
+  // recording beat progress would inject fictional hours into the SETA/B-BBEE training-hours
+  // return, and a waitlisted one is not in the course yet. This was flagged in review: the
+  // first version accepted any row regardless of status.
+  return row.status === "active" || row.status === "completed";
+}
+
+/**
+ * May this user take part in this course's coursework -- submit, post, answer?
+ *
+ * Staff pass because they legitimately need to see and test what they deliver. Everyone else
+ * must be enrolled. Use this on any route where a LEARNER acts on course content, as opposed
+ * to canStaffActOnCourse which gates authoring and moderation.
+ */
+export async function canParticipateInCourse(user: StaffUser, courseId: string): Promise<boolean> {
+  if (await canStaffActOnCourse(user, courseId)) return true;
+  return isEnrolledInCourse(user.id, courseId);
 }
 
 /**

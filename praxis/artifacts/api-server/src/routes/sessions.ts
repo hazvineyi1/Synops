@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canParticipateInCourse } from "../lib/scope";
 import {
   buildSocraticSystemPrompt,
   ensureQuestion,
@@ -437,6 +438,13 @@ router.get("/sessions/:sessionId/progress", requireAuth, async (req, res) => {
 router.post("/learner/submit-work", requireAuth, async (req, res) => {
   const { moduleId, title, contentText } = req.body;
   const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, moduleId) });
+  // The module lookup result was never checked -- a bad moduleId silently produced a
+  // submission with an empty moduleTitle. Now it 404s, and the caller must be on the course.
+  if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
+  if (!(await canParticipateInCourse(req.dbUser!, mod.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const [submission] = await db
     .insert(submissionsTable)
     .values({

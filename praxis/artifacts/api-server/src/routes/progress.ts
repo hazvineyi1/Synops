@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canParticipateInCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -58,6 +59,13 @@ router.post("/progress/beat", requireAuth, async (req, res) => {
     .limit(1);
   if (!mod) {
     res.status(404).json({ error: "Module not found" });
+    return;
+  }
+  // This writes beat_progress, calls maybeCompleteEnrolment, and feeds the SETA/B-BBEE
+  // training-hours reporting mentioned below. Recording progress against a course you are
+  // not on would put fictional training hours into a compliance return.
+  if (!(await canParticipateInCourse(req.dbUser!, mod.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
     return;
   }
 

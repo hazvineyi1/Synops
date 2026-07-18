@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { coursesTable, modulesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
+import { canParticipateInCourse, canStaffActOnCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -58,6 +59,11 @@ router.get("/courses/:courseId", requireAuth, async (req, res) => {
     where: eq(coursesTable.id, req.params.courseId),
   });
   if (!course) { res.status(404).json({ error: "Not found" }); return; }
+  // The course record plus all of its modules. Course-scoped, not platform-public.
+  if (!(await canParticipateInCourse(req.dbUser!, course.id))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const modules = await db
     .select()
     .from(modulesTable)
@@ -81,6 +87,9 @@ router.get("/courses/:courseId", requireAuth, async (req, res) => {
 
 // PATCH /courses/:courseId
 router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  // requireRole proves staff SOMEWHERE, not staff on THIS course, so a coach/admin of one
+  // org could edit another org's course metadata. Add the course-scoped check.
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const { title, description, status, competencyTags, nqfLevel, thumbnailUrl, objectives } = req.body;
   const [updated] = await db
     .update(coursesTable)
@@ -96,6 +105,11 @@ router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "part
 
 // DELETE /courses/:courseId
 router.delete("/courses/:courseId", requireAuth, async (req, res) => {
+  // Deleting an entire course had no authorization check whatsoever.
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   await db.delete(coursesTable).where(eq(coursesTable.id, req.params.courseId));
   res.status(204).send();
 });

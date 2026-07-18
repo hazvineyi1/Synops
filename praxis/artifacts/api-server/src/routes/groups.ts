@@ -11,6 +11,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, or, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canParticipateInCourse } from "../lib/scope";
 import { canAdministerOrg, canAccessCourse, type ScopedUser } from "../lib/roles";
 import { computeCoachingHealth, type CoachingHealth } from "../lib/coachingHealth";
 import { mailerConfigured, sendMail, appUrl, emailShell, type EmailBrand } from "../lib/mailer";
@@ -198,6 +199,11 @@ router.post("/coaching/health/digest", requireAuth, async (req, res) => {
 
 // GET /courses/:courseId/groups
 router.get("/courses/:courseId/groups", requireAuth, async (req, res) => {
+  // Returns every section member's name AND email -- a cohort roster. Enrolment-only.
+  if (!(await canParticipateInCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const groups = await db.select().from(courseGroupsTable).where(eq(courseGroupsTable.courseId, req.params.courseId));
   const withMembers = await Promise.all(groups.map(async g => {
     const memberRows = await db
@@ -255,6 +261,15 @@ router.delete("/groups/:groupId", requireAuth, async (req, res) => {
 
 // POST /groups/:groupId/join
 router.post("/groups/:groupId/join", requireAuth, async (req, res) => {
+  // This did not even look the group up: it inserted a membership row for whatever groupId
+  // was in the URL. Section membership is what lib/scope derives coach scope from, so an
+  // arbitrary user could place themselves on any course's section roster.
+  const group = await db.query.courseGroupsTable.findFirst({ where: eq(courseGroupsTable.id, req.params.groupId) });
+  if (!group) { res.status(404).json({ error: "Group not found" }); return; }
+  if (!(await canParticipateInCourse(req.dbUser!, group.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const existing = await db.query.courseGroupMembersTable.findFirst({
     where: and(eq(courseGroupMembersTable.groupId, req.params.groupId), eq(courseGroupMembersTable.userId, req.userId!)),
   });

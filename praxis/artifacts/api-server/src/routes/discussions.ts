@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { discussionsTable, discussionRepliesTable, usersTable, notificationsTable } from "@workspace/db";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { canStaffActOnCourse } from "../lib/scope";
+import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 import { generateFacilitatorQuestion, countWords } from "../lib/discussionEngine";
 import { translateTexts } from "../lib/caseEngine";
 
@@ -23,6 +23,10 @@ function toUserSnap(u: typeof usersTable.$inferSelect | null) {
  * no other learner's posting activity is exposed here.
  */
 router.get("/courses/:courseId/discussions", requireAuth, async (req, res) => {
+  if (!(await canParticipateInCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const rows = await db
     .select({ discussion: discussionsTable, author: usersTable })
     .from(discussionsTable)
@@ -62,6 +66,12 @@ router.get("/courses/:courseId/discussions", requireAuth, async (req, res) => {
 
 // POST /courses/:courseId/discussions
 router.post("/courses/:courseId/discussions", requireAuth, async (req, res) => {
+  // Starting a thread is participation, so the caller must be ON the course -- previously
+  // any authenticated user could open a thread in any cohort on the platform.
+  if (!(await canParticipateInCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const {
     title, body, requireInitialPost, moduleId, aiFacilitated, language,
     minInitialWords, maxInitialWords, minReplyWords, requiredInteractions,
@@ -98,6 +108,12 @@ router.get("/courses/:courseId/discussions/:discussionId", requireAuth, async (r
     .where(eq(discussionsTable.id, req.params.discussionId))
     .limit(1);
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  // This returns every reply plus each author's name, email, avatar and role -- effectively
+  // the cohort roster and everything they said. Enrolment-only.
+  if (!(await canParticipateInCourse(req.dbUser!, row.discussion.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   const replyRows = await db
     .select({ reply: discussionRepliesTable, author: usersTable })
@@ -183,6 +199,13 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
 
   const discussion = await db.query.discussionsTable.findFirst({ where: eq(discussionsTable.id, req.params.discussionId) });
   if (!discussion) { res.status(404).json({ error: "Discussion not found" }); return; }
+  // Posting into a cohort's discussion requires being in that cohort. Checked against the
+  // DISCUSSION's own course, not the :courseId in the path, so a valid course id in the URL
+  // cannot be used to reach a thread that belongs elsewhere.
+  if (!(await canParticipateInCourse(req.dbUser!, discussion.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   if (discussion.isClosed) { res.status(409).json({ error: "This discussion is closed." }); return; }
 
   const words = countWords(body ?? "");
@@ -329,6 +352,12 @@ router.post("/discussions/:discussionId/translate", requireAuth, async (req, res
   const langCode = String(req.body?.langCode ?? "en");
   const discussion = await db.query.discussionsTable.findFirst({ where: eq(discussionsTable.id, req.params.discussionId) });
   if (!discussion) { res.status(404).json({ error: "Discussion not found" }); return; }
+  // Returns the full body of every contribution, so it is a read of the whole thread by
+  // another name and needs the same gate as reading it directly.
+  if (!(await canParticipateInCourse(req.dbUser!, discussion.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
   const replies = await db
     .select()

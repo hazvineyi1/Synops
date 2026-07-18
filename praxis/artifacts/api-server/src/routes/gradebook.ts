@@ -20,7 +20,7 @@ import {
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isSuperAdmin, isCoFacilitator, canAdministerOrg, canAccessCourse, canAccessOrg, type ScopedUser } from "../lib/roles";
-import { canStaffActOnCourse, leaderCourseIds, learnerIdsForCoFacilitator, canGradeInCourse } from "../lib/scope";
+import { canStaffActOnCourse, leaderCourseIds, learnerIdsForCoFacilitator, canGradeInCourse, canParticipateInCourse } from "../lib/scope";
 import { partnersTable, organisationsTable, courseGroupsTable } from "@workspace/db";
 import {
   getCourseColumns,
@@ -379,6 +379,12 @@ router.get("/gradebook/nav/courses", requireAuth, async (req, res) => {
 router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
   const { courseId } = req.params;
   const userId = req.userId!;
+  // Self-scoped on the ROWS, but it still exposes the course's whole column structure --
+  // titles, due dates, points, grading settings -- for any courseId asked for.
+  if (!(await canParticipateInCourse(req.dbUser!, courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const columns = await getCourseColumns(courseId);
   const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
@@ -836,8 +842,29 @@ router.patch("/study-plans/:planId/items/:index", requireAuth, async (req, res) 
   res.json({ id: row.id, items: row.items, status: row.status });
 });
 
-// Legacy: keep direct gradebook-entry edit working.
+/**
+ * Legacy: direct gradebook-entry edit.
+ *
+ * THIS WAS THE WORST HOLE IN THE CODEBASE. It had requireAuth and nothing else: it took an
+ * entry id and a score straight from the body and wrote them. Any authenticated user --
+ * including any learner -- could award themselves, or anyone else, any mark on any course
+ * in any organisation, and grades feed credentials. Being "legacy" is why it was missed;
+ * the newer cell/grade routes were all gated as they were written.
+ *
+ * It now resolves the entry's own course and applies the same canGradeInCourse check the
+ * assignment grade route uses, scoped to the learner whose entry it is -- so a Co-facilitator
+ * still cannot reach outside the sections they lead.
+ */
 router.patch("/gradebook-entries/:entryId", requireAuth, async (req, res) => {
+  const entry = await db.query.gradebookEntriesTable.findFirst({
+    where: eq(gradebookEntriesTable.id, req.params.entryId),
+  });
+  if (!entry) { res.status(404).json({ error: "Entry not found" }); return; }
+  if (!(await canGradeInCourse(req.dbUser!, entry.courseId, entry.userId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
   const { score, letterGrade, excused } = req.body;
   const [updated] = await db.update(gradebookEntriesTable)
     .set({ score, letterGrade, excused, updatedAt: new Date() })

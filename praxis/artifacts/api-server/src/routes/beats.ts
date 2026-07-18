@@ -3,8 +3,34 @@ import { db } from "@workspace/db";
 import { beatsTable, modulesTable } from "@workspace/db";
 import { eq, asc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 
 const router = Router();
+
+/**
+ * Beats are the actual teaching content -- narration, scenarios, transcripts. Every route
+ * in this file was `requireAuth` only, which meant any authenticated user could read, edit
+ * or DELETE the content beats of any course on the platform. A beat has no courseId of its
+ * own, so the course is resolved through its module; both helpers below do that lookup and
+ * return null when the chain is broken, so a missing module fails closed rather than open.
+ */
+async function courseOfModule(moduleId: string): Promise<string | null> {
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, moduleId) });
+  return mod?.courseId ?? null;
+}
+async function courseOfBeat(beatId: string): Promise<string | null> {
+  const beat = await db.query.beatsTable.findFirst({ where: eq(beatsTable.id, beatId) });
+  if (!beat) return null;
+  return courseOfModule(beat.moduleId);
+}
+async function guard(req: any, res: any, courseId: string | null, mode: "staff" | "participant"): Promise<boolean> {
+  if (!courseId) { res.status(404).json({ error: "Not found" }); return false; }
+  const ok = mode === "staff"
+    ? await canStaffActOnCourse(req.dbUser!, courseId)
+    : await canParticipateInCourse(req.dbUser!, courseId);
+  if (!ok) { res.status(403).json({ error: "Forbidden" }); return false; }
+  return true;
+}
 
 function toBeatResponse(b: typeof beatsTable.$inferSelect) {
   return {
@@ -26,6 +52,7 @@ function toBeatResponse(b: typeof beatsTable.$inferSelect) {
 
 // GET /modules/:moduleId/beats
 router.get("/modules/:moduleId/beats", requireAuth, async (req, res) => {
+  if (!(await guard(req, res, await courseOfModule(req.params.moduleId), "participant"))) return;
   const beats = await db
     .select()
     .from(beatsTable)
@@ -36,6 +63,7 @@ router.get("/modules/:moduleId/beats", requireAuth, async (req, res) => {
 
 // POST /modules/:moduleId/beats
 router.post("/modules/:moduleId/beats", requireAuth, async (req, res) => {
+  if (!(await guard(req, res, await courseOfModule(req.params.moduleId), "staff"))) return;
   const { type, title, narration, bulletPoints, scenario, order } = req.body;
   const [beat] = await db
     .insert(beatsTable)
@@ -59,6 +87,7 @@ router.post("/modules/:moduleId/beats", requireAuth, async (req, res) => {
 
 // PATCH /beats/:beatId
 router.patch("/beats/:beatId", requireAuth, async (req, res) => {
+  if (!(await guard(req, res, await courseOfBeat(req.params.beatId), "staff"))) return;
   const { title, narration, bulletPoints, scenario, order, transcript, videoUrl } = req.body;
   const [updated] = await db
     .update(beatsTable)
@@ -70,6 +99,7 @@ router.patch("/beats/:beatId", requireAuth, async (req, res) => {
 
 // DELETE /beats/:beatId
 router.delete("/beats/:beatId", requireAuth, async (req, res) => {
+  if (!(await guard(req, res, await courseOfBeat(req.params.beatId), "staff"))) return;
   await db.delete(beatsTable).where(eq(beatsTable.id, req.params.beatId));
   res.status(204).send();
 });

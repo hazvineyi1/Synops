@@ -3,8 +3,31 @@ import { db } from "@workspace/db";
 import { modulesTable, beatsTable, coursesTable } from "@workspace/db";
 import { eq, asc, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
+import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 
 const router = Router();
+
+/**
+ * Course-scoped guards.
+ *
+ * Every mutating route below used to be `requireAuth` and nothing else, so any authenticated
+ * user -- a learner included -- could create, delete or publish modules on ANY course in ANY
+ * organisation. PATCH had a role check but no course check, which still let an admin of one
+ * organisation rewrite another's curriculum.
+ *
+ * staffOn() gates authoring; participantOn() gates reading, because course content is not
+ * public to the whole platform either.
+ */
+async function staffOn(req: any, res: any, courseId: string): Promise<boolean> {
+  if (await canStaffActOnCourse(req.dbUser!, courseId)) return true;
+  res.status(403).json({ error: "Forbidden" });
+  return false;
+}
+async function participantOn(req: any, res: any, courseId: string): Promise<boolean> {
+  if (await canParticipateInCourse(req.dbUser!, courseId)) return true;
+  res.status(403).json({ error: "Forbidden" });
+  return false;
+}
 
 function toModuleResponse(m: typeof modulesTable.$inferSelect) {
   return {
@@ -43,6 +66,7 @@ function toBeatResponse(b: typeof beatsTable.$inferSelect) {
 
 // GET /courses/:courseId/modules
 router.get("/courses/:courseId/modules", requireAuth, async (req, res) => {
+  if (!(await participantOn(req, res, req.params.courseId))) return;
   const modules = await db
     .select()
     .from(modulesTable)
@@ -53,6 +77,7 @@ router.get("/courses/:courseId/modules", requireAuth, async (req, res) => {
 
 // POST /courses/:courseId/modules
 router.post("/courses/:courseId/modules", requireAuth, async (req, res) => {
+  if (!(await staffOn(req, res, req.params.courseId))) return;
   const { title, description, estimatedMinutes, order } = req.body;
   const [mod] = await db
     .insert(modulesTable)
@@ -72,6 +97,9 @@ router.get("/modules/:moduleId", requireAuth, async (req, res) => {
     where: eq(modulesTable.id, req.params.moduleId),
   });
   if (!mod) { res.status(404).json({ error: "Not found" }); return; }
+  // Returns the module AND every beat -- the full narration and scenario text. Not something
+  // to hand to anyone with an account on the platform.
+  if (!(await participantOn(req, res, mod.courseId))) return;
   const beats = await db
     .select()
     .from(beatsTable)
@@ -82,6 +110,12 @@ router.get("/modules/:moduleId", requireAuth, async (req, res) => {
 
 // PATCH /modules/:moduleId
 router.patch("/modules/:moduleId", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  // The role gate alone was not enough: it proved the caller is staff SOMEWHERE, not staff
+  // on this course, so an admin of one organisation could rewrite another's curriculum.
+  const existing = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await staffOn(req, res, existing.courseId))) return;
+
   const { title, description, status, lessonType, estimatedMinutes, order, objectives, modality } = req.body;
   const [updated] = await db
     .update(modulesTable)
@@ -99,12 +133,18 @@ router.patch("/modules/:moduleId", requireAuth, requireRole("super_admin", "part
 
 // DELETE /modules/:moduleId
 router.delete("/modules/:moduleId", requireAuth, async (req, res) => {
+  const existing = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await staffOn(req, res, existing.courseId))) return;
   await db.delete(modulesTable).where(eq(modulesTable.id, req.params.moduleId));
   res.status(204).send();
 });
 
 // POST /modules/:moduleId/publish
 router.post("/modules/:moduleId/publish", requireAuth, async (req, res) => {
+  const existing = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await staffOn(req, res, existing.courseId))) return;
   const [updated] = await db
     .update(modulesTable)
     .set({ status: "published", updatedAt: new Date() })

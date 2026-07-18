@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { announcementsTable, usersTable, notificationsTable, enrolmentsTable } from "@workspace/db";
 import { eq, desc, or, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { canStaffActOnCourse } from "../lib/scope";
+import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -25,6 +25,10 @@ router.get("/announcements", requireAuth, async (req, res) => {
 
 // GET /courses/:courseId/announcements
 router.get("/courses/:courseId/announcements", requireAuth, async (req, res) => {
+  if (!(await canParticipateInCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const rows = await db
     .select({ ann: announcementsTable, author: usersTable })
     .from(announcementsTable)
@@ -82,6 +86,12 @@ router.post("/courses/:courseId/announcements", requireAuth, async (req, res) =>
 
 // PATCH /announcements/:announcementId
 router.patch("/announcements/:announcementId", requireAuth, async (req, res) => {
+  // The POST was staff-gated but edit and delete were left open -- any authenticated user
+  // could rewrite or remove any cohort's announcement. Resolve the announcement's course
+  // and gate to that course's staff.
+  const existing = await db.query.announcementsTable.findFirst({ where: eq(announcementsTable.id, req.params.announcementId) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await canStaffActOnCourse(req.dbUser!, existing.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const { title, body, pinned } = req.body;
   const [updated] = await db.update(announcementsTable)
     .set({ title, body, pinned, updatedAt: new Date() })
@@ -92,6 +102,9 @@ router.patch("/announcements/:announcementId", requireAuth, async (req, res) => 
 
 // DELETE /announcements/:announcementId
 router.delete("/announcements/:announcementId", requireAuth, async (req, res) => {
+  const existing = await db.query.announcementsTable.findFirst({ where: eq(announcementsTable.id, req.params.announcementId) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await canStaffActOnCourse(req.dbUser!, existing.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(announcementsTable).where(eq(announcementsTable.id, req.params.announcementId));
   res.status(204).send();
 });

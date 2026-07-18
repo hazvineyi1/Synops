@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { courseEventsTable, enrolmentsTable, assignmentsTable, deliverySessionsTable } from "@workspace/db";
 import { eq, or, and, gte, lte, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { canParticipateInCourse, canStaffActOnCourse } from "../lib/scope";
 
 const router = Router();
 
@@ -75,8 +76,29 @@ router.get("/calendar", requireAuth, async (req, res) => {
   ]);
 });
 
+/**
+ * Who may edit or delete a calendar event.
+ *
+ * Both routes previously took an eventId and wrote, with no ownership check at all -- any
+ * authenticated user could rewrite or delete any event on the platform, including another
+ * cohort's deadlines. An event belongs either to the person who made it (personal) or to a
+ * course (staff of that course).
+ */
+async function ownsEvent(req: any, res: any, eventId: string): Promise<boolean> {
+  const ev = await db.query.courseEventsTable.findFirst({ where: eq(courseEventsTable.id, eventId) });
+  if (!ev) { res.status(404).json({ error: "Event not found" }); return false; }
+  if (ev.userId && ev.userId === req.userId) return true;
+  if (ev.courseId && (await canStaffActOnCourse(req.dbUser!, ev.courseId))) return true;
+  res.status(403).json({ error: "Forbidden" });
+  return false;
+}
+
 // GET /courses/:courseId/events
 router.get("/courses/:courseId/events", requireAuth, async (req, res) => {
+  if (!(await canParticipateInCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const events = await db.select().from(courseEventsTable).where(eq(courseEventsTable.courseId, req.params.courseId));
   res.json(events.map(e => ({ ...e, startDate: e.startDate.toISOString(), endDate: e.endDate?.toISOString() ?? null })));
 });
@@ -84,6 +106,12 @@ router.get("/courses/:courseId/events", requireAuth, async (req, res) => {
 // POST /calendar/events
 router.post("/calendar/events", requireAuth, async (req, res) => {
   const { courseId, title, description, startDate, endDate, allDay, type, color } = req.body;
+  // courseId is caller-supplied. Without this, anyone could post an event onto any cohort's
+  // calendar. A null courseId is a personal event and stays unrestricted.
+  if (courseId && !(await canParticipateInCourse(req.dbUser!, courseId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
   const [event] = await db.insert(courseEventsTable).values({
     courseId: courseId ?? null, userId: req.userId, title, description,
     startDate: new Date(startDate), endDate: endDate ? new Date(endDate) : null,
@@ -94,6 +122,7 @@ router.post("/calendar/events", requireAuth, async (req, res) => {
 
 // PATCH /calendar/events/:eventId
 router.patch("/calendar/events/:eventId", requireAuth, async (req, res) => {
+  if (!(await ownsEvent(req, res, req.params.eventId))) return;
   const { title, description, startDate, endDate, color } = req.body;
   const [updated] = await db.update(courseEventsTable)
     .set({ title, description, startDate: startDate ? new Date(startDate) : undefined, endDate: endDate ? new Date(endDate) : undefined, color })
@@ -104,6 +133,7 @@ router.patch("/calendar/events/:eventId", requireAuth, async (req, res) => {
 
 // DELETE /calendar/events/:eventId
 router.delete("/calendar/events/:eventId", requireAuth, async (req, res) => {
+  if (!(await ownsEvent(req, res, req.params.eventId))) return;
   await db.delete(courseEventsTable).where(eq(courseEventsTable.id, req.params.eventId));
   res.status(204).send();
 });
