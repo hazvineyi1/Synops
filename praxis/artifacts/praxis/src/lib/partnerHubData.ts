@@ -273,6 +273,70 @@ export function accountActivity(accountId: string, lastActive: string): LoginEve
   }));
 }
 
+// ── Org-scoped delivery seed (deterministic per org, so the org hub is self-contained) ───────
+export type OrgCourse = { id: string; title: string; modality: 'Online' | 'Hybrid' | 'In-person'; enrolled: number; avgProgress: number; status: 'active' | 'draft' | 'archived' };
+export type OrgLearner = { id: string; name: string; email: string; course: string; progress: number; status: 'on-track' | 'at-risk' | 'completed' };
+export type OrgCoachingSummary = { sections: number; coaches: number; onTrack: number; atRisk: number; avgHealth: number };
+export type OrgGradebookSummary = { avgScore: number; submitted: number; pendingMarking: number; graded: number };
+
+const COURSE_CATALOG = [
+  'Customer Service Excellence', 'Digital Skills Foundations', 'Retail Operations', 'Team Leadership',
+  'Financial Literacy at Work', 'Occupational Health & Safety', 'Data Handling & Reporting', 'Effective Communication',
+];
+const FIRST_NAMES = ['Thandeka', 'Bongani', 'Ayanda', 'Sizwe', 'Lerato', 'Kagiso', 'Naledi', 'Tebogo', 'Zanele', 'Mpho', 'Refilwe', 'Andile'];
+const LAST_NAMES = ['Mokoena', 'Nkosi', 'Dlamini', 'Khumalo', 'Mahlangu', 'Zwane', 'Ndlovu', 'Sithole', 'Molefe', 'Botha', 'Naidoo', 'Pillay'];
+
+function seedOf(s: string) { return s.split('').reduce((a, c) => a + c.charCodeAt(0), 0); }
+
+/** Courses delivered for an organisation, derived deterministically from its seat count. */
+export function orgCourses(h: PartnerHub, orgId: string): OrgCourse[] {
+  const d = orgDetail(h, orgId);
+  const seed = seedOf(orgId);
+  const total = d.sub?.seats ?? 30;
+  const n = 3 + (seed % 3); // 3–5 courses
+  return Array.from({ length: n }).map((_, i) => {
+    const title = COURSE_CATALOG[(seed + i) % COURSE_CATALOG.length];
+    const enrolled = Math.max(6, Math.round((total / n) * (0.7 + ((seed + i) % 5) / 10)));
+    const modality = (['Online', 'Hybrid', 'In-person'] as const)[(seed + i) % 3];
+    const status = (i === n - 1 && seed % 4 === 0 ? 'draft' : 'active') as OrgCourse['status'];
+    return { id: `${orgId}_c${i}`, title, modality, enrolled, avgProgress: 45 + ((seed + i * 13) % 50), status };
+  });
+}
+
+/** A sample learner roster for an organisation (display sample; totals come from seats). */
+export function orgLearners(h: PartnerHub, orgId: string, sample = 8): OrgLearner[] {
+  const seed = seedOf(orgId);
+  const courses = orgCourses(h, orgId);
+  return Array.from({ length: sample }).map((_, i) => {
+    const fn = FIRST_NAMES[(seed + i) % FIRST_NAMES.length];
+    const ln = LAST_NAMES[(seed * 2 + i * 3) % LAST_NAMES.length];
+    const progress = 20 + ((seed + i * 17) % 80);
+    const status: OrgLearner['status'] = progress >= 95 ? 'completed' : progress < 40 ? 'at-risk' : 'on-track';
+    return {
+      id: `${orgId}_l${i}`, name: `${fn} ${ln}`,
+      email: `${fn.toLowerCase()}.${ln.toLowerCase()}@learner.co.za`,
+      course: courses[(seed + i) % courses.length].title, progress, status,
+    };
+  });
+}
+
+/** Coaching health summary for an organisation. */
+export function orgCoaching(h: PartnerHub, orgId: string): OrgCoachingSummary {
+  const d = orgDetail(h, orgId);
+  const seed = seedOf(orgId);
+  const learners = d.sub?.activeSeats ?? 24;
+  const atRisk = Math.round(learners * (0.1 + (seed % 3) / 20));
+  return { sections: 2 + (seed % 3), coaches: Math.max(1, d.coaches.length), onTrack: learners - atRisk, atRisk, avgHealth: 72 + (seed % 20) };
+}
+
+/** Gradebook summary for an organisation. */
+export function orgGradebook(h: PartnerHub, orgId: string): OrgGradebookSummary {
+  const seed = seedOf(orgId);
+  const submitted = 40 + (seed % 60);
+  const pendingMarking = seed % 12;
+  return { avgScore: 68 + (seed % 22), submitted, pendingMarking, graded: submitted - pendingMarking };
+}
+
 export function fundersRollup(h: PartnerHub) {
   const fundedSeats = h.agreements.reduce((s, a) => s + a.seatsFunded, 0);
   const funderValue = h.agreements.reduce((s, a) => s + a.value, 0);

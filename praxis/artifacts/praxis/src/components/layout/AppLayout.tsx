@@ -34,8 +34,10 @@ import {
   Wallet,
   Palette,
   Megaphone,
+  ArrowLeft,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getPartnerHub, orgDetail } from '@/lib/partnerHubData';
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Sokratify theme: one dark-navy sidebar + warm off-white content across the
@@ -173,11 +175,38 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (role === 'partner_admin') {
-      // Two clearly cordoned areas: the top pair (Overview + Organisations) are where the
-      // partner LOOKS; the "Main Admin" group is the partner-wide control surface (finance,
-      // funders, documents, accounts, comms, branding, audit, settings) kept visibly apart
-      // from the org-by-org and delivery surfaces. Studio / Case studies / Activities are
-      // authoring tools that belong to the super-admin tier and are intentionally absent.
+      // When the partner admin has stepped INTO an organisation (/partner/org/:id), the whole
+      // sidebar becomes that organisation's own hub — every delivery, people, funding, document
+      // and billing surface is scoped to that one org, and the only way out is "All organisations".
+      // Nothing partner-wide leaks in here.
+      const orgMatch = location.match(/^\/partner\/org\/([^/]+)/);
+      if (orgMatch) {
+        const orgId = orgMatch[1];
+        const base = `/partner/org/${orgId}`;
+        const org = orgDetail(getPartnerHub(user.partnerId), orgId).org;
+        const orgName = org?.name ?? t('nav.organisation', 'Organisation');
+        return [
+          { items: [{ label: t('nav.allOrganisations', 'All organisations'), href: '/partner/organisations', icon: ArrowLeft }] },
+          {
+            heading: orgName,
+            items: [
+              { label: t('nav.orgOverview', 'Overview'), href: base, icon: LayoutDashboard },
+              { label: t('nav.orgPeople', 'People'), href: `${base}/people`, icon: Users },
+              { label: t('nav.orgCourses', 'Courses'), href: `${base}/courses`, icon: BookOpen },
+              { label: t('nav.orgCoaching', 'Coaching'), href: `${base}/coaching`, icon: GraduationCap },
+              { label: t('nav.orgGradebook', 'Gradebook'), href: `${base}/gradebook`, icon: ClipboardList },
+              { label: t('nav.orgFunding', 'Funding'), href: `${base}/funding`, icon: Landmark },
+              { label: t('nav.orgDocuments', 'Documents'), href: `${base}/documents`, icon: FileText },
+              { label: t('nav.orgBilling', 'Billing'), href: `${base}/billing`, icon: Wallet },
+              { label: t('nav.orgSettings', 'Settings'), href: `${base}/settings`, icon: Settings },
+            ],
+          },
+        ];
+      }
+
+      // Top level (outside any organisation): only where the partner LOOKS (Overview,
+      // Organisations) and the partner-wide control surface (the Partner Admin Platform).
+      // Delivery no longer lives here — it belongs inside each organisation.
       return [
         {
           items: [
@@ -186,7 +215,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           ],
         },
         {
-          heading: t('nav.groups.mainAdmin', 'Main Admin'),
+          heading: t('nav.groups.partnerPlatform', 'Partner Admin Platform'),
           items: [
             { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
             { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },
@@ -196,15 +225,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             { label: t('nav.branding', 'Branding'), href: '/partner/theme', icon: Palette },
             { label: t('nav.audit', 'Audit & Impersonation'), href: '/partner/audit', icon: ShieldCheck },
             { label: t('nav.partnerSettings', 'Settings'), href: '/partner/settings', icon: Settings },
-          ],
-        },
-        {
-          heading: t('nav.groups.delivery', 'Delivery'),
-          items: [
-            { label: t('nav.courseCatalog'), href: '/courses', icon: BookOpen },
-            { label: t('nav.coaching', 'Coaching'), href: '/coaching/sections', icon: Users },
-            { label: t('nav.coachingHealth', 'Coaching health'), href: '/coaching/health', icon: TrendingUp },
-            { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
           ],
         },
         { items: [{ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy }] },

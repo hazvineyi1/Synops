@@ -56,6 +56,7 @@ import { MyGrades } from '@/pages/MyGrades';
 import { Jotter } from '@/pages/Jotter';
 import { PartnerOverview } from '@/pages/partner/PartnerOverview';
 import { PartnerOrganisations } from '@/pages/partner/PartnerOrganisations';
+import { PartnerOrgHub } from '@/pages/partner/PartnerOrgHub';
 import { PartnerFinance } from '@/pages/partner/PartnerFinance';
 import { PartnerFunders } from '@/pages/partner/PartnerFunders';
 import { PartnerDocuments } from '@/pages/partner/PartnerDocuments';
@@ -203,6 +204,8 @@ function Routes() {
         {/* Partner Hub (partner_admin tier) */}
         <ProtectedRoute path="/partner" component={PartnerOverview} />
         <ProtectedRoute path="/partner/organisations" component={PartnerOrganisations} />
+        <ProtectedRoute path="/partner/org/:orgId/:section" component={PartnerOrgHub} />
+        <ProtectedRoute path="/partner/org/:orgId" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/finance" component={PartnerFinance} />
         <ProtectedRoute path="/partner/funders" component={PartnerFunders} />
         <ProtectedRoute path="/partner/documents" component={PartnerDocuments} />

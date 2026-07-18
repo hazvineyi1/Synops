@@ -149,7 +149,7 @@ export function PartnerOverview() {
           {h.orgs.map((o) => {
             const d = orgDetail(h, o.id);
             return (
-              <button key={o.id} onClick={() => navigate(`/partner/organisations?org=${o.id}`)}
+              <button key={o.id} onClick={() => navigate(`/partner/org/${o.id}`)}
                 className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:bg-muted/40 transition-colors">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium truncate">{o.name}</span>
