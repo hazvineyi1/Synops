@@ -16,6 +16,7 @@ function toCourseResponse(c: typeof coursesTable.$inferSelect) {
     moduleCount: c.moduleCount,
     enrolmentCount: c.enrolmentCount,
     competencyTags: c.competencyTags,
+    objectives: c.objectives ?? [],
     nqfLevel: c.nqfLevel,
     thumbnailUrl: c.thumbnailUrl,
     createdAt: c.createdAt.toISOString(),
@@ -80,10 +81,14 @@ router.get("/courses/:courseId", requireAuth, async (req, res) => {
 
 // PATCH /courses/:courseId
 router.patch("/courses/:courseId", requireAuth, async (req, res) => {
-  const { title, description, status, competencyTags, nqfLevel, thumbnailUrl } = req.body;
+  const { title, description, status, competencyTags, nqfLevel, thumbnailUrl, objectives } = req.body;
   const [updated] = await db
     .update(coursesTable)
-    .set({ title, description, status, competencyTags, nqfLevel, thumbnailUrl, updatedAt: new Date() })
+    .set({
+      title, description, status, competencyTags, nqfLevel, thumbnailUrl,
+      ...(objectives !== undefined ? { objectives } : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(coursesTable.id, req.params.courseId))
     .returning();
   res.json(toCourseResponse(updated));

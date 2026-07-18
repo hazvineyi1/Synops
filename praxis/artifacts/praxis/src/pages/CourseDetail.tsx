@@ -8,16 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { 
-  BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2, 
-  Calendar, FileText, Users, UsersRound, Plus, ChevronRight, Pin,
-  CheckCircle, Clock, AlertCircle, Play
+import {
+  BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
+  Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, Pin,
+  CheckCircle, Clock, AlertCircle, Play, Target
 } from 'lucide-react';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { CourseNextStep } from '@/components/CourseNextStep';
 
 // --- Types ---
-interface Course { id: string; title: string; description: string; status: string; competencyTags: string[]; nqfLevel?: number; }
+interface Course { id: string; title: string; description: string; status: string; competencyTags: string[]; nqfLevel?: number; objectives?: string[]; }
 interface Module { id: string; courseId: string; title: string; description?: string; order: number; status: string; lessonType?: string; estimatedMinutes: number; beatCount: number; beats?: Beat[]; }
 interface Beat { id: string; type: string; title: string; order: number; videoUrl?: string; narration?: string | null; bulletPoints?: string[] | null; scenario?: string | null; }
 interface Assignment { id: string; title: string; description?: string; dueDate?: string; pointsPossible: number; published: boolean; }
@@ -68,6 +68,92 @@ function formatDate(d?: string) {
 function isOverdue(dueDate?: string) {
   if (!dueDate) return false;
   return new Date(dueDate) < new Date();
+}
+
+// Month-grid calendar view. A real month layout (Mon-start) with events placed on their
+// day, plus prev/next navigation. Complements the flat List view.
+function MonthGrid({ events, cursor, onCursor }: {
+  events: Event[];
+  cursor: Date;
+  onCursor: (d: Date) => void;
+}) {
+  const year = cursor.getFullYear();
+  const month = cursor.getMonth();
+  const first = new Date(year, month, 1);
+  const startWeekday = (first.getDay() + 6) % 7; // Monday = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const byDay: Record<number, Event[]> = {};
+  events.forEach((e) => {
+    const dt = new Date(e.startDate);
+    if (dt.getFullYear() === year && dt.getMonth() === month) {
+      (byDay[dt.getDate()] ??= []).push(e);
+    }
+  });
+
+  const today = new Date();
+  const isToday = (d: number) =>
+    today.getFullYear() === year && today.getMonth() === month && today.getDate() === d;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={() => onCursor(new Date(year, month - 1, 1))}
+          className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted/50"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="font-semibold text-sm">
+          {cursor.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
+        </span>
+        <button
+          onClick={() => onCursor(new Date(year, month + 1, 1))}
+          className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted/50"
+          aria-label="Next month"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden border border-border">
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+          <div key={d} className="bg-muted/50 py-1.5 text-center text-[11px] font-semibold text-muted-foreground">{d}</div>
+        ))}
+        {cells.map((d, i) => (
+          <div key={i} className={cn('bg-card min-h-[84px] p-1.5', !d && 'bg-muted/20')}>
+            {d && (
+              <>
+                <div className={cn('text-xs mb-1', isToday(d) ? 'font-bold text-primary' : 'text-muted-foreground')}>
+                  {d}
+                </div>
+                <div className="space-y-1">
+                  {(byDay[d] ?? []).slice(0, 3).map((e) => (
+                    <div
+                      key={e.id}
+                      className="text-[10px] leading-tight rounded px-1 py-0.5 truncate text-white"
+                      style={{ backgroundColor: e.color ?? '#6366f1' }}
+                      title={`${e.title} (${e.type.replace('_', ' ')})`}
+                    >
+                      {e.title}
+                    </div>
+                  ))}
+                  {(byDay[d] ?? []).length > 3 && (
+                    <div className="text-[10px] text-muted-foreground">+{(byDay[d]?.length ?? 0) - 3} more</div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 const LESSON_TYPE_META: Record<string, { icon: React.ElementType; label: string; color: string }> = {
@@ -130,6 +216,8 @@ export function CourseDetail() {
   const activeTab = searchParams.get('tab') || 'overview';
   const [ivBeat, setIvBeat] = useState<Beat | null>(null);
   const [selectedPage, setSelectedPage] = useState<Page | null>(null);
+  const [calendarView, setCalendarView] = useState<'month' | 'list'>('month');
+  const [calCursor, setCalCursor] = useState<Date>(() => new Date());
   const qc = useQueryClient();
 
   const { data: user } = useGetMe();
@@ -179,6 +267,13 @@ export function CourseDetail() {
     mutationFn: (groupId: string) => apiFetch(`/groups/${groupId}/join`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['groups', courseId] }),
   });
+
+  // Course structure = published modules in order, each annotated with the learner's
+  // progress (complete / certified / percent) so the Overview shows a real module map.
+  const moduleProgressById = new Map((progress?.modules ?? []).map((m) => [m.moduleId, m] as const));
+  const publishedModules = (modules ?? [])
+    .filter((m) => m.status === 'published')
+    .sort((a, b) => a.order - b.order);
 
   if (courseLoading) return (
     <div className="space-y-4">
@@ -304,18 +399,90 @@ export function CourseDetail() {
         {/* Learners get the cognitively-optimized single-primary-action view; staff keep
             the informational overview (about + upcoming + quick links). */}
         {activeTab === 'overview' && !isInstructor && enrolment && (
-          <CourseNextStep
-            courseTitle={course.title}
-            defaultDensity={densityRec?.density ?? 'focus'}
-            progress={progress as any}
-            modules={modules as any}
-            assignments={assignments as any}
-            discussions={discussions as any}
-            onOpenModule={(moduleId) => navigate(`/courses/${courseId}/modules/${moduleId}`)}
-            onStartRecall={(moduleId) => recallMutation.mutate(moduleId)}
-            onOpenAssignment={(aid) => navigate(`/courses/${courseId}/assignments/${aid}`)}
-            onOpenDiscussions={() => setTab('discussions')}
-          />
+          <div className="space-y-10">
+            <CourseNextStep
+              courseTitle={course.title}
+              defaultDensity={densityRec?.density ?? 'focus'}
+              progress={progress as any}
+              modules={modules as any}
+              assignments={assignments as any}
+              discussions={discussions as any}
+              onOpenModule={(moduleId) => navigate(`/courses/${courseId}/modules/${moduleId}`)}
+              onStartRecall={(moduleId) => recallMutation.mutate(moduleId)}
+              onOpenAssignment={(aid) => navigate(`/courses/${courseId}/assignments/${aid}`)}
+              onOpenDiscussions={() => setTab('discussions')}
+            />
+
+            {/* What you'll learn — course-level learning objectives */}
+            <section>
+              <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">What you'll learn</h2>
+              {(course.objectives && course.objectives.length > 0) ? (
+                <ul className="space-y-2.5">
+                  {course.objectives.map((o, i) => (
+                    <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
+                      <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <span className="text-sm leading-relaxed">{o}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : course.competencyTags && course.competencyTags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {course.competencyTags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Learning objectives for this course haven't been added yet.</p>
+              )}
+            </section>
+
+            {/* Course structure — the module map with progress */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-serif font-semibold tracking-tight">Course structure</h2>
+                <button onClick={() => setTab('modules')} className="text-sm text-primary hover:underline">All modules</button>
+              </div>
+              {publishedModules.length > 0 ? (
+                <div className="space-y-2">
+                  {publishedModules.map((m, i) => {
+                    const p = moduleProgressById.get(m.id);
+                    const done = p?.complete;
+                    const certified = p?.certified;
+                    const pct = p?.percent ?? 0;
+                    return (
+                      <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
+                        className="w-full flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left hover:bg-muted/40 transition-colors">
+                        <span className={cn('h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0',
+                          done ? 'bg-emerald-500/15 text-emerald-600'
+                            : certified ? 'bg-amber-500/15 text-amber-600'
+                            : 'bg-muted text-muted-foreground')}>
+                          {done ? <CheckCircle className="h-4 w-4" /> : String(i + 1).padStart(2, '0')}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{m.title}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                            <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{m.estimatedMinutes ?? 0} min</span>
+                            {certified && !done && <span className="text-amber-600">Mastered</span>}
+                            {pct > 0 && !done && <span>{pct}% viewed</span>}
+                            {done && <span className="text-emerald-600">Complete</span>}
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No modules have been published yet.</p>
+              )}
+            </section>
+
+            {/* About this course */}
+            {course.description && (
+              <section>
+                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">About this course</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{course.description}</p>
+              </section>
+            )}
+          </div>
         )}
         {activeTab === 'overview' && (isInstructor || !enrolment) && (
           <div className="grid md:grid-cols-3 gap-6">
@@ -541,11 +708,31 @@ export function CourseDetail() {
         {/* CALENDAR */}
         {activeTab === 'calendar' && (
           <div className="space-y-4">
-            {!events && <Skeleton className="h-64" />}
-            {events?.length === 0 && <div className="text-center text-muted-foreground py-12">No events scheduled.</div>}
-            {events && events.length > 0 && (
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-serif font-semibold tracking-tight">Calendar</h2>
+              <div className="flex items-center rounded-lg border border-border p-0.5 text-xs">
+                {(['month', 'list'] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setCalendarView(v)}
+                    className={cn('px-3 py-1 rounded-md font-medium capitalize transition-colors',
+                      calendarView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {!events ? (
+              <Skeleton className="h-64" />
+            ) : calendarView === 'month' ? (
+              <MonthGrid events={events} cursor={calCursor} onCursor={setCalCursor} />
+            ) : events.length === 0 ? (
+              <div className="text-center text-muted-foreground py-12 border-2 border-dashed border-border rounded-xl">No events scheduled.</div>
+            ) : (
               <div className="space-y-2">
-                {events.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).map((e) => (
+                {events.slice().sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).map((e) => (
                   <div key={e.id} className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/30">
                     <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: e.color ?? '#6366f1' }} />
                     <div className="flex-1">

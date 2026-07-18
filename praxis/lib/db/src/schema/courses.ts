@@ -17,6 +17,9 @@ export const coursesTable = pgTable("courses", {
   moduleCount: integer("module_count").notNull().default(0),
   enrolmentCount: integer("enrolment_count").notNull().default(0),
   competencyTags: text("competency_tags").array().notNull().default([]),
+  // Course-level learning outcomes (what a learner can do on completion). Shown on the
+  // learner Overview; distinct from per-module objectives.
+  objectives: text("objectives").array().notNull().default([]),
   nqfLevel: integer("nqf_level"),
   thumbnailUrl: text("thumbnail_url"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
