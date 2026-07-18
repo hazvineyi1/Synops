@@ -1,15 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { gradebookApi, type GradebookColumn, type MeGradebook } from "@/lib/gradebookApi";
-import { apiFetch } from "@/lib/api";
-import { CoachThread } from "@/components/CoachThread";
 import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Sparkles, TrendingDown, TrendingUp, Minus, MessageSquare } from "lucide-react";
-
-interface MyIntervention { alertId: string; courseId: string; courseTitle: string; status: string }
+import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Sparkles, TrendingDown, TrendingUp, Minus, GraduationCap } from "lucide-react";
 
 const pillBand = (band: string) =>
   band === "good"
@@ -22,6 +19,7 @@ const pillBand = (band: string) =>
 
 export function MyGrades() {
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
   const [courseId, setCourseId] = useState<string>("");
 
   const mine = useQuery({ queryKey: ["gb-mine"], queryFn: () => gradebookApi.mine() });
@@ -34,9 +32,6 @@ export function MyGrades() {
     queryFn: () => gradebookApi.me(courseId),
     enabled: !!courseId,
   });
-
-  const interventions = useQuery<MyIntervention[]>({ queryKey: ["my-interventions"], queryFn: () => apiFetch<MyIntervention[]>("/my/interventions") });
-  const myAlert = interventions.data?.find((i) => i.courseId === courseId);
 
   const markItem = useMutation({
     mutationFn: (v: { planId: string; index: number; done: boolean }) => gradebookApi.markPlanItem(v.planId, v.index, v.done),
@@ -103,14 +98,22 @@ export function MyGrades() {
                 <h2 className="font-semibold text-foreground">Your personalised study plan</h2>
               </div>
               <p className="mb-3 text-sm text-muted-foreground">{me.data.plan.rationale}</p>
-              {me.data.plan.coachUrl && (
-                <Button
-                  className="mb-3 w-full sm:w-auto gap-1.5"
-                  onClick={() => window.open(me.data!.plan!.coachUrl!, "_blank", "noopener,noreferrer")}
-                >
-                  <MessageSquare className="h-4 w-4" /> Open your AI coach <ArrowRight className="h-4 w-4" />
-                </Button>
-              )}
+              {/*
+                The AI Coach is where remediation actually happens. This button replaces the
+                old "Message your coach" thread: rather than typing a message and waiting, the
+                learner goes straight into the guided Coach hub. Prefer the external signed
+                magic-link when the Coach app returned one; otherwise open the in-app hub.
+              */}
+              <Button
+                className="mb-3 w-full sm:w-auto gap-1.5"
+                onClick={() =>
+                  me.data!.plan!.coachUrl
+                    ? window.open(me.data!.plan!.coachUrl!, "_blank", "noopener,noreferrer")
+                    : navigate("/coach-hub")
+                }
+              >
+                <GraduationCap className="h-4 w-4" /> Go to your AI Coach <ArrowRight className="h-4 w-4" />
+              </Button>
               <ol className="space-y-2">
                 {me.data.plan.items.map((it, idx) => {
                   const href = it.kind === "case" && it.refId ? `/cases/${it.refId}/begin` : it.kind === "activity" && it.refId ? `/activities/${it.refId}/play` : null;
@@ -136,17 +139,6 @@ export function MyGrades() {
                   );
                 })}
               </ol>
-            </div>
-          )}
-
-          {myAlert && (
-            <div className="rounded-xl border border-border bg-background p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <h2 className="font-semibold text-foreground">Message your coach</h2>
-              </div>
-              <p className="mb-3 text-sm text-muted-foreground">Your coach is here to help. Ask a question or let them know how you're getting on — they'll get a notification.</p>
-              <CoachThread alertId={myAlert.alertId} />
             </div>
           )}
 
@@ -216,7 +208,7 @@ function OverviewBar({ me }: { me: MeGradebook }) {
         </div>
       </div>
 
-      {(off || risk) && (
+      {(off || risk) ? (
         <div className={cn("flex items-start gap-3 rounded-xl border p-4", off ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-amber-300 bg-amber-50 dark:bg-amber-950/20")}>
           <AlertTriangle className={cn("mt-0.5 h-5 w-5 shrink-0", off ? "text-red-600" : "text-amber-600")} />
           <div className="text-sm">
@@ -225,6 +217,17 @@ function OverviewBar({ me }: { me: MeGradebook }) {
               <div className="text-muted-foreground">{me.alert.reasonLabels.join(" · ")}</div>
             )}
             {me.plan && <div className="mt-1 text-muted-foreground">Your study plan below is built to get you back on track.</div>}
+          </div>
+        </div>
+      ) : (
+        // On track: a reassuring green state, not silence. Previously nothing rendered here,
+        // so a learner doing fine saw an empty gap where the struggling learner saw an alert
+        // -- which reads as "is something missing?" rather than "you're doing well".
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 dark:bg-emerald-950/20">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+          <div className="text-sm">
+            <div className="font-semibold text-foreground">You're on track — keep it up.</div>
+            <div className="text-muted-foreground">Nothing is overdue and your mastery is where it should be. No study plan needed right now.</div>
           </div>
         </div>
       )}

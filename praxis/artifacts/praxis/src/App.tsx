@@ -53,6 +53,7 @@ import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
 import { ActivityPlay } from '@/pages/ActivityPlay';
 import { ActivityEmbed } from '@/pages/ActivityEmbed';
 import { MyGrades } from '@/pages/MyGrades';
+import { Jotter } from '@/pages/Jotter';
 import { GradebookBrowser } from '@/pages/GradebookBrowser';
 import { Support } from '@/pages/Support';
 
@@ -189,6 +190,7 @@ function Routes() {
         />
         <ProtectedRoute path="/courses/:courseId/gradebook" component={CourseGradebook} />
         <ProtectedRoute path="/grades" component={MyGrades} />
+        <ProtectedRoute path="/jotter" component={Jotter} />
         <ProtectedRoute path="/coach-hub" component={CoachHub} />
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />

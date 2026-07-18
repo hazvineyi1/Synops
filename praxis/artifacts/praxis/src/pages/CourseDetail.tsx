@@ -17,7 +17,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
-import { CourseNextStep } from '@/components/CourseNextStep';
 
 /**
  * Shared shell for the small instructor "create X" forms on this page.
@@ -661,13 +660,6 @@ export function CourseDetail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['enrolment', courseId] }),
   });
 
-  // Retrieval-practice nudge starts a coach session on an already-completed module
-  // (a Socratic session over mastered material IS retrieval practice).
-  const recallMutation = useMutation({
-    mutationFn: (moduleId: string) => apiFetch<{ id: string }>('/sessions', { method: 'POST', body: JSON.stringify({ moduleId }) }),
-    onSuccess: (s) => navigate(`/learn/${s.id}`),
-  });
-
   const joinGroupMutation = useMutation({
     mutationFn: (groupId: string) => apiFetch(`/groups/${groupId}/join`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['groups', courseId] }),
@@ -748,7 +740,7 @@ export function CourseDetail() {
 
       {/* Real completion, from beats actually viewed. Only shown to enrolled learners:
           an unenrolled visitor browsing the catalog has no progress to speak of. */}
-      {/* The focused learner Overview (CourseNextStep) already shows progress + next step,
+      {/* The learner Overview's "Start here" list already shows progress + the next module,
           so this header progress card is redundant there; keep it on the other tabs. */}
       {enrolment && progress && progress.totalBeats > 0 && !(activeTab === 'overview' && !isInstructor) && (
         <div className="mb-6 rounded-lg border border-border bg-card p-4">

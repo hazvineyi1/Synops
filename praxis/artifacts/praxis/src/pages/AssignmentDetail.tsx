@@ -49,31 +49,8 @@ function parseConfig(instructions?: string): Record<string, any> | null {
 // ── Word count ────────────────────────────────────────────────────────────────
 function wordCount(text: string) { return text.trim() ? text.trim().split(/\s+/).length : 0; }
 
-// ─── Essay submission ─────────────────────────────────────────────────────────
-function EssayForm({ value, onChange, minWords = 0 }: {
-  value: string; onChange: (v: string) => void; minWords?: number;
-}) {
-  const wc = wordCount(value);
-  const enough = minWords === 0 || wc >= minWords;
-  return (
-    <div className="space-y-2">
-      <Textarea
-        placeholder="Write your response here…"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        className="min-h-[220px] text-sm resize-none leading-relaxed"
-      />
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{wc} word{wc !== 1 ? 's' : ''}</span>
-        {minWords > 0 && (
-          <span className={enough ? 'text-emerald-600' : ''}>
-            {enough ? '✓ Minimum met' : `${minWords - wc} more word${minWords - wc !== 1 ? 's' : ''} needed`}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
+// EssayForm was replaced by WrittenSubmission (defined below): a larger editor that also
+// accepts a pasted or uploaded document, not just typed text.
 
 // ─── Reflection submission ────────────────────────────────────────────────────
 function ReflectionForm({ prompts, value, onChange }: {
@@ -400,6 +377,95 @@ function DiscussionForm({ value, onChange }: { value: string; onChange: (v: stri
 const ACCEPTED = '.pdf,.docx,.txt,.md,.rtf,.html,.odt,.pptx';
 const MAX_BYTES = 15 * 1024 * 1024;
 
+/**
+ * Read a chosen document to a base64 payload the server can parse.
+ * Shared by every submission type that accepts an attachment. Throws a human-readable
+ * message on an unreadable type or an oversized file; chunked because
+ * String.fromCharCode(...bytes) blows the call stack on a real document.
+ */
+async function readFileToBase64(f: File): Promise<{ filename: string; dataBase64: string }> {
+  const ext = (f.name.split('.').pop() ?? '').toLowerCase();
+  if (!ACCEPTED.includes(`.${ext}`)) throw new Error(`We can't read .${ext} files. Try PDF, Word, or a text file.`);
+  if (f.size > MAX_BYTES) throw new Error('That file is larger than 15MB. Try exporting a smaller version.');
+  const bytes = new Uint8Array(await f.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return { filename: f.name, dataBase64: btoa(binary) };
+}
+
+/**
+ * A compact "attach a document instead" row. Lets a written submission (essay, etc.) carry
+ * an uploaded file without the big drop-zone dominating the form — the primary path stays
+ * typing/pasting into the editor, the attachment is the alternative.
+ */
+function AttachFile({ file, onFileChange }: {
+  file: { filename: string; dataBase64: string } | null;
+  onFileChange: (f: { filename: string; dataBase64: string } | null) => void;
+}) {
+  const [error, setError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const handle = async (f: File) => {
+    setError(null); setReading(true);
+    try { onFileChange(await readFileToBase64(f)); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not read that file.'); }
+    finally { setReading(false); }
+  };
+  return (
+    <div className="space-y-1.5">
+      <input ref={ref} type="file" accept={ACCEPTED} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void handle(f); }} />
+      {file ? (
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
+          <FileText className="h-4 w-4 text-primary shrink-0" />
+          <span className="font-medium truncate flex-1">{file.filename}</span>
+          <button type="button" onClick={() => { onFileChange(null); if (ref.current) ref.current.value = ''; }} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => ref.current?.click()} disabled={reading}
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Upload className="h-4 w-4" />
+          {reading ? 'Reading your file…' : 'Attach a document instead (PDF, Word, or text)'}
+        </button>
+      )}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * The written-submission editor for essays and open responses. A large editor is the point:
+ * the previous layout crammed this into a one-third sidebar column where a long essay was
+ * unreadable as you wrote it. Type, paste, or attach a document — all three are first-class.
+ */
+function WrittenSubmission({ value, onChange, file, onFileChange, minWords, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  file: { filename: string; dataBase64: string } | null;
+  onFileChange: (f: { filename: string; dataBase64: string } | null) => void;
+  minWords?: number;
+  placeholder?: string;
+}) {
+  const wc = wordCount(value);
+  const short = minWords ? wc < minWords : false;
+  return (
+    <div className="space-y-2.5">
+      <Textarea
+        placeholder={placeholder ?? 'Write or paste your response here…'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="min-h-[340px] text-sm leading-relaxed resize-y"
+      />
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className={cn('text-muted-foreground', short && 'text-amber-600')}>
+          {wc} words{minWords ? ` · ${minWords} word minimum` : ''}
+        </span>
+        <span className="text-muted-foreground">Type, paste, or attach a document below.</span>
+      </div>
+      <AttachFile file={file} onFileChange={onFileChange} />
+    </div>
+  );
+}
+
 function FileUploadForm({ text, onTextChange, file, onFileChange }: {
   text: string;
   onTextChange: (v: string) => void;
@@ -413,31 +479,10 @@ function FileUploadForm({ text, onTextChange, file, onFileChange }: {
   const fileName = file?.filename ?? null;
 
   const handleFile = async (f: File) => {
-    setError(null);
-    const ext = (f.name.split('.').pop() ?? '').toLowerCase();
-    if (!ACCEPTED.includes(`.${ext}`)) {
-      setError(`We can't read .${ext} files. Try PDF, Word, or a text file — or type your answer below.`);
-      return;
-    }
-    if (f.size > MAX_BYTES) {
-      setError('That file is larger than 15MB. Try exporting a smaller version.');
-      return;
-    }
-    setReading(true);
-    try {
-      const buf = await f.arrayBuffer();
-      // Chunked, because String.fromCharCode(...bytes) blows the call stack on large files.
-      const bytes = new Uint8Array(buf);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i += 0x8000) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      }
-      onFileChange({ filename: f.name, dataBase64: btoa(binary) });
-    } catch {
-      setError("We couldn't read that file. Try saving it again, or type your answer below.");
-    } finally {
-      setReading(false);
-    }
+    setError(null); setReading(true);
+    try { onFileChange(await readFileToBase64(f)); }
+    catch (e) { setError(e instanceof Error ? e.message : "We couldn't read that file. Try saving it again."); }
+    finally { setReading(false); }
   };
 
   return (
@@ -721,14 +766,12 @@ export function AssignmentDetail() {
   } else if (subType === 'quiz') {
     submissionBody = JSON.stringify({ type: 'quiz', answers: quizAnswers, ...quizScore });
     canSubmit = quizSubmitted;
-  } else if (subType === 'file_upload') {
-    // Either an attached document or typed notes is a real submission; requiring the text
-    // box would have blocked the learner who did exactly what the form asked.
+  } else {
+    // essay, discussion, file_upload and any generic type: a typed/pasted response OR an
+    // attached document both count. Requiring the text box blocked the learner who uploaded
+    // exactly what the assignment asked for.
     submissionBody = essay;
     canSubmit = !!upload || essay.trim().length > 0;
-  } else {
-    submissionBody = essay;
-    canSubmit = essay.trim().length > 0;
   }
 
   // ── Icon & colour per type ─────────────────────────────────────────────────
@@ -744,7 +787,7 @@ export function AssignmentDetail() {
   const MetaIcon = meta.icon;
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-3xl mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
         <button onClick={() => navigate('/courses')} className="hover:text-foreground transition-colors">Courses</button>
@@ -778,38 +821,43 @@ export function AssignmentDetail() {
         </div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Main */}
-        <div className="md:col-span-2 space-y-4">
-          {/* Description / instructions */}
-          {assignment.description && (
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base">Description</CardTitle></CardHeader>
-              <CardContent><p className="text-sm text-muted-foreground leading-relaxed">{assignment.description}</p></CardContent>
-            </Card>
+      {/*
+        Single-column flow. The task (description + instructions, both short) sits at the top;
+        the submission editor gets the full width below it. The previous three-column grid
+        squeezed the submission into a one-third sidebar -- fine for a filename, unusable for
+        writing an essay -- while the two-thirds task column sat mostly empty.
+      */}
+      <div className="space-y-5">
+          {/* Task: description + instructions, compact and side by side on wide screens */}
+          {(assignment.description || (assignment.instructions && !config)) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {assignment.description && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">Description</CardTitle></CardHeader>
+                  <CardContent><p className="text-sm text-muted-foreground leading-relaxed">{assignment.description}</p></CardContent>
+                </Card>
+              )}
+              {assignment.instructions && !config && (
+                <Card>
+                  <CardHeader className="pb-2"><CardTitle className="text-base">Instructions</CardTitle></CardHeader>
+                  <CardContent>
+                    <div
+                      className="prose prose-sm max-w-none text-foreground text-sm leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: parseMarkdown(assignment.instructions) }}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
-          {assignment.instructions && !config && (
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base">Instructions</CardTitle></CardHeader>
-              <CardContent>
-                <div
-                  className="prose prose-sm max-w-none text-foreground text-sm leading-relaxed"
-                  dangerouslySetInnerHTML={{ __html: parseMarkdown(assignment.instructions) }}
-                />
-              </CardContent>
-            </Card>
-          )}
-          {/* Case study scenario shown in main area */}
+          {/* Case study scenario */}
           {subType === 'case_study' && config?.scenario && !submitted && !graded && (
             <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-sm leading-relaxed">
               <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-2">Scenario</div>
               <p>{config.scenario}</p>
             </div>
           )}
-        </div>
 
-        {/* Sidebar: submission panel */}
-        <div className="space-y-4">
           {/* Graded */}
           {graded && (
             <Card className="border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20">
@@ -954,9 +1002,9 @@ export function AssignmentDetail() {
                   <FileUploadForm text={essay} onTextChange={setEssay} file={upload} onFileChange={setUpload} />
                 )}
 
-                {/* ── Essay (default) ── */}
+                {/* ── Essay (default) — type, paste, or attach a document ── */}
                 {(subType === 'essay' || !['reflection','case_study','quiz','discussion','file_upload'].includes(subType)) && (
-                  <EssayForm value={essay} onChange={setEssay} minWords={assignment.minWords} />
+                  <WrittenSubmission value={essay} onChange={setEssay} file={upload} onFileChange={setUpload} minWords={assignment.minWords} />
                 )}
 
                 {/* Submit button — not shown for quiz (handled inside QuizForm) */}
@@ -987,7 +1035,6 @@ export function AssignmentDetail() {
               </CardContent>
             </Card>
           )}
-        </div>
       </div>
 
       {isStaff && <StaffGradingPanel assignmentId={assignmentId!} pointsPossible={Number(assignment.pointsPossible)} />}

@@ -30,6 +30,7 @@ import {
   Layers,
   ClipboardList,
   GraduationCap,
+  NotebookPen,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -126,6 +127,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
           { label: t('nav.myGrades', 'My grades'), href: '/grades', icon: TrendingUp },
           { label: t('nav.coach', 'Coach'), href: '/coach-hub', icon: GraduationCap },
+          { label: t('nav.jotter', 'Jotter'), href: '/jotter', icon: NotebookPen },
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
           { label: t('nav.credentials'), href: '/credentials', icon: Award },
           { label: t('nav.help', 'Help'), href: '/support', icon: LifeBuoy },
