@@ -218,6 +218,7 @@ export function CourseDetail() {
   const [selectedPage, setSelectedPage] = useState<Page | null>(null);
   const [calendarView, setCalendarView] = useState<'month' | 'list'>('month');
   const [calCursor, setCalCursor] = useState<Date>(() => new Date());
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const qc = useQueryClient();
 
   const { data: user } = useGetMe();
@@ -238,7 +239,7 @@ export function CourseDetail() {
   const { data: discussions } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' || activeTab === 'overview' });
   const { data: announcements } = useQuery({ queryKey: ['announcements', courseId], queryFn: () => apiFetch<Announcement[]>(`/courses/${courseId}/announcements`), enabled: activeTab === 'announcements' || activeTab === 'overview' });
   const { data: myGrades } = useQuery({ queryKey: ['grades', courseId, 'me'], queryFn: () => apiFetch<{ grades: GradeEntry[]; totalEarned: number; totalPossible: number; overallPercent: number; }>(`/courses/${courseId}/gradebook/me`), enabled: activeTab === 'gradebook' && !isInstructor });
-  const { data: events } = useQuery({ queryKey: ['events', courseId], queryFn: () => apiFetch<Event[]>(`/courses/${courseId}/events`), enabled: activeTab === 'calendar' });
+  const { data: events } = useQuery({ queryKey: ['events', courseId], queryFn: () => apiFetch<Event[]>(`/courses/${courseId}/events`), enabled: activeTab === 'calendar' || activeTab === 'overview' });
   const { data: pages } = useQuery({ queryKey: ['pages', courseId], queryFn: () => apiFetch<Page[]>(`/courses/${courseId}/pages`), enabled: activeTab === 'pages' });
   const { data: roster } = useQuery({ queryKey: ['roster', courseId], queryFn: () => apiFetch<RosterEntry[]>(`/courses/${courseId}/roster`), enabled: activeTab === 'people' });
   const { data: groups } = useQuery({ queryKey: ['groups', courseId], queryFn: () => apiFetch<Group[]>(`/courses/${courseId}/groups`), enabled: activeTab === 'groups' });
@@ -274,6 +275,12 @@ export function CourseDetail() {
   const publishedModules = (modules ?? [])
     .filter((m) => m.status === 'published')
     .sort((a, b) => a.order - b.order);
+  const totalMinutes = publishedModules.reduce((s, m) => s + (m.estimatedMinutes ?? 0), 0);
+  // The module we suggest the learner start with: the first that isn't complete or mastered.
+  const recommendedIdx = publishedModules.findIndex((m) => {
+    const p = moduleProgressById.get(m.id);
+    return !(p?.complete || p?.certified);
+  });
 
   if (courseLoading) return (
     <div className="space-y-4">
@@ -368,22 +375,21 @@ export function CourseDetail() {
         </div>
       )}
 
-      {/* Course sections: a vertical nav on desktop (every section visible, no
-          horizontal scrolling), wrapping to pills on mobile. Replaces the old
-          overflow-x tab strip, which hid half its tabs off-screen. */}
-      <div className="lg:grid lg:grid-cols-[210px_1fr] lg:gap-8">
-        <nav className="mb-6 lg:mb-0 lg:sticky lg:top-20 lg:self-start">
-          <div className="flex flex-wrap gap-2 lg:flex-col lg:gap-1">
+      {/* Course sections: a horizontal, scrollable tab bar across the top. Replaces the
+          old left side rail. */}
+      <div>
+        <nav className="mb-6 border-b border-border">
+          <div className="flex gap-1 overflow-x-auto">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setTab(tab.id)}
                 aria-current={activeTab === tab.id ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors lg:w-full",
+                  "flex items-center gap-2 whitespace-nowrap border-b-2 -mb-px px-3.5 py-2.5 text-sm font-medium transition-colors",
                   activeTab === tab.id
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
                 )}
               >
                 <tab.icon className="h-4 w-4 shrink-0" />
@@ -400,22 +406,17 @@ export function CourseDetail() {
             the informational overview (about + upcoming + quick links). */}
         {activeTab === 'overview' && !isInstructor && enrolment && (
           <div className="space-y-10">
-            <CourseNextStep
-              courseTitle={course.title}
-              defaultDensity={densityRec?.density ?? 'focus'}
-              progress={progress as any}
-              modules={modules as any}
-              assignments={assignments as any}
-              discussions={discussions as any}
-              onOpenModule={(moduleId) => navigate(`/courses/${courseId}/modules/${moduleId}`)}
-              onStartRecall={(moduleId) => recallMutation.mutate(moduleId)}
-              onOpenAssignment={(aid) => navigate(`/courses/${courseId}/assignments/${aid}`)}
-              onOpenDiscussions={() => setTab('discussions')}
-            />
+            {/* 1. Course overview */}
+            {course.description && (
+              <section>
+                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course overview</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{course.description}</p>
+              </section>
+            )}
 
-            {/* What you'll learn — course-level learning objectives */}
+            {/* 2. Course learning objectives */}
             <section>
-              <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">What you'll learn</h2>
+              <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course learning objectives</h2>
               {(course.objectives && course.objectives.length > 0) ? (
                 <ul className="space-y-2.5">
                   {course.objectives.map((o, i) => (
@@ -425,21 +426,49 @@ export function CourseDetail() {
                     </li>
                   ))}
                 </ul>
-              ) : course.competencyTags && course.competencyTags.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {course.competencyTags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
-                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Learning objectives for this course haven't been added yet.</p>
               )}
             </section>
 
-            {/* Course structure — the module map with progress */}
+            {/* 3. Course structure (summary) */}
             <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-serif font-semibold tracking-tight">Course structure</h2>
-                <button onClick={() => setTab('modules')} className="text-sm text-primary hover:underline">All modules</button>
+              <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course structure</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { icon: BookOpen, value: String(publishedModules.length), label: publishedModules.length === 1 ? 'Module' : 'Modules' },
+                  { icon: Clock, value: String(totalMinutes), label: 'Minutes' },
+                  { icon: Play, value: 'Self-paced', label: 'Delivery' },
+                  { icon: CheckCircle, value: 'Credential', label: 'On mastery' },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-xl border border-border bg-card p-4">
+                    <s.icon className="h-5 w-5 text-muted-foreground mb-2" />
+                    <div className="text-base font-serif font-bold leading-none">{s.value}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
+                  </div>
+                ))}
               </div>
+            </section>
+
+            {/* 4. What you'll learn (skills) */}
+            <section>
+              <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">What you'll learn</h2>
+              {course.competencyTags && course.competencyTags.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {course.competencyTags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">The skills you'll build will be listed here.</p>
+              )}
+            </section>
+
+            {/* 5. Start here -> pick a module */}
+            <section>
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-lg font-serif font-semibold tracking-tight">Start here</h2>
+                <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% complete</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3">Pick a module to work on. We suggest starting with the recommended one.</p>
               {publishedModules.length > 0 ? (
                 <div className="space-y-2">
                   {publishedModules.map((m, i) => {
@@ -447,9 +476,11 @@ export function CourseDetail() {
                     const done = p?.complete;
                     const certified = p?.certified;
                     const pct = p?.percent ?? 0;
+                    const recommended = i === recommendedIdx;
                     return (
                       <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
-                        className="w-full flex items-center gap-3 rounded-xl border border-border bg-card p-3.5 text-left hover:bg-muted/40 transition-colors">
+                        className={cn('w-full flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors',
+                          recommended ? 'border-primary/50 bg-primary/5' : 'border-border bg-card hover:bg-muted/40')}>
                         <span className={cn('h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0',
                           done ? 'bg-emerald-500/15 text-emerald-600'
                             : certified ? 'bg-amber-500/15 text-amber-600'
@@ -457,7 +488,10 @@ export function CourseDetail() {
                           {done ? <CheckCircle className="h-4 w-4" /> : String(i + 1).padStart(2, '0')}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{m.title}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium truncate">{m.title}</span>
+                            {recommended && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">Start here</Badge>}
+                          </div>
                           <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                             <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{m.estimatedMinutes ?? 0} min</span>
                             {certified && !done && <span className="text-amber-600">Mastered</span>}
@@ -475,13 +509,47 @@ export function CourseDetail() {
               )}
             </section>
 
-            {/* About this course */}
-            {course.description && (
-              <section>
-                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">About this course</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{course.description}</p>
-              </section>
-            )}
+            {/* Calendar — open / close, changeable */}
+            <section>
+              <button onClick={() => setCalendarOpen((o) => !o)}
+                className="w-full flex items-center justify-between rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
+                <span className="flex items-center gap-2 font-serif font-semibold"><Calendar className="h-4 w-4 text-primary" /> Calendar</span>
+                <ChevronRight className={cn('h-4 w-4 text-muted-foreground transition-transform', calendarOpen && 'rotate-90')} />
+              </button>
+              {calendarOpen && (
+                <div className="mt-3 rounded-xl border border-border bg-card p-4">
+                  <div className="flex items-center justify-end mb-3">
+                    <div className="flex items-center rounded-lg border border-border p-0.5 text-xs">
+                      {(['month', 'list'] as const).map((v) => (
+                        <button key={v} onClick={() => setCalendarView(v)}
+                          className={cn('px-3 py-1 rounded-md font-medium capitalize transition-colors',
+                            calendarView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {!events ? (
+                    <Skeleton className="h-64" />
+                  ) : calendarView === 'month' ? (
+                    <MonthGrid events={events} cursor={calCursor} onCursor={setCalCursor} />
+                  ) : events.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-8">No events scheduled.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {events.slice().sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).map((e) => (
+                        <div key={e.id} className="flex items-center gap-3 p-3 rounded-lg border border-border">
+                          <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: e.color ?? '#6366f1' }} />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-foreground">{e.title}</div>
+                            <div className="text-xs text-muted-foreground">{e.type.replace('_', ' ')}</div>
+                          </div>
+                          <div className="text-sm text-muted-foreground">{formatDate(e.startDate)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
           </div>
         )}
         {activeTab === 'overview' && (isInstructor || !enrolment) && (
