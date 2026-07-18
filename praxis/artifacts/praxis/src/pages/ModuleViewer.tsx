@@ -1108,13 +1108,13 @@ export function ModuleViewer() {
             >
               <Trophy className="h-8 w-8 text-emerald-500 mx-auto mb-3" />
               <p className="font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
-                Module Complete!
+                Section complete
               </p>
               <p className="text-sm text-muted-foreground mb-4">
-                You've worked through all {beats.length} pages in this module.
+                You've worked through all {beats.length} pages. Continue to the next learning experience.
               </p>
-              <Button variant="outline" onClick={() => navigate(`/courses/${courseId}`)}>
-                Back to Course
+              <Button onClick={() => navigate(`/courses/${courseId}/modules/${moduleId}`)}>
+                Continue <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </motion.div>
           )}
@@ -1302,6 +1302,12 @@ function ModuleHubView({
     queryFn: () => apiFetch<HubDiscussion[]>(`/courses/${courseId}/discussions`),
     enabled: !!courseId,
   });
+  // Per-module completion across the course, to drive Next-module / course-complete nav.
+  const { data: courseProg } = useQuery({
+    queryKey: ['course-progress', courseId],
+    queryFn: () => apiFetch<{ modules: { moduleId: string; complete: boolean; certified?: boolean; percent: number }[] }>(`/progress/course/${courseId}`),
+    enabled: !!courseId,
+  });
 
   const startSession = useMutation({
     mutationFn: () => apiFetch<{ id: string }>('/sessions', {
@@ -1348,6 +1354,39 @@ function ModuleHubView({
     { id: 'assignments', label: 'Assignments', icon: FileText,      count: moduleAssignments.length },
     { id: 'workshop',    label: 'Workshop',    icon: Users },
   ];
+
+  // ── Guided linear progression ──────────────────────────────────────────────
+  // The ordered learning experiences that actually exist in this module.
+  const flow: { id: HubTab; label: string }[] = [
+    ...(videoBeats.length ? [{ id: 'video' as HubTab, label: 'Video' }] : []),
+    ...(readingBeats.length ? [{ id: 'readings' as HubTab, label: 'Readings' }] : []),
+    ...(practiceCount ? [{ id: 'complete' as HubTab, label: 'Activities' }] : []),
+  ];
+  // Where the course sits: this module, the next module, and completion state.
+  const orderedMods = (courseModules ?? []).slice().sort((a, b) => a.order - b.order);
+  const curModIdx = orderedMods.findIndex((m) => m.id === moduleId);
+  const nextMod = curModIdx >= 0 ? orderedMods[curModIdx + 1] : undefined;
+  const progByMod = new Map((courseProg?.modules ?? []).map((m) => [m.moduleId, m] as const));
+  // A module counts as "done" when its content is complete OR mastery was demonstrated.
+  const modDone = (id: string) => { const p = progByMod.get(id); return !!(p?.complete || p?.certified); };
+  const moduleComplete = modDone(moduleId);
+  const allModulesComplete = orderedMods.length > 0 && orderedMods.every((m) => modDone(m.id));
+
+  // The single forward action for the Continue bar when the module isn't complete yet.
+  const flowIdx = flow.findIndex((f) => f.id === tab);
+  let continueLabel = 'Demonstrate mastery';
+  let continueAction: () => void = () => startSession.mutate();
+  let continueIsMastery = true;
+  if (flow.length > 0 && flowIdx < 0) {
+    continueIsMastery = false;
+    continueLabel = `Start: ${flow[0].label}`;
+    continueAction = () => setTab(flow[0].id);
+  } else if (flowIdx >= 0 && flowIdx < flow.length - 1) {
+    continueIsMastery = false;
+    const nxt = flow[flowIdx + 1];
+    continueLabel = `Next: ${nxt.label}`;
+    continueAction = () => setTab(nxt.id);
+  }
 
   if (isLoading) {
     return (
@@ -1728,6 +1767,64 @@ function ModuleHubView({
         )}
 
       </div>
+
+      {/* Continue bar: a clear forward path -- through the module's learning experiences,
+          then on to the next module, and finally a course-completion celebration. */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-12">
+        {allModulesComplete ? (
+          <div className="rounded-2xl border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-8 text-center">
+            <div className="h-14 w-14 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+              <Trophy className="h-7 w-7" />
+            </div>
+            <p className="font-serif font-bold text-xl text-emerald-800 dark:text-emerald-300">Course complete. Congratulations!</p>
+            <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto">
+              You've worked through every module in {course?.title ?? 'this course'}. Your credentials are on your Credentials page.
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center mt-5">
+              <Button onClick={() => navigate('/credentials')}>View credentials</Button>
+              <Button variant="outline" onClick={() => navigate(`/courses/${courseId}`)}>Back to course</Button>
+            </div>
+          </div>
+        ) : moduleComplete ? (
+          <div className="rounded-2xl border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <span className="h-10 w-10 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle className="h-6 w-6" />
+            </span>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold">Module complete</p>
+              <p className="text-sm text-muted-foreground">{nextMod ? `Up next: ${nextMod.title}` : 'That was the final module in this course.'}</p>
+            </div>
+            {nextMod ? (
+              <Button className="shrink-0" onClick={() => navigate(`/courses/${courseId}/modules/${nextMod.id}`)}>
+                Next module <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button variant="outline" className="shrink-0" onClick={() => navigate(`/courses/${courseId}`)}>Back to course</Button>
+            )}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">Keep going</p>
+              <p className="text-sm text-muted-foreground">
+                {continueIsMastery
+                  ? "You've been through the material. Demonstrate mastery to complete this module."
+                  : 'Work through each learning experience in order.'}
+              </p>
+            </div>
+            <Button
+              className="shrink-0"
+              disabled={continueIsMastery && (allBeats.length === 0 || startSession.isPending)}
+              onClick={continueAction}
+            >
+              {continueIsMastery && <GraduationCap className="h-4 w-4 mr-2" />}
+              {continueLabel}
+              {!continueIsMastery && <ChevronRight className="h-4 w-4 ml-1" />}
+            </Button>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
