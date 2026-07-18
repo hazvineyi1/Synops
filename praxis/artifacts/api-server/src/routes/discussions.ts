@@ -137,13 +137,26 @@ router.patch("/discussions/:discussionId", requireAuth, async (req, res) => {
   const isAuthor = discussion.authorId === actor.id;
   if (!isStaff && !isAuthor) { res.status(403).json({ error: "Forbidden" }); return; }
 
-  const { title, body, isPinned, isClosed } = req.body;
+  const {
+    title, body, isPinned, isClosed, aiFacilitated, moduleId,
+    minInitialWords, maxInitialWords, minReplyWords, requiredInteractions,
+  } = req.body;
   const updates: Partial<typeof discussionsTable.$inferInsert> = { updatedAt: new Date() };
   if (title !== undefined) updates.title = title;
   if (body !== undefined) updates.body = body;
   if (isStaff) {
     if (isPinned !== undefined) updates.isPinned = isPinned;
     if (isClosed !== undefined) updates.isClosed = isClosed;
+    // Facilitation, module scope and the participation bar are staff decisions. Being
+    // settable AFTER creation matters: every thread that existed before AI facilitation
+    // shipped has it switched off, and every thread predates module scoping entirely, so
+    // without this they could only be changed by editing the database by hand.
+    if (aiFacilitated !== undefined) updates.aiFacilitated = !!aiFacilitated;
+    if (moduleId !== undefined) updates.moduleId = moduleId || null;
+    if (minInitialWords !== undefined) updates.minInitialWords = minInitialWords;
+    if (maxInitialWords !== undefined) updates.maxInitialWords = maxInitialWords;
+    if (minReplyWords !== undefined) updates.minReplyWords = minReplyWords;
+    if (requiredInteractions !== undefined) updates.requiredInteractions = requiredInteractions;
   }
   const [updated] = await db.update(discussionsTable)
     .set(updates)
@@ -279,6 +292,29 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
   }
 
   res.status(201).json({ ...reply, author: toUserSnap(user), facilitator });
+});
+
+/**
+ * DELETE /discussions/:discussionId — staff only.
+ *
+ * There was no way to remove a discussion at all, so a thread created in error was
+ * permanent. Deletes the replies first because nothing enforces the foreign key, and
+ * orphaned discussion_replies rows would otherwise accumulate invisibly.
+ *
+ * Staff-only rather than author-also: deleting a thread destroys other people's
+ * contributions, which is a moderation decision, not an authorship one.
+ */
+router.delete("/discussions/:discussionId", requireAuth, async (req, res) => {
+  const discussion = await db.query.discussionsTable.findFirst({
+    where: eq(discussionsTable.id, req.params.discussionId),
+  });
+  if (!discussion) { res.status(204).send(); return; }
+  if (!(await canStaffActOnCourse(req.dbUser!, discussion.courseId))) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  await db.delete(discussionRepliesTable).where(eq(discussionRepliesTable.discussionId, req.params.discussionId));
+  await db.delete(discussionsTable).where(eq(discussionsTable.id, req.params.discussionId));
+  res.status(204).send();
 });
 
 /**

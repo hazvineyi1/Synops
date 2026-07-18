@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ChevronRight, MessageSquare, Sparkles, Languages, CheckCircle } from 'lucide-react';
+import { ChevronRight, MessageSquare, Sparkles, Languages, CheckCircle, Settings } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +32,8 @@ const LANGS: { code: string; label: string }[] = [
 
 export function DiscussionThread() {
   const { courseId, discussionId } = useParams<{ courseId: string; discussionId: string }>();
+  // useLocation was imported but never destructured here; navigate is needed after a delete.
+  const [, navigate] = useLocation();
   const [replyText, setReplyText] = useState('');
   const [lang, setLang] = useState('en');
   const [viewLang, setViewLang] = useState<string | null>(null);
@@ -67,6 +69,27 @@ export function DiscussionThread() {
     },
     // The server owns the rule; surface its message rather than inventing our own.
     onError: (e) => setError(e instanceof Error ? e.message : 'Could not post that reply.'),
+  });
+
+  const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(user?.role ?? '');
+
+  // Module list for the scope picker. Only fetched for staff, who are the only people who
+  // can change it.
+  const { data: modules } = useQuery({
+    queryKey: ['modules', courseId],
+    queryFn: () => apiFetch<{ id: string; title: string; order: number }[]>(`/courses/${courseId}/modules`),
+    enabled: isInstructor && !!courseId,
+  });
+
+  const patch = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      apiFetch(`/discussions/${discussionId}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['discussion', discussionId] }),
+  });
+
+  const remove = useMutation({
+    mutationFn: () => apiFetch(`/discussions/${discussionId}`, { method: 'DELETE' }),
+    onSuccess: () => navigate(`/courses/${courseId}?tab=discussions`),
   });
 
   if (isLoading) return <div className="space-y-4"><Skeleton className="h-32" /><Skeleton className="h-24" /></div>;
@@ -118,6 +141,59 @@ export function DiscussionThread() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Instructor controls. Facilitation and module scope are set here rather than only
+          at creation, because every thread that predates those features has facilitation
+          off and no module, and there was otherwise no way to change either. */}
+      {isInstructor && (
+        <div className="rounded-xl border border-dashed border-primary/30 bg-primary/[0.03] px-4 py-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">Discussion settings</span>
+            <Badge variant="outline" className="text-[10px]">Instructor</Badge>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={!!discussion.aiFacilitated}
+                disabled={patch.isPending}
+                onChange={(e) => patch.mutate({ aiFacilitated: e.target.checked })}
+              />
+              <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+              AI facilitation
+            </label>
+
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Shown in</span>
+              <Select
+                value={discussion.moduleId ?? 'course'}
+                onValueChange={(v) => patch.mutate({ moduleId: v === 'course' ? null : v })}
+              >
+                <SelectTrigger className="h-8 w-[220px] text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="course">Whole course</SelectItem>
+                  {(modules ?? []).slice().sort((a, b) => a.order - b.order).map((m) => (
+                    <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <button
+              onClick={() => { if (confirm('Delete this discussion and every reply in it? This cannot be undone.')) remove.mutate(); }}
+              disabled={remove.isPending}
+              className="ml-auto text-xs text-rose-600 hover:underline"
+            >
+              {remove.isPending ? 'Deleting...' : 'Delete discussion'}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Learners must write {discussion.myParticipation?.minInitialWords ?? 100}-{discussion.myParticipation?.maxInitialWords ?? 150} words
+            to open, then {discussion.myParticipation?.minReplyWords ?? 50}+ per reply, for {discussion.myParticipation?.required ?? 5} contributions.
+          </p>
+        </div>
+      )}
 
       {/* Participation progress + translation. The learner should always know how many
           contributions are expected and how many they have made, without counting by hand. */}

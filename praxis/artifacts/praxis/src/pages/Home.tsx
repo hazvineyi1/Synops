@@ -15,7 +15,10 @@ export function Home() {
           <div className="flex items-center gap-4">
             <Link href="/dev-login" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Try Demo</Link>
             <Link href="/sign-in" className="text-sm font-medium hover:text-primary transition-colors">Sign In</Link>
-            <Link href="/sign-up">
+            {/* /sign-up is not a route -- this fell through to NotFound. Praxis is not
+                self-serve; access is requested and provisioned, which is what
+                /request-access does. */}
+            <Link href="/request-access">
               <Button>Get Started</Button>
             </Link>
           </div>
@@ -36,7 +39,7 @@ export function Home() {
               Equip your organization with the reasoning skills required for mastery. A platform built for South African enterprise skills development.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <Link href="/sign-up">
+              <Link href="/request-access">
                 <Button size="lg" className="w-full sm:w-auto text-base h-12 px-8">
                   Partner With Us
                   <ChevronRight className="ml-2 h-4 w-4" />
