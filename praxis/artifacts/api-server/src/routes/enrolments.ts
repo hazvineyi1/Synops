@@ -64,6 +64,36 @@ router.post("/courses/:courseId/enrol", requireAuth, async (req, res) => {
 
 // POST /courses/:courseId/roster — admin enrols a user
 /**
+ * GET /courses/:courseId/enrolment-candidates — who could be enrolled on this course.
+ *
+ * Derived from the COURSE's organisation, not the caller's. Sourcing candidates from the
+ * caller's own org is wrong twice over: a super admin has no organisationId and so would
+ * see nobody, and an org admin browsing another tenant's course would be offered the wrong
+ * people. Already-enrolled users are filtered out server-side.
+ *
+ * Staff only, and it returns names without emails -- picking someone to enrol does not
+ * require their personal contact details (POPIA).
+ */
+router.get("/courses/:courseId/enrolment-candidates", requireAuth, async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Forbidden" }); return;
+  }
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, req.params.courseId) });
+  if (!course) { res.status(404).json({ error: "Course not found" }); return; }
+
+  const [members, enrolled] = await Promise.all([
+    db.select().from(usersTable).where(eq(usersTable.organisationId, course.tenantId)),
+    db.select({ userId: enrolmentsTable.userId }).from(enrolmentsTable)
+      .where(eq(enrolmentsTable.courseId, req.params.courseId)),
+  ]);
+  const taken = new Set(enrolled.map((e) => e.userId));
+
+  res.json(members
+    .filter((u) => !taken.has(u.id))
+    .map((u) => ({ id: u.id, firstName: u.firstName, lastName: u.lastName, role: u.role })));
+});
+
+/**
  * POST /courses/:courseId/roster — enrol a learner.
  *
  * STAFF ONLY. This previously had no authorisation check beyond being logged in, which

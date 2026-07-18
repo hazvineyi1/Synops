@@ -135,23 +135,27 @@ function NewPage({ courseId }: { courseId: string }) {
  * Picks from org members rather than accepting a raw id, and hides anyone already on the
  * roster so the obvious mistake (enrolling the same person twice) cannot be made from here.
  */
-function AddLearner({ courseId, orgId, enrolledIds }: { courseId: string; orgId?: string | null; enrolledIds: Set<string> }) {
+function AddLearner({ courseId }: { courseId: string }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const { data: members } = useQuery({
-    queryKey: ['org-members', orgId],
-    queryFn: () => apiFetch<{ id: string; firstName?: string; lastName?: string; role?: string }[]>(`/organisations/${orgId}/members`),
-    enabled: open && !!orgId,
+  // Candidates come from the COURSE's organisation, resolved server-side, with the
+  // already-enrolled filtered out there too.
+  const { data: candidates, isLoading } = useQuery({
+    queryKey: ['enrolment-candidates', courseId],
+    queryFn: () => apiFetch<{ id: string; firstName?: string; lastName?: string; role?: string }[]>(`/courses/${courseId}/enrolment-candidates`),
+    enabled: open,
   });
-  const candidates = (members ?? []).filter((u) => !enrolledIds.has(u.id));
 
   const m = useMutation({
     mutationFn: () => apiFetch(`/courses/${courseId}/roster`, { method: 'POST', body: JSON.stringify({ userId, role: 'student' }) }),
     onSuccess: () => { setOpen(false); setError(null); setUserId('');
-      qc.invalidateQueries({ queryKey: ['roster', courseId] }); },
+      qc.invalidateQueries({ queryKey: ['roster', courseId] });
+      // Also refresh the candidate list, or enrolling two people in a row would still
+      // offer the first one on the second attempt.
+      qc.invalidateQueries({ queryKey: ['enrolment-candidates', courseId] }); },
     onError: (e) => setError(e instanceof Error ? e.message : 'Could not enrol that learner.'),
   });
 
@@ -160,19 +164,17 @@ function AddLearner({ courseId, orgId, enrolledIds }: { courseId: string; orgId?
       onOpen={() => setOpen(true)} onCancel={() => { setOpen(false); setError(null); }}
       onSubmit={() => m.mutate()} submitLabel="Enrol learner" busy={m.isPending}
       disabled={!userId} error={error}>
-      {!orgId ? (
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading members...</p>
+      ) : (candidates ?? []).length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          Your account is not attached to an organisation, so there is no member list to choose from.
-        </p>
-      ) : candidates.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {members ? 'Everyone in your organisation is already enrolled on this course.' : 'Loading members...'}
+          Everyone in this course's organisation is already enrolled.
         </p>
       ) : (
         <Select value={userId} onValueChange={setUserId}>
           <SelectTrigger className="text-sm"><SelectValue placeholder="Choose someone to enrol" /></SelectTrigger>
           <SelectContent>
-            {candidates.map((u) => (
+            {(candidates ?? []).map((u) => (
               <SelectItem key={u.id} value={u.id}>
                 {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.id}{u.role ? ` — ${u.role}` : ''}
               </SelectItem>
@@ -1285,13 +1287,7 @@ export function CourseDetail() {
             {roster && (
               <>
                 <div className="text-sm text-muted-foreground mb-2">{roster.length} enrolled</div>
-                {isInstructor && (
-                  <AddLearner
-                    courseId={courseId}
-                    orgId={(user as { organisationId?: string | null } | undefined)?.organisationId}
-                    enrolledIds={new Set(roster.map((r) => r.user?.id).filter(Boolean) as string[])}
-                  />
-                )}
+                {isInstructor && <AddLearner courseId={courseId} />}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
