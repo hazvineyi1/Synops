@@ -204,7 +204,30 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
   const startCatchUp = (it: PlanItem) => (aiCoachUrl ? openAiCoach() : launchItem(it));
 
   const courses = prog?.courses ?? [];
-  const inProgress = courses.filter((c) => c.status !== "completed").sort((a, b) => b.percent - a.percent);
+
+  /**
+   * Every enrolled course, labelled, rather than only the unfinished ones.
+   *
+   * Hiding finished courses meant a learner who had completed everything saw "No courses in
+   * progress / Browse courses" and no trace of the work they had actually done -- which
+   * reads as though their record had been lost. Order puts what needs doing first:
+   * in progress, then not started, then completed.
+   */
+  const courseState = (c: { status?: string; percent: number }): 'in_progress' | 'not_started' | 'completed' | 'withdrawn' => {
+    if (c.status === 'withdrawn') return 'withdrawn';
+    if (c.status === 'completed' || c.percent >= 100) return 'completed';
+    return c.percent > 0 ? 'in_progress' : 'not_started';
+  };
+  const STATE_META: Record<string, { label: string; cls: string; rank: number }> = {
+    in_progress: { label: 'In progress', cls: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30', rank: 0 },
+    not_started: { label: 'Not started', cls: 'bg-muted text-muted-foreground border-border', rank: 1 },
+    completed:   { label: 'Completed',   cls: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30', rank: 2 },
+    withdrawn:   { label: 'Withdrawn',   cls: 'bg-muted text-muted-foreground border-border', rank: 3 },
+  };
+  const myCourses = courses
+    .map((c) => ({ ...c, state: courseState(c) }))
+    .sort((a, b) => STATE_META[a.state].rank - STATE_META[b.state].rank || b.percent - a.percent);
+  const inProgress = myCourses.filter((c) => c.state === 'in_progress');
   const upcoming = (dueSoon ?? [])
     .filter((e) => new Date(e.startDate).getTime() >= Date.now() - 86400000)
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
@@ -270,7 +293,10 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         ) : (
           <>
             <StatCard icon={Flame} label={prog?.streak ? "Day streak" : "Start a streak today"} value={prog?.streak ?? 0} tint="bg-amber-500/10 text-amber-600" />
-            <StatCard icon={BookOpen} label="Courses in progress" value={prog?.coursesInProgress ?? 0} tint="bg-indigo-500/10 text-indigo-600" />
+            {/* Counted from the same list the cards below render, so the number and the list
+                can never disagree. The server's coursesInProgress uses a percent-only rule
+                and drifts from the enrolment status shown on each card. */}
+            <StatCard icon={BookOpen} label="Courses in progress" value={inProgress.length} tint="bg-indigo-500/10 text-indigo-600" />
             <StatCard icon={Award} label="Credentials earned" value={credentials?.length ?? 0} tint="bg-emerald-500/10 text-emerald-600" />
             <StatCard icon={Clock} label="Learning time" value={formatHours(prog?.totalMinutes ?? 0)} tint="bg-sky-500/10 text-sky-600" />
           </>
@@ -296,16 +322,16 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
               <div className="grid sm:grid-cols-2 gap-4">
                 {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-xl" />)}
               </div>
-            ) : inProgress.length === 0 ? (
+            ) : myCourses.length === 0 ? (
               <Card className="p-8 text-center">
                 <GraduationCap className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                <p className="font-medium">No courses in progress</p>
+                <p className="font-medium">You aren't enrolled on any courses yet</p>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">Browse your catalog and start learning.</p>
                 <Button onClick={() => navigate("/courses")}>Browse courses</Button>
               </Card>
             ) : (
               <div className="grid sm:grid-cols-2 gap-4">
-                {inProgress.slice(0, 4).map((c) => {
+                {myCourses.slice(0, 4).map((c) => {
                   const a = courseAccent(c.courseId);
                   return (
                     <Card
@@ -321,6 +347,10 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                           <h3 className="font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                             {c.title}
                           </h3>
+                          <span className={cn('mt-1.5 inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                            STATE_META[c.state].cls)}>
+                            {STATE_META[c.state].label}
+                          </span>
                         </div>
                       </div>
 
@@ -333,7 +363,8 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                           <div className={cn("h-full rounded-full transition-all", a.bar)} style={{ width: `${c.percent}%` }} />
                         </div>
                         <div className={cn("mt-4 inline-flex items-center gap-1 text-sm font-medium", a.text)}>
-                          Continue <ArrowRight className="h-4 w-4" />
+                          {c.state === 'completed' ? 'Review' : c.state === 'not_started' ? 'Start' : 'Continue'}
+                          <ArrowRight className="h-4 w-4" />
                         </div>
                       </div>
                     </Card>

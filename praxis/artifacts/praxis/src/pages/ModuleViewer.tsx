@@ -2280,31 +2280,65 @@ function ModuleHubView({
         {/* STRUCTURE */}
         {tab === 'structure' && (
           <div className="space-y-8">
+            {/* This is the MODULE's structure, not the course's. Inside a module the learner
+                needs to know how THIS module is put together and in what order to work
+                through it; the course-wide module list belongs on the course page, and
+                repeating it here just answered a question nobody was asking. */}
             <div>
-              <SectionHead title="Course structure" sub="Where this module sits, and how to move through the course." />
+              <SectionHead title="How this module is built"
+                sub={`What is inside, in the order you should work through it. About ${mod?.estimatedMinutes ?? 0} minutes in total.`} />
               <div className="space-y-1.5">
-                {(courseModules ?? []).slice().sort((a, b) => a.order - b.order).map((m, i) => {
-                  const isCurrent = m.id === moduleId;
+                {DELIVERABLES.filter((d) => tabState[d.id].has).map((d, i) => {
+                  const meta = TABS.find((t) => t.id === d.id);
+                  const st = tabState[d.id];
                   return (
-                    <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
-                      className={cn('w-full flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors',
-                        isCurrent ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted/40')}>
-                      <span className={cn('h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0',
-                        isCurrent ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+                    <button key={d.id} onClick={() => setTab(d.id)}
+                      className="w-full flex items-center gap-3 rounded-xl border border-border p-3.5 text-left hover:bg-muted/40 transition-colors">
+                      <span className="h-7 w-7 rounded-lg bg-muted text-muted-foreground flex items-center justify-center text-xs font-bold shrink-0">
                         {String(i + 1).padStart(2, '0')}
                       </span>
-                      <span className="flex-1 text-sm font-medium truncate">{m.title}</span>
-                      {isCurrent
-                        ? <Badge variant="outline" className="text-[10px] shrink-0">You are here</Badge>
+                      {meta && <meta.icon className="h-4 w-4 text-muted-foreground shrink-0" />}
+                      <span className="flex-1 text-sm font-medium truncate">{d.label}</span>
+                      {typeof meta?.count === 'number' && meta.count > 0 && (
+                        <span className="text-xs text-muted-foreground tabular-nums shrink-0">{meta.count}</span>
+                      )}
+                      {st.done
+                        ? <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
                         : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
                     </button>
                   );
                 })}
-                {(!courseModules || courseModules.length === 0) && (
-                  <EmptyState icon={List} title="No module list available yet" />
+                {flow.length === 0 && (
+                  <EmptyState icon={List} title="Nothing has been added to this module yet" />
                 )}
               </div>
+              {/* Mastery closes the module, so it belongs at the end of its structure too. */}
+              <div className="mt-1.5 flex items-center gap-3 rounded-xl border border-dashed border-border p-3.5">
+                <span className="h-7 w-7 rounded-lg bg-muted text-muted-foreground flex items-center justify-center shrink-0">
+                  <GraduationCap className="h-4 w-4" />
+                </span>
+                <span className="flex-1 text-sm font-medium">Demonstrate mastery</span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {masteryUnlocked ? 'Available now' : 'After the above'}
+                </span>
+              </div>
             </div>
+
+            {/* Where the module sits in the course -- kept, but reduced to one line rather
+                than a duplicate of the course page's module list. */}
+            {courseModules && courseModules.length > 0 && (
+              <div>
+                <SectionHead title="Where this sits" />
+                <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+                  Module {curModIdx >= 0 ? curModIdx + 1 : '?'} of {orderedMods.length} in {course?.title ?? courseFull?.title}.
+                  {nextMod ? <> Up next: <span className="text-foreground font-medium">{nextMod.title}</span>.</> : <> This is the final module.</>}
+                  {' '}
+                  <button onClick={() => navigate(`/courses/${courseId}`)} className="text-primary hover:underline">
+                    See the full course outline
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div>
               <SectionHead title="What's expected of you" sub="Participation, integrity, and support for this course." />
