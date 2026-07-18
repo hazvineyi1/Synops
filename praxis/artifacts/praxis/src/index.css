@@ -196,3 +196,42 @@
     pointer-events: none;
   }
 }
+
+/*
+  Print rules for the Funder Evidence Report.
+
+  The report's "Print / Save PDF" button calls window.print(). Without these rules that
+  prints the entire application -- sidebar, top nav, the button itself -- around the report,
+  which is not something you would send a funder. Everything outside .printable-area is
+  hidden, and the report itself is flattened: shadows and rounded corners are screen
+  affordances that only waste toner, and print-color-adjust keeps the brand colour on the
+  headings rather than letting the browser drop backgrounds silently.
+*/
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area,
+  .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
+  /* Keep coloured headings and progress bars legible instead of being stripped. */
+  .printable-area * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  @page {
+    margin: 18mm;
+  }
+}

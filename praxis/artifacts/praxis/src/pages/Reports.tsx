@@ -26,8 +26,16 @@ export function Reports() {
           <h1 className="text-4xl font-serif font-bold tracking-tight">Funder Evidence Report</h1>
           <p className="text-muted-foreground">Generated {new Date(report.generatedAt).toLocaleDateString()}</p>
         </div>
-        <Button variant="outline">
-          <Download className="h-4 w-4 mr-2" /> Download PDF
+        {/*
+          This button had no onClick at all -- a funder-facing export that did nothing.
+          There is no PDF-rendering backend for this report, and inventing one to serve a
+          page the browser can already print would be the expensive way round: window.print()
+          against the existing .printable-area gives a real, saveable PDF through the browser's
+          own "Save as PDF", with the live data and no server round trip.
+          Labelled "Print / Save PDF" because that is honestly what happens.
+        */}
+        <Button variant="outline" onClick={() => window.print()}>
+          <Download className="h-4 w-4 mr-2" /> Print / Save PDF
         </Button>
       </div>
 

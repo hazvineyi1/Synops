@@ -8,8 +8,108 @@ import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canGradeInCourse, canStaffActOnCourse } from "../lib/scope";
 import { onGradeEvent } from "../lib/gradebookAlerts";
+import { extractFromBuffer } from "../lib/extractText";
+import { generateAssignmentGrade } from "../lib/assignmentEngine";
+import type { AssignmentCriterionScore } from "@workspace/db";
 
 const router = Router();
+
+/**
+ * Everything that happens when a submission actually becomes graded.
+ *
+ * Extracted because there are now two ways in -- a facilitator marking by hand, and a
+ * facilitator confirming an AI draft -- and they must be identical. Grading is not a single
+ * write: it sets the submission, mirrors the score into the gradebook, notifies the learner,
+ * and fires onGradeEvent (off-track recompute, auto study plan, staff alerts). A second copy
+ * of this that forgot one step would produce grades that silently behave differently from
+ * the others.
+ */
+async function applyGrade(opts: {
+  submissionId: string;
+  assignmentId: string;
+  learnerId: string;
+  courseId: string;
+  graderId: string;
+  score: number | null;
+  letterGrade?: string | null;
+  feedback?: string | null;
+  rubricAssessment?: AssignmentCriterionScore[] | null;
+}) {
+  const [updated] = await db.update(assignmentSubmissionsTable)
+    .set({
+      score: opts.score === null ? null : String(opts.score),
+      letterGrade: opts.letterGrade ?? null,
+      feedback: opts.feedback ?? null,
+      rubricAssessment: opts.rubricAssessment ?? null,
+      gradedBy: opts.graderId,
+      gradedAt: new Date(),
+      status: "graded",
+      updatedAt: new Date(),
+    })
+    .where(eq(assignmentSubmissionsTable.id, opts.submissionId))
+    .returning();
+
+  await db.update(gradebookEntriesTable)
+    .set({
+      score: opts.score === null ? null : String(opts.score),
+      letterGrade: opts.letterGrade ?? null,
+      missing: false,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(gradebookEntriesTable.assignmentId, opts.assignmentId),
+      eq(gradebookEntriesTable.userId, opts.learnerId),
+    ));
+
+  await db.insert(notificationsTable).values({
+    userId: opts.learnerId,
+    type: "assignment_graded",
+    title: "Your assignment has been graded",
+    body: `Score: ${opts.score ?? "--"} — ${opts.feedback?.slice(0, 80) ?? "View feedback in gradebook"}`,
+    link: `/assignments/${opts.assignmentId}`,
+    courseId: opts.courseId,
+    actorId: opts.graderId,
+  });
+
+  // Refresh the learner's unified-gradebook off-track state (+ auto plan / alerts).
+  void onGradeEvent({ sourceType: "assignment", sourceId: opts.assignmentId, courseId: opts.courseId, userId: opts.learnerId });
+
+  return updated;
+}
+
+/**
+ * Draft an AI assessment for a submission, after the submission itself is safely stored.
+ *
+ * Best-effort and deliberately fire-and-forget: a slow or failed model call must never cost
+ * a learner their submission. Writes only to the ai_* columns -- see the schema comment for
+ * why this is not allowed to become a grade on its own.
+ */
+async function draftAiAssessment(submissionId: string, assignment: typeof assignmentsTable.$inferSelect, text: string) {
+  try {
+    const rubric = assignment.rubricId
+      ? await db.query.rubricsTable.findFirst({ where: eq(rubricsTable.id, assignment.rubricId) })
+      : null;
+    const draft = await generateAssignmentGrade({
+      title: assignment.title,
+      instructions: assignment.instructions ?? assignment.description,
+      pointsPossible: Number(assignment.pointsPossible),
+      criteria: rubric?.criteria ?? [],
+      submissionText: text,
+    });
+    if (!draft.ok) return;
+    await db.update(assignmentSubmissionsTable)
+      .set({
+        aiScore: draft.score === null ? null : String(draft.score),
+        aiFeedback: draft.feedback,
+        aiRubricAssessment: draft.rubricScores,
+        aiGradedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(assignmentSubmissionsTable.id, submissionId));
+  } catch {
+    // Swallowed on purpose: the submission is already saved and valid without this.
+  }
+}
 
 function toAssignmentResponse(a: typeof assignmentsTable.$inferSelect) {
   return {
@@ -98,11 +198,50 @@ router.delete("/assignments/:assignmentId", requireAuth, async (req, res) => {
   res.status(204).send();
 });
 
-// POST /assignments/:assignmentId/submit
+/**
+ * POST /assignments/:assignmentId/submit
+ *
+ * Accepts typed text, a link, and/or an uploaded document. There is no object storage in
+ * this stack, so an upload is parsed to text at submit time and only the text is kept --
+ * the same approach module readings take. parsedText stays separate from body so what the
+ * learner typed remains distinguishable from what their document contained.
+ *
+ * After the submission is safely stored, an AI assessment is drafted (see assignmentEngine).
+ * It is written to the ai_* columns only and is NOT a grade: the learner gets fast, specific
+ * feedback, and staff confirm before anything reaches the gradebook.
+ */
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024; // express.json caps at 25mb; base64 inflates ~33%
+const ALLOWED_EXT = ["pdf", "docx", "txt", "md", "markdown", "rtf", "html", "htm", "odt", "pptx"];
+const extOf = (name: string) => (name.split(".").pop() ?? "").toLowerCase();
+
 router.post("/assignments/:assignmentId/submit", requireAuth, async (req, res) => {
-  const { body: submissionBody, url, fileUrls } = req.body;
+  const { body: submissionBody, url, fileUrls, filename, dataBase64 } = req.body;
   const assignment = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, req.params.assignmentId) });
   if (!assignment) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Parse an uploaded document to text before anything is written, so a bad file fails the
+  // submission outright rather than half-saving it.
+  let parsedText: string | null = null;
+  let sourceFilename: string | null = null;
+  if (dataBase64 && filename) {
+    const ext = extOf(filename);
+    if (!ALLOWED_EXT.includes(ext)) {
+      res.status(400).json({ error: `Unsupported file type ".${ext}". Try PDF, Word, or a text file.` });
+      return;
+    }
+    const buf = Buffer.from(dataBase64, "base64");
+    if (buf.length > MAX_UPLOAD_BYTES) {
+      res.status(400).json({ error: "That file is too large (15MB maximum)." });
+      return;
+    }
+    try {
+      parsedText = await extractFromBuffer(filename, buf);
+      sourceFilename = filename;
+    } catch (err) {
+      res.status(422).json({ error: err instanceof Error ? err.message : "Could not read that file." });
+      return;
+    }
+  }
 
   const isLate = assignment.dueDate && new Date() > assignment.dueDate;
 
@@ -113,13 +252,23 @@ router.post("/assignments/:assignmentId/submit", requireAuth, async (req, res) =
   let submission;
   if (existing) {
     [submission] = await db.update(assignmentSubmissionsTable)
-      .set({ body: submissionBody, url, fileUrls: fileUrls ?? [], status: isLate ? "late" : "submitted", submittedAt: new Date(), updatedAt: new Date() })
+      .set({
+        body: submissionBody, url, fileUrls: fileUrls ?? [],
+        // A resubmission without a file must not keep the previous file's text, or the
+        // learner would be assessed on work they just replaced.
+        parsedText, sourceFilename,
+        // Any prior AI draft describes the old submission. Clear it rather than leave stale
+        // feedback attached to new work.
+        aiScore: null, aiFeedback: null, aiRubricAssessment: null, aiGradedAt: null,
+        status: isLate ? "late" : "submitted", submittedAt: new Date(), updatedAt: new Date(),
+      })
       .where(eq(assignmentSubmissionsTable.id, existing.id))
       .returning();
   } else {
     [submission] = await db.insert(assignmentSubmissionsTable).values({
       assignmentId: req.params.assignmentId, userId: req.userId!,
       body: submissionBody, url, fileUrls: fileUrls ?? [],
+      parsedText, sourceFilename,
       status: isLate ? "late" : "submitted", submittedAt: new Date(),
     }).returning();
     // Update gradebook — mark as submitted
@@ -127,7 +276,12 @@ router.post("/assignments/:assignmentId/submit", requireAuth, async (req, res) =
       .set({ missing: false, late: isLate ?? false })
       .where(and(eq(gradebookEntriesTable.assignmentId, req.params.assignmentId), eq(gradebookEntriesTable.userId, req.userId!)));
   }
+
+  // Respond first: the learner's work is saved and nothing below should delay confirming that.
   res.status(201).json(submission);
+
+  const assessable = [parsedText, submissionBody].filter(Boolean).join("\n\n").trim();
+  if (assessable) void draftAiAssessment(submission.id, assignment, assessable);
 });
 
 // GET /assignments/:assignmentId/my-submission
@@ -178,30 +332,58 @@ router.patch("/assignment-submissions/:submissionId/grade", requireAuth, async (
   }
 
   const { score, letterGrade, feedback, rubricAssessment } = req.body;
-  const [updated] = await db.update(assignmentSubmissionsTable)
-    .set({ score, letterGrade, feedback, rubricAssessment, gradedBy: req.userId, gradedAt: new Date(), status: "graded", updatedAt: new Date() })
-    .where(eq(assignmentSubmissionsTable.id, req.params.submissionId))
-    .returning();
-
-  // Update gradebook
-  await db.update(gradebookEntriesTable)
-    .set({ score, letterGrade, missing: false, updatedAt: new Date() })
-    .where(and(eq(gradebookEntriesTable.assignmentId, updated.assignmentId), eq(gradebookEntriesTable.userId, updated.userId)));
-
-  // Notify learner
-  await db.insert(notificationsTable).values({
-    userId: updated.userId,
-    type: "assignment_graded",
-    title: "Your assignment has been graded",
-    body: `Score: ${score} — ${feedback?.slice(0, 80) ?? "View feedback in gradebook"}`,
-    link: `/assignments/${updated.assignmentId}`,
+  const updated = await applyGrade({
+    submissionId: submission.id,
+    assignmentId: submission.assignmentId,
+    learnerId: submission.userId,
     courseId: assignment.courseId,
-    actorId: req.userId,
+    graderId: req.userId!,
+    score: score === null || score === undefined || score === "" ? null : Number(score),
+    letterGrade, feedback, rubricAssessment,
   });
+  res.json(updated);
+});
 
-  // Refresh the learner's unified-gradebook off-track state (+ auto plan / alerts).
-  void onGradeEvent({ sourceType: "assignment", sourceId: updated.assignmentId, courseId: assignment.courseId, userId: updated.userId });
+/**
+ * POST /assignment-submissions/:submissionId/confirm-ai-grade
+ *
+ * The moment a draft becomes a grade. Staff-gated by exactly the same check as marking by
+ * hand, and it records the CONFIRMING STAFF MEMBER as gradedBy -- not the model. Whoever
+ * clicks this owns the mark, which is the entire reason a confirmation step exists.
+ *
+ * The body may override score and feedback, so confirming with an edit is one action rather
+ * than a confirm followed by a correction the learner would see twice.
+ */
+router.post("/assignment-submissions/:submissionId/confirm-ai-grade", requireAuth, async (req, res) => {
+  const submission = await db.query.assignmentSubmissionsTable.findFirst({
+    where: eq(assignmentSubmissionsTable.id, req.params.submissionId),
+  });
+  if (!submission) { res.status(404).json({ error: "Submission not found" }); return; }
+  if (!submission.aiGradedAt) { res.status(409).json({ error: "There is no AI draft on this submission." }); return; }
+  const assignment = await db.query.assignmentsTable.findFirst({
+    where: eq(assignmentsTable.id, submission.assignmentId),
+  });
+  if (!assignment) { res.status(404).json({ error: "Assignment not found" }); return; }
+  if (!(await canGradeInCourse(req.dbUser!, assignment.courseId, submission.userId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
 
+  const { score: overrideScore, feedback: overrideFeedback } = req.body ?? {};
+  const score = overrideScore === undefined || overrideScore === null || overrideScore === ""
+    ? (submission.aiScore === null ? null : Number(submission.aiScore))
+    : Number(overrideScore);
+
+  const updated = await applyGrade({
+    submissionId: submission.id,
+    assignmentId: submission.assignmentId,
+    learnerId: submission.userId,
+    courseId: assignment.courseId,
+    graderId: req.userId!,
+    score,
+    feedback: overrideFeedback ?? submission.aiFeedback,
+    rubricAssessment: submission.aiRubricAssessment ?? null,
+  });
   res.json(updated);
 });
 

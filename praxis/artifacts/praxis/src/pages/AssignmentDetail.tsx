@@ -3,6 +3,7 @@ import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
+import { useGetMe } from '@workspace/api-client-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import {
   ChevronRight, CheckCircle, Clock, AlertCircle, BookOpen,
   FileText, MessageCircle, Layers, HelpCircle, X, Upload,
-  ChevronDown, ChevronUp, Star,
+  ChevronDown, ChevronUp, Star, Sparkles,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -387,12 +388,57 @@ function DiscussionForm({ value, onChange }: { value: string; onChange: (v: stri
 }
 
 // ─── File upload submission ───────────────────────────────────────────────────
-function FileUploadForm({ text, onTextChange }: { text: string; onTextChange: (v: string) => void }) {
-  const [dragging, setDragging] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const ref = useRef<HTMLInputElement>(null);
+/**
+ * This form used to be decorative: it displayed the chosen file's name and never read it,
+ * so a learner who attached a document and clicked Submit sent an empty submission and had
+ * no way to tell. It now reads the file and hands the bytes to the parent.
+ *
+ * Documents are parsed to text server-side (there is no object storage), so the accepted
+ * types are the ones we can actually read. Images are deliberately no longer advertised --
+ * promising a photo upload we cannot read was the source of the original problem.
+ */
+const ACCEPTED = '.pdf,.docx,.txt,.md,.rtf,.html,.odt,.pptx';
+const MAX_BYTES = 15 * 1024 * 1024;
 
-  const handleFile = (f: File) => setFileName(f.name);
+function FileUploadForm({ text, onTextChange, file, onFileChange }: {
+  text: string;
+  onTextChange: (v: string) => void;
+  file: { filename: string; dataBase64: string } | null;
+  onFileChange: (f: { filename: string; dataBase64: string } | null) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const fileName = file?.filename ?? null;
+
+  const handleFile = async (f: File) => {
+    setError(null);
+    const ext = (f.name.split('.').pop() ?? '').toLowerCase();
+    if (!ACCEPTED.includes(`.${ext}`)) {
+      setError(`We can't read .${ext} files. Try PDF, Word, or a text file — or type your answer below.`);
+      return;
+    }
+    if (f.size > MAX_BYTES) {
+      setError('That file is larger than 15MB. Try exporting a smaller version.');
+      return;
+    }
+    setReading(true);
+    try {
+      const buf = await f.arrayBuffer();
+      // Chunked, because String.fromCharCode(...bytes) blows the call stack on large files.
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      }
+      onFileChange({ filename: f.name, dataBase64: btoa(binary) });
+    } catch {
+      setError("We couldn't read that file. Try saving it again, or type your answer below.");
+    } finally {
+      setReading(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -406,12 +452,14 @@ function FileUploadForm({ text, onTextChange }: { text: string; onTextChange: (v
           dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30',
         )}
       >
-        <input ref={ref} type="file" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-        {fileName ? (
+        <input ref={ref} type="file" accept={ACCEPTED} className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
+        {reading ? (
+          <p className="text-sm text-muted-foreground">Reading your file…</p>
+        ) : fileName ? (
           <div className="flex items-center justify-center gap-2 text-sm">
             <FileText className="h-5 w-5 text-primary" />
             <span className="font-medium">{fileName}</span>
-            <button type="button" onClick={e => { e.stopPropagation(); setFileName(null); }} className="text-muted-foreground hover:text-foreground">
+            <button type="button" onClick={e => { e.stopPropagation(); onFileChange(null); if (ref.current) ref.current.value = ''; }} className="text-muted-foreground hover:text-foreground">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -419,10 +467,11 @@ function FileUploadForm({ text, onTextChange }: { text: string; onTextChange: (v
           <div className="text-muted-foreground">
             <Upload className="h-8 w-8 mx-auto mb-2 opacity-40" />
             <p className="text-sm font-medium">Drop your file here or click to browse</p>
-            <p className="text-xs mt-1 opacity-60">PDF, Word, images or any document</p>
+            <p className="text-xs mt-1 opacity-60">PDF, Word, or a text document · up to 15MB</p>
           </div>
         )}
       </div>
+      {error && <p className="text-xs text-red-500 text-center">{error}</p>}
       <div className="text-xs text-muted-foreground text-center">— or add written notes below —</div>
       <Textarea
         placeholder="Optional: add any written notes or context…"
@@ -434,14 +483,165 @@ function FileUploadForm({ text, onTextChange }: { text: string; onTextChange: (v
   );
 }
 
+// ─── Staff grading panel ──────────────────────────────────────────────────────
+/**
+ * Marking for staff.
+ *
+ * This existed only as a backend route: nothing in the app has ever called
+ * GET /assignments/:id/submissions or the grade endpoint, so assignments could be submitted
+ * but never marked. That is also what makes the AI draft matter here -- a facilitator opens
+ * this, reads a considered assessment of the work, adjusts it, and confirms.
+ *
+ * Confirming records the STAFF MEMBER as the grader. The draft is a starting point; the
+ * mark is theirs.
+ */
+const STAFF_ROLES = ['coach', 'org_admin', 'partner_admin', 'super_admin'];
+
+function StaffGradingPanel({ assignmentId, pointsPossible }: { assignmentId: string; pointsPossible: number }) {
+  const qc = useQueryClient();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [draftScore, setDraftScore] = useState('');
+  const [draftFeedback, setDraftFeedback] = useState('');
+
+  const { data: subs } = useQuery({
+    queryKey: ['assignment-submissions', assignmentId],
+    queryFn: () => apiFetch<any[]>(`/assignments/${assignmentId}/submissions`),
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['assignment-submissions', assignmentId] });
+    setOpenId(null);
+  };
+  const confirmAi = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/assignment-submissions/${id}/confirm-ai-grade`, {
+        method: 'POST',
+        body: JSON.stringify({ score: draftScore === '' ? undefined : Number(draftScore), feedback: draftFeedback || undefined }),
+      }),
+    onSuccess: invalidate,
+  });
+  const gradeManually = useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/assignment-submissions/${id}/grade`, {
+        method: 'PATCH',
+        body: JSON.stringify({ score: draftScore === '' ? null : Number(draftScore), feedback: draftFeedback || null }),
+      }),
+    onSuccess: invalidate,
+  });
+
+  const open = (s: any) => {
+    setOpenId(s.id);
+    // Pre-fill from the draft so confirming is one click, and editing is editing rather
+    // than retyping.
+    setDraftScore(s.score ?? s.aiScore ?? '');
+    setDraftFeedback(s.feedback ?? s.aiFeedback ?? '');
+  };
+
+  const list = subs ?? [];
+  const ungraded = list.filter(s => s.status !== 'graded');
+
+  return (
+    <Card className="mt-6">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <FileCheckIcon />
+          Submissions to mark ({ungraded.length} of {list.length})
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {list.length === 0 && <p className="text-sm text-muted-foreground">Nobody has submitted this yet.</p>}
+        {list.map(s => {
+          const name = s.user ? `${s.user.firstName ?? ''} ${s.user.lastName ?? ''}`.trim() || s.user.email : 'Learner';
+          const isOpen = openId === s.id;
+          const text = [s.body, s.parsedText].filter(Boolean).join('\n\n');
+          return (
+            <div key={s.id} className="border border-border rounded-lg">
+              <button className="w-full text-left p-3 flex items-center justify-between gap-3" onClick={() => (isOpen ? setOpenId(null) : open(s))}>
+                <div className="min-w-0">
+                  <div className="font-medium text-sm truncate">{name}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {s.status === 'graded'
+                      ? `Graded · ${s.score ?? '--'} / ${pointsPossible}`
+                      : s.aiGradedAt
+                        ? `Awaiting your mark · draft ready${s.aiScore ? ` (${s.aiScore})` : ''}`
+                        : 'Awaiting your mark'}
+                    {s.sourceFilename ? ` · ${s.sourceFilename}` : ''}
+                  </div>
+                </div>
+                {isOpen ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+              </button>
+
+              {isOpen && (
+                <div className="px-3 pb-3 space-y-3 border-t border-border pt-3">
+                  {text && (
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Submission</div>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto bg-muted/40 rounded-lg p-3">{text}</p>
+                    </div>
+                  )}
+                  {Array.isArray(s.aiRubricAssessment) && s.aiRubricAssessment.length > 0 && (
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Draft rubric</div>
+                      {s.aiRubricAssessment.map((c: any) => (
+                        <div key={c.criterion} className="text-xs mb-1">
+                          <span className="font-medium">{c.criterion}</span>
+                          <span className="text-muted-foreground"> — {c.points} / {c.maxPoints}</span>
+                          {c.note && <p className="text-muted-foreground leading-relaxed">{c.note}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number" min={0} max={pointsPossible} value={draftScore}
+                      onChange={e => setDraftScore(e.target.value)}
+                      className="h-9 w-24 rounded-md border border-input bg-background px-2 text-sm"
+                      placeholder="Score"
+                    />
+                    <span className="text-sm text-muted-foreground">/ {pointsPossible}</span>
+                  </div>
+                  <Textarea
+                    value={draftFeedback}
+                    onChange={e => setDraftFeedback(e.target.value)}
+                    placeholder="Feedback to the learner"
+                    className="min-h-[120px] text-sm"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => (s.aiGradedAt ? confirmAi.mutate(s.id) : gradeManually.mutate(s.id))}
+                      disabled={confirmAi.isPending || gradeManually.isPending}
+                    >
+                      {confirmAi.isPending || gradeManually.isPending ? 'Saving…' : 'Release grade'}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setOpenId(null)}>Cancel</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Releasing notifies the learner and updates the gradebook. You are recorded as the grader.
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+const FileCheckIcon = () => <CheckCircle className="h-4 w-4 text-primary" />;
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export function AssignmentDetail() {
   const { courseId, assignmentId } = useParams<{ courseId: string; assignmentId: string }>();
   const [, navigate] = useLocation();
   const qc = useQueryClient();
+  const { data: me } = useGetMe();
+  const isStaff = !!me && STAFF_ROLES.includes(me.role);
 
   // Generic text state (essay / discussion / file notes)
   const [essay, setEssay] = useState('');
+  const [upload, setUpload] = useState<{ filename: string; dataBase64: string } | null>(null);
   // Structured states
   const [reflectionAnswers, setReflectionAnswers] = useState<Record<string, string>>({});
   const [caseStudyAnswers, setCaseStudyAnswers] = useState<Record<string, string>>({});
@@ -464,8 +664,21 @@ export function AssignmentDetail() {
 
   const submitMutation = useMutation({
     mutationFn: (body: string) =>
-      apiFetch(`/assignments/${assignmentId}/submit`, { method: 'POST', body: JSON.stringify({ body }) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['my-submission', assignmentId] }),
+      apiFetch(`/assignments/${assignmentId}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({ body, filename: upload?.filename, dataBase64: upload?.dataBase64 }),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-submission', assignmentId] });
+      // The AI draft is written after the response returns, so a single refetch would show
+      // "no feedback yet" and stay that way. Poll briefly instead of making the learner reload.
+      let tries = 0;
+      const t = setInterval(() => {
+        tries += 1;
+        qc.invalidateQueries({ queryKey: ['my-submission', assignmentId] });
+        if (tries >= 8) clearInterval(t);
+      }, 4000);
+    },
   });
 
   if (isLoading) {
@@ -508,6 +721,11 @@ export function AssignmentDetail() {
   } else if (subType === 'quiz') {
     submissionBody = JSON.stringify({ type: 'quiz', answers: quizAnswers, ...quizScore });
     canSubmit = quizSubmitted;
+  } else if (subType === 'file_upload') {
+    // Either an attached document or typed notes is a real submission; requiring the text
+    // box would have blocked the learner who did exactly what the form asked.
+    submissionBody = essay;
+    canSubmit = !!upload || essay.trim().length > 0;
   } else {
     submissionBody = essay;
     canSubmit = essay.trim().length > 0;
@@ -635,7 +853,49 @@ export function AssignmentDetail() {
                 <div>
                   <div className="font-medium">Submitted</div>
                   <div className="text-xs text-muted-foreground mt-0.5">{formatDate(submission.submittedAt)} · Awaiting grade</div>
+                  {submission.sourceFilename && (
+                    <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      <FileText className="h-3 w-3" />{submission.sourceFilename}
+                    </div>
+                  )}
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/*
+            Early feedback while the work is still awaiting a real grade.
+            Labelled unambiguously as automated and NOT a mark -- the score is deliberately
+            not shown, because a learner who sees "62/100" will read it as their grade no
+            matter what the caption says, and their facilitator has not looked at it yet.
+            What is worth having immediately is the substance of the response.
+          */}
+          {submitted && !graded && submission.aiFeedback && (
+            <Card className="border-amber-200 bg-amber-50/40 dark:bg-amber-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  Early feedback
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Automated, and not your grade. Your facilitator marks this work — use this to start improving now.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{submission.aiFeedback}</p>
+                {Array.isArray(submission.aiRubricAssessment) && submission.aiRubricAssessment.length > 0 && (
+                  <div className="space-y-2 pt-1">
+                    {submission.aiRubricAssessment.map((c: any) => (
+                      <div key={c.criterion} className="text-xs">
+                        <div className="flex items-center justify-between font-medium">
+                          <span>{c.criterion}</span>
+                          <span className="text-muted-foreground">{c.points} / {c.maxPoints}</span>
+                        </div>
+                        {c.note && <p className="text-muted-foreground mt-0.5 leading-relaxed">{c.note}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -691,7 +951,7 @@ export function AssignmentDetail() {
 
                 {/* ── File upload ── */}
                 {subType === 'file_upload' && (
-                  <FileUploadForm text={essay} onTextChange={setEssay} />
+                  <FileUploadForm text={essay} onTextChange={setEssay} file={upload} onFileChange={setUpload} />
                 )}
 
                 {/* ── Essay (default) ── */}
@@ -729,6 +989,8 @@ export function AssignmentDetail() {
           )}
         </div>
       </div>
+
+      {isStaff && <StaffGradingPanel assignmentId={assignmentId!} pointsPossible={Number(assignment.pointsPossible)} />}
     </div>
   );
 }
