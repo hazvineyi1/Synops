@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { discussionsTable, discussionRepliesTable, usersTable, notificationsTable } from "@workspace/db";
-import { eq, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canStaffActOnCourse } from "../lib/scope";
+import { generateFacilitatorQuestion, countWords } from "../lib/discussionEngine";
+import { translateTexts } from "../lib/caseEngine";
 
 const router = Router();
 
@@ -31,25 +33,52 @@ router.get("/courses/:courseId/discussions", requireAuth, async (req, res) => {
   const myReplies = await db
     .select({ discussionId: discussionRepliesTable.discussionId })
     .from(discussionRepliesTable)
-    .where(eq(discussionRepliesTable.authorId, req.userId!));
-  const replied = new Set(myReplies.map((r) => r.discussionId));
+    .where(and(
+      eq(discussionRepliesTable.authorId, req.userId!),
+      eq(discussionRepliesTable.isAiFacilitator, false),
+    ));
+  // Count, not just a boolean: participation is "5 interactions", so a thread the learner
+  // has posted in once is not the same as one they have finished.
+  const myCount = new Map<string, number>();
+  for (const r of myReplies) myCount.set(r.discussionId, (myCount.get(r.discussionId) ?? 0) + 1);
 
-  res.json(rows.map(r => ({
-    ...r.discussion,
-    author: toUserSnap(r.author),
-    iHaveReplied: replied.has(r.discussion.id),
-  })));
+  // ?moduleId= narrows to one module's threads. Without it the module Participate tab shows
+  // every thread in the whole course, which is what it did before.
+  const moduleId = typeof req.query.moduleId === "string" ? req.query.moduleId : null;
+  const visible = moduleId
+    ? rows.filter((r) => r.discussion.moduleId === moduleId || r.discussion.moduleId == null)
+    : rows;
+
+  res.json(visible.map(r => {
+    const n = myCount.get(r.discussion.id) ?? 0;
+    return {
+      ...r.discussion,
+      author: toUserSnap(r.author),
+      iHaveReplied: n >= r.discussion.requiredInteractions,
+      myPosts: n,
+    };
+  }));
 });
 
 // POST /courses/:courseId/discussions
 router.post("/courses/:courseId/discussions", requireAuth, async (req, res) => {
-  const { title, body, requireInitialPost } = req.body;
+  const {
+    title, body, requireInitialPost, moduleId, aiFacilitated, language,
+    minInitialWords, maxInitialWords, minReplyWords, requiredInteractions,
+  } = req.body;
   const [discussion] = await db.insert(discussionsTable).values({
     courseId: req.params.courseId,
     authorId: req.userId!,
     title,
     body,
     requireInitialPost: requireInitialPost ?? false,
+    moduleId: moduleId ?? null,
+    aiFacilitated: aiFacilitated ?? true,
+    language: language ?? "en",
+    ...(minInitialWords != null ? { minInitialWords } : {}),
+    ...(maxInitialWords != null ? { maxInitialWords } : {}),
+    ...(minReplyWords != null ? { minReplyWords } : {}),
+    ...(requiredInteractions != null ? { requiredInteractions } : {}),
   }).returning();
   res.status(201).json(discussion);
 });
@@ -71,10 +100,24 @@ router.get("/courses/:courseId/discussions/:discussionId", requireAuth, async (r
     .where(eq(discussionRepliesTable.discussionId, req.params.discussionId))
     .orderBy(asc(discussionRepliesTable.createdAt));
 
+  // The caller's own participation against this thread's rule. Sent from the server so the
+  // composer and the completion check agree on one count rather than each doing their own
+  // arithmetic and drifting. AI facilitator turns never count towards a learner's total.
+  const mine = replyRows.filter((r) => r.reply.authorId === req.userId && !r.reply.isAiFacilitator);
+  const d = row.discussion;
   res.json({
-    ...row.discussion,
+    ...d,
     author: toUserSnap(row.author),
     replies: replyRows.map(r => ({ ...r.reply, author: toUserSnap(r.author) })),
+    myParticipation: {
+      posts: mine.length,
+      required: d.requiredInteractions,
+      hasInitialPost: mine.length > 0,
+      met: mine.length >= d.requiredInteractions,
+      minInitialWords: d.minInitialWords,
+      maxInitialWords: d.maxInitialWords,
+      minReplyWords: d.minReplyWords,
+    },
   });
 });
 
@@ -103,11 +146,58 @@ router.patch("/discussions/:discussionId", requireAuth, async (req, res) => {
   res.json(updated);
 });
 
-// POST /courses/:courseId/discussions/:discussionId/replies
+/**
+ * POST /courses/:courseId/discussions/:discussionId/replies
+ *
+ * Enforces the thread's participation rule SERVER-SIDE. The composer shows a word counter,
+ * but a rule that only lives in the browser is a suggestion -- anything posting straight at
+ * the API would sail past it, and the counts feed a completion requirement.
+ *
+ * Order matters: the learner's own first contribution is the "initial post" and is held to
+ * the 100-150 word band; everything after it is an interaction held to the 50-word floor.
+ * A one-word "agreed" is exactly what this exists to reject.
+ */
 router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth, async (req, res) => {
-  const { body, parentReplyId } = req.body;
+  const { body, parentReplyId, language } = req.body;
   const user = req.dbUser!;
   const isInstructor = ["coach", "org_admin", "partner_admin", "super_admin"].includes(user.role);
+
+  const discussion = await db.query.discussionsTable.findFirst({ where: eq(discussionsTable.id, req.params.discussionId) });
+  if (!discussion) { res.status(404).json({ error: "Discussion not found" }); return; }
+  if (discussion.isClosed) { res.status(409).json({ error: "This discussion is closed." }); return; }
+
+  const words = countWords(body ?? "");
+  if (words === 0) { res.status(400).json({ error: "Write something first." }); return; }
+
+  // Staff and the AI facilitator are not held to the learner participation rule -- it
+  // describes what a LEARNER must contribute, not what a facilitator may say.
+  if (!isInstructor) {
+    const mine = await db
+      .select({ id: discussionRepliesTable.id })
+      .from(discussionRepliesTable)
+      .where(and(
+        eq(discussionRepliesTable.discussionId, req.params.discussionId),
+        eq(discussionRepliesTable.authorId, req.userId!),
+      ));
+    const isInitial = mine.length === 0;
+
+    if (isInitial) {
+      if (words < discussion.minInitialWords || words > discussion.maxInitialWords) {
+        res.status(422).json({
+          error: `Your first post should be between ${discussion.minInitialWords} and ${discussion.maxInitialWords} words. Yours is ${words}.`,
+          rule: "initial", words,
+          min: discussion.minInitialWords, max: discussion.maxInitialWords,
+        });
+        return;
+      }
+    } else if (words < discussion.minReplyWords) {
+      res.status(422).json({
+        error: `Replies need at least ${discussion.minReplyWords} words so there is something for others to engage with. Yours is ${words}.`,
+        rule: "reply", words, min: discussion.minReplyWords,
+      });
+      return;
+    }
+  }
 
   const [reply] = await db.insert(discussionRepliesTable).values({
     discussionId: req.params.discussionId,
@@ -115,6 +205,8 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
     body,
     parentReplyId: parentReplyId ?? null,
     isInstructorReply: isInstructor,
+    language: typeof language === "string" && language ? language : discussion.language,
+    wordCount: words,
   }).returning();
 
   // bump reply count
@@ -123,7 +215,6 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
     .where(eq(discussionsTable.id, req.params.discussionId));
 
   // notify original author
-  const discussion = await db.query.discussionsTable.findFirst({ where: eq(discussionsTable.id, req.params.discussionId) });
   if (discussion && discussion.authorId !== req.userId) {
     await db.insert(notificationsTable).values({
       userId: discussion.authorId,
@@ -136,7 +227,84 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
     });
   }
 
-  res.status(201).json({ ...reply, author: toUserSnap(user) });
+  // The AI facilitator asks the next question. Deliberately best-effort and AFTER the
+  // learner's post is safely committed: if the model is slow, unconfigured or errors, the
+  // learner's contribution still stands. A post must never fail because the facilitator
+  // could not think of a question.
+  let facilitator: typeof discussionRepliesTable.$inferSelect | null = null;
+  if (discussion.aiFacilitated && !isInstructor) {
+    try {
+      const all = await db
+        .select({ reply: discussionRepliesTable, author: usersTable })
+        .from(discussionRepliesTable)
+        .leftJoin(usersTable, eq(discussionRepliesTable.authorId, usersTable.id))
+        .where(eq(discussionRepliesTable.discussionId, req.params.discussionId))
+        .orderBy(asc(discussionRepliesTable.createdAt));
+
+      const question = await generateFacilitatorQuestion({
+        title: discussion.title,
+        prompt: discussion.body,
+        langCode: discussion.language,
+        turns: all.map((r) => ({
+          author: r.author?.firstName ?? "Learner",
+          body: r.reply.body,
+          isAi: r.reply.isAiFacilitator,
+        })),
+      });
+
+      if (question) {
+        const [f] = await db.insert(discussionRepliesTable).values({
+          discussionId: req.params.discussionId,
+          authorId: discussion.authorId,
+          body: question,
+          isInstructorReply: true,
+          isAiFacilitator: true,
+          language: discussion.language,
+          wordCount: countWords(question),
+        }).returning();
+        facilitator = f;
+        await db.update(discussionsTable)
+          .set({ replyCount: sql`${discussionsTable.replyCount} + 1`, updatedAt: new Date() })
+          .where(eq(discussionsTable.id, req.params.discussionId));
+      }
+    } catch {
+      // Facilitation is a bonus, never a gate on the learner's own post.
+    }
+  }
+
+  res.status(201).json({ ...reply, author: toUserSnap(user), facilitator });
+});
+
+/**
+ * POST /discussions/:discussionId/translate
+ * Body: { langCode }
+ *
+ * Translates the thread (prompt + every contribution) into the requested language and
+ * returns it WITHOUT persisting: translation is a reading aid for the person asking, not an
+ * edit to what someone else actually wrote. The original stays the record.
+ */
+router.post("/discussions/:discussionId/translate", requireAuth, async (req, res) => {
+  const langCode = String(req.body?.langCode ?? "en");
+  const discussion = await db.query.discussionsTable.findFirst({ where: eq(discussionsTable.id, req.params.discussionId) });
+  if (!discussion) { res.status(404).json({ error: "Discussion not found" }); return; }
+
+  const replies = await db
+    .select()
+    .from(discussionRepliesTable)
+    .where(eq(discussionRepliesTable.discussionId, req.params.discussionId))
+    .orderBy(asc(discussionRepliesTable.createdAt));
+
+  const source = [discussion.body, ...replies.map((r) => r.body)];
+  const out = await translateTexts(source, langCode);
+
+  // translateTexts returns the originals unchanged on any failure, so a mismatch here is
+  // the honest "we could not translate" signal rather than a silent half-translation.
+  res.json({
+    langCode,
+    translated: out.length === source.length && out.some((t, i) => t !== source[i]),
+    body: out[0] ?? discussion.body,
+    replies: replies.map((r, i) => ({ id: r.id, body: out[i + 1] ?? r.body })),
+  });
 });
 
 // DELETE /discussions/replies/:replyId — the reply's author may delete their own; anyone
