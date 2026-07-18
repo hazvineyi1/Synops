@@ -66,6 +66,12 @@ router.post("/courses/:courseId/discussions", requireAuth, async (req, res) => {
     title, body, requireInitialPost, moduleId, aiFacilitated, language,
     minInitialWords, maxInitialWords, minReplyWords, requiredInteractions,
   } = req.body;
+  // Learners may start threads -- asking the group a question is participation, not
+  // administration. But only staff may set the participation BAR: otherwise a learner
+  // could author a thread that quietly requires one short post and have it count the
+  // same as one that requires five substantial ones.
+  const isStaff = await canStaffActOnCourse(req.dbUser!, req.params.courseId);
+
   const [discussion] = await db.insert(discussionsTable).values({
     courseId: req.params.courseId,
     authorId: req.userId!,
@@ -75,10 +81,10 @@ router.post("/courses/:courseId/discussions", requireAuth, async (req, res) => {
     moduleId: moduleId ?? null,
     aiFacilitated: aiFacilitated ?? true,
     language: language ?? "en",
-    ...(minInitialWords != null ? { minInitialWords } : {}),
-    ...(maxInitialWords != null ? { maxInitialWords } : {}),
-    ...(minReplyWords != null ? { minReplyWords } : {}),
-    ...(requiredInteractions != null ? { requiredInteractions } : {}),
+    ...(isStaff && minInitialWords != null ? { minInitialWords } : {}),
+    ...(isStaff && maxInitialWords != null ? { maxInitialWords } : {}),
+    ...(isStaff && minReplyWords != null ? { minReplyWords } : {}),
+    ...(isStaff && requiredInteractions != null ? { requiredInteractions } : {}),
   }).returning();
   res.status(201).json(discussion);
 });

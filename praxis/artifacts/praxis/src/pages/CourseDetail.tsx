@@ -13,9 +13,168 @@ import {
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, Pin,
   CheckCircle, Clock, AlertCircle, Play, Target, Save
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { CourseNextStep } from '@/components/CourseNextStep';
+
+/**
+ * Create a discussion.
+ *
+ * The backend has supported this for a long time but no UI ever called it -- the New
+ * Discussion button had no handler -- so AI facilitation and the participation rules were
+ * unreachable except by hand-crafting an API call. This is that missing surface.
+ *
+ * Defaults match the standard ask (opening post 100-150 words, then four more of 50+),
+ * but they are editable because a short reflection thread and a debate thread should not
+ * carry the same bar.
+ */
+function NewDiscussion({ courseId, modules }: { courseId: string; modules: { id: string; title: string; order: number }[] }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({
+    title: '', body: '', moduleId: 'course', language: 'en', aiFacilitated: true,
+    minInitialWords: 100, maxInitialWords: 150, minReplyWords: 50, requiredInteractions: 5,
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  const create = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}/discussions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: f.title,
+        body: f.body,
+        moduleId: f.moduleId === 'course' ? null : f.moduleId,
+        language: f.language,
+        aiFacilitated: f.aiFacilitated,
+        requireInitialPost: true,
+        minInitialWords: Number(f.minInitialWords),
+        maxInitialWords: Number(f.maxInitialWords),
+        minReplyWords: Number(f.minReplyWords),
+        requiredInteractions: Number(f.requiredInteractions),
+      }),
+    }),
+    onSuccess: () => {
+      setOpen(false); setError(null);
+      setF((p) => ({ ...p, title: '', body: '' }));
+      qc.invalidateQueries({ queryKey: ['discussions', courseId] });
+    },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not create that discussion.'),
+  });
+
+  if (!open) {
+    return (
+      <div className="flex justify-end mb-4">
+        <Button size="sm" className="gap-2" onClick={() => setOpen(true)}>
+          <Plus className="h-4 w-4" /> New Discussion
+        </Button>
+      </div>
+    );
+  }
+
+  const ordered = modules.slice().sort((a, b) => a.order - b.order);
+  return (
+    <Card className="mb-4 border-dashed border-primary/30">
+      <CardContent className="pt-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-sm">New discussion</span>
+        </div>
+
+        <input
+          value={f.title}
+          onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))}
+          placeholder="Discussion title"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+        />
+        <div>
+          <Textarea
+            value={f.body}
+            onChange={(e) => setF((p) => ({ ...p, body: e.target.value }))}
+            rows={4}
+            placeholder="The prompt. Ask something that has more than one defensible answer -- a question with a single right answer produces five identical posts."
+            className="text-sm resize-none"
+          />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="text-xs text-muted-foreground">Scope</label>
+            <Select value={f.moduleId} onValueChange={(v) => setF((p) => ({ ...p, moduleId: v }))}>
+              <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="course">Whole course</SelectItem>
+                {ordered.map((m) => <SelectItem key={m.id} value={m.id}>{m.title}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Language</label>
+            <Select value={f.language} onValueChange={(v) => setF((p) => ({ ...p, language: v }))}>
+              <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="zu">isiZulu</SelectItem>
+                <SelectItem value="xh">isiXhosa</SelectItem>
+                <SelectItem value="af">Afrikaans</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <label className="flex items-start gap-2.5 rounded-lg border border-border p-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={f.aiFacilitated}
+            onChange={(e) => setF((p) => ({ ...p, aiFacilitated: e.target.checked }))}
+            className="mt-0.5"
+          />
+          <span className="text-sm">
+            <span className="font-medium">AI facilitation</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              After each learner contribution the facilitator asks one prodding question built on what
+              was actually written. It never answers or resolves the debate.
+            </span>
+          </span>
+        </label>
+
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground mb-2">Participation requirement</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {([
+              ['Opening min', 'minInitialWords'],
+              ['Opening max', 'maxInitialWords'],
+              ['Reply min', 'minReplyWords'],
+              ['Contributions', 'requiredInteractions'],
+            ] as const).map(([label, key]) => (
+              <div key={key}>
+                <label className="text-xs text-muted-foreground">{label}</label>
+                <input
+                  type="number" min={1}
+                  value={f[key]}
+                  onChange={(e) => setF((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            Enforced when a learner posts, not just shown in the composer.
+          </p>
+        </div>
+
+        {error && <p className="text-xs text-rose-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => { setOpen(false); setError(null); }}>Cancel</Button>
+          <Button size="sm" disabled={!f.title.trim() || !f.body.trim() || create.isPending} onClick={() => create.mutate()}>
+            {create.isPending ? 'Creating...' : 'Create discussion'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 // --- Types ---
 interface Course { id: string; title: string; description: string; status: string; competencyTags: string[]; nqfLevel?: number; objectives?: string[]; }
@@ -274,7 +433,8 @@ export function CourseDetail() {
     queryFn: () => apiFetch<CourseProgress>(`/progress/course/${courseId}`),
     enabled: !!courseId,
   });
-  const { data: modules } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: activeTab === 'modules' || activeTab === 'overview' });
+  // Also needed on the discussions tab, where a new thread can be scoped to a module.
+  const { data: modules } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: activeTab === 'modules' || activeTab === 'overview' || activeTab === 'discussions' });
   const { data: assignments } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<Assignment[]>(`/courses/${courseId}/assignments`), enabled: activeTab === 'assignments' || activeTab === 'overview' });
   const { data: discussions } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' || activeTab === 'overview' });
   const { data: announcements } = useQuery({ queryKey: ['announcements', courseId], queryFn: () => apiFetch<Announcement[]>(`/courses/${courseId}/announcements`), enabled: activeTab === 'announcements' || activeTab === 'overview' });
@@ -732,11 +892,7 @@ export function CourseDetail() {
         {activeTab === 'discussions' && (
           <div className="space-y-3">
             {isInstructor && (
-              <div className="flex justify-end mb-4">
-                <Button size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" /> New Discussion
-                </Button>
-              </div>
+              <NewDiscussion courseId={courseId} modules={modules ?? []} />
             )}
             {!discussions && <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>}
             {discussions?.length === 0 && <div className="text-center text-muted-foreground py-12">No discussions yet.</div>}
