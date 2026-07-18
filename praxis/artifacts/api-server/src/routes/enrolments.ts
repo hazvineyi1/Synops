@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { enrolmentsTable, usersTable, coursesTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { enrolmentsTable, usersTable, coursesTable, organisationsTable } from "@workspace/db";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canStaffActOnCourse } from "../lib/scope";
 
@@ -81,8 +81,19 @@ router.get("/courses/:courseId/enrolment-candidates", requireAuth, async (req, r
   const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, req.params.courseId) });
   if (!course) { res.status(404).json({ error: "Course not found" }); return; }
 
+  // courses.tenant_id holds a PARTNER id (e.g. partner_skillbridge) while
+  // users.organisation_id holds an ORGANISATION id (e.g. org_shoprite); organisations hang
+  // off a partner via partner_id. Comparing the two directly matches nothing, ever --
+  // which is exactly what my first version did, returning zero candidates on every course.
+  // Resolve the partner's organisations first, and accept a tenant that is itself an org
+  // so this keeps working if a course is ever owned directly by one.
+  const orgs = await db.select({ id: organisationsTable.id })
+    .from(organisationsTable)
+    .where(eq(organisationsTable.partnerId, course.tenantId));
+  const orgIds = [...new Set([...orgs.map((o) => o.id), course.tenantId])];
+
   const [members, enrolled] = await Promise.all([
-    db.select().from(usersTable).where(eq(usersTable.organisationId, course.tenantId)),
+    db.select().from(usersTable).where(inArray(usersTable.organisationId, orgIds)),
     db.select({ userId: enrolmentsTable.userId }).from(enrolmentsTable)
       .where(eq(enrolmentsTable.courseId, req.params.courseId)),
   ]);
