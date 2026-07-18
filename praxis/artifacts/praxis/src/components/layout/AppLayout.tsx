@@ -117,14 +117,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const getNavGroups = (): NavGroup[] => {
     if (role === 'learner') {
+      // Case studies and Activities are reached by learners inside their modules (assigned
+      // as part of the module experience), so they are intentionally NOT top-level nav for
+      // learners. Staff still get them as authoring surfaces in their own nav blocks.
       return [{
         items: [
           { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
           { label: t('nav.myGrades', 'My grades'), href: '/grades', icon: TrendingUp },
           { label: t('nav.coach', 'Coach'), href: '/coach-hub', icon: GraduationCap },
-          { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
-          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
           { label: t('nav.credentials'), href: '/credentials', icon: Award },
           { label: t('nav.help', 'Help'), href: '/support', icon: LifeBuoy },
