@@ -55,9 +55,13 @@ import { ActivityEmbed } from '@/pages/ActivityEmbed';
 import { MyGrades } from '@/pages/MyGrades';
 import { Jotter } from '@/pages/Jotter';
 import { PartnerOverview } from '@/pages/partner/PartnerOverview';
+import { PartnerOrganisations } from '@/pages/partner/PartnerOrganisations';
 import { PartnerFinance } from '@/pages/partner/PartnerFinance';
 import { PartnerFunders } from '@/pages/partner/PartnerFunders';
+import { PartnerDocuments } from '@/pages/partner/PartnerDocuments';
 import { PartnerAccounts } from '@/pages/partner/PartnerAccounts';
+import { PartnerComms } from '@/pages/partner/PartnerComms';
+import { PartnerSettings } from '@/pages/partner/PartnerSettings';
 import { PartnerAudit } from '@/pages/partner/PartnerAudit';
 import { GradebookBrowser } from '@/pages/GradebookBrowser';
 import { Support } from '@/pages/Support';
@@ -198,9 +202,13 @@ function Routes() {
         <ProtectedRoute path="/jotter" component={Jotter} />
         {/* Partner Hub (partner_admin tier) */}
         <ProtectedRoute path="/partner" component={PartnerOverview} />
+        <ProtectedRoute path="/partner/organisations" component={PartnerOrganisations} />
         <ProtectedRoute path="/partner/finance" component={PartnerFinance} />
         <ProtectedRoute path="/partner/funders" component={PartnerFunders} />
+        <ProtectedRoute path="/partner/documents" component={PartnerDocuments} />
         <ProtectedRoute path="/partner/accounts" component={PartnerAccounts} />
+        <ProtectedRoute path="/partner/comms" component={PartnerComms} />
+        <ProtectedRoute path="/partner/settings" component={PartnerSettings} />
         <ProtectedRoute path="/partner/audit" component={PartnerAudit} />
         <ProtectedRoute path="/coach-hub" component={CoachHub} />
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 import { useSession } from '@/context/SessionContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { Wallet, Receipt, Landmark, Percent, ScrollText, Users } from 'lucide-react';
+import { Wallet, Receipt, Landmark, Percent, ScrollText, Users, Upload } from 'lucide-react';
 import {
   getPartnerHub, financeRollup, fundersRollup, ZAR, ZAR2, VAT_RATE, type Invoice,
 } from '@/lib/partnerHubData';
@@ -27,6 +28,7 @@ const disbPill = (s: string) =>
  */
 export function PartnerFinance() {
   const { user } = useSession();
+  const [, navigate] = useLocation();
   const h = getPartnerHub(user?.partnerId);
   const fin = financeRollup(h);
   const fun = fundersRollup(h);
@@ -96,6 +98,10 @@ export function PartnerFinance() {
 
         {/* Invoicing & Payments */}
         <TabsContent value="invoices" className="mt-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs text-muted-foreground">Raise, track and reconcile invoices. Upload supplier invoices and proof of payment to the filing cabinet.</p>
+            <Button size="sm" variant="outline" className="gap-2 shrink-0" onClick={() => navigate('/partner/documents')}><Upload className="h-3.5 w-3.5" /> Upload invoice</Button>
+          </div>
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">

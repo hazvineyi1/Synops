@@ -33,6 +33,7 @@ import {
   NotebookPen,
   Wallet,
   Palette,
+  Megaphone,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -172,27 +173,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (role === 'partner_admin') {
-      // Grouped so the Partner Hub (the partner's own admin surface: finance, funders,
-      // accounts, branding, audit) is clearly separated from the delivery surfaces it
-      // shares with the org tier.
+      // Two clearly cordoned areas: the top pair (Overview + Organisations) are where the
+      // partner LOOKS; the "Main Admin" group is the partner-wide control surface (finance,
+      // funders, documents, accounts, comms, branding, audit, settings) kept visibly apart
+      // from the org-by-org and delivery surfaces. Studio / Case studies / Activities are
+      // authoring tools that belong to the super-admin tier and are intentionally absent.
       return [
-        // Overview and Organisations are two DISTINCT destinations, not the old redundant
-        // pair that both pointed at /dashboard: Overview is the Partner Hub summary, and
-        // Organisations is the tenant dashboard (the list of orgs under this partner).
         {
           items: [
             { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
-            { label: t('nav.organisations', 'Organisations'), href: '/dashboard', icon: Building },
+            { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
           ],
         },
         {
-          heading: t('nav.groups.partnerHub', 'Partner Hub'),
+          heading: t('nav.groups.mainAdmin', 'Main Admin'),
           items: [
             { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
             { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },
+            { label: t('nav.documents', 'Documents'), href: '/partner/documents', icon: FileText },
             { label: t('nav.accountsRoles', 'Accounts & Roles'), href: '/partner/accounts', icon: Users },
+            { label: t('nav.communications', 'Communications'), href: '/partner/comms', icon: Megaphone },
             { label: t('nav.branding', 'Branding'), href: '/partner/theme', icon: Palette },
             { label: t('nav.audit', 'Audit & Impersonation'), href: '/partner/audit', icon: ShieldCheck },
+            { label: t('nav.partnerSettings', 'Settings'), href: '/partner/settings', icon: Settings },
           ],
         },
         {
@@ -202,9 +205,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             { label: t('nav.coaching', 'Coaching'), href: '/coaching/sections', icon: Users },
             { label: t('nav.coachingHealth', 'Coaching health'), href: '/coaching/health', icon: TrendingUp },
             { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
-            { label: t('nav.studio'), href: '/studio', icon: PenTool },
-            { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
-            { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
           ],
         },
         { items: [{ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy }] },
@@ -293,7 +293,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navGroups = getNavGroups();
   const flatNav = navGroups.flatMap((g) => g.items);
-  const isNavActive = (href: string) => location === href || location.startsWith(href + '/');
+  // Highlight ONLY the most-specific matching item. The old prefix rule lit up every
+  // ancestor: on /partner/finance both "Overview" (/partner) and "Financial Hub"
+  // (/partner/finance) glowed. An item is active only if no longer nav href also matches
+  // the current location.
+  const isNavActive = (href: string) => {
+    if (location === href) return true;
+    if (!location.startsWith(href + '/')) return false;
+    return !flatNav.some((i) => i.href.length > href.length && (location === i.href || location.startsWith(i.href + '/')));
+  };
   const bottomItems = flatNav.slice(0, 4);
 
   const groupHeading = (text: string) => (

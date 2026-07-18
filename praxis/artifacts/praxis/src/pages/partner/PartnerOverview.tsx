@@ -9,9 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Wallet, Landmark, Users, ArrowRight, AlertTriangle,
-  Building, ShieldCheck, Palette, Receipt,
+  Building, ShieldCheck, Receipt, FileText, ChevronRight,
 } from 'lucide-react';
-import { getPartnerHub, financeRollup, fundersRollup, ZAR, type AuditCategory } from '@/lib/partnerHubData';
+import { getPartnerHub, financeRollup, fundersRollup, orgDetail, ZAR, type AuditCategory } from '@/lib/partnerHubData';
 
 const catStyle: Record<AuditCategory, string> = {
   financial: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
@@ -41,6 +41,24 @@ export function PartnerOverview() {
         subtitle={`${h.partnerName} — your financial, funder, account and compliance controls in one place.`}
         action={<Badge variant="outline" className="gap-1.5"><Building className="h-3.5 w-3.5" /> {h.orgs.length} {h.orgs.length === 1 ? 'organisation' : 'organisations'}</Badge>}
       />
+
+      {/* Quick jump bar — relocated from the bottom so the main-admin destinations are reachable up front */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+        {[
+          { label: 'Organisations', icon: Building, href: '/partner/organisations' },
+          { label: 'Financial Hub', icon: Wallet, href: '/partner/finance' },
+          { label: 'Funders Hub', icon: Landmark, href: '/partner/funders' },
+          { label: 'Documents', icon: FileText, href: '/partner/documents' },
+          { label: 'Accounts & Roles', icon: Users, href: '/partner/accounts' },
+          { label: 'Audit', icon: ShieldCheck, href: '/partner/audit' },
+        ].map((q) => (
+          <button key={q.href} onClick={() => navigate(q.href)}
+            className="rounded-xl border border-border bg-card px-3 py-2.5 text-left hover:border-primary/40 hover:bg-muted/40 transition-colors flex items-center gap-2.5">
+            <q.icon className="h-4 w-4 text-primary shrink-0" />
+            <span className="text-xs font-medium truncate">{q.label}</span>
+          </button>
+        ))}
+      </div>
 
       {/* Top KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -124,21 +142,30 @@ export function PartnerOverview() {
         </div>
       </Card>
 
-      {/* Quick links */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Accounts & Roles', icon: Users, href: '/partner/accounts' },
-          { label: 'Branding', icon: Palette, href: '/partner/theme' },
-          { label: 'Audit & Impersonation', icon: ShieldCheck, href: '/partner/audit' },
-          { label: 'Course catalog', icon: Building, href: '/courses' },
-        ].map((q) => (
-          <button key={q.href} onClick={() => navigate(q.href)}
-            className="rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors flex items-center gap-3">
-            <q.icon className="h-5 w-5 text-primary shrink-0" />
-            <span className="text-sm font-medium">{q.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Organisations at a glance — org-by-org access, main-admin's map of the tenant */}
+      <Card className="p-5">
+        <SectionTitle action={<Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate('/partner/organisations')}>Manage <ArrowRight className="h-3.5 w-3.5" /></Button>}>Organisations</SectionTitle>
+        <div className="mt-3 grid sm:grid-cols-2 gap-3">
+          {h.orgs.map((o) => {
+            const d = orgDetail(h, o.id);
+            return (
+              <button key={o.id} onClick={() => navigate(`/partner/organisations?org=${o.id}`)}
+                className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:bg-muted/40 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium truncate">{o.name}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {d.plan && <span><Wallet className="inline h-3 w-3 mr-1" />{d.plan.name}</span>}
+                  <span><Users className="inline h-3 w-3 mr-1" />{d.sub?.seats ?? 0} seats</span>
+                  {d.delegated.length > 0 && <span><ShieldCheck className="inline h-3 w-3 mr-1" />{d.delegated.length} delegated admin{d.delegated.length > 1 ? 's' : ''}</span>}
+                  {d.openInvoices > 0 && <span className="text-amber-600"><Receipt className="inline h-3 w-3 mr-1" />{d.openInvoices} open invoice{d.openInvoices > 1 ? 's' : ''}</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
     </div>
   );
 }

@@ -48,6 +48,33 @@ export type ImpersonationSession = {
   id: string; admin: string; target: string; org: string; startedAt: string;
   durationMin: number; reason: string; active: boolean;
 };
+export type DocCategory = 'invoice' | 'contract' | 'funder' | 'compliance' | 'other';
+export type PartnerDoc = {
+  id: string; name: string; category: DocCategory; orgName: string | null;
+  status: 'filed' | 'pending' | 'action-required'; uploadedAt: string; size: string;
+};
+export type LoginEvent = { at: string; ip: string; device: string; ok: boolean };
+export type DelegatedAdmin = {
+  id: string; name: string; email: string; orgName: string;
+  powers: string[]; status: 'active' | 'invited'; addedAt: string;
+};
+
+/**
+ * The powers a main (partner) admin can hand to a junior/org admin. A delegated admin is
+ * scoped to exactly one organisation and can do only what is ticked here -- everything else,
+ * and every OTHER organisation, stays invisible to them. Partner-wide surfaces (Financial
+ * Hub, Funders Hub, other orgs, delegation itself) are never delegatable.
+ */
+export const DELEGATABLE_POWERS = [
+  { key: 'learners', label: 'Manage learners', help: 'Enrol, remove and view learners in the org' },
+  { key: 'coaches', label: 'Manage coaches', help: 'Assign and manage the org’s coaches' },
+  { key: 'catalog', label: 'Manage course catalog', help: 'Choose which courses the org runs' },
+  { key: 'gradebook', label: 'View gradebook', help: 'See progress and grades for the org' },
+  { key: 'sessions', label: 'Manage sessions & attendance', help: 'Schedule sessions, mark attendance' },
+  { key: 'reports', label: 'View reports', help: 'Read the org’s completion and outcome reports' },
+  { key: 'invoices', label: 'View invoices (read-only)', help: 'See the org’s invoices, not pay them' },
+  { key: 'documents', label: 'Upload org documents', help: 'File paperwork for this org only' },
+] as const;
 
 export interface PartnerHub {
   partnerId: string;
@@ -63,6 +90,8 @@ export interface PartnerHub {
   invites: Invite[];
   audit: AuditEntry[];
   impersonations: ImpersonationSession[];
+  documents: PartnerDoc[];
+  delegatedAdmins: DelegatedAdmin[];
 }
 
 const PLANS: Plan[] = [
@@ -126,6 +155,18 @@ const TALENTFORGE: PartnerHub = {
     { id: 'im1', admin: 'James Mokoena', target: 'Thabo Dlamini', org: 'MTN Skills Academy', startedAt: '2026-07-18T08:40:00', durationMin: 12, reason: 'Reconciling seat count', active: false },
     { id: 'im2', admin: 'James Mokoena', target: 'Nomsa Khumalo', org: 'Vodacom Learning Centre', startedAt: '2026-07-11T13:22:00', durationMin: 8, reason: 'Verifying invoice dispute', active: false },
   ],
+  documents: [
+    { id: 'doc1', name: 'TF-2026-0042 Tax Invoice.pdf', category: 'invoice', orgName: 'MTN Skills Academy', status: 'filed', uploadedAt: '2026-07-01', size: '84 KB' },
+    { id: 'doc2', name: 'MICT SETA Grant Agreement 2026-27.pdf', category: 'funder', orgName: 'MTN Skills Academy', status: 'filed', uploadedAt: '2026-04-01', size: '1.2 MB' },
+    { id: 'doc3', name: 'MTN Master Services Agreement.pdf', category: 'contract', orgName: 'MTN Skills Academy', status: 'filed', uploadedAt: '2026-03-12', size: '640 KB' },
+    { id: 'doc4', name: 'Vodacom SLA (renewal).docx', category: 'contract', orgName: 'Vodacom Learning Centre', status: 'action-required', uploadedAt: '2026-07-10', size: '210 KB' },
+    { id: 'doc5', name: 'B-BBEE Skills Spend Evidence Q2.xlsx', category: 'compliance', orgName: 'MTN Skills Academy', status: 'pending', uploadedAt: '2026-07-14', size: '48 KB' },
+    { id: 'doc6', name: 'NSFAS Means-Test Register.pdf', category: 'funder', orgName: 'Vodacom Learning Centre', status: 'pending', uploadedAt: '2026-07-15', size: '320 KB' },
+  ],
+  delegatedAdmins: [
+    { id: 'da1', name: 'Thabo Dlamini', email: 'thabo.dlamini@mtn.com', orgName: 'MTN Skills Academy', powers: ['learners', 'coaches', 'catalog', 'gradebook', 'sessions', 'reports'], status: 'active', addedAt: '2026-05-02' },
+    { id: 'da2', name: 'Nomsa Khumalo', email: 'nomsa.khumalo@vodacom.com', orgName: 'Vodacom Learning Centre', powers: ['learners', 'gradebook', 'reports'], status: 'active', addedAt: '2026-06-18' },
+  ],
 };
 
 // ── SkillBridge Africa (retail: Shoprite) ────────────────────────────────────
@@ -167,6 +208,16 @@ const SKILLBRIDGE: PartnerHub = {
   impersonations: [
     { id: 'im1', admin: 'Sarah Williams', target: 'Sipho Nkosi', org: 'Shoprite Workforce Development', startedAt: '2026-07-12T11:48:00', durationMin: 15, reason: 'Seat allocation query', active: false },
   ],
+  documents: [
+    { id: 'doc1', name: 'SB-2026-0088 Tax Invoice.pdf', category: 'invoice', orgName: 'Shoprite Workforce Development', status: 'filed', uploadedAt: '2026-07-01', size: '92 KB' },
+    { id: 'doc2', name: 'W&RSETA Discretionary Grant 2026-27.pdf', category: 'funder', orgName: 'Shoprite Workforce Development', status: 'filed', uploadedAt: '2026-04-01', size: '1.4 MB' },
+    { id: 'doc3', name: 'Shoprite Master Services Agreement.pdf', category: 'contract', orgName: 'Shoprite Workforce Development', status: 'filed', uploadedAt: '2026-02-20', size: '720 KB' },
+    { id: 'doc4', name: 'Services SETA Renewal Notice.pdf', category: 'funder', orgName: 'Shoprite Workforce Development', status: 'action-required', uploadedAt: '2026-07-16', size: '180 KB' },
+    { id: 'doc5', name: 'Retail Unit Standards POE Bundle.zip', category: 'compliance', orgName: 'Shoprite Workforce Development', status: 'pending', uploadedAt: '2026-07-13', size: '5.1 MB' },
+  ],
+  delegatedAdmins: [
+    { id: 'da1', name: 'Sipho Nkosi', email: 'sipho.nkosi@shoprite.co.za', orgName: 'Shoprite Workforce Development', powers: ['learners', 'coaches', 'catalog', 'gradebook', 'sessions', 'reports', 'documents'], status: 'active', addedAt: '2026-04-10' },
+  ],
 };
 
 const HUBS: Record<string, PartnerHub> = {
@@ -190,6 +241,36 @@ export function financeRollup(h: PartnerHub) {
   const outstanding = h.invoices.filter((i) => i.status !== 'paid').reduce((s, i) => s + i.net * (1 + VAT_RATE), 0);
   const overdue = h.invoices.filter((i) => i.status === 'overdue').length;
   return { totalSeats, activeSeats, mrrNet, mrrGross: mrrNet * (1 + VAT_RATE), outstanding, overdue };
+}
+
+/** Per-organisation rollup for the org-by-org drill-in. */
+export function orgDetail(h: PartnerHub, orgId: string) {
+  const org = h.orgs.find((o) => o.id === orgId);
+  const sub = h.subscriptions.find((s) => s.orgId === orgId);
+  const plan = sub ? h.plans.find((p) => p.id === sub.planId) : undefined;
+  const name = org?.name ?? '';
+  const coaches = h.accounts.filter((a) => a.role === 'coach' && a.orgName === name);
+  const admins = h.accounts.filter((a) => a.role === 'org_admin' && a.orgName === name);
+  const delegated = h.delegatedAdmins.filter((d) => d.orgName === name);
+  const funders = h.agreements.filter((a) => a.scopeOrgs.includes(name));
+  const allocations = h.allocations.filter((a) => a.orgName === name);
+  const openInvoices = h.invoices.filter((i) => i.orgName === name && i.status !== 'paid').length;
+  const docs = h.documents.filter((d) => d.orgName === name).length;
+  return { org, name, sub, plan, coaches, admins, delegated, funders, allocations, openInvoices, docs };
+}
+
+/** Deterministic seeded login history for an account (functional stand-in for real audit). */
+export function accountActivity(accountId: string, lastActive: string): LoginEvent[] {
+  const base = new Date(lastActive + 'T09:00:00').getTime();
+  const day = 86400000;
+  const devices = ['Chrome · Windows', 'Safari · iPhone', 'Chrome · Android', 'Edge · Windows'];
+  const seed = accountId.split('').reduce((s, c) => s + c.charCodeAt(0), 0);
+  return Array.from({ length: 5 }).map((_, i) => ({
+    at: new Date(base - i * day * (1 + (seed % 3))).toISOString(),
+    ip: `41.${(seed + i * 7) % 200}.${(seed * 3 + i) % 200}.${(seed + i * 11) % 200}`,
+    device: devices[(seed + i) % devices.length],
+    ok: !(i === 3 && seed % 4 === 0),
+  }));
 }
 
 export function fundersRollup(h: PartnerHub) {
