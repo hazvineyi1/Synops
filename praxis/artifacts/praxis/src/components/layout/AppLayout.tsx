@@ -31,6 +31,8 @@ import {
   ClipboardList,
   GraduationCap,
   NotebookPen,
+  Wallet,
+  Palette,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -170,20 +172,36 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (role === 'partner_admin') {
-      return [{
-        items: [
-          { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
-          { label: t('nav.organisations'), href: '/dashboard', icon: Building },
-          { label: t('nav.courseCatalog'), href: '/courses', icon: BookOpen },
-          { label: t('nav.coaching', 'Coaching'), href: '/coaching/sections', icon: Users },
-          { label: t('nav.coachingHealth', 'Coaching health'), href: '/coaching/health', icon: TrendingUp },
-          { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
-          { label: t('nav.studio'), href: '/studio', icon: PenTool },
-          { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
-          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
-          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
-        ],
-      }];
+      // Grouped so the Partner Hub (the partner's own admin surface: finance, funders,
+      // accounts, branding, audit) is clearly separated from the delivery surfaces it
+      // shares with the org tier.
+      return [
+        { items: [{ label: t('nav.home', 'Home'), href: '/dashboard', icon: LayoutDashboard }] },
+        {
+          heading: t('nav.groups.partnerHub', 'Partner Hub'),
+          items: [
+            { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
+            { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
+            { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },
+            { label: t('nav.accountsRoles', 'Accounts & Roles'), href: '/partner/accounts', icon: Users },
+            { label: t('nav.branding', 'Branding'), href: '/partner/theme', icon: Palette },
+            { label: t('nav.audit', 'Audit & Impersonation'), href: '/partner/audit', icon: ShieldCheck },
+          ],
+        },
+        {
+          heading: t('nav.groups.delivery', 'Delivery'),
+          items: [
+            { label: t('nav.courseCatalog'), href: '/courses', icon: BookOpen },
+            { label: t('nav.coaching', 'Coaching'), href: '/coaching/sections', icon: Users },
+            { label: t('nav.coachingHealth', 'Coaching health'), href: '/coaching/health', icon: TrendingUp },
+            { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
+            { label: t('nav.studio'), href: '/studio', icon: PenTool },
+            { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
+            { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+          ],
+        },
+        { items: [{ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy }] },
+      ];
     }
 
     // Super admin: full access to every surface the other roles have, grouped so

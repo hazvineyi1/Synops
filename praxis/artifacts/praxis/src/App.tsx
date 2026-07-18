@@ -54,6 +54,11 @@ import { ActivityPlay } from '@/pages/ActivityPlay';
 import { ActivityEmbed } from '@/pages/ActivityEmbed';
 import { MyGrades } from '@/pages/MyGrades';
 import { Jotter } from '@/pages/Jotter';
+import { PartnerOverview } from '@/pages/partner/PartnerOverview';
+import { PartnerFinance } from '@/pages/partner/PartnerFinance';
+import { PartnerFunders } from '@/pages/partner/PartnerFunders';
+import { PartnerAccounts } from '@/pages/partner/PartnerAccounts';
+import { PartnerAudit } from '@/pages/partner/PartnerAudit';
 import { GradebookBrowser } from '@/pages/GradebookBrowser';
 import { Support } from '@/pages/Support';
 
@@ -191,6 +196,12 @@ function Routes() {
         <ProtectedRoute path="/courses/:courseId/gradebook" component={CourseGradebook} />
         <ProtectedRoute path="/grades" component={MyGrades} />
         <ProtectedRoute path="/jotter" component={Jotter} />
+        {/* Partner Hub (partner_admin tier) */}
+        <ProtectedRoute path="/partner" component={PartnerOverview} />
+        <ProtectedRoute path="/partner/finance" component={PartnerFinance} />
+        <ProtectedRoute path="/partner/funders" component={PartnerFunders} />
+        <ProtectedRoute path="/partner/accounts" component={PartnerAccounts} />
+        <ProtectedRoute path="/partner/audit" component={PartnerAudit} />
         <ProtectedRoute path="/coach-hub" component={CoachHub} />
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />
