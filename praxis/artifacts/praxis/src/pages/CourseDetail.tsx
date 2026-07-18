@@ -72,11 +72,13 @@ function isOverdue(dueDate?: string) {
 }
 
 // Month-grid calendar view. A real month layout (Mon-start) with events placed on their
-// day, plus prev/next navigation. Complements the flat List view.
-function MonthGrid({ events, cursor, onCursor }: {
+// day, plus prev/next navigation. Complements the flat List view. `compact` renders a
+// smaller grid with event dots (for the narrow sidebar).
+function MonthGrid({ events, cursor, onCursor, compact = false }: {
   events: Event[];
   cursor: Date;
   onCursor: (d: Date) => void;
+  compact?: boolean;
 }) {
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -111,7 +113,7 @@ function MonthGrid({ events, cursor, onCursor }: {
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <span className="font-semibold text-sm">
+        <span className={cn('font-semibold', compact ? 'text-xs' : 'text-sm')}>
           {cursor.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
         </span>
         <button
@@ -123,31 +125,39 @@ function MonthGrid({ events, cursor, onCursor }: {
         </button>
       </div>
       <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden border border-border">
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-          <div key={d} className="bg-muted/50 py-1.5 text-center text-[11px] font-semibold text-muted-foreground">{d}</div>
+        {(compact ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']).map((d, idx) => (
+          <div key={idx} className={cn('bg-muted/50 text-center font-semibold text-muted-foreground', compact ? 'py-1 text-[9px]' : 'py-1.5 text-[11px]')}>{d}</div>
         ))}
         {cells.map((d, i) => (
-          <div key={i} className={cn('bg-card min-h-[84px] p-1.5', !d && 'bg-muted/20')}>
+          <div key={i} className={cn('bg-card', compact ? 'min-h-[44px] p-1' : 'min-h-[84px] p-1.5', !d && 'bg-muted/20')}>
             {d && (
               <>
-                <div className={cn('text-xs mb-1', isToday(d) ? 'font-bold text-primary' : 'text-muted-foreground')}>
+                <div className={cn(compact ? 'text-[10px]' : 'text-xs mb-1', isToday(d) ? 'font-bold text-primary' : 'text-muted-foreground')}>
                   {d}
                 </div>
-                <div className="space-y-1">
-                  {(byDay[d] ?? []).slice(0, 3).map((e) => (
-                    <div
-                      key={e.id}
-                      className="text-[10px] leading-tight rounded px-1 py-0.5 truncate text-white"
-                      style={{ backgroundColor: e.color ?? '#6366f1' }}
-                      title={`${e.title} (${e.type.replace('_', ' ')})`}
-                    >
-                      {e.title}
-                    </div>
-                  ))}
-                  {(byDay[d] ?? []).length > 3 && (
-                    <div className="text-[10px] text-muted-foreground">+{(byDay[d]?.length ?? 0) - 3} more</div>
-                  )}
-                </div>
+                {compact ? (
+                  <div className="flex flex-wrap gap-0.5 mt-0.5">
+                    {(byDay[d] ?? []).slice(0, 3).map((e) => (
+                      <span key={e.id} className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: e.color ?? '#6366f1' }} title={`${e.title} (${e.type.replace('_', ' ')})`} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {(byDay[d] ?? []).slice(0, 3).map((e) => (
+                      <div
+                        key={e.id}
+                        className="text-[10px] leading-tight rounded px-1 py-0.5 truncate text-white"
+                        style={{ backgroundColor: e.color ?? '#6366f1' }}
+                        title={`${e.title} (${e.type.replace('_', ' ')})`}
+                      >
+                        {e.title}
+                      </div>
+                    ))}
+                    {(byDay[d] ?? []).length > 3 && (
+                      <div className="text-[10px] text-muted-foreground">+{(byDay[d]?.length ?? 0) - 3} more</div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -254,6 +264,9 @@ export function CourseDetail() {
   const { data: user } = useGetMe();
   const role = user?.role ?? 'learner';
   const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(role);
+  // Enrolled learners get the clean single-flow course page (no tab rail). Instructors and
+  // catalog visitors keep the tabbed course-management shell.
+  const isLearnerView = !isInstructor && !!enrolment;
 
   const setTab = (tab: string) => navigate(`/courses/${courseId}?tab=${tab}`);
 
@@ -412,181 +425,197 @@ export function CourseDetail() {
         </div>
       )}
 
-      {/* Course sections: a horizontal, scrollable tab bar across the top. Replaces the
-          old left side rail. */}
+      {/* Course sections. Instructors/visitors get the horizontal tab bar; enrolled
+          learners get the clean single-flow page (no tab rail) rendered below. */}
       <div>
-        <nav className="mb-6 border-b border-border">
-          <div className="flex gap-1 overflow-x-auto">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setTab(tab.id)}
-                aria-current={activeTab === tab.id ? "page" : undefined}
-                className={cn(
-                  "flex items-center gap-2 whitespace-nowrap border-b-2 -mb-px px-3.5 py-2.5 text-sm font-medium transition-colors",
-                  activeTab === tab.id
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                <tab.icon className="h-4 w-4 shrink-0" />
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </nav>
+        {!isLearnerView && (
+          <nav className="mb-6 border-b border-border">
+            <div className="flex gap-1 overflow-x-auto">
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setTab(tab.id)}
+                  aria-current={activeTab === tab.id ? "page" : undefined}
+                  className={cn(
+                    "flex items-center gap-2 whitespace-nowrap border-b-2 -mb-px px-3.5 py-2.5 text-sm font-medium transition-colors",
+                    activeTab === tab.id
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <tab.icon className="h-4 w-4 shrink-0" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </nav>
+        )}
 
         {/* Tab content */}
         <div className="min-w-0">
         {/* OVERVIEW */}
         {/* Learners get the cognitively-optimized single-primary-action view; staff keep
             the informational overview (about + upcoming + quick links). */}
-        {activeTab === 'overview' && !isInstructor && enrolment && (
-          <div className="space-y-10">
-            {/* 1. Course overview */}
-            {course.description && (
+        {activeTab === 'overview' && isLearnerView && (
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8">
+            {/* Main column: the single learning flow */}
+            <div className="space-y-10 min-w-0">
+              {/* 1. Course overview */}
+              {course.description && (
+                <section>
+                  <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course overview</h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{course.description}</p>
+                </section>
+              )}
+
+              {/* 2. Course learning objectives */}
               <section>
-                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course overview</h2>
-                <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{course.description}</p>
+                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course learning objectives</h2>
+                {(course.objectives && course.objectives.length > 0) ? (
+                  <ul className="space-y-2.5">
+                    {course.objectives.map((o, i) => (
+                      <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
+                        <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        <span className="text-sm leading-relaxed">{o}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Learning objectives for this course haven't been added yet.</p>
+                )}
               </section>
-            )}
 
-            {/* 2. Course learning objectives */}
-            <section>
-              <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course learning objectives</h2>
-              {(course.objectives && course.objectives.length > 0) ? (
-                <ul className="space-y-2.5">
-                  {course.objectives.map((o, i) => (
-                    <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-                      <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                      <span className="text-sm leading-relaxed">{o}</span>
-                    </li>
+              {/* 3. Course structure (summary) */}
+              <section>
+                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course structure</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { icon: BookOpen, value: String(publishedModules.length), label: publishedModules.length === 1 ? 'Module' : 'Modules' },
+                    { icon: Clock, value: String(totalMinutes), label: 'Minutes' },
+                    { icon: Play, value: 'Self-paced', label: 'Delivery' },
+                    { icon: CheckCircle, value: 'Credential', label: 'On mastery' },
+                  ].map((s) => (
+                    <div key={s.label} className="rounded-xl border border-border bg-card p-4">
+                      <s.icon className="h-5 w-5 text-muted-foreground mb-2" />
+                      <div className="text-base font-serif font-bold leading-none">{s.value}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
+                    </div>
                   ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">Learning objectives for this course haven't been added yet.</p>
-              )}
-            </section>
-
-            {/* 3. Course structure (summary) */}
-            <section>
-              <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course structure</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { icon: BookOpen, value: String(publishedModules.length), label: publishedModules.length === 1 ? 'Module' : 'Modules' },
-                  { icon: Clock, value: String(totalMinutes), label: 'Minutes' },
-                  { icon: Play, value: 'Self-paced', label: 'Delivery' },
-                  { icon: CheckCircle, value: 'Credential', label: 'On mastery' },
-                ].map((s) => (
-                  <div key={s.label} className="rounded-xl border border-border bg-card p-4">
-                    <s.icon className="h-5 w-5 text-muted-foreground mb-2" />
-                    <div className="text-base font-serif font-bold leading-none">{s.value}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* 4. What you'll learn (skills) */}
-            <section>
-              <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">What you'll learn</h2>
-              {course.competencyTags && course.competencyTags.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {course.competencyTags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">The skills you'll build will be listed here.</p>
-              )}
-            </section>
+              </section>
 
-            {/* 5. Start here -> pick a module */}
-            <section>
-              <div className="flex items-center justify-between mb-1">
-                <h2 className="text-lg font-serif font-semibold tracking-tight">Start here</h2>
-                <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% complete</span>
+              {/* 4. What you'll learn (skills) */}
+              <section>
+                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">What you'll learn</h2>
+                {course.competencyTags && course.competencyTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {course.competencyTags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">The skills you'll build will be listed here.</p>
+                )}
+              </section>
+
+              {/* 5. Start here -> pick a module */}
+              <section>
+                <div className="flex items-center justify-between mb-1">
+                  <h2 className="text-lg font-serif font-semibold tracking-tight">Start here</h2>
+                  <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% complete</span>
+                </div>
+                <p className="text-sm text-muted-foreground mb-3">Pick a module to work on. We suggest starting with the recommended one.</p>
+                {publishedModules.length > 0 ? (
+                  <div className="space-y-2">
+                    {publishedModules.map((m, i) => {
+                      const p = moduleProgressById.get(m.id);
+                      const done = p?.complete;
+                      const certified = p?.certified;
+                      const pct = p?.percent ?? 0;
+                      const recommended = i === recommendedIdx;
+                      return (
+                        <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
+                          className={cn('w-full flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors',
+                            recommended ? 'border-primary/50 bg-primary/5' : 'border-border bg-card hover:bg-muted/40')}>
+                          <span className={cn('h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0',
+                            done ? 'bg-emerald-500/15 text-emerald-600'
+                              : certified ? 'bg-amber-500/15 text-amber-600'
+                              : 'bg-muted text-muted-foreground')}>
+                            {done ? <CheckCircle className="h-4 w-4" /> : String(i + 1).padStart(2, '0')}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium truncate">{m.title}</span>
+                              {recommended && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">Start here</Badge>}
+                            </div>
+                            <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+                              <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{m.estimatedMinutes ?? 0} min</span>
+                              {certified && !done && <span className="text-amber-600">Mastered</span>}
+                              {pct > 0 && !done && <span>{pct}% viewed</span>}
+                              {done && <span className="text-emerald-600">Complete</span>}
+                            </div>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No modules have been published yet.</p>
+                )}
+              </section>
+            </div>
+
+            {/* Side column: Calendar + Announcements */}
+            <aside className="mt-10 lg:mt-0 space-y-6 lg:sticky lg:top-20 lg:self-start">
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="flex items-center gap-2 font-serif font-semibold text-sm"><Calendar className="h-4 w-4 text-primary" /> Calendar</span>
+                  <div className="flex items-center rounded-lg border border-border p-0.5 text-[11px]">
+                    {(['month', 'list'] as const).map((v) => (
+                      <button key={v} onClick={() => setCalendarView(v)}
+                        className={cn('px-2 py-0.5 rounded-md font-medium capitalize transition-colors',
+                          calendarView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
+                    ))}
+                  </div>
+                </div>
+                {!events ? (
+                  <Skeleton className="h-48" />
+                ) : calendarView === 'month' ? (
+                  <MonthGrid compact events={events} cursor={calCursor} onCursor={setCalCursor} />
+                ) : events.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-6 text-center">No events scheduled.</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {events.slice().sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).slice(0, 8).map((e) => (
+                      <div key={e.id} className="flex items-start gap-2">
+                        <div className="h-2.5 w-2.5 rounded-full mt-1 shrink-0" style={{ backgroundColor: e.color ?? '#6366f1' }} />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-medium leading-snug">{e.title}</div>
+                          <div className="text-[11px] text-muted-foreground">{formatDate(e.startDate)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-muted-foreground mb-3">Pick a module to work on. We suggest starting with the recommended one.</p>
-              {publishedModules.length > 0 ? (
-                <div className="space-y-2">
-                  {publishedModules.map((m, i) => {
-                    const p = moduleProgressById.get(m.id);
-                    const done = p?.complete;
-                    const certified = p?.certified;
-                    const pct = p?.percent ?? 0;
-                    const recommended = i === recommendedIdx;
+
+              {announcements && announcements.length > 0 && (
+                <div className="rounded-2xl border border-border bg-card p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Megaphone className="h-4 w-4 text-amber-600" />
+                    <span className="font-serif font-semibold text-sm">Announcements</span>
+                  </div>
+                  {(() => {
+                    const a = announcements.find((x) => x.pinned) ?? announcements[0];
                     return (
-                      <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
-                        className={cn('w-full flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors',
-                          recommended ? 'border-primary/50 bg-primary/5' : 'border-border bg-card hover:bg-muted/40')}>
-                        <span className={cn('h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0',
-                          done ? 'bg-emerald-500/15 text-emerald-600'
-                            : certified ? 'bg-amber-500/15 text-amber-600'
-                            : 'bg-muted text-muted-foreground')}>
-                          {done ? <CheckCircle className="h-4 w-4" /> : String(i + 1).padStart(2, '0')}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium truncate">{m.title}</span>
-                            {recommended && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">Start here</Badge>}
-                          </div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
-                            <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{m.estimatedMinutes ?? 0} min</span>
-                            {certified && !done && <span className="text-amber-600">Mastered</span>}
-                            {pct > 0 && !done && <span>{pct}% viewed</span>}
-                            {done && <span className="text-emerald-600">Complete</span>}
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                      </button>
+                      <div>
+                        <div className="text-xs font-medium">{a.title}</div>
+                        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-3 leading-relaxed">{a.body}</p>
+                      </div>
                     );
-                  })}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No modules have been published yet.</p>
-              )}
-            </section>
-
-            {/* Calendar — open / close, changeable */}
-            <section>
-              <button onClick={() => setCalendarOpen((o) => !o)}
-                className="w-full flex items-center justify-between rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
-                <span className="flex items-center gap-2 font-serif font-semibold"><Calendar className="h-4 w-4 text-primary" /> Calendar</span>
-                <ChevronRight className={cn('h-4 w-4 text-muted-foreground transition-transform', calendarOpen && 'rotate-90')} />
-              </button>
-              {calendarOpen && (
-                <div className="mt-3 rounded-xl border border-border bg-card p-4">
-                  <div className="flex items-center justify-end mb-3">
-                    <div className="flex items-center rounded-lg border border-border p-0.5 text-xs">
-                      {(['month', 'list'] as const).map((v) => (
-                        <button key={v} onClick={() => setCalendarView(v)}
-                          className={cn('px-3 py-1 rounded-md font-medium capitalize transition-colors',
-                            calendarView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
-                      ))}
-                    </div>
-                  </div>
-                  {!events ? (
-                    <Skeleton className="h-64" />
-                  ) : calendarView === 'month' ? (
-                    <MonthGrid events={events} cursor={calCursor} onCursor={setCalCursor} />
-                  ) : events.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">No events scheduled.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {events.slice().sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).map((e) => (
-                        <div key={e.id} className="flex items-center gap-3 p-3 rounded-lg border border-border">
-                          <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: e.color ?? '#6366f1' }} />
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-foreground">{e.title}</div>
-                            <div className="text-xs text-muted-foreground">{e.type.replace('_', ' ')}</div>
-                          </div>
-                          <div className="text-sm text-muted-foreground">{formatDate(e.startDate)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  })()}
                 </div>
               )}
-            </section>
+            </aside>
           </div>
         )}
         {activeTab === 'overview' && (isInstructor || !enrolment) && (
