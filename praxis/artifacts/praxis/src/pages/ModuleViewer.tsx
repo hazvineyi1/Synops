@@ -1391,25 +1391,29 @@ function ModuleHubView({
         </div>
       </div>
 
-      {/* Tab bar */}
+      {/* Tab bar. Pills that WRAP onto a second row rather than scrolling horizontally --
+          every section stays visible with no slider. */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <div className="flex gap-1 overflow-x-auto border-b border-border">
+        <div className="flex flex-wrap gap-2 border-b border-border pb-4">
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-2 whitespace-nowrap px-3.5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
-                  active ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
+                  'flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
                 )}
               >
                 <t.icon className="h-4 w-4 shrink-0" />
                 {t.label}
                 {typeof t.count === 'number' && t.count > 0 && (
                   <span className={cn('rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
-                    active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>{t.count}</span>
+                    active ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-background text-muted-foreground')}>{t.count}</span>
                 )}
               </button>
             );
