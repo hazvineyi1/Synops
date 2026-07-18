@@ -17,7 +17,9 @@ import {
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
   Users, Layers, Target, Compass, Info, Save, Settings, Sparkles, Link2,
+  Pause, Square, Headphones,
 } from 'lucide-react';
+import { useReadAloud } from '@/lib/speech';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,6 +53,8 @@ interface Beat {
   scenario?: string | null;
   visualData?: { quiz?: Quiz; interactive?: Interactive; subtype?: string; columns?: [string, string] } | null;
   videoUrl?: string | null;
+  /** Authored word-for-word transcript. Absent means we only have narration/notes. */
+  transcript?: string | null;
   audioUrl?: string | null;
 }
 
@@ -1289,6 +1293,110 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 /**
+ * Staff-only transcript editor for a video beat. Transcripts are authored, never generated:
+ * a machine paraphrase presented as a transcript is worse than none, because a learner
+ * relying on it instead of the audio has no way to know it is approximate.
+ */
+function TranscriptEditor({ beatId, initial, moduleId }: { beatId: string; initial: string; moduleId: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(initial);
+
+  const save = useMutation({
+    mutationFn: () => apiFetch(`/beats/${beatId}`, { method: 'PATCH', body: JSON.stringify({ transcript: text }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['module-detail', moduleId] }); setOpen(false); },
+  });
+
+  if (!open) {
+    return (
+      <Button size="sm" variant="outline" className="mt-3 gap-1.5" onClick={() => setOpen(true)}>
+        <Settings className="h-3.5 w-3.5" /> {initial ? 'Edit transcript' : 'Add transcript'}
+        <Badge variant="outline" className="text-[10px] ml-1">Instructor</Badge>
+      </Button>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-dashed border-primary/30 bg-primary/[0.03] p-4 space-y-2">
+      <p className="text-xs uppercase tracking-wider text-muted-foreground">Video transcript</p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={10}
+        placeholder="Paste the word-for-word transcript of this video."
+        className="w-full rounded-lg border border-border bg-background p-3 text-sm leading-relaxed"
+      />
+      <p className="text-xs text-muted-foreground">
+        Paste what the video actually says. Learners who rely on this instead of the audio need it to match.
+      </p>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={() => { setText(initial); setOpen(false); }}>Cancel</Button>
+        <Button size="sm" disabled={save.isPending || text === initial} onClick={() => save.mutate()}>
+          <Save className="h-4 w-4 mr-2" /> {save.isPending ? 'Saving...' : 'Save transcript'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Listen-to-this-reading controls.
+ *
+ * Uses the browser's own speech engine (no service, no cost, nothing stored). We show the
+ * sentence being read rather than highlighting inside the text, because the speech engine
+ * needs whitespace-normalised chunks and the reading itself keeps its paragraph breaks.
+ */
+function ReadAloudBar({ text }: { text: string }) {
+  const { start, pause, resume, stop, status, index, chunks, supported } = useReadAloud();
+
+  if (!supported) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Read-aloud is not available in this browser. Chrome, Edge and Safari support it.
+      </p>
+    );
+  }
+
+  const current = index >= 0 ? chunks[index] : null;
+  const pct = chunks.length && index >= 0 ? Math.round(((index + 1) / chunks.length) * 100) : 0;
+
+  return (
+    <div className="rounded-xl border border-emerald-500/25 bg-emerald-500/[0.04] p-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Headphones className="h-4 w-4 text-emerald-600 shrink-0" />
+        {status === 'idle' ? (
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => start(text)}>
+            <Play className="h-3.5 w-3.5" /> Listen
+          </Button>
+        ) : (
+          <>
+            {status === 'playing' ? (
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={pause}>
+                <Pause className="h-3.5 w-3.5" /> Pause
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={resume}>
+                <Play className="h-3.5 w-3.5" /> Resume
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={stop}>
+              <Square className="h-3.5 w-3.5" /> Stop
+            </Button>
+            <span className="text-xs text-muted-foreground">{pct}%</span>
+          </>
+        )}
+        {status === 'idle' && (
+          <span className="text-xs text-muted-foreground">Have this reading read to you.</span>
+        )}
+      </div>
+      {current && (
+        <p className="mt-2 text-xs italic text-emerald-700/90 dark:text-emerald-400/90">{current}</p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Uploaded module readings: staff attach a document/link, learners read the parsed text
  * inline or open the link. We store parsed text (no binary storage in this stack), so a
  * document becomes a readable article rather than a download.
@@ -1353,6 +1461,7 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
                 Open the original in a new window
               </a>
             )}
+            {reader?.content ? <div className="mt-3"><ReadAloudBar text={reader.content} /></div> : null}
             <p className="mt-4 text-sm leading-relaxed text-foreground/85 whitespace-pre-line">{reader?.content}</p>
             {(reader?.chars ?? 0) >= 200000 && (
               <p className="mt-4 text-xs text-amber-600">This document was long and has been truncated.</p>
@@ -1785,11 +1894,22 @@ function ModuleHubView({
           videoBeats.length > 0 ? (
             <div className="space-y-8">
               {videoBeats.map((b) => {
-                const transcript = [b.narration, ...(b.bulletPoints ?? [])].filter(Boolean).join('\n\n');
+                // Only an authored transcript may be called a transcript. Narration plus
+                // bullet points is the script the beat was built from -- useful to read
+                // along with, but not a record of what the video says, so it is labelled
+                // as notes. Claiming otherwise is an accessibility problem, not a wording one.
+                const realTranscript = (b.transcript ?? '').trim();
+                const notes = [b.narration, ...(b.bulletPoints ?? [])].filter(Boolean).join('\n\n');
+                const body = realTranscript || notes;
                 return (
                   <div key={b.id} className="space-y-3">
                     <SectionHead title={b.title || 'Video lesson'} sub={b.narration || undefined} />
-                    <Instruction>Watch the full video. Turn captions on with the CC control in the player. A transcript is provided below so you can follow along.</Instruction>
+                    <Instruction>
+                      Watch the full video. If the player shows a CC control you can turn captions on.
+                      {realTranscript
+                        ? ' A transcript is provided below so you can follow along or read instead.'
+                        : ' The lesson notes below cover the same material if you prefer to read.'}
+                    </Instruction>
                     {b.videoUrl ? (
                       <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-sm">
                         <video src={b.videoUrl} controls className="w-full h-full" />
@@ -1799,10 +1919,27 @@ function ModuleHubView({
                         note="This lesson is marked as a video but no file is attached yet. It can be added in the Studio editor." />
                     )}
                     <div className="rounded-xl border border-border bg-card p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Transcript</p>
-                      <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line">
-                        {transcript || 'A transcript for this video is being prepared.'}
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                        {realTranscript ? 'Transcript' : 'Lesson notes'}
                       </p>
+                      {body ? (
+                        <>
+                          <ReadAloudBar text={body} />
+                          <p className="mt-3 text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{body}</p>
+                          {!realTranscript && (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              These are the lesson notes, not a word-for-word transcript of the video.
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No transcript or notes have been added for this video yet.
+                        </p>
+                      )}
+                      {isInstructor && (
+                        <TranscriptEditor beatId={b.id} initial={realTranscript} moduleId={moduleId} />
+                      )}
                     </div>
                   </div>
                 );

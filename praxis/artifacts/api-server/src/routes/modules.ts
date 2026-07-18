@@ -34,6 +34,8 @@ function toBeatResponse(b: typeof beatsTable.$inferSelect) {
     bulletPoints: b.bulletPoints,
     scenario: b.scenario,
     visualData: b.visualData,
+    videoUrl: b.videoUrl,
+    transcript: b.transcript,
     audioUrl: b.audioUrl,
     audioStatus: b.audioStatus,
   };

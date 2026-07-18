@@ -31,6 +31,10 @@ export const beatsTable = pgTable("beats", {
   visualData: jsonb("visual_data"),
   videoUrl: text("video_url"),
   videoDurationSeconds: integer("video_duration_seconds"),
+  // Authored transcript for a video beat. Kept separate from `narration`: narration is the
+  // script the beat was generated from, a transcript is what the learner is told the video
+  // actually says. Only the real thing may be labelled a transcript.
+  transcript: text("transcript"),
   audioUrl: text("audio_url"),
   audioStatus: audioStatusEnum("audio_status").notNull().default("none"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

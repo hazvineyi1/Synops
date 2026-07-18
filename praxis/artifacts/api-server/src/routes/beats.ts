@@ -17,6 +17,8 @@ function toBeatResponse(b: typeof beatsTable.$inferSelect) {
     bulletPoints: b.bulletPoints,
     scenario: b.scenario,
     visualData: b.visualData,
+    videoUrl: b.videoUrl,
+    transcript: b.transcript,
     audioUrl: b.audioUrl,
     audioStatus: b.audioStatus,
   };
@@ -57,10 +59,10 @@ router.post("/modules/:moduleId/beats", requireAuth, async (req, res) => {
 
 // PATCH /beats/:beatId
 router.patch("/beats/:beatId", requireAuth, async (req, res) => {
-  const { title, narration, bulletPoints, scenario, order } = req.body;
+  const { title, narration, bulletPoints, scenario, order, transcript, videoUrl } = req.body;
   const [updated] = await db
     .update(beatsTable)
-    .set({ title, narration, bulletPoints, scenario, order, updatedAt: new Date() })
+    .set({ title, narration, bulletPoints, scenario, order, transcript, videoUrl, updatedAt: new Date() })
     .where(eq(beatsTable.id, req.params.beatId))
     .returning();
   res.json(toBeatResponse(updated));
@@ -72,54 +74,29 @@ router.delete("/beats/:beatId", requireAuth, async (req, res) => {
   res.status(204).send();
 });
 
-// POST /beats/:beatId/generate-audio
+/**
+ * POST /beats/:beatId/generate-audio
+ *
+ * DISABLED ON PURPOSE. The previous implementation called ElevenLabs, threw the audio
+ * bytes away (there is no object storage in this stack), and then set audioStatus="ready"
+ * with audioUrl still null -- so the UI showed a play control for audio that did not
+ * exist, and when the API key was absent it stranded the beat at "pending" forever.
+ *
+ * Rather than leave a route that lies, it fails clearly. Learner-facing narration is
+ * handled client-side by the browser speech engine (see lib/speech.ts useReadAloud):
+ * zero cost, nothing to store, and it works today. Re-enable this only once there is a
+ * bucket to write to AND audioUrl is actually persisted.
+ */
 router.post("/beats/:beatId/generate-audio", requireAuth, async (req, res) => {
   const beat = await db.query.beatsTable.findFirst({
     where: eq(beatsTable.id, req.params.beatId),
   });
   if (!beat) { res.status(404).json({ error: "Not found" }); return; }
 
-  // Mark as pending — actual ElevenLabs call would be async worker
-  const [updated] = await db
-    .update(beatsTable)
-    .set({ audioStatus: "pending", updatedAt: new Date() })
-    .where(eq(beatsTable.id, req.params.beatId))
-    .returning();
-
-  // TODO: Queue ElevenLabs synthesis job
-  // For MVP: if ELEVENLABS_API_KEY set, call synchronously
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (apiKey) {
-    try {
-      const response = await fetch("https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM", {
-        method: "POST",
-        headers: {
-          "xi-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: beat.narration,
-          model_id: "eleven_multilingual_v2",
-          voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-        }),
-      });
-      if (response.ok) {
-        // In production: upload to object storage; return URL
-        // For MVP: mark as ready with placeholder
-        const [done] = await db
-          .update(beatsTable)
-          .set({ audioStatus: "ready", updatedAt: new Date() })
-          .where(eq(beatsTable.id, req.params.beatId))
-          .returning();
-        res.status(202).json(toBeatResponse(done));
-        return;
-      }
-    } catch (_err) {
-      // Fall through to pending
-    }
-  }
-
-  res.status(202).json(toBeatResponse(updated));
+  res.status(501).json({
+    error: "Server-side narration audio is not available: this deployment has no audio storage configured.",
+    hint: "Learners can use the built-in read-aloud control, which narrates in the browser.",
+  });
 });
 
 export default router;

@@ -1,4 +1,138 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+
+const BCP47_MAP: Record<string, string> = { en: "en-ZA", zu: "zu-ZA", xh: "xh-ZA", af: "af-ZA", sn: "sn-ZW" };
+const FEMALE_HINT = /female|woman|zira|samantha|victoria|karen|moira|tessa|serena|fiona|susan|linda|amelie|joana/i;
+const MALE_HINT = /male|man|david|mark|daniel|alex|fred|george|arthur|thomas|oliver|rishi/i;
+
+const speechSupported = () => typeof window !== "undefined" && "speechSynthesis" in window;
+
+/** Shared voice picker: prefer the requested language, then English, then anything. */
+function pickVoiceFor(gender: "female" | "male" | null, lang: string): SpeechSynthesisVoice | null {
+  if (!speechSupported()) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const base = (lang || "en").slice(0, 2).toLowerCase();
+  const langMatch = voices.filter((v) => v.lang.toLowerCase().startsWith(base));
+  const english = voices.filter((v) => /^en/i.test(v.lang));
+  const pool = langMatch.length ? langMatch : (english.length ? english : voices);
+  if (gender === "female") { const m = pool.find((v) => FEMALE_HINT.test(v.name)); if (m) return m; }
+  if (gender === "male") { const m = pool.find((v) => MALE_HINT.test(v.name)); if (m) return m; }
+  return pool[0] ?? null;
+}
+
+/**
+ * Does the browser actually have a voice in this language? Worth surfacing: isiZulu,
+ * isiXhosa and Shona voices are rare on desktop, and without this the reader silently
+ * narrates them with an English voice, which is grating across a whole reading.
+ */
+export function hasVoiceForLang(lang: string): boolean {
+  if (!speechSupported()) return false;
+  const base = (lang || "en").slice(0, 2).toLowerCase();
+  return window.speechSynthesis.getVoices().some((v) => v.lang.toLowerCase().startsWith(base));
+}
+
+/**
+ * Split text into sentence-sized chunks. Required: speech engines truncate long
+ * utterances (Chrome caps around 32k chars, some cut off after ~15s of audio), so a
+ * multi-paragraph reading must be queued sentence by sentence.
+ */
+export function chunkForSpeech(text: string, max = 220): string[] {
+  const clean = (text ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const sentences = clean.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [clean];
+  const out: string[] = [];
+  let buf = "";
+  for (const raw of sentences) {
+    const s = raw.trim();
+    if (!s) continue;
+    if (s.length > max) {
+      if (buf) { out.push(buf); buf = ""; }
+      for (let i = 0; i < s.length; i += max) out.push(s.slice(i, i + max));
+      continue;
+    }
+    if ((buf ? `${buf} ${s}` : s).length <= max) buf = buf ? `${buf} ${s}` : s;
+    else { out.push(buf); buf = s; }
+  }
+  if (buf) out.push(buf);
+  return out;
+}
+
+/**
+ * Read-aloud for long-form text (module readings).
+ *
+ * Deliberately separate from useSpeech: the tutor hook is built for short turns, cancels
+ * any in-flight utterance on every call, and has no pause/resume. This one chunks the text,
+ * queues it, exposes real pause/resume/stop, and reports which sentence is being read so
+ * the UI can show it. It is explicitly started by the learner, so it does NOT inherit the
+ * tutor's opt-in mute preference.
+ */
+export function useReadAloud() {
+  const supported = speechSupported();
+  const [status, setStatus] = useState<"idle" | "playing" | "paused">("idle");
+  const [index, setIndex] = useState(-1);
+  const [chunks, setChunks] = useState<string[]>([]);
+
+  const chunksRef = useRef<string[]>([]);
+  const idxRef = useRef(0);
+  const stoppedRef = useRef(false);
+  const langRef = useRef("en");
+
+  const speakFrom = useCallback(() => {
+    if (!supported || stoppedRef.current) return;
+    const list = chunksRef.current;
+    const i = idxRef.current;
+    if (i >= list.length) { setStatus("idle"); setIndex(-1); return; }
+    setIndex(i);
+    const u = new SpeechSynthesisUtterance(list[i]);
+    u.lang = BCP47_MAP[langRef.current] ?? "en-ZA";
+    const v = pickVoiceFor(null, langRef.current);
+    if (v) u.voice = v;
+    u.rate = 1;
+    const advance = () => { if (stoppedRef.current) return; idxRef.current = i + 1; speakFrom(); };
+    u.onend = advance;
+    u.onerror = advance;
+    window.speechSynthesis.speak(u);
+  }, [supported]);
+
+  const start = useCallback((text: string, lang = "en") => {
+    if (!supported || !text?.trim()) return;
+    window.speechSynthesis.cancel();
+    stoppedRef.current = false;
+    langRef.current = lang;
+    const list = chunkForSpeech(text);
+    chunksRef.current = list;
+    setChunks(list);
+    idxRef.current = 0;
+    setStatus("playing");
+    speakFrom();
+  }, [supported, speakFrom]);
+
+  const pause = useCallback(() => {
+    if (!supported) return;
+    window.speechSynthesis.pause();
+    setStatus("paused");
+  }, [supported]);
+
+  const resume = useCallback(() => {
+    if (!supported) return;
+    window.speechSynthesis.resume();
+    setStatus("playing");
+  }, [supported]);
+
+  const stop = useCallback(() => {
+    stoppedRef.current = true;
+    if (supported) window.speechSynthesis.cancel();
+    setStatus("idle");
+    setIndex(-1);
+  }, [supported]);
+
+  useEffect(() => () => {
+    stoppedRef.current = true;
+    if (speechSupported()) window.speechSynthesis.cancel();
+  }, []);
+
+  return { start, pause, resume, stop, status, index, chunks, supported };
+}
 
 /**
  * Browser text-to-speech for the tutor "talking head". Zero-cost, no external service.
