@@ -16,7 +16,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle, BookOpen, List,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
-  Users, Layers, Target, Compass, Info, Save, Settings, Sparkles,
+  Users, Layers, Target, Compass, Info, Save, Settings, Sparkles, Link2,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1270,6 +1270,170 @@ function ModuleSettingsEditor({ initialObjectives, initialModality, saving, onSa
   );
 }
 
+interface ModuleReadingRow {
+  id: string; moduleId: string; title: string; kind: string;
+  sourceUrl: string | null; filename: string | null; chars: number;
+  hasContent: boolean; order: number; createdAt: string;
+}
+
+const READING_ACCEPT = ".pdf,.docx,.txt,.md,.csv,.tsv,.rtf,.html,.htm,.pptx,.xlsx,.xls";
+
+/** data:...;base64,XXXX -> XXXX (mirrors the Coach materials uploader). */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => { const s = String(r.result); resolve(s.slice(s.indexOf(',') + 1)); };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+/**
+ * Uploaded module readings: staff attach a document/link, learners read the parsed text
+ * inline or open the link. We store parsed text (no binary storage in this stack), so a
+ * document becomes a readable article rather than a download.
+ */
+function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstructor: boolean }) {
+  const qc = useQueryClient();
+  const { data: readings } = useQuery({
+    queryKey: ['module-readings', moduleId],
+    queryFn: () => apiFetch<ModuleReadingRow[]>(`/modules/${moduleId}/readings`),
+    enabled: !!moduleId,
+  });
+
+  const [readerId, setReaderId] = useState<string | null>(null);
+  const { data: reader, isLoading: readerLoading } = useQuery({
+    queryKey: ['reading', readerId],
+    queryFn: () => apiFetch<ModuleReadingRow & { content: string }>(`/readings/${readerId}`),
+    enabled: !!readerId,
+  });
+
+  const [mode, setMode] = useState<'file' | 'link'>('file');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const add = useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      apiFetch(`/modules/${moduleId}/readings`, { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => { setLinkUrl(''); setError(null); qc.invalidateQueries({ queryKey: ['module-readings', moduleId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not add that reading.'),
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => apiFetch(`/readings/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['module-readings', moduleId] }),
+  });
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    if (file.size > 15 * 1024 * 1024) { setError('That file is too large (15MB maximum).'); return; }
+    setBusy(true);
+    try {
+      const dataBase64 = await fileToBase64(file);
+      await add.mutateAsync({ filename: file.name, dataBase64 });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed.');
+    } finally { setBusy(false); }
+  };
+
+  // Inline reader for a parsed document.
+  if (readerId) {
+    return (
+      <div className="space-y-3">
+        <Button variant="ghost" size="sm" onClick={() => setReaderId(null)} className="gap-1.5">
+          <ChevronLeft className="h-4 w-4" /> Back to readings
+        </Button>
+        {readerLoading ? <Skeleton className="h-64" /> : (
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <h3 className="text-lg font-serif font-semibold mb-1">{reader?.title}</h3>
+            {reader?.sourceUrl && (
+              <a href={reader.sourceUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                Open the original in a new window
+              </a>
+            )}
+            <p className="mt-4 text-sm leading-relaxed text-foreground/85 whitespace-pre-line">{reader?.content}</p>
+            {(reader?.chars ?? 0) >= 200000 && (
+              <p className="mt-4 text-xs text-amber-600">This document was long and has been truncated.</p>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {(readings ?? []).map((r) => (
+        <div key={r.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+          <span className="h-9 w-9 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+            {r.kind === 'link' ? <Link2 className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium truncate">{r.title}</div>
+            <div className="text-xs text-muted-foreground">
+              {r.kind === 'link' ? 'Link' : (r.filename ?? 'Document')}
+              {r.hasContent ? ` · ${Math.max(1, Math.round(r.chars / 1500))} min read` : ''}
+            </div>
+          </div>
+          {r.kind === 'link' && r.sourceUrl && (
+            <a href={r.sourceUrl} target="_blank" rel="noreferrer"
+              className="text-xs font-medium text-primary hover:underline shrink-0">Open</a>
+          )}
+          {r.hasContent && (
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => setReaderId(r.id)}>Read</Button>
+          )}
+          {isInstructor && (
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-rose-500 shrink-0"
+              onClick={() => remove.mutate(r.id)} aria-label="Remove reading">
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      ))}
+
+      {isInstructor && (
+        <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/[0.03] p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-primary" />
+            <span className="font-serif font-semibold text-sm">Add a reading</span>
+            <Badge variant="outline" className="text-[10px] ml-1">Instructor</Badge>
+          </div>
+          <div className="flex gap-2">
+            {(['file', 'link'] as const).map((m) => (
+              <button key={m} onClick={() => { setMode(m); setError(null); }}
+                className={cn('rounded-full px-3 py-1 text-xs font-medium capitalize',
+                  mode === m ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+                {m === 'file' ? 'Upload document' : 'Paste a link'}
+              </button>
+            ))}
+          </div>
+          {mode === 'file' ? (
+            <label className="flex items-center justify-center rounded-xl border-2 border-dashed border-border bg-background px-4 py-6 text-sm text-muted-foreground cursor-pointer hover:bg-muted/40">
+              <input type="file" accept={READING_ACCEPT} className="hidden"
+                onChange={(e) => onFile(e.target.files?.[0])} />
+              {busy || add.isPending ? 'Reading the document…' : 'Choose a PDF, Word, PowerPoint, Excel or text file (15MB max)'}
+            </label>
+          ) : (
+            <div className="flex gap-2">
+              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://example.com/article"
+                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              <Button size="sm" disabled={!linkUrl.trim() || add.isPending}
+                onClick={() => add.mutate({ url: linkUrl.trim() })}>Add</Button>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Documents are parsed so learners can read them here. Links open in a new window.
+          </p>
+          {error && <p className="text-xs text-rose-600">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ModuleHubView({
   mod, allBeats, course, courseId, moduleId, navigate, isLoading,
 }: {
@@ -1315,6 +1479,13 @@ function ModuleHubView({
     queryFn: () => activitiesApi.list({ moduleId }),
     enabled: !!moduleId,
   });
+  // Uploaded readings (documents/links) attached to this module. Shares its cache key with
+  // ReadingsSection, so this is one request, not two.
+  const { data: moduleReadings } = useQuery({
+    queryKey: ['module-readings', moduleId],
+    queryFn: () => apiFetch<ModuleReadingRow[]>(`/modules/${moduleId}/readings`),
+    enabled: !!moduleId,
+  });
 
   const startSession = useMutation({
     mutationFn: () => apiFetch<{ id: string }>('/sessions', {
@@ -1341,6 +1512,9 @@ function ModuleHubView({
   const moduleAssignments = (assignments ?? []).filter(a => a.moduleId === moduleId);
   const activityCount     = moduleActivities?.length ?? 0;
   const practiceCount     = interactiveBeats.length + quizBeats.length + activityCount;
+  // Readings = in-module reading beats PLUS uploaded documents/links. Both must count, or
+  // a module with only uploaded readings would drop out of the flow and show an empty tab.
+  const readingCount      = readingBeats.length + (moduleReadings?.length ?? 0);
 
   const modality = (mod?.modality ?? 'async') as string;
   const mm = MODALITY_META[modality] ?? MODALITY_META.async;
@@ -1356,7 +1530,7 @@ function ModuleHubView({
     { id: 'overview',    label: 'Overview',    icon: Compass },
     { id: 'structure',   label: 'Structure',   icon: List },
     { id: 'video',       label: 'Video',       icon: PlayCircle,    count: videoBeats.length },
-    { id: 'readings',    label: 'Readings',    icon: BookOpen,      count: readingBeats.length },
+    { id: 'readings',    label: 'Readings',    icon: BookOpen,      count: readingCount },
     { id: 'complete',    label: 'Complete',    icon: Zap,           count: practiceCount },
     { id: 'participate', label: 'Participate', icon: MessageSquare, count: discussions?.length ?? 0 },
     { id: 'assignments', label: 'Assignments', icon: FileText,      count: moduleAssignments.length },
@@ -1367,7 +1541,7 @@ function ModuleHubView({
   // The ordered learning experiences that actually exist in this module.
   const flow: { id: HubTab; label: string }[] = [
     ...(videoBeats.length ? [{ id: 'video' as HubTab, label: 'Video' }] : []),
-    ...(readingBeats.length ? [{ id: 'readings' as HubTab, label: 'Readings' }] : []),
+    ...(readingCount ? [{ id: 'readings' as HubTab, label: 'Readings' }] : []),
     ...(practiceCount ? [{ id: 'complete' as HubTab, label: 'Activities' }] : []),
   ];
   // Where the course sits: this module, the next module, and completion state.
@@ -1520,7 +1694,7 @@ function ModuleHubView({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
                   { label: 'Video',       n: videoBeats.length,   icon: PlayCircle, go: () => setTab('video') },
-                  { label: 'Readings',    n: readingBeats.length, icon: BookOpen,   go: () => setTab('readings') },
+                  { label: 'Readings',    n: readingCount, icon: BookOpen,   go: () => setTab('readings') },
                   { label: 'Activities',  n: practiceCount,       icon: Zap,        go: () => setTab('complete') },
                   { label: 'Assignments', n: moduleAssignments.length, icon: FileText, go: () => setTab('assignments') },
                 ].map((s) => (
@@ -1536,7 +1710,7 @@ function ModuleHubView({
 
             <div className="flex flex-col sm:flex-row gap-3 pt-1">
               <Button className="flex-1 h-12"
-                onClick={() => setTab(videoBeats.length ? 'video' : readingBeats.length ? 'readings' : 'complete')}>
+                onClick={() => setTab(videoBeats.length ? 'video' : readingCount ? 'readings' : 'complete')}>
                 <Play className="h-4 w-4 mr-2" /> Start learning
               </Button>
               <Button variant="outline" className="flex-1 h-12"
@@ -1640,28 +1814,38 @@ function ModuleHubView({
           )
         )}
 
-        {/* READINGS */}
+        {/* READINGS — in-module reading beats plus uploaded documents/links */}
         {tab === 'readings' && (
-          readingBeats.length > 0 ? (
-            <div className="space-y-4">
-              <Instruction>Work through the readings at your own pace. Your progress is tracked automatically. Open the reader to move through them in order.</Instruction>
-              <div className="space-y-2">
-                {readingBeats.map((b, i) => (
-                  <div key={b.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
-                    <span className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span>
-                    <span className="flex-1 text-sm font-medium truncate">{b.title}</span>
-                    {b.audioUrl && <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1 shrink-0"><Play className="h-3 w-3" /> audio</span>}
-                  </div>
-                ))}
-              </div>
-              <Button className="w-full h-11" onClick={() => open('reading')}>
-                <BookOpen className="h-4 w-4 mr-2" /> Open readings
-              </Button>
-            </div>
-          ) : (
-            <EmptyState icon={BookOpen} title="No readings for this module"
-              note="Uploaded documents and readings will appear here. PDF upload and read-aloud audio are coming soon." />
-          )
+          <div className="space-y-4">
+            {readingCount > 0 && (
+              <Instruction>Work through the readings at your own pace. Your progress is tracked automatically.</Instruction>
+            )}
+
+            {readingBeats.length > 0 && (
+              <>
+                <div className="space-y-2">
+                  {readingBeats.map((b, i) => (
+                    <div key={b.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+                      <span className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span>
+                      <span className="flex-1 text-sm font-medium truncate">{b.title}</span>
+                      {b.audioUrl && <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1 shrink-0"><Play className="h-3 w-3" /> audio</span>}
+                    </div>
+                  ))}
+                </div>
+                <Button className="w-full h-11" onClick={() => open('reading')}>
+                  <BookOpen className="h-4 w-4 mr-2" /> Open readings
+                </Button>
+              </>
+            )}
+
+            {/* Uploaded documents / links (+ the staff uploader). */}
+            <ReadingsSection moduleId={moduleId} isInstructor={isInstructor} />
+
+            {readingCount === 0 && !isInstructor && (
+              <EmptyState icon={BookOpen} title="No readings for this module"
+                note="Documents and links your facilitator adds will appear here." />
+            )}
+          </div>
         )}
 
         {/* COMPLETE — interactive practice + mastery */}

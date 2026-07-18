@@ -35,3 +35,4 @@ export * from "./prompt_templates";
 export * from "./cases";
 export * from "./tutor_figures";
 export * from "./gradebook";
+export * from "./module_readings";
