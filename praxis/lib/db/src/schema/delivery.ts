@@ -30,12 +30,19 @@ export const deliverySessionsTable = pgTable("delivery_sessions", {
   tenantId: text("tenant_id").notNull(),
   // Optional link to a course/program; null for a standalone session (e.g. a workshop).
   courseId: text("course_id"),
+  // Optional link to a specific module, so a live/hybrid module can surface its own
+  // workshop in the learner's module view. Null = a course-wide or standalone session.
+  // Kept nullable on purpose: most sessions are cohort-level, not module-level.
+  moduleId: text("module_id"),
   facilitatorId: text("facilitator_id"),
   title: text("title").notNull(),
   sessionType: deliverySessionTypeEnum("session_type").notNull().default("in_person"),
   scheduledAt: timestamp("scheduled_at").notNull(),
   durationMinutes: integer("duration_minutes").notNull().default(60),
   location: text("location"),
+  // Joining link for a virtual session. Distinct from `location`, which is free text for
+  // a physical venue -- a learner needs to know which one they are looking at.
+  joinUrl: text("join_url"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

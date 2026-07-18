@@ -1292,6 +1292,207 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+interface WorkshopRow {
+  id: string;
+  title: string;
+  sessionType: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  location?: string | null;
+  joinUrl?: string | null;
+  notes?: string | null;
+  myAttendance?: { status: string; coachingHours?: string | null } | null;
+}
+
+const ATTENDANCE_LABEL: Record<string, { label: string; cls: string }> = {
+  present: { label: 'You attended', cls: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30' },
+  late:    { label: 'Marked late', cls: 'bg-amber-500/10 text-amber-600 border-amber-500/30' },
+  excused: { label: 'Excused', cls: 'bg-sky-500/10 text-sky-600 border-sky-500/30' },
+  absent:  { label: 'Marked absent', cls: 'bg-rose-500/10 text-rose-600 border-rose-500/30' },
+};
+
+/**
+ * Live workshops for this module.
+ *
+ * Reads the EXISTING delivery_sessions store (the same one behind Sessions and My sessions
+ * and the funder coaching-hour totals) filtered to this module -- not a parallel workshop
+ * table, so attendance recorded here still counts everywhere it already counted.
+ */
+function WorkshopSection({ moduleId, isInstructor }: { moduleId: string; isInstructor: boolean }) {
+  const qc = useQueryClient();
+  const { data: sessions, isLoading } = useQuery({
+    queryKey: ['module-workshops', moduleId],
+    queryFn: () => apiFetch<WorkshopRow[]>(`/modules/${moduleId}/delivery-sessions`),
+    enabled: !!moduleId,
+  });
+
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    title: '', sessionType: 'workshop', scheduledAt: '', durationMinutes: 60, location: '', joinUrl: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+
+  const create = useMutation({
+    mutationFn: () => apiFetch(`/modules/${moduleId}/delivery-sessions`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: form.title,
+        sessionType: form.sessionType,
+        scheduledAt: new Date(form.scheduledAt).toISOString(),
+        durationMinutes: Number(form.durationMinutes) || 60,
+        location: form.location || null,
+        joinUrl: form.joinUrl || null,
+      }),
+    }),
+    onSuccess: () => {
+      setOpen(false); setError(null);
+      setForm({ title: '', sessionType: 'workshop', scheduledAt: '', durationMinutes: 60, location: '', joinUrl: '' });
+      qc.invalidateQueries({ queryKey: ['module-workshops', moduleId] });
+    },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not schedule that workshop.'),
+  });
+
+  const now = Date.now();
+  const list = sessions ?? [];
+
+  return (
+    <div className="space-y-4">
+      <SectionHead title="Workshop" sub="Live, facilitated sessions for this module." />
+
+      {isLoading && <Skeleton className="h-24" />}
+
+      {!isLoading && list.length === 0 && (
+        <EmptyState icon={Users} title="No workshop scheduled for this module"
+          note={isInstructor
+            ? 'Schedule one below and it will appear here and on your learners’ calendars.'
+            : 'When a live session is scheduled, its time and joining details will appear here.'} />
+      )}
+
+      {list.map((s) => {
+        const when = new Date(s.scheduledAt);
+        const past = when.getTime() + s.durationMinutes * 60_000 < now;
+        const att = s.myAttendance ? ATTENDANCE_LABEL[s.myAttendance.status] : null;
+        return (
+          <div key={s.id} className={cn('rounded-2xl border bg-card p-5 space-y-3', past ? 'border-border opacity-80' : 'border-rose-200 dark:border-rose-900')}>
+            <div className="flex items-start gap-3">
+              <span className="h-10 w-10 rounded-xl bg-rose-500/10 text-rose-600 flex items-center justify-center shrink-0">
+                <Users className="h-5 w-5" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold">{s.title}</div>
+                <div className="text-sm text-muted-foreground capitalize">
+                  {s.sessionType.replace(/_/g, ' ')} · {s.durationMinutes} min
+                  {past ? ' · finished' : ''}
+                </div>
+              </div>
+              {att && (
+                <Badge variant="outline" className={cn('shrink-0 text-[11px]', att.cls)}>{att.label}</Badge>
+              )}
+            </div>
+
+            <div className="text-sm">
+              <span className="font-medium">
+                {when.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+              </span>
+              <span className="text-muted-foreground">
+                {' '}at {when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </div>
+
+            {s.location && <div className="text-sm text-muted-foreground">Venue: {s.location}</div>}
+
+            {s.joinUrl && !past && (
+              <a href={s.joinUrl} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+                <Link2 className="h-4 w-4" /> Join the session
+              </a>
+            )}
+            {s.notes && <p className="text-sm text-foreground/80 whitespace-pre-line">{s.notes}</p>}
+          </div>
+        );
+      })}
+
+      {isInstructor && (
+        <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/[0.03] p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-primary" />
+            <h3 className="font-serif font-semibold text-sm">Schedule a workshop</h3>
+            <Badge variant="outline" className="text-[10px] ml-1">Instructor</Badge>
+          </div>
+
+          {!open ? (
+            <Button size="sm" variant="outline" onClick={() => setOpen(true)}>Add a session</Button>
+          ) : (
+            <div className="space-y-3">
+              <input
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="Session title"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs text-muted-foreground">Date and time</label>
+                  <input
+                    type="datetime-local"
+                    value={form.scheduledAt}
+                    onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Duration (minutes)</label>
+                  <input
+                    type="number"
+                    min={15}
+                    value={form.durationMinutes}
+                    onChange={(e) => setForm((f) => ({ ...f, durationMinutes: Number(e.target.value) }))}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="max-w-xs">
+                <label className="text-xs text-muted-foreground">Type</label>
+                <Select value={form.sessionType} onValueChange={(v) => setForm((f) => ({ ...f, sessionType: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="workshop">Workshop</SelectItem>
+                    <SelectItem value="in_person">In person</SelectItem>
+                    <SelectItem value="virtual">Virtual</SelectItem>
+                    <SelectItem value="mentoring">Mentoring</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <input
+                value={form.location}
+                onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
+                placeholder="Venue (optional)"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+              <input
+                value={form.joinUrl}
+                onChange={(e) => setForm((f) => ({ ...f, joinUrl: e.target.value }))}
+                placeholder="Joining link for a virtual session (optional)"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              />
+              {error && <p className="text-xs text-rose-600">{error}</p>}
+              <p className="text-xs text-muted-foreground">
+                Attendance is recorded on the Sessions page and counts towards coaching hours.
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={() => { setOpen(false); setError(null); }}>Cancel</Button>
+                <Button size="sm" disabled={!form.title || !form.scheduledAt || create.isPending} onClick={() => create.mutate()}>
+                  <Save className="h-4 w-4 mr-2" /> {create.isPending ? 'Scheduling...' : 'Schedule'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Staff-only transcript editor for a video beat. Transcripts are authored, never generated:
  * a machine paraphrase presented as a transcript is worse than none, because a learner
@@ -1556,6 +1757,13 @@ function ModuleHubView({
 }) {
   const [tab, setTab] = useState<HubTab>('overview');
 
+  // Same query key as WorkshopSection, so React Query serves both from one fetch.
+  const { data: moduleWorkshops } = useQuery({
+    queryKey: ['module-workshops', moduleId],
+    queryFn: () => apiFetch<WorkshopRow[]>(`/modules/${moduleId}/delivery-sessions`),
+    enabled: !!moduleId,
+  });
+
   const { data: courseModules } = useQuery({
     queryKey: ['modules', courseId],
     queryFn: () => apiFetch<HubModule[]>(`/courses/${courseId}/modules`),
@@ -1643,7 +1851,7 @@ function ModuleHubView({
     { id: 'complete',    label: 'Complete',    icon: Zap,           count: practiceCount },
     { id: 'participate', label: 'Participate', icon: MessageSquare, count: discussions?.length ?? 0 },
     { id: 'assignments', label: 'Assignments', icon: FileText,      count: moduleAssignments.length },
-    { id: 'workshop',    label: 'Workshop',    icon: Users },
+    { id: 'workshop',    label: 'Workshop',    icon: Users,         count: moduleWorkshops?.length ?? 0 },
   ];
 
   // ── Guided linear progression ──────────────────────────────────────────────
@@ -2100,11 +2308,7 @@ function ModuleHubView({
 
         {/* WORKSHOP */}
         {tab === 'workshop' && (
-          <div className="space-y-4">
-            <SectionHead title="Workshop" sub="Live, facilitated sessions for this module." />
-            <EmptyState icon={Users} title="No workshop scheduled for this module"
-              note="When a live or hybrid workshop is scheduled, its time, joining link, and materials will appear here." />
-          </div>
+          <WorkshopSection moduleId={moduleId} isInstructor={isInstructor} />
         )}
 
       </div>

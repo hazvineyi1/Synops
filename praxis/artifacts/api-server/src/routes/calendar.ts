@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { courseEventsTable, enrolmentsTable, assignmentsTable } from "@workspace/db";
+import { courseEventsTable, enrolmentsTable, assignmentsTable, deliverySessionsTable } from "@workspace/db";
 import { eq, or, and, gte, lte, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -39,9 +39,39 @@ router.get("/calendar", requireAuth, async (req, res) => {
       createdAt: a.createdAt,
     }));
 
+  // Live sessions / workshops for the learner's enrolled courses. A scheduled workshop the
+  // learner is expected to attend but that never appears on their calendar is a missed
+  // session waiting to happen, so these are synthesised in as "class_session" events (that
+  // enum value already existed with no producer). Sessions with no course are org-wide
+  // internal ones and are not surfaced to the learner here.
+  const sessions = courseIds.length
+    ? await db.select().from(deliverySessionsTable)
+    : [];
+  const sessionEvents = sessions
+    .filter((s) => s.courseId && courseIds.includes(s.courseId))
+    .map((s) => ({
+      id: `delivery_session_${s.id}`,
+      courseId: s.courseId!,
+      userId: null,
+      title: s.title,
+      description: [
+        s.sessionType.replace(/_/g, " "),
+        s.location ? `at ${s.location}` : null,
+        `${s.durationMinutes} min`,
+      ].filter(Boolean).join(" · "),
+      startDate: s.scheduledAt,
+      endDate: new Date(s.scheduledAt.getTime() + s.durationMinutes * 60_000),
+      allDay: false,
+      type: "class_session" as const,
+      linkedAssignmentId: null,
+      color: "#0ea5e9",
+      createdAt: s.createdAt,
+    }));
+
   res.json([
     ...events.map(e => ({ ...e, startDate: e.startDate.toISOString(), endDate: e.endDate?.toISOString() ?? null, createdAt: e.createdAt.toISOString() })),
     ...assignmentEvents.map(e => ({ ...e, startDate: e.startDate.toISOString(), endDate: null, createdAt: e.createdAt.toISOString() })),
+    ...sessionEvents.map(e => ({ ...e, startDate: e.startDate.toISOString(), endDate: e.endDate.toISOString(), createdAt: e.createdAt.toISOString() })),
   ]);
 });
 
