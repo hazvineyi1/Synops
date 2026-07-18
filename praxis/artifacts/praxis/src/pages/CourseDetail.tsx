@@ -688,10 +688,27 @@ export function CourseDetail() {
     .sort((a, b) => a.order - b.order);
   const totalMinutes = publishedModules.reduce((s, m) => s + (m.estimatedMinutes ?? 0), 0);
   // The module we suggest the learner start with: the first that isn't complete or mastered.
-  const recommendedIdx = publishedModules.findIndex((m) => {
+  const recommendedId = publishedModules.find((m) => {
     const p = moduleProgressById.get(m.id);
     return !(p?.complete || p?.certified);
-  });
+  })?.id;
+
+  // Display order for the "Start here" list: what the learner should do NEXT comes first.
+  //   0 = in progress (started, not finished)   -> top
+  //   1 = not started yet (the next one in line) -> middle
+  //   2 = complete or mastered                   -> bottom
+  // Each card keeps its CURRICULUM number (seq) so reordering never renumbers a module --
+  // "Handling Difficult Situations" stays 03 even when it floats to the top as what's next.
+  // Array.sort is stable, and publishedModules is already in curriculum order, so modules
+  // within the same bucket stay in sequence.
+  const orderedModules = publishedModules
+    .map((m, i) => {
+      const p = moduleProgressById.get(m.id);
+      const done = !!(p?.complete || p?.certified);
+      const started = (p?.percent ?? 0) > 0 && !done;
+      return { m, seq: i + 1, bucket: done ? 2 : started ? 0 : 1 };
+    })
+    .sort((a, b) => a.bucket - b.bucket);
 
   if (courseLoading) return (
     <div className="space-y-4">
@@ -884,14 +901,14 @@ export function CourseDetail() {
                   <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% complete</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">Pick a module to work on. We suggest starting with the recommended one.</p>
-                {publishedModules.length > 0 ? (
+                {orderedModules.length > 0 ? (
                   <div className="space-y-2">
-                    {publishedModules.map((m, i) => {
+                    {orderedModules.map(({ m, seq }) => {
                       const p = moduleProgressById.get(m.id);
                       const done = p?.complete;
                       const certified = p?.certified;
                       const pct = p?.percent ?? 0;
-                      const recommended = i === recommendedIdx;
+                      const recommended = m.id === recommendedId;
                       return (
                         <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
                           className={cn('w-full flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors',
@@ -900,7 +917,7 @@ export function CourseDetail() {
                             done ? 'bg-emerald-500/15 text-emerald-600'
                               : certified ? 'bg-amber-500/15 text-amber-600'
                               : 'bg-muted text-muted-foreground')}>
-                            {done ? <CheckCircle className="h-4 w-4" /> : String(i + 1).padStart(2, '0')}
+                            {done ? <CheckCircle className="h-4 w-4" /> : String(seq).padStart(2, '0')}
                           </span>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
