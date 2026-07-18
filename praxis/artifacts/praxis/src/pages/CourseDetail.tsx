@@ -430,18 +430,18 @@ export function CourseDetail() {
           learners get the clean single-flow page (no tab rail) rendered below. */}
       <div>
         {!isLearnerView && (
-          <nav className="mb-6 border-b border-border">
-            <div className="flex gap-1 overflow-x-auto">
+          <nav className="mb-6">
+            <div className="flex flex-wrap gap-2 border-b border-border pb-4">
               {TABS.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setTab(tab.id)}
                   aria-current={activeTab === tab.id ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-2 whitespace-nowrap border-b-2 -mb-px px-3.5 py-2.5 text-sm font-medium transition-colors",
+                    "flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
                     activeTab === tab.id
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   <tab.icon className="h-4 w-4 shrink-0" />

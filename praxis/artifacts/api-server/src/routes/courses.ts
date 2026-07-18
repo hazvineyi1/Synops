@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { coursesTable, modulesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireAuth, requireRole } from "../middlewares/requireAuth";
 
 const router = Router();
 
@@ -80,7 +80,7 @@ router.get("/courses/:courseId", requireAuth, async (req, res) => {
 });
 
 // PATCH /courses/:courseId
-router.patch("/courses/:courseId", requireAuth, async (req, res) => {
+router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
   const { title, description, status, competencyTags, nqfLevel, thumbnailUrl, objectives } = req.body;
   const [updated] = await db
     .update(coursesTable)
