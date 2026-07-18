@@ -138,7 +138,17 @@ router.get("/activities", requireAuth, async (req, res) => {
   }
   if (moduleId) rows = rows.filter((a) => a.moduleId === moduleId);
   if (courseId) rows = rows.filter((a) => a.courseId === courseId);
-  res.json(rows.map(activityResponse));
+
+  // `mySubmitted` for the CALLING user only. The module page needs to know whether THIS
+  // learner has done each activity before it can honestly say the module is finished;
+  // the activity row alone only says the activity exists.
+  const mine = await db
+    .select({ activityId: activitySubmissionsTable.activityId })
+    .from(activitySubmissionsTable)
+    .where(eq(activitySubmissionsTable.userId, req.userId!));
+  const submitted = new Set(mine.map((r) => r.activityId));
+
+  res.json(rows.map((a) => ({ ...activityResponse(a), mySubmitted: submitted.has(a.id) })));
 });
 
 /** GET /activities/:id — scoped to tenant / library / assignment; unpublished = managers only. */

@@ -1171,8 +1171,11 @@ interface HubModule { id: string; courseId: string; title: string; order: number
 interface HubAssignment {
   id: string; title: string; description?: string; moduleId?: string | null;
   dueDate?: string | null; pointsPossible?: number | string; submissionType?: string;
+  /** Has THIS learner submitted? Server-computed for the caller only. */
+  mySubmitted?: boolean;
 }
-interface HubDiscussion { id: string; title: string; replyCount?: number }
+/** `iHaveReplied` is caller-scoped; replyCount is a global total and cannot stand in for it. */
+interface HubDiscussion { id: string; title: string; replyCount?: number; iHaveReplied?: boolean }
 interface HubCourse { id: string; title: string; description?: string }
 
 type HubTab = 'overview' | 'structure' | 'video' | 'readings' | 'complete' | 'participate' | 'assignments' | 'workshop';
@@ -1292,6 +1295,96 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
+/**
+ * The mastery gate.
+ *
+ * Locked until everything the learner can finish unaided is finished. When it is locked it
+ * always says exactly what is outstanding and links straight to it -- a disabled button with
+ * no explanation is the thing that makes people email support.
+ *
+ * `waiting` items are listed but never lock the button: they depend on someone else (a
+ * workshop that has not run yet, attendance a facilitator has not recorded) and holding a
+ * credential hostage to another person's admin is not a gate, it is a trap.
+ */
+function MasteryCard({ unlocked, blocking, waiting, pending, onStart, onGo }: {
+  unlocked: boolean;
+  blocking: { id: HubTab; label: string }[];
+  waiting: { id: HubTab; label: string }[];
+  pending: boolean;
+  onStart: () => void;
+  onGo: (t: HubTab) => void;
+}) {
+  return (
+    <div className={cn('rounded-xl border p-4',
+      unlocked ? 'border-rose-200 dark:border-rose-800 bg-rose-500/5' : 'border-border bg-muted/30')}>
+      <div className="flex items-center gap-3 mb-3">
+        <span className={cn('h-10 w-10 rounded-xl flex items-center justify-center shrink-0',
+          unlocked ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-600' : 'bg-muted text-muted-foreground')}>
+          <GraduationCap className="h-5 w-5" />
+        </span>
+        <div className="min-w-0">
+          <div className="font-semibold text-sm">Demonstrate mastery</div>
+          <div className="text-xs text-muted-foreground">
+            {unlocked
+              ? 'A guided Socratic session. Earns your credential when you reach mastery.'
+              : 'Available once you have worked through the sections below.'}
+          </div>
+        </div>
+      </div>
+
+      {!unlocked && blocking.length > 0 && (
+        <ul className="mb-3 space-y-1.5">
+          {blocking.map((b) => (
+            <li key={b.id}>
+              <button onClick={() => onGo(b.id)}
+                className="w-full flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm hover:bg-muted/50 transition-colors">
+                <span className="h-4 w-4 rounded-full border-2 border-muted-foreground/40 shrink-0" />
+                <span className="flex-1 min-w-0 truncate">Still to do: {b.label}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {waiting.length > 0 && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Also outstanding, but not holding you up:{' '}
+          {waiting.map((w) => w.label).join(', ')}.
+        </p>
+      )}
+
+      <Button className="w-full" disabled={!unlocked || pending} onClick={onStart}>
+        {pending ? 'Starting...' : unlocked ? 'Start session' : 'Locked until the above is done'}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Shown when a section has nothing in it.
+ *
+ * An empty section is a dead end unless it says where to go instead, so this always ends
+ * with the actual next step: the next unfinished deliverable, or mastery, or the next
+ * module, or the course being finished.
+ */
+function NothingHere({ icon: Icon, title, next }: {
+  icon: React.ElementType;
+  title: string;
+  next: { label: string; onClick: () => void; note: string };
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border p-10 text-center">
+      <Icon className="h-8 w-8 mx-auto text-muted-foreground/50 mb-3" />
+      <p className="font-semibold">{title}</p>
+      <p className="text-sm text-muted-foreground mt-1 mb-5">{next.note}</p>
+      <Button onClick={next.onClick} className="gap-1.5">
+        {next.label} <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
 interface WorkshopRow {
   id: string;
   title: string;
@@ -1318,7 +1411,11 @@ const ATTENDANCE_LABEL: Record<string, { label: string; cls: string }> = {
  * and the funder coaching-hour totals) filtered to this module -- not a parallel workshop
  * table, so attendance recorded here still counts everywhere it already counted.
  */
-function WorkshopSection({ moduleId, isInstructor }: { moduleId: string; isInstructor: boolean }) {
+function WorkshopSection({ moduleId, isInstructor, next }: {
+  moduleId: string;
+  isInstructor: boolean;
+  next: { label: string; onClick: () => void; note: string };
+}) {
   const qc = useQueryClient();
   const { data: sessions, isLoading } = useQuery({
     queryKey: ['module-workshops', moduleId],
@@ -1362,10 +1459,10 @@ function WorkshopSection({ moduleId, isInstructor }: { moduleId: string; isInstr
       {isLoading && <Skeleton className="h-24" />}
 
       {!isLoading && list.length === 0 && (
-        <EmptyState icon={Users} title="No workshop scheduled for this module"
-          note={isInstructor
-            ? 'Schedule one below and it will appear here and on your learners’ calendars.'
-            : 'When a live session is scheduled, its time and joining details will appear here.'} />
+        isInstructor
+          ? <EmptyState icon={Users} title="No workshop scheduled for this module"
+              note="Schedule one below and it will appear here and on your learners' calendars." />
+          : <NothingHere icon={Users} title="No workshop scheduled for this module" next={next} />
       )}
 
       {list.map((s) => {
@@ -1803,6 +1900,14 @@ function ModuleHubView({
     queryFn: () => apiFetch<ModuleReadingRow[]>(`/modules/${moduleId}/readings`),
     enabled: !!moduleId,
   });
+  // Which beats this learner has actually viewed. The hub never fetched this before, so it
+  // could only ever see what EXISTS in the module, never what was done -- which is why the
+  // mastery button used to be available immediately.
+  const { data: beatProgress } = useQuery({
+    queryKey: ['module-progress', moduleId],
+    queryFn: () => apiFetch<{ viewedBeatIds: string[] }>(`/progress/module/${moduleId}`),
+    enabled: !!moduleId,
+  });
 
   const startSession = useMutation({
     mutationFn: () => apiFetch<{ id: string }>('/sessions', {
@@ -1854,13 +1959,71 @@ function ModuleHubView({
     { id: 'workshop',    label: 'Workshop',    icon: Users,         count: moduleWorkshops?.length ?? 0 },
   ];
 
+  // ── What this learner has actually completed ───────────────────────────────
+  // Every rule below is backed by a real per-learner record. Where no such record exists
+  // we say so rather than guessing -- a gate built on a guess either blocks people who
+  // finished or waves through people who did not.
+  const viewed = new Set(beatProgress?.viewedBeatIds ?? []);
+  const allViewed = (list: Beat[]) => list.length > 0 && list.every((b) => viewed.has(b.id));
+
+  const videoDone    = allViewed(videoBeats);
+  // Uploaded documents and links have no per-learner read receipt, so they cannot be part
+  // of the gate. A module whose readings are ONLY uploaded files therefore has nothing
+  // trackable to satisfy -- without this branch that module would lock mastery forever,
+  // because allViewed([]) is false and there would be no beat the learner could ever view.
+  const readingsDone = readingBeats.length === 0 ? true : allViewed(readingBeats);
+  const practiceDone =
+    (interactiveBeats.length + quizBeats.length === 0 || allViewed([...interactiveBeats, ...quizBeats])) &&
+    (moduleActivities ?? []).every((a) => !!(a as { mySubmitted?: boolean }).mySubmitted) &&
+    practiceCount > 0;
+  const assignmentsDone = moduleAssignments.length > 0 && moduleAssignments.every((a) => !!a.mySubmitted);
+  const workshopsDone   = (moduleWorkshops?.length ?? 0) > 0
+    && (moduleWorkshops ?? []).every((w) => w.myAttendance?.status === 'present' || w.myAttendance?.status === 'late' || w.myAttendance?.status === 'excused');
+  const discussionsDone = (discussions?.length ?? 0) > 0 && (discussions ?? []).every((d) => !!d.iHaveReplied);
+
+  /** Per-tab state the rail and the panels both read from. */
+  const tabState: Record<HubTab, { has: boolean; done: boolean }> = {
+    overview:    { has: true, done: true },
+    structure:   { has: true, done: true },
+    video:       { has: videoBeats.length > 0,             done: videoDone },
+    readings:    { has: readingCount > 0,                  done: readingsDone },
+    complete:    { has: practiceCount > 0,                 done: practiceDone },
+    participate: { has: (discussions?.length ?? 0) > 0,    done: discussionsDone },
+    assignments: { has: moduleAssignments.length > 0,      done: assignmentsDone },
+    workshop:    { has: (moduleWorkshops?.length ?? 0) > 0, done: workshopsDone },
+  };
+
   // ── Guided linear progression ──────────────────────────────────────────────
-  // The ordered learning experiences that actually exist in this module.
-  const flow: { id: HubTab; label: string }[] = [
-    ...(videoBeats.length ? [{ id: 'video' as HubTab, label: 'Video' }] : []),
-    ...(readingCount ? [{ id: 'readings' as HubTab, label: 'Readings' }] : []),
-    ...(practiceCount ? [{ id: 'complete' as HubTab, label: 'Activities' }] : []),
+  // Every deliverable that exists, in the order the module should be worked through.
+  const DELIVERABLES: { id: HubTab; label: string }[] = [
+    { id: 'video', label: 'Video' },
+    { id: 'readings', label: 'Readings' },
+    { id: 'complete', label: 'Activities' },
+    { id: 'participate', label: 'Discussion' },
+    { id: 'assignments', label: 'Assignments' },
+    { id: 'workshop', label: 'Workshop' },
   ];
+  const flow = DELIVERABLES.filter((d) => tabState[d.id].has);
+
+  /**
+   * What still stands between the learner and mastery.
+   *
+   * Split deliberately. `blocking` are things the learner can finish on their own, so it is
+   * fair to hold mastery back until they are done. `waiting` are things they cannot complete
+   * unaided -- a workshop that has not happened yet, or attendance a facilitator has not
+   * recorded -- so those are shown but never used to lock the button. Locking on those would
+   * strand a learner behind someone else's admin.
+   *
+   * Discussions are course-wide, not module-scoped, so a thread belonging to another module
+   * must not block this one. Shown, never blocking, until discussions carry a moduleId.
+   */
+  const blocking = flow.filter((d) =>
+    (d.id === 'video' || d.id === 'readings' || d.id === 'complete' || d.id === 'assignments')
+    && !tabState[d.id].done);
+  const waiting = flow.filter((d) =>
+    (d.id === 'workshop' || d.id === 'participate') && !tabState[d.id].done);
+  const masteryUnlocked = allBeats.length > 0 && blocking.length === 0;
+
   // Where the course sits: this module, the next module, and completion state.
   const orderedMods = (courseModules ?? []).slice().sort((a, b) => a.order - b.order);
   const curModIdx = orderedMods.findIndex((m) => m.id === moduleId);
@@ -1871,21 +2034,58 @@ function ModuleHubView({
   const moduleComplete = modDone(moduleId);
   const allModulesComplete = orderedMods.length > 0 && orderedMods.every((m) => modDone(m.id));
 
-  // The single forward action for the Continue bar when the module isn't complete yet.
-  const flowIdx = flow.findIndex((f) => f.id === tab);
+  /**
+   * The next thing to actually do: the first deliverable that exists and is not finished,
+   * skipping the one being viewed. Driven by completion, not by which tab happens to be
+   * open -- the old version prompted "Demonstrate mastery" simply because you had clicked
+   * a tab outside the flow, whether or not you had done anything.
+   */
+  const nextUndone = flow.find((d) => d.id !== tab && !tabState[d.id].done)
+    ?? flow.find((d) => !tabState[d.id].done);
+
   let continueLabel = 'Demonstrate mastery';
   let continueAction: () => void = () => startSession.mutate();
   let continueIsMastery = true;
-  if (flow.length > 0 && flowIdx < 0) {
+  if (nextUndone) {
     continueIsMastery = false;
-    continueLabel = `Start: ${flow[0].label}`;
-    continueAction = () => setTab(flow[0].id);
-  } else if (flowIdx >= 0 && flowIdx < flow.length - 1) {
-    continueIsMastery = false;
-    const nxt = flow[flowIdx + 1];
-    continueLabel = `Next: ${nxt.label}`;
-    continueAction = () => setTab(nxt.id);
+    continueLabel = `${tab === 'overview' ? 'Start' : 'Next'}: ${nextUndone.label}`;
+    continueAction = () => setTab(nextUndone.id);
   }
+
+  /**
+   * The forward step an empty section should point at, so a section with nothing in it
+   * still tells the learner where to go rather than leaving them at a dead end.
+   */
+  const nextStep: { label: string; onClick: () => void; note: string } =
+    nextUndone
+      ? {
+          label: `Go to ${nextUndone.label}`,
+          onClick: () => setTab(nextUndone.id),
+          note: `There is nothing to do in this section. Next up in this module: ${nextUndone.label}.`,
+        }
+      : masteryUnlocked && !moduleComplete
+        ? {
+            label: 'Demonstrate mastery',
+            onClick: () => startSession.mutate(),
+            note: 'Nothing to do here, and you have worked through everything else in this module.',
+          }
+        : nextMod
+          ? {
+              label: 'Next module',
+              onClick: () => navigate(`/courses/${courseId}/modules/${nextMod.id}`),
+              note: `Nothing to do in this section. Up next: ${nextMod.title}.`,
+            }
+          : allModulesComplete
+            ? {
+                label: 'Back to the course',
+                onClick: () => navigate(`/courses/${courseId}`),
+                note: 'Nothing to do here, and you have completed every module on this course.',
+              }
+            : {
+                label: 'Back to the course',
+                onClick: () => navigate(`/courses/${courseId}`),
+                note: 'There is nothing in this section for this module.',
+              };
 
   if (isLoading) {
     return (
@@ -1942,40 +2142,78 @@ function ModuleHubView({
         </div>
       </div>
 
-      {/* Tab bar. Rectangular, colour-coded tabs in an aligned grid (2 cols on mobile,
-          4 on desktop) -- no horizontal scroll. Each tab carries its own coloured border;
-          the active tab fills with its colour so the current section is obvious. */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {TABS.map((t) => {
-            const active = tab === t.id;
-            const c = TAB_COLOR[t.id];
-            return (
+      {/* Two-column body: progression rail on the left, the selected section on the right.
+          The rail is ordered the way the module should be worked through, so its top-to-
+          bottom order is itself the instruction. On mobile it collapses to a scrolling row
+          above the content, because a fixed side rail on a phone eats the reading width. */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
+
+        <nav aria-label="Module sections"
+          className="lg:w-60 lg:shrink-0 lg:sticky lg:top-[84px] lg:self-start">
+          <ol className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
+            {TABS.map((t) => {
+              const active = tab === t.id;
+              const c = TAB_COLOR[t.id];
+              const st = tabState[t.id];
+              const isDeliverable = t.id !== 'overview' && t.id !== 'structure';
+              // Empty sections stay in the rail so the shape of the module is honest, but
+              // they are muted and carry no count. They remain clickable: opening one is
+              // how the learner is told where to go instead.
+              const muted = isDeliverable && !st.has;
+              const done = isDeliverable && st.has && st.done;
+              return (
+                <li key={t.id} className="shrink-0 lg:shrink">
+                  <button
+                    onClick={() => setTab(t.id)}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'w-full flex items-center gap-2.5 rounded-md border-2 px-3 py-2.5 text-sm font-medium transition-colors text-left',
+                      active
+                        ? cn(c.activeBg, 'border-transparent text-white shadow-sm')
+                        : muted
+                          ? 'border-dashed border-border bg-transparent text-muted-foreground/70 hover:bg-muted/30'
+                          : cn(c.border, c.text, 'bg-card hover:bg-muted/40'),
+                    )}
+                  >
+                    <t.icon className="h-4 w-4 shrink-0" />
+                    <span className="flex-1 min-w-0 truncate">{t.label}</span>
+                    {done && (
+                      <CheckCircle className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-emerald-500')} />
+                    )}
+                    {!done && typeof t.count === 'number' && t.count > 0 && (
+                      <span className={cn('rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
+                        active ? 'bg-white/25 text-white' : 'bg-muted text-muted-foreground')}>{t.count}</span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+
+            {/* Mastery is the end of the rail, and only becomes available once everything
+                the learner can finish on their own is finished. */}
+            <li className="shrink-0 lg:shrink lg:pt-2 lg:mt-2 lg:border-t lg:border-border">
               <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                aria-current={active ? 'page' : undefined}
+                onClick={() => masteryUnlocked && startSession.mutate()}
+                disabled={!masteryUnlocked || startSession.isPending}
+                title={masteryUnlocked ? undefined : 'Finish the sections above first'}
                 className={cn(
-                  'flex items-center justify-center gap-2 rounded-md border-2 px-3 py-2.5 text-sm font-medium transition-colors',
-                  active
-                    ? cn(c.activeBg, 'border-transparent text-white shadow-sm')
-                    : cn(c.border, c.text, 'bg-card hover:bg-muted/40'),
+                  'w-full flex items-center gap-2.5 rounded-md border-2 px-3 py-2.5 text-sm font-medium transition-colors text-left',
+                  masteryUnlocked
+                    ? 'border-transparent bg-rose-600 text-white shadow-sm hover:bg-rose-700'
+                    : 'border-dashed border-border bg-transparent text-muted-foreground/70 cursor-not-allowed',
                 )}
               >
-                <t.icon className="h-4 w-4 shrink-0" />
-                {t.label}
-                {typeof t.count === 'number' && t.count > 0 && (
-                  <span className={cn('rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
-                    active ? 'bg-white/25 text-white' : 'bg-muted text-muted-foreground')}>{t.count}</span>
-                )}
+                <GraduationCap className="h-4 w-4 shrink-0" />
+                <span className="flex-1 min-w-0 truncate">
+                  {startSession.isPending ? 'Starting...' : 'Demonstrate mastery'}
+                </span>
               </button>
-            );
-          })}
-        </div>
-      </div>
+            </li>
+          </ol>
+        </nav>
 
-      {/* Tab content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        {/* Tab content */}
+        <div className="flex-1 min-w-0">
 
         {/* OVERVIEW */}
         {tab === 'overview' && (
@@ -2025,15 +2263,15 @@ function ModuleHubView({
               </div>
             </div>
 
+            {/* One forward action. Mastery is deliberately NOT offered here as a parallel
+                choice: it is the end of the module, not an alternative to doing it, so it
+                only appears once the work is actually done. */}
             <div className="flex flex-col sm:flex-row gap-3 pt-1">
-              <Button className="flex-1 h-12"
-                onClick={() => setTab(videoBeats.length ? 'video' : readingCount ? 'readings' : 'complete')}>
-                <Play className="h-4 w-4 mr-2" /> Start learning
-              </Button>
-              <Button variant="outline" className="flex-1 h-12"
-                disabled={allBeats.length === 0 || startSession.isPending}
-                onClick={() => startSession.mutate()}>
-                <GraduationCap className="h-4 w-4 mr-2" /> Demonstrate mastery
+              <Button className="flex-1 h-12" onClick={continueAction}
+                disabled={continueIsMastery && (!masteryUnlocked || startSession.isPending)}>
+                {continueIsMastery
+                  ? <><GraduationCap className="h-4 w-4 mr-2" /> Demonstrate mastery</>
+                  : <><Play className="h-4 w-4 mr-2" /> {continueLabel}</>}
               </Button>
             </div>
           </div>
@@ -2154,8 +2392,7 @@ function ModuleHubView({
               })}
             </div>
           ) : (
-            <EmptyState icon={PlayCircle} title="No video for this module"
-              note="This module doesn't include a video lesson. Move on to the Readings or activities." />
+            <NothingHere icon={PlayCircle} title="No video for this module" next={nextStep} />
           )
         )}
 
@@ -2187,8 +2424,7 @@ function ModuleHubView({
             <ReadingsSection moduleId={moduleId} isInstructor={isInstructor} />
 
             {readingCount === 0 && !isInstructor && (
-              <EmptyState icon={BookOpen} title="No readings for this module"
-                note="Documents and links your facilitator adds will appear here." />
+              <NothingHere icon={BookOpen} title="No readings for this module" next={nextStep} />
             )}
           </div>
         )}
@@ -2235,22 +2471,17 @@ function ModuleHubView({
                 ))}
               </>
             ) : (
-              <EmptyState icon={Zap} title="No interactive activities for this module"
-                note="Practice exercises and knowledge checks will appear here when added." />
+              <NothingHere icon={Zap} title="No interactive activities for this module" next={nextStep} />
             )}
 
-            <div className="rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-500/5 p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <span className="h-10 w-10 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 flex items-center justify-center shrink-0"><GraduationCap className="h-5 w-5" /></span>
-                <div className="min-w-0">
-                  <div className="font-semibold text-sm">Demonstrate mastery</div>
-                  <div className="text-xs text-muted-foreground">A guided Socratic session. Earns your credential when you reach mastery.</div>
-                </div>
-              </div>
-              <Button className="w-full" disabled={allBeats.length === 0 || startSession.isPending} onClick={() => startSession.mutate()}>
-                {startSession.isPending ? 'Starting…' : 'Start session'}
-              </Button>
-            </div>
+            <MasteryCard
+              unlocked={masteryUnlocked}
+              blocking={blocking}
+              waiting={waiting}
+              pending={startSession.isPending}
+              onStart={() => startSession.mutate()}
+              onGo={setTab}
+            />
           </div>
         )}
 
@@ -2271,8 +2502,7 @@ function ModuleHubView({
                 ))}
               </div>
             ) : (
-              <EmptyState icon={MessageSquare} title="No discussions open yet"
-                note="Group discussions and forums for this course will appear here." />
+              <NothingHere icon={MessageSquare} title="No discussions open yet" next={nextStep} />
             )}
           </div>
         )}
@@ -2300,17 +2530,17 @@ function ModuleHubView({
                 </div>
               </>
             ) : (
-              <EmptyState icon={FileText} title="No assignments for this module"
-                note="Written assignments and file submissions will appear here, and link straight into your gradebook." />
+              <NothingHere icon={FileText} title="No assignments for this module" next={nextStep} />
             )}
           </div>
         )}
 
         {/* WORKSHOP */}
         {tab === 'workshop' && (
-          <WorkshopSection moduleId={moduleId} isInstructor={isInstructor} />
+          <WorkshopSection moduleId={moduleId} isInstructor={isInstructor} next={nextStep} />
         )}
 
+        </div>
       </div>
 
       {/* Continue bar: a clear forward path -- through the module's learning experiences,
@@ -2359,7 +2589,7 @@ function ModuleHubView({
             </div>
             <Button
               className="shrink-0"
-              disabled={continueIsMastery && (allBeats.length === 0 || startSession.isPending)}
+              disabled={continueIsMastery && (!masteryUnlocked || startSession.isPending)}
               onClick={continueAction}
             >
               {continueIsMastery && <GraduationCap className="h-4 w-4 mr-2" />}

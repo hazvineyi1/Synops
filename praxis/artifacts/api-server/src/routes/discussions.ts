@@ -12,7 +12,14 @@ function toUserSnap(u: typeof usersTable.$inferSelect | null) {
   return { id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, avatarUrl: u.avatarUrl, role: u.role };
 }
 
-// GET /courses/:courseId/discussions
+/**
+ * GET /courses/:courseId/discussions
+ *
+ * Each row carries `iHaveReplied` for the CALLING learner. replyCount is a global total, so
+ * on its own it cannot answer "has THIS learner participated?" -- which is what a
+ * participation requirement actually turns on. Only the caller's own authorship is checked;
+ * no other learner's posting activity is exposed here.
+ */
 router.get("/courses/:courseId/discussions", requireAuth, async (req, res) => {
   const rows = await db
     .select({ discussion: discussionsTable, author: usersTable })
@@ -20,7 +27,18 @@ router.get("/courses/:courseId/discussions", requireAuth, async (req, res) => {
     .leftJoin(usersTable, eq(discussionsTable.authorId, usersTable.id))
     .where(eq(discussionsTable.courseId, req.params.courseId))
     .orderBy(desc(discussionsTable.isPinned), desc(discussionsTable.createdAt));
-  res.json(rows.map(r => ({ ...r.discussion, author: toUserSnap(r.author) })));
+
+  const myReplies = await db
+    .select({ discussionId: discussionRepliesTable.discussionId })
+    .from(discussionRepliesTable)
+    .where(eq(discussionRepliesTable.authorId, req.userId!));
+  const replied = new Set(myReplies.map((r) => r.discussionId));
+
+  res.json(rows.map(r => ({
+    ...r.discussion,
+    author: toUserSnap(r.author),
+    iHaveReplied: replied.has(r.discussion.id),
+  })));
 });
 
 // POST /courses/:courseId/discussions

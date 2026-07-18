@@ -26,12 +26,29 @@ function toAssignmentResponse(a: typeof assignmentsTable.$inferSelect) {
   };
 }
 
-// GET /courses/:courseId/assignments
+/**
+ * GET /courses/:courseId/assignments
+ *
+ * Each row carries `mySubmitted` for the CALLING learner. Without it the module page can
+ * only see that an assignment exists, not whether this learner handed it in -- which makes
+ * any "have you finished everything?" gate guesswork. One extra query for the caller's own
+ * submissions, never anyone else's.
+ */
 router.get("/courses/:courseId/assignments", requireAuth, async (req, res) => {
   const assignments = await db.select().from(assignmentsTable)
     .where(eq(assignmentsTable.courseId, req.params.courseId))
     .orderBy(assignmentsTable.position);
-  res.json(assignments.map(toAssignmentResponse));
+
+  const mine = await db
+    .select({ assignmentId: assignmentSubmissionsTable.assignmentId })
+    .from(assignmentSubmissionsTable)
+    .where(eq(assignmentSubmissionsTable.userId, req.userId!));
+  const submitted = new Set(mine.map((r) => r.assignmentId));
+
+  res.json(assignments.map((a) => ({
+    ...toAssignmentResponse(a),
+    mySubmitted: submitted.has(a.id),
+  })));
 });
 
 // POST /courses/:courseId/assignments
