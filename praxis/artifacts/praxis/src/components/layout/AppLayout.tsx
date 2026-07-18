@@ -176,11 +176,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       // accounts, branding, audit) is clearly separated from the delivery surfaces it
       // shares with the org tier.
       return [
-        { items: [{ label: t('nav.home', 'Home'), href: '/dashboard', icon: LayoutDashboard }] },
+        // Overview and Organisations are two DISTINCT destinations, not the old redundant
+        // pair that both pointed at /dashboard: Overview is the Partner Hub summary, and
+        // Organisations is the tenant dashboard (the list of orgs under this partner).
+        {
+          items: [
+            { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
+            { label: t('nav.organisations', 'Organisations'), href: '/dashboard', icon: Building },
+          ],
+        },
         {
           heading: t('nav.groups.partnerHub', 'Partner Hub'),
           items: [
-            { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
             { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
             { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },
             { label: t('nav.accountsRoles', 'Accounts & Roles'), href: '/partner/accounts', icon: Users },
