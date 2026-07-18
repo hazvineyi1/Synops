@@ -264,9 +264,6 @@ export function CourseDetail() {
   const { data: user } = useGetMe();
   const role = user?.role ?? 'learner';
   const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(role);
-  // Enrolled learners get the clean single-flow course page (no tab rail). Instructors and
-  // catalog visitors keep the tabbed course-management shell.
-  const isLearnerView = !isInstructor && !!enrolment;
 
   const setTab = (tab: string) => navigate(`/courses/${courseId}?tab=${tab}`);
 
@@ -287,6 +284,10 @@ export function CourseDetail() {
   const { data: roster } = useQuery({ queryKey: ['roster', courseId], queryFn: () => apiFetch<RosterEntry[]>(`/courses/${courseId}/roster`), enabled: activeTab === 'people' });
   const { data: groups } = useQuery({ queryKey: ['groups', courseId], queryFn: () => apiFetch<Group[]>(`/courses/${courseId}/groups`), enabled: activeTab === 'groups' });
   const { data: enrolment } = useQuery({ queryKey: ['enrolment', courseId, 'me'], queryFn: () => apiFetch<Enrolment | null>(`/courses/${courseId}/my-enrolment`) });
+  // Enrolled learners get the clean single-flow course page (no tab rail). Instructors and
+  // catalog visitors keep the tabbed course-management shell. Declared AFTER the enrolment
+  // query (it reads enrolment) to avoid a temporal-dead-zone reference.
+  const isLearnerView = !isInstructor && !!enrolment;
   // Behavioural density recommendation (Focus vs Full view) — sets the DEFAULT only;
   // the learner's explicit toggle choice always wins. Learners only.
   const { data: densityRec } = useQuery({
