@@ -18,6 +18,7 @@ import { ActivityBuilder } from "@/components/ActivityBuilder";
 import { AddToGradebookDialog } from "@/components/AddToGradebookDialog";
 import { renderActivity, type InteractionType, type ActivitySpec } from "@/lib/activityTemplates";
 import { activitiesApi, type Activity, type ActivitySubmission, type GeneratedActivity, type MyActivityAssignment } from "@/lib/activitiesApi";
+import { apiFetch } from "@/lib/api";
 
 const CAN_AUTHOR = ["super_admin", "instructional_designer", "org_admin", "partner_admin", "coach"];
 const CAN_ASSIGN = ["super_admin", "instructional_designer", "org_admin", "partner_admin"];
@@ -84,6 +85,20 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
   const [bloom, setBloom] = useState<string>("");
   const [difficulty, setDifficulty] = useState<string>("");
   const [published, setPublished] = useState(false);
+  const [courseId, setCourseId] = useState<string>("");
+  const [moduleId, setModuleId] = useState<string>("");
+
+  // Course / module placement: homing an activity in a module surfaces it in that module's
+  // Complete tab for learners.
+  const { data: courseList } = useQuery({
+    queryKey: ["courses"],
+    queryFn: () => apiFetch<{ id: string; title: string }[]>("/courses"),
+  });
+  const { data: courseModules } = useQuery({
+    queryKey: ["modules", courseId],
+    queryFn: () => apiFetch<{ id: string; title: string; order: number }[]>(`/courses/${courseId}/modules`),
+    enabled: !!courseId,
+  });
 
   useEffect(() => {
     setTitle(activity?.title ?? seed?.title ?? "");
@@ -94,6 +109,8 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
     setBloom(activity?.bloomsLevel ?? seed?.bloomsLevel ?? "");
     setDifficulty(activity?.difficulty ?? seed?.difficulty ?? "");
     setPublished(activity?.published ?? false);
+    setCourseId(activity?.courseId ?? seed?.courseId ?? "");
+    setModuleId(activity?.moduleId ?? seed?.moduleId ?? "");
   }, [activity?.id, newMode, seed]);
 
   const isEmbed = source === "embed";
@@ -108,6 +125,8 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
         embedUrl: isEmbed ? parsed.embedUrl : null,
         kind, bloomsLevel: bloom || null, difficulty: difficulty || null,
         published,
+        courseId: courseId || null,
+        moduleId: moduleId || null,
       };
       return activity ? activitiesApi.update(activity.id, input) : activitiesApi.create(input);
     },
@@ -169,6 +188,26 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
               </select>
             </div>
           </div>
+
+          {/* Placement: home this activity in a course/module so it appears in that
+              module's Complete tab for learners. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Course</Label>
+              <select value={courseId} onChange={(e) => { setCourseId(e.target.value); setModuleId(""); }} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm">
+                <option value="">Standalone (no course)</option>
+                {(courseList ?? []).map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-sm">Module</Label>
+              <select value={moduleId} onChange={(e) => setModuleId(e.target.value)} disabled={!courseId} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm disabled:opacity-50">
+                <option value="">{courseId ? "Whole course (not module-specific)" : "Pick a course first"}</option>
+                {(courseModules ?? []).slice().sort((a, b) => a.order - b.order).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+              </select>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground -mt-1">Assign to a module to surface this activity inside that module's Complete tab.</p>
         </div>
     </div>
   );
