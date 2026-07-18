@@ -14,6 +14,8 @@ function toModuleResponse(m: typeof modulesTable.$inferSelect) {
     description: m.description,
     status: m.status,
     lessonType: m.lessonType ?? 'socratic',
+    objectives: m.objectives ?? [],
+    modality: m.modality ?? 'async',
     order: m.order,
     beatCount: m.beatCount,
     estimatedMinutes: m.estimatedMinutes,
@@ -78,10 +80,16 @@ router.get("/modules/:moduleId", requireAuth, async (req, res) => {
 
 // PATCH /modules/:moduleId
 router.patch("/modules/:moduleId", requireAuth, async (req, res) => {
-  const { title, description, status, lessonType, estimatedMinutes, order } = req.body;
+  const { title, description, status, lessonType, estimatedMinutes, order, objectives, modality } = req.body;
   const [updated] = await db
     .update(modulesTable)
-    .set({ title, description, status, lessonType, estimatedMinutes, order, updatedAt: new Date() })
+    .set({
+      title, description, status, lessonType, estimatedMinutes, order,
+      // Only overwrite when provided, so a partial PATCH never wipes them.
+      ...(objectives !== undefined ? { objectives } : {}),
+      ...(modality !== undefined ? { modality } : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(modulesTable.id, req.params.moduleId))
     .returning();
   res.json(toModuleResponse(updated));

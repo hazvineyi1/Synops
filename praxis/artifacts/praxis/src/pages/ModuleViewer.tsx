@@ -12,6 +12,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle, BookOpen, List,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
+  Users, Layers, Target, Compass, Info,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,6 +59,8 @@ interface ModuleDetail {
   beatCount: number;
   status: string;
   lessonType?: string;
+  objectives?: string[];
+  modality?: 'async' | 'sync' | 'hybrid';
   beats: Beat[];
 }
 
@@ -1156,57 +1159,51 @@ export function ModuleViewer() {
 
 // ─── Module Hub ───────────────────────────────────────────────────────────────
 
-interface ActivityDef {
-  id: string;
-  icon: React.ElementType;
-  title: string;
-  subtitle: string;
-  description: string;
-  gradient: string;
-  iconBg: string;
-  iconColor: string;
-  border: string;
-  available: boolean;
-  loading?: boolean;
-  onClick: () => void;
+interface HubModule { id: string; courseId: string; title: string; order: number; status: string }
+interface HubAssignment {
+  id: string; title: string; description?: string; moduleId?: string | null;
+  dueDate?: string | null; pointsPossible?: number | string; submissionType?: string;
+}
+interface HubDiscussion { id: string; title: string; replyCount?: number }
+interface HubCourse { id: string; title: string; description?: string }
+
+type HubTab = 'overview' | 'structure' | 'video' | 'readings' | 'complete' | 'participate' | 'assignments' | 'workshop';
+
+const READING_TYPES = ['title_card', 'points', 'scenario', 'compare', 'close'];
+
+// Delivery modality shown as a badge so a learner always knows whether a module is
+// self-paced, a live class, or a mix.
+const MODALITY_META: Record<string, { label: string; sub: string; icon: React.ElementType; cls: string }> = {
+  async:  { label: 'Self-paced', sub: 'Asynchronous',      icon: Clock,  cls: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-300/50' },
+  sync:   { label: 'Live class', sub: 'Synchronous',       icon: Users,  cls: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-300/50' },
+  hybrid: { label: 'Hybrid',     sub: 'Live + self-paced', icon: Layers, cls: 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-300/50' },
+};
+
+function EmptyState({ icon: Icon, title, note }: { icon: React.ElementType; title: string; note?: string }) {
+  return (
+    <div className="rounded-2xl border-2 border-dashed border-border bg-muted/10 py-14 px-6 text-center">
+      <Icon className="h-9 w-9 mx-auto mb-3 text-muted-foreground/40" />
+      <p className="font-medium text-foreground">{title}</p>
+      {note && <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto leading-relaxed">{note}</p>}
+    </div>
+  );
 }
 
-function ActivityCard({ act }: { act: ActivityDef }) {
-  const Icon = act.icon;
+function Instruction({ children }: { children: React.ReactNode }) {
   return (
-    <button
-      type="button"
-      disabled={!act.available || act.loading}
-      onClick={act.onClick}
-      className={cn(
-        'relative text-left w-full rounded-2xl border p-5 transition-all duration-200 group',
-        act.border,
-        act.available && !act.loading
-          ? cn('hover:shadow-lg hover:-translate-y-0.5 cursor-pointer bg-gradient-to-br', act.gradient)
-          : 'opacity-50 cursor-not-allowed bg-muted/20',
-      )}
-    >
-      {/* Icon */}
-      <div className={cn('h-12 w-12 rounded-xl flex items-center justify-center mb-4', act.iconBg)}>
-        {act.loading
-          ? <div className="h-5 w-5 border-2 border-current border-t-transparent rounded-full animate-spin opacity-60" />
-          : <Icon className={cn('h-6 w-6', act.iconColor)} />}
-      </div>
+    <div className="flex items-start gap-2.5 rounded-xl bg-primary/5 border border-primary/15 px-4 py-3 text-sm text-foreground/80 leading-relaxed">
+      <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+      <div>{children}</div>
+    </div>
+  );
+}
 
-      <div className="font-semibold text-sm mb-0.5 text-foreground">{act.title}</div>
-      <div className="text-xs text-muted-foreground mb-3">{act.subtitle}</div>
-      <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-2">{act.description}</p>
-
-      {/* Top-right indicator */}
-      {!act.available && (
-        <div className="absolute top-3 right-3">
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Soon</Badge>
-        </div>
-      )}
-      {act.available && !act.loading && (
-        <ChevronRight className="absolute top-4 right-4 h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-      )}
-    </button>
+function SectionHead({ title, sub }: { title: string; sub?: string }) {
+  return (
+    <div className="mb-4">
+      <h3 className="text-lg font-serif font-semibold text-foreground">{title}</h3>
+      {sub && <p className="text-sm text-muted-foreground mt-0.5 leading-relaxed">{sub}</p>}
+    </div>
   );
 }
 
@@ -1221,14 +1218,28 @@ function ModuleHubView({
   navigate: (to: string) => void;
   isLoading: boolean;
 }) {
-  const hasVideo        = allBeats.some(b => b.type === 'video' || !!b.videoUrl);
-  const hasReading      = allBeats.some(b => ['title_card','points','scenario','compare','close'].includes(b.type));
-  const hasQuiz         = allBeats.some(b => !!b.visualData?.quiz);
-  const hasInteractive  = allBeats.some(b => !!b.visualData?.interactive);
-  const hasContent      = allBeats.length > 0;
-  const interactiveCount = allBeats.filter(b => !!b.visualData?.interactive).length;
-  const quizCount  = allBeats.filter(b => !!b.visualData?.quiz).length;
-  const readCount  = allBeats.filter(b => !b.visualData?.quiz).length;
+  const [tab, setTab] = useState<HubTab>('overview');
+
+  const { data: courseModules } = useQuery({
+    queryKey: ['modules', courseId],
+    queryFn: () => apiFetch<HubModule[]>(`/courses/${courseId}/modules`),
+    enabled: !!courseId,
+  });
+  const { data: courseFull } = useQuery({
+    queryKey: ['course', courseId],
+    queryFn: () => apiFetch<HubCourse>(`/courses/${courseId}`),
+    enabled: !!courseId,
+  });
+  const { data: assignments } = useQuery({
+    queryKey: ['assignments', courseId],
+    queryFn: () => apiFetch<HubAssignment[]>(`/courses/${courseId}/assignments`),
+    enabled: !!courseId,
+  });
+  const { data: discussions } = useQuery({
+    queryKey: ['discussions', courseId],
+    queryFn: () => apiFetch<HubDiscussion[]>(`/courses/${courseId}/discussions`),
+    enabled: !!courseId,
+  });
 
   const startSession = useMutation({
     mutationFn: () => apiFetch<{ id: string }>('/sessions', {
@@ -1238,86 +1249,32 @@ function ModuleHubView({
     onSuccess: (s) => navigate(`/learn/${s.id}`),
   });
 
-  const activities: ActivityDef[] = [
-    {
-      id: 'video',
-      icon: PlayCircle,
-      title: 'Video & Animation',
-      subtitle: hasVideo ? 'Watch' : 'No video yet',
-      description: 'Learn through visual content and animations.',
-      gradient: 'from-blue-500/10 to-blue-600/5',
-      iconBg: 'bg-blue-100 dark:bg-blue-900/40',
-      iconColor: 'text-blue-600 dark:text-blue-400',
-      border: 'border-blue-200 dark:border-blue-800',
-      available: hasVideo,
-      onClick: () => navigate(`/courses/${courseId}/modules/${moduleId}?mode=video`),
-    },
-    {
-      id: 'reading',
-      icon: BookOpen,
-      title: 'Reading',
-      subtitle: hasReading ? `${readCount} page${readCount !== 1 ? 's' : ''}` : 'No content yet',
-      description: 'Work through structured pages at your own pace.',
-      gradient: 'from-emerald-500/10 to-emerald-600/5',
-      iconBg: 'bg-emerald-100 dark:bg-emerald-900/40',
-      iconColor: 'text-emerald-600 dark:text-emerald-400',
-      border: 'border-emerald-200 dark:border-emerald-800',
-      available: hasReading,
-      onClick: () => navigate(`/courses/${courseId}/modules/${moduleId}?mode=reading`),
-    },
-    {
-      id: 'interactive',
-      icon: Zap,
-      title: 'Interactive',
-      subtitle: hasInteractive ? `${interactiveCount} activit${interactiveCount !== 1 ? 'ies' : 'y'}` : 'No activities yet',
-      description: 'Drag-to-order, match pairs, and fill-in-the-blank exercises.',
-      gradient: 'from-violet-500/10 to-violet-600/5',
-      iconBg: 'bg-violet-100 dark:bg-violet-900/40',
-      iconColor: 'text-violet-600 dark:text-violet-400',
-      border: 'border-violet-200 dark:border-violet-800',
-      available: hasInteractive,
-      onClick: () => navigate(`/courses/${courseId}/modules/${moduleId}?mode=interactive`),
-    },
-    {
-      id: 'quiz',
-      icon: HelpCircle,
-      title: 'Check for Understanding',
-      subtitle: hasQuiz ? `${quizCount} question${quizCount !== 1 ? 's' : ''}` : 'No questions yet',
-      description: 'Quick knowledge checks to test your recall.',
-      gradient: 'from-amber-500/10 to-amber-600/5',
-      iconBg: 'bg-amber-100 dark:bg-amber-900/40',
-      iconColor: 'text-amber-600 dark:text-amber-400',
-      border: 'border-amber-200 dark:border-amber-800',
-      available: hasQuiz,
-      onClick: () => navigate(`/courses/${courseId}/modules/${moduleId}?mode=quiz`),
-    },
-    {
-      id: 'test',
-      icon: GraduationCap,
-      title: 'Final Test',
-      subtitle: hasContent ? 'Socratic AI dialogue' : 'No content yet',
-      description: 'Demonstrate mastery through guided AI questioning.',
-      gradient: 'from-rose-500/10 to-rose-600/5',
-      iconBg: 'bg-rose-100 dark:bg-rose-900/40',
-      iconColor: 'text-rose-600 dark:text-rose-400',
-      border: 'border-rose-200 dark:border-rose-800',
-      available: hasContent,
-      loading: startSession.isPending,
-      onClick: () => startSession.mutate(),
-    },
-    {
-      id: 'assignment',
-      icon: FileText,
-      title: 'Assignment',
-      subtitle: 'Submit your work',
-      description: 'Apply your learning with a practical task.',
-      gradient: 'from-slate-500/10 to-slate-600/5',
-      iconBg: 'bg-slate-100 dark:bg-slate-800',
-      iconColor: 'text-slate-600 dark:text-slate-400',
-      border: 'border-slate-200 dark:border-slate-700',
-      available: true,
-      onClick: () => navigate(`/courses/${courseId}?tab=assignments`),
-    },
+  const videoBeats        = allBeats.filter(b => b.type === 'video' || !!b.videoUrl);
+  const readingBeats      = allBeats.filter(b => READING_TYPES.includes(b.type) && !b.visualData?.quiz && !b.visualData?.interactive);
+  const interactiveBeats  = allBeats.filter(b => !!b.visualData?.interactive);
+  const quizBeats         = allBeats.filter(b => !!b.visualData?.quiz);
+  const moduleAssignments = (assignments ?? []).filter(a => a.moduleId === moduleId);
+  const practiceCount     = interactiveBeats.length + quizBeats.length;
+
+  const modality = (mod?.modality ?? 'async') as string;
+  const mm = MODALITY_META[modality] ?? MODALITY_META.async;
+  // Explicit objectives if the ID set them; otherwise fall back to the module's closing
+  // key takeaways so the Overview is never empty when there is real content.
+  const objectives = (mod?.objectives && mod.objectives.length > 0)
+    ? mod.objectives
+    : (allBeats.find(b => b.type === 'close')?.bulletPoints ?? []);
+
+  const open = (mode: string) => navigate(`/courses/${courseId}/modules/${moduleId}?mode=${mode}`);
+
+  const TABS: { id: HubTab; label: string; icon: React.ElementType; count?: number }[] = [
+    { id: 'overview',    label: 'Overview',    icon: Compass },
+    { id: 'structure',   label: 'Structure',   icon: List },
+    { id: 'video',       label: 'Video',       icon: PlayCircle,    count: videoBeats.length },
+    { id: 'readings',    label: 'Readings',    icon: BookOpen,      count: readingBeats.length },
+    { id: 'complete',    label: 'Complete',    icon: Zap,           count: practiceCount },
+    { id: 'participate', label: 'Participate', icon: MessageSquare, count: discussions?.length ?? 0 },
+    { id: 'assignments', label: 'Assignments', icon: FileText,      count: moduleAssignments.length },
+    { id: 'workshop',    label: 'Workshop',    icon: Users },
   ];
 
   if (isLoading) {
@@ -1348,49 +1305,341 @@ function ModuleHubView({
             onClick={() => navigate(`/courses/${courseId}`)}
           >
             <ChevronLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">{course?.title ?? 'Course'}</span>
+            <span className="hidden sm:inline truncate max-w-[160px]">{course?.title ?? courseFull?.title ?? 'Course'}</span>
           </Button>
           <span className="text-muted-foreground/30 hidden sm:inline">/</span>
           <h1 className="font-semibold text-sm flex-1 truncate hidden sm:block">{mod?.title}</h1>
-          {mod?.estimatedMinutes && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground ml-auto shrink-0">
-              <Clock className="h-3.5 w-3.5" />
-              {mod.estimatedMinutes} min total
-            </div>
-          )}
+          <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ml-auto shrink-0', mm.cls)}>
+            <mm.icon className="h-3.5 w-3.5" /> {mm.label}
+          </span>
         </div>
       </header>
 
       {/* Hero */}
       <div className="border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            {course?.title}
+            {course?.title ?? courseFull?.title}
           </p>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-3">{mod?.title}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2">{mod?.title}</h2>
           {mod?.description && (
-            <p className="text-muted-foreground max-w-xl leading-relaxed">{mod.description}</p>
+            <p className="text-muted-foreground max-w-2xl leading-relaxed">{mod.description}</p>
           )}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes ?? 0} min</span>
+            <span className="inline-flex items-center gap-1.5"><mm.icon className="h-3.5 w-3.5" /> {mm.label} · {mm.sub}</span>
+          </div>
         </div>
       </div>
 
-      {/* Activity grid */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        <p className="text-sm font-medium text-muted-foreground mb-5">
-          How would you like to engage with this module?
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {activities.map((act, i) => (
-            <motion.div
-              key={act.id}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.055, duration: 0.3 }}
-            >
-              <ActivityCard act={act} />
-            </motion.div>
-          ))}
+      {/* Tab bar */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+        <div className="flex gap-1 overflow-x-auto border-b border-border">
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  'flex items-center gap-2 whitespace-nowrap px-3.5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors',
+                  active ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <t.icon className="h-4 w-4 shrink-0" />
+                {t.label}
+                {typeof t.count === 'number' && t.count > 0 && (
+                  <span className={cn('rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
+                    active ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>{t.count}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
+      </div>
+
+      {/* Tab content */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+
+        {/* OVERVIEW */}
+        {tab === 'overview' && (
+          <div className="space-y-6">
+            <div>
+              <SectionHead title="What you'll be able to do" sub="The learning objectives for this module." />
+              {objectives.length > 0 ? (
+                <ul className="space-y-2.5">
+                  {objectives.map((o, i) => (
+                    <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
+                      <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <span className="text-sm leading-relaxed">{o}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState icon={Target} title="Learning objectives haven't been added yet"
+                  note="Your instructional designer can add clear, measurable objectives for this module in the Studio editor." />
+              )}
+            </div>
+
+            <div>
+              <SectionHead title="What's inside" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Video',       n: videoBeats.length,   icon: PlayCircle, go: () => setTab('video') },
+                  { label: 'Readings',    n: readingBeats.length, icon: BookOpen,   go: () => setTab('readings') },
+                  { label: 'Activities',  n: practiceCount,       icon: Zap,        go: () => setTab('complete') },
+                  { label: 'Assignments', n: moduleAssignments.length, icon: FileText, go: () => setTab('assignments') },
+                ].map((s) => (
+                  <button key={s.label} onClick={s.go}
+                    className="rounded-xl border border-border bg-card p-4 text-left hover:shadow-sm transition-shadow">
+                    <s.icon className="h-5 w-5 text-muted-foreground mb-2" />
+                    <div className="text-xl font-serif font-bold leading-none">{s.n}</div>
+                    <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-1">
+              <Button className="flex-1 h-12"
+                onClick={() => setTab(videoBeats.length ? 'video' : readingBeats.length ? 'readings' : 'complete')}>
+                <Play className="h-4 w-4 mr-2" /> Start learning
+              </Button>
+              <Button variant="outline" className="flex-1 h-12"
+                disabled={allBeats.length === 0 || startSession.isPending}
+                onClick={() => startSession.mutate()}>
+                <GraduationCap className="h-4 w-4 mr-2" /> Demonstrate mastery
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* STRUCTURE */}
+        {tab === 'structure' && (
+          <div className="space-y-8">
+            <div>
+              <SectionHead title="Course structure" sub="Where this module sits, and how to move through the course." />
+              <div className="space-y-1.5">
+                {(courseModules ?? []).slice().sort((a, b) => a.order - b.order).map((m, i) => {
+                  const isCurrent = m.id === moduleId;
+                  return (
+                    <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
+                      className={cn('w-full flex items-center gap-3 rounded-xl border p-3.5 text-left transition-colors',
+                        isCurrent ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted/40')}>
+                      <span className={cn('h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0',
+                        isCurrent ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+                        {String(i + 1).padStart(2, '0')}
+                      </span>
+                      <span className="flex-1 text-sm font-medium truncate">{m.title}</span>
+                      {isCurrent
+                        ? <Badge variant="outline" className="text-[10px] shrink-0">You are here</Badge>
+                        : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                    </button>
+                  );
+                })}
+                {(!courseModules || courseModules.length === 0) && (
+                  <EmptyState icon={List} title="No module list available yet" />
+                )}
+              </div>
+            </div>
+
+            <div>
+              <SectionHead title="What's expected of you" sub="Participation, integrity, and support for this course." />
+              <div className="space-y-2.5 text-sm text-foreground/80">
+                <div className="rounded-xl border border-border bg-card p-4 leading-relaxed">
+                  <p className="font-medium text-foreground mb-1">Participation</p>
+                  Engage with each section, complete the activities, and demonstrate mastery when you're ready. Your progress saves as you go.
+                </div>
+                <div className="rounded-xl border border-border bg-card p-4 leading-relaxed">
+                  <p className="font-medium text-foreground mb-1">Academic integrity</p>
+                  Submit your own work. Coaching and discussion are encouraged; copying others' answers is not.
+                </div>
+                <div className="rounded-xl border border-border bg-card p-4 leading-relaxed">
+                  <p className="font-medium text-foreground mb-1">Support &amp; accessibility</p>
+                  Captions, transcripts, and read-aloud options are provided where available. If you need an accommodation, contact your facilitator.
+                </div>
+              </div>
+            </div>
+
+            {courseFull?.description && (
+              <div>
+                <SectionHead title="Syllabus" />
+                <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground leading-relaxed">
+                  {courseFull.description}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIDEO */}
+        {tab === 'video' && (
+          videoBeats.length > 0 ? (
+            <div className="space-y-8">
+              {videoBeats.map((b) => {
+                const transcript = [b.narration, ...(b.bulletPoints ?? [])].filter(Boolean).join('\n\n');
+                return (
+                  <div key={b.id} className="space-y-3">
+                    <SectionHead title={b.title || 'Video lesson'} sub={b.narration || undefined} />
+                    <Instruction>Watch the full video. Turn captions on with the CC control in the player. A transcript is provided below so you can follow along.</Instruction>
+                    {b.videoUrl ? (
+                      <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-sm">
+                        <video src={b.videoUrl} controls className="w-full h-full" />
+                      </div>
+                    ) : (
+                      <EmptyState icon={PlayCircle} title="Video file not uploaded yet"
+                        note="This lesson is marked as a video but no file is attached yet. It can be added in the Studio editor." />
+                    )}
+                    <div className="rounded-xl border border-border bg-card p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Transcript</p>
+                      <p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line">
+                        {transcript || 'A transcript for this video is being prepared.'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState icon={PlayCircle} title="No video for this module"
+              note="This module doesn't include a video lesson. Move on to the Readings or activities." />
+          )
+        )}
+
+        {/* READINGS */}
+        {tab === 'readings' && (
+          readingBeats.length > 0 ? (
+            <div className="space-y-4">
+              <Instruction>Work through the readings at your own pace. Your progress is tracked automatically. Open the reader to move through them in order.</Instruction>
+              <div className="space-y-2">
+                {readingBeats.map((b, i) => (
+                  <div key={b.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-4">
+                    <span className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span>
+                    <span className="flex-1 text-sm font-medium truncate">{b.title}</span>
+                    {b.audioUrl && <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1 shrink-0"><Play className="h-3 w-3" /> audio</span>}
+                  </div>
+                ))}
+              </div>
+              <Button className="w-full h-11" onClick={() => open('reading')}>
+                <BookOpen className="h-4 w-4 mr-2" /> Open readings
+              </Button>
+            </div>
+          ) : (
+            <EmptyState icon={BookOpen} title="No readings for this module"
+              note="Uploaded documents and readings will appear here. PDF upload and read-aloud audio are coming soon." />
+          )
+        )}
+
+        {/* COMPLETE — interactive practice + mastery */}
+        {tab === 'complete' && (
+          <div className="space-y-4">
+            {practiceCount > 0 ? (
+              <>
+                <Instruction>Complete each activity below. These give you immediate feedback and help the ideas stick before you demonstrate mastery.</Instruction>
+                {interactiveBeats.length > 0 && (
+                  <button onClick={() => open('interactive')}
+                    className="w-full flex items-center gap-4 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-500/5 p-4 text-left hover:shadow-sm transition-shadow">
+                    <span className="h-10 w-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 text-violet-600 flex items-center justify-center shrink-0"><Zap className="h-5 w-5" /></span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm">Interactive activities</div>
+                      <div className="text-xs text-muted-foreground">{interactiveBeats.length} exercise{interactiveBeats.length !== 1 ? 's' : ''} · drag-order, match pairs, fill-in-the-blank</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                )}
+                {quizBeats.length > 0 && (
+                  <button onClick={() => open('quiz')}
+                    className="w-full flex items-center gap-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-500/5 p-4 text-left hover:shadow-sm transition-shadow">
+                    <span className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 flex items-center justify-center shrink-0"><HelpCircle className="h-5 w-5" /></span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm">Check for understanding</div>
+                      <div className="text-xs text-muted-foreground">{quizBeats.length} question{quizBeats.length !== 1 ? 's' : ''}</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                )}
+              </>
+            ) : (
+              <EmptyState icon={Zap} title="No interactive activities for this module"
+                note="Practice exercises and knowledge checks will appear here when added." />
+            )}
+
+            <div className="rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-500/5 p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="h-10 w-10 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 flex items-center justify-center shrink-0"><GraduationCap className="h-5 w-5" /></span>
+                <div className="min-w-0">
+                  <div className="font-semibold text-sm">Demonstrate mastery</div>
+                  <div className="text-xs text-muted-foreground">A guided Socratic session. Earns your credential when you reach mastery.</div>
+                </div>
+              </div>
+              <Button className="w-full" disabled={allBeats.length === 0 || startSession.isPending} onClick={() => startSession.mutate()}>
+                {startSession.isPending ? 'Starting…' : 'Start session'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* PARTICIPATE */}
+        {tab === 'participate' && (
+          <div className="space-y-4">
+            <SectionHead title="Join the discussion" sub="Learning is social. Share your thinking and respond to others." />
+            <Instruction>Be respectful and constructive. Add value with each post, reference the material, and disagree with ideas, not people.</Instruction>
+            {(discussions && discussions.length > 0) ? (
+              <div className="space-y-2">
+                {discussions.map((d) => (
+                  <button key={d.id} onClick={() => navigate(`/courses/${courseId}/discussions/${d.id}`)}
+                    className="w-full flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
+                    <MessageSquare className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span className="flex-1 text-sm font-medium truncate">{d.title}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{d.replyCount ?? 0} repl{(d.replyCount ?? 0) === 1 ? 'y' : 'ies'}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <EmptyState icon={MessageSquare} title="No discussions open yet"
+                note="Group discussions and forums for this course will appear here." />
+            )}
+          </div>
+        )}
+
+        {/* ASSIGNMENTS */}
+        {tab === 'assignments' && (
+          <div className="space-y-4">
+            <SectionHead title="Assignments" sub="Submit your work. Grades and feedback flow into your gradebook." />
+            {moduleAssignments.length > 0 ? (
+              <>
+                <Instruction>Open an assignment to read the full brief, then type your response or upload a file. You'll see your grade and feedback here once it's marked.</Instruction>
+                <div className="space-y-2">
+                  {moduleAssignments.map((a) => (
+                    <button key={a.id} onClick={() => navigate(`/courses/${courseId}/assignments/${a.id}`)}
+                      className="w-full flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">{a.title}</div>
+                        {a.dueDate && <div className="text-xs text-muted-foreground">Due {new Date(a.dueDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</div>}
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">{a.pointsPossible ?? 0} pts</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <EmptyState icon={FileText} title="No assignments for this module"
+                note="Written assignments and file submissions will appear here, and link straight into your gradebook." />
+            )}
+          </div>
+        )}
+
+        {/* WORKSHOP */}
+        {tab === 'workshop' && (
+          <div className="space-y-4">
+            <SectionHead title="Workshop" sub="Live, facilitated sessions for this module." />
+            <EmptyState icon={Users} title="No workshop scheduled for this module"
+              note="When a live or hybrid workshop is scheduled, its time, joining link, and materials will appear here." />
+          </div>
+        )}
+
       </div>
     </div>
   );
