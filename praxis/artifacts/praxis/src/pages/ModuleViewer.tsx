@@ -1306,14 +1306,36 @@ function fileToBase64(file: File): Promise<string> {
  * workshop that has not run yet, attendance a facilitator has not recorded) and holding a
  * credential hostage to another person's admin is not a gate, it is a trap.
  */
-function MasteryCard({ unlocked, blocking, waiting, pending, onStart, onGo }: {
+function MasteryCard({ unlocked, earned, blocking, waiting, pending, onStart, onGo }: {
   unlocked: boolean;
+  /** Already holds the credential -- the outstanding list is history, not a barrier. */
+  earned?: boolean;
   blocking: { id: HubTab; label: string }[];
   waiting: { id: HubTab; label: string }[];
   pending: boolean;
   onStart: () => void;
   onGo: (t: HubTab) => void;
 }) {
+  if (earned) {
+    return (
+      <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-500/5 p-4">
+        <div className="flex items-center gap-3">
+          <span className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center shrink-0">
+            <Trophy className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <div className="font-semibold text-sm">Mastery demonstrated</div>
+            <div className="text-xs text-muted-foreground">
+              You have already earned the credential for this module. You can run the session again to revise.
+            </div>
+          </div>
+        </div>
+        <Button variant="outline" className="w-full mt-3" disabled={pending} onClick={onStart}>
+          {pending ? 'Starting...' : 'Practise again'}
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className={cn('rounded-xl border p-4',
       unlocked ? 'border-rose-200 dark:border-rose-800 bg-rose-500/5' : 'border-border bg-muted/30')}>
@@ -2022,13 +2044,26 @@ function ModuleHubView({
     && !tabState[d.id].done);
   const waiting = flow.filter((d) =>
     (d.id === 'workshop' || d.id === 'participate') && !tabState[d.id].done);
-  const masteryUnlocked = allBeats.length > 0 && blocking.length === 0;
+
+  /**
+   * Already holds the credential for this module.
+   *
+   * Without this the gate told a learner who had ALREADY demonstrated mastery that mastery
+   * was "locked until the above is done" -- on the same screen as a "Module complete" bar.
+   * Both cannot be true. A credential earned is not revoked by an unfinished activity, so
+   * a certified module never shows the lock.
+   */
+  // NOTE: progByMod is built here, ABOVE its consumers. It used to be declared further
+  // down with the course-position block, and referencing it up here is a temporal dead
+  // zone crash -- the same mistake that once white-screened this page.
+  const progByMod = new Map((courseProg?.modules ?? []).map((m) => [m.moduleId, m] as const));
+  const alreadyCertified = !!progByMod.get(moduleId)?.certified;
+  const masteryUnlocked = alreadyCertified || (allBeats.length > 0 && blocking.length === 0);
 
   // Where the course sits: this module, the next module, and completion state.
   const orderedMods = (courseModules ?? []).slice().sort((a, b) => a.order - b.order);
   const curModIdx = orderedMods.findIndex((m) => m.id === moduleId);
   const nextMod = curModIdx >= 0 ? orderedMods[curModIdx + 1] : undefined;
-  const progByMod = new Map((courseProg?.modules ?? []).map((m) => [m.moduleId, m] as const));
   // A module counts as "done" when its content is complete OR mastery was demonstrated.
   const modDone = (id: string) => { const p = progByMod.get(id); return !!(p?.complete || p?.certified); };
   const moduleComplete = modDone(moduleId);
@@ -2510,6 +2545,7 @@ function ModuleHubView({
 
             <MasteryCard
               unlocked={masteryUnlocked}
+              earned={alreadyCertified}
               blocking={blocking}
               waiting={waiting}
               pending={startSession.isPending}
