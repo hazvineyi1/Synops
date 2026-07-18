@@ -11,11 +11,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useGetMe } from '@workspace/api-client-react';
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
+import { activitiesApi } from '@/lib/activitiesApi';
 import {
   ChevronLeft, ChevronRight, CheckCircle, BookOpen, List,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
-  Users, Layers, Target, Compass, Info, Save, Settings,
+  Users, Layers, Target, Compass, Info, Save, Settings, Sparkles,
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1308,6 +1309,12 @@ function ModuleHubView({
     queryFn: () => apiFetch<{ modules: { moduleId: string; complete: boolean; certified?: boolean; percent: number }[] }>(`/progress/course/${courseId}`),
     enabled: !!courseId,
   });
+  // Standalone activities assigned to (homed in) this module -- surfaced in the Complete tab.
+  const { data: moduleActivities } = useQuery({
+    queryKey: ['module-activities', moduleId],
+    queryFn: () => activitiesApi.list({ moduleId }),
+    enabled: !!moduleId,
+  });
 
   const startSession = useMutation({
     mutationFn: () => apiFetch<{ id: string }>('/sessions', {
@@ -1332,7 +1339,8 @@ function ModuleHubView({
   const interactiveBeats  = allBeats.filter(b => !!b.visualData?.interactive);
   const quizBeats         = allBeats.filter(b => !!b.visualData?.quiz);
   const moduleAssignments = (assignments ?? []).filter(a => a.moduleId === moduleId);
-  const practiceCount     = interactiveBeats.length + quizBeats.length;
+  const activityCount     = moduleActivities?.length ?? 0;
+  const practiceCount     = interactiveBeats.length + quizBeats.length + activityCount;
 
   const modality = (mod?.modality ?? 'async') as string;
   const mm = MODALITY_META[modality] ?? MODALITY_META.async;
@@ -1684,6 +1692,18 @@ function ModuleHubView({
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 )}
+                {/* Standalone activities assigned to this module (played full-screen). */}
+                {(moduleActivities ?? []).map((a) => (
+                  <button key={a.id} onClick={() => navigate(`/activities/${a.id}/play`)}
+                    className="w-full flex items-center gap-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-500/5 p-4 text-left hover:shadow-sm transition-shadow">
+                    <span className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center shrink-0"><Sparkles className="h-5 w-5" /></span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-sm truncate">{a.title}</div>
+                      <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}{a.difficulty ? ` · ${a.difficulty}` : ''}</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                ))}
               </>
             ) : (
               <EmptyState icon={Zap} title="No interactive activities for this module"
