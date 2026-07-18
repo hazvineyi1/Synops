@@ -34,7 +34,9 @@ export const gradebookItemsTable = pgTable(
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     courseId: text("course_id").notNull(),
     /** Where scores are read from. "manual" = entered by hand into gradebook_cells. */
-    sourceType: text("source_type", { enum: ["assignment", "case", "activity", "manual"] }).notNull(),
+    // NOTE: a text column with a TS-only enum, not a pgEnum, so adding a value needs no
+    // migration. "attendance" points at a delivery_sessions row.
+    sourceType: text("source_type", { enum: ["assignment", "case", "activity", "manual", "attendance"] }).notNull(),
     /** The assignment / case / activity id. null for manual columns. */
     sourceId: text("source_id"),
     title: text("title").notNull(),

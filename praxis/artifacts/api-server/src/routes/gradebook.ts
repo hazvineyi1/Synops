@@ -14,6 +14,8 @@ import {
   interactiveActivitiesTable,
   caseScenariosTable,
   caseRubricsTable,
+  deliverySessionsTable,
+  attendanceRecordsTable,
 } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -516,14 +518,54 @@ router.get("/gradebook/mine", requireAuth, async (req, res) => {
   res.json({ courses: out });
 });
 
+/**
+ * GET /courses/:courseId/gradebook-attendance-options
+ *
+ * Live sessions on this course that could become an attendance column, with how many
+ * attendance records each already has. A session with zero records would produce an empty
+ * column, so the count is shown rather than letting a facilitator add a blank one blind.
+ */
+router.get("/courses/:courseId/gradebook-attendance-options", requireAuth, async (req, res) => {
+  const { courseId } = req.params;
+  if (!(await requireStaffOnCourse(req, res, courseId))) return;
+
+  const sessions = await db
+    .select()
+    .from(deliverySessionsTable)
+    .where(eq(deliverySessionsTable.courseId, courseId))
+    .orderBy(desc(deliverySessionsTable.scheduledAt));
+  if (sessions.length === 0) { res.json([]); return; }
+
+  const [records, existing] = await Promise.all([
+    db.select({ sessionId: attendanceRecordsTable.sessionId })
+      .from(attendanceRecordsTable)
+      .where(inArray(attendanceRecordsTable.sessionId, sessions.map((s) => s.id))),
+    db.select({ sourceId: gradebookItemsTable.sourceId })
+      .from(gradebookItemsTable)
+      .where(and(eq(gradebookItemsTable.courseId, courseId), eq(gradebookItemsTable.sourceType, "attendance"))),
+  ]);
+  const counts = new Map<string, number>();
+  for (const r of records) counts.set(r.sessionId, (counts.get(r.sessionId) ?? 0) + 1);
+  const added = new Set(existing.map((e) => e.sourceId));
+
+  res.json(sessions.map((s) => ({
+    id: s.id,
+    title: s.title,
+    sessionType: s.sessionType,
+    scheduledAt: s.scheduledAt.toISOString(),
+    recordedCount: counts.get(s.id) ?? 0,
+    alreadyInGradebook: added.has(s.id),
+  })));
+});
+
 // ── Column (gradebook item) CRUD ──────────────────────────────────────────────────
 // POST /courses/:courseId/gradebook-items
 router.post("/courses/:courseId/gradebook-items", requireAuth, async (req, res) => {
   const { courseId } = req.params;
   if (!(await requireStaffOnCourse(req, res, courseId))) return;
   const b = req.body ?? {};
-  const sourceType = b.sourceType as "assignment" | "case" | "activity" | "manual";
-  if (!["assignment", "case", "activity", "manual"].includes(sourceType)) {
+  const sourceType = b.sourceType as "assignment" | "case" | "activity" | "manual" | "attendance";
+  if (!["assignment", "case", "activity", "manual", "attendance"].includes(sourceType)) {
     res.status(400).json({ error: "Invalid sourceType" });
     return;
   }
@@ -556,6 +598,26 @@ router.post("/courses/:courseId/gradebook-items", requireAuth, async (req, res) 
     if (!a) { res.status(404).json({ error: "Assignment not found" }); return; }
     if (!title) title = a.title;
     if (b.pointsPossible == null) points = Number(a.pointsPossible) || 100;
+  } else if (sourceType === "attendance" && sourceId) {
+    // One column per live session. It must belong to THIS course, or a facilitator could
+    // pull another course's attendance into their gradebook.
+    const s = await db.query.deliverySessionsTable.findFirst({
+      where: eq(deliverySessionsTable.id, sourceId),
+    });
+    if (!s) { res.status(404).json({ error: "Session not found" }); return; }
+    if (s.courseId !== courseId) {
+      res.status(400).json({ error: "That session belongs to a different course." });
+      return;
+    }
+    if (!title) {
+      const when = s.scheduledAt.toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+      title = `${s.title} (${when})`;
+    }
+    // Attendance is pass/fail per session, so the column is worth 1 point unless the
+    // facilitator says otherwise. Defaulting to 100 would let one missed session outweigh
+    // an entire assignment.
+    if (b.pointsPossible == null) points = 1;
+    if (category === "General") category = "Attendance";
   }
   if (!title) title = "Untitled item";
 

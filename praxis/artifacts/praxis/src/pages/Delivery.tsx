@@ -152,7 +152,7 @@ export function Delivery() {
                   <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
               </div>
-              {openId === s.id && <AttendanceEditor sessionId={s.id} orgId={orgId} />}
+              {openId === s.id && <AttendanceEditor sessionId={s.id} orgId={orgId} courseId={s.courseId} />}
             </CardContent>
           </Card>
         ))}
@@ -161,18 +161,37 @@ export function Delivery() {
   );
 }
 
-function AttendanceEditor({ sessionId, orgId }: { sessionId: string; orgId: string }) {
+/**
+ * Attendance for one session.
+ *
+ * Who can be marked: the learners ENROLLED ON THE SESSION'S COURSE, not everyone in the
+ * organisation. Listing the whole org meant a facilitator marking a ten-person class was
+ * shown every learner the organisation has, which is both a long scroll and a way to
+ * record attendance for someone who is not on the course at all.
+ *
+ * A session with no course is a standalone/org-wide one (the schema allows course_id to be
+ * null), and for those the org list is the correct source, so that path is kept.
+ */
+function AttendanceEditor({ sessionId, orgId, courseId }: { sessionId: string; orgId: string; courseId?: string | null }) {
   const qc = useQueryClient();
+  const { data: roster } = useQuery({
+    queryKey: ['roster', courseId],
+    queryFn: () => apiFetch<{ user: Member }[]>(`/courses/${courseId}/roster`),
+    enabled: !!courseId,
+  });
   const { data: members } = useQuery({
     queryKey: ['org-members', orgId],
     queryFn: () => apiFetch<Member[]>(`/organisations/${orgId}/members`),
+    enabled: !courseId,
   });
   const { data: existing } = useQuery({
     queryKey: ['attendance', sessionId],
     queryFn: () => apiFetch<{ userId: string; status: string; coachingHours: string | null }[]>(`/delivery-sessions/${sessionId}/attendance`),
   });
 
-  const learners = (members ?? []).filter((m) => m.role === 'learner');
+  const learners = courseId
+    ? (roster ?? []).map((r) => r.user).filter((u) => u && u.role === 'learner')
+    : (members ?? []).filter((m) => m.role === 'learner');
   const [rows, setRows] = useState<Record<string, { status: string; hours: string }>>({});
 
   // Seed local edit state from any existing records once loaded.
@@ -207,7 +226,11 @@ function AttendanceEditor({ sessionId, orgId }: { sessionId: string; orgId: stri
   return (
     <div className="mt-4 pt-4 border-t border-border space-y-2">
       <p className="text-sm font-medium flex items-center gap-2"><Users className="h-4 w-4" />Attendance &amp; coaching hours</p>
-      {learners.length === 0 && <p className="text-sm text-muted-foreground">No learners in this organisation.</p>}
+      {learners.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          {courseId ? 'Nobody is enrolled on this session\'s course yet.' : 'No learners in this organisation.'}
+        </p>
+      )}
       {learners.map((l) => (
         <div key={l.id} className="flex items-center gap-3 text-sm">
           <span className="flex-1 truncate">{l.firstName || l.email}{l.lastName ? ` ${l.lastName}` : ''}</span>

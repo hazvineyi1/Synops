@@ -9,6 +9,7 @@ import {
   caseRubricsTable,
   interactiveActivitiesTable,
   activitySubmissionsTable,
+  attendanceRecordsTable,
   gradebookSettingsTable,
   type GradebookItem,
   type LetterBand,
@@ -22,6 +23,8 @@ import { eq, and, inArray } from "drizzle-orm";
  *  - assignments        -> gradebook_entries.score / assignment.points_possible
  *  - cases              -> best completed case_session (rubric total, else engagement/10)
  *  - interactive acts   -> best activity_submission.score / activity.max_score
+ *  - attendance         -> one column per delivery session; present/late 1, absent 0,
+ *                          excused deliberately unscored (see getScoreData)
  *  - manual columns     -> gradebook_cells.manual_score / item.points_possible
  *
  * A column is either a default assignment column (no registry row) or a `gradebook_items`
@@ -39,7 +42,7 @@ const AT_RISK = 0.8; // [PASS, AT_RISK) with no harder signal => "at_risk"
 export interface GradebookColumn {
   key: string; // stable client key
   itemId: string | null; // gradebook_items.id, or null for a default assignment column
-  sourceType: "assignment" | "case" | "activity" | "manual";
+  sourceType: "assignment" | "case" | "activity" | "manual" | "attendance";
   sourceId: string | null;
   title: string;
   category: string;
@@ -192,7 +195,7 @@ export async function getCourseColumns(courseId: string): Promise<GradebookColum
     columns.push({
       key: `item:${it.id}`,
       itemId: it.id,
-      sourceType: it.sourceType as "case" | "activity" | "manual",
+      sourceType: it.sourceType as "case" | "activity" | "manual" | "attendance",
       sourceId: it.sourceId,
       title: it.title,
       category: it.category,
@@ -245,6 +248,8 @@ export async function getScoreData(
   const colByAssignment = new Map(columns.filter((c) => c.sourceType === "assignment").map((c) => [c.sourceId!, c]));
   const colByCase = new Map(columns.filter((c) => c.sourceType === "case").map((c) => [c.sourceId!, c]));
   const colByActivity = new Map(columns.filter((c) => c.sourceType === "activity").map((c) => [c.sourceId!, c]));
+  const attendanceSessionIds = columns.filter((c) => c.sourceType === "attendance").map((c) => c.sourceId!);
+  const colBySession = new Map(columns.filter((c) => c.sourceType === "attendance").map((c) => [c.sourceId!, c]));
   const manualColByItem = new Map(columns.filter((c) => c.sourceType === "manual" && c.itemId).map((c) => [c.itemId!, c]));
 
   await Promise.all([
@@ -309,6 +314,32 @@ export async function getScoreData(
         const frac = max > 0 ? Math.max(0, Math.min(1, s / max)) : 0;
         const prev = fractions.get(sub.userId)?.get(col.key);
         if (prev === undefined || frac > prev) setFrac(sub.userId, col.key, frac); // best attempt
+      }
+    })(),
+    // Attendance — one column per delivery session, scored from the learner's own record.
+    //
+    // FAIRNESS, deliberately:
+    //  * present / late  -> 1. They attended. Docking marks for lateness is a policy the
+    //    platform does not own; if an org wants that it should be a setting, not something
+    //    invented here.
+    //  * absent          -> 0.
+    //  * excused         -> NO SCORE AT ALL, not zero. That is the entire point of marking
+    //    someone excused; writing 0 would quietly punish the learner the facilitator just
+    //    decided not to punish, and would drag their overall mastery down.
+    //  * no record       -> no score, same as an unmarked assignment. Attendance nobody
+    //    recorded is missing data, not a zero.
+    (async () => {
+      if (attendanceSessionIds.length === 0) return;
+      const rows = await db
+        .select()
+        .from(attendanceRecordsTable)
+        .where(inArray(attendanceRecordsTable.sessionId, attendanceSessionIds));
+      for (const r of rows) {
+        if (!uSet.has(r.userId)) continue;
+        const col = colBySession.get(r.sessionId);
+        if (!col) continue;
+        if (r.status === "excused") continue; // neither credit nor penalty
+        setFrac(r.userId, col.key, r.status === "absent" ? 0 : 1);
       }
     })(),
     // Manual scores + per-cell notes (any item that has a registry row).
