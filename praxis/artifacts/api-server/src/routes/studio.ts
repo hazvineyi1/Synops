@@ -2,10 +2,15 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { scriptDraftsTable, modulesTable, beatsTable, coursesTable } from "@workspace/db";
 import { eq, desc, sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireAuth, requireRole } from "../middlewares/requireAuth";
+import { canStaffActOnCourse } from "../lib/scope";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 const router = Router();
+
+// Studio authors modules. Restrict authoring/publishing to the author tiers (super_admin passes),
+// rather than any signed-in user. Reads stay auth-only so learners/others can still view a draft.
+const requireAuthor = requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer");
 
 /**
  * The beat types the DB enum actually accepts. Kept in lockstep with beatTypeEnum in
@@ -35,7 +40,7 @@ function toDraftResponse(d: typeof scriptDraftsTable.$inferSelect) {
 }
 
 // POST /studio/generate-script
-router.post("/studio/generate-script", requireAuth, async (req, res) => {
+router.post("/studio/generate-script", requireAuth, requireAuthor, async (req, res) => {
   const user = req.dbUser!;
   const tenantId = user.partnerId ?? user.organisationId ?? user.id;
   const { title, sourceText, language = "en-ZA", maxBeats = 6 } = req.body;
@@ -156,7 +161,7 @@ router.get("/studio/scripts/:draftId", requireAuth, async (req, res) => {
 });
 
 // PATCH /studio/scripts/:draftId
-router.patch("/studio/scripts/:draftId", requireAuth, async (req, res) => {
+router.patch("/studio/scripts/:draftId", requireAuth, requireAuthor, async (req, res) => {
   const { title, beats } = req.body;
   const [updated] = await db
     .update(scriptDraftsTable)
@@ -167,13 +172,17 @@ router.patch("/studio/scripts/:draftId", requireAuth, async (req, res) => {
 });
 
 // POST /studio/scripts/:draftId/publish
-router.post("/studio/scripts/:draftId/publish", requireAuth, async (req, res) => {
+router.post("/studio/scripts/:draftId/publish", requireAuth, requireAuthor, async (req, res) => {
   const draft = await db.query.scriptDraftsTable.findFirst({
     where: eq(scriptDraftsTable.id, req.params.draftId),
   });
   if (!draft) { res.status(404).json({ error: "Not found" }); return; }
 
   const { courseId, moduleTitle, lessonType } = req.body;
+  if (!courseId) { res.status(400).json({ error: "courseId is required" }); return; }
+  // Publishing inserts a module into the target course, so the caller must be staff ON that course
+  // (not just an author somewhere) -- otherwise a coach in one org could publish into another's course.
+  if (!(await canStaffActOnCourse(req.dbUser!, courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const beats = (draft.beatsData as any[]) ?? [];
 
   // Create module

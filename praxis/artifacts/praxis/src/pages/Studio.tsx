@@ -17,8 +17,8 @@ export function Studio() {
     <div className="space-y-8 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-col gap-2">
-          <h1 className="text-4xl font-serif font-bold tracking-tight">Animation Studio</h1>
-          <p className="text-muted-foreground">Generate and edit Socratic beats before publishing to courses.</p>
+          <h1 className="text-4xl font-serif font-bold tracking-tight">Studio · Module Builder</h1>
+          <p className="text-muted-foreground">Turn source material into a structured lesson, then publish it as a module in a course.</p>
         </div>
         <Link href="/studio/new">
           <Button>
