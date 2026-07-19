@@ -44,6 +44,7 @@ import casesRouter from "./cases";
 import caseEmbedRouter from "./caseEmbed";
 import tutorFiguresRouter from "./tutorFigures";
 import learningHubRouter from "./learningHub";
+import billingRouter from "./billing";
 import devRouter, { devRoutesEnabled } from "./dev";
 
 const router = Router();
@@ -93,6 +94,7 @@ router.use(casesRouter);
 router.use(caseEmbedRouter);
 router.use(tutorFiguresRouter);
 router.use(learningHubRouter);
+router.use(billingRouter);
 // Defense in depth: the dev router is not even mounted unless explicitly enabled (see routes/dev.ts).
 if (devRoutesEnabled) router.use(devRouter);
 

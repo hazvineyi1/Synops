@@ -1,5 +1,5 @@
-Partner Hub Overview reads real partners; unbacked panels marked Sample (ASCII-only)
+Partner Accounts + Funders on live data (real members endpoint, real funding_agreements) (ASCII-only)
 
-Platform Overview no longer shows the seeded TalentForge/SkillBridge demo. It now fetches real partners (GET /partners) and organisations (GET /organisations), rendering the partner list, per-partner org drill-in, and KPIs (partners, orgs, learners) from live data with an empty-state CTA to create the first partner. Financials/funders/coaching-health have no live backend, so those panels are clearly badged Sample data. partnerHubData: registerRealPartners + emptyHub fallback so opening a REAL partner's hub shows an empty, correctly-named hub instead of another partner's demo figures.
+Accounts and Roles now lists the partner's REAL accounts from new GET /partners/:id/members (super admin any partner, partner_admin own); the manage drawer wires Reset password (POST /platform/users/:id/reset-link) and Suspend/Reactivate to the real endpoints for super admin. Funders Hub is now backed by a real funding_agreements table (new schema): list/add/edit/delete/status/conditions persist via GET/POST/PATCH/DELETE /partners/:id/funding (self-creates the table, additive; super admin any partner, partner_admin own). Seat allocation is derived read-only from funded seats pending learner-level assignment.
 
-VALIDATION: esbuild clean on partnerHubData.ts, PlatformOverview.tsx.
+VALIDATION: esbuild clean on partners.ts, funder.ts, db index (funding_agreements exported), PartnerAccounts.tsx, PartnerFunders.tsx.

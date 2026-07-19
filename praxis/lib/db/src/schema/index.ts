@@ -39,3 +39,4 @@ export * from "./module_readings";
 export * from "./learning_hub";
 export * from "./course_partner_assignments";
 export * from "./funding_agreements";
+export * from "./billing";
