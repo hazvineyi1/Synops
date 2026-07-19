@@ -434,7 +434,7 @@ export function orgGradebook(h: PartnerHub, orgId: string): OrgGradebookSummary 
   return { avgScore: 68 + (seed % 22), submitted, pendingMarking, graded: submitted - pendingMarking };
 }
 
-export type ImpersonatableUser = { id: string; name: string; email: string; role: string; orgName: string };
+export type ImpersonatableUser = { id: string; name: string; email: string; role: string; orgId: string; orgName: string };
 
 /**
  * Everyone a partner admin may impersonate: every account across their organisations (org admins,
@@ -443,9 +443,10 @@ export type ImpersonatableUser = { id: string; name: string; email: string; role
  * super admin.
  */
 export function impersonatableUsers(h: PartnerHub): ImpersonatableUser[] {
-  const staff = h.accounts.map((a) => ({ id: a.id, name: a.name, email: a.email, role: a.role === 'org_admin' ? 'Org admin' : 'Coach', orgName: a.orgName }));
-  const delegated = h.delegatedAdmins.map((d) => ({ id: d.id, name: d.name, email: d.email, role: 'Delegated admin', orgName: d.orgName }));
-  const learners = h.orgs.flatMap((o) => orgLearners(h, o.id).map((l) => ({ id: l.id, name: l.name, email: l.email, role: 'Learner', orgName: o.name })));
+  const orgIdByName = (name: string) => h.orgs.find((o) => o.name === name)?.id ?? '';
+  const staff = h.accounts.map((a) => ({ id: a.id, name: a.name, email: a.email, role: a.role === 'org_admin' ? 'Org admin' : 'Coach', orgId: orgIdByName(a.orgName), orgName: a.orgName }));
+  const delegated = h.delegatedAdmins.map((d) => ({ id: d.id, name: d.name, email: d.email, role: 'Delegated admin', orgId: orgIdByName(d.orgName), orgName: d.orgName }));
+  const learners = h.orgs.flatMap((o) => orgLearners(h, o.id).map((l) => ({ id: l.id, name: l.name, email: l.email, role: 'Learner', orgId: o.id, orgName: o.name })));
   return [...staff, ...delegated, ...learners];
 }
 

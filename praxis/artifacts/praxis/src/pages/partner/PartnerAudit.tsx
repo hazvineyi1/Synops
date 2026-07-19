@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useLocation } from 'wouter';
 import { useSession } from '@/context/SessionContext';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -8,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { ScrollText, ShieldCheck, Clock, Bell, Lock, Eye, Search, StopCircle } from 'lucide-react';
-import { getPartnerHub, impersonatableUsers, type AuditCategory, type ImpersonationSession } from '@/lib/partnerHubData';
+import { getPartnerHub, impersonatableUsers, type AuditCategory, type ImpersonatableUser } from '@/lib/partnerHubData';
+import { useImpersonation, startImpersonation, stopImpersonation } from '@/lib/impersonationStore';
 
 const CATS: (AuditCategory | 'all')[] = ['all', 'account', 'financial', 'funder', 'impersonation', 'branding'];
 const catStyle: Record<AuditCategory, string> = {
@@ -32,6 +34,7 @@ const roleBadge = (r: string) =>
  */
 export function PartnerAudit() {
   const { user } = useSession();
+  const [, navigate] = useLocation();
   const h = getPartnerHub(user?.partnerId);
   const [cat, setCat] = useState<(AuditCategory | 'all')>('all');
 
@@ -40,12 +43,12 @@ export function PartnerAudit() {
     [cat, h.audit],
   );
 
-  // Impersonation state
+  // Impersonation via the shared store (persists into the impersonation view).
   const adminName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Partner Admin';
   const targets = useMemo(() => impersonatableUsers(h), [h]);
   const [query, setQuery] = useState('');
-  const [sessions, setSessions] = useState<ImpersonationSession[]>(h.impersonations);
-  const [active, setActive] = useState<{ id: string; name: string; role: string; org: string; startedMs: number } | null>(null);
+  const { active, log } = useImpersonation();
+  const sessions = useMemo(() => [...log, ...h.impersonations], [log, h.impersonations]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -53,19 +56,9 @@ export function PartnerAudit() {
     return list.slice(0, 40);
   }, [targets, query]);
 
-  const start = (t: { id: string; name: string; role: string; orgName: string }) => {
-    const startedMs = Date.now();
-    setActive({ id: t.id, name: t.name, role: t.role, org: t.orgName, startedMs });
-    setSessions((xs) => [{
-      id: `im_${startedMs}`, admin: adminName, target: t.name, org: t.orgName,
-      startedAt: new Date(startedMs).toISOString(), durationMin: 0, reason: 'Support / review', active: true,
-    }, ...xs]);
-  };
-  const stop = () => {
-    if (!active) return;
-    const mins = Math.max(1, Math.round((Date.now() - active.startedMs) / 60000));
-    setSessions((xs) => xs.map((s) => (s.active ? { ...s, active: false, durationMin: mins } : s)));
-    setActive(null);
+  const startAndView = (t: ImpersonatableUser) => {
+    startImpersonation({ userId: t.id, name: t.name, role: t.role, orgId: t.orgId, orgName: t.orgName, admin: adminName, startedMs: Date.now() });
+    navigate(`/partner/impersonate/${t.orgId}/${t.id}`);
   };
 
   return (
@@ -117,9 +110,12 @@ export function PartnerAudit() {
             <Card className="p-4 border-amber-300 bg-amber-50/70 dark:bg-amber-950/30 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 text-sm">
                 <Eye className="h-5 w-5 text-amber-600 shrink-0" />
-                <span>Viewing as <strong>{active.name}</strong> ({active.role}) - {active.org}. Session is time-boxed to 30 minutes and logged.</span>
+                <span>Currently viewing as <strong>{active.name}</strong> ({active.role}) - {active.orgName}.</span>
               </div>
-              <Button size="sm" variant="outline" className="gap-1.5 shrink-0 border-amber-400" onClick={stop}><StopCircle className="h-4 w-4" /> Stop</Button>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/partner/impersonate/${active.orgId}/${active.userId}`)}><Eye className="h-4 w-4" /> Resume view</Button>
+                <Button size="sm" variant="outline" className="gap-1.5 border-amber-400" onClick={stopImpersonation}><StopCircle className="h-4 w-4" /> Stop</Button>
+              </div>
             </Card>
           )}
 
@@ -162,7 +158,7 @@ export function PartnerAudit() {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className={cn('rounded px-2 py-0.5 text-[10px] font-medium', roleBadge(t.role))}>{t.role}</span>
-                    <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" disabled={!!active} onClick={() => start(t)}><Eye className="h-3 w-3" /> View as</Button>
+                    <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" disabled={!!active} onClick={() => startAndView(t)}><Eye className="h-3 w-3" /> View as</Button>
                   </div>
                 </div>
               ))}

@@ -1,7 +1,7 @@
-Financial Hub: editable figures (plan price, seats, invoice net, VAT rate) with live recompute (ASCII-only)
+Audit: partner admin can impersonate anyone in their organisations except the super admin (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-The Financial Hub key figures are now editable inline via a NumInput helper: plan price per seat, per-org seat count, invoice net amount, and the VAT rate. Everything derived recomputes live - each org monthly total, the Monthly recurring KPI + a new Total row, Outstanding, invoice VAT/total columns (header shows the current rate), and VAT collected/pending. VAT rate has a reset-to-15% shortcut. Seeded/session only; persistence is a backend step.
+The Impersonation tab is now a working start/stop flow. New impersonatableUsers(hub) lists every tenant account across the partner orgs - org admins, coaches, delegated admins and learners - and the platform super admin is never a tenant account so it can never appear (shown explicitly with a locked note). Searchable list with View as; starting sets a time-boxed active session (amber banner + Stop), prepends it to the sessions log as active, and Stop records the duration. Policy cards (time-boxed / org-notified / auto-logged) retained.
 
-VALIDATION: parse-check + local-resolution bundle clean; Pencil icon confirmed.
+VALIDATION: parse-check + local-resolution bundle clean; ImpersonationSession + impersonatableUsers exports and Eye/Search/StopCircle icons confirmed.
