@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useSearch, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, API } from '@/lib/api';
+import { BLOOM_LEVELS, bloomColor, generateObjectives, type BloomLevel } from '@/lib/courseDevEngine';
 import { useGetMe } from '@workspace/api-client-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -932,21 +933,73 @@ function AssignPartnersCard({ courseId }: { courseId: string }) {
   );
 }
 
-function CourseObjectivesCard({ initial, saving, onSave }: {
+const DEFAULT_BLOOM: BloomLevel[] = ['Understand', 'Apply', 'Analyze'];
+
+function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
   initial: string[];
   saving: boolean;
   onSave: (objectives: string[]) => void;
+  title: string;
+  description?: string;
 }) {
   const [draft, setDraft] = useState<string[]>(initial.length ? initial : ['']);
+  const [genOpen, setGenOpen] = useState(false);
+  const [levels, setLevels] = useState<BloomLevel[]>(DEFAULT_BLOOM);
   const clean = draft.map((s) => s.trim()).filter(Boolean);
   const dirty = JSON.stringify(clean) !== JSON.stringify(initial);
+  const toggleLevel = (l: BloomLevel) =>
+    setLevels((p) => (p.includes(l) ? p.filter((x) => x !== l) : [...p, l]));
+  const generate = () => {
+    // Rules-based Bloom's engine: one measurable objective per chosen cognitive level,
+    // seeded from the course title/description. Appended to the draft for review — the ID
+    // edits and Saves; nothing is written until Save objectives.
+    const gen = generateObjectives(title, description ?? '', BLOOM_LEVELS.filter((l) => levels.includes(l)));
+    const existing = new Set(clean.map((s) => s.toLowerCase()));
+    const additions = gen.map((o) => o.text).filter((t) => !existing.has(t.toLowerCase()));
+    if (additions.length) setDraft([...clean, ...additions]);
+  };
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Course learning objectives</CardTitle>
-        <p className="text-xs text-muted-foreground">Shown to learners on the course overview.</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">Course learning objectives</CardTitle>
+            <p className="text-xs text-muted-foreground">Shown to learners on the course overview.</p>
+          </div>
+          <Button size="sm" variant="outline" className="gap-1.5 flex-shrink-0" onClick={() => setGenOpen((o) => !o)}>
+            <Sparkles className="h-3.5 w-3.5" /> Generate
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {genOpen && (
+          <div className="rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-3 space-y-2.5">
+            <p className="text-xs text-muted-foreground">Pick the cognitive levels (Bloom's Taxonomy). One measurable objective is drafted per level from the course title and description, then added below for you to edit.</p>
+            <div className="flex flex-wrap gap-1.5">
+              {BLOOM_LEVELS.map((l) => {
+                const on = levels.includes(l);
+                return (
+                  <button
+                    key={l}
+                    type="button"
+                    onClick={() => toggleLevel(l)}
+                    className={cn(
+                      'text-xs rounded-full px-2.5 py-1 border transition-colors',
+                      on ? bloomColor(l) : 'text-muted-foreground border-border hover:bg-muted',
+                    )}
+                  >
+                    {l}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex justify-end">
+              <Button size="sm" className="gap-1.5" disabled={!levels.length} onClick={generate}>
+                <Sparkles className="h-3.5 w-3.5" /> Generate objectives
+              </Button>
+            </div>
+          </div>
+        )}
         <ObjectivesEditor value={draft} onChange={setDraft} />
         <div className="flex justify-end">
           <Button size="sm" disabled={!dirty || saving} onClick={() => onSave(clean)}>
@@ -1417,6 +1470,8 @@ export function CourseDetail() {
                   initial={course.objectives ?? []}
                   saving={saveCourse.isPending}
                   onSave={(objectives) => saveCourse.mutate({ objectives })}
+                  title={course.title}
+                  description={course.description}
                 />
               )}
               {/* Super admin: assign this platform-owned course out to partners. */}

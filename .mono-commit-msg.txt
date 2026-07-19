@@ -1,5 +1,5 @@
-Course Development Suite: Review and Publish tab (review real content, videos, activity previews, publish) (ASCII-only)
+Platform-owned courses assigned to partners from the super admin (ASCII-only)
 
-The suite ended at authoring drafts with no way to review the finished course or finalize it. New Review and Publish tab: pick a real course, then see a readiness checklist (description, modules, published module, activities, published activities, an assessment), the module list (open each to review its content + video), interactive activities PREVIEWED INLINE (ActivityPlayer), and the attached case studies + assignments. A Publish course button (PATCH /courses status) with an Unpublish toggle finalizes it. Reads existing endpoints (/courses, /courses/:id, /activities?courseId, /courses/:id/cases, /courses/:id/assignments).
+Courses now belong to the platform (super admin) and are assigned OUT to partners. Backend: new course_partner_assignments table; POST /courses sets tenantId=platform for hub roles; GET /courses is additive (a partner sees courses their tenant owns PLUS courses assigned to their partner); POST /courses/setup-platform creates the table and brings every existing course under platform ownership (idempotent, no psql needed); GET/PUT /courses/:id/partners manage assignments; canStaffActOnCourse grants a partner admin/coach access to courses assigned to their partner. Frontend: super-admin Assign-to-partners card on the course page, and an Adopt-all-to-platform button on the Courses list.
 
-VALIDATION: esbuild bundle clean on CourseDevelopmentSuite.tsx.
+VALIDATION: esbuild clean on scope.ts, courses.ts, db index (new table exported), CourseDetail.tsx, Courses.tsx.
