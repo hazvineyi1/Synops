@@ -84,6 +84,31 @@ export function PartnerOverview() {
         </Card>
       )}
 
+      {/* Organisations at a glance — org-by-org access, main-admin's map of the tenant */}
+      <Card className="p-5">
+        <SectionTitle action={<Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate('/partner/organisations')}>Manage <ArrowRight className="h-3.5 w-3.5" /></Button>}>Organisations</SectionTitle>
+        <div className="mt-3 grid sm:grid-cols-2 gap-3">
+          {h.orgs.map((o) => {
+            const d = orgDetail(h, o.id);
+            return (
+              <button key={o.id} onClick={() => navigate(`/partner/org/${o.id}`)}
+                className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:bg-muted/40 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium truncate">{o.name}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  {d.plan && <span><Wallet className="inline h-3 w-3 mr-1" />{d.plan.name}</span>}
+                  <span><Users className="inline h-3 w-3 mr-1" />{d.sub?.seats ?? 0} seats</span>
+                  {d.delegated.length > 0 && <span><ShieldCheck className="inline h-3 w-3 mr-1" />{d.delegated.length} delegated admin{d.delegated.length > 1 ? 's' : ''}</span>}
+                  {d.openInvoices > 0 && <span className="text-amber-600"><Receipt className="inline h-3 w-3 mr-1" />{d.openInvoices} open invoice{d.openInvoices > 1 ? 's' : ''}</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Financial snapshot */}
         <Card className="p-5">
@@ -139,31 +164,6 @@ export function PartnerOverview() {
               <span className="text-xs text-muted-foreground shrink-0">{new Date(e.at).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</span>
             </div>
           ))}
-        </div>
-      </Card>
-
-      {/* Organisations at a glance — org-by-org access, main-admin's map of the tenant */}
-      <Card className="p-5">
-        <SectionTitle action={<Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate('/partner/organisations')}>Manage <ArrowRight className="h-3.5 w-3.5" /></Button>}>Organisations</SectionTitle>
-        <div className="mt-3 grid sm:grid-cols-2 gap-3">
-          {h.orgs.map((o) => {
-            const d = orgDetail(h, o.id);
-            return (
-              <button key={o.id} onClick={() => navigate(`/partner/org/${o.id}`)}
-                className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:bg-muted/40 transition-colors">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium truncate">{o.name}</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  {d.plan && <span><Wallet className="inline h-3 w-3 mr-1" />{d.plan.name}</span>}
-                  <span><Users className="inline h-3 w-3 mr-1" />{d.sub?.seats ?? 0} seats</span>
-                  {d.delegated.length > 0 && <span><ShieldCheck className="inline h-3 w-3 mr-1" />{d.delegated.length} delegated admin{d.delegated.length > 1 ? 's' : ''}</span>}
-                  {d.openInvoices > 0 && <span className="text-amber-600"><Receipt className="inline h-3 w-3 mr-1" />{d.openInvoices} open invoice{d.openInvoices > 1 ? 's' : ''}</span>}
-                </div>
-              </button>
-            );
-          })}
         </div>
       </Card>
     </div>

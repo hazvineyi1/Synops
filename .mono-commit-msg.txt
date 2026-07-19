@@ -1,9 +1,7 @@
-Org Hub: learner drawer actions give visible feedback + archive/delete account (ASCII-only)
+Org Hub: track last password reset (date + channel) on the learner drawer (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-BUGFIX: reset-password, WhatsApp/email resend and login-help buttons appeared dead because their confirmation used the page-level flash banner, which renders BEHIND the modal. Added an in-drawer confirmation line so every action (role change, reset via email/WhatsApp, resend login help, suspend/reactivate) reports where the admin can see it.
+Member now carries lastReset { at, channel }. Sending a reset via Email or WhatsApp records the timestamp and channel; the drawer shows Last reset <date> via <email/WhatsApp> under the reset buttons, or No password reset on record. Learners are seeded with a realistic prior-reset history (some never reset).
 
-NEW: Archive account (soft - keeps the record, removes access, reversible via Restore) and Delete account (permanent, behind an inline Confirm/Cancel with a warning). Member status type gains archived; status chip shown in the drawer header and the People table.
-
-VALIDATION: parse-check + local-resolution bundle clean; Trash2 icon confirmed.
+VALIDATION: parse-check + local-resolution bundle clean.
