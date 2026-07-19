@@ -434,6 +434,21 @@ export function orgGradebook(h: PartnerHub, orgId: string): OrgGradebookSummary 
   return { avgScore: 68 + (seed % 22), submitted, pendingMarking, graded: submitted - pendingMarking };
 }
 
+export type ImpersonatableUser = { id: string; name: string; email: string; role: string; orgName: string };
+
+/**
+ * Everyone a partner admin may impersonate: every account across their organisations (org admins,
+ * coaches), delegated admins and learners. The platform super admin is NOT a tenant account and is
+ * never in this list - a partner admin can impersonate anyone in their organisation except the
+ * super admin.
+ */
+export function impersonatableUsers(h: PartnerHub): ImpersonatableUser[] {
+  const staff = h.accounts.map((a) => ({ id: a.id, name: a.name, email: a.email, role: a.role === 'org_admin' ? 'Org admin' : 'Coach', orgName: a.orgName }));
+  const delegated = h.delegatedAdmins.map((d) => ({ id: d.id, name: d.name, email: d.email, role: 'Delegated admin', orgName: d.orgName }));
+  const learners = h.orgs.flatMap((o) => orgLearners(h, o.id).map((l) => ({ id: l.id, name: l.name, email: l.email, role: 'Learner', orgName: o.name })));
+  return [...staff, ...delegated, ...learners];
+}
+
 export function fundersRollup(h: PartnerHub) {
   const fundedSeats = h.agreements.reduce((s, a) => s + a.seatsFunded, 0);
   const funderValue = h.agreements.reduce((s, a) => s + a.value, 0);

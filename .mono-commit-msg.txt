@@ -1,7 +1,7 @@
-Partner Hub: remove em dashes from all partner-hub surfaces (ASCII-only)
+Financial Hub: editable figures (plan price, seats, invoice net, VAT rate) with live recompute (ASCII-only)
 
-NO MIGRATION REQUIRED. Frontend only, copy/style change.
+NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-Replaced every em dash with a hyphen across the partner pages (Overview, Organisations, Org hub, Class detail, Finance, Funders, Documents, Accounts, Comms, Settings, Audit, Branding), plus partnerHubData and the AppLayout partner nav/comments. Scoped to the partner hub (app-wide would exceed the commit file cap and touch unrelated features).
+The Financial Hub key figures are now editable inline via a NumInput helper: plan price per seat, per-org seat count, invoice net amount, and the VAT rate. Everything derived recomputes live - each org monthly total, the Monthly recurring KPI + a new Total row, Outstanding, invoice VAT/total columns (header shows the current rate), and VAT collected/pending. VAT rate has a reset-to-15% shortcut. Seeded/session only; persistence is a backend step.
 
-VALIDATION: all edited files parse-check clean; no em dashes remain in the partner-hub files.
+VALIDATION: parse-check + local-resolution bundle clean; Pencil icon confirmed.
