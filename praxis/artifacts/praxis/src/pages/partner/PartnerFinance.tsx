@@ -45,7 +45,7 @@ export function PartnerFinance() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Financial Hub" icon={Wallet} subtitle={`${h.partnerName} — subscriptions, invoicing, funder disbursement and VAT.`} />
+      <PageHeader title="Financial Hub" icon={Wallet} subtitle={`${h.partnerName} - subscriptions, invoicing, funder disbursement and VAT.`} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={Wallet} label="Monthly recurring (excl. VAT)" value={ZAR(fin.mrrNet)} tint="bg-emerald-500/10 text-emerald-600" />
@@ -123,7 +123,7 @@ export function PartnerFinance() {
               </tbody>
             </table>
           </Card>
-          <p className="mt-2 text-xs text-muted-foreground">Payment gateway integration is not yet wired — "Mark paid" records the payment in this review build. Multi-currency and card capture come with the gateway.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Payment gateway integration is not yet wired - "Mark paid" records the payment in this review build. Multi-currency and card capture come with the gateway.</p>
         </TabsContent>
 
         {/* Funder Disbursement */}
@@ -166,7 +166,7 @@ export function PartnerFinance() {
         <TabsContent value="audit" className="mt-4">
           <Card className="p-4 mb-3 flex items-start gap-3 text-sm">
             <ScrollText className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div className="text-muted-foreground">This is a <span className="text-foreground font-medium">filtered view</span> of the unified Partner Activity Audit Log — financial entries only. Financial entries carry stricter retention than other categories.</div>
+            <div className="text-muted-foreground">This is a <span className="text-foreground font-medium">filtered view</span> of the unified Partner Activity Audit Log - financial entries only. Financial entries carry stricter retention than other categories.</div>
           </Card>
           <Card className="overflow-hidden">
             <table className="w-full text-sm">

@@ -1,5 +1,5 @@
 /**
- * Partner Hub — seeded data layer.
+ * Partner Hub - seeded data layer.
  *
  * The Partner Hub (Financial Hub, Funders Hub, Accounts & Roles, unified Audit Log) is an
  * exemplar administrative surface built for review against the v0.1 functional spec. Per
@@ -376,7 +376,7 @@ export function orgLearners(h: PartnerHub, orgId: string, sample = 12): OrgLearn
       disability: DISABILITIES[(seed + i) % DISABILITIES.length],
       highestQualification: QUALIFICATIONS[(seed + i) % QUALIFICATIONS.length],
       employmentStatus: empStatus, jobTitle: jobs[(seed + i) % jobs.length],
-      employer: empStatus === 'Employed' ? `${LAST_NAMES[(seed + i * 4) % LAST_NAMES.length]} Group` : '—',
+      employer: empStatus === 'Employed' ? `${LAST_NAMES[(seed + i * 4) % LAST_NAMES.length]} Group` : '-',
       lifecycleStatus: lifecycle,
       emergencyContact: `${FIRST_NAMES[(seed + i * 6) % FIRST_NAMES.length]} ${ln} · +27 ${String(70 + ((seed + i) % 20)).slice(0, 2)} ${phoneTail.slice(0, 3)} ${phoneTail.slice(3)}`,
     };

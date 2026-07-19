@@ -64,7 +64,7 @@ export function PartnerTheme() {
     <div className="space-y-8 animate-in fade-in">
       <div className="flex flex-col gap-2">
         <h1 className="text-4xl font-serif font-bold tracking-tight">Branding</h1>
-        <p className="text-muted-foreground">White-label the whole experience — name, logo, colours, favicon and sender identity. Changes go live across the app on save.</p>
+        <p className="text-muted-foreground">White-label the whole experience - name, logo, colours, favicon and sender identity. Changes go live across the app on save.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -122,7 +122,7 @@ export function PartnerTheme() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Serve the whole platform on your own address — e.g. <span className="font-mono">learn.youracademy.com</span>. Learners never see a Synops URL; even the sign-in page carries your branding.
+                Serve the whole platform on your own address - e.g. <span className="font-mono">learn.youracademy.com</span>. Learners never see a Synops URL; even the sign-in page carries your branding.
               </p>
               <div className="space-y-2">
                 <Label>Domain</Label>
@@ -135,14 +135,14 @@ export function PartnerTheme() {
                 {domain && (
                   <div className={`flex items-center gap-2 text-xs font-medium ${domainLive ? 'text-green-600' : 'text-amber-600'}`}>
                     {domainLive ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
-                    {domainLive ? 'Live — this domain is serving the platform now.' : 'Saved. Finish the two setup steps below, then it goes live (TLS can take a few minutes).'}
+                    {domainLive ? 'Live - this domain is serving the platform now.' : 'Saved. Finish the two setup steps below, then it goes live (TLS can take a few minutes).'}
                   </div>
                 )}
               </div>
               <div className="rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground space-y-2">
                 <p className="font-bold text-foreground uppercase tracking-wider text-[11px]">Two steps to go live</p>
                 <p><span className="font-bold text-foreground">1.</span> Add the domain to the Praxis service in Railway (Settings → Networking → Custom Domain). Railway issues the TLS certificate and shows you a <span className="font-mono">CNAME</span> target.</p>
-                <p><span className="font-bold text-foreground">2.</span> At your domain registrar, add a <span className="font-mono">CNAME</span> record for the subdomain pointing to that Railway target. Save it here — done.</p>
+                <p><span className="font-bold text-foreground">2.</span> At your domain registrar, add a <span className="font-mono">CNAME</span> record for the subdomain pointing to that Railway target. Save it here - done.</p>
               </div>
               <div className="pt-2">
                 <Button onClick={() => save.mutate()} disabled={save.isPending} variant="outline" className="w-full">

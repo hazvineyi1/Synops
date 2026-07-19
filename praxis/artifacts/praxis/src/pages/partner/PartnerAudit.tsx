@@ -35,7 +35,7 @@ export function PartnerAudit() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Audit & Impersonation" icon={ShieldCheck} subtitle={`${h.partnerName} — one immutable log for all admin and financial actions, plus impersonation controls.`} />
+      <PageHeader title="Audit & Impersonation" icon={ShieldCheck} subtitle={`${h.partnerName} - one immutable log for all admin and financial actions, plus impersonation controls.`} />
 
       <Tabs defaultValue="log">
         <TabsList>

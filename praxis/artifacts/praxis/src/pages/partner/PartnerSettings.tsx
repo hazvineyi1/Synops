@@ -39,7 +39,7 @@ export function PartnerSettings() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" icon={Settings} subtitle={`${h.partnerName} — tenant profile, notifications, security and data.`} />
+      <PageHeader title="Settings" icon={Settings} subtitle={`${h.partnerName} - tenant profile, notifications, security and data.`} />
 
       {flash && (
         <Card className="p-3 border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 flex items-center gap-2 text-sm">
@@ -106,7 +106,7 @@ export function PartnerSettings() {
           <div className="grid sm:grid-cols-2 gap-3">
             <Card className="p-4 flex items-start gap-3"><ShieldCheck className="h-5 w-5 text-primary shrink-0" /><div><div className="text-sm font-medium">Impersonation policy</div><div className="text-xs text-muted-foreground">Time-boxed to 30 min, org-notified and auto-logged. Managed in Audit &amp; Impersonation.</div></div></Card>
             <Card className="p-4 flex items-start gap-3"><ShieldCheck className="h-5 w-5 text-primary shrink-0" /><div><div className="text-sm font-medium">Tenant isolation</div><div className="text-xs text-muted-foreground">Your data is isolated per tenant with row-level security enforced at the database.</div></div></Card>
-            <Card className="p-4 flex items-start gap-3"><ShieldCheck className="h-5 w-5 text-primary shrink-0" /><div><div className="text-sm font-medium">Role provisioning</div><div className="text-xs text-muted-foreground">A Partner can only mint Coach and Org-admin accounts — enforced server-side.</div></div></Card>
+            <Card className="p-4 flex items-start gap-3"><ShieldCheck className="h-5 w-5 text-primary shrink-0" /><div><div className="text-sm font-medium">Role provisioning</div><div className="text-xs text-muted-foreground">A Partner can only mint Coach and Org-admin accounts - enforced server-side.</div></div></Card>
             <Card className="p-4 flex items-start gap-3"><ShieldCheck className="h-5 w-5 text-primary shrink-0" /><div><div className="text-sm font-medium">Audit retention</div><div className="text-xs text-muted-foreground">Financial entries carry stricter, append-only retention.</div></div></Card>
           </div>
           <Button variant="outline" className="gap-1.5" onClick={() => navigate('/partner/audit')}><ShieldCheck className="h-4 w-4" /> Open Audit &amp; Impersonation</Button>
@@ -118,9 +118,9 @@ export function PartnerSettings() {
             <h3 className="text-sm font-semibold">Export &amp; portability</h3>
             <p className="text-sm text-muted-foreground">Export your tenant data for reporting, backup or migration. Exports respect tenant isolation and exclude other partners' data.</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="gap-1.5" onClick={() => flashMsg('Accounts export queued — you will receive a download link.')}><Download className="h-4 w-4" /> Export accounts (CSV)</Button>
-              <Button variant="outline" className="gap-1.5" onClick={() => flashMsg('Financial export queued — you will receive a download link.')}><Download className="h-4 w-4" /> Export financials (CSV)</Button>
-              <Button variant="outline" className="gap-1.5" onClick={() => flashMsg('Full tenant export queued — you will receive a download link.')}><Download className="h-4 w-4" /> Full tenant export</Button>
+              <Button variant="outline" className="gap-1.5" onClick={() => flashMsg('Accounts export queued - you will receive a download link.')}><Download className="h-4 w-4" /> Export accounts (CSV)</Button>
+              <Button variant="outline" className="gap-1.5" onClick={() => flashMsg('Financial export queued - you will receive a download link.')}><Download className="h-4 w-4" /> Export financials (CSV)</Button>
+              <Button variant="outline" className="gap-1.5" onClick={() => flashMsg('Full tenant export queued - you will receive a download link.')}><Download className="h-4 w-4" /> Full tenant export</Button>
             </div>
             <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
               Export generation is wired at the backend reporting step. Actions here are logged to the audit trail.

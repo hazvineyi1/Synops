@@ -38,11 +38,11 @@ export function PartnerOverview() {
       <PageHeader
         title="Partner Hub"
         icon={LayoutDashboard}
-        subtitle={`${h.partnerName} — your financial, funder, account and compliance controls in one place.`}
+        subtitle={`${h.partnerName} - your financial, funder, account and compliance controls in one place.`}
         action={<Badge variant="outline" className="gap-1.5"><Building className="h-3.5 w-3.5" /> {h.orgs.length} {h.orgs.length === 1 ? 'organisation' : 'organisations'}</Badge>}
       />
 
-      {/* Quick jump bar — relocated from the bottom so the main-admin destinations are reachable up front */}
+      {/* Quick jump bar - relocated from the bottom so the main-admin destinations are reachable up front */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {[
           { label: 'Organisations', icon: Building, href: '/partner/organisations' },
@@ -84,7 +84,7 @@ export function PartnerOverview() {
         </Card>
       )}
 
-      {/* Organisations at a glance — org-by-org access, main-admin's map of the tenant */}
+      {/* Organisations at a glance - org-by-org access, main-admin's map of the tenant */}
       <Card className="p-5">
         <SectionTitle action={<Button size="sm" variant="ghost" className="gap-1" onClick={() => navigate('/partner/organisations')}>Manage <ArrowRight className="h-3.5 w-3.5" /></Button>}>Organisations</SectionTitle>
         <div className="mt-3 grid sm:grid-cols-2 gap-3">

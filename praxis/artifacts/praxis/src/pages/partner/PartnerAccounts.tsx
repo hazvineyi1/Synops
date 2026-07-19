@@ -50,7 +50,7 @@ const roleBadge = (r: string) =>
  * Accounts & Roles (spec §2, upgrade §5/§8). Provisioning and lifecycle for every account below
  * the Partner tier: the role/permission matrix, invites, and now per-account controls (password
  * reset, login help, suspend/reactivate, login-activity history) plus delegated organisation
- * admins — a junior admin scoped to one organisation with only the powers the Partner grants.
+ * admins - a junior admin scoped to one organisation with only the powers the Partner grants.
  */
 export function PartnerAccounts() {
   const { user } = useSession();
@@ -103,7 +103,7 @@ export function PartnerAccounts() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Accounts & Roles" icon={Users} subtitle={`${h.partnerName} — provisioning, account lifecycle, delegated admins and access scope.`} />
+      <PageHeader title="Accounts & Roles" icon={Users} subtitle={`${h.partnerName} - provisioning, account lifecycle, delegated admins and access scope.`} />
 
       {flash && (
         <Card className="p-3 border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 flex items-center gap-2 text-sm">
@@ -162,8 +162,7 @@ export function PartnerAccounts() {
             <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <div className="text-muted-foreground">
               Delegate a single organisation to a junior admin and grant only the powers you choose. A delegated admin
-              is <span className="text-foreground font-medium">confined to their one organisation</span> and can do nothing beyond the powers allocated here —
-              Main-Admin surfaces (Financial Hub, Funders, other organisations) stay out of reach.
+              is <span className="text-foreground font-medium">confined to their one organisation</span> and can do nothing beyond the powers allocated here -               Main-Admin surfaces (Financial Hub, Funders, other organisations) stay out of reach.
             </div>
           </Card>
 
@@ -232,7 +231,7 @@ export function PartnerAccounts() {
         {/* Create & Invite */}
         <TabsContent value="invite" className="mt-4">
           <Card className="p-5 max-w-xl space-y-3">
-            <div className="text-sm text-muted-foreground">A Partner may provision the tiers below it — Coach and Org-admin accounts. Learner accounts are created by Organisations.</div>
+            <div className="text-sm text-muted-foreground">A Partner may provision the tiers below it - Coach and Org-admin accounts. Learner accounts are created by Organisations.</div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Email</label>
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.co.za" className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />

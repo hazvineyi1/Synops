@@ -74,7 +74,7 @@ const lifecyclePill = (s: string) =>
 
 /**
  * Organisation Hub (partner_admin). Once the partner steps into an organisation, this IS the app:
- * every surface — people, courses, coaching, gradebook, funding, documents and billing — is scoped
+ * every surface - people, courses, coaching, gradebook, funding, documents and billing - is scoped
  * to this one organisation, and it is operational: add members, set roles, reset passwords, view
  * learners, and assign courses to a class. Nothing partner-wide is reachable from here. Seeded.
  */
@@ -194,7 +194,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       <PageHeader
         title={d.org.name}
         icon={meta.icon}
-        subtitle={`${meta.title} — scoped entirely to ${d.org.name}.`}
+        subtitle={`${meta.title} - scoped entirely to ${d.org.name}.`}
         action={d.plan ? <Badge variant="outline" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> {d.plan.name}</Badge> : undefined}
       />
 
@@ -208,7 +208,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       {section === 'overview' && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard icon={Users} label="Seats (active)" value={d.sub ? `${d.sub.activeSeats}/${d.sub.seats}` : '—'} tint="bg-indigo-500/10 text-indigo-600" />
+            <StatCard icon={Users} label="Seats (active)" value={d.sub ? `${d.sub.activeSeats}/${d.sub.seats}` : '-'} tint="bg-indigo-500/10 text-indigo-600" />
             <StatCard icon={BookOpen} label="Courses" value={courses.length} tint="bg-emerald-500/10 text-emerald-600" />
             <StatCard icon={TrendingUp} label="Coaching health" value={`${coaching.avgHealth}%`} tint="bg-violet-500/10 text-violet-600" />
             <StatCard icon={Receipt} label="Open invoices" value={d.openInvoices} tint={d.openInvoices ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground'} />
@@ -275,7 +275,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <td className="p-3"><div className="font-medium">{m.name}</div><div className="text-xs text-muted-foreground">{m.email}</div></td>
                     <td className="p-3"><span className={cn('rounded px-2 py-0.5 text-xs font-medium', roleBadge(m.role))}>{ROLE_LABEL[m.role]}</span></td>
                     <td className="p-3"><Badge variant={m.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', m.status === 'suspended' && 'border-red-300 text-red-600', m.status === 'archived' && 'border-slate-300 text-slate-500')}>{m.status}</Badge></td>
-                    {roleFilter === 'learner' && <td className="p-3">{m.progress != null ? <div className="flex items-center gap-2"><Progress value={m.progress} className="h-1.5 w-24" /><span className="text-xs tabular-nums text-muted-foreground">{m.progress}%</span></div> : <span className="text-muted-foreground">—</span>}</td>}
+                    {roleFilter === 'learner' && <td className="p-3">{m.progress != null ? <div className="flex items-center gap-2"><Progress value={m.progress} className="h-1.5 w-24" /><span className="text-xs tabular-nums text-muted-foreground">{m.progress}%</span></div> : <span className="text-muted-foreground">-</span>}</td>}
                     <td className="p-3 text-right"><Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => openMember(m)}><Settings2 className="h-3.5 w-3.5" /> Manage</Button></td>
                   </tr>
                 ))}
@@ -340,7 +340,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                       <td className="p-3 font-medium">{c.title}</td>
                       <td className="p-3 text-muted-foreground">{c.modality}</td>
                       <td className="p-3 text-right tabular-nums">{c.enrolled}</td>
-                      <td className="p-3">{inClasses.length === 0 ? <span className="text-xs text-muted-foreground">—</span> : <div className="flex flex-wrap gap-1">{inClasses.map((cl) => <span key={cl.id} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{cl.name}</span>)}</div>}</td>
+                      <td className="p-3">{inClasses.length === 0 ? <span className="text-xs text-muted-foreground">-</span> : <div className="flex flex-wrap gap-1">{inClasses.map((cl) => <span key={cl.id} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{cl.name}</span>)}</div>}</td>
                       <td className="p-3"><Badge variant={c.status === 'active' ? 'secondary' : 'outline'} className="capitalize">{c.status}</Badge></td>
                     </tr>
                   );
@@ -478,9 +478,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       {section === 'billing' && (
         <div className="space-y-4">
           <div className="grid sm:grid-cols-3 gap-3">
-            <StatCard icon={Wallet} label="Plan" value={d.plan?.name ?? '—'} tint="bg-indigo-500/10 text-indigo-600" />
-            <StatCard icon={Users} label="Seats" value={d.sub ? `${d.sub.activeSeats}/${d.sub.seats}` : '—'} tint="bg-emerald-500/10 text-emerald-600" />
-            <StatCard icon={Receipt} label="Monthly (excl. VAT)" value={d.plan && d.sub ? ZAR(d.plan.pricePerSeat * d.sub.seats) : '—'} tint="bg-violet-500/10 text-violet-600" />
+            <StatCard icon={Wallet} label="Plan" value={d.plan?.name ?? '-'} tint="bg-indigo-500/10 text-indigo-600" />
+            <StatCard icon={Users} label="Seats" value={d.sub ? `${d.sub.activeSeats}/${d.sub.seats}` : '-'} tint="bg-emerald-500/10 text-emerald-600" />
+            <StatCard icon={Receipt} label="Monthly (excl. VAT)" value={d.plan && d.sub ? ZAR(d.plan.pricePerSeat * d.sub.seats) : '-'} tint="bg-violet-500/10 text-violet-600" />
           </div>
           <Card className="overflow-hidden">
             <div className="p-3 text-sm font-semibold border-b border-border">Invoices</div>
@@ -579,9 +579,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <option value="learner">Learner</option><option value="coach">Coach</option><option value="org_admin">Org admin</option>
                   </select></label>
 
-                {/* Reset password — choose channel */}
+                {/* Reset password - choose channel */}
                 <div className="rounded-lg border border-border p-3">
-                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><KeyRound className="h-3.5 w-3.5" /> Reset password — send link via</div>
+                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><KeyRound className="h-3.5 w-3.5" /> Reset password - send link via</div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { recordReset(selected.id, 'email'); drawerNote(`Password reset link sent to ${selected.email}.`); }}><Mail className="h-3.5 w-3.5" /> Email</Button>
                     <Button size="sm" variant="outline" className="gap-1.5" disabled={!selectedLearner?.whatsappOptIn} onClick={() => { recordReset(selected.id, 'whatsapp'); drawerNote(`Password reset link sent via WhatsApp to ${selectedLearner?.phone}.`); }}><Smartphone className="h-3.5 w-3.5" /> WhatsApp</Button>
@@ -590,7 +590,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <Clock className="h-3 w-3" />
                     {selected.lastReset ? <>Last reset {fmtDate(selected.lastReset.at)} via {selected.lastReset.channel === 'whatsapp' ? 'WhatsApp' : 'email'}.</> : <>No password reset on record.</>}
                   </p>
-                  {selectedLearner && !selectedLearner.whatsappOptIn && <p className="text-[11px] text-muted-foreground mt-0.5">WhatsApp reset unavailable — learner has not opted in.</p>}
+                  {selectedLearner && !selectedLearner.whatsappOptIn && <p className="text-[11px] text-muted-foreground mt-0.5">WhatsApp reset unavailable - learner has not opted in.</p>}
                 </div>
 
                 {/* Account actions */}

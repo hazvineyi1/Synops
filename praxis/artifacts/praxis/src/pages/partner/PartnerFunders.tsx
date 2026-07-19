@@ -26,7 +26,7 @@ export function PartnerFunders() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Funders Hub" icon={Landmark} subtitle={`${h.partnerName} — funding agreements, seat allocation and grant conditions.`} />
+      <PageHeader title="Funders Hub" icon={Landmark} subtitle={`${h.partnerName} - funding agreements, seat allocation and grant conditions.`} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={Landmark} label="Active funders" value={fun.funders} tint="bg-violet-500/10 text-violet-600" />
@@ -119,7 +119,7 @@ export function PartnerFunders() {
         {/* Funder Portal */}
         <TabsContent value="portal" className="mt-4 space-y-3">
           <Card className="p-4 text-sm text-muted-foreground">
-            Each funder gets a scoped, read-only dashboard showing only the seats and outcomes tied to their own agreement — never other funders' data or the partner's finances. Proposed default visibility (per the spec's Open Decisions): completion rates, credentials issued, and coaching hours for their funded seats; not individual learner PII.
+            Each funder gets a scoped, read-only dashboard showing only the seats and outcomes tied to their own agreement - never other funders' data or the partner's finances. Proposed default visibility (per the spec's Open Decisions): completion rates, credentials issued, and coaching hours for their funded seats; not individual learner PII.
           </Card>
           {Array.from(new Set(h.agreements.map((a) => a.funder))).map((f) => (
             <Card key={f} className="p-4 flex items-center justify-between gap-3">

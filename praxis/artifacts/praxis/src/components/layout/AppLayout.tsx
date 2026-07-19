@@ -42,7 +42,7 @@ import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
 /* ─────────────────────────────────────────────────────────────────────────
  * Sokratify theme: one dark-navy sidebar + warm off-white content across the
  * whole app. The page content keeps the app's light surfaces (cards/text); only
- * the shell chrome is dark, so every role — and the Platform Console — shares one
+ * the shell chrome is dark, so every role - and the Platform Console - shares one
  * cohesive look.
  * ──────────────────────────────────────────────────────────────────────── */
 const SIDEBAR_BG = 'hsl(222 47% 11%)';
@@ -309,7 +309,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       }];
     }
 
-    // Instructional Designer: Hub authoring — Studio + standards (decision §3 / §9).
+    // Instructional Designer: Hub authoring - Studio + standards (decision §3 / §9).
     if (role === 'instructional_designer') {
       return [{
         items: [
@@ -349,7 +349,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-[100dvh] overflow-hidden" style={{ background: CONTENT_BG }}>
 
-      {/* Impersonation banner — must be impossible to miss. */}
+      {/* Impersonation banner - must be impossible to miss. */}
       {user.impersonating && (
         <div className="fixed inset-x-0 top-0 z-[60] bg-amber-500 text-amber-950 text-sm font-medium px-4 py-2 flex items-center justify-center gap-3 shadow-md">
           <span>

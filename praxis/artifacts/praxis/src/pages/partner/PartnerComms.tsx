@@ -25,7 +25,7 @@ const TEMPLATES = [
 /**
  * Communications (upgrade §7). Partner-wide broadcast: compose an in-app or email announcement to
  * all organisations, a single organisation, or a role, with reusable templates and a sent history.
- * Functional on seeded data — actual delivery is a backend step, kept separate from the UI surface.
+ * Functional on seeded data - actual delivery is a backend step, kept separate from the UI surface.
  */
 export function PartnerComms() {
   const { user } = useSession();
@@ -65,7 +65,7 @@ export function PartnerComms() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Communications" icon={Megaphone} subtitle={`${h.partnerName} — broadcast announcements to your organisations, coaches and learners.`} />
+      <PageHeader title="Communications" icon={Megaphone} subtitle={`${h.partnerName} - broadcast announcements to your organisations, coaches and learners.`} />
 
       {flash && (
         <Card className="p-3 border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 flex items-center gap-2 text-sm">

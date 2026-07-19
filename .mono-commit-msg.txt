@@ -1,5 +1,9 @@
-Partner Overview: move the Organisations card up (below the KPIs, above the Financial/Funders snapshots) (ASCII-only)
+Partner Hub: full navigability for super admin - hub sidebar on every partner page + escape to platform (ASCII-only)
 
-NO MIGRATION REQUIRED. Frontend only. Reordered the Partner Overview so Organisations - the main-admin map into each tenant - is high on the page instead of at the bottom.
+NO MIGRATION REQUIRED. Frontend only.
 
-VALIDATION: parse-check + local-resolution bundle clean; order confirmed.
+PROBLEM: as super admin, the partner sub-pages (Financial Hub, Funders, Documents, Accounts, Audit, etc.) fell back to the platform sidebar, so there was no Overview link and no way to move across the hub or back.
+
+FIX: extracted a shared partnerHubGroups nav (Overview, Organisations, and the Partner Admin Platform group) used by partner_admin AND by super_admin whenever the location is under /partner. Super admin also gets a Platform Console item at the top to exit back to their world. So from any partner page the sidebar always has Overview + every hub destination. Verified every partner nav href maps to a registered route.
+
+VALIDATION: parse-check + local-resolution bundle clean; href->route coverage checked.

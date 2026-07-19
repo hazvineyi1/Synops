@@ -12,8 +12,8 @@ import { getPartnerHub, orgDetail, financeRollup, ZAR } from '@/lib/partnerHubDa
 
 /**
  * Organisations (selector). The Main-Admin's list of every organisation under the partner. Picking
- * one steps fully INTO that organisation's own hub (/partner/org/:id) — its own sidebar, its own
- * delivery, people, funding, documents and billing — where nothing partner-wide is reachable. This
+ * one steps fully INTO that organisation's own hub (/partner/org/:id) - its own sidebar, its own
+ * delivery, people, funding, documents and billing - where nothing partner-wide is reachable. This
  * page and the Partner Overview are the only surfaces that sit above the organisations.
  */
 export function PartnerOrganisations() {
@@ -27,7 +27,7 @@ export function PartnerOrganisations() {
       <PageHeader
         title="Organisations"
         icon={Building}
-        subtitle={`${h.partnerName} — ${h.orgs.length} organisation${h.orgs.length === 1 ? '' : 's'}. Open one to work inside it.`}
+        subtitle={`${h.partnerName} - ${h.orgs.length} organisation${h.orgs.length === 1 ? '' : 's'}. Open one to work inside it.`}
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -52,7 +52,7 @@ export function PartnerOrganisations() {
               </div>
               <div className="mt-3 grid grid-cols-2 gap-y-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" />{d.plan?.name ?? 'No plan'}</span>
-                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{d.sub ? `${d.sub.activeSeats}/${d.sub.seats} seats` : '—'}</span>
+                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{d.sub ? `${d.sub.activeSeats}/${d.sub.seats} seats` : '-'}</span>
                 <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" />{d.funders.length} funder{d.funders.length === 1 ? '' : 's'}</span>
                 <span className="flex items-center gap-1.5"><GraduationCap className="h-3.5 w-3.5" />{d.coaches.length} coach{d.coaches.length === 1 ? '' : 'es'}</span>
                 {d.delegated.length > 0 && <span className="flex items-center gap-1.5 text-violet-600"><ShieldCheck className="h-3.5 w-3.5" />{d.delegated.length} delegated</span>}

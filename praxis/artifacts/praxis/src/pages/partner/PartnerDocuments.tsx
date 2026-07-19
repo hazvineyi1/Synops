@@ -29,7 +29,7 @@ const statusStyle: Record<PartnerDoc['status'], { cls: string; icon: React.Compo
 
 /**
  * Documents & Filing (spec §3/§4). A single filing cabinet for every piece of partner paperwork:
- * invoices, contracts, funder agreements and compliance records — uploaded, categorised, tagged to
+ * invoices, contracts, funder agreements and compliance records - uploaded, categorised, tagged to
  * an organisation and status-tracked. Upload is a functional client-side stand-in (no live storage
  * backend wired yet); everything else is real UI on seeded data.
  */
@@ -73,7 +73,7 @@ export function PartnerDocuments() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Documents & Filing" icon={FileText} subtitle={`${h.partnerName} — one filing cabinet for invoices, contracts, funder agreements and compliance paperwork.`} />
+      <PageHeader title="Documents & Filing" icon={FileText} subtitle={`${h.partnerName} - one filing cabinet for invoices, contracts, funder agreements and compliance paperwork.`} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard icon={FileText} label="Documents filed" value={counts.total} tint="bg-indigo-500/10 text-indigo-600" />
@@ -112,7 +112,7 @@ export function PartnerDocuments() {
         <button
           onClick={() => fileRef.current?.click()}
           className="mt-3 w-full rounded-xl border-2 border-dashed border-border py-6 text-center text-sm text-muted-foreground hover:border-primary/40 hover:bg-muted/30 transition-colors">
-          Drag files here or click to browse — {CATS.find((c) => c.key === uploadCat)?.hint}
+          Drag files here or click to browse - {CATS.find((c) => c.key === uploadCat)?.hint}
         </button>
       </Card>
 
