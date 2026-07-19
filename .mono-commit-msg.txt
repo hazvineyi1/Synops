@@ -1,7 +1,9 @@
-Impersonation: View as opens the users own view - a learner shows their class (ASCII-only)
+Org rename propagates everywhere + logged (partner/super admin only); impersonation reachable from People (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-Impersonation now actually shows what the user sees. New shared impersonationStore (active session + log) so a session persists across pages. Audit View as starts the session and navigates to /partner/impersonate/:orgId/:userId (PartnerImpersonateView) with a sticky Viewing-as banner and Exit. For a LEARNER it renders their learner view: their class(es) with coach and assigned courses, their courses with progress, grade/attendance/last-active, coach and on-track status. Coaches see the classes they coach; org/delegated admins get a link into the org hub. impersonatableUsers now carries orgId. Audit recent-sessions merges the live log; active banner offers Resume view / Stop.
+ORG RENAME: new orgOverridesStore holds a live rename (by id and by original seeded name) plus an append-only change log. Renaming in the org Settings tab updates the name across the hub, sidebar, Organisations list, Overview, Financial Hub, Funders, Documents, Communications and the impersonation surfaces, and records what it was, who changed it and when in the Audit activity log. orgDetail keeps the ORIGINAL name for seeded-data filters and overrides only the DISPLAY name, so nothing breaks. Editing is gated to Partner Admin / Super Admin (field is read-only with a locked note otherwise).
 
-VALIDATION: parse-check + local-resolution bundle clean; impersonate route registered.
+IMPERSONATION DISCOVERABILITY: the org People list and the member Manage drawer now have a View as (impersonate) action (partner/super admin only) that starts the session and opens the users own view - so you can impersonate a learner, coach or org admin right where you see them, in addition to the Audit > Impersonation tab.
+
+VALIDATION: parse-check + local-resolution bundle clean across all 10 changed files.
