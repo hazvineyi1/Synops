@@ -11,6 +11,10 @@ import {
   organisationsTable,
   enrolmentsTable,
   courseGroupMembersTable,
+  billingSubscriptionsTable,
+  billingInvoicesTable,
+  fundingAgreementsTable,
+  platformFilingsTable,
 } from "@workspace/db";
 import { eq, and, isNull, desc, sql, or, ilike, gte, type SQL } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
@@ -525,6 +529,104 @@ router.get("/platform/overview", requireAuth, requireSuperAdmin, async (_req, re
     logins24h: logins24h?.total ?? 0,
     failedLogins24h: failed24h?.total ?? 0,
   });
+});
+
+/**
+ * GET /platform/financials — platform-wide financial roll-up aggregated from the REAL per-partner
+ * billing + funding data (billing_subscriptions, billing_invoices, funding_agreements). Returns a
+ * per-partner breakdown and platform totals. Missing tables (pre-first-write) are treated as empty.
+ */
+router.get("/platform/financials", requireAuth, requireSuperAdmin, async (_req, res) => {
+  const VAT = 0.15;
+  const partners = await db.select().from(partnersTable);
+  let subs: any[] = [], invs: any[] = [], funds: any[] = [];
+  try { subs = await db.select().from(billingSubscriptionsTable); } catch { /* table not created */ }
+  try { invs = await db.select().from(billingInvoicesTable); } catch { /* table not created */ }
+  try { funds = await db.select().from(fundingAgreementsTable); } catch { /* table not created */ }
+
+  const byPartner = partners.map((p) => {
+    const mrrNet = subs.filter((s) => s.partnerId === p.id).reduce((a, s) => a + (s.pricePerSeat || 0) * (s.seats || 0), 0);
+    const outstandingNet = invs.filter((i) => i.partnerId === p.id && i.status !== "paid").reduce((a, i) => a + (i.net || 0), 0);
+    const paidNet = invs.filter((i) => i.partnerId === p.id && i.status === "paid").reduce((a, i) => a + (i.net || 0), 0);
+    const funderValue = funds.filter((f) => f.partnerId === p.id).reduce((a, f) => a + (f.value || 0), 0);
+    return {
+      id: p.id, name: p.name,
+      mrrGross: Math.round(mrrNet * (1 + VAT)),
+      outstanding: Math.round(outstandingNet * (1 + VAT)),
+      funderValue,
+      vatCollected: Math.round(paidNet * VAT),
+      overdue: invs.some((i) => i.partnerId === p.id && i.status === "overdue"),
+    };
+  });
+  const totals = byPartner.reduce(
+    (t, p) => ({ mrrGross: t.mrrGross + p.mrrGross, outstanding: t.outstanding + p.outstanding, funderValue: t.funderValue + p.funderValue, vatCollected: t.vatCollected + p.vatCollected, overdue: t.overdue || p.overdue }),
+    { mrrGross: 0, outstanding: 0, funderValue: 0, vatCollected: 0, overdue: false },
+  );
+  res.json({ partners: byPartner, totals });
+});
+
+// ── Platform contract / MOU filing cabinet (super admin) ─────────────────────
+async function ensureFilingsTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS platform_filings (
+      id text PRIMARY KEY,
+      title text NOT NULL,
+      doc_type text NOT NULL DEFAULT 'MOU',
+      partner text DEFAULT 'Platform',
+      counterparty text,
+      status text NOT NULL DEFAULT 'active',
+      signed text,
+      expires text,
+      size text,
+      file_url text,
+      created_by text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`);
+}
+
+router.get("/platform/filings", requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    const rows = await db.select().from(platformFilingsTable).orderBy(desc(platformFilingsTable.createdAt));
+    res.json(rows);
+  } catch {
+    res.json([]);
+  }
+});
+
+router.post("/platform/filings", requireAuth, requireSuperAdmin, async (req, res) => {
+  const b = req.body ?? {};
+  if (!b.title || !String(b.title).trim()) { res.status(400).json({ error: "A title is required." }); return; }
+  await ensureFilingsTable();
+  const [row] = await db.insert(platformFilingsTable).values({
+    title: String(b.title).trim(),
+    docType: b.docType ? String(b.docType) : "MOU",
+    partner: b.partner ? String(b.partner) : "Platform",
+    counterparty: b.counterparty ? String(b.counterparty) : null,
+    status: b.status ? String(b.status) : "active",
+    signed: b.signed ? String(b.signed) : null,
+    expires: b.expires ? String(b.expires) : null,
+    size: b.size ? String(b.size) : null,
+    createdBy: req.userId,
+  }).returning();
+  await audit(req, "filing.create", "platform_filing", row.id, { title: row.title, docType: row.docType });
+  res.status(201).json(row);
+});
+
+router.patch("/platform/filings/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+  const b = req.body ?? {};
+  const patch: Record<string, unknown> = {};
+  for (const k of ["title", "docType", "partner", "counterparty", "status", "signed", "expires"] as const) {
+    if (b[k] !== undefined) patch[k] = b[k] ? String(b[k]) : null;
+  }
+  const [row] = await db.update(platformFilingsTable).set(patch).where(eq(platformFilingsTable.id, req.params.id)).returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
+});
+
+router.delete("/platform/filings/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+  await db.delete(platformFilingsTable).where(eq(platformFilingsTable.id, req.params.id));
+  await audit(req, "filing.delete", "platform_filing", req.params.id);
+  res.status(204).send();
 });
 
 export default router;

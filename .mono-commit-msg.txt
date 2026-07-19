@@ -1,5 +1,5 @@
-Documents and Filing on live data: real partner_documents register (ASCII-only)
+Communications on live data: real partner_announcements broadcast history (ASCII-only)
 
-Partner Documents and Filing is now a real persistent register. New documents router (mounted): GET/POST/PATCH/DELETE /partners/:id/documents (self-create table, additive; super admin any partner, partner_admin own). Upload files -> each recorded as a filing entry (name, category, org, size, status); per-row status change (pending/filed/action-required) and delete persist; counts/filters from real data. New schema partner_documents.ts. File BYTES storage (virus scan + retention) noted as a further step needing storage creds.
+Partner Communications now persists. New partnerComms router (mounted): GET/POST/DELETE /partners/:id/announcements (self-create table, additive; super admin any partner, partner_admin own). Send records the broadcast (subject, body, channel, audience, recipient count); the Sent tab reads real history; recipient counts + audience (all/org/role) computed from the partner's REAL members; delete persists. New schema partner_announcements.ts. Actual in-app/email delivery remains the messaging step.
 
-VALIDATION: esbuild clean on documents.ts, routes/index.ts, db index (partner_documents exported), PartnerDocuments.tsx.
+VALIDATION: esbuild clean on partnerComms.ts, routes/index.ts, db index (partner_announcements exported), PartnerComms.tsx.

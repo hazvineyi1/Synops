@@ -42,3 +42,4 @@ export * from "./funding_agreements";
 export * from "./billing";
 export * from "./partner_documents";
 export * from "./partner_announcements";
+export * from "./platform_filings";

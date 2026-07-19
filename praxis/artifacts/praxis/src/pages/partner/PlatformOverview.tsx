@@ -41,6 +41,11 @@ export function PlatformOverview() {
     queryKey: ['organisations'],
     queryFn: () => apiFetch<ApiOrg[]>('/organisations'),
   });
+  const { data: fin } = useQuery({
+    queryKey: ['platform-financials'],
+    queryFn: () => apiFetch<{ totals: { mrrGross: number; outstanding: number; funderValue: number; vatCollected: number } }>('/platform/financials'),
+  });
+  const finTotals = fin?.totals ?? { mrrGross: 0, outstanding: 0, funderValue: 0, vatCollected: 0 };
 
   // Real partners drive getPartnerHub's empty-hub fallback, so opening one never shows demo data.
   useEffect(() => {
@@ -153,18 +158,20 @@ export function PlatformOverview() {
         </div>
       </div>
 
-      {/* Platform financials + health — SAMPLE until billing/funder/analytics backends exist */}
+      {/* Platform financials — REAL, aggregated across partners */}
       <Card className="p-5">
-        <div className="flex items-center justify-between">
-          <SectionTitle>Platform financials &amp; health</SectionTitle>
-          <SampleBadge />
+        <SectionTitle>Platform financials</SectionTitle>
+        <p className="mt-1 text-xs text-muted-foreground">Aggregated live from every partner's subscriptions, invoices and funding agreements.</p>
+        <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Wallet className="h-3.5 w-3.5" /> Monthly recurring</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(finTotals.mrrGross)}</div></div>
+          <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Receipt className="h-3.5 w-3.5" /> Outstanding</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(finTotals.outstanding)}</div></div>
+          <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Landmark className="h-3.5 w-3.5" /> Funding value</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(finTotals.funderValue)}</div></div>
+          <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Percent className="h-3.5 w-3.5" /> VAT collected</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(finTotals.vatCollected)}</div></div>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">Illustrative figures. These panels are not yet connected to live billing, funder, or analytics data.</p>
-        <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3 opacity-75">
-          <div className="rounded-lg border border-dashed border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Wallet className="h-3.5 w-3.5" /> Monthly recurring</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(sample.mrrGross)}</div></div>
-          <div className="rounded-lg border border-dashed border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Receipt className="h-3.5 w-3.5" /> Outstanding</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(sample.outstanding)}</div></div>
-          <div className="rounded-lg border border-dashed border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Landmark className="h-3.5 w-3.5" /> Funding value</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(sample.funderValue)}</div></div>
-          <div className="rounded-lg border border-dashed border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><HeartPulse className="h-3.5 w-3.5" /> Avg coaching health</div><div className="mt-1 text-xl font-bold tabular-nums">{health.avgHealth}<span className="text-xs text-muted-foreground font-normal"> / 100</span></div></div>
+        <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
+          <HeartPulse className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">Avg coaching health <span className="font-semibold text-foreground">{health.avgHealth}/100</span></span>
+          <SampleBadge />
         </div>
       </Card>
     </div>
