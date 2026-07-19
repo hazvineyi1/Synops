@@ -1,5 +1,5 @@
-Real platform alerts + health on the Overview (derived from live data) (ASCII-only)
+Seat-level funder assignment: assign learners to a grant's funded seats (ASCII-only)
 
-GET /platform/alerts computes real attention-needed signals: funding agreements expiring within 60 days or expired, unpaid invoices, documents flagged action-required, partners still onboarding, courses in draft; plus real health (learner count, active enrolments). PlatformOverview gains an Attention-needed panel + a real health line, replacing the last seeded coaching-health/alerts placeholders. Missing tables count as zero.
+New funded_seat_assignments table + endpoints in funder.ts: GET /partners/:id/funding-usage (used counts), GET/POST/DELETE /partners/:id/funding/:agreementId/seats (assign a learner to a funding agreement, capacity + duplicate guarded; self-create table). Funders Hub Seat Allocation tab now real: each agreement expands to its assigned learners with used/capacity progress, assign from the partner's real learners, and remove. Completion evidence can now attribute back to the right grant. New schema funded_seat_assignments.ts.
 
-VALIDATION: esbuild clean on platform.ts, PlatformOverview.tsx.
+VALIDATION: esbuild clean on funder.ts, db index (funded_seat_assignments exported), PartnerFunders.tsx.
