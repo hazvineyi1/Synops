@@ -486,3 +486,35 @@ export function fundersRollup(h: PartnerHub) {
   const funders = new Set(h.agreements.map((a) => a.funder)).size;
   return { fundedSeats, funderValue, received, scheduled, expiring, funders };
 }
+
+/**
+ * Platform-wide aggregate for the super-admin overview: totals across every partner plus a per-partner
+ * breakdown (organisations, funders, financials) so the super admin sees everything at a glance and
+ * can drill into any partner.
+ */
+export function platformOverview() {
+  const partners = Object.entries(HUBS).map(([id, hub]) => {
+    const fin = financeRollup(hub);
+    const fund = fundersRollup(hub);
+    const orgs = hub.orgs.map((o) => {
+      const d = orgDetail(hub, o.id);
+      return { id: o.id, name: d.org?.name ?? o.name, seats: d.sub?.seats ?? 0, activeSeats: d.sub?.activeSeats ?? 0, plan: d.plan?.name ?? '-', openInvoices: d.openInvoices };
+    });
+    const funders = hub.agreements.map((a) => ({ id: a.id, funder: a.funder, funderType: a.funderType, value: a.value, seats: a.seatsFunded, status: a.status }));
+    return {
+      id, name: hub.partnerName, orgs, funders,
+      mrrNet: fin.mrrNet, mrrGross: fin.mrrGross, outstanding: fin.outstanding, overdue: fin.overdue,
+      totalSeats: fin.totalSeats, activeSeats: fin.activeSeats,
+      funderValue: fund.funderValue, funderReceived: fund.received, funderScheduled: fund.scheduled, fundersCount: fund.funders, fundedSeats: fund.fundedSeats,
+      accounts: hub.accounts.length, delegated: hub.delegatedAdmins.length,
+      vatCollected: hub.invoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.net * VAT_RATE, 0),
+    };
+  });
+  const totals = partners.reduce((t, p) => ({
+    partners: t.partners + 1, orgs: t.orgs + p.orgs.length, seats: t.seats + p.totalSeats, activeSeats: t.activeSeats + p.activeSeats,
+    mrrNet: t.mrrNet + p.mrrNet, mrrGross: t.mrrGross + p.mrrGross, outstanding: t.outstanding + p.outstanding, overdue: t.overdue + p.overdue,
+    funderValue: t.funderValue + p.funderValue, funderReceived: t.funderReceived + p.funderReceived, funders: t.funders + p.fundersCount,
+    accounts: t.accounts + p.accounts, delegated: t.delegated + p.delegated, vatCollected: t.vatCollected + p.vatCollected,
+  }), { partners: 0, orgs: 0, seats: 0, activeSeats: 0, mrrNet: 0, mrrGross: 0, outstanding: 0, overdue: 0, funderValue: 0, funderReceived: 0, funders: 0, accounts: 0, delegated: 0, vatCollected: 0 });
+  return { partners, totals };
+}

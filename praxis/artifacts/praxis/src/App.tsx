@@ -59,6 +59,7 @@ import { PartnerOrganisations } from '@/pages/partner/PartnerOrganisations';
 import { PartnerOrgHub } from '@/pages/partner/PartnerOrgHub';
 import { PartnerImpersonateView } from '@/pages/partner/PartnerImpersonateView';
 import { PartnerPartners } from '@/pages/partner/PartnerPartners';
+import { PlatformOverview } from '@/pages/partner/PlatformOverview';
 import { PartnerFinance } from '@/pages/partner/PartnerFinance';
 import { PartnerFunders } from '@/pages/partner/PartnerFunders';
 import { PartnerDocuments } from '@/pages/partner/PartnerDocuments';
@@ -205,6 +206,7 @@ function Routes() {
         <ProtectedRoute path="/jotter" component={Jotter} />
         {/* Partner Hub (partner_admin tier) */}
         <ProtectedRoute path="/partner" component={PartnerOverview} />
+        <ProtectedRoute path="/platform-overview" component={PlatformOverview} />
         <ProtectedRoute path="/partner/partners" component={PartnerPartners} />
         <ProtectedRoute path="/partner/organisations" component={PartnerOrganisations} />
         <ProtectedRoute path="/partner/impersonate/:orgId/:userId" component={PartnerImpersonateView} />

@@ -253,7 +253,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     // sidebar above takes over so the in-hub experience is identical to the partner admin's.)
     if (role === 'super_admin') {
       return [
-        { items: [{ label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard }] },
+        { items: [{ label: t('nav.overview', 'Overview'), href: '/platform-overview', icon: LayoutDashboard }] },
         {
           heading: t('nav.groups.partnerPlatform', 'Partner Admin Platform'),
           items: [

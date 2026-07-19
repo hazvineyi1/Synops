@@ -1,7 +1,7 @@
-Super admin: full Partner Admin Platform access + same layout in the sidebar (ASCII-only)
+Partner Hub: Partners list for super admin - pick a partner to work in its hub with full access (ASCII-only)
 
-NO MIGRATION REQUIRED. Frontend only.
+NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-The super-admin sidebar now carries the complete Partner Admin Platform group with the same items and labels as the partner admin: Partner Overview, Organisations, Financial Hub, Funders Hub, Documents, Accounts & Roles, Communications, Branding, Audit & Impersonation, Settings. The platform-owner tools (Platform Console, Partners, Funders admin) and the Curriculum / Delivery / Quality groups remain. Stepping into /partner still hands the super admin the identical focused partner-hub sidebar as the partner admin (with a Platform Console escape), and org context + impersonation already work for them - so the super admin now has everything and all access the partner admin has.
+New Partners page (/partner/partners, super-admin only) lists every partner on the platform (TalentForge, SkillBridge) with orgs, seats, funders, staff, delegated admins and funding value. Selecting a partner sets it active (setActivePartner) and opens /partner - and because getPartnerHub now resolves the active partner when the viewer has no partnerId of their own (i.e. a super admin), the WHOLE Partner Hub (Overview, Organisations, Financial Hub, Funders, Documents, Accounts, Communications, Audit, and every org/class beneath) resolves to that partner, giving full access to its dependencies. A real partner_admin always sees only their own partner (override ignored). Partners added to the super-admin nav (default sidebar + in-hub sidebar).
 
-VALIDATION: AppLayout parse-check + local-resolution bundle clean; all 9 partner destinations present in the super-admin nav.
+VALIDATION: parse-check + local-resolution bundle clean; /partner/partners route + allPartners/setActivePartner exports confirmed.
