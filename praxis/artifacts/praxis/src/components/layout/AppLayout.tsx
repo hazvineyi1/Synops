@@ -46,6 +46,11 @@ import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
  * cohesive look.
  * ──────────────────────────────────────────────────────────────────────── */
 const SIDEBAR_BG = 'hsl(222 47% 11%)';
+// Super admin at the platform level gets a distinct deep-violet shell, so it is always obvious you
+// are viewing as the platform owner. The moment a super admin steps into a partner (or a partner
+// admin signs in), the shell reverts to the navy partner colour - a clear "you are now inside a
+// partner, not the platform" cue.
+const SUPER_BG = 'hsl(263 45% 15%)';
 const CONTENT_BG = 'hsl(43 30% 97%)';
 const HAIRLINE = 'rgba(255,255,255,0.07)';
 
@@ -120,6 +125,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const role = user.role;
+
+  // Shell colour + context ribbon. A super admin at the platform level is violet; inside a partner
+  // (or a partner admin) it is navy, so the colour itself tells you which context you are in.
+  const inPartnerContext = location.startsWith('/partner');
+  const isSuperPlatform = role === 'super_admin' && !inPartnerContext;
+  const sidebarBg = isSuperPlatform ? SUPER_BG : SIDEBAR_BG;
+  const activePartnerName = role === 'super_admin' && inPartnerContext ? getPartnerHub(user.partnerId).partnerName : null;
 
   const getNavGroups = (): NavGroup[] => {
     // Org context: whenever anyone with tenant oversight (partner admin OR super admin) is inside
@@ -251,6 +263,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     // specific partner is opened (the focused partner-hub sidebar above takes over then). Plus the
     // platform-owner tools and the curriculum / delivery / quality surfaces.
     if (role === 'super_admin') {
+      // Platform-level nav, grouped under headings that make sense. Partner-specific destinations
+      // (Organisations, Financial Hub, Funders, etc.) are NOT here - they live inside a partner,
+      // reached by opening one from the Partner Hub overview. The Learning Hub is the platform's
+      // content/authoring home (courses, templates, studio) from which courses are assigned to
+      // partners. "Org members" was removed (it belongs inside an organisation, not the platform).
       return [
         {
           heading: t('nav.groups.partnerHub', 'Partner Hub'),
@@ -259,15 +276,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           ],
         },
         {
-          heading: t('nav.groups.platform', 'Platform'),
-          items: [
-            { label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ShieldCheck },
-            { label: t('nav.partners'), href: '/admin/partners', icon: Building },
-            { label: t('nav.funders', 'Funders'), href: '/admin/funders', icon: Landmark },
-          ],
-        },
-        {
-          heading: t('nav.groups.curriculum', 'Curriculum'),
+          heading: t('nav.groups.learningHub', 'Learning Hub'),
           items: [
             { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: BookOpen },
             { label: t('nav.studio'), href: '/studio', icon: PenTool },
@@ -284,14 +293,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             { label: t('nav.coachingHealth', 'Coaching health'), href: '/coaching/health', icon: TrendingUp },
             { label: t('nav.submissions', 'Submissions'), href: '/coach/submissions', icon: FileText },
             { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
-            { label: t('nav.members', 'Org members'), href: '/org/members', icon: UserCog },
           ],
         },
         {
-          heading: t('nav.groups.quality', 'Quality & Reports'),
+          heading: t('nav.groups.platform', 'Platform'),
           items: [
+            { label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ShieldCheck },
             { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
-          { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
+            { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
             { label: t('nav.reports'), href: '/reports', icon: FileText },
             { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
           ],
@@ -365,7 +374,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* ── Desktop sidebar ─────────────────────────────────── */}
-      <aside className="w-64 flex-shrink-0 flex-col hidden md:flex" style={{ background: SIDEBAR_BG }}>
+      <aside className="w-64 flex-shrink-0 flex-col hidden md:flex" style={{ background: sidebarBg }}>
         <div className="h-16 flex items-center px-6" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
           <Link href="/dashboard" className="flex items-center gap-2 font-serif font-bold text-xl tracking-tight" style={{ color: '#fff' }}>
             {brandLogo ? (
@@ -376,6 +385,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             {brandName}
           </Link>
         </div>
+
+        {role === 'super_admin' && (
+          <div className="px-4 py-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider"
+            style={{ color: isSuperPlatform ? '#c4b5fd' : '#fbbf24', background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${HAIRLINE}` }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: isSuperPlatform ? '#a78bfa' : '#fbbf24' }} />
+            {isSuperPlatform ? t('nav.superAdminPlatform', 'Super Admin · Platform') : `${t('nav.insidePartner', 'Inside partner')} · ${activePartnerName ?? ''}`}
+          </div>
+        )}
 
         <nav className="flex-1 py-5 px-3 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.25) transparent" }}>
           {navGroups.map((group, gi) => (
@@ -433,7 +450,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* ── Mobile full-screen menu drawer ─────────────────── */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex flex-col" style={{ background: SIDEBAR_BG }}>
+        <div className="fixed inset-0 z-50 md:hidden flex flex-col" style={{ background: sidebarBg }}>
           <div className="h-14 flex items-center justify-between px-5 shrink-0" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
             <span className="font-serif font-bold text-base" style={{ color: '#fff' }}>{brandName}</span>
             <button
@@ -507,7 +524,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* ── Main content ─────────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Mobile top header */}
-        <header className="h-14 flex items-center justify-between px-4 md:hidden shrink-0" style={{ background: SIDEBAR_BG }}>
+        <header className="h-14 flex items-center justify-between px-4 md:hidden shrink-0" style={{ background: sidebarBg }}>
           <button
             onClick={() => setMobileMenuOpen(true)}
             className="p-2 -ml-2 rounded-md"
@@ -543,7 +560,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* ── Mobile bottom tab bar ────────────────────────────── */}
-      <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden" style={{ background: SIDEBAR_BG, borderTop: `1px solid ${HAIRLINE}` }}>
+      <nav className="fixed bottom-0 inset-x-0 z-40 md:hidden" style={{ background: sidebarBg, borderTop: `1px solid ${HAIRLINE}` }}>
         <div className="flex items-stretch h-16">
           {bottomItems.map((item) => {
             const active = isNavActive(item.href);

@@ -1,7 +1,10 @@
-Super admin: Platform Overview - all partners at a glance with orgs/funders/financials + overall platform financials (ASCII-only)
+Super admin nav: Partner Hub = all-partners overview; org/hub items only inside a partner; drop redundant Partners page (ASCII-only)
 
-NO MIGRATION REQUIRED. Frontend only, seeded partner data.
+NO MIGRATION REQUIRED. Frontend only.
 
-The super admin Overview now points to a new Platform Overview (/platform-overview). It aggregates across every partner (new platformOverview() helper): platform KPIs (partners, organisations, seats, funders), an overall Platform Financials card (monthly recurring incl VAT, outstanding, funding value, VAT collected, funder received - summed across all partners), and a per-partner breakdown. Each partner is an expandable row showing its organisations (click to open that org), funders (value + status) and a financial-hub snapshot, with Open hub / Open Financial Hub buttons that set the active partner and drop into their hub. Clicking a partner or org enters that partner via the active-partner switch.
+Restructures the super-admin Partner Hub to match how it should work:
+1) Organisations (and Financial Hub, Funders, Documents, Accounts, etc.) are no longer top-level for the super admin - the top-level Partner Admin Platform group is removed. Those appear only once you open a specific partner (the focused partner-hub sidebar), so orgs live under their partner.
+2) The Partner Hub entry now shows ALL partners: the super-admin Overview lands on the platform overview (retitled Partner Hub) which lists every partner with their orgs, funders and financials - not a single partner.
+3) Removed the separate Partners page from the nav (and the link to it); the all-partners overview IS the partners list. From there, Open hub / clicking a partner drops into that individual partner hub, with an All partners escape to come back.
 
-VALIDATION: parse-check + local-resolution bundle clean; /platform-overview route + platformOverview export confirmed.
+VALIDATION: parse-check + local-resolution bundle clean; confirmed no per-partner destinations remain at the super-admin top level.

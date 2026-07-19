@@ -501,13 +501,23 @@ export function platformOverview() {
       return { id: o.id, name: d.org?.name ?? o.name, seats: d.sub?.seats ?? 0, activeSeats: d.sub?.activeSeats ?? 0, plan: d.plan?.name ?? '-', openInvoices: d.openInvoices };
     });
     const funders = hub.agreements.map((a) => ({ id: a.id, funder: a.funder, funderType: a.funderType, value: a.value, seats: a.seatsFunded, status: a.status }));
+    // Engagement / health signals aggregated from every organisation in the partner.
+    const coaching = hub.orgs.map((o) => orgCoaching(hub, o.id));
+    const atRisk = coaching.reduce((s, c) => s + c.atRisk, 0);
+    const onTrack = coaching.reduce((s, c) => s + c.onTrack, 0);
+    const learners = atRisk + onTrack;
+    const avgHealth = coaching.length ? Math.round(coaching.reduce((s, c) => s + c.avgHealth, 0) / coaching.length) : 0;
+    const invited = hub.accounts.filter((a) => a.status === 'invited').length + hub.invites.length;
+    const suspended = hub.accounts.filter((a) => a.status === 'suspended').length;
+    const pendingMarking = hub.orgs.reduce((s, o) => s + orgGradebook(hub, o.id).pendingMarking, 0);
     return {
       id, name: hub.partnerName, orgs, funders,
       mrrNet: fin.mrrNet, mrrGross: fin.mrrGross, outstanding: fin.outstanding, overdue: fin.overdue,
       totalSeats: fin.totalSeats, activeSeats: fin.activeSeats,
-      funderValue: fund.funderValue, funderReceived: fund.received, funderScheduled: fund.scheduled, fundersCount: fund.funders, fundedSeats: fund.fundedSeats,
+      funderValue: fund.funderValue, funderReceived: fund.received, funderScheduled: fund.scheduled, fundersCount: fund.funders, fundedSeats: fund.fundedSeats, expiringFunders: fund.expiring,
       accounts: hub.accounts.length, delegated: hub.delegatedAdmins.length,
       vatCollected: hub.invoices.filter((i) => i.status === 'paid').reduce((s, i) => s + i.net * VAT_RATE, 0),
+      learners, atRisk, onTrack, avgHealth, invited, suspended, pendingMarking,
     };
   });
   const totals = partners.reduce((t, p) => ({
@@ -515,6 +525,20 @@ export function platformOverview() {
     mrrNet: t.mrrNet + p.mrrNet, mrrGross: t.mrrGross + p.mrrGross, outstanding: t.outstanding + p.outstanding, overdue: t.overdue + p.overdue,
     funderValue: t.funderValue + p.funderValue, funderReceived: t.funderReceived + p.funderReceived, funders: t.funders + p.fundersCount,
     accounts: t.accounts + p.accounts, delegated: t.delegated + p.delegated, vatCollected: t.vatCollected + p.vatCollected,
-  }), { partners: 0, orgs: 0, seats: 0, activeSeats: 0, mrrNet: 0, mrrGross: 0, outstanding: 0, overdue: 0, funderValue: 0, funderReceived: 0, funders: 0, accounts: 0, delegated: 0, vatCollected: 0 });
-  return { partners, totals };
+    learners: t.learners + p.learners, atRisk: t.atRisk + p.atRisk, invited: t.invited + p.invited, suspended: t.suspended + p.suspended,
+    expiringFunders: t.expiringFunders + p.expiringFunders, pendingMarking: t.pendingMarking + p.pendingMarking,
+    healthSum: t.healthSum + p.avgHealth,
+  }), { partners: 0, orgs: 0, seats: 0, activeSeats: 0, mrrNet: 0, mrrGross: 0, outstanding: 0, overdue: 0, funderValue: 0, funderReceived: 0, funders: 0, accounts: 0, delegated: 0, vatCollected: 0, learners: 0, atRisk: 0, invited: 0, suspended: 0, expiringFunders: 0, pendingMarking: 0, healthSum: 0 });
+  const avgHealth = totals.partners ? Math.round(totals.healthSum / totals.partners) : 0;
+  const engagementRate = totals.learners ? Math.round((totals.learners - totals.atRisk) / totals.learners * 100) : 0;
+  // Alerts at a glance: each carries a severity, count, label and a link the super admin can act on.
+  const alerts = [
+    { id: 'offtrack', severity: 'warn' as const, count: totals.atRisk, label: 'learners off track', detail: 'Below 40% progress across all partners', href: '/platform-overview' },
+    { id: 'overdue', severity: totals.overdue ? 'danger' as const : 'ok' as const, count: totals.overdue, label: 'overdue invoices', detail: `${ZAR(totals.outstanding)} outstanding`, href: '/platform-overview' },
+    { id: 'funders', severity: totals.expiringFunders ? 'warn' as const : 'ok' as const, count: totals.expiringFunders, label: 'funding agreements expiring', detail: 'Partners due for renewal / update', href: '/platform-overview' },
+    { id: 'onboarding', severity: totals.invited ? 'info' as const : 'ok' as const, count: totals.invited, label: 'accounts pending onboarding', detail: 'Invited, no password set', href: '/platform-overview' },
+    { id: 'marking', severity: totals.pendingMarking ? 'info' as const : 'ok' as const, count: totals.pendingMarking, label: 'submissions awaiting marking', detail: 'Across all organisations', href: '/platform-overview' },
+    { id: 'suspended', severity: totals.suspended ? 'warn' as const : 'ok' as const, count: totals.suspended, label: 'suspended accounts', detail: 'Review access status', href: '/platform-overview' },
+  ];
+  return { partners, totals, health: { avgHealth, engagementRate, activeLearners: totals.learners - totals.atRisk }, alerts };
 }
