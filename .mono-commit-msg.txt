@@ -1,7 +1,7 @@
-Partner Hub: Partners list for super admin - pick a partner to work in its hub with full access (ASCII-only)
+Super admin: Platform Overview - all partners at a glance with orgs/funders/financials + overall platform financials (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-New Partners page (/partner/partners, super-admin only) lists every partner on the platform (TalentForge, SkillBridge) with orgs, seats, funders, staff, delegated admins and funding value. Selecting a partner sets it active (setActivePartner) and opens /partner - and because getPartnerHub now resolves the active partner when the viewer has no partnerId of their own (i.e. a super admin), the WHOLE Partner Hub (Overview, Organisations, Financial Hub, Funders, Documents, Accounts, Communications, Audit, and every org/class beneath) resolves to that partner, giving full access to its dependencies. A real partner_admin always sees only their own partner (override ignored). Partners added to the super-admin nav (default sidebar + in-hub sidebar).
+The super admin Overview now points to a new Platform Overview (/platform-overview). It aggregates across every partner (new platformOverview() helper): platform KPIs (partners, organisations, seats, funders), an overall Platform Financials card (monthly recurring incl VAT, outstanding, funding value, VAT collected, funder received - summed across all partners), and a per-partner breakdown. Each partner is an expandable row showing its organisations (click to open that org), funders (value + status) and a financial-hub snapshot, with Open hub / Open Financial Hub buttons that set the active partner and drop into their hub. Clicking a partner or org enters that partner via the active-partner switch.
 
-VALIDATION: parse-check + local-resolution bundle clean; /partner/partners route + allPartners/setActivePartner exports confirmed.
+VALIDATION: parse-check + local-resolution bundle clean; /platform-overview route + platformOverview export confirmed.

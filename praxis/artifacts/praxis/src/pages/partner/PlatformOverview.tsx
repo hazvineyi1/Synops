@@ -28,9 +28,8 @@ export function PlatformOverview() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Platform Overview" icon={LayoutDashboard}
-        subtitle={`Everything across ${totals.partners} partners at a glance. Open any partner to work inside their hub.`}
-        action={<Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate('/partner/partners')}>Partners <ArrowRight className="h-3.5 w-3.5" /></Button>} />
+      <PageHeader title="Partner Hub" icon={LayoutDashboard}
+        subtitle={`${totals.partners} partners on the platform. Everything at a glance - open any partner to work inside their hub.`} />
 
       {/* Platform KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

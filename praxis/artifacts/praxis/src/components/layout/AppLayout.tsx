@@ -159,8 +159,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {
         items: [
           { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
-          // Only the super admin oversees multiple partners.
-          ...(role === 'super_admin' ? [{ label: t('nav.partners', 'Partners'), href: '/partner/partners', icon: Building }] : []),
           { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
         ],
       },
@@ -180,11 +178,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       { items: [{ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy }] },
     ];
 
-    // Super admin anywhere inside the partner hub gets the full partner nav plus an escape back
-    // to their platform console. (Org context is already handled above.)
+    // Super admin INSIDE a specific partner's hub: the focused partner nav, plus an escape back to
+    // the all-partners overview. (Org context is handled above; the partner list lives at the
+    // platform overview, so there is no separate Partners page here.)
     if (role === 'super_admin' && (location === '/partner' || location.startsWith('/partner/'))) {
       return [
-        { items: [{ label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ArrowLeft }] },
+        { items: [{ label: t('nav.allPartners', 'All partners'), href: '/platform-overview', icon: ArrowLeft }] },
         ...partnerHubGroups(),
       ];
     }
@@ -247,27 +246,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       return partnerHubGroups();
     }
 
-    // Super admin: full access to every surface the other roles have, grouped so the breadth stays
-    // scannable. The super admin has EVERYTHING the partner admin has (same group + labels), plus
-    // the platform-owner tools. (When the super admin is inside /partner, the shared partner-hub
-    // sidebar above takes over so the in-hub experience is identical to the partner admin's.)
+    // Super admin: the Partner Hub for a super admin is the all-partners Overview (platform overview);
+    // the per-partner destinations (Organisations, Financial Hub, Funders, etc.) only appear once a
+    // specific partner is opened (the focused partner-hub sidebar above takes over then). Plus the
+    // platform-owner tools and the curriculum / delivery / quality surfaces.
     if (role === 'super_admin') {
       return [
-        { items: [{ label: t('nav.overview', 'Overview'), href: '/platform-overview', icon: LayoutDashboard }] },
         {
-          heading: t('nav.groups.partnerPlatform', 'Partner Admin Platform'),
+          heading: t('nav.groups.partnerHub', 'Partner Hub'),
           items: [
-            { label: t('nav.partnerOverview', 'Partner Overview'), href: '/partner', icon: Wallet },
-            { label: t('nav.partners', 'Partners'), href: '/partner/partners', icon: Building },
-            { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
-            { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
-            { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },
-            { label: t('nav.documents', 'Documents'), href: '/partner/documents', icon: FileText },
-            { label: t('nav.accountsRoles', 'Accounts & Roles'), href: '/partner/accounts', icon: Users },
-            { label: t('nav.communications', 'Communications'), href: '/partner/comms', icon: Megaphone },
-            { label: t('nav.branding', 'Branding'), href: '/partner/theme', icon: Palette },
-            { label: t('nav.audit', 'Audit & Impersonation'), href: '/partner/audit', icon: ShieldCheck },
-            { label: t('nav.partnerSettings', 'Settings'), href: '/partner/settings', icon: Settings },
+            { label: t('nav.overview', 'Overview'), href: '/platform-overview', icon: LayoutDashboard },
           ],
         },
         {
