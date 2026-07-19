@@ -8,6 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, and, isNull, gt } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import {
   hashPassword,
   verifyPassword,
@@ -148,9 +149,14 @@ router.post("/auth/forgot-password", async (req, res) => {
       issuedBy: "self_service",
       expiresAt: new Date(Date.now() + RESET_TTL_MS),
     });
-    // TODO: deliver by email once a provider is configured. Until then a super_admin
-    // issues the link directly from the platform console (POST /platform/users/:id/reset-link).
-    req.log?.info({ userId: user.id }, "password reset requested");
+    // Deliver by email when a provider is configured (RESEND_API_KEY + EMAIL_FROM). Without it,
+    // a super_admin still issues the link from the platform console (POST /platform/users/:id/reset-link).
+    if (emailEnabled()) {
+      const base = (process.env.APP_URL?.replace(/\/$/, "")) || `${req.protocol}://${req.get("host") ?? "localhost"}`;
+      const name = [user.firstName, user.lastName].filter(Boolean).join(" ") || null;
+      void sendSetPasswordEmail(user.email, name, `${base}/reset-password?token=${token}`, "reset");
+    }
+    req.log?.info({ userId: user.id, emailed: emailEnabled() }, "password reset requested");
   }
 
   res.json({

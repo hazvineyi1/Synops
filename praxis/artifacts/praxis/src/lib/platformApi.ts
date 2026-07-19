@@ -152,10 +152,12 @@ export const platformApi = {
   getUser: (id: string) => req<PlatformUserDetail>(`/platform/users/${id}`),
 
   createUser: (body: { email: string; firstName?: string; lastName?: string; role: string; partnerId?: string | null; organisationId?: string | null }) =>
-    req<{ id: string; email: string; role: string; status: string; link: string; expiresAt: string }>(
+    req<{ id: string; email: string; role: string; status: string; link: string; expiresAt: string; emailed?: boolean }>(
       "/platform/users",
       { method: "POST", body: JSON.stringify(body) },
     ),
+
+  deleteUser: (id: string) => req<void>(`/platform/users/${id}`, { method: "DELETE" }),
 
   impersonate: (id: string) =>
     req<{ ok: boolean; impersonating: { id: string; email: string } }>(

@@ -197,6 +197,7 @@ function UsersTab({ onOpen }: { onOpen: (u: PlatformUserRow) => void }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState({ email: "", firstName: "", lastName: "", role: "learner" });
   const [createdLink, setCreatedLink] = useState<string | null>(null);
+  const [createdEmailed, setCreatedEmailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const create = useMutation({
     mutationFn: () => platformApi.createUser({
@@ -205,12 +206,13 @@ function UsersTab({ onOpen }: { onOpen: (u: PlatformUserRow) => void }) {
     }),
     onSuccess: (r) => {
       setCreatedLink(r.link);
+      setCreatedEmailed(!!r.emailed);
       qc.invalidateQueries({ queryKey: ["platform", "users"] });
-      toast({ title: "User created", description: `${r.email} — send them the set-password link below.` });
+      toast({ title: "User created", description: r.emailed ? `Set-password link emailed to ${r.email}.` : `${r.email} — send them the set-password link below.` });
     },
     onError: (e: unknown) => toast({ title: "Could not create user", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
-  const resetCreate = () => { setForm({ email: "", firstName: "", lastName: "", role: "learner" }); setCreatedLink(null); setCopied(false); };
+  const resetCreate = () => { setForm({ email: "", firstName: "", lastName: "", role: "learner" }); setCreatedLink(null); setCreatedEmailed(false); setCopied(false); };
 
   return (
     <div className="space-y-4">
@@ -232,7 +234,9 @@ function UsersTab({ onOpen }: { onOpen: (u: PlatformUserRow) => void }) {
           <DialogHeader><DialogTitle>Create user</DialogTitle></DialogHeader>
           {createdLink ? (
             <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">Account created. Send this one-time set-password link (expires in 1 hour). They set a password, then sign in.</p>
+              <p className="text-sm text-muted-foreground">{createdEmailed
+                ? "Account created and the set-password link was emailed to them. You can also copy it below (expires in 1 hour)."
+                : "Account created. Send this one-time set-password link (expires in 1 hour). They set a password, then sign in."}</p>
               <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 p-2">
                 <code className="flex-1 truncate text-xs">{createdLink}</code>
                 <Button size="icon" variant="ghost" className="h-8 w-8" onClick={async () => { await navigator.clipboard.writeText(createdLink).catch(() => {}); setCopied(true); }}>
@@ -376,8 +380,14 @@ function UserDialog({
 
   const makeResetLink = useMutation({
     mutationFn: () => platformApi.resetLink(user!.id),
-    onSuccess: (r) => setResetLink(r.link),
+    onSuccess: (r) => { setResetLink(r.link); if (r.emailed) toast({ title: "Reset link emailed", description: r.email }); },
     onError: (e: unknown) => toast({ title: "Could not create reset link", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+
+  const del = useMutation({
+    mutationFn: () => platformApi.deleteUser(user!.id),
+    onSuccess: () => { toast({ title: "User deleted" }); invalidate(); onClose(); },
+    onError: (e: unknown) => toast({ title: "Could not delete user", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
   if (!user) return null;
@@ -480,6 +490,15 @@ function UserDialog({
               Suspend
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            disabled={isSelf || del.isPending}
+            onClick={() => { if (window.confirm(`Permanently delete ${name}? This removes their login, sessions and enrolments. This cannot be undone.`)) del.mutate(); }}
+          >
+            {del.isPending ? "Deleting…" : "Delete"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

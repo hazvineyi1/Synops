@@ -10,10 +10,12 @@ import {
   partnersTable,
   organisationsTable,
   enrolmentsTable,
+  courseGroupMembersTable,
 } from "@workspace/db";
 import { eq, and, isNull, desc, sql, or, ilike, gte, type SQL } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { logAudit as audit } from "../lib/audit";
+import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import {
   newSessionToken,
   sessionExpiry,
@@ -233,10 +235,34 @@ router.post("/platform/users", requireAuth, requireSuperAdmin, async (req, res) 
   });
   await audit(req, "user.create", "user", created.id, { email, role });
 
-  res.status(201).json({
-    id: created.id, email, role, status: "invited",
-    link: `${appBase(req)}/reset-password?token=${token}`, expiresAt,
+  const link = `${appBase(req)}/reset-password?token=${token}`;
+  const emailed = emailEnabled() ? (await sendSetPasswordEmail(email, firstName, link, "invite")).ok : false;
+
+  res.status(201).json({ id: created.id, email, role, status: "invited", link, expiresAt, emailed });
+});
+
+/**
+ * DELETE /platform/users/:id — hard-delete a user and their access rows in one transaction.
+ * Removes login ability and the PII in the auth trail (sessions, resets, login events) plus their
+ * enrolments and section memberships, so dashboards do not dangle. Content they authored (courses,
+ * cases) is intentionally left. You cannot delete your own account.
+ */
+router.delete("/platform/users/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  if (id === req.userId) { res.status(400).json({ error: "You cannot delete your own account." }); return; }
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+
+  await db.transaction(async (tx) => {
+    await tx.delete(authSessionsTable).where(eq(authSessionsTable.userId, id));
+    await tx.delete(passwordResetsTable).where(eq(passwordResetsTable.userId, id));
+    await tx.delete(loginEventsTable).where(eq(loginEventsTable.userId, id));
+    await tx.delete(enrolmentsTable).where(eq(enrolmentsTable.userId, id));
+    await tx.delete(courseGroupMembersTable).where(eq(courseGroupMembersTable.userId, id));
+    await tx.delete(usersTable).where(eq(usersTable.id, id));
   });
+  await audit(req, "user.delete", "user", id, { email: user.email });
+  res.status(204).send();
 });
 
 /**
@@ -266,7 +292,9 @@ router.post("/platform/users/:id/reset-link", requireAuth, requireSuperAdmin, as
 
   await audit(req, "user.reset_link", "user", user.id, { email: user.email });
 
-  res.json({ link: `${appBase(req)}/reset-password?token=${token}`, expiresAt, email: user.email });
+  const link = `${appBase(req)}/reset-password?token=${token}`;
+  const emailed = emailEnabled() ? (await sendSetPasswordEmail(user.email, [user.firstName, user.lastName].filter(Boolean).join(" ") || null, link, "reset")).ok : false;
+  res.json({ link, expiresAt, email: user.email, emailed });
 });
 
 /** POST /platform/users/:id/suspend — blocks sign-in AND kills live sessions. */
