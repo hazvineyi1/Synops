@@ -1,9 +1,9 @@
-Org Hub: richer learner profile drawer + reset-password channel choice (ASCII-only)
+Org Hub: learner drawer actions give visible feedback + archive/delete account (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-LEARNER RECORD: OrgLearner now carries date of birth + age, gender, ID/passport (shown masked), nationality, home language, population group (B-BBEE), disability, highest qualification, employment status, current occupation, employer, learner lifecycle status (Active/On break/Graduated/Withdrawn) and emergency contact, all generated deterministically with SA-realistic values.
+BUGFIX: reset-password, WhatsApp/email resend and login-help buttons appeared dead because their confirmation used the page-level flash banner, which renders BEHIND the modal. Added an in-drawer confirmation line so every action (role change, reset via email/WhatsApp, resend login help, suspend/reactivate) reports where the admin can see it.
 
-PROFILE DRAWER REDESIGN: wider, scrollable, avatar header with lifecycle badge; grouped sections (Personal, Contact, Education & employment, Programme & funding) via a ProfileRow helper. Reset password now offers a channel choice - Email or WhatsApp - with WhatsApp gated on the learner opt-in.
+NEW: Archive account (soft - keeps the record, removes access, reversible via Restore) and Delete account (permanent, behind an inline Confirm/Cancel with a warning). Member status type gains archived; status chip shown in the drawer header and the People table.
 
-VALIDATION: parse-check + local-resolution bundle clean; new lucide icons (Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock) confirmed to resolve.
+VALIDATION: parse-check + local-resolution bundle clean; Trash2 icon confirmed.

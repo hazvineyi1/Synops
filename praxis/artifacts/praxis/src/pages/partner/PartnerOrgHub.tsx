@@ -38,7 +38,8 @@ const SECTION_META: Record<string, { title: string; icon: React.ComponentType<{ 
 
 type OrgRole = 'org_admin' | 'coach' | 'learner';
 type MemberStatus = 'active' | 'invited' | 'suspended' | 'archived';
-type Member = { id: string; name: string; email: string; role: OrgRole; status: MemberStatus; progress?: number; course?: string };
+type ResetRecord = { at: string; channel: 'email' | 'whatsapp' };
+type Member = { id: string; name: string; email: string; role: OrgRole; status: MemberStatus; progress?: number; course?: string; lastReset?: ResetRecord };
 
 const ROLE_LABEL: Record<OrgRole, string> = { org_admin: 'Org admin', coach: 'Coach', learner: 'Learner' };
 const roleBadge = (r: OrgRole) =>
@@ -105,7 +106,11 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const [members, setMembers] = useState<Member[]>(() => [
     ...d.admins.map((a) => ({ id: a.id, name: a.name, email: a.email, role: 'org_admin' as OrgRole, status: a.status })),
     ...d.coaches.map((a) => ({ id: a.id, name: a.name, email: a.email, role: 'coach' as OrgRole, status: a.status })),
-    ...seededLearners.map((l) => ({ id: l.id, name: l.name, email: l.email, role: 'learner' as OrgRole, status: 'active' as const, progress: l.progress, course: l.course })),
+    ...seededLearners.map((l) => {
+      const sd = l.id.split('').reduce((x, c) => x + c.charCodeAt(0), 0);
+      const lastReset: ResetRecord | undefined = sd % 3 === 0 ? undefined : { at: new Date(Date.now() - (sd % 120 + 1) * 86400000).toISOString().slice(0, 10), channel: sd % 2 === 0 ? 'email' : 'whatsapp' };
+      return { id: l.id, name: l.name, email: l.email, role: 'learner' as OrgRole, status: 'active' as const, progress: l.progress, course: l.course, lastReset };
+    }),
   ]);
   const [roleFilter, setRoleFilter] = useState<OrgRole | 'all'>('all');
   const [selected, setSelected] = useState<Member | null>(null);
@@ -120,6 +125,11 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const [confirmDelete, setConfirmDelete] = useState(false);
   const drawerNote = (m: string) => { setDrawerMsg(m); window.setTimeout(() => setDrawerMsg(null), 4500); };
   const openMember = (m: Member) => { setSelected(m); setDrawerMsg(null); setConfirmDelete(false); };
+  const recordReset = (id: string, channel: 'email' | 'whatsapp') => {
+    const rec: ResetRecord = { at: new Date().toISOString().slice(0, 10), channel };
+    setMembers((xs) => xs.map((m) => (m.id === id ? { ...m, lastReset: rec } : m)));
+    setSelected((s) => (s && s.id === id ? { ...s, lastReset: rec } : s));
+  };
   const deleteMember = (id: string, name: string) => { setMembers((xs) => xs.filter((x) => x.id !== id)); setSelected(null); setConfirmDelete(false); flashMsg(`${name}'s account was deleted.`); };
 
   const setMemberStatus = (id: string, status: Member['status']) => {
@@ -573,10 +583,14 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 <div className="rounded-lg border border-border p-3">
                   <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><KeyRound className="h-3.5 w-3.5" /> Reset password — send link via</div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => drawerNote(`Password reset link sent to ${selected.email}.`)}><Mail className="h-3.5 w-3.5" /> Email</Button>
-                    <Button size="sm" variant="outline" className="gap-1.5" disabled={!selectedLearner?.whatsappOptIn} onClick={() => drawerNote(`Password reset link sent via WhatsApp to ${selectedLearner?.phone}.`)}><Smartphone className="h-3.5 w-3.5" /> WhatsApp</Button>
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { recordReset(selected.id, 'email'); drawerNote(`Password reset link sent to ${selected.email}.`); }}><Mail className="h-3.5 w-3.5" /> Email</Button>
+                    <Button size="sm" variant="outline" className="gap-1.5" disabled={!selectedLearner?.whatsappOptIn} onClick={() => { recordReset(selected.id, 'whatsapp'); drawerNote(`Password reset link sent via WhatsApp to ${selectedLearner?.phone}.`); }}><Smartphone className="h-3.5 w-3.5" /> WhatsApp</Button>
                   </div>
-                  {selectedLearner && !selectedLearner.whatsappOptIn && <p className="text-[11px] text-muted-foreground mt-1.5">WhatsApp reset unavailable — learner has not opted in.</p>}
+                  <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" />
+                    {selected.lastReset ? <>Last reset {fmtDate(selected.lastReset.at)} via {selected.lastReset.channel === 'whatsapp' ? 'WhatsApp' : 'email'}.</> : <>No password reset on record.</>}
+                  </p>
+                  {selectedLearner && !selectedLearner.whatsappOptIn && <p className="text-[11px] text-muted-foreground mt-0.5">WhatsApp reset unavailable — learner has not opted in.</p>}
                 </div>
 
                 {/* Account actions */}
