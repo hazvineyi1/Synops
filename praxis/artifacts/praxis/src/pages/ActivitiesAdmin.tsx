@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket, Upload, ArrowLeft, BookOpenCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -506,6 +506,10 @@ export function ActivitiesAdmin() {
   const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
   const canAssign = !!user && CAN_ASSIGN.includes(user.role);
 
+  // When opened from a course ("Add interactive"), preselect that course so a new activity links to it.
+  const search = useSearch();
+  const preCourseId = new URLSearchParams(search).get("courseId") || "";
+
   // Learners get a dedicated assigned-activities view (no authoring).
   if (user && !canAuthor) return <LearnerActivities />;
 
@@ -523,11 +527,16 @@ export function ActivitiesAdmin() {
     onError: (e) => toast({ title: "Could not update", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
-  const startNew = (mode: NewMode) => { setSeed(null); setNewMode(mode); setCreating(true); setSelectedId(null); setRightTab("edit"); setNewMenu(false); };
+  const startNew = (mode: NewMode) => { setSeed(preCourseId ? { courseId: preCourseId } : null); setNewMode(mode); setCreating(true); setSelectedId(null); setRightTab("edit"); setNewMenu(false); };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {aiOpen && <AIGenerateDialog onClose={() => setAiOpen(false)} onUse={(g) => { setSeed({ title: g.title, instructions: g.instructions, html: renderActivity(g.type as InteractionType, g.spec as ActivitySpec), kind: g.type, bloomsLevel: g.bloomsLevel, difficulty: g.difficulty as Activity["difficulty"], source: "ai" }); setNewMode("html"); setCreating(true); setSelectedId(null); setRightTab("edit"); setAiOpen(false); }} />}
+      {aiOpen && <AIGenerateDialog onClose={() => setAiOpen(false)} onUse={(g) => { setSeed({ title: g.title, instructions: g.instructions, html: renderActivity(g.type as InteractionType, g.spec as ActivitySpec), kind: g.type, bloomsLevel: g.bloomsLevel, difficulty: g.difficulty as Activity["difficulty"], source: "ai", ...(preCourseId ? { courseId: preCourseId } : {}) }); setNewMode("html"); setCreating(true); setSelectedId(null); setRightTab("edit"); setAiOpen(false); }} />}
+      {preCourseId && !detailActive && (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" /> New activities you create here will be linked to the course you came from.
+        </div>
+      )}
       {builderOpen && <ActivityBuilder onClose={() => setBuilderOpen(false)} onCreated={(a) => { setBuilderOpen(false); setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} />}
       {assignFor && <ActivityAssignDialog activityId={assignFor.id} activityTitle={assignFor.title} onClose={() => setAssignFor(null)} />}
 

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useListCourses } from "@workspace/api-client-react";
-import { BookOpen, ArrowRight, CheckCircle2, Layers, Award, Plus, Sparkles } from "lucide-react";
+import { BookOpen, ArrowRight, CheckCircle2, Layers, Award, Plus, Sparkles, Copy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +74,20 @@ export function Courses() {
       setCreateErr(e instanceof Error ? e.message : "Could not create the course.");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const [cloningId, setCloningId] = useState<string | null>(null);
+  const cloneCourse = async (id: string) => {
+    setCloningId(id);
+    try {
+      const course = await apiFetch<{ id: string }>(`/courses/${id}/clone`, { method: "POST" });
+      await queryClient.invalidateQueries();
+      navigate(`/courses/${course.id}`);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Could not clone the course.");
+    } finally {
+      setCloningId(null);
     }
   };
 
@@ -195,9 +209,17 @@ export function Courses() {
                     <Layers className="h-3.5 w-3.5" />
                     {course.moduleCount || 0} modules · Self-paced
                   </div>
-                  <Button variant="outline" className="w-full" onClick={() => navigate(`/courses/${course.id}`)}>
-                    View course
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={() => navigate(`/courses/${course.id}`)}>
+                      View course
+                    </Button>
+                    {canAuthor && (
+                      <Button variant="outline" size="icon" title="Clone course" disabled={cloningId === course.id}
+                        onClick={() => cloneCourse(course.id)}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </Card>
               );
             })}

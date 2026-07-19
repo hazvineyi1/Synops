@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { coursesTable, modulesTable } from "@workspace/db";
+import { coursesTable, modulesTable, beatsTable, assignmentsTable, interactiveActivitiesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { canParticipateInCourse, canStaffActOnCourse } from "../lib/scope";
@@ -112,6 +112,53 @@ router.delete("/courses/:courseId", requireAuth, async (req, res) => {
   }
   await db.delete(coursesTable).where(eq(coursesTable.id, req.params.courseId));
   res.status(204).send();
+});
+
+// POST /courses/:courseId/clone -- deep-copy a course with its modules, beats, assignments and
+// course-linked interactive activities. The copy starts as a draft owned by the caller's tenant.
+router.post("/courses/:courseId/clone", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  const user = req.dbUser!;
+  const src = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, req.params.courseId) });
+  if (!src) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await canStaffActOnCourse(user, src.id))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const tenantId = user.partnerId ?? user.organisationId ?? user.id;
+
+  // 1) the course row (drop identity/counters, force draft, retitle)
+  const { id: _cid, createdAt: _cc, updatedAt: _cu, moduleCount: _cmc, enrolmentCount: _cec, ...courseRest } = src as any;
+  const [course] = await db.insert(coursesTable)
+    .values({ ...courseRest, title: `Copy of ${src.title}`, status: "draft", tenantId })
+    .returning();
+
+  // 2) modules (+ their beats), keeping an old->new module id map for downstream links
+  const mods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, src.id)).orderBy(modulesTable.order);
+  const moduleIdMap: Record<string, string> = {};
+  for (const m of mods) {
+    const { id: oldMid, createdAt: _mc, updatedAt: _mu, ...modRest } = m as any;
+    const [nm] = await db.insert(modulesTable).values({ ...modRest, courseId: course.id }).returning();
+    moduleIdMap[oldMid] = nm.id;
+    const beats = await db.select().from(beatsTable).where(eq(beatsTable.moduleId, oldMid));
+    for (const b of beats) {
+      const { id: _bid, createdAt: _bc, updatedAt: _bu, ...beatRest } = b as any;
+      await db.insert(beatsTable).values({ ...beatRest, moduleId: nm.id });
+    }
+  }
+
+  // 3) assignments (remap moduleId if the assignment was module-scoped)
+  const asgs = await db.select().from(assignmentsTable).where(eq(assignmentsTable.courseId, src.id));
+  for (const a of asgs) {
+    const { id: _aid, createdAt: _ac, updatedAt: _au, ...asgRest } = a as any;
+    await db.insert(assignmentsTable).values({ ...asgRest, courseId: course.id, moduleId: a.moduleId ? (moduleIdMap[a.moduleId] ?? null) : null });
+  }
+
+  // 4) interactive activities linked to the course (remap moduleId)
+  const acts = await db.select().from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.courseId, src.id));
+  for (const act of acts) {
+    const { id: _iid, createdAt: _ic, updatedAt: _iu, ...actRest } = act as any;
+    await db.insert(interactiveActivitiesTable).values({ ...actRest, courseId: course.id, moduleId: act.moduleId ? (moduleIdMap[act.moduleId] ?? null) : null });
+  }
+
+  await db.update(coursesTable).set({ moduleCount: mods.length }).where(eq(coursesTable.id, course.id));
+  res.status(201).json(toCourseResponse({ ...course, moduleCount: mods.length }));
 });
 
 export default router;

@@ -1,13 +1,13 @@
-Learning Hub persistence B: DB tables + Supabase Storage upload + CRUD API (additive) (ASCII-only)
+Learning Hub persistence backend + create-course UI + ribbon/catalog polish (ASCII-only)
 
-MIGRATION REQUIRED: run praxis/migration-learning-hub.sql against the Praxis Postgres (creates learning_content, course_templates, course_assignments + seeds). Additive/idempotent.
+MIGRATION REQUIRED: run praxis/migration-learning-hub.sql against the Praxis Postgres (creates learning_content, course_templates, course_assignments + seeds). Additive/idempotent. Nothing calls those tables from the UI yet, so this deploy is safe even before the migration runs.
 
-Backend only, no frontend behaviour change yet (UI still uses in-session state until the C increment rewires it, so this deploy is safe).
+LEARNING HUB PERSISTENCE (backend, additive): Drizzle tables in lib/db schema/learning_hub.ts; new api-server route learningHub.ts (content GET/POST + upload to Supabase Storage, review, delete; templates GET/POST; assignments GET/PUT/toggle), writes gated to super_admin; src/lib/supabaseStorage.ts REST helper (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, storageEnabled()).
 
-- New Drizzle tables in lib/db schema/learning_hub.ts (exported from schema index).
-- New api-server route learningHub.ts mounted in routes/index: GET/POST content, POST content/upload (forwards file to Supabase Storage via REST), PATCH review, DELETE, templates GET/POST, assignments GET/PUT/toggle. Writes gated to super_admin.
-- src/lib/supabaseStorage.ts (REST, no SDK): reads SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY at call time; storageEnabled() so missing config fails cleanly.
+COURSE AUTHORING (real /courses): New course button on the catalog for author roles -> POST /courses -> opens the course. Tightened POST /courses to author roles only (was any authenticated user).
 
-ENV (for uploads): set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the Praxis service and create a Storage bucket (default name learning-hub).
+POLISH: super-admin ribbon lettering now solid white/bolder; org Courses tab shows an Assigned from the Learning Hub card.
 
-VALIDATION: esbuild syntax-check clean on supabaseStorage, learningHub route, schema, routes index.
+ENV (for uploads later): SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY on the Praxis service + a Storage bucket named learning-hub.
+
+VALIDATION: esbuild clean on Courses.tsx, courses.ts, learningHub route/schema/storage, AppLayout, PartnerOrgHub.

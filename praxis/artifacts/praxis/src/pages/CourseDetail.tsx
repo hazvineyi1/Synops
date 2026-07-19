@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, Pin,
-  CheckCircle, Clock, AlertCircle, Play, Target, Save
+  CheckCircle, Clock, AlertCircle, Play, Target, Save, Pencil, Trash2, Layers, Sparkles
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -125,6 +125,122 @@ function NewPage({ courseId }: { courseId: string }) {
         Publish immediately
       </label>
     </CreatePanel>
+  );
+}
+
+/** Create an assignment (deliverable) on this course. Staff-gated server-side. */
+function NewAssignment({ courseId }: { courseId: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ title: '', description: '', instructions: '', submissionType: 'text', pointsPossible: '100', dueDate: '', published: true });
+  const [error, setError] = useState<string | null>(null);
+  const reset = () => setF({ title: '', description: '', instructions: '', submissionType: 'text', pointsPossible: '100', dueDate: '', published: true });
+  const m = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}/assignments`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: f.title.trim(),
+        description: f.description.trim() || undefined,
+        instructions: f.instructions.trim() || undefined,
+        submissionType: f.submissionType,
+        pointsPossible: Number(f.pointsPossible) || 0,
+        dueDate: f.dueDate || undefined,
+        published: f.published,
+      }),
+    }),
+    onSuccess: () => { setOpen(false); setError(null); reset(); qc.invalidateQueries({ queryKey: ['assignments', courseId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not create that assignment.'),
+  });
+  return (
+    <CreatePanel icon={ClipboardList} title="New Assignment" open={open}
+      onOpen={() => setOpen(true)} onCancel={() => { setOpen(false); setError(null); }}
+      onSubmit={() => m.mutate()} submitLabel="Create assignment" busy={m.isPending}
+      disabled={!f.title.trim()} error={error}>
+      <input className={fieldCls} placeholder="Assignment title" value={f.title}
+        onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} />
+      <Textarea rows={2} className="text-sm resize-none" placeholder="Short description"
+        value={f.description} onChange={(e) => setF((p) => ({ ...p, description: e.target.value }))} />
+      <Textarea rows={4} className="text-sm resize-none" placeholder="Instructions for learners"
+        value={f.instructions} onChange={(e) => setF((p) => ({ ...p, instructions: e.target.value }))} />
+      <div className="grid grid-cols-3 gap-2">
+        <label className="text-xs"><span className="mb-1 block text-muted-foreground">Submission</span>
+          <select className={fieldCls} value={f.submissionType} onChange={(e) => setF((p) => ({ ...p, submissionType: e.target.value }))}>
+            <option value="text">Text</option><option value="file">File</option><option value="url">Link</option>
+          </select></label>
+        <label className="text-xs"><span className="mb-1 block text-muted-foreground">Points</span>
+          <input className={fieldCls} inputMode="numeric" value={f.pointsPossible}
+            onChange={(e) => setF((p) => ({ ...p, pointsPossible: e.target.value.replace(/[^0-9]/g, '') }))} /></label>
+        <label className="text-xs"><span className="mb-1 block text-muted-foreground">Due date</span>
+          <input type="date" className={fieldCls} value={f.dueDate}
+            onChange={(e) => setF((p) => ({ ...p, dueDate: e.target.value }))} /></label>
+      </div>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={f.published} onChange={(e) => setF((p) => ({ ...p, published: e.target.checked }))} />
+        Publish to learners immediately
+      </label>
+    </CreatePanel>
+  );
+}
+
+/** Instructor row for an assignment: inline edit + delete against the real endpoints. */
+function InstructorAssignmentCard({ courseId, a, onOpen }: { courseId: string; a: Assignment; onOpen: () => void }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState({ title: a.title, description: a.description ?? '', pointsPossible: String(a.pointsPossible), dueDate: a.dueDate ? a.dueDate.slice(0, 10) : '', published: a.published });
+  const [error, setError] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: () => apiFetch(`/assignments/${a.id}`, { method: 'PATCH', body: JSON.stringify({
+      title: f.title.trim(), description: f.description.trim() || undefined,
+      pointsPossible: Number(f.pointsPossible) || 0, dueDate: f.dueDate || undefined, published: f.published,
+    }) }),
+    onSuccess: () => { setEditing(false); setError(null); qc.invalidateQueries({ queryKey: ['assignments', courseId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not save.'),
+  });
+  const del = useMutation({
+    mutationFn: () => apiFetch(`/assignments/${a.id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['assignments', courseId] }),
+  });
+
+  if (editing) {
+    return (
+      <Card className="border-dashed border-primary/30">
+        <CardContent className="pt-5 space-y-3">
+          <input className={fieldCls} value={f.title} onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} placeholder="Title" />
+          <Textarea rows={2} className="text-sm resize-none" value={f.description} onChange={(e) => setF((p) => ({ ...p, description: e.target.value }))} placeholder="Description" />
+          <div className="grid grid-cols-2 gap-2 max-w-sm">
+            <label className="text-xs"><span className="mb-1 block text-muted-foreground">Points</span>
+              <input className={fieldCls} inputMode="numeric" value={f.pointsPossible} onChange={(e) => setF((p) => ({ ...p, pointsPossible: e.target.value.replace(/[^0-9]/g, '') }))} /></label>
+            <label className="text-xs"><span className="mb-1 block text-muted-foreground">Due date</span>
+              <input type="date" className={fieldCls} value={f.dueDate} onChange={(e) => setF((p) => ({ ...p, dueDate: e.target.value }))} /></label>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={f.published} onChange={(e) => setF((p) => ({ ...p, published: e.target.checked }))} /> Published
+          </label>
+          {error && <p className="text-xs text-rose-600">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setError(null); }}>Cancel</Button>
+            <Button size="sm" disabled={save.isPending || !f.title.trim()} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : 'Save changes'}</Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <CardContent className="py-4 flex items-center justify-between gap-4">
+        <button className="flex-1 min-w-0 text-left" onClick={onOpen}>
+          <div className="font-medium text-foreground flex items-center gap-2">{a.title}{!a.published && <Badge variant="outline" className="text-[10px]">Draft</Badge>}</div>
+          {a.description && <div className="text-sm text-muted-foreground truncate">{a.description}</div>}
+        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className="text-sm text-muted-foreground">{a.pointsPossible} pts</span>
+          {a.dueDate && <Badge variant={isOverdue(a.dueDate) ? 'destructive' : 'outline'} className="text-xs">{isOverdue(a.dueDate) ? 'OVERDUE' : formatDate(a.dueDate)}</Badge>}
+          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)} title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-600" title="Delete"
+            onClick={() => { if (window.confirm(`Delete "${a.title}"? This cannot be undone.`)) del.mutate(); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -528,6 +644,51 @@ function MonthGrid({ events, cursor, onCursor, compact = false }: {
 // Instructor-only editor for course-level learning objectives. Self-contained draft +
 // dirty tracking; the parent supplies the initial value and the save handler. Keying the
 // element by the saved value (see usage) resets the draft after a successful save.
+/** Instructor: edit core course metadata (title, description, NQF level, published status). */
+function CourseSettingsCard({ course, saving, onSave }: {
+  course: { title: string; description?: string; nqfLevel?: number | null; status?: string };
+  saving: boolean;
+  onSave: (patch: Record<string, unknown>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({
+    title: course.title ?? '', description: course.description ?? '',
+    nqfLevel: course.nqfLevel != null ? String(course.nqfLevel) : '', status: course.status ?? 'draft',
+  });
+  if (!open) {
+    return (
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" className="gap-2" onClick={() => setOpen(true)}><Pencil className="h-3.5 w-3.5" /> Edit course</Button>
+      </div>
+    );
+  }
+  return (
+    <Card className="border-dashed border-primary/30">
+      <CardContent className="pt-5 space-y-3">
+        <div className="flex items-center gap-2"><Pencil className="h-4 w-4 text-primary" /><span className="font-semibold text-sm">Course settings</span></div>
+        <label className="text-xs block"><span className="mb-1 block text-muted-foreground">Title</span>
+          <input className={fieldCls} value={f.title} onChange={(e) => setF((p) => ({ ...p, title: e.target.value }))} /></label>
+        <label className="text-xs block"><span className="mb-1 block text-muted-foreground">Description</span>
+          <Textarea rows={3} className="text-sm resize-none" value={f.description} onChange={(e) => setF((p) => ({ ...p, description: e.target.value }))} /></label>
+        <div className="grid grid-cols-2 gap-2 max-w-sm">
+          <label className="text-xs"><span className="mb-1 block text-muted-foreground">NQF level</span>
+            <input className={fieldCls} inputMode="numeric" value={f.nqfLevel} onChange={(e) => setF((p) => ({ ...p, nqfLevel: e.target.value.replace(/[^0-9]/g, '') }))} /></label>
+          <label className="text-xs"><span className="mb-1 block text-muted-foreground">Status</span>
+            <select className={fieldCls} value={f.status} onChange={(e) => setF((p) => ({ ...p, status: e.target.value }))}>
+              <option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option>
+            </select></label>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button size="sm" disabled={saving || !f.title.trim()} onClick={() => { onSave({ title: f.title.trim(), description: f.description.trim(), nqfLevel: f.nqfLevel ? Number(f.nqfLevel) : null, status: f.status }); setOpen(false); }}>
+            {saving ? 'Saving...' : 'Save course'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CourseObjectivesCard({ initial, saving, onSave }: {
   initial: string[];
   saving: boolean;
@@ -997,6 +1158,15 @@ export function CourseDetail() {
                   <p className="text-muted-foreground leading-relaxed">{course.description}</p>
                 </CardContent>
               </Card>
+              {/* Instructor: edit core course settings (title, description, NQF, status). */}
+              {isInstructor && (
+                <CourseSettingsCard
+                  key={`${course.title}|${course.status}|${course.nqfLevel}`}
+                  course={course as any}
+                  saving={saveCourse.isPending}
+                  onSave={(patch) => saveCourse.mutate(patch)}
+                />
+              )}
               {/* Instructor: edit course learning objectives (authoring). */}
               {isInstructor && (
                 <CourseObjectivesCard
@@ -1062,8 +1232,18 @@ export function CourseDetail() {
         {/* MODULES */}
         {activeTab === 'modules' && (
           <div className="space-y-4">
+            {isInstructor && (
+              <Card className="border-dashed">
+                <CardContent className="py-4 flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium mr-1 flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-primary" /> Add to this course:</span>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate('/studio')}><Layers className="h-3.5 w-3.5" /> Author a module (Studio)</Button>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/cases?courseId=${courseId}`)}><FileText className="h-3.5 w-3.5" /> Case study</Button>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Play className="h-3.5 w-3.5" /> Interactive</Button>
+                </CardContent>
+              </Card>
+            )}
             {!modules && <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div>}
-            {modules?.length === 0 && <div className="text-center text-muted-foreground py-12">No modules yet.</div>}
+            {modules?.length === 0 && <div className="text-center text-muted-foreground py-12">No modules yet. Use "Author a module" above to add one.</div>}
             {modules?.map((mod) => (
               <ModuleRow key={mod.id} mod={mod} />
             ))}
@@ -1073,26 +1253,31 @@ export function CourseDetail() {
         {/* ASSIGNMENTS */}
         {activeTab === 'assignments' && (
           <div className="space-y-3">
+            {isInstructor && <NewAssignment courseId={courseId} />}
             {!assignments && <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>}
             {assignments?.length === 0 && <div className="text-center text-muted-foreground py-12">No assignments yet.</div>}
             {assignments?.map((a) => (
-              <Card key={a.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/courses/${courseId}/assignments/${a.id}`)}>
-                <CardContent className="py-4 flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground">{a.title}</div>
-                    {a.description && <div className="text-sm text-muted-foreground truncate">{a.description}</div>}
-                  </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-sm text-muted-foreground">{a.pointsPossible} pts</span>
-                    {a.dueDate && (
-                      <Badge variant={isOverdue(a.dueDate) ? 'destructive' : 'outline'} className="text-xs">
-                        {isOverdue(a.dueDate) ? 'OVERDUE' : formatDate(a.dueDate)}
-                      </Badge>
-                    )}
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
+              isInstructor ? (
+                <InstructorAssignmentCard key={a.id} courseId={courseId} a={a} onOpen={() => navigate(`/courses/${courseId}/assignments/${a.id}`)} />
+              ) : (
+                <Card key={a.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/courses/${courseId}/assignments/${a.id}`)}>
+                  <CardContent className="py-4 flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-foreground">{a.title}</div>
+                      {a.description && <div className="text-sm text-muted-foreground truncate">{a.description}</div>}
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="text-sm text-muted-foreground">{a.pointsPossible} pts</span>
+                      {a.dueDate && (
+                        <Badge variant={isOverdue(a.dueDate) ? 'destructive' : 'outline'} className="text-xs">
+                          {isOverdue(a.dueDate) ? 'OVERDUE' : formatDate(a.dueDate)}
+                        </Badge>
+                      )}
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardContent>
+                </Card>
+              )
             ))}
           </div>
         )}
