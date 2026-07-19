@@ -1,6 +1,7 @@
-In-course Case studies tab (list/attach/detach via gradebook) (ASCII-only)
+Add-to-course from the deliverable pages: obvious per-card action on Activities and Cases (ASCII-only)
 
-- Backend: new GET /courses/:courseId/cases (cases.ts) returns the case studies attached to a course by resolving its gradebook case columns to case titles/status + the gradebook item id (for detach).
-- Frontend: CourseDetail gains a Case studies tab (CourseCasesTab) mirroring the Activities tab - lists attached cases, Attach existing (POST gradebook-items sourceType=case), New case study (to the Cases author), Open (case builder), and Detach (DELETE /gradebook-items/:id; the case itself is not deleted). Uses existing endpoints.
+Previously placing a deliverable in a course was buried (Activities: a dropdown behind Edit tab; Cases: a published-only button labelled Gradebook), so it looked like there was no way to do it.
+- Activities: every activity card gets an Add to course / Change course button + an In a course badge; opens a course+module picker that PATCHes /activities/:id (shows in the course Activities tab).
+- Cases: relabelled Gradebook to Add to course, opened it to all authors, and drafts now show a disabled Add to course (publish first) so the path is visible.
 
-VALIDATION: esbuild clean on CourseDetail.tsx and cases.ts.
+VALIDATION: esbuild bundle clean on ActivitiesAdmin.tsx and Cases.tsx.

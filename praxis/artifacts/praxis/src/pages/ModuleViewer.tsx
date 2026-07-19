@@ -93,6 +93,40 @@ function getBeatMeta(beat: Beat) {
   return BEAT_META[beat.type] ?? { icon: BookOpen, label: beat.type, accent: 'text-muted-foreground' };
 }
 
+/**
+ * Coerce any beat field to a display string. Some beats (esp. AI-generated or seeded ones) carry a
+ * scenario/field as a structured object (e.g. {situation, question, options, correctOption,
+ * explanation}) rather than plain text; rendering an object as a React child throws React error #31
+ * and blanks the module. Every rendered beat field passes through here first.
+ */
+function toBeatText(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map(toBeatText).filter(Boolean).join('\n');
+  if (typeof v === 'object') {
+    const o = v as Record<string, any>;
+    if (o.situation || o.question || o.options || o.prompt) {
+      const parts: string[] = [];
+      if (o.situation) parts.push(String(o.situation));
+      if (o.prompt) parts.push(String(o.prompt));
+      if (o.question) parts.push(String(o.question));
+      if (Array.isArray(o.options)) {
+        parts.push(o.options.map((op: any, i: number) => {
+          const label = String.fromCharCode(65 + i);
+          const text = typeof op === 'string' ? op : (op?.text ?? op?.label ?? JSON.stringify(op));
+          const correct = o.correctOption != null && (o.correctOption === i || o.correctOption === op || o.correctOption === text);
+          return `${label}. ${text}${correct ? '  (correct)' : ''}`;
+        }).join('\n'));
+      }
+      if (o.explanation) parts.push(`Why: ${o.explanation}`);
+      return parts.filter(Boolean).join('\n\n');
+    }
+    try { return JSON.stringify(v); } catch { return String(v); }
+  }
+  return String(v);
+}
+
 // ─── Individual beat renderers ─────────────────────────────────────────────────
 
 function TitleCardBeat({ beat }: { beat: Beat }) {
@@ -111,7 +145,7 @@ function TitleCardBeat({ beat }: { beat: Beat }) {
           {beat.title}
         </h1>
         <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
-          {beat.narration}
+          {toBeatText(beat.narration)}
         </p>
       </motion.div>
     </div>
@@ -128,7 +162,7 @@ function PointsBeat({ beat }: { beat: Beat }) {
         transition={{ duration: 0.4 }}
         className="text-lg text-muted-foreground mb-10 leading-relaxed"
       >
-        {beat.narration}
+        {toBeatText(beat.narration)}
       </motion.p>
       <div className="space-y-3">
         {points.map((pt, i) => (
@@ -142,7 +176,7 @@ function PointsBeat({ beat }: { beat: Beat }) {
               <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center flex-shrink-0 font-bold text-sm">
                 {i + 1}
               </div>
-              <p className="text-base pt-0.5 leading-relaxed">{pt}</p>
+              <p className="text-base pt-0.5 leading-relaxed">{toBeatText(pt)}</p>
             </div>
           </motion.div>
         ))}
@@ -165,10 +199,10 @@ function ScenarioBeat({ beat }: { beat: Beat }) {
             <span className="font-semibold text-amber-700 dark:text-amber-400">Your Scenario</span>
           </div>
           <div className="p-6 space-y-6">
-            <p className="text-base text-muted-foreground leading-relaxed">{beat.narration}</p>
+            <p className="text-base text-muted-foreground leading-relaxed">{toBeatText(beat.narration)}</p>
             {beat.scenario && (
-              <blockquote className="border-l-4 border-amber-400 pl-5 py-1 italic text-foreground text-base leading-relaxed">
-                {beat.scenario}
+              <blockquote className="border-l-4 border-amber-400 pl-5 py-1 italic text-foreground text-base leading-relaxed whitespace-pre-wrap">
+                {toBeatText(beat.scenario)}
               </blockquote>
             )}
             <div className="bg-background/80 rounded-xl p-4 border border-border/40">
@@ -207,7 +241,7 @@ function CompareBeat({ beat }: { beat: Beat }) {
         animate={{ opacity: 1 }}
         className="text-muted-foreground mb-10 leading-relaxed text-base"
       >
-        {beat.narration}
+        {toBeatText(beat.narration)}
       </motion.p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <motion.div
@@ -224,7 +258,7 @@ function CompareBeat({ beat }: { beat: Beat }) {
               {leftItems.map((item, i) => (
                 <div key={i} className="flex gap-2 items-start">
                   <X className="h-4 w-4 text-rose-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm leading-relaxed">{stripPrefix(item)}</span>
+                  <span className="text-sm leading-relaxed">{stripPrefix(toBeatText(item))}</span>
                 </div>
               ))}
             </div>
@@ -244,7 +278,7 @@ function CompareBeat({ beat }: { beat: Beat }) {
               {rightItems.map((item, i) => (
                 <div key={i} className="flex gap-2 items-start">
                   <CheckCircle className="h-4 w-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm leading-relaxed">{stripPrefix(item)}</span>
+                  <span className="text-sm leading-relaxed">{stripPrefix(toBeatText(item))}</span>
                 </div>
               ))}
             </div>
@@ -269,7 +303,7 @@ function CloseBeat({ beat }: { beat: Beat }) {
           <Trophy className="h-8 w-8" />
         </div>
         <h2 className="text-2xl font-bold mb-3">{beat.title}</h2>
-        <p className="text-muted-foreground leading-relaxed max-w-lg mx-auto">{beat.narration}</p>
+        <p className="text-muted-foreground leading-relaxed max-w-lg mx-auto">{toBeatText(beat.narration)}</p>
       </motion.div>
       {points.length > 0 && (
         <div className="space-y-3">
@@ -285,7 +319,7 @@ function CloseBeat({ beat }: { beat: Beat }) {
             >
               <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/40 border border-border/50">
                 <CheckCircle className="h-5 w-5 text-emerald-500 mt-0.5 flex-shrink-0" />
-                <span className="text-sm leading-relaxed">{pt}</span>
+                <span className="text-sm leading-relaxed">{toBeatText(pt)}</span>
               </div>
             </motion.div>
           ))}
@@ -298,7 +332,7 @@ function CloseBeat({ beat }: { beat: Beat }) {
 function VideoBeat({ beat }: { beat: Beat }) {
   return (
     <div className="px-8 py-12 max-w-3xl mx-auto">
-      <p className="text-muted-foreground mb-6 leading-relaxed">{beat.narration}</p>
+      <p className="text-muted-foreground mb-6 leading-relaxed">{toBeatText(beat.narration)}</p>
       {beat.videoUrl ? (
         <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-md">
           <video src={beat.videoUrl} controls className="w-full h-full" />
