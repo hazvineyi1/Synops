@@ -507,10 +507,91 @@ interface Enrolment { id: string; status: string; }
 interface ModuleProgress { moduleId: string; title: string; order: number; viewedBeats: number; totalBeats: number; percent: number; complete: boolean; certified?: boolean; }
 interface CourseProgress { courseId: string; viewedBeats: number; totalBeats: number; percent: number; certified?: boolean; modules: ModuleProgress[]; }
 
+interface CourseActivity { id: string; title: string; kind: string; published: boolean; courseId?: string | null; moduleId?: string | null; bloomsLevel?: string | null; difficulty?: string | null; }
+
+/** In-course Interactives: list activities linked to this course, attach existing ones, or author new. */
+function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isInstructor: boolean }) {
+  const [, navigate] = useLocation();
+  const qc = useQueryClient();
+  const [attachOpen, setAttachOpen] = useState(false);
+  const { data: attached, isLoading } = useQuery({ queryKey: ['course-activities', courseId], queryFn: () => apiFetch<CourseActivity[]>(`/activities?courseId=${courseId}`) });
+  const { data: allActs } = useQuery({ queryKey: ['all-activities'], queryFn: () => apiFetch<CourseActivity[]>(`/activities`), enabled: attachOpen });
+
+  const attach = useMutation({
+    mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ courseId }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['course-activities', courseId] }); qc.invalidateQueries({ queryKey: ['all-activities'] }); },
+  });
+  const detach = useMutation({
+    mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ courseId: null, moduleId: null }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['course-activities', courseId] }),
+  });
+  const candidates = (allActs || []).filter((a) => a.courseId !== courseId);
+
+  return (
+    <div className="space-y-3">
+      {isInstructor && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAttachOpen((v) => !v)}><Plus className="h-4 w-4" /> Attach existing</Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Sparkles className="h-4 w-4" /> New interactive</Button>
+        </div>
+      )}
+
+      {isInstructor && attachOpen && (
+        <Card className="border-dashed border-primary/30">
+          <CardContent className="pt-5 space-y-2">
+            <div className="text-sm font-semibold">Attach an existing activity to this course</div>
+            {candidates.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No unattached activities available. Create one with "New interactive".</div>
+            ) : (
+              <div className="max-h-64 overflow-auto divide-y divide-border">
+                {candidates.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between gap-3 py-2">
+                    <div className="min-w-0"><div className="text-sm font-medium truncate">{a.title}</div><div className="text-xs text-muted-foreground capitalize">{a.kind}{a.courseId ? ' · linked to another course' : ' · library'}</div></div>
+                    <Button size="sm" variant="outline" disabled={attach.isPending} onClick={() => attach.mutate(a.id)}>Attach</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {isLoading && <div className="space-y-2">{[1, 2].map((i) => <Skeleton key={i} className="h-16" />)}</div>}
+      {attached?.length === 0 && !isLoading && (
+        <div className="text-center text-muted-foreground py-12">No interactives on this course yet.{isInstructor && ' Attach an existing one or create a new interactive.'}</div>
+      )}
+      {attached?.map((a) => (
+        <Card key={a.id}>
+          <CardContent className="py-4 flex items-center justify-between gap-4">
+            <button className="flex-1 min-w-0 text-left" onClick={() => navigate(`/activities/${a.id}/play`)}>
+              <div className="font-medium text-foreground flex items-center gap-2">{a.title}{!a.published && <Badge variant="outline" className="text-[10px]">Draft</Badge>}</div>
+              <div className="text-xs text-muted-foreground capitalize flex flex-wrap gap-2 mt-0.5">
+                <span>{a.kind}</span>
+                {a.bloomsLevel && <span className="text-purple-600">{a.bloomsLevel}</span>}
+                {a.difficulty && <span>{a.difficulty}</span>}
+              </div>
+            </button>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Button size="sm" variant="ghost" onClick={() => navigate(`/activities/${a.id}/play`)}><Play className="h-3.5 w-3.5 mr-1.5" /> Open</Button>
+              {isInstructor && (
+                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" title="Remove from course"
+                  onClick={() => { if (window.confirm(`Remove "${a.title}" from this course? The activity itself is not deleted.`)) detach.mutate(a.id); }}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 const TABS = [
   { id: 'overview', label: 'Overview', icon: BookOpen },
   { id: 'modules', label: 'Modules', icon: BookOpen },
   { id: 'assignments', label: 'Assignments', icon: ClipboardList },
+  { id: 'activities', label: 'Activities', icon: Sparkles },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'gradebook', label: 'Gradebook', icon: BarChart2 },
@@ -1280,6 +1361,11 @@ export function CourseDetail() {
               )
             ))}
           </div>
+        )}
+
+        {/* ACTIVITIES (interactives linked to this course) */}
+        {activeTab === 'activities' && (
+          <CourseActivitiesTab courseId={courseId} isInstructor={isInstructor} />
         )}
 
         {/* DISCUSSIONS */}

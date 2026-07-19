@@ -1,6 +1,6 @@
-Studio cleanup: rename to Module Builder + lock down backend routes (ASCII-only)
+Studio: delete-draft endpoint + delete button on cards (ASCII-only)
 
-- Renamed the page from Animation Studio to Studio - Module Builder with an accurate subtitle (turn source material into a lesson, publish as a module in a course).
-- Backend hardening (studio.ts): generate-script, PATCH draft, and publish now require an author role (super_admin/partner_admin/org_admin/coach/instructional_designer) instead of any signed-in user; publish additionally checks canStaffActOnCourse for the target course, so you cannot publish a module into a course you do not staff. Reads stay auth-only.
+- Backend: new DELETE /studio/scripts/:draftId gated to author roles; non-hub authors may only delete drafts in their own tenant, hub roles (super_admin/instructional_designer) any.
+- Frontend: trash button on each Studio draft card (author roles only) with a confirm, then refetch; clears the accumulated test drafts.
 
 VALIDATION: esbuild clean on Studio.tsx and studio.ts.
