@@ -1,9 +1,7 @@
-Org rename propagates everywhere + logged (partner/super admin only); impersonation reachable from People (ASCII-only)
+Funders Hub: add funders + edit figures/content (agreements, seats, allocations, conditions) (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-ORG RENAME: new orgOverridesStore holds a live rename (by id and by original seeded name) plus an append-only change log. Renaming in the org Settings tab updates the name across the hub, sidebar, Organisations list, Overview, Financial Hub, Funders, Documents, Communications and the impersonation surfaces, and records what it was, who changed it and when in the Audit activity log. orgDetail keeps the ORIGINAL name for seeded-data filters and overrides only the DISPLAY name, so nothing breaks. Editing is gated to Partner Admin / Super Admin (field is read-only with a locked note otherwise).
+The Funders Hub is now editable. Add funder opens a dialog (funder name, type, organisation, agreement value, funded seats, start/expiry, conditions) that creates an agreement and a matching seat allocation. On each agreement card the value, funded seats and status are editable inline and conditions can be added/removed; agreements can be deleted. Seat Allocation tab: used and allocated are editable with the progress recomputing. The KPI cards (funders, funded seats, agreement value) now derive from the live agreement state. Persistence and funder KYC remain the backend phase.
 
-IMPERSONATION DISCOVERABILITY: the org People list and the member Manage drawer now have a View as (impersonate) action (partner/super admin only) that starts the session and opens the users own view - so you can impersonate a learner, coach or org admin right where you see them, in addition to the Audit > Impersonation tab.
-
-VALIDATION: parse-check + local-resolution bundle clean across all 10 changed files.
+VALIDATION: parse-check + local-resolution bundle clean; FunderAgreement/SeatAllocation types + Plus/Trash2/X/Pencil icons confirmed.

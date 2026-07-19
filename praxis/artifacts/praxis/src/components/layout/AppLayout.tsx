@@ -245,23 +245,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       return partnerHubGroups();
     }
 
-    // Super admin: full access to every surface the other roles have, grouped so
-    // the breadth stays scannable (decision: one grouped all-access sidebar).
+    // Super admin: full access to every surface the other roles have, grouped so the breadth stays
+    // scannable. The super admin has EVERYTHING the partner admin has (same group + labels), plus
+    // the platform-owner tools. (When the super admin is inside /partner, the shared partner-hub
+    // sidebar above takes over so the in-hub experience is identical to the partner admin's.)
     if (role === 'super_admin') {
       return [
         { items: [{ label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard }] },
         {
-          heading: t('nav.groups.platform', 'Platform'),
+          heading: t('nav.groups.partnerPlatform', 'Partner Admin Platform'),
           items: [
-            { label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ShieldCheck },
-            { label: t('nav.partnerHub', 'Partner Hub'), href: '/partner', icon: Wallet },
+            { label: t('nav.partnerOverview', 'Partner Overview'), href: '/partner', icon: Wallet },
             { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
-            { label: t('nav.platformSettings', 'Branding'), href: '/partner/theme', icon: Settings },
+            { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
+            { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },
+            { label: t('nav.documents', 'Documents'), href: '/partner/documents', icon: FileText },
+            { label: t('nav.accountsRoles', 'Accounts & Roles'), href: '/partner/accounts', icon: Users },
+            { label: t('nav.communications', 'Communications'), href: '/partner/comms', icon: Megaphone },
+            { label: t('nav.branding', 'Branding'), href: '/partner/theme', icon: Palette },
+            { label: t('nav.audit', 'Audit & Impersonation'), href: '/partner/audit', icon: ShieldCheck },
+            { label: t('nav.partnerSettings', 'Settings'), href: '/partner/settings', icon: Settings },
           ],
         },
         {
-          heading: t('nav.groups.partners', 'Partners & Funders'),
+          heading: t('nav.groups.platform', 'Platform'),
           items: [
+            { label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ShieldCheck },
             { label: t('nav.partners'), href: '/admin/partners', icon: Building },
             { label: t('nav.funders', 'Funders'), href: '/admin/funders', icon: Landmark },
           ],
