@@ -281,7 +281,14 @@ export function accountActivity(accountId: string, lastActive: string): LoginEve
 
 // ── Org-scoped delivery seed (deterministic per org, so the org hub is self-contained) ───────
 export type OrgCourse = { id: string; title: string; modality: 'Online' | 'Hybrid' | 'In-person'; enrolled: number; avgProgress: number; status: 'active' | 'draft' | 'archived' };
-export type OrgLearner = { id: string; name: string; email: string; course: string; progress: number; status: 'on-track' | 'at-risk' | 'completed' };
+export type OrgLearner = {
+  id: string; name: string; email: string; course: string; progress: number;
+  status: 'on-track' | 'at-risk' | 'completed';
+  // Org-level personal information (shown at org level, not inside a class):
+  phone: string; whatsappOptIn: boolean; address: string; funder: string;
+  enrolledVia: 'email' | 'whatsapp' | 'bulk'; enrolledAt: string; lastActive: string;
+};
+export type OrgStaffMember = { id: string; name: string; email: string; kind: 'admin' | 'coach' | 'facilitator' };
 export type OrgCoachingSummary = { sections: number; coaches: number; onTrack: number; atRisk: number; avgHealth: number };
 export type OrgGradebookSummary = { avgScore: number; submitted: number; pendingMarking: number; graded: number };
 
@@ -291,6 +298,7 @@ const COURSE_CATALOG = [
 ];
 const FIRST_NAMES = ['Thandeka', 'Bongani', 'Ayanda', 'Sizwe', 'Lerato', 'Kagiso', 'Naledi', 'Tebogo', 'Zanele', 'Mpho', 'Refilwe', 'Andile'];
 const LAST_NAMES = ['Mokoena', 'Nkosi', 'Dlamini', 'Khumalo', 'Mahlangu', 'Zwane', 'Ndlovu', 'Sithole', 'Molefe', 'Botha', 'Naidoo', 'Pillay'];
+const SA_SUBURBS = ['Soweto, Johannesburg', 'Umlazi, Durban', 'Khayelitsha, Cape Town', 'Mamelodi, Pretoria', 'Mdantsane, East London', 'Tembisa, Ekurhuleni', 'Seshego, Polokwane', 'Galeshewe, Kimberley'];
 
 function seedOf(s: string) { return s.split('').reduce((a, c) => a + c.charCodeAt(0), 0); }
 
@@ -310,20 +318,48 @@ export function orgCourses(h: PartnerHub, orgId: string): OrgCourse[] {
 }
 
 /** A sample learner roster for an organisation (display sample; totals come from seats). */
-export function orgLearners(h: PartnerHub, orgId: string, sample = 8): OrgLearner[] {
+export function orgLearners(h: PartnerHub, orgId: string, sample = 12): OrgLearner[] {
   const seed = seedOf(orgId);
   const courses = orgCourses(h, orgId);
+  const d = orgDetail(h, orgId);
+  const funderNames = d.funders.length ? d.funders.map((f) => f.funder) : ['Self-funded'];
+  const via = (['email', 'whatsapp', 'bulk'] as const);
   return Array.from({ length: sample }).map((_, i) => {
     const fn = FIRST_NAMES[(seed + i) % FIRST_NAMES.length];
     const ln = LAST_NAMES[(seed * 2 + i * 3) % LAST_NAMES.length];
     const progress = 20 + ((seed + i * 17) % 80);
     const status: OrgLearner['status'] = progress >= 95 ? 'completed' : progress < 40 ? 'at-risk' : 'on-track';
+    const phoneTail = String(1000000 + ((seed * 7919 + i * 6113) % 8999999)).slice(0, 7);
+    const dayOff = (seed + i * 11) % 60;
     return {
       id: `${orgId}_l${i}`, name: `${fn} ${ln}`,
       email: `${fn.toLowerCase()}.${ln.toLowerCase()}@learner.co.za`,
       course: courses[(seed + i) % courses.length].title, progress, status,
+      phone: `+27 ${String(60 + ((seed + i) % 24)).slice(0, 2)} ${phoneTail.slice(0, 3)} ${phoneTail.slice(3)}`,
+      whatsappOptIn: ((seed + i) % 3) !== 0,
+      address: `${1 + ((seed + i * 3) % 200)} ${LAST_NAMES[(seed + i) % LAST_NAMES.length]} St, ${SA_SUBURBS[(seed + i) % SA_SUBURBS.length]}`,
+      funder: funderNames[(seed + i) % funderNames.length],
+      enrolledVia: via[(seed + i) % 3],
+      enrolledAt: new Date(2026, 0, 1 + ((seed + i * 5) % 150)).toISOString().slice(0, 10),
+      lastActive: new Date(Date.now() - dayOff * 86400000).toISOString().slice(0, 10),
     };
   });
+}
+
+/** Assignable staff pool for an organisation: real org admins + coaches, plus seeded facilitators. */
+export function orgStaff(h: PartnerHub, orgId: string): OrgStaffMember[] {
+  const d = orgDetail(h, orgId);
+  const seed = seedOf(orgId);
+  const base: OrgStaffMember[] = [
+    ...d.admins.map((a) => ({ id: a.id, name: a.name, email: a.email, kind: 'admin' as const })),
+    ...d.coaches.map((a) => ({ id: a.id, name: a.name, email: a.email, kind: 'coach' as const })),
+  ];
+  const facilitators: OrgStaffMember[] = Array.from({ length: 3 }).map((_, i) => {
+    const fn = FIRST_NAMES[(seed * 3 + i * 5) % FIRST_NAMES.length];
+    const ln = LAST_NAMES[(seed + i * 7) % LAST_NAMES.length];
+    return { id: `${orgId}_fac${i}`, name: `${fn} ${ln}`, email: `${fn.toLowerCase()}.${ln.toLowerCase()}@facilitator.co.za`, kind: 'facilitator' as const };
+  });
+  return [...base, ...facilitators];
 }
 
 /** Coaching health summary for an organisation. */

@@ -204,6 +204,7 @@ function Routes() {
         {/* Partner Hub (partner_admin tier) */}
         <ProtectedRoute path="/partner" component={PartnerOverview} />
         <ProtectedRoute path="/partner/organisations" component={PartnerOrganisations} />
+        <ProtectedRoute path="/partner/org/:orgId/classes/:classId" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/org/:orgId/:section" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/org/:orgId" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/finance" component={PartnerFinance} />

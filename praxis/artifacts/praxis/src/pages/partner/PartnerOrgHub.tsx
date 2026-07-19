@@ -13,15 +13,19 @@ import {
   Building, Users, BookOpen, GraduationCap, ClipboardList, Landmark, FileText, Wallet,
   Settings, TrendingUp, Receipt, ShieldCheck, Upload, ChevronRight, CheckCircle2, AlertTriangle,
   UserPlus, KeyRound, Ban, RotateCcw, Settings2, Layers, Check, Send, LifeBuoy,
+  Phone, MapPin, Mail, Smartphone, Link2, Plus,
 } from 'lucide-react';
 import {
-  getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgCoaching, orgGradebook, orgClasses,
+  getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgCoaching, orgGradebook,
   DELEGATABLE_POWERS, ZAR, VAT_RATE, type Invoice, type PartnerDoc, type DocCategory,
 } from '@/lib/partnerHubData';
+import { useOrgClasses, createClass } from '@/lib/orgClassStore';
+import { PartnerClassDetail } from './PartnerClassDetail';
 
 const SECTION_META: Record<string, { title: string; icon: React.ComponentType<{ className?: string }> }> = {
   overview: { title: 'Overview', icon: Building },
   people: { title: 'People', icon: Users },
+  classes: { title: 'Classes', icon: Layers },
   courses: { title: 'Courses', icon: BookOpen },
   coaching: { title: 'Coaching', icon: GraduationCap },
   gradebook: { title: 'Gradebook', icon: ClipboardList },
@@ -51,10 +55,11 @@ const invoicePill = (s: Invoice['status']) =>
  * to this one organisation, and it is operational: add members, set roles, reset passwords, view
  * learners, and assign courses to a class. Nothing partner-wide is reachable from here. Seeded.
  */
-export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?: string } }) {
+export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?: string; classId?: string } }) {
   const { user } = useSession();
   const [, navigate] = useLocation();
   const orgId = params?.orgId ?? '';
+  const classId = params?.classId;
   // Resolve the hub that owns this org, so a super admin (no partnerId) still sees the right tenant.
   const h = findHubByOrgId(orgId) ?? getPartnerHub(user?.partnerId);
   const section = params?.section ?? 'overview';
@@ -65,7 +70,14 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const seededLearners = useMemo(() => orgLearners(h, orgId), [h, orgId]);
   const coaching = useMemo(() => orgCoaching(h, orgId), [h, orgId]);
   const gradebook = useMemo(() => orgGradebook(h, orgId), [h, orgId]);
-  const classes = useMemo(() => orgClasses(h, orgId), [h, orgId]);
+  const classes = useOrgClasses(orgId);
+
+  // Create-class + self-enrolment UI state
+  const [newClassName, setNewClassName] = useState('');
+  const [enrollOpen, setEnrollOpen] = useState(false);
+  const [enrollChannel, setEnrollChannel] = useState<'email' | 'whatsapp'>('email');
+  const [enrollTo, setEnrollTo] = useState('');
+  const enrollLink = `https://learn.${(d.org?.name ?? 'org').toLowerCase().replace(/[^a-z0-9]+/g, '')}.synops.io/join/${orgId.replace('org_', '')}`;
 
   // ── Members: staff + learners for this org, all manageable in-place ──
   const [members, setMembers] = useState<Member[]>(() => [
@@ -103,20 +115,8 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
     learner: members.filter((m) => m.role === 'learner').length,
   };
 
-  // ── Course → class assignment ──
-  const [assignments, setAssignments] = useState<Record<string, string[]>>({});
-  const [assignFor, setAssignFor] = useState<string | null>(null); // courseId
-  const assignToClass = (courseId: string, classId: string) => {
-    setAssignments((a) => {
-      const cur = a[courseId] ?? [];
-      return cur.includes(classId) ? a : { ...a, [courseId]: [...cur, classId] };
-    });
-    const cls = classes.find((c) => c.id === classId);
-    flashMsg(`Course assigned to ${cls?.name ?? 'class'}.`);
-    setAssignFor(null);
-  };
-  const unassign = (courseId: string, classId: string) =>
-    setAssignments((a) => ({ ...a, [courseId]: (a[courseId] ?? []).filter((c) => c !== classId) }));
+  // Look up the full learner record for the People detail drawer (org-level personal info).
+  const selectedLearner = selected?.role === 'learner' ? seededLearners.find((l) => l.id === selected.id) : undefined;
 
   // ── Documents & invoices (scoped) ──
   const [invoices, setInvoices] = useState<Invoice[]>(() => h.invoices.filter((i) => i.orgName === d.name));
@@ -135,6 +135,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
     if (fileRef.current) fileRef.current.value = '';
     flashMsg('Document filed for this organisation.');
   };
+
+  // A specific class is open (/partner/org/:id/classes/:classId) -> the class workspace.
+  if (classId) return <PartnerClassDetail orgId={orgId} classId={classId} />;
 
   if (!d.org) {
     return (
@@ -173,10 +176,10 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
               { label: 'People', href: `${base}/people`, icon: Users, sub: `${counts.all} members · ${counts.learner} learners` },
-              { label: 'Courses', href: `${base}/courses`, icon: BookOpen, sub: `${courses.length} courses · ${classes.length} classes` },
+              { label: 'Classes', href: `${base}/classes`, icon: Layers, sub: `${classes.length} class${classes.length === 1 ? '' : 'es'}` },
+              { label: 'Courses', href: `${base}/courses`, icon: BookOpen, sub: `${courses.length} courses` },
               { label: 'Coaching', href: `${base}/coaching`, icon: GraduationCap, sub: `${coaching.atRisk} at risk` },
               { label: 'Gradebook', href: `${base}/gradebook`, icon: ClipboardList, sub: `avg ${gradebook.avgScore}%` },
-              { label: 'Funding', href: `${base}/funding`, icon: Landmark, sub: `${d.funders.length} agreement${d.funders.length === 1 ? '' : 's'}` },
               { label: 'Documents', href: `${base}/documents`, icon: FileText, sub: `${docs.length} filed` },
             ].map((c) => (
               <button key={c.href} onClick={() => navigate(c.href)}
@@ -202,7 +205,10 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 {label} ({k === 'all' ? counts.all : counts[k]})
               </button>
             ))}
-            <Button size="sm" className="ml-auto gap-1.5" onClick={() => setAddOpen(true)}><UserPlus className="h-3.5 w-3.5" /> Add member</Button>
+            <div className="ml-auto flex items-center gap-2">
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEnrollOpen(true)}><Link2 className="h-3.5 w-3.5" /> Self-enrolment link</Button>
+              <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}><UserPlus className="h-3.5 w-3.5" /> Add member</Button>
+            </div>
           </div>
 
           {d.delegated.length > 0 && roleFilter !== 'learner' && (
@@ -241,57 +247,66 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         </div>
       )}
 
-      {/* ── COURSES ── */}
+      {/* ── CLASSES ── */}
+      {section === 'classes' && (
+        <div className="space-y-4">
+          <Card className="p-4">
+            <div className="flex items-end gap-2">
+              <label className="text-xs flex-1">
+                <span className="mb-1 block font-medium text-muted-foreground">Create a class</span>
+                <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g. Evening Cohort 2026" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
+              </label>
+              <Button className="gap-1.5" disabled={!newClassName.trim()} onClick={() => { const id = createClass(orgId, newClassName); setNewClassName(''); flashMsg('Class created.'); navigate(`${base}/classes/${id}`); }}><Plus className="h-4 w-4" /> Create</Button>
+            </div>
+          </Card>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {classes.map((cl) => (
+              <button key={cl.id} onClick={() => navigate(`${base}/classes/${cl.id}`)}
+                className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:bg-muted/30 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold truncate flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> {cl.name}</span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span><Users className="inline h-3 w-3 mr-1" />{cl.learnerIds.length} learners</span>
+                  <span><GraduationCap className="inline h-3 w-3 mr-1" />{cl.staff.length} staff</span>
+                  <span><BookOpen className="inline h-3 w-3 mr-1" />{cl.courseIds.length} courses</span>
+                  {cl.messages.some((m) => m.unread) && <span className="text-red-600">{cl.messages.filter((m) => m.unread).length} new messages</span>}
+                </div>
+              </button>
+            ))}
+            {classes.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">No classes yet. Create one above.</Card>}
+          </div>
+        </div>
+      )}
+
+      {/* ── COURSES (catalog) ── */}
       {section === 'courses' && (
         <div className="space-y-4">
           <Card className="p-4 flex items-start gap-3 text-sm">
-            <Layers className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div className="text-muted-foreground">Assign a course to one of {d.org.name}'s classes to enrol that whole cohort. Classes: {classes.map((c) => c.name).join(', ')}.</div>
+            <BookOpen className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <div className="text-muted-foreground">The course catalog for {d.org.name}. Courses are delivered to learners by assigning them to a <button className="text-primary underline" onClick={() => navigate(`${base}/classes`)}>class</button>.</div>
           </Card>
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="text-left p-3">Course</th><th className="text-left p-3">Modality</th><th className="text-right p-3">Enrolled</th><th className="text-left p-3">Assigned classes</th><th className="text-left p-3">Status</th><th className="p-3"></th></tr>
+                <tr><th className="text-left p-3">Course</th><th className="text-left p-3">Modality</th><th className="text-right p-3">Enrolled</th><th className="text-left p-3">In classes</th><th className="text-left p-3">Status</th></tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {courses.map((c) => {
-                  const assigned = assignments[c.id] ?? [];
+                  const inClasses = classes.filter((cl) => cl.courseIds.includes(c.id));
                   return (
                     <tr key={c.id}>
                       <td className="p-3 font-medium">{c.title}</td>
                       <td className="p-3 text-muted-foreground">{c.modality}</td>
                       <td className="p-3 text-right tabular-nums">{c.enrolled}</td>
-                      <td className="p-3">
-                        {assigned.length === 0 ? <span className="text-xs text-muted-foreground">Not assigned</span> : (
-                          <div className="flex flex-wrap gap-1">
-                            {assigned.map((cid) => {
-                              const cls = classes.find((x) => x.id === cid);
-                              return <button key={cid} onClick={() => unassign(c.id, cid)} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground hover:bg-red-100 hover:text-red-700" title="Remove">{cls?.name ?? cid} ×</button>;
-                            })}
-                          </div>
-                        )}
-                      </td>
+                      <td className="p-3">{inClasses.length === 0 ? <span className="text-xs text-muted-foreground">—</span> : <div className="flex flex-wrap gap-1">{inClasses.map((cl) => <span key={cl.id} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{cl.name}</span>)}</div>}</td>
                       <td className="p-3"><Badge variant={c.status === 'active' ? 'secondary' : 'outline'} className="capitalize">{c.status}</Badge></td>
-                      <td className="p-3 text-right"><Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => setAssignFor(c.id)}><Send className="h-3.5 w-3.5" /> Assign to class</Button></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </Card>
-
-          {/* Classes overview */}
-          <Card className="p-5">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Classes</h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {classes.map((cl) => (
-                <div key={cl.id} className="rounded-lg border border-border p-3">
-                  <div className="font-medium text-sm">{cl.name}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{cl.learners} learners · Coach {cl.coach}</div>
-                  <div className="text-xs text-muted-foreground mt-1">{courses.filter((c) => (assignments[c.id] ?? []).includes(cl.id)).length} course(s) assigned</div>
-                </div>
-              ))}
-            </div>
           </Card>
         </div>
       )}
@@ -520,6 +535,22 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>
                   </div>
                 </div>
+
+                {/* Org-level learner profile (personal info lives at the org, not the class) */}
+                {selectedLearner && (
+                  <div className="rounded-lg border border-border p-3 space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Learner profile (organisation level)</div>
+                    <div className="grid grid-cols-1 gap-1.5 text-sm">
+                      <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> {selectedLearner.phone}</div>
+                      <div className="flex items-center gap-2"><Smartphone className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> WhatsApp: {selectedLearner.whatsappOptIn ? <Badge className="bg-emerald-600 text-[10px]">Opted in</Badge> : <Badge variant="outline" className="text-[10px]">Not opted in</Badge>}</div>
+                      <div className="flex items-start gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" /> {selectedLearner.address}</div>
+                      <div className="flex items-center gap-2"><Building className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> {d.org.name}</div>
+                      <div className="flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> Funder: {selectedLearner.funder}</div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">Registered via {selectedLearner.enrolledVia} on {new Date(selectedLearner.enrolledAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })} · last active {new Date(selectedLearner.lastActive).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</div>
+                    </div>
+                  </div>
+                )}
+
                 <p className="text-xs text-muted-foreground">Actions apply only within {d.org.name} and are written to the audit trail. Email delivery is a backend step.</p>
               </div>
             </>
@@ -527,29 +558,35 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         </DialogContent>
       </Dialog>
 
-      {/* ── Assign course to class dialog ── */}
-      <Dialog open={!!assignFor} onOpenChange={(o) => !o && setAssignFor(null)}>
+      {/* ── Self-enrolment dialog (org level: email or WhatsApp) ── */}
+      <Dialog open={enrollOpen} onOpenChange={setEnrollOpen}>
         <DialogContent className="max-w-md">
-          {assignFor && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Assign to a class</DialogTitle>
-                <DialogDescription>{courses.find((c) => c.id === assignFor)?.title} — pick a class to enrol the whole cohort.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-2">
-                {classes.map((cl) => {
-                  const already = (assignments[assignFor] ?? []).includes(cl.id);
-                  return (
-                    <button key={cl.id} disabled={already} onClick={() => assignToClass(assignFor, cl.id)}
-                      className={cn('w-full flex items-center justify-between rounded-lg border p-3 text-left transition', already ? 'border-border opacity-60' : 'border-border hover:border-primary/40 hover:bg-muted/30')}>
-                      <span><span className="block text-sm font-medium">{cl.name}</span><span className="block text-xs text-muted-foreground">{cl.learners} learners · Coach {cl.coach}</span></span>
-                      {already ? <Check className="h-4 w-4 text-emerald-600" /> : <Send className="h-4 w-4 text-muted-foreground" />}
-                    </button>
-                  );
-                })}
+          <DialogHeader>
+            <DialogTitle>Learner self-enrolment</DialogTitle>
+            <DialogDescription>Send a self-enrolment link so learners can register themselves into {d.org.name}. Registration works by email or WhatsApp.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Self-enrolment link</div>
+              <div className="flex items-center gap-2">
+                <input readOnly value={enrollLink} className="h-10 flex-1 rounded-md border border-input bg-muted/40 px-3 text-xs text-muted-foreground" />
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { try { navigator.clipboard?.writeText(enrollLink); } catch { /* noop */ } flashMsg('Link copied.'); }}><Link2 className="h-3.5 w-3.5" /> Copy</Button>
               </div>
-            </>
-          )}
+            </div>
+            <div>
+              <div className="mb-1 text-xs font-medium text-muted-foreground">Send via</div>
+              <div className="flex gap-2">
+                <button onClick={() => setEnrollChannel('email')} className={cn('flex-1 rounded-lg border px-3 py-2 text-sm inline-flex items-center justify-center gap-1.5 transition', enrollChannel === 'email' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40')}><Mail className="h-4 w-4" /> Email</button>
+                <button onClick={() => setEnrollChannel('whatsapp')} className={cn('flex-1 rounded-lg border px-3 py-2 text-sm inline-flex items-center justify-center gap-1.5 transition', enrollChannel === 'whatsapp' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40')}><Smartphone className="h-4 w-4" /> WhatsApp</button>
+              </div>
+            </div>
+            <label className="text-xs block">
+              <span className="mb-1 block font-medium text-muted-foreground">{enrollChannel === 'email' ? 'Recipient email(s)' : 'Recipient WhatsApp number(s)'}</span>
+              <input value={enrollTo} onChange={(e) => setEnrollTo(e.target.value)} placeholder={enrollChannel === 'email' ? 'name@example.com, ...' : '+27 82 000 0000, ...'} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
+            </label>
+            <Button className="w-full gap-1.5" disabled={!enrollTo.trim()} onClick={() => { setEnrollTo(''); setEnrollOpen(false); flashMsg(`Self-enrolment link sent via ${enrollChannel === 'email' ? 'email' : 'WhatsApp'}.`); }}><Send className="h-4 w-4" /> Send invitation</Button>
+            <p className="text-xs text-muted-foreground">Learners who register through this link are added to {d.org.name} and can then be placed into a class.</p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -139,6 +139,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.orgOverview', 'Overview'), href: b, icon: LayoutDashboard },
             { label: t('nav.orgPeople', 'People'), href: `${b}/people`, icon: Users },
+            { label: t('nav.orgClasses', 'Classes'), href: `${b}/classes`, icon: Layers },
             { label: t('nav.orgCourses', 'Courses'), href: `${b}/courses`, icon: BookOpen },
             { label: t('nav.orgCoaching', 'Coaching'), href: `${b}/coaching`, icon: GraduationCap },
             { label: t('nav.orgGradebook', 'Gradebook'), href: `${b}/gradebook`, icon: ClipboardList },
