@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
@@ -15,13 +15,13 @@ import {
   Users, Check, X, Send, ShieldCheck, KeyRound, LifeBuoy, Ban, RotateCcw,
   Clock, Settings2, UserPlus, CheckCircle2, Info,
 } from 'lucide-react';
-import {
-  getPartnerHub, getActivePartnerId, accountActivity, DELEGATABLE_POWERS,
-  type Invite, type DelegatedAdmin,
-} from '@/lib/partnerHubData';
+import { getActivePartnerId, DELEGATABLE_POWERS, type Invite } from '@/lib/partnerHubData';
 
 // A real account row from GET /partners/:id/members.
 interface Member { id: string; name: string; email: string; role: string; status: string; orgName: string | null; updatedAt: string }
+interface DelegatedAdmin { id: string; name: string; email: string; orgName: string | null; powers: string[]; status: string; createdAt: string }
+interface OrgLite { id: string; name: string; partnerId: string | null }
+interface LoginEv { at: string; outcome: string; ip: string; device: string; impersonated: boolean }
 
 const CAPS = [
   'View all organisations',
@@ -59,7 +59,6 @@ const roleBadge = (r: string) =>
  */
 export function PartnerAccounts() {
   const { user } = useSession();
-  const h = getPartnerHub(user?.partnerId);
   const partnerId = user?.partnerId ?? getActivePartnerId();
   const isSuper = user?.role === 'super_admin';
   const qc = useQueryClient();
@@ -72,10 +71,14 @@ export function PartnerAccounts() {
   });
   const accounts: Member[] = members ?? [];
 
-  const [invites, setInvites] = useState<Invite[]>(h.invites);
+  // Real organisations for the invite / delegate dropdowns.
+  const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
+  const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
+
+  const [invites, setInvites] = useState<Invite[]>([]);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'coach' | 'org_admin'>('coach');
-  const [org, setOrg] = useState(h.orgs[0]?.name ?? '');
+  const [org, setOrg] = useState('');
 
   // Account detail drawer
   const [selected, setSelected] = useState<Member | null>(null);
@@ -94,40 +97,46 @@ export function PartnerAccounts() {
     onError: () => flashMsg('Could not create a reset link.'),
   });
 
-  // Delegated admins (PU7)
-  const [delegates, setDelegates] = useState<DelegatedAdmin[]>(h.delegatedAdmins);
+  const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3500); };
+
+  // Delegated admins (PU7) — real, persistent register.
+  const { data: delegatesData } = useQuery({ queryKey: ['delegated-admins', partnerId], queryFn: () => apiFetch<DelegatedAdmin[]>(`/partners/${partnerId}/delegated-admins`), enabled: !!partnerId });
+  const delegates = delegatesData ?? [];
   const [dName, setDName] = useState('');
   const [dEmail, setDEmail] = useState('');
-  const [dOrg, setDOrg] = useState(h.orgs[0]?.name ?? '');
+  const [dOrg, setDOrg] = useState('');
   const [dPowers, setDPowers] = useState<string[]>(['learners', 'reports']);
+  const invalidateDelegates = () => qc.invalidateQueries({ queryKey: ['delegated-admins', partnerId] });
+  const addDelegateM = useMutation({
+    mutationFn: (body: Record<string, unknown>) => apiFetch(`/partners/${partnerId}/delegated-admins`, { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => { invalidateDelegates(); setDName(''); setDEmail(''); setDPowers(['learners', 'reports']); flashMsg('Delegated admin invited.'); },
+    onError: () => flashMsg('Could not add the delegated admin.'),
+  });
+  const revokeDelegateM = useMutation({ mutationFn: (id: string) => apiFetch(`/partners/${partnerId}/delegated-admins/${id}`, { method: 'DELETE' }), onSuccess: invalidateDelegates });
 
   const sendInvite = () => {
     if (!email.trim()) return;
     setInvites((xs) => [{ id: Math.random().toString(36).slice(2), email: email.trim(), role, orgName: org, sentAt: new Date().toISOString().slice(0, 10) }, ...xs]);
     setEmail('');
   };
-
-  const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3500); };
-
-  const togglePower = (key: string) =>
-    setDPowers((xs) => (xs.includes(key) ? xs.filter((k) => k !== key) : [...xs, key]));
-
+  const togglePower = (key: string) => setDPowers((xs) => (xs.includes(key) ? xs.filter((k) => k !== key) : [...xs, key]));
   const addDelegate = () => {
     if (!dName.trim() || !dEmail.trim() || dPowers.length === 0) return;
-    setDelegates((xs) => [{
-      id: `da_${Date.now()}`, name: dName.trim(), email: dEmail.trim(), orgName: dOrg,
-      powers: [...dPowers], status: 'invited', addedAt: new Date().toISOString().slice(0, 10),
-    }, ...xs]);
-    setDName(''); setDEmail(''); setDPowers(['learners', 'reports']);
-    flashMsg(`Delegated admin invited for ${dOrg}.`);
+    addDelegateM.mutate({ name: dName.trim(), email: dEmail.trim(), orgName: dOrg || null, orgId: orgs.find((o) => o.name === dOrg)?.id ?? null, powers: dPowers, status: 'invited' });
   };
-  const revokeDelegate = (id: string) => setDelegates((xs) => xs.filter((d) => d.id !== id));
+  const revokeDelegate = (id: string) => revokeDelegateM.mutate(id);
 
-  const activity = useMemo(() => (selected ? accountActivity(selected.id, selected.updatedAt) : []), [selected]);
+  // Real login activity for the selected account (super admin only).
+  const { data: loginActivity } = useQuery({
+    queryKey: ['login-activity', selected?.id],
+    queryFn: () => apiFetch<LoginEv[]>(`/platform/users/${selected!.id}/login-activity`),
+    enabled: isSuper && !!selected,
+  });
+  const activity = loginActivity ?? [];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Accounts & Roles" icon={Users} subtitle={`${h.partnerName} - provisioning, account lifecycle, delegated admins and access scope.`} />
+      <PageHeader title="Accounts & Roles" icon={Users} subtitle="Provisioning, account lifecycle, delegated admins and access scope." />
 
       {flash && (
         <Card className="p-3 border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 flex items-center gap-2 text-sm">
@@ -227,7 +236,8 @@ export function PartnerAccounts() {
                 <input value={dEmail} onChange={(e) => setDEmail(e.target.value)} placeholder="name@org.co.za" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Organisation</span>
                 <select value={dOrg} onChange={(e) => setDOrg(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
-                  {h.orgs.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+                  <option value="">Select organisation…</option>
+                  {orgs.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
                 </select></label>
             </div>
             <div>
@@ -273,7 +283,8 @@ export function PartnerAccounts() {
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Organisation</label>
                 <select value={org} onChange={(e) => setOrg(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
-                  {h.orgs.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+                  <option value="">Select organisation…</option>
+                  {orgs.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
                 </select>
               </div>
             </div>
@@ -347,7 +358,7 @@ export function PartnerAccounts() {
                 <tr className="bg-muted/20">
                   <td className="p-3 font-medium">{user?.firstName ?? 'You'} (Partner)</td>
                   <td className="p-3">Partner Admin</td>
-                  <td className="p-3">All {h.orgs.length} organisation{h.orgs.length > 1 ? 's' : ''}</td>
+                  <td className="p-3">All {orgs.length} organisation{orgs.length === 1 ? '' : 's'}</td>
                 </tr>
               </tbody>
             </table>
@@ -391,32 +402,31 @@ export function PartnerAccounts() {
                   </div>
                 )}
 
-                {/* Login activity */}
-                <div>
-                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" /> Recent login activity
-                  </div>
-                  <div className="rounded-lg border border-border divide-y divide-border">
-                    {activity.map((ev, i) => (
-                      <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                        <div className="min-w-0">
-                          <div className="font-medium">{ev.device}</div>
-                          <div className="text-xs text-muted-foreground">{ev.ip}</div>
+                {/* Login activity — real sign-in trail (super admin) */}
+                {isSuper && (
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" /> Recent login activity
+                    </div>
+                    <div className="rounded-lg border border-border divide-y divide-border">
+                      {activity.map((ev, i) => (
+                        <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">{ev.impersonated ? 'Impersonation' : (ev.device || 'Sign-in')}</div>
+                            <div className="text-xs text-muted-foreground">{ev.ip}</div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="text-xs text-muted-foreground">{new Date(ev.at).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                            {ev.outcome === 'success'
+                              ? <span className="text-[10px] text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Success</span>
+                              : <span className="text-[10px] text-red-600 inline-flex items-center gap-1"><X className="h-3 w-3" /> {ev.outcome}</span>}
+                          </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-xs text-muted-foreground">{new Date(ev.at).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
-                          {ev.ok
-                            ? <span className="text-[10px] text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Success</span>
-                            : <span className="text-[10px] text-red-600 inline-flex items-center gap-1"><X className="h-3 w-3" /> Failed</span>}
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                      {activity.length === 0 && <div className="px-3 py-4 text-center text-xs text-muted-foreground">No login events recorded for this account yet.</div>}
+                    </div>
                   </div>
-                </div>
-
-                <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                  <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Password reset, login help and suspend actions are wired to the surface and logged to the audit trail; delivery of the actual emails is a backend step.
-                </p>
+                )}
               </div>
             </>
           )}

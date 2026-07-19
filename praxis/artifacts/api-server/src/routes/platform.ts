@@ -619,7 +619,32 @@ router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res)
     { id: "onboarding", label: "partners onboarding", count: onboardingPartners, severity: onboardingPartners ? "info" : "ok", detail: "Not yet marked active" },
     { id: "drafts", label: "courses in draft", count: draftCourses, severity: draftCourses ? "info" : "ok", detail: "Not yet published to partners" },
   ];
-  res.json({ alerts, health: { learners, activeEnrolments } });
+  const engagementRate = learners > 0 ? Math.min(100, Math.round((activeEnrolments / learners) * 100)) : 0;
+  res.json({ alerts, health: { learners, activeEnrolments, engagementRate } });
+});
+
+/**
+ * GET /platform/users/:id/login-activity — a user's recent login events (super admin). Real sign-in
+ * trail (successes + failures + impersonations) from login_events, newest first.
+ */
+router.get("/platform/users/:id/login-activity", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const rows = await db
+      .select()
+      .from(loginEventsTable)
+      .where(eq(loginEventsTable.userId, req.params.id))
+      .orderBy(desc(loginEventsTable.createdAt))
+      .limit(10);
+    res.json(rows.map((r) => ({
+      at: r.createdAt.toISOString(),
+      outcome: r.outcome,
+      ip: r.ipAddress ?? "-",
+      device: r.userAgent ?? "-",
+      impersonated: !!r.impersonatorId,
+    })));
+  } catch {
+    res.json([]);
+  }
 });
 
 // ── Platform contract / MOU filing cabinet (super admin) ─────────────────────

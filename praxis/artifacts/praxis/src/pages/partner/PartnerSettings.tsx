@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -10,7 +12,9 @@ import { cn } from '@/lib/utils';
 import {
   Settings, Building, Palette, Bell, ShieldCheck, Download, CheckCircle2, ChevronRight,
 } from 'lucide-react';
-import { getPartnerHub } from '@/lib/partnerHubData';
+import { getActivePartnerId } from '@/lib/partnerHubData';
+
+interface PartnerRow { id: string; name: string; contactEmail: string | null }
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
@@ -28,7 +32,18 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 export function PartnerSettings() {
   const { user } = useSession();
   const [, navigate] = useLocation();
-  const h = getPartnerHub(user?.partnerId);
+  const partnerId = user?.partnerId ?? getActivePartnerId();
+
+  // Real partner profile.
+  const { data: partner } = useQuery({ queryKey: ['partner', partnerId], queryFn: () => apiFetch<PartnerRow>(`/partners/${partnerId}`), enabled: !!partnerId });
+  const [pname, setPname] = useState('');
+  const [pcontact, setPcontact] = useState('');
+  useEffect(() => { if (partner) { setPname(partner.name ?? ''); setPcontact(partner.contactEmail ?? ''); } }, [partner]);
+  const saveProfile = useMutation({
+    mutationFn: () => apiFetch(`/partners/${partnerId}`, { method: 'PATCH', body: JSON.stringify({ name: pname.trim(), contactEmail: pcontact.trim() }) }),
+    onSuccess: () => flashMsg('Partner profile saved.'),
+    onError: () => flashMsg('Could not save the profile.'),
+  });
 
   const [prefs, setPrefs] = useState({
     invoiceAlerts: true, funderExpiry: true, weeklyDigest: false, delegateActions: true, loginAlerts: true,
@@ -39,7 +54,7 @@ export function PartnerSettings() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" icon={Settings} subtitle={`${h.partnerName} - tenant profile, notifications, security and data.`} />
+      <PageHeader title="Settings" icon={Settings} subtitle="Tenant profile, notifications, security and data." />
 
       {flash && (
         <Card className="p-3 border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 flex items-center gap-2 text-sm">
@@ -61,15 +76,13 @@ export function PartnerSettings() {
             <h3 className="text-sm font-semibold flex items-center gap-2"><Building className="h-4 w-4 text-primary" /> Partner profile</h3>
             <div className="grid sm:grid-cols-2 gap-3">
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Partner name</span>
-                <input defaultValue={h.partnerName} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+                <input value={pname} onChange={(e) => setPname(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Billing contact</span>
-                <input defaultValue={h.accounts.find((a) => a.role === 'org_admin')?.email ?? user?.email ?? ''} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
-              <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">VAT number</span>
-                <input defaultValue="4123456789" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+                <input value={pcontact} onChange={(e) => setPcontact(e.target.value)} placeholder="ops@partner.co.za" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Billing currency</span>
                 <input defaultValue="ZAR (South African Rand)" readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
             </div>
-            <Button className="gap-1.5" onClick={() => flashMsg('Partner profile saved.')}><CheckCircle2 className="h-4 w-4" /> Save profile</Button>
+            <Button className="gap-1.5" disabled={!pname.trim() || saveProfile.isPending} onClick={() => saveProfile.mutate()}><CheckCircle2 className="h-4 w-4" /> {saveProfile.isPending ? 'Saving…' : 'Save profile'}</Button>
           </Card>
 
           <Card className="p-5 max-w-2xl">

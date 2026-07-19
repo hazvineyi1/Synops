@@ -10,31 +10,20 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Building, Users, Landmark, Wallet, Receipt, Percent, ShieldCheck,
-  ChevronRight, ChevronDown, ArrowRight, TrendingUp, HeartPulse, GraduationCap, FlaskConical,
+  ChevronRight, ChevronDown, ArrowRight, TrendingUp, HeartPulse, GraduationCap,
   AlertTriangle, CheckCircle2, BellRing,
 } from 'lucide-react';
-import { platformOverview, setActivePartner, registerRealPartners, ZAR } from '@/lib/partnerHubData';
+import { setActivePartner, registerRealPartners, ZAR } from '@/lib/partnerHubData';
 import { orgNameOverride, useOrgOverrides } from '@/lib/orgOverridesStore';
 
 interface ApiPartner { id: string; name: string; slug: string; status: string; orgCount?: number; learnerCount?: number }
 interface ApiOrg { id: string; name: string; partnerId: string | null; memberCount?: number }
 
-// A small badge that marks a panel as not-yet-real. Financials, funders, coaching-health and
-// alerts have no live backend, so anything derived from the seed is flagged rather than shown as
-// if it were real.
 const ALERT_SEV: Record<string, { ring: string; text: string }> = {
   warn: { ring: 'border-amber-300 bg-amber-50/70 dark:bg-amber-950/20', text: 'text-amber-600' },
   info: { ring: 'border-blue-200 bg-blue-50/60 dark:bg-blue-950/20', text: 'text-blue-600' },
   ok: { ring: 'border-border bg-muted/20', text: 'text-emerald-600' },
 };
-
-function SampleBadge() {
-  return (
-    <Badge variant="outline" className="gap-1 text-[10px] border-amber-300 text-amber-700 bg-amber-50">
-      <FlaskConical className="h-3 w-3" /> Sample data
-    </Badge>
-  );
-}
 
 export function PlatformOverview() {
   const [, navigate] = useLocation();
@@ -50,16 +39,17 @@ export function PlatformOverview() {
   });
   const { data: fin } = useQuery({
     queryKey: ['platform-financials'],
-    queryFn: () => apiFetch<{ totals: { mrrGross: number; outstanding: number; funderValue: number; vatCollected: number } }>('/platform/financials'),
+    queryFn: () => apiFetch<{ partners: { id: string; mrrGross: number; outstanding: number; funderValue: number; vatCollected: number }[]; totals: { mrrGross: number; outstanding: number; funderValue: number; vatCollected: number } }>('/platform/financials'),
   });
   const finTotals = fin?.totals ?? { mrrGross: 0, outstanding: 0, funderValue: 0, vatCollected: 0 };
+  const finByPartner = new Map((fin?.partners ?? []).map((p) => [p.id, p]));
   const { data: alertData } = useQuery({
     queryKey: ['platform-alerts'],
-    queryFn: () => apiFetch<{ alerts: { id: string; label: string; count: number; severity: string; detail: string }[]; health: { learners: number; activeEnrolments: number } }>('/platform/alerts'),
+    queryFn: () => apiFetch<{ alerts: { id: string; label: string; count: number; severity: string; detail: string }[]; health: { learners: number; activeEnrolments: number; engagementRate: number } }>('/platform/alerts'),
   });
   const alerts = alertData?.alerts ?? [];
   const openAlerts = alerts.filter((a) => a.count > 0);
-  const alertHealth = alertData?.health ?? { learners: 0, activeEnrolments: 0 };
+  const alertHealth = alertData?.health ?? { learners: 0, activeEnrolments: 0, engagementRate: 0 };
 
   // Real partners drive getPartnerHub's empty-hub fallback, so opening one never shows demo data.
   useEffect(() => {
@@ -81,9 +71,6 @@ export function PlatformOverview() {
   useEffect(() => { if (partners) setOpen(new Set(partners.map((p) => p.id))); }, [partners]);
   const toggle = (id: string) => setOpen((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const enter = (id: string) => { setActivePartner(id); navigate('/partner'); };
-
-  // Sample aggregates (finance / funders / health) from the seed, clearly labelled below.
-  const { totals: sample, health } = useMemo(() => platformOverview(), []);
 
   const partnerCount = partners?.length ?? 0;
   const orgCount = orgs?.filter((o) => o.partnerId).length ?? 0;
@@ -184,12 +171,12 @@ export function PlatformOverview() {
                       </div>
                     </div>
 
-                    {/* Commercials (SAMPLE) */}
+                    {/* Commercials (REAL) */}
                     <div>
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" /> Commercials <SampleBadge /></div>
-                      <div className="space-y-1.5 text-sm opacity-70">
-                        <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-card px-3 py-2"><span className="text-muted-foreground">Billing</span><span className="text-muted-foreground">Not wired</span></div>
-                        <div className="flex items-center justify-between rounded-lg border border-dashed border-border bg-card px-3 py-2"><span className="text-muted-foreground">Funders</span><span className="text-muted-foreground">Not wired</span></div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" /> Commercials</div>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"><span className="text-muted-foreground">Monthly (incl. VAT)</span><span className="font-medium tabular-nums">{ZAR(finByPartner.get(p.id)?.mrrGross ?? 0)}</span></div>
+                        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"><span className="text-muted-foreground">Funding value</span><span className="font-medium tabular-nums">{ZAR(finByPartner.get(p.id)?.funderValue ?? 0)}</span></div>
                       </div>
                       <Button size="sm" variant="outline" className="mt-2 gap-1.5 w-full" onClick={() => { setActivePartner(p.id); navigate('/partner/finance'); }}><Wallet className="h-3.5 w-3.5" /> Open Financial Hub</Button>
                     </div>
@@ -213,8 +200,7 @@ export function PlatformOverview() {
         </div>
         <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
           <HeartPulse className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Avg coaching health <span className="font-semibold text-foreground">{health.avgHealth}/100</span></span>
-          <SampleBadge />
+          <span className="text-xs text-muted-foreground">Learner engagement <span className="font-semibold text-foreground">{alertHealth.engagementRate}%</span> <span className="text-muted-foreground">({alertHealth.activeEnrolments} of {alertHealth.learners} learners active)</span></span>
         </div>
       </Card>
     </div>
