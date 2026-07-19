@@ -1,9 +1,9 @@
-Real user management: absolute reset links + Create user in Platform Console (ASCII-only)
+Delete user + email delivery for set-password links (ASCII-only)
 
-Two blockers fixed:
-1) Reset/set-password links were relative (/reset-password?token=...) because APP_URL was unset, so copying them did not work -> could not set a password. platform.ts now builds an ABSOLUTE base from the request host (appBase(): APP_URL if set, else req.protocol+host; trust proxy makes https correct on Railway). Applied to the reset-link endpoint.
-2) No way to add users from the console (users could only be created against an org). New POST /platform/users (super_admin): create a user by email/name/role (any of the 7 roles), status invited, and returns a one-time set-password link in the same response. Frontend: a Create user button + dialog on the Platform Console Users tab that shows the copyable link.
+1) DELETE user: new DELETE /platform/users/:id (super_admin, cannot delete self) hard-deletes the user plus their sessions, password resets, login events, enrolments and section memberships in one transaction; authored content is left. A Delete button is added to the Platform Console user drawer (with confirm). platformApi.deleteUser added.
 
-So: create user -> copy link -> they set a password -> sign in. Set APP_URL on Railway for tidy links (optional now that it falls back to the request host).
+2) EMAIL delivery: new lib/email.ts (Resend HTTP API, no dep - same pattern as supabaseStorage). When RESEND_API_KEY + EMAIL_FROM are set, Create user, the console Reset link, and self-service forgot-password now EMAIL the set-password link automatically (and the console still shows a copyable link as fallback + an 'emailed' indicator). Unconfigured = no-op, existing manual-link flow unchanged.
 
-VALIDATION: esbuild clean on platform.ts, platformApi.ts, PlatformConsole.tsx.
+ENV (optional, to enable auto-send): RESEND_API_KEY + EMAIL_FROM (a verified sender). Also set APP_URL for tidy links.
+
+VALIDATION: esbuild clean on email.ts, platform.ts, auth.ts, platformApi.ts, PlatformConsole.tsx.

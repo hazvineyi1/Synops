@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { useBrandTheme, type BrandTheme } from '@/context/ThemeProvider';
@@ -7,9 +7,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, Palette, Globe, CheckCircle2, Clock } from 'lucide-react';
+import { Save, Loader2, Palette, Globe, CheckCircle2, Clock, Sparkles, Upload, Wand2 } from 'lucide-react';
 
 type Form = Partial<BrandTheme>;
+
+type ImgParts = { dataUrl: string; base64: string; mediaType: string };
+function readImage(file: File): Promise<ImgParts> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => {
+      const dataUrl = String(r.result);
+      resolve({ dataUrl, base64: dataUrl.split(',')[1] || '', mediaType: (dataUrl.match(/^data:([^;]+);/)?.[1]) || file.type || 'image/png' });
+    };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
 
 function ColorField({ label, value, onChange, fallback }: { label: string; value: string; onChange: (v: string) => void; fallback: string }) {
   return (
@@ -58,6 +71,36 @@ export function PartnerTheme() {
 
   const upd = (patch: Form) => setForm((f) => ({ ...f, ...patch }));
 
+  // AI brand kit: upload a logo (+ optional business card + website), let AI derive colours + copy.
+  const logoRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLInputElement>(null);
+  const [logoParts, setLogoParts] = useState<ImgParts | null>(null);
+  const [cardParts, setCardParts] = useState<ImgParts | null>(null);
+  const [aiWebsite, setAiWebsite] = useState('');
+  const [aiName, setAiName] = useState('');
+
+  const onLogo = async (f: File | null) => { if (!f) return; const p = await readImage(f); setLogoParts(p); upd({ logoUrl: p.dataUrl }); };
+  const onCard = async (f: File | null) => { if (!f) return; setCardParts(await readImage(f)); };
+
+  const gen = useMutation({
+    mutationFn: () => apiFetch<{ displayName: string; primaryColor: string; secondaryColor: string; accentColor: string; fontFamily: string; credentialTitle: string; tagline: string }>(
+      '/brand/ai-generate',
+      { method: 'POST', body: JSON.stringify({
+        logoBase64: logoParts!.base64, logoMediaType: logoParts!.mediaType,
+        cardBase64: cardParts?.base64, cardMediaType: cardParts?.mediaType,
+        website: aiWebsite.trim() || undefined, businessName: (aiName.trim() || form.displayName || undefined),
+      }) }),
+    onSuccess: (r) => {
+      upd({
+        displayName: r.displayName || form.displayName,
+        primaryColor: r.primaryColor, secondaryColor: r.secondaryColor, accentColor: r.accentColor,
+        fontFamily: r.fontFamily || form.fontFamily, credentialTitle: r.credentialTitle || form.credentialTitle,
+      });
+      toast({ title: 'Brand generated', description: r.tagline ? `"${r.tagline}" — review and Save to apply.` : 'Review and Save to apply.' });
+    },
+    onError: (e: any) => toast({ title: 'Could not generate', description: e?.message ?? 'Try again', variant: 'destructive' }),
+  });
+
   if (isLoading) return <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
   return (
@@ -69,6 +112,43 @@ export function PartnerTheme() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="space-y-6">
+          <Card className="border-primary/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> AI brand kit</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">Upload the partner's logo (and optionally a business card and website). AI reads the logo and generates the colours, font and personalization. Review below, then Save.</p>
+
+              <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={(e) => onLogo(e.target.files?.[0] ?? null)} />
+              <input ref={cardRef} type="file" accept="image/*" className="hidden" onChange={(e) => onCard(e.target.files?.[0] ?? null)} />
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Logo (required)</Label>
+                  <button type="button" onClick={() => logoRef.current?.click()} className="w-full h-24 rounded-lg border border-dashed border-border hover:border-primary/40 flex items-center justify-center overflow-hidden bg-muted/30">
+                    {logoParts?.dataUrl || form.logoUrl ? <img src={logoParts?.dataUrl || form.logoUrl} alt="Logo" className="max-h-20 object-contain" /> : <span className="text-xs text-muted-foreground flex items-center gap-1"><Upload className="h-3.5 w-3.5" /> Upload logo</span>}
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Business card (optional)</Label>
+                  <button type="button" onClick={() => cardRef.current?.click()} className="w-full h-24 rounded-lg border border-dashed border-border hover:border-primary/40 flex items-center justify-center overflow-hidden bg-muted/30">
+                    {cardParts?.dataUrl ? <img src={cardParts.dataUrl} alt="Card" className="max-h-20 object-contain" /> : <span className="text-xs text-muted-foreground flex items-center gap-1"><Upload className="h-3.5 w-3.5" /> Upload card</span>}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Business name</Label><Input value={aiName} onChange={(e) => setAiName(e.target.value)} placeholder="Their brand name" /></div>
+                <div className="space-y-1.5"><Label>Website</Label><Input value={aiWebsite} onChange={(e) => setAiWebsite(e.target.value)} placeholder="https://theirsite.com" /></div>
+              </div>
+
+              <Button onClick={() => gen.mutate()} disabled={!logoParts || gen.isPending} className="w-full gap-1.5">
+                {gen.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : <><Wand2 className="h-4 w-4" /> Generate brand with AI</>}
+              </Button>
+              <p className="text-xs text-muted-foreground">The logo is stored with the brand. Needs AI to be configured on the server; if not, set the colours manually below.</p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" /> Visual identity</CardTitle>
