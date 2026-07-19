@@ -1,5 +1,5 @@
-Partner Accounts + Funders on live data (real members endpoint, real funding_agreements) (ASCII-only)
+Financial Hub on live data: real billing_subscriptions + billing_invoices (ASCII-only)
 
-Accounts and Roles now lists the partner's REAL accounts from new GET /partners/:id/members (super admin any partner, partner_admin own); the manage drawer wires Reset password (POST /platform/users/:id/reset-link) and Suspend/Reactivate to the real endpoints for super admin. Funders Hub is now backed by a real funding_agreements table (new schema): list/add/edit/delete/status/conditions persist via GET/POST/PATCH/DELETE /partners/:id/funding (self-creates the table, additive; super admin any partner, partner_admin own). Seat allocation is derived read-only from funded seats pending learner-level assignment.
+Partner Financial Hub is now backed by real tables. New billing router (mounted): GET /partners/:id/billing plus POST/PATCH/DELETE for /subscriptions and /invoices (self-create tables, additive; super admin any partner, partner_admin own). Subscriptions tab: real rows, add subscription (org + plan + price + seats), edit price/seats on blur, delete; monthly MRR derived. Invoicing tab: create invoice, edit net on blur, Mark paid (status), delete; VAT + totals derived. Funder Disbursement tab now derives from the REAL funding agreements. Tax/VAT derived from real invoices. New schema billing.ts (billing_subscriptions, billing_invoices).
 
-VALIDATION: esbuild clean on partners.ts, funder.ts, db index (funding_agreements exported), PartnerAccounts.tsx, PartnerFunders.tsx.
+VALIDATION: esbuild clean on billing.ts, routes/index.ts, db index (billing tables exported), PartnerFinance.tsx.
