@@ -1,7 +1,6 @@
-Learning Hub increment C: rewire frontend from in-session state to the real API (ASCII-only)
+In-course Case studies tab (list/attach/detach via gradebook) (ASCII-only)
 
-learningHubStore now hydrates from and writes through /api/learning/* instead of holding seed data in memory: hydrates content/templates/assignments once on first use, and persists every mutation (addContent link, uploadContent file->Supabase Storage, review, delete, assignment toggle/set) to Postgres with optimistic cache updates. LearningHub upload path now does a real file upload (surfaces the storage-not-configured error until SUPABASE env is set); URL/link add persists. PartnerOrgHub 'Assigned from the Learning Hub' now reads the reactive loaded assignments/templates so it reflects real, persisted grants. Data survives reload.
+- Backend: new GET /courses/:courseId/cases (cases.ts) returns the case studies attached to a course by resolving its gradebook case columns to case titles/status + the gradebook item id (for detach).
+- Frontend: CourseDetail gains a Case studies tab (CourseCasesTab) mirroring the Activities tab - lists attached cases, Attach existing (POST gradebook-items sourceType=case), New case study (to the Cases author), Open (case builder), and Detach (DELETE /gradebook-items/:id; the case itself is not deleted). Uses existing endpoints.
 
-NOTE: file uploads need SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY + a learning-hub bucket; templates/links/assignments persist with just DATABASE_URL.
-
-VALIDATION: esbuild bundle clean on learningHubStore, LearningHub, PartnerOrgHub, CourseDevelopmentSuite.
+VALIDATION: esbuild clean on CourseDetail.tsx and cases.ts.

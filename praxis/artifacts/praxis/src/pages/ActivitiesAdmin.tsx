@@ -487,6 +487,46 @@ function LearnerActivities() {
 }
 function Skeletons() { return <div className="grid gap-4 md:grid-cols-3">{Array.from({ length: 3 }).map((_, i) => <Card key={i} className="h-32" />)}</div>; }
 
+/** Quick "Add to course" picker for an activity: homes it in a course (and optional module). */
+function AddActivityToCourseDialog({ activity, onClose }: { activity: Activity; onClose: () => void }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [courseId, setCourseId] = useState<string>(activity.courseId ?? "");
+  const [moduleId, setModuleId] = useState<string>(activity.moduleId ?? "");
+  const { data: courses } = useQuery({ queryKey: ["courses"], queryFn: () => apiFetch<{ id: string; title: string }[]>("/courses") });
+  const { data: modules } = useQuery({ queryKey: ["modules", courseId], queryFn: () => apiFetch<{ id: string; title: string; order: number }[]>(`/courses/${courseId}/modules`), enabled: !!courseId });
+  const save = useMutation({
+    mutationFn: () => apiFetch(`/activities/${activity.id}`, { method: "PATCH", body: JSON.stringify({ courseId: courseId || null, moduleId: moduleId || null }) }),
+    onSuccess: () => { toast({ title: courseId ? "Added to course" : "Removed from course" }); qc.invalidateQueries({ queryKey: ["activities"] }); onClose(); },
+    onError: (e) => toast({ title: "Could not save", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <Card className="w-full max-w-md p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="font-semibold text-sm">Add &quot;{activity.title}&quot; to a course</div>
+        <div>
+          <Label className="text-sm">Course</Label>
+          <select value={courseId} onChange={(e) => { setCourseId(e.target.value); setModuleId(""); }} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm">
+            <option value="">Standalone (not in a course)</option>
+            {(courses ?? []).map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+          </select>
+        </div>
+        <div>
+          <Label className="text-sm">Module (optional)</Label>
+          <select value={moduleId} onChange={(e) => setModuleId(e.target.value)} disabled={!courseId} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm disabled:opacity-50">
+            <option value="">{courseId ? "Whole course (not module-specific)" : "Pick a course first"}</option>
+            {(modules ?? []).slice().sort((a, b) => a.order - b.order).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+          </select>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+          <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 /* ══════════════════════════ Page ══════════════════════════ */
 export function ActivitiesAdmin() {
   const { user } = useSession();
@@ -501,6 +541,7 @@ export function ActivitiesAdmin() {
   const [aiOpen, setAiOpen] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [assignFor, setAssignFor] = useState<Activity | null>(null);
+  const [courseFor, setCourseFor] = useState<Activity | null>(null);
   const [rightTab, setRightTab] = useState<"preview" | "edit" | "subs" | "share">("preview");
 
   const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
@@ -539,6 +580,7 @@ export function ActivitiesAdmin() {
       )}
       {builderOpen && <ActivityBuilder onClose={() => setBuilderOpen(false)} onCreated={(a) => { setBuilderOpen(false); setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} />}
       {assignFor && <ActivityAssignDialog activityId={assignFor.id} activityTitle={assignFor.title} onClose={() => setAssignFor(null)} />}
+      {courseFor && <AddActivityToCourseDialog activity={courseFor} onClose={() => setCourseFor(null)} />}
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -645,7 +687,15 @@ export function ActivitiesAdmin() {
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{a.source === "ai" ? "AI" : a.source === "embed" ? "Embed" : (a.kind || "custom").replace("_", " ")}</span>
                 {a.bloomsLevel && <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-purple-500/10 text-purple-700 border-purple-500/30">{a.bloomsLevel}</span>}
                 {a.difficulty && <span className="text-[10px] px-1.5 py-0.5 rounded-full border bg-muted capitalize">{a.difficulty}</span>}
+                {a.courseId && <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700">In a course</span>}
               </div>
+              {canAuthor && (
+                <div className="pt-1">
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full" onClick={(e) => { e.stopPropagation(); setCourseFor(a); }}>
+                    <Plus className="h-3 w-3" /> {a.courseId ? "Change course" : "Add to course"}
+                  </Button>
+                </div>
+              )}
             </Card>
           ))}
         </div>

@@ -119,12 +119,17 @@ export function Cases() {
                       <Share2 className="h-4 w-4 mr-1.5" /> Assign
                     </Button>
                   )}
-                  {canAssign && c.status === "published" && (
+                  {canAuthor && c.status === "published" && (
                     <AddToGradebookDialog sourceType="case" sourceId={c.id} title={c.title}>
-                      <Button size="sm" variant="outline" title="Add this case to a course gradebook">
-                        <BookOpenCheck className="h-4 w-4 mr-1.5" /> Gradebook
+                      <Button size="sm" variant="outline" title="Add this case study to a course">
+                        <BookOpenCheck className="h-4 w-4 mr-1.5" /> Add to course
                       </Button>
                     </AddToGradebookDialog>
+                  )}
+                  {canAuthor && c.status !== "published" && (
+                    <Button size="sm" variant="outline" disabled title="Publish the case first, then add it to a course">
+                      <BookOpenCheck className="h-4 w-4 mr-1.5" /> Add to course
+                    </Button>
                   )}
                 </div>
               </CardContent>
