@@ -1,9 +1,11 @@
-Super admin console P1: nav reorg + distinct colour + robust Partner Hub (ASCII-only)
+Super admin console P1-P3: nav+colour+alerts, Learning Hub, org creation, Course Dev Suite (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only.
 
-1) Nav reorg under sensible headings: Partner Hub / Learning Hub (was Curriculum) / Delivery and Coaching / Platform. Removed Org members tab and the top-level Partners and Funders tabs (those are reached inside a partner).
-2) Distinct super-admin colour: violet shell + Super Admin Platform ribbon at the platform level; reverts to navy + Inside partner ribbon once you open a partner, so the colour tells you the context.
-3) Robust Partner Hub overview: Alerts at a glance (off-track learners, overdue invoices, expiring funders, pending onboarding, unmarked submissions, suspended accounts) + Platform health and engagement (avg coaching health, engagement rate, active learners, system status).
+P1: nav reorg (Partner Hub / Learning Hub / Delivery / Platform), removed Members + top-level Partners/Funders; distinct violet super-admin shell + context ribbon (navy inside a partner); Partner Hub overview gains Alerts at a glance + Platform health and engagement.
 
-VALIDATION: local-resolution esbuild bundle clean on AppLayout, PlatformOverview, partnerHubData.
+P2: Learning Hub page (content library with video/file/link upload + review gate, course/lesson templates, assign courses to partners) backed by learningHubStore; super admin / partner admin can CREATE an organisation in a partner (createOrg pushes a real org+subscription so it behaves like a seeded one).
+
+P3: Course Development Suite - Bloom verb engine + objective generator with measurability checks, scaffolded assessment suggestions with cluster warnings, and interactive-video authoring (transcribe/segment/draft/REQUIRED human review gate/publish).
+
+VALIDATION: local-resolution esbuild bundle clean on all 8 changed/new files.

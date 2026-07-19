@@ -62,6 +62,7 @@ import { PartnerPartners } from '@/pages/partner/PartnerPartners';
 import { PlatformOverview } from '@/pages/partner/PlatformOverview';
 import { LearningHub } from '@/pages/partner/LearningHub';
 import { CourseDevelopmentSuite } from '@/pages/partner/CourseDevelopmentSuite';
+import { PlatformFinance } from '@/pages/partner/PlatformFinance';
 import { PartnerFinance } from '@/pages/partner/PartnerFinance';
 import { PartnerFunders } from '@/pages/partner/PartnerFunders';
 import { PartnerDocuments } from '@/pages/partner/PartnerDocuments';
@@ -211,6 +212,7 @@ function Routes() {
         <ProtectedRoute path="/platform-overview" component={PlatformOverview} />
         <ProtectedRoute path="/learning/develop" component={CourseDevelopmentSuite} />
         <ProtectedRoute path="/learning" component={LearningHub} />
+        <ProtectedRoute path="/platform-finance" component={PlatformFinance} />
         <ProtectedRoute path="/partner/partners" component={PartnerPartners} />
         <ProtectedRoute path="/partner/organisations" component={PartnerOrganisations} />
         <ProtectedRoute path="/partner/impersonate/:orgId/:userId" component={PartnerImpersonateView} />
