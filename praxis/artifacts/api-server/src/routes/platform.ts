@@ -15,6 +15,8 @@ import {
   billingInvoicesTable,
   fundingAgreementsTable,
   platformFilingsTable,
+  partnerDocumentsTable,
+  coursesTable,
 } from "@workspace/db";
 import { eq, and, isNull, desc, sql, or, ilike, gte, type SQL } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
@@ -563,6 +565,61 @@ router.get("/platform/financials", requireAuth, requireSuperAdmin, async (_req, 
     { mrrGross: 0, outstanding: 0, funderValue: 0, vatCollected: 0, overdue: false },
   );
   res.json({ partners: byPartner, totals });
+});
+
+/**
+ * GET /platform/alerts — real, platform-wide "attention needed" signals derived from live data:
+ * funding agreements expiring/expired, unpaid invoices, action-required documents, partners still
+ * onboarding, and courses still in draft. Plus a small real health block (learners, active
+ * enrolments). Missing tables (pre-first-write) count as zero.
+ */
+router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res) => {
+  const now = Date.now();
+  const soon = now + 60 * 24 * 60 * 60 * 1000; // 60 days
+  const safeCount = async (fn: () => Promise<number>) => { try { return await fn(); } catch { return 0; } };
+
+  const expiringFunding = await safeCount(async () => {
+    const rows = await db.select({ expiry: fundingAgreementsTable.expiry, status: fundingAgreementsTable.status }).from(fundingAgreementsTable);
+    return rows.filter((r) => {
+      if (r.status === "expired") return true;
+      if (!r.expiry) return false;
+      const t = Date.parse(r.expiry);
+      return Number.isFinite(t) && t <= soon;
+    }).length;
+  });
+  const unpaidInvoices = await safeCount(async () => {
+    const rows = await db.select({ status: billingInvoicesTable.status }).from(billingInvoicesTable);
+    return rows.filter((r) => r.status !== "paid").length;
+  });
+  const actionDocs = await safeCount(async () => {
+    const rows = await db.select({ status: partnerDocumentsTable.status }).from(partnerDocumentsTable);
+    return rows.filter((r) => r.status === "action-required").length;
+  });
+  const onboardingPartners = await safeCount(async () => {
+    const rows = await db.select({ status: partnersTable.status }).from(partnersTable);
+    return rows.filter((r) => r.status === "onboarding").length;
+  });
+  const draftCourses = await safeCount(async () => {
+    const rows = await db.select({ status: coursesTable.status }).from(coursesTable);
+    return rows.filter((r) => r.status === "draft").length;
+  });
+  const learners = await safeCount(async () => {
+    const rows = await db.select({ role: usersTable.role }).from(usersTable);
+    return rows.filter((r) => r.role === "learner").length;
+  });
+  const activeEnrolments = await safeCount(async () => {
+    const rows = await db.select({ status: enrolmentsTable.status }).from(enrolmentsTable);
+    return rows.filter((r) => r.status === "active").length;
+  });
+
+  const alerts = [
+    { id: "funding", label: "funding agreements expiring", count: expiringFunding, severity: expiringFunding ? "warn" : "ok", detail: "Within 60 days or already expired" },
+    { id: "invoices", label: "unpaid invoices", count: unpaidInvoices, severity: unpaidInvoices ? "warn" : "ok", detail: "Awaiting payment across partners" },
+    { id: "documents", label: "documents need action", count: actionDocs, severity: actionDocs ? "warn" : "ok", detail: "Filing entries flagged action-required" },
+    { id: "onboarding", label: "partners onboarding", count: onboardingPartners, severity: onboardingPartners ? "info" : "ok", detail: "Not yet marked active" },
+    { id: "drafts", label: "courses in draft", count: draftCourses, severity: draftCourses ? "info" : "ok", detail: "Not yet published to partners" },
+  ];
+  res.json({ alerts, health: { learners, activeEnrolments } });
 });
 
 // ── Platform contract / MOU filing cabinet (super admin) ─────────────────────

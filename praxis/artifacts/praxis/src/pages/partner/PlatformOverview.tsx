@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Building, Users, Landmark, Wallet, Receipt, Percent, ShieldCheck,
   ChevronRight, ChevronDown, ArrowRight, TrendingUp, HeartPulse, GraduationCap, FlaskConical,
+  AlertTriangle, CheckCircle2, BellRing,
 } from 'lucide-react';
 import { platformOverview, setActivePartner, registerRealPartners, ZAR } from '@/lib/partnerHubData';
 import { orgNameOverride, useOrgOverrides } from '@/lib/orgOverridesStore';
@@ -21,6 +22,12 @@ interface ApiOrg { id: string; name: string; partnerId: string | null; memberCou
 // A small badge that marks a panel as not-yet-real. Financials, funders, coaching-health and
 // alerts have no live backend, so anything derived from the seed is flagged rather than shown as
 // if it were real.
+const ALERT_SEV: Record<string, { ring: string; text: string }> = {
+  warn: { ring: 'border-amber-300 bg-amber-50/70 dark:bg-amber-950/20', text: 'text-amber-600' },
+  info: { ring: 'border-blue-200 bg-blue-50/60 dark:bg-blue-950/20', text: 'text-blue-600' },
+  ok: { ring: 'border-border bg-muted/20', text: 'text-emerald-600' },
+};
+
 function SampleBadge() {
   return (
     <Badge variant="outline" className="gap-1 text-[10px] border-amber-300 text-amber-700 bg-amber-50">
@@ -46,6 +53,13 @@ export function PlatformOverview() {
     queryFn: () => apiFetch<{ totals: { mrrGross: number; outstanding: number; funderValue: number; vatCollected: number } }>('/platform/financials'),
   });
   const finTotals = fin?.totals ?? { mrrGross: 0, outstanding: 0, funderValue: 0, vatCollected: 0 };
+  const { data: alertData } = useQuery({
+    queryKey: ['platform-alerts'],
+    queryFn: () => apiFetch<{ alerts: { id: string; label: string; count: number; severity: string; detail: string }[]; health: { learners: number; activeEnrolments: number } }>('/platform/alerts'),
+  });
+  const alerts = alertData?.alerts ?? [];
+  const openAlerts = alerts.filter((a) => a.count > 0);
+  const alertHealth = alertData?.health ?? { learners: 0, activeEnrolments: 0 };
 
   // Real partners drive getPartnerHub's empty-hub fallback, so opening one never shows demo data.
   useEffect(() => {
@@ -90,6 +104,35 @@ export function PlatformOverview() {
         <StatCard icon={GraduationCap} label="Learners" value={learnerTotal} tint="bg-violet-500/10 text-violet-600" />
         <StatCard icon={ShieldCheck} label="System" value={'Healthy'} tint="bg-blue-500/10 text-blue-600" />
       </div>
+
+      {/* Attention needed — REAL alerts derived from live data */}
+      <Card className="p-5">
+        <div className="flex items-center justify-between">
+          <SectionTitle>Attention needed</SectionTitle>
+          <Badge className={cn('gap-1', openAlerts.length ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}>
+            {openAlerts.length ? <><BellRing className="h-3 w-3" /> {openAlerts.length} to review</> : <><CheckCircle2 className="h-3 w-3" /> All clear</>}
+          </Badge>
+        </div>
+        <div className="mt-3 grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {alerts.map((a) => {
+            const s = ALERT_SEV[a.severity] ?? ALERT_SEV.ok;
+            return (
+              <div key={a.id} className={cn('rounded-lg border p-3', s.ring)}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className={cn('text-2xl font-bold tabular-nums', a.count ? s.text : 'text-muted-foreground')}>{a.count}</div>
+                  {a.count > 0 ? <AlertTriangle className={cn('h-4 w-4', s.text)} /> : <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                </div>
+                <div className="mt-1 text-sm font-medium capitalize leading-tight">{a.label}</div>
+                <div className="text-xs text-muted-foreground">{a.detail}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5" /> {alertHealth.learners} learners</span>
+          <span className="flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> {alertHealth.activeEnrolments} active enrolments</span>
+        </div>
+      </Card>
 
       {/* Per-partner breakdown (REAL) */}
       <div>
