@@ -1,9 +1,5 @@
-AI white-label brand kit: logo/card/website -> Claude vision derives colours + personalization (ASCII-only)
+Course Development Suite: Review and Publish tab (review real content, videos, activity previews, publish) (ASCII-only)
 
-Backend: POST /brand/ai-generate (super_admin/partner_admin) sends the uploaded logo (+ optional business card image, website, business name) to Claude vision and returns a brand kit JSON: displayName, primaryColor/secondaryColor/accentColor (validated hex), fontFamily, credentialTitle, tagline. Does not save - the client previews then applies via the existing PUT /brand/theme. 503 if AI env not configured.
+The suite ended at authoring drafts with no way to review the finished course or finalize it. New Review and Publish tab: pick a real course, then see a readiness checklist (description, modules, published module, activities, published activities, an assessment), the module list (open each to review its content + video), interactive activities PREVIEWED INLINE (ActivityPlayer), and the attached case studies + assignments. A Publish course button (PATCH /courses status) with an Unpublish toggle finalizes it. Reads existing endpoints (/courses, /courses/:id, /activities?courseId, /courses/:id/cases, /courses/:id/assignments).
 
-Frontend (Branding page / PartnerTheme): new AI brand kit card - upload logo (stored as a data URL in logoUrl, no external storage needed) + optional business card + website + name -> Generate brand with AI -> fills the colour/name/font/credential fields and live preview; then Save applies it. Manual colour editing still works if AI is off.
-
-Needs AI env (AI_INTEGRATIONS_ANTHROPIC_BASE_URL + _API_KEY) for generation; branding otherwise works manually.
-
-VALIDATION: esbuild clean on brand.ts and PartnerTheme.tsx.
+VALIDATION: esbuild bundle clean on CourseDevelopmentSuite.tsx.
