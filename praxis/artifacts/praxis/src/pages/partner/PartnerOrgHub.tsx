@@ -14,6 +14,7 @@ import {
   Settings, TrendingUp, Receipt, ShieldCheck, Upload, ChevronRight, CheckCircle2, AlertTriangle,
   UserPlus, KeyRound, Ban, RotateCcw, Settings2, Layers, Check, Send, LifeBuoy,
   Phone, MapPin, Mail, Smartphone, Link2, Plus,
+  Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock,
 } from 'lucide-react';
 import {
   getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgCoaching, orgGradebook,
@@ -48,6 +49,26 @@ const invoicePill = (s: Invoice['status']) =>
   s === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
     : s === 'overdue' ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
       : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300';
+
+function ProfileRow({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2.5 py-1">
+      <Icon className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+      <div className="min-w-0">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-sm">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+const initials = (name: string) => name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+const lifecyclePill = (s: string) =>
+  s === 'Active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+    : s === 'Graduated' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
+      : s === 'Withdrawn' ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
+        : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300';
 
 /**
  * Organisation Hub (partner_admin). Once the partner steps into an organisation, this IS the app:
@@ -507,15 +528,23 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         </DialogContent>
       </Dialog>
 
-      {/* ── Member manage drawer ── */}
+      {/* ── Member / learner profile drawer ── */}
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
           {selected && (
             <>
               <DialogHeader>
-                <DialogTitle>{selected.name}</DialogTitle>
-                <DialogDescription>{selected.email} · {d.org.name}</DialogDescription>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold shrink-0">{initials(selected.name)}</div>
+                  <div className="min-w-0">
+                    <DialogTitle className="flex items-center gap-2">{selected.name}
+                      {selectedLearner && <span className={cn('rounded px-2 py-0.5 text-[10px] font-medium', lifecyclePill(selectedLearner.lifecycleStatus))}>{selectedLearner.lifecycleStatus}</span>}
+                    </DialogTitle>
+                    <DialogDescription>{selected.email} · <span className="capitalize">{ROLE_LABEL[selected.role]}</span> · {d.org.name}</DialogDescription>
+                  </div>
+                </div>
               </DialogHeader>
+
               <div className="space-y-4">
                 <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Role in this organisation</span>
                   <select value={selected.role} onChange={(e) => { setMemberRole(selected.id, e.target.value as OrgRole); flashMsg(`Role updated to ${ROLE_LABEL[e.target.value as OrgRole]}.`); }}
@@ -523,35 +552,83 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <option value="learner">Learner</option><option value="coach">Coach</option><option value="org_admin">Org admin</option>
                   </select></label>
 
+                {/* Reset password — choose channel */}
+                <div className="rounded-lg border border-border p-3">
+                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><KeyRound className="h-3.5 w-3.5" /> Reset password — send link via</div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => flashMsg(`Password reset link sent to ${selected.email}.`)}><Mail className="h-3.5 w-3.5" /> Email</Button>
+                    <Button size="sm" variant="outline" className="gap-1.5" disabled={!selectedLearner?.whatsappOptIn} onClick={() => flashMsg(`Password reset link sent via WhatsApp to ${selectedLearner?.phone}.`)}><Smartphone className="h-3.5 w-3.5" /> WhatsApp</Button>
+                  </div>
+                  {selectedLearner && !selectedLearner.whatsappOptIn && <p className="text-[11px] text-muted-foreground mt-1.5">WhatsApp reset unavailable — learner has not opted in.</p>}
+                </div>
+
+                {/* Account actions */}
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" className="gap-2 justify-start" onClick={() => flashMsg(`Password reset link sent to ${selected.email}.`)}><KeyRound className="h-4 w-4" /> Reset password</Button>
                   <Button variant="outline" className="gap-2 justify-start" onClick={() => flashMsg(`Login help sent to ${selected.email}.`)}><LifeBuoy className="h-4 w-4" /> Login help</Button>
                   {selected.status === 'suspended' ? (
                     <Button variant="outline" className="gap-2 justify-start text-emerald-600" onClick={() => { setMemberStatus(selected.id, 'active'); flashMsg(`${selected.name} reactivated.`); }}><RotateCcw className="h-4 w-4" /> Reactivate</Button>
                   ) : (
-                    <Button variant="outline" className="gap-2 justify-start text-red-600" onClick={() => { setMemberStatus(selected.id, 'suspended'); flashMsg(`${selected.name} suspended.`); }}><Ban className="h-4 w-4" /> Suspend</Button>
+                    <Button variant="outline" className="gap-2 justify-start text-red-600" onClick={() => { setMemberStatus(selected.id, 'suspended'); flashMsg(`${selected.name} suspended.`); }}><Ban className="h-4 w-4" /> Suspend account</Button>
                   )}
-                  <div className="flex items-center gap-2 rounded-md border border-border px-3 text-sm text-muted-foreground">
-                    <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>
-                  </div>
                 </div>
 
-                {/* Org-level learner profile (personal info lives at the org, not the class) */}
                 {selectedLearner && (
-                  <div className="rounded-lg border border-border p-3 space-y-2">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Learner profile (organisation level)</div>
-                    <div className="grid grid-cols-1 gap-1.5 text-sm">
-                      <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> {selectedLearner.phone}</div>
-                      <div className="flex items-center gap-2"><Smartphone className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> WhatsApp: {selectedLearner.whatsappOptIn ? <Badge className="bg-emerald-600 text-[10px]">Opted in</Badge> : <Badge variant="outline" className="text-[10px]">Not opted in</Badge>}</div>
-                      <div className="flex items-start gap-2"><MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" /> {selectedLearner.address}</div>
-                      <div className="flex items-center gap-2"><Building className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> {d.org.name}</div>
-                      <div className="flex items-center gap-2"><Landmark className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> Funder: {selectedLearner.funder}</div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground pt-1">Registered via {selectedLearner.enrolledVia} on {new Date(selectedLearner.enrolledAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })} · last active {new Date(selectedLearner.lastActive).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</div>
+                  <>
+                    {/* Personal */}
+                    <div className="rounded-lg border border-border p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Personal</div>
+                      <div className="grid sm:grid-cols-2 gap-x-4">
+                        <ProfileRow icon={Calendar} label="Date of birth">{fmtDate(selectedLearner.dob)} · {selectedLearner.age} yrs</ProfileRow>
+                        <ProfileRow icon={User} label="Gender">{selectedLearner.gender}</ProfileRow>
+                        <ProfileRow icon={Fingerprint} label="ID / passport">{selectedLearner.idNumber.slice(0, 6)}*****{selectedLearner.idNumber.slice(-2)}</ProfileRow>
+                        <ProfileRow icon={Globe} label="Nationality">{selectedLearner.nationality}</ProfileRow>
+                        <ProfileRow icon={Languages} label="Home language">{selectedLearner.homeLanguage}</ProfileRow>
+                        <ProfileRow icon={Users} label="Population group (B-BBEE)">{selectedLearner.populationGroup}</ProfileRow>
+                        <ProfileRow icon={Accessibility} label="Disability">{selectedLearner.disability}</ProfileRow>
+                      </div>
                     </div>
-                  </div>
+
+                    {/* Contact */}
+                    <div className="rounded-lg border border-border p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Contact</div>
+                      <div className="grid sm:grid-cols-2 gap-x-4">
+                        <ProfileRow icon={Phone} label="Phone">{selectedLearner.phone}</ProfileRow>
+                        <ProfileRow icon={Smartphone} label="WhatsApp">{selectedLearner.whatsappOptIn ? <Badge className="bg-emerald-600 text-[10px]">Opted in</Badge> : <Badge variant="outline" className="text-[10px]">Not opted in</Badge>}</ProfileRow>
+                        <ProfileRow icon={Mail} label="Email">{selectedLearner.email}</ProfileRow>
+                        <ProfileRow icon={Heart} label="Emergency contact">{selectedLearner.emergencyContact}</ProfileRow>
+                        <div className="sm:col-span-2"><ProfileRow icon={MapPin} label="Home address">{selectedLearner.address}</ProfileRow></div>
+                      </div>
+                    </div>
+
+                    {/* Education & Employment */}
+                    <div className="rounded-lg border border-border p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Education &amp; employment</div>
+                      <div className="grid sm:grid-cols-2 gap-x-4">
+                        <ProfileRow icon={GraduationCap} label="Highest qualification">{selectedLearner.highestQualification}</ProfileRow>
+                        <ProfileRow icon={Briefcase} label="Employment status">{selectedLearner.employmentStatus}</ProfileRow>
+                        <ProfileRow icon={Briefcase} label="Current occupation">{selectedLearner.jobTitle}</ProfileRow>
+                        <ProfileRow icon={Building} label="Employer">{selectedLearner.employer}</ProfileRow>
+                      </div>
+                    </div>
+
+                    {/* Programme */}
+                    <div className="rounded-lg border border-border p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Programme &amp; funding</div>
+                      <div className="grid sm:grid-cols-2 gap-x-4">
+                        <ProfileRow icon={Landmark} label="Funder">{selectedLearner.funder}</ProfileRow>
+                        <ProfileRow icon={BookOpen} label="Current course">{selectedLearner.course}</ProfileRow>
+                        <ProfileRow icon={TrendingUp} label="Progress">
+                          <span className="flex items-center gap-2"><Progress value={selectedLearner.progress} className="h-1.5 w-24" /> {selectedLearner.progress}%</span>
+                        </ProfileRow>
+                        <ProfileRow icon={CheckCircle2} label="Learner status"><span className="capitalize">{selectedLearner.status.replace('-', ' ')}</span></ProfileRow>
+                        <ProfileRow icon={UserPlus} label="Registered">via {selectedLearner.enrolledVia} · {fmtDate(selectedLearner.enrolledAt)}</ProfileRow>
+                        <ProfileRow icon={Clock} label="Last active">{fmtDate(selectedLearner.lastActive)}</ProfileRow>
+                      </div>
+                    </div>
+                  </>
                 )}
 
-                <p className="text-xs text-muted-foreground">Actions apply only within {d.org.name} and are written to the audit trail. Email delivery is a backend step.</p>
+                <p className="text-xs text-muted-foreground">Actions apply only within {d.org.name} and are written to the audit trail. Delivery of emails / WhatsApp messages is a backend step.</p>
               </div>
             </>
           )}

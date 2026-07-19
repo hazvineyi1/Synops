@@ -1,11 +1,11 @@
-Org Hub: make it work for the super admin, ship the operational features, and shorten this commit message (ASCII-only)
+Org Hub: full Classes system + org-level learner records + self-enrolment (ASCII-only)
 
-NO MIGRATION REQUIRED. Frontend only, seeded partner data layer.
+NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-ROOT CAUSE the last few deploys never landed: this commit message had grown past 37,000 chars (full history prepended each run), exceeding the Windows command-line limit, so git commit -m silently failed and HEAD stayed pinned at the earlier commit. The message is now short.
+CLASSES: new Classes section in the org hub. Create and name classes; each class has its own workspace -- roster (enrol/remove learners, reset learner password), staff assignment (facilitator/coach/admin), course assignment, class gradebook, in-app learner messages with reply, and activity/engagement metrics. New reactive module store (orgClassStore.ts) so classes persist across the class sub-pages. Route /partner/org/:orgId/classes/:classId; Classes added to the org sidebar. Courses section is now a read-only catalog (assignment happens inside a class).
 
-ORG HUB FOR SUPER ADMIN: the /partner/org/:id sidebar switch moved to the top of getNavGroups and now fires for partner_admin OR super_admin, so opening an organisation gives the full in-org sidebar (Overview, People, Courses, Coaching, Gradebook, Funding, Documents, Billing, Settings) with All organisations as the way out. Added Partner Hub + Organisations to the super-admin nav so the hub is reachable. New findHubByOrgId(orgId) resolves the owning tenant for any org (fixes super admin always falling back to TalentForge).
+ORG-LEVEL LEARNER INFO: learners now carry phone, WhatsApp opt-in, address, funder, registered-via/at and last-active, shown in the People learner drawer at the ORG level (not the class level).
 
-OPERATIONAL HUB (was staged but never committed due to the above): People gets a unified member list with role filter and learners-only view, Add member with role select, and a per-member Manage drawer (change role, reset password, login help, suspend/reactivate). Courses gets assign-to-class with removable chips and a Classes panel. Seed: OrgClass + orgClasses().
+SELF-ENROLMENT: from People, generate a self-enrolment link and send it by email or WhatsApp.
 
-VALIDATION: parse-check + local-resolution bundle clean for AppLayout, PartnerOrgHub, partnerHubData; verified against the live deployed bundle to pin the cause.
+VALIDATION: parse-check + local-resolution bundle clean; lucide icons and store/data exports verified; class route registered. Message kept short (the 37k-char overflow lesson).

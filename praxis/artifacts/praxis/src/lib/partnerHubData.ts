@@ -287,6 +287,12 @@ export type OrgLearner = {
   // Org-level personal information (shown at org level, not inside a class):
   phone: string; whatsappOptIn: boolean; address: string; funder: string;
   enrolledVia: 'email' | 'whatsapp' | 'bulk'; enrolledAt: string; lastActive: string;
+  // Rich learner record (SA training / SETA / B-BBEE realistic):
+  dob: string; age: number; gender: string; idNumber: string; nationality: string;
+  homeLanguage: string; populationGroup: string; disability: string;
+  highestQualification: string; employmentStatus: string; jobTitle: string; employer: string;
+  lifecycleStatus: 'Active' | 'On break' | 'Graduated' | 'Withdrawn';
+  emergencyContact: string;
 };
 export type OrgStaffMember = { id: string; name: string; email: string; kind: 'admin' | 'coach' | 'facilitator' };
 export type OrgCoachingSummary = { sections: number; coaches: number; onTrack: number; atRisk: number; avgHealth: number };
@@ -299,6 +305,17 @@ const COURSE_CATALOG = [
 const FIRST_NAMES = ['Thandeka', 'Bongani', 'Ayanda', 'Sizwe', 'Lerato', 'Kagiso', 'Naledi', 'Tebogo', 'Zanele', 'Mpho', 'Refilwe', 'Andile'];
 const LAST_NAMES = ['Mokoena', 'Nkosi', 'Dlamini', 'Khumalo', 'Mahlangu', 'Zwane', 'Ndlovu', 'Sithole', 'Molefe', 'Botha', 'Naidoo', 'Pillay'];
 const SA_SUBURBS = ['Soweto, Johannesburg', 'Umlazi, Durban', 'Khayelitsha, Cape Town', 'Mamelodi, Pretoria', 'Mdantsane, East London', 'Tembisa, Ekurhuleni', 'Seshego, Polokwane', 'Galeshewe, Kimberley'];
+const SA_LANGUAGES = ['isiZulu', 'isiXhosa', 'Sepedi', 'Setswana', 'Sesotho', 'English', 'Afrikaans', 'Xitsonga', 'siSwati', 'Tshivenda'];
+const POP_GROUPS = ['African', 'Coloured', 'Indian/Asian', 'White'];
+const QUALIFICATIONS = ['Grade 10', 'Matric (NSC)', 'National Certificate (NQF 4)', 'Higher Certificate (NQF 5)', 'Diploma (NQF 6)', "Bachelor's Degree (NQF 7)"];
+const EMPLOYMENT_STATUS = ['Employed', 'Unemployed', 'Self-employed', 'Student / Learner'];
+const JOB_BY_STATUS: Record<string, string[]> = {
+  Employed: ['Retail Assistant', 'Call Centre Agent', 'Administrator', 'Cashier', 'Warehouse Clerk', 'Team Leader'],
+  Unemployed: ['Not currently employed'],
+  'Self-employed': ['Spaza Shop Owner', 'Freelance Bookkeeper', 'Hairdresser', 'Street Vendor'],
+  'Student / Learner': ['Full-time Learner'],
+};
+const DISABILITIES = ['None', 'None', 'None', 'None', 'Visual impairment', 'Hearing impairment', 'Physical (mobility)'];
 
 function seedOf(s: string) { return s.split('').reduce((a, c) => a + c.charCodeAt(0), 0); }
 
@@ -331,6 +348,17 @@ export function orgLearners(h: PartnerHub, orgId: string, sample = 12): OrgLearn
     const status: OrgLearner['status'] = progress >= 95 ? 'completed' : progress < 40 ? 'at-risk' : 'on-track';
     const phoneTail = String(1000000 + ((seed * 7919 + i * 6113) % 8999999)).slice(0, 7);
     const dayOff = (seed + i * 11) % 60;
+    const age = 18 + ((seed + i * 13) % 30); // 18–47
+    const birthYear = 2026 - age;
+    const bm = 1 + ((seed + i * 7) % 12);
+    const bd = 1 + ((seed + i * 5) % 28);
+    const dob = `${birthYear}-${String(bm).padStart(2, '0')}-${String(bd).padStart(2, '0')}`;
+    const gender = ((seed + i) % 2) === 0 ? 'Female' : 'Male';
+    const idSeq = String(1000 + ((seed * 31 + i * 17) % 8999));
+    const idNumber = `${String(birthYear).slice(2)}${String(bm).padStart(2, '0')}${String(bd).padStart(2, '0')}${idSeq}08${(seed + i) % 10}`;
+    const empStatus = EMPLOYMENT_STATUS[(seed + i) % EMPLOYMENT_STATUS.length];
+    const jobs = JOB_BY_STATUS[empStatus];
+    const lifecycle = (['Active', 'Active', 'Active', 'On break', 'Graduated', 'Withdrawn'] as const)[(seed + i) % 6];
     return {
       id: `${orgId}_l${i}`, name: `${fn} ${ln}`,
       email: `${fn.toLowerCase()}.${ln.toLowerCase()}@learner.co.za`,
@@ -342,6 +370,15 @@ export function orgLearners(h: PartnerHub, orgId: string, sample = 12): OrgLearn
       enrolledVia: via[(seed + i) % 3],
       enrolledAt: new Date(2026, 0, 1 + ((seed + i * 5) % 150)).toISOString().slice(0, 10),
       lastActive: new Date(Date.now() - dayOff * 86400000).toISOString().slice(0, 10),
+      dob, age, gender, idNumber, nationality: ((seed + i) % 9) === 0 ? 'Zimbabwean' : 'South African',
+      homeLanguage: SA_LANGUAGES[(seed + i) % SA_LANGUAGES.length],
+      populationGroup: POP_GROUPS[(seed + i * 2) % POP_GROUPS.length],
+      disability: DISABILITIES[(seed + i) % DISABILITIES.length],
+      highestQualification: QUALIFICATIONS[(seed + i) % QUALIFICATIONS.length],
+      employmentStatus: empStatus, jobTitle: jobs[(seed + i) % jobs.length],
+      employer: empStatus === 'Employed' ? `${LAST_NAMES[(seed + i * 4) % LAST_NAMES.length]} Group` : '—',
+      lifecycleStatus: lifecycle,
+      emergencyContact: `${FIRST_NAMES[(seed + i * 6) % FIRST_NAMES.length]} ${ln} · +27 ${String(70 + ((seed + i) % 20)).slice(0, 2)} ${phoneTail.slice(0, 3)} ${phoneTail.slice(3)}`,
     };
   });
 }
