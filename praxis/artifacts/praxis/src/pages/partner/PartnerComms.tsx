@@ -9,6 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { Megaphone, Send, Users, Building, CheckCircle2, Bell, FileText } from 'lucide-react';
 import { getPartnerHub } from '@/lib/partnerHubData';
+import { orgLabel, useOrgOverrides } from '@/lib/orgOverridesStore';
 
 type Audience = { kind: 'all' } | { kind: 'org'; org: string } | { kind: 'role'; role: string };
 type Announcement = {
@@ -29,6 +30,7 @@ const TEMPLATES = [
  */
 export function PartnerComms() {
   const { user } = useSession();
+  useOrgOverrides();
   const h = getPartnerHub(user?.partnerId);
 
   const [subject, setSubject] = useState('');
@@ -96,7 +98,7 @@ export function PartnerComms() {
                   className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium transition', audience.kind === 'all' ? 'border-primary bg-primary/5' : 'border-border text-muted-foreground hover:border-primary/40')}>All organisations</button>
                 {h.orgs.map((o) => (
                   <button key={o.id} onClick={() => setAudience({ kind: 'org', org: o.name })}
-                    className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium transition', audience.kind === 'org' && audience.org === o.name ? 'border-primary bg-primary/5' : 'border-border text-muted-foreground hover:border-primary/40')}>{o.name}</button>
+                    className={cn('rounded-lg border px-3 py-1.5 text-xs font-medium transition', audience.kind === 'org' && audience.org === o.name ? 'border-primary bg-primary/5' : 'border-border text-muted-foreground hover:border-primary/40')}>{orgLabel(o.name)}</button>
                 ))}
                 {['coach', 'org_admin', 'learner'].map((r) => (
                   <button key={r} onClick={() => setAudience({ kind: 'role', role: r })}

@@ -1,7 +1,7 @@
-Audit: partner admin can impersonate anyone in their organisations except the super admin (ASCII-only)
+Impersonation: View as opens the users own view - a learner shows their class (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-The Impersonation tab is now a working start/stop flow. New impersonatableUsers(hub) lists every tenant account across the partner orgs - org admins, coaches, delegated admins and learners - and the platform super admin is never a tenant account so it can never appear (shown explicitly with a locked note). Searchable list with View as; starting sets a time-boxed active session (amber banner + Stop), prepends it to the sessions log as active, and Stop records the duration. Policy cards (time-boxed / org-notified / auto-logged) retained.
+Impersonation now actually shows what the user sees. New shared impersonationStore (active session + log) so a session persists across pages. Audit View as starts the session and navigates to /partner/impersonate/:orgId/:userId (PartnerImpersonateView) with a sticky Viewing-as banner and Exit. For a LEARNER it renders their learner view: their class(es) with coach and assigned courses, their courses with progress, grade/attendance/last-active, coach and on-track status. Coaches see the classes they coach; org/delegated admins get a link into the org hub. impersonatableUsers now carries orgId. Audit recent-sessions merges the live log; active banner offers Resume view / Stop.
 
-VALIDATION: parse-check + local-resolution bundle clean; ImpersonationSession + impersonatableUsers exports and Eye/Search/StopCircle icons confirmed.
+VALIDATION: parse-check + local-resolution bundle clean; impersonate route registered.

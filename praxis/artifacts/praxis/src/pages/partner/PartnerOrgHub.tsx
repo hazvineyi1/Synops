@@ -14,8 +14,10 @@ import {
   Settings, TrendingUp, Receipt, ShieldCheck, Upload, ChevronRight, CheckCircle2, AlertTriangle,
   UserPlus, KeyRound, Ban, RotateCcw, Settings2, Layers, Check, Send, LifeBuoy,
   Phone, MapPin, Mail, Smartphone, Link2, Plus,
-  Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock, Trash2,
+  Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock, Trash2, Eye, Lock,
 } from 'lucide-react';
+import { startImpersonation } from '@/lib/impersonationStore';
+import { renameOrg, useOrgOverrides } from '@/lib/orgOverridesStore';
 import {
   getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgCoaching, orgGradebook,
   DELEGATABLE_POWERS, ZAR, VAT_RATE, type Invoice, type PartnerDoc, type DocCategory,
@@ -86,8 +88,14 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   // Resolve the hub that owns this org, so a super admin (no partnerId) still sees the right tenant.
   const h = findHubByOrgId(orgId) ?? getPartnerHub(user?.partnerId);
   const section = params?.section ?? 'overview';
+  useOrgOverrides(); // re-render when an org is renamed so the new name shows here immediately
   const d = orgDetail(h, orgId);
   const base = `/partner/org/${orgId}`;
+
+  // Only a partner admin or super admin may edit the organisation or impersonate.
+  const canManageOrg = user?.role === 'partner_admin' || user?.role === 'super_admin';
+  const actorName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Admin';
+  const [orgNameDraft, setOrgNameDraft] = useState<string | null>(null);
 
   const courses = useMemo(() => orgCourses(h, orgId), [h, orgId]);
   const seededLearners = useMemo(() => orgLearners(h, orgId), [h, orgId]);
@@ -145,6 +153,12 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
     setMembers((xs) => [{ id: `m_${Date.now()}`, name: nm.trim(), email: em.trim(), role: rl, status: 'invited' }, ...xs]);
     setNm(''); setEm(''); setRl('learner'); setAddOpen(false);
     flashMsg(`${ROLE_LABEL[rl]} invited to ${d.name}.`);
+  };
+
+  const roleLabelOf = (r: OrgRole) => (r === 'org_admin' ? 'Org admin' : r === 'coach' ? 'Coach' : 'Learner');
+  const viewAsMember = (m: Member) => {
+    startImpersonation({ userId: m.id, name: m.name, role: roleLabelOf(m.role), orgId, orgName: d.org?.name ?? '', admin: actorName, startedMs: Date.now() });
+    navigate(`/partner/impersonate/${orgId}/${m.id}`);
   };
 
   const filteredMembers = roleFilter === 'all' ? members : members.filter((m) => m.role === roleFilter);
@@ -276,7 +290,12 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <td className="p-3"><span className={cn('rounded px-2 py-0.5 text-xs font-medium', roleBadge(m.role))}>{ROLE_LABEL[m.role]}</span></td>
                     <td className="p-3"><Badge variant={m.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', m.status === 'suspended' && 'border-red-300 text-red-600', m.status === 'archived' && 'border-slate-300 text-slate-500')}>{m.status}</Badge></td>
                     {roleFilter === 'learner' && <td className="p-3">{m.progress != null ? <div className="flex items-center gap-2"><Progress value={m.progress} className="h-1.5 w-24" /><span className="text-xs tabular-nums text-muted-foreground">{m.progress}%</span></div> : <span className="text-muted-foreground">-</span>}</td>}
-                    <td className="p-3 text-right"><Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => openMember(m)}><Settings2 className="h-3.5 w-3.5" /> Manage</Button></td>
+                    <td className="p-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {canManageOrg && <Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => viewAsMember(m)} title="Impersonate - see what they see"><Eye className="h-3.5 w-3.5" /> View as</Button>}
+                        <Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => openMember(m)}><Settings2 className="h-3.5 w-3.5" /> Manage</Button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {filteredMembers.length === 0 && <tr><td colSpan={roleFilter === 'learner' ? 5 : 4} className="p-6 text-center text-muted-foreground">No members in this view.</td></tr>}
@@ -508,23 +527,44 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       )}
 
       {/* ── SETTINGS ── */}
-      {section === 'settings' && (
-        <Card className="p-5 max-w-2xl space-y-4">
-          <h3 className="text-sm font-semibold flex items-center gap-2"><Settings className="h-4 w-4 text-primary" /> Organisation settings</h3>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Organisation name</span>
-              <input defaultValue={d.org.name} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
-            <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Primary admin</span>
-              <input defaultValue={d.admins[0]?.email ?? ''} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
-            <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Plan</span>
-              <input defaultValue={d.plan?.name ?? ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
-            <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Seats</span>
-              <input defaultValue={d.sub ? String(d.sub.seats) : ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
-          </div>
-          <Button className="gap-1.5" onClick={() => flashMsg('Organisation settings saved.')}><CheckCircle2 className="h-4 w-4" /> Save settings</Button>
-          <p className="text-xs text-muted-foreground">Plan and seat changes are handled from the partner-wide Financial Hub; name and admin can be adjusted here.</p>
-        </Card>
-      )}
+      {section === 'settings' && (() => {
+        const nameValue = orgNameDraft ?? d.org.name;
+        const nameChanged = nameValue.trim() !== '' && nameValue.trim() !== d.org.name;
+        const saveOrgName = () => {
+          if (!canManageOrg) return;
+          const ok = renameOrg(orgId, d.name, d.org.name, nameValue, actorName, (user?.role ?? 'partner_admin').replace('_', ' '));
+          setOrgNameDraft(null);
+          flashMsg(ok ? `Organisation renamed to "${nameValue.trim()}". Change recorded in the activity log.` : 'Organisation settings saved.');
+        };
+        return (
+          <Card className="p-5 max-w-2xl space-y-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2"><Settings className="h-4 w-4 text-primary" /> Organisation settings</h3>
+            {!canManageOrg && (
+              <div className="rounded-lg border border-slate-200 bg-slate-50/60 dark:bg-slate-900/40 px-3 py-2 flex items-center gap-2 text-xs text-muted-foreground">
+                <Lock className="h-3.5 w-3.5 shrink-0" /> Only a Partner Admin or Super Admin can change these settings.
+              </div>
+            )}
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Organisation name</span>
+                <input value={nameValue} readOnly={!canManageOrg} onChange={(e) => setOrgNameDraft(e.target.value)}
+                  className={cn('h-10 w-full rounded-md border border-input px-3 text-sm', canManageOrg ? 'bg-background' : 'bg-muted/40 text-muted-foreground')} /></label>
+              <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Primary admin</span>
+                <input defaultValue={d.admins[0]?.email ?? ''} readOnly={!canManageOrg} className={cn('h-10 w-full rounded-md border border-input px-3 text-sm', canManageOrg ? 'bg-background' : 'bg-muted/40 text-muted-foreground')} /></label>
+              <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Plan</span>
+                <input defaultValue={d.plan?.name ?? ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
+              <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Seats</span>
+                <input defaultValue={d.sub ? String(d.sub.seats) : ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
+            </div>
+            {canManageOrg && (
+              <div className="flex items-center gap-3">
+                <Button className="gap-1.5" disabled={!nameChanged} onClick={saveOrgName}><CheckCircle2 className="h-4 w-4" /> Save changes</Button>
+                {nameChanged && <span className="text-xs text-muted-foreground">Renaming will update the organisation everywhere and log the change.</span>}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Renaming the organisation updates it across the hub and records what it was, who changed it and when in the Audit activity log. Plan and seat changes are handled from the partner-wide Financial Hub.</p>
+          </Card>
+        );
+      })()}
 
       {/* ── Add member dialog ── */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -595,6 +635,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
 
                 {/* Account actions */}
                 <div className="grid grid-cols-2 gap-2">
+                  {canManageOrg && <Button variant="outline" className="gap-2 justify-start col-span-2 border-primary/40 text-primary" onClick={() => viewAsMember(selected)}><Eye className="h-4 w-4" /> View as {selected.name.split(' ')[0]} (impersonate)</Button>}
                   <Button variant="outline" className="gap-2 justify-start" onClick={() => drawerNote(`Login help link resent to ${selected.email}.`)}><LifeBuoy className="h-4 w-4" /> Resend login help</Button>
                   {selected.status === 'suspended' ? (
                     <Button variant="outline" className="gap-2 justify-start text-emerald-600" onClick={() => { setMemberStatus(selected.id, 'active'); drawerNote(`${selected.name} reactivated.`); }}><RotateCcw className="h-4 w-4" /> Reactivate</Button>

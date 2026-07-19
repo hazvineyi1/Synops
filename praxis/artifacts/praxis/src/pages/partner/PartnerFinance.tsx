@@ -12,6 +12,7 @@ import { Wallet, Receipt, Landmark, Percent, ScrollText, Upload, Pencil } from '
 import {
   getPartnerHub, fundersRollup, ZAR, ZAR2, VAT_RATE, type Invoice,
 } from '@/lib/partnerHubData';
+import { orgLabel, orgNameOverride, useOrgOverrides } from '@/lib/orgOverridesStore';
 
 const statusPill = (s: Invoice['status']) =>
   s === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
@@ -45,6 +46,7 @@ function NumInput({ value, onChange, prefix, suffix, width = 'w-28' }: { value: 
 export function PartnerFinance() {
   const { user } = useSession();
   const [, navigate] = useLocation();
+  useOrgOverrides();
   const h = getPartnerHub(user?.partnerId);
   const fun = fundersRollup(h);
 
@@ -126,7 +128,7 @@ export function PartnerFinance() {
                   const monthly = (planPrices[plan.id] ?? 0) * seatCount;
                   return (
                     <tr key={s.orgId}>
-                      <td className="p-3 font-medium">{s.orgName}</td>
+                      <td className="p-3 font-medium">{orgNameOverride(s.orgId) ?? orgLabel(s.orgName)}</td>
                       <td className="p-3"><Badge variant="secondary">{plan.name}</Badge></td>
                       <td className="p-3 text-right"><NumInput value={seatCount} onChange={(n) => setSeats((ss) => ({ ...ss, [s.orgId]: n }))} width="w-20" /></td>
                       <td className="p-3 text-right tabular-nums text-muted-foreground">{Math.min(s.activeSeats, seatCount)}</td>
@@ -158,7 +160,7 @@ export function PartnerFinance() {
                 {invoices.map((i) => (
                   <tr key={i.id}>
                     <td className="p-3 font-mono text-xs">{i.number}</td>
-                    <td className="p-3">{i.orgName}</td>
+                    <td className="p-3">{orgLabel(i.orgName)}</td>
                     <td className="p-3 text-muted-foreground">{i.period}</td>
                     <td className="p-3 text-right">{i.status === 'paid' ? <span className="tabular-nums">{ZAR(i.net)}</span> : <NumInput value={i.net} onChange={(n) => setInvoiceNet(i.id, n)} prefix="R" />}</td>
                     <td className="p-3 text-right tabular-nums text-muted-foreground">{ZAR(i.net * vatFrac)}</td>
@@ -184,7 +186,7 @@ export function PartnerFinance() {
                 {h.disbursements.map((d) => (
                   <tr key={d.id}>
                     <td className="p-3 font-medium">{d.funder}</td>
-                    <td className="p-3">{d.orgName}</td>
+                    <td className="p-3">{orgLabel(d.orgName)}</td>
                     <td className="p-3 text-right tabular-nums">{d.seats}</td>
                     <td className="p-3 text-right tabular-nums font-medium">{ZAR(d.amount)}</td>
                     <td className="p-3"><Badge className={cn('text-[10px]', disbPill(d.status))}>{d.status}</Badge></td>

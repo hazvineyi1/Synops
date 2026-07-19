@@ -13,6 +13,8 @@
  * and their real organisations, so a partner_admin sees only their own tenant's figures.
  */
 
+import { orgNameOverride } from './orgOverridesStore';
+
 export const ZAR = (n: number) =>
   'R' + n.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 export const ZAR2 = (n: number) =>
@@ -251,10 +253,14 @@ export function financeRollup(h: PartnerHub) {
 
 /** Per-organisation rollup for the org-by-org drill-in. */
 export function orgDetail(h: PartnerHub, orgId: string) {
-  const org = h.orgs.find((o) => o.id === orgId);
+  const rawOrg = h.orgs.find((o) => o.id === orgId);
   const sub = h.subscriptions.find((s) => s.orgId === orgId);
   const plan = sub ? h.plans.find((p) => p.id === sub.planId) : undefined;
-  const name = org?.name ?? '';
+  // `name` stays the ORIGINAL seeded name so the filters below still match seeded rows; only the
+  // DISPLAY name (org.name) picks up a live rename override, so the UI shows the new name.
+  const name = rawOrg?.name ?? '';
+  const override = rawOrg ? orgNameOverride(orgId) : undefined;
+  const org = rawOrg ? { ...rawOrg, name: override ?? rawOrg.name } : undefined;
   const coaches = h.accounts.filter((a) => a.role === 'coach' && a.orgName === name);
   const admins = h.accounts.filter((a) => a.role === 'org_admin' && a.orgName === name);
   const delegated = h.delegatedAdmins.filter((d) => d.orgName === name);
@@ -444,9 +450,10 @@ export type ImpersonatableUser = { id: string; name: string; email: string; role
  */
 export function impersonatableUsers(h: PartnerHub): ImpersonatableUser[] {
   const orgIdByName = (name: string) => h.orgs.find((o) => o.name === name)?.id ?? '';
-  const staff = h.accounts.map((a) => ({ id: a.id, name: a.name, email: a.email, role: a.role === 'org_admin' ? 'Org admin' : 'Coach', orgId: orgIdByName(a.orgName), orgName: a.orgName }));
-  const delegated = h.delegatedAdmins.map((d) => ({ id: d.id, name: d.name, email: d.email, role: 'Delegated admin', orgId: orgIdByName(d.orgName), orgName: d.orgName }));
-  const learners = h.orgs.flatMap((o) => orgLearners(h, o.id).map((l) => ({ id: l.id, name: l.name, email: l.email, role: 'Learner', orgId: o.id, orgName: o.name })));
+  const disp = (orgId: string, fallback: string) => orgNameOverride(orgId) ?? fallback;
+  const staff = h.accounts.map((a) => { const oid = orgIdByName(a.orgName); return { id: a.id, name: a.name, email: a.email, role: a.role === 'org_admin' ? 'Org admin' : 'Coach', orgId: oid, orgName: disp(oid, a.orgName) }; });
+  const delegated = h.delegatedAdmins.map((d) => { const oid = orgIdByName(d.orgName); return { id: d.id, name: d.name, email: d.email, role: 'Delegated admin', orgId: oid, orgName: disp(oid, d.orgName) }; });
+  const learners = h.orgs.flatMap((o) => orgLearners(h, o.id).map((l) => ({ id: l.id, name: l.name, email: l.email, role: 'Learner', orgId: o.id, orgName: disp(o.id, o.name) })));
   return [...staff, ...delegated, ...learners];
 }
 

@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { Landmark, Users, ShieldCheck, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { getPartnerHub, fundersRollup, ZAR } from '@/lib/partnerHubData';
+import { orgLabel, useOrgOverrides } from '@/lib/orgOverridesStore';
 
 const agStatus = (s: string) =>
   s === 'active' ? 'bg-emerald-600' : s === 'expiring' ? 'bg-amber-500' : 'bg-muted text-muted-foreground';
@@ -21,6 +22,7 @@ const agStatus = (s: string) =>
  */
 export function PartnerFunders() {
   const { user } = useSession();
+  useOrgOverrides();
   const h = getPartnerHub(user?.partnerId);
   const fun = fundersRollup(h);
 
@@ -55,7 +57,7 @@ export function PartnerFunders() {
                     <Badge className={cn('text-[10px]', agStatus(a.status))}>{a.status}</Badge>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    {a.scopeOrgs.join(', ')} · {new Date(a.start).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })} – {new Date(a.expiry).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })}
+                    {a.scopeOrgs.map(orgLabel).join(', ')} · {new Date(a.start).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })} - {new Date(a.expiry).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })}
                   </div>
                 </div>
                 <div className="text-right">
@@ -83,7 +85,7 @@ export function PartnerFunders() {
                 <div className="flex items-center justify-between gap-3 mb-2">
                   <div>
                     <span className="font-medium">{al.funder}</span>
-                    <span className="text-muted-foreground text-sm"> · {al.orgName}</span>
+                    <span className="text-muted-foreground text-sm"> · {orgLabel(al.orgName)}</span>
                   </div>
                   <span className="text-sm tabular-nums text-muted-foreground">{al.used} / {al.allocated} seats used</span>
                 </div>

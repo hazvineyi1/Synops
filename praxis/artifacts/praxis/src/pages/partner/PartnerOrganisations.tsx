@@ -9,6 +9,7 @@ import {
   Building, ChevronRight, Wallet, Users, Landmark, Receipt, ShieldCheck, GraduationCap, Mail,
 } from 'lucide-react';
 import { getPartnerHub, orgDetail, financeRollup, ZAR } from '@/lib/partnerHubData';
+import { orgNameOverride, useOrgOverrides } from '@/lib/orgOverridesStore';
 
 /**
  * Organisations (selector). The Main-Admin's list of every organisation under the partner. Picking
@@ -19,6 +20,7 @@ import { getPartnerHub, orgDetail, financeRollup, ZAR } from '@/lib/partnerHubDa
 export function PartnerOrganisations() {
   const { user } = useSession();
   const [, navigate] = useLocation();
+  useOrgOverrides();
   const h = getPartnerHub(user?.partnerId);
   const fin = financeRollup(h);
 
@@ -46,7 +48,7 @@ export function PartnerOrganisations() {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0"><Building className="h-5 w-5" /></span>
-                  <span className="font-semibold truncate">{o.name}</span>
+                  <span className="font-semibold truncate">{orgNameOverride(o.id) ?? o.name}</span>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </div>

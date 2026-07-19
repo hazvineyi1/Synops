@@ -12,6 +12,7 @@ import {
   Search, CheckCircle2, Clock, AlertTriangle, Download,
 } from 'lucide-react';
 import { getPartnerHub, type PartnerDoc, type DocCategory } from '@/lib/partnerHubData';
+import { orgLabel, useOrgOverrides } from '@/lib/orgOverridesStore';
 
 const CATS: { key: DocCategory; label: string; icon: React.ComponentType<{ className?: string }>; hint: string }[] = [
   { key: 'invoice', label: 'Invoices', icon: Receipt, hint: 'Tax invoices, statements, proof of payment' },
@@ -35,6 +36,7 @@ const statusStyle: Record<PartnerDoc['status'], { cls: string; icon: React.Compo
  */
 export function PartnerDocuments() {
   const { user } = useSession();
+  useOrgOverrides();
   const h = getPartnerHub(user?.partnerId);
 
   const [docs, setDocs] = useState<PartnerDoc[]>(h.documents);
@@ -101,7 +103,7 @@ export function PartnerDocuments() {
             <select value={uploadOrg} onChange={(e) => setUploadOrg(e.target.value)}
               className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
               <option value="">Partner-wide (no org)</option>
-              {h.orgs.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+              {h.orgs.map((o) => <option key={o.id} value={o.name}>{orgLabel(o.name)}</option>)}
             </select>
           </label>
           <div>
@@ -168,7 +170,7 @@ export function PartnerDocuments() {
                     </div>
                   </td>
                   <td className="p-3 text-muted-foreground">{c.label}</td>
-                  <td className="p-3 text-muted-foreground">{d.orgName ?? <span className="italic">Partner-wide</span>}</td>
+                  <td className="p-3 text-muted-foreground">{d.orgName ? orgLabel(d.orgName) : <span className="italic">Partner-wide</span>}</td>
                   <td className="p-3">
                     <span className={cn('rounded px-2 py-0.5 text-[10px] font-medium inline-flex items-center gap-1', s.cls)}>
                       <s.icon className="h-2.5 w-2.5" /> {s.label}

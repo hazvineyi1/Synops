@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { ScrollText, ShieldCheck, Clock, Bell, Lock, Eye, Search, StopCircle } from 'lucide-react';
 import { getPartnerHub, impersonatableUsers, type AuditCategory, type ImpersonatableUser } from '@/lib/partnerHubData';
 import { useImpersonation, startImpersonation, stopImpersonation } from '@/lib/impersonationStore';
+import { useOrgOverrides } from '@/lib/orgOverridesStore';
 
 const CATS: (AuditCategory | 'all')[] = ['all', 'account', 'financial', 'funder', 'impersonation', 'branding'];
 const catStyle: Record<AuditCategory, string> = {
@@ -38,9 +39,12 @@ export function PartnerAudit() {
   const h = getPartnerHub(user?.partnerId);
   const [cat, setCat] = useState<(AuditCategory | 'all')>('all');
 
+  // Live org-config changes (e.g. renames) are recorded here too and shown newest-first.
+  const { changeLog } = useOrgOverrides();
+  const allAudit = useMemo(() => [...changeLog, ...h.audit], [changeLog, h.audit]);
   const rows = useMemo(
-    () => (cat === 'all' ? h.audit : h.audit.filter((e) => e.category === cat)),
-    [cat, h.audit],
+    () => (cat === 'all' ? allAudit : allAudit.filter((e) => e.category === cat)),
+    [cat, allAudit],
   );
 
   // Impersonation via the shared store (persists into the impersonation view).

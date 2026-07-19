@@ -12,6 +12,7 @@ import {
   Building, ShieldCheck, Receipt, FileText, ChevronRight,
 } from 'lucide-react';
 import { getPartnerHub, financeRollup, fundersRollup, orgDetail, ZAR, type AuditCategory } from '@/lib/partnerHubData';
+import { orgLabel, orgNameOverride, useOrgOverrides } from '@/lib/orgOverridesStore';
 
 const catStyle: Record<AuditCategory, string> = {
   financial: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
@@ -29,6 +30,7 @@ const catStyle: Record<AuditCategory, string> = {
 export function PartnerOverview() {
   const { user } = useSession();
   const [, navigate] = useLocation();
+  useOrgOverrides();
   const h = getPartnerHub(user?.partnerId);
   const fin = financeRollup(h);
   const fun = fundersRollup(h);
@@ -94,7 +96,7 @@ export function PartnerOverview() {
               <button key={o.id} onClick={() => navigate(`/partner/org/${o.id}`)}
                 className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:bg-muted/40 transition-colors">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium truncate">{o.name}</span>
+                  <span className="font-medium truncate">{orgNameOverride(o.id) ?? o.name}</span>
                   <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -118,7 +120,7 @@ export function PartnerOverview() {
               const plan = h.plans.find((p) => p.id === s.planId);
               return (
                 <div key={s.orgId} className="flex items-center justify-between gap-3">
-                  <span className="truncate">{s.orgName}</span>
+                  <span className="truncate">{orgNameOverride(s.orgId) ?? orgLabel(s.orgName)}</span>
                   <span className="flex items-center gap-2 shrink-0">
                     <Badge variant="secondary" className="text-[10px]">{plan?.name}</Badge>
                     <span className="text-muted-foreground tabular-nums">{s.activeSeats}/{s.seats} seats</span>
