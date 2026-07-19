@@ -1,9 +1,9 @@
-Delete user + email delivery for set-password links (ASCII-only)
+AI white-label brand kit: logo/card/website -> Claude vision derives colours + personalization (ASCII-only)
 
-1) DELETE user: new DELETE /platform/users/:id (super_admin, cannot delete self) hard-deletes the user plus their sessions, password resets, login events, enrolments and section memberships in one transaction; authored content is left. A Delete button is added to the Platform Console user drawer (with confirm). platformApi.deleteUser added.
+Backend: POST /brand/ai-generate (super_admin/partner_admin) sends the uploaded logo (+ optional business card image, website, business name) to Claude vision and returns a brand kit JSON: displayName, primaryColor/secondaryColor/accentColor (validated hex), fontFamily, credentialTitle, tagline. Does not save - the client previews then applies via the existing PUT /brand/theme. 503 if AI env not configured.
 
-2) EMAIL delivery: new lib/email.ts (Resend HTTP API, no dep - same pattern as supabaseStorage). When RESEND_API_KEY + EMAIL_FROM are set, Create user, the console Reset link, and self-service forgot-password now EMAIL the set-password link automatically (and the console still shows a copyable link as fallback + an 'emailed' indicator). Unconfigured = no-op, existing manual-link flow unchanged.
+Frontend (Branding page / PartnerTheme): new AI brand kit card - upload logo (stored as a data URL in logoUrl, no external storage needed) + optional business card + website + name -> Generate brand with AI -> fills the colour/name/font/credential fields and live preview; then Save applies it. Manual colour editing still works if AI is off.
 
-ENV (optional, to enable auto-send): RESEND_API_KEY + EMAIL_FROM (a verified sender). Also set APP_URL for tidy links.
+Needs AI env (AI_INTEGRATIONS_ANTHROPIC_BASE_URL + _API_KEY) for generation; branding otherwise works manually.
 
-VALIDATION: esbuild clean on email.ts, platform.ts, auth.ts, platformApi.ts, PlatformConsole.tsx.
+VALIDATION: esbuild clean on brand.ts and PartnerTheme.tsx.

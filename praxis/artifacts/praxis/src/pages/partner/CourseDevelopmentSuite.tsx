@@ -1,15 +1,20 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionTitle } from '@/components/StatCard';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { ActivityPlayer } from '@/components/ActivityPlayer';
 import { cn } from '@/lib/utils';
 import {
   Sparkles, Target, ClipboardCheck, Video, ArrowLeft, Wand2, CheckCircle2, AlertTriangle,
-  Check, X, Pencil, Play, ShieldCheck, FileText, Film, RotateCcw,
+  Check, X, Pencil, Play, ShieldCheck, FileText, Film, RotateCcw, ClipboardList, Rocket, BookOpen,
 } from 'lucide-react';
 import {
   BLOOM_LEVELS, bloomColor, generateObjectives, suggestAssessments, draftVideoSegments,
@@ -58,6 +63,7 @@ export function CourseDevelopmentSuite() {
           <TabsTrigger value="objectives" className="gap-1.5"><Target className="h-4 w-4" /> Objectives</TabsTrigger>
           <TabsTrigger value="assessments" className="gap-1.5"><ClipboardCheck className="h-4 w-4" /> Assessments</TabsTrigger>
           <TabsTrigger value="video" className="gap-1.5"><Video className="h-4 w-4" /> Interactive Video</TabsTrigger>
+          <TabsTrigger value="review" className="gap-1.5"><Rocket className="h-4 w-4" /> Review &amp; Publish</TabsTrigger>
         </TabsList>
 
         {/* ── Objectives ─────────────────────────────────── */}
@@ -134,7 +140,153 @@ export function CourseDevelopmentSuite() {
         <TabsContent value="video" className="mt-4 space-y-4">
           <InteractiveVideo videos={videos} />
         </TabsContent>
+
+        {/* ── Review & Publish (real course) ─────────────── */}
+        <TabsContent value="review" className="mt-4 space-y-4">
+          <ReviewFinalize />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// ── Review & finalize a real course: content, videos, activity previews, publish ──────────────
+function ReviewFinalize() {
+  const [, navigate] = useLocation();
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [courseId, setCourseId] = useState('');
+
+  const { data: courses } = useQuery({ queryKey: ['courses'], queryFn: () => apiFetch<any[]>('/courses') });
+  const { data: detail } = useQuery({ queryKey: ['course-detail', courseId], queryFn: () => apiFetch<any>(`/courses/${courseId}`), enabled: !!courseId });
+  const { data: acts } = useQuery({ queryKey: ['course-activities', courseId], queryFn: () => apiFetch<any[]>(`/activities?courseId=${courseId}`), enabled: !!courseId });
+  const { data: cases } = useQuery({ queryKey: ['course-cases', courseId], queryFn: () => apiFetch<any[]>(`/courses/${courseId}/cases`), enabled: !!courseId });
+  const { data: assigns } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<any[]>(`/courses/${courseId}/assignments`), enabled: !!courseId });
+
+  const publish = useMutation({
+    mutationFn: (status: string) => apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    onSuccess: (_d, status) => { qc.invalidateQueries({ queryKey: ['course-detail', courseId] }); toast({ title: status === 'published' ? 'Course published' : 'Course set to draft' }); },
+    onError: (e: any) => toast({ title: 'Could not update', description: e?.message ?? '', variant: 'destructive' }),
+  });
+
+  const modules = detail?.modules ?? [];
+  const publishedModules = modules.filter((m: any) => m.status === 'published');
+  const activities = acts ?? [];
+  const publishedActs = activities.filter((a: any) => a.published);
+  const withVideo = activities.filter((a: any) => a.kind === 'video');
+  const checks = [
+    { label: 'Course has a description', ok: !!detail?.description },
+    { label: 'At least one module', ok: modules.length > 0 },
+    { label: 'A module is published (learner-visible)', ok: publishedModules.length > 0 },
+    { label: 'Interactive activities added', ok: activities.length > 0 },
+    { label: 'Activities published', ok: publishedActs.length > 0 || activities.length === 0 },
+    { label: 'An assessment / assignment exists', ok: (assigns ?? []).length > 0 },
+  ];
+  const readyToPublish = checks.every((c) => c.ok);
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 space-y-3">
+        <SectionTitle>Choose a course to review</SectionTitle>
+        <select value={courseId} onChange={(e) => setCourseId(e.target.value)} className="h-10 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm">
+          <option value="">Select a course…</option>
+          {(courses ?? []).map((c) => <option key={c.id} value={c.id}>{c.title}{c.status ? ` (${c.status})` : ''}</option>)}
+        </select>
+        {!courseId && <p className="text-sm text-muted-foreground">Pick a course to review its content, videos and activities, then publish when it's ready.</p>}
+      </Card>
+
+      {courseId && (
+        <>
+          {/* Readiness + publish */}
+          <Card className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <SectionTitle>Readiness</SectionTitle>
+                <div className="text-xs text-muted-foreground mt-0.5">Status: <Badge variant={detail?.status === 'published' ? 'secondary' : 'outline'} className="capitalize">{detail?.status ?? '-'}</Badge></div>
+              </div>
+              {detail?.status === 'published'
+                ? <Button variant="outline" className="gap-1.5" disabled={publish.isPending} onClick={() => publish.mutate('draft')}>Unpublish</Button>
+                : <Button className="gap-1.5" disabled={publish.isPending || !readyToPublish} onClick={() => publish.mutate('published')}><Rocket className="h-4 w-4" /> Publish course</Button>}
+            </div>
+            <div className="mt-3 grid sm:grid-cols-2 gap-x-6 gap-y-1.5">
+              {checks.map((c) => (
+                <div key={c.label} className="flex items-center gap-2 text-sm">
+                  {c.ok ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" /> : <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />}
+                  <span className={cn(!c.ok && 'text-muted-foreground')}>{c.label}</span>
+                </div>
+              ))}
+            </div>
+            {!readyToPublish && detail?.status !== 'published' && <p className="text-xs text-amber-600 mt-2">Resolve the amber items to publish. You can still publish individual modules/activities as you go.</p>}
+          </Card>
+
+          {/* Modules — open each to review its content and video */}
+          <Card className="p-5">
+            <SectionTitle>Modules ({modules.length})</SectionTitle>
+            {!detail ? <Skeleton className="h-16 mt-3" /> : modules.length === 0 ? (
+              <p className="text-sm text-muted-foreground mt-2">No modules yet. Build one in Studio, then it appears here.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {modules.map((m: any) => (
+                  <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm flex items-center gap-2"><BookOpen className="h-3.5 w-3.5 text-muted-foreground" /> {m.title}
+                        <Badge variant={m.status === 'published' ? 'secondary' : 'outline'} className="text-[10px] capitalize">{m.status}</Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground">{m.beatCount ?? 0} beats{m.estimatedMinutes ? ` · ~${m.estimatedMinutes} min` : ''}</div>
+                    </div>
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}><Play className="h-3.5 w-3.5" /> Review</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Interactive activities — preview inline */}
+          <Card className="p-5">
+            <SectionTitle>Interactive activities ({activities.length}{withVideo.length ? ` · ${withVideo.length} video` : ''})</SectionTitle>
+            {activities.length === 0 ? (
+              <p className="text-sm text-muted-foreground mt-2">No interactives on this course. Add them from the course Activities tab.</p>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {activities.map((a: any) => (
+                  <div key={a.id} className="rounded-lg border border-border overflow-hidden">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted/30 border-b border-border">
+                      <div className="text-sm font-medium flex items-center gap-2">{a.title}
+                        {a.published ? <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">Published</Badge> : <Badge variant="outline" className="text-[10px]">Draft</Badge>}
+                        <span className="text-xs text-muted-foreground capitalize">{a.kind}</span>
+                      </div>
+                      <Button size="sm" variant="ghost" onClick={() => window.open(`/activities/${a.id}/play`, '_blank')}>Full screen</Button>
+                    </div>
+                    <ActivityPlayer html={a.html ?? ''} embedUrl={a.embedUrl ?? null} disabled />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Case studies + assignments summary */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Card className="p-5">
+              <SectionTitle>Case studies ({(cases ?? []).length})</SectionTitle>
+              <div className="mt-2 space-y-1.5">
+                {(cases ?? []).map((c: any) => (
+                  <button key={c.itemId} onClick={() => navigate(`/cases/${c.caseId}/edit`)} className="w-full text-left text-sm rounded-md border border-border px-3 py-2 hover:border-primary/40 flex items-center gap-2"><FileText className="h-3.5 w-3.5 text-muted-foreground" /> {c.title}</button>
+                ))}
+                {(cases ?? []).length === 0 && <p className="text-sm text-muted-foreground">None attached.</p>}
+              </div>
+            </Card>
+            <Card className="p-5">
+              <SectionTitle>Assignments ({(assigns ?? []).length})</SectionTitle>
+              <div className="mt-2 space-y-1.5">
+                {(assigns ?? []).map((a: any) => (
+                  <div key={a.id} className="text-sm rounded-md border border-border px-3 py-2 flex items-center justify-between gap-2"><span className="flex items-center gap-2"><ClipboardList className="h-3.5 w-3.5 text-muted-foreground" /> {a.title}</span><span className="text-xs text-muted-foreground">{a.pointsPossible} pts</span></div>
+                ))}
+                {(assigns ?? []).length === 0 && <p className="text-sm text-muted-foreground">None yet.</p>}
+              </div>
+            </Card>
+          </div>
+        </>
+      )}
     </div>
   );
 }
