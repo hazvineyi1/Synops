@@ -1,6 +1,5 @@
-Attached deliverables render ready-to-use inline: interactive activities + case launch cards (ASCII-only)
+Add + publish activities inside a module (ModuleViewer Complete tab) (ASCII-only)
 
-- Activities: each attached interactive now renders EMBEDDED and INTERACTIVE inline in the course Activities tab (no separate open step), with an Attached badge and a Completed badge once the learner submits (ActivityPlayer onSubmit). Full screen + Remove remain.
-- Cases: each attached case now shows an inline launch card (header with title + Attached badge, a Start case button that opens the Socratic runner, plus Edit for instructors), instead of a bare link. Draft cases show Start disabled with a publish hint.
+Inside a module's Complete section, instructors now get an Activities in this module panel: Add existing (attach a library/other activity to this course+module via PATCH), New (author one), and per activity a Publish activity button (PATCH published:true) plus Unpublish and Remove-from-module. Draft activities are marked and only surface to learners once published. This makes the module the place deliverables are added and completed, with a clear publish step. All icons verified imported (added Plus, Trash2).
 
-VALIDATION: esbuild bundle clean on CourseDetail.tsx.
+VALIDATION: esbuild bundle clean on ModuleViewer.tsx.

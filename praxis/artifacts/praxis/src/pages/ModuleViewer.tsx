@@ -1972,6 +1972,64 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
   );
 }
 
+/**
+ * Instructor panel in the module's Video section: attach a video to the module by pasting a URL or
+ * uploading a file (routed to Supabase Storage via the Learning Hub upload endpoint). Sets the
+ * videoUrl on the module's video beat, creating one if the module has none yet.
+ */
+function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBeats: any[] }) {
+  const qc = useQueryClient();
+  const existing = videoBeats[0];
+  const [url, setUrl] = useState<string>(existing?.videoUrl ?? '');
+  const [title, setTitle] = useState<string>(existing?.title ?? 'Video lesson');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const refresh = () => qc.invalidateQueries({ queryKey: ['module-detail', moduleId] });
+
+  const save = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      if (existing) {
+        await apiFetch(`/beats/${existing.id}`, { method: 'PATCH', body: JSON.stringify({ videoUrl: url || null, title: title || 'Video lesson' }) });
+      } else {
+        const beat = await apiFetch<{ id: string }>(`/modules/${moduleId}/beats`, { method: 'POST', body: JSON.stringify({ type: 'video', title: title || 'Video lesson', narration: '', order: 999 }) });
+        await apiFetch(`/beats/${beat.id}`, { method: 'PATCH', body: JSON.stringify({ videoUrl: url || null }) });
+      }
+      refresh(); setMsg('Video saved to this module.');
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not save.'); }
+    finally { setBusy(false); }
+  };
+
+  const onFile = async (f: File | null) => {
+    if (!f) return;
+    setBusy(true); setMsg('Uploading…');
+    try {
+      const b64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(f); });
+      const row = await apiFetch<{ url: string }>(`/learning/content/upload`, { method: 'POST', body: JSON.stringify({ filename: f.name, dataBase64: b64, title: f.name }) });
+      setUrl(row.url); setMsg('Uploaded. Click Save video to attach it to the module.');
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Upload failed. File storage may not be configured.'); }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = ''; }
+  };
+
+  return (
+    <div className="rounded-xl border border-dashed border-primary/30 p-4 space-y-3">
+      <div className="text-sm font-semibold flex items-center gap-2"><PlayCircle className="h-4 w-4 text-primary" /> {existing?.videoUrl ? 'Change module video' : 'Add a video to this module'} <span className="text-xs font-normal text-muted-foreground">Instructor</span></div>
+      <label className="text-xs block"><span className="mb-1 block text-muted-foreground">Video title</span>
+        <input value={title} onChange={(e) => setTitle(e.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+      <label className="text-xs block"><span className="mb-1 block text-muted-foreground">Video URL (paste a link, or upload below)</span>
+        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://... (mp4 / storage / streaming URL)" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+      <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={busy} onClick={() => fileRef.current?.click()}><Link2 className="h-3.5 w-3.5" /> Upload file</Button>
+        <Button size="sm" className="gap-1.5" disabled={busy} onClick={save}><Save className="h-3.5 w-3.5" /> Save video</Button>
+        {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
+      </div>
+      <p className="text-xs text-muted-foreground">Direct file upload uses Supabase Storage; until that is configured, paste a hosted video URL. Learners see the video in this section once saved.</p>
+    </div>
+  );
+}
+
 function ModuleHubView({
   mod, allBeats, course, courseId, moduleId, navigate, isLoading,
 }: {
@@ -2515,7 +2573,9 @@ function ModuleHubView({
 
         {/* VIDEO */}
         {tab === 'video' && (
-          videoBeats.length > 0 ? (
+          <div className="space-y-4">
+            {isInstructor && <ModuleVideoAdmin moduleId={moduleId} videoBeats={videoBeats} />}
+            {videoBeats.length > 0 ? (
             <div className="space-y-8">
               {videoBeats.map((b) => {
                 // Only an authored transcript may be called a transcript. Narration plus
@@ -2569,9 +2629,10 @@ function ModuleHubView({
                 );
               })}
             </div>
-          ) : (
-            <NothingHere icon={PlayCircle} title="No video for this module" next={nextStep} />
-          )
+            ) : (
+              !isInstructor && <NothingHere icon={PlayCircle} title="No video for this module" next={nextStep} />
+            )}
+          </div>
         )}
 
         {/* READINGS — in-module reading beats plus uploaded documents/links */}
