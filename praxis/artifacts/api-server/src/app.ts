@@ -1,6 +1,8 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import path from "node:path";
 import fs from "node:fs";
@@ -10,6 +12,36 @@ import { registerPwa } from "./pwa";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
+
+// Behind Railway's proxy: trust exactly one hop so req.ip / X-Forwarded-For are the real client
+// (needed for correct rate-limit keying and audit IPs). Not `true` — that would trust a spoofable
+// chain and express-rate-limit rejects it.
+app.set("trust proxy", 1);
+
+// Security headers. CSP, frameguard, COEP and CORP are intentionally left OFF here: the SPA uses
+// inline styles and sandboxed activity iframes, and /c/:token /a/:token are DESIGNED to be embedded
+// on external sites (a SAMEORIGIN frame policy would break them). Everything else helmet sets is a
+// safe, non-breaking win: HSTS, X-Content-Type-Options: nosniff, Referrer-Policy, no X-Powered-By.
+// TODO(hardening): add a tuned Content-Security-Policy with frame-ancestors scoped to the embed routes.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
+  frameguard: false,
+}));
+
+// Rate limiting. In-process store (per instance) — a real backstop for a single Railway instance;
+// swap for a shared store (Redis) before horizontal scaling. Auth/impersonation paths are throttled
+// hard against credential stuffing; the broad /api limit is a generous DoS backstop that will not
+// trip a normal dashboard.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: "draft-7", legacyHeaders: false,
+  message: { error: "Too many attempts. Please wait a few minutes and try again." },
+});
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, limit: 1000, standardHeaders: "draft-7", legacyHeaders: false,
+  message: { error: "Rate limit exceeded. Slow down and retry shortly." },
+});
 
 app.use(
   pinoHttp({
@@ -39,6 +71,11 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(cookieParser());
 app.use(express.json({ limit: "25mb" })); // large enough for base64-encoded document uploads (activity content extraction)
 app.use(express.urlencoded({ extended: true }));
+
+// Throttle the auth + (dev) impersonation surfaces hardest, then a broad backstop over all of /api.
+app.use("/api/auth", authLimiter);
+app.use("/api/dev", authLimiter);
+app.use("/api", apiLimiter);
 
 app.use("/api", router);
 

@@ -39,6 +39,20 @@ const RESET_TTL_MS = 60 * 60 * 1000;
 /** Cookie holding the admin's own session while they impersonate someone else. */
 const IMPERSONATOR_COOKIE = "praxis_impersonator";
 
+/**
+ * Absolute base URL for the set-password / reset links we hand to admins. Uses APP_URL when set,
+ * otherwise the current request's host -- so links are always clickable even if APP_URL is not
+ * configured (this was returning a relative `/reset-password?...` that could not be opened).
+ * `app.set("trust proxy", 1)` makes req.protocol honour Railway's x-forwarded-proto.
+ */
+function appBase(req: { protocol: string; get: (h: string) => string | undefined }): string {
+  const configured = process.env.APP_URL?.replace(/\/$/, "");
+  if (configured) return configured;
+  return `${req.protocol}://${req.get("host") ?? "localhost"}`;
+}
+
+const CREATABLE_ROLES = ["super_admin", "partner_admin", "org_admin", "coach", "learner", "instructional_designer", "funder"];
+
 // The audit helper now lives in ../lib/audit (imported above as `audit`) so every route
 // file can write to the same tamper-evident trail, not just the platform console.
 
@@ -188,6 +202,44 @@ router.post("/platform/stop-impersonating", requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /platform/users — create a new user with any role and return a one-time set-password link.
+ * The account starts as "invited" with no password; the returned link lets them set one (or an admin
+ * hands it over). This is the missing "add a user" path: users used to only be creatable against an
+ * organisation (org member add), so there was no way to mint a platform admin from the console.
+ */
+router.post("/platform/users", requireAuth, requireSuperAdmin, async (req, res) => {
+  const email = String(req.body?.email ?? "").toLowerCase().trim();
+  const firstName = (req.body?.firstName ?? "").trim() || null;
+  const lastName = (req.body?.lastName ?? "").trim() || null;
+  const role = String(req.body?.role ?? "");
+  const partnerId = req.body?.partnerId ? String(req.body.partnerId) : null;
+  const organisationId = req.body?.organisationId ? String(req.body.organisationId) : null;
+
+  if (!email || !email.includes("@")) { res.status(400).json({ error: "A valid email is required." }); return; }
+  if (!CREATABLE_ROLES.includes(role)) { res.status(400).json({ error: "A valid role is required." }); return; }
+
+  const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  if (existing.length) { res.status(409).json({ error: "A user with that email already exists. Edit them from the list instead." }); return; }
+
+  const [created] = await db.insert(usersTable).values({
+    email, firstName, lastName, role: role as any, status: "invited", partnerId, organisationId,
+  }).returning();
+
+  // Mint the one-time set-password link immediately, so onboarding is a single step.
+  const token = newSessionToken();
+  const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+  await db.insert(passwordResetsTable).values({
+    userId: created.id, tokenHash: sha256(token), issuedBy: "admin", issuedByUserId: req.userId!, expiresAt,
+  });
+  await audit(req, "user.create", "user", created.id, { email, role });
+
+  res.status(201).json({
+    id: created.id, email, role, status: "invited",
+    link: `${appBase(req)}/reset-password?token=${token}`, expiresAt,
+  });
+});
+
+/**
  * POST /platform/users/:id/reset-link
  * Master password reset: mints a one-time link for an admin to hand to a locked-out
  * user. Works with no email provider configured. The raw token is returned ONCE and
@@ -214,8 +266,7 @@ router.post("/platform/users/:id/reset-link", requireAuth, requireSuperAdmin, as
 
   await audit(req, "user.reset_link", "user", user.id, { email: user.email });
 
-  const base = process.env.APP_URL?.replace(/\/$/, "") ?? "";
-  res.json({ link: `${base}/reset-password?token=${token}`, expiresAt, email: user.email });
+  res.json({ link: `${appBase(req)}/reset-password?token=${token}`, expiresAt, email: user.email });
 });
 
 /** POST /platform/users/:id/suspend — blocks sign-in AND kills live sessions. */

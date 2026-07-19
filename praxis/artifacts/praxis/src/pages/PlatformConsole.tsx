@@ -183,24 +183,92 @@ function OverviewTab() {
 
 /* ───────────────────────────── Users ───────────────────────────── */
 
+const CREATE_ROLES = ["super_admin", "partner_admin", "org_admin", "coach", "learner", "instructional_designer", "funder"] as const;
+
 function UsersTab({ onOpen }: { onOpen: (u: PlatformUserRow) => void }) {
   const [q, setQ] = useState("");
+  const qc = useQueryClient();
+  const { toast } = useToast();
   const { data, isLoading } = useQuery({
     queryKey: ["platform", "users", q],
     queryFn: () => platformApi.listUsers(q),
   });
 
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState({ email: "", firstName: "", lastName: "", role: "learner" });
+  const [createdLink, setCreatedLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const create = useMutation({
+    mutationFn: () => platformApi.createUser({
+      email: form.email.trim(), firstName: form.firstName.trim() || undefined,
+      lastName: form.lastName.trim() || undefined, role: form.role,
+    }),
+    onSuccess: (r) => {
+      setCreatedLink(r.link);
+      qc.invalidateQueries({ queryKey: ["platform", "users"] });
+      toast({ title: "User created", description: `${r.email} — send them the set-password link below.` });
+    },
+    onError: (e: unknown) => toast({ title: "Could not create user", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+  const resetCreate = () => { setForm({ email: "", firstName: "", lastName: "", role: "learner" }); setCreatedLink(null); setCopied(false); };
+
   return (
     <div className="space-y-4">
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by name or email…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative max-w-md flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or email…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Button onClick={() => { resetCreate(); setCreateOpen(true); }}>Create user</Button>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetCreate(); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Create user</DialogTitle></DialogHeader>
+          {createdLink ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">Account created. Send this one-time set-password link (expires in 1 hour). They set a password, then sign in.</p>
+              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 p-2">
+                <code className="flex-1 truncate text-xs">{createdLink}</code>
+                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={async () => { await navigator.clipboard.writeText(createdLink).catch(() => {}); setCopied(true); }}>
+                  {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => resetCreate()}>Create another</Button>
+                <Button onClick={() => { setCreateOpen(false); resetCreate(); }}>Done</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Email</span>
+                <Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="person@org.co.za" /></label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">First name</span>
+                  <Input value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} /></label>
+                <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Last name</span>
+                  <Input value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} /></label>
+              </div>
+              <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Role</span>
+                <Select value={form.role} onValueChange={(v) => setForm((f) => ({ ...f, role: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CREATE_ROLES.map((r) => <SelectItem key={r} value={r} className="capitalize">{roleLabel(r)}</SelectItem>)}
+                  </SelectContent>
+                </Select></label>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                <Button disabled={!form.email.trim() || create.isPending} onClick={() => create.mutate()}>{create.isPending ? "Creating…" : "Create user"}</Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <div className="overflow-x-auto">

@@ -11,7 +11,17 @@ import { newSessionToken, sessionExpiry, cookieOptions, SESSION_COOKIE } from ".
 
 const router = Router();
 
-const isDev = process.env.NODE_ENV !== "production";
+/**
+ * SECURITY: these routes (unauthenticated impersonation, user enumeration, self role-change) must be
+ * DEFAULT-OFF. The old gate was `NODE_ENV !== "production"`, which fails open whenever NODE_ENV is
+ * simply unset (as it was on the live host) -- exposing an unauthenticated path to a super_admin
+ * session. They are now off unless EXPLICITLY enabled via ENABLE_DEV_ROUTES=true, and never enabled
+ * when NODE_ENV=production. To use the demo login in a research-preview environment, set
+ * ENABLE_DEV_ROUTES=true; remove it (and set NODE_ENV=production) for any real deployment.
+ */
+export const devRoutesEnabled =
+  process.env.ENABLE_DEV_ROUTES === "true" && process.env.NODE_ENV !== "production";
+const isDev = devRoutesEnabled;
 
 // POST /dev/impersonate — sign in as any seed user without a password (dev only).
 // Now that requireAuth reads a real auth_session, this mints one instead of the old

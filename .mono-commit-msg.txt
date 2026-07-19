@@ -1,5 +1,5 @@
-Add + publish activities inside a module (ModuleViewer Complete tab) (ASCII-only)
+Editable module Video section: add/upload a video to a module (ModuleViewer) (ASCII-only)
 
-Inside a module's Complete section, instructors now get an Activities in this module panel: Add existing (attach a library/other activity to this course+module via PATCH), New (author one), and per activity a Publish activity button (PATCH published:true) plus Unpublish and Remove-from-module. Draft activities are marked and only surface to learners once published. This makes the module the place deliverables are added and completed, with a clear publish step. All icons verified imported (added Plus, Trash2).
+The module Video section is now editable for instructors: a ModuleVideoAdmin panel lets you set a title and attach a video by URL, or Upload file (base64 -> /learning/content/upload -> Supabase Storage, returns a URL). Saving PATCHes the video beat's videoUrl, creating a video beat (POST /modules/:id/beats type=video) if the module has none. Learners then see the video in this section. Until Supabase is configured, pasting a hosted URL works; file upload shows a clear message. Panel shows in both the empty and populated states. Icons verified imported.
 
 VALIDATION: esbuild bundle clean on ModuleViewer.tsx.
