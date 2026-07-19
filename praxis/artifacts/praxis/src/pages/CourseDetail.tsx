@@ -877,6 +877,61 @@ function CourseSettingsCard({ course, saving, onSave }: {
   );
 }
 
+// Super-admin only: courses belong to the platform and are assigned OUT to partners here.
+// A partner's admins/coaches then see and deliver the courses assigned to their partner.
+function AssignPartnersCard({ courseId }: { courseId: string }) {
+  const qc = useQueryClient();
+  const { data: partners, isLoading } = useQuery({
+    queryKey: ['all-partners'],
+    queryFn: () => apiFetch<{ id: string; name: string; status?: string }[]>(`/partners`),
+  });
+  const { data: current } = useQuery({
+    queryKey: ['course-partners', courseId],
+    queryFn: () => apiFetch<{ partnerIds: string[] }>(`/courses/${courseId}/partners`),
+  });
+  const [sel, setSel] = useState<Set<string> | null>(null);
+  const chosen = sel ?? new Set(current?.partnerIds ?? []);
+  const dirty = sel !== null;
+  const toggle = (id: string) => {
+    const n = new Set(chosen);
+    n.has(id) ? n.delete(id) : n.add(id);
+    setSel(n);
+  };
+  const save = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}/partners`, { method: 'PUT', body: JSON.stringify({ partnerIds: [...chosen] }) }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['course-partners', courseId] }); setSel(null); },
+  });
+  return (
+    <Card className="border-dashed border-primary/30">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Assign to partners</CardTitle>
+        <p className="text-xs text-muted-foreground">This course belongs to the platform. Choose which partners can see and deliver it.</p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Loading partners...</p>
+        ) : !partners?.length ? (
+          <p className="text-xs text-muted-foreground">No partners yet. Create a partner first, then assign this course to it.</p>
+        ) : (
+          <div className="space-y-1">
+            {partners.map((p) => (
+              <label key={p.id} className="flex items-center gap-2 text-sm cursor-pointer rounded px-2 py-1.5 hover:bg-muted/50">
+                <input type="checkbox" className="h-4 w-4" checked={chosen.has(p.id)} onChange={() => toggle(p.id)} />
+                <span className="font-medium">{p.name}</span>
+                {p.status && <Badge variant="outline" className="text-[10px] ml-auto capitalize">{p.status}</Badge>}
+              </label>
+            ))}
+          </div>
+        )}
+        <div className="flex justify-end gap-2">
+          {dirty && <Button size="sm" variant="ghost" onClick={() => setSel(null)}>Reset</Button>}
+          <Button size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : 'Save assignments'}</Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function CourseObjectivesCard({ initial, saving, onSave }: {
   initial: string[];
   saving: boolean;
@@ -1364,6 +1419,8 @@ export function CourseDetail() {
                   onSave={(objectives) => saveCourse.mutate({ objectives })}
                 />
               )}
+              {/* Super admin: assign this platform-owned course out to partners. */}
+              {role === 'super_admin' && <AssignPartnersCard courseId={courseId} />}
               {/* Front page content */}
               {pages?.find(p => p.frontPage) && (
                 <Card>

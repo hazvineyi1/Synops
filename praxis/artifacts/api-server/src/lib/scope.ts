@@ -12,6 +12,7 @@ import {
   courseGroupsTable,
   courseGroupMembersTable,
   coursesTable,
+  coursePartnerAssignmentsTable,
   funderScopesTable,
   deliverySessionsTable,
   attendanceRecordsTable,
@@ -75,6 +76,25 @@ export async function leaderCourseIds(userId: string): Promise<Set<string>> {
 /** Does this Co-facilitator lead any section of `courseId`? */
 export async function leadsCourse(userId: string, courseId: string): Promise<boolean> {
   return (await leaderCourseIds(userId)).has(courseId);
+}
+
+/**
+ * Is this platform-owned course assigned to the given partner? Courses belong to the super
+ * admin and are handed to partners by assignment; a partner's admins/coaches may act on the
+ * courses assigned to their partner. Swallows a missing table (pre-setup) as "no".
+ */
+export async function courseAssignedToPartner(courseId: string, partnerId: string): Promise<boolean> {
+  try {
+    const row = await db.query.coursePartnerAssignmentsTable.findFirst({
+      where: and(
+        eq(coursePartnerAssignmentsTable.courseId, courseId),
+        eq(coursePartnerAssignmentsTable.partnerId, partnerId),
+      ),
+    });
+    return !!row;
+  } catch {
+    return false;
+  }
 }
 
 /** Does this Co-facilitator lead this specific section (group)? */
@@ -144,6 +164,9 @@ export async function canStaffActOnCourse(user: StaffUser, courseId: string): Pr
   const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
   if (!course) return false;
   if (canAdministerOrg(user.role) && canAccessCourse(user, course)) return true;
+  // Platform-owned course assigned to this admin/coach's partner -> they may deliver it.
+  if ((canAdministerOrg(user.role) || isCoFacilitator(user.role)) && user.partnerId &&
+      (await courseAssignedToPartner(courseId, user.partnerId))) return true;
   if (isCoFacilitator(user.role)) return leadsCourse(user.id, courseId);
   return false;
 }

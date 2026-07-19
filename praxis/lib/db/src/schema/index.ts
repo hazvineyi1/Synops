@@ -37,3 +37,4 @@ export * from "./tutor_figures";
 export * from "./gradebook";
 export * from "./module_readings";
 export * from "./learning_hub";
+export * from "./course_partner_assignments";

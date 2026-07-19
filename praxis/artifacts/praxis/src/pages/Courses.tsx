@@ -49,6 +49,23 @@ export function Courses() {
   });
 
   const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
+  const isSuper = user?.role === "super_admin";
+  const [adopting, setAdopting] = useState(false);
+  // One-time: bring every existing course under super-admin ownership (tenantId "platform") so
+  // the whole catalogue is owned centrally and delivered to partners by assignment. Idempotent.
+  const adoptAll = async () => {
+    if (!window.confirm("Make ALL existing courses platform-owned (belonging to the super admin)? Partners keep access only to courses assigned to them. This is safe to run once.")) return;
+    setAdopting(true);
+    try {
+      const r = await apiFetch<{ coursesAdopted: number }>("/courses/setup-platform", { method: "POST" });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      window.alert(`Done. ${r.coursesAdopted} course(s) are now owned by the platform. Assign each to partners from its page.`);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Could not update course ownership.");
+    } finally {
+      setAdopting(false);
+    }
+  };
   const [createOpen, setCreateOpen] = useState(false);
   const [nc, setNc] = useState({ title: "", description: "", nqfLevel: "" });
   const [creating, setCreating] = useState(false);
@@ -106,7 +123,14 @@ export function Courses() {
         icon={BookOpen}
         subtitle={hasEnrolled ? "Pick up a course in progress, or explore something new." : "Browse available programs and begin your mastery journey."}
         action={canAuthor ? (
-          <Button className="gap-1.5" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> New course</Button>
+          <div className="flex items-center gap-2">
+            {isSuper && (
+              <Button variant="outline" className="gap-1.5" disabled={adopting} onClick={adoptAll} title="Make all existing courses platform-owned">
+                {adopting ? "Adopting…" : "Adopt all to platform"}
+              </Button>
+            )}
+            <Button className="gap-1.5" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> New course</Button>
+          </div>
         ) : undefined}
       />
 

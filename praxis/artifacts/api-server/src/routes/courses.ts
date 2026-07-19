@@ -1,9 +1,13 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { coursesTable, modulesTable, beatsTable, assignmentsTable, interactiveActivitiesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { coursesTable, modulesTable, beatsTable, assignmentsTable, interactiveActivitiesTable, coursePartnerAssignmentsTable } from "@workspace/db";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { canParticipateInCourse, canStaffActOnCourse } from "../lib/scope";
+
+// Courses belong to the super admin (tenantId "platform") and are assigned OUT to partners.
+const HUB_ROLES = new Set(["super_admin", "instructional_designer"]);
+const isHub = (role?: string | null) => !!role && HUB_ROLES.has(role);
 
 const router = Router();
 
@@ -30,27 +34,101 @@ router.get("/courses", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   // Hub roles (super_admin, instructional_designer) author/oversee across every org, so
   // they see the whole catalogue; everyone else is scoped to their partner/org tenant.
-  const seesAll = user.role === "super_admin" || user.role === "instructional_designer";
-  const courses = seesAll
-    ? await db.select().from(coursesTable).orderBy(desc(coursesTable.createdAt))
-    : await db
-        .select()
-        .from(coursesTable)
-        .where(eq(coursesTable.tenantId, user.partnerId ?? user.organisationId ?? user.id))
-        .orderBy(desc(coursesTable.createdAt));
-  res.json(courses.map(toCourseResponse));
+  const seesAll = isHub(user.role);
+  if (seesAll) {
+    const courses = await db.select().from(coursesTable).orderBy(desc(coursesTable.createdAt));
+    res.json(courses.map(toCourseResponse));
+    return;
+  }
+  // Non-hub users see (a) courses their own tenant owns, plus (b) platform-owned courses
+  // ASSIGNED to their partner from the console. Additive: assignment only grants visibility,
+  // it never removes a course the tenant already owns. Learner course access is still gated
+  // by enrolment elsewhere; this list drives the catalogue an admin/coach can act on.
+  const scope = user.partnerId ?? user.organisationId ?? user.id;
+  const owned = await db.select().from(coursesTable).where(eq(coursesTable.tenantId, scope));
+  let assigned: (typeof coursesTable.$inferSelect)[] = [];
+  if (user.partnerId) {
+    try {
+      const rows = await db
+        .select({ courseId: coursePartnerAssignmentsTable.courseId })
+        .from(coursePartnerAssignmentsTable)
+        .where(eq(coursePartnerAssignmentsTable.partnerId, user.partnerId));
+      const ids = [...new Set(rows.map((r) => r.courseId))].filter((id) => !owned.some((o) => o.id === id));
+      if (ids.length) assigned = await db.select().from(coursesTable).where(inArray(coursesTable.id, ids));
+    } catch {
+      // Assignment table not created yet (setup-platform not run) -> just the owned list.
+    }
+  }
+  const all = [...owned, ...assigned].sort(
+    (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+  );
+  res.json(all.map(toCourseResponse));
 });
 
 // POST /courses -- author tiers only (was requireAuth-only, which let any signed-in user create).
 router.post("/courses", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
   const user = req.dbUser!;
-  const tenantId = user.partnerId ?? user.organisationId ?? user.id;
+  // Hub roles (super admin / ID) author the platform catalogue: their courses are owned by
+  // "platform" and assigned to partners afterwards. A partner/org author's course stays their own.
+  const tenantId = isHub(user.role) ? "platform" : (user.partnerId ?? user.organisationId ?? user.id);
   const { title, description, competencyTags, nqfLevel, thumbnailUrl } = req.body;
   const [course] = await db
     .insert(coursesTable)
     .values({ title, description, tenantId, competencyTags: competencyTags ?? [], nqfLevel, thumbnailUrl })
     .returning();
   res.status(201).json(toCourseResponse(course));
+});
+
+/**
+ * POST /courses/setup-platform (super admin) — one-time: make the assignment table exist and
+ * bring EVERY existing course under super-admin ownership (tenantId "platform") so the whole
+ * catalogue is owned centrally and delivered to partners by assignment. Idempotent. Needed
+ * because the server has no psql access to run the migration by hand.
+ */
+router.post("/courses/setup-platform", requireAuth, requireRole("super_admin"), async (_req, res) => {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS course_partner_assignments (
+      id text PRIMARY KEY,
+      course_id text NOT NULL,
+      partner_id text NOT NULL,
+      assigned_by text,
+      assigned_at timestamptz NOT NULL DEFAULT now()
+    )`);
+  await db.execute(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS course_partner_assignments_course_partner_uidx
+      ON course_partner_assignments (course_id, partner_id)`);
+  const updated = await db.update(coursesTable).set({ tenantId: "platform" }).returning({ id: coursesTable.id });
+  res.json({ ok: true, coursesAdopted: updated.length });
+});
+
+// GET /courses/:courseId/partners (super admin) — which partners this course is assigned to.
+router.get("/courses/:courseId/partners", requireAuth, requireRole("super_admin"), async (req, res) => {
+  try {
+    const rows = await db
+      .select({ partnerId: coursePartnerAssignmentsTable.partnerId })
+      .from(coursePartnerAssignmentsTable)
+      .where(eq(coursePartnerAssignmentsTable.courseId, req.params.courseId));
+    res.json({ partnerIds: [...new Set(rows.map((r) => r.partnerId))] });
+  } catch {
+    // Table not created yet (setup-platform not run) -> no assignments.
+    res.json({ partnerIds: [] });
+  }
+});
+
+// PUT /courses/:courseId/partners (super admin) — replace the set of partners a course is
+// assigned to. Body: { partnerIds: string[] }.
+router.put("/courses/:courseId/partners", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const courseId = req.params.courseId;
+  const partnerIds = Array.isArray(req.body?.partnerIds)
+    ? [...new Set(req.body.partnerIds.filter((p: unknown): p is string => typeof p === "string" && p.length > 0))]
+    : [];
+  await db.delete(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.courseId, courseId));
+  if (partnerIds.length) {
+    await db.insert(coursePartnerAssignmentsTable).values(
+      partnerIds.map((partnerId) => ({ courseId, partnerId, assignedBy: req.dbUser!.id })),
+    );
+  }
+  res.json({ partnerIds });
 });
 
 // GET /courses/:courseId
