@@ -10,13 +10,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
-  Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, Pin,
-  CheckCircle, Clock, AlertCircle, Play, Target, Save, Pencil, Trash2, Layers, Sparkles
+  Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
+  CheckCircle, Clock, AlertCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Sparkles
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
+import { ActivityPlayer } from '@/components/ActivityPlayer';
 
 /**
  * Shared shell for the small instructor "create X" forms on this page.
@@ -507,7 +508,7 @@ interface Enrolment { id: string; status: string; }
 interface ModuleProgress { moduleId: string; title: string; order: number; viewedBeats: number; totalBeats: number; percent: number; complete: boolean; certified?: boolean; }
 interface CourseProgress { courseId: string; viewedBeats: number; totalBeats: number; percent: number; certified?: boolean; modules: ModuleProgress[]; }
 
-interface CourseActivity { id: string; title: string; kind: string; published: boolean; courseId?: string | null; moduleId?: string | null; bloomsLevel?: string | null; difficulty?: string | null; }
+interface CourseActivity { id: string; title: string; kind: string; published: boolean; courseId?: string | null; moduleId?: string | null; bloomsLevel?: string | null; difficulty?: string | null; html?: string; embedUrl?: string | null; }
 
 /** In-course Interactives: list activities linked to this course, attach existing ones, or author new. */
 function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isInstructor: boolean }) {
@@ -526,6 +527,8 @@ function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isI
     onSuccess: () => qc.invalidateQueries({ queryKey: ['course-activities', courseId] }),
   });
   const candidates = (allActs || []).filter((a) => a.courseId !== courseId);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   return (
     <div className="space-y-3">
@@ -560,29 +563,43 @@ function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isI
       {attached?.length === 0 && !isLoading && (
         <div className="text-center text-muted-foreground py-12">No interactives on this course yet.{isInstructor && ' Attach an existing one or create a new interactive.'}</div>
       )}
-      {attached?.map((a) => (
-        <Card key={a.id}>
-          <CardContent className="py-4 flex items-center justify-between gap-4">
-            <button className="flex-1 min-w-0 text-left" onClick={() => navigate(`/activities/${a.id}/play`)}>
-              <div className="font-medium text-foreground flex items-center gap-2">{a.title}{!a.published && <Badge variant="outline" className="text-[10px]">Draft</Badge>}</div>
-              <div className="text-xs text-muted-foreground capitalize flex flex-wrap gap-2 mt-0.5">
-                <span>{a.kind}</span>
-                {a.bloomsLevel && <span className="text-purple-600">{a.bloomsLevel}</span>}
-                {a.difficulty && <span>{a.difficulty}</span>}
+      {attached?.map((a) => {
+        const isOpen = expanded.has(a.id);
+        return (
+          <Card key={a.id}>
+            <CardContent className="py-4">
+              <div className="flex items-center justify-between gap-4">
+                <button className="flex-1 min-w-0 text-left" onClick={() => toggleExpand(a.id)}>
+                  <div className="font-medium text-foreground flex items-center gap-2">
+                    <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !isOpen && '-rotate-90')} />
+                    {a.title}{!a.published && <Badge variant="outline" className="text-[10px]">Draft</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground capitalize flex flex-wrap gap-2 mt-0.5 pl-6">
+                    <span>{a.kind}</span>
+                    {a.bloomsLevel && <span className="text-purple-600">{a.bloomsLevel}</span>}
+                    {a.difficulty && <span>{a.difficulty}</span>}
+                  </div>
+                </button>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <Button size="sm" variant="ghost" onClick={() => toggleExpand(a.id)}>{isOpen ? 'Hide' : 'Preview'}</Button>
+                  <Button size="sm" variant="ghost" onClick={() => navigate(`/activities/${a.id}/play`)}><Play className="h-3.5 w-3.5 mr-1.5" /> Open</Button>
+                  {isInstructor && (
+                    <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" title="Remove from course"
+                      onClick={() => { if (window.confirm(`Remove "${a.title}" from this course? The activity itself is not deleted.`)) detach.mutate(a.id); }}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
-            </button>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <Button size="sm" variant="ghost" onClick={() => navigate(`/activities/${a.id}/play`)}><Play className="h-3.5 w-3.5 mr-1.5" /> Open</Button>
-              {isInstructor && (
-                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" title="Remove from course"
-                  onClick={() => { if (window.confirm(`Remove "${a.title}" from this course? The activity itself is not deleted.`)) detach.mutate(a.id); }}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+              {isOpen && (
+                <div className="mt-3 rounded-lg border border-border overflow-hidden">
+                  <ActivityPlayer html={a.html ?? ''} embedUrl={a.embedUrl ?? null} disabled />
+                </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

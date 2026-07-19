@@ -1,7 +1,5 @@
-Add-to-course from the deliverable pages: obvious per-card action on Activities and Cases (ASCII-only)
+Fix ModuleViewer white-screen crash (React #31 on object-valued beat fields) (ASCII-only)
 
-Previously placing a deliverable in a course was buried (Activities: a dropdown behind Edit tab; Cases: a published-only button labelled Gradebook), so it looked like there was no way to do it.
-- Activities: every activity card gets an Add to course / Change course button + an In a course badge; opens a course+module picker that PATCHes /activities/:id (shows in the course Activities tab).
-- Cases: relabelled Gradebook to Add to course, opened it to all authors, and drafts now show a disabled Add to course (publish first) so the path is visible.
+Opening a module blanked/froze the page whenever a beat had a scenario (or other field) stored as a structured object (e.g. an AI/seeded quiz-scenario with keys situation/question/options/correctOption/explanation) rather than plain text - rendering an object as a React child throws React error 31 and takes down the whole module. Same class as the earlier Studio fix. Added toBeatText() to ModuleViewer and routed every rendered beat field (narration, scenario, points, compare items) through it so object fields render as readable text.
 
-VALIDATION: esbuild bundle clean on ActivitiesAdmin.tsx and Cases.tsx.
+VALIDATION: esbuild bundle clean on ModuleViewer.tsx.
