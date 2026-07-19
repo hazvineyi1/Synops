@@ -14,7 +14,7 @@ import {
   Settings, TrendingUp, Receipt, ShieldCheck, Upload, ChevronRight, CheckCircle2, AlertTriangle,
   UserPlus, KeyRound, Ban, RotateCcw, Settings2, Layers, Check, Send, LifeBuoy,
   Phone, MapPin, Mail, Smartphone, Link2, Plus,
-  Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock,
+  Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock, Trash2,
 } from 'lucide-react';
 import {
   getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgCoaching, orgGradebook,
@@ -37,7 +37,8 @@ const SECTION_META: Record<string, { title: string; icon: React.ComponentType<{ 
 };
 
 type OrgRole = 'org_admin' | 'coach' | 'learner';
-type Member = { id: string; name: string; email: string; role: OrgRole; status: 'active' | 'invited' | 'suspended'; progress?: number; course?: string };
+type MemberStatus = 'active' | 'invited' | 'suspended' | 'archived';
+type Member = { id: string; name: string; email: string; role: OrgRole; status: MemberStatus; progress?: number; course?: string };
 
 const ROLE_LABEL: Record<OrgRole, string> = { org_admin: 'Org admin', coach: 'Coach', learner: 'Learner' };
 const roleBadge = (r: OrgRole) =>
@@ -112,6 +113,14 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const [nm, setNm] = useState(''); const [em, setEm] = useState(''); const [rl, setRl] = useState<OrgRole>('learner');
   const [flash, setFlash] = useState<string | null>(null);
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
+
+  // In-drawer confirmation (the page-level flash is hidden behind the modal, so actions
+  // taken inside the drawer report here, where the admin can actually see them).
+  const [drawerMsg, setDrawerMsg] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const drawerNote = (m: string) => { setDrawerMsg(m); window.setTimeout(() => setDrawerMsg(null), 4500); };
+  const openMember = (m: Member) => { setSelected(m); setDrawerMsg(null); setConfirmDelete(false); };
+  const deleteMember = (id: string, name: string) => { setMembers((xs) => xs.filter((x) => x.id !== id)); setSelected(null); setConfirmDelete(false); flashMsg(`${name}'s account was deleted.`); };
 
   const setMemberStatus = (id: string, status: Member['status']) => {
     setMembers((xs) => xs.map((m) => (m.id === id ? { ...m, status } : m)));
@@ -255,9 +264,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                   <tr key={m.id} className="hover:bg-muted/20">
                     <td className="p-3"><div className="font-medium">{m.name}</div><div className="text-xs text-muted-foreground">{m.email}</div></td>
                     <td className="p-3"><span className={cn('rounded px-2 py-0.5 text-xs font-medium', roleBadge(m.role))}>{ROLE_LABEL[m.role]}</span></td>
-                    <td className="p-3"><Badge variant={m.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', m.status === 'suspended' && 'border-red-300 text-red-600')}>{m.status}</Badge></td>
+                    <td className="p-3"><Badge variant={m.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', m.status === 'suspended' && 'border-red-300 text-red-600', m.status === 'archived' && 'border-slate-300 text-slate-500')}>{m.status}</Badge></td>
                     {roleFilter === 'learner' && <td className="p-3">{m.progress != null ? <div className="flex items-center gap-2"><Progress value={m.progress} className="h-1.5 w-24" /><span className="text-xs tabular-nums text-muted-foreground">{m.progress}%</span></div> : <span className="text-muted-foreground">—</span>}</td>}
-                    <td className="p-3 text-right"><Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => setSelected(m)}><Settings2 className="h-3.5 w-3.5" /> Manage</Button></td>
+                    <td className="p-3 text-right"><Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => openMember(m)}><Settings2 className="h-3.5 w-3.5" /> Manage</Button></td>
                   </tr>
                 ))}
                 {filteredMembers.length === 0 && <tr><td colSpan={roleFilter === 'learner' ? 5 : 4} className="p-6 text-center text-muted-foreground">No members in this view.</td></tr>}
@@ -537,8 +546,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 <div className="flex items-center gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold shrink-0">{initials(selected.name)}</div>
                   <div className="min-w-0">
-                    <DialogTitle className="flex items-center gap-2">{selected.name}
+                    <DialogTitle className="flex items-center gap-2 flex-wrap">{selected.name}
                       {selectedLearner && <span className={cn('rounded px-2 py-0.5 text-[10px] font-medium', lifecyclePill(selectedLearner.lifecycleStatus))}>{selectedLearner.lifecycleStatus}</span>}
+                      {(selected.status === 'suspended' || selected.status === 'archived') && <span className="rounded px-2 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 capitalize">{selected.status}</span>}
                     </DialogTitle>
                     <DialogDescription>{selected.email} · <span className="capitalize">{ROLE_LABEL[selected.role]}</span> · {d.org.name}</DialogDescription>
                   </div>
@@ -546,8 +556,15 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
               </DialogHeader>
 
               <div className="space-y-4">
+                {/* In-drawer confirmation (visible above the modal, unlike the page flash) */}
+                {drawerMsg && (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/30 px-3 py-2 flex items-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" /> {drawerMsg}
+                  </div>
+                )}
+
                 <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Role in this organisation</span>
-                  <select value={selected.role} onChange={(e) => { setMemberRole(selected.id, e.target.value as OrgRole); flashMsg(`Role updated to ${ROLE_LABEL[e.target.value as OrgRole]}.`); }}
+                  <select value={selected.role} onChange={(e) => { setMemberRole(selected.id, e.target.value as OrgRole); drawerNote(`Role updated to ${ROLE_LABEL[e.target.value as OrgRole]}.`); }}
                     className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
                     <option value="learner">Learner</option><option value="coach">Coach</option><option value="org_admin">Org admin</option>
                   </select></label>
@@ -556,21 +573,35 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 <div className="rounded-lg border border-border p-3">
                   <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><KeyRound className="h-3.5 w-3.5" /> Reset password — send link via</div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => flashMsg(`Password reset link sent to ${selected.email}.`)}><Mail className="h-3.5 w-3.5" /> Email</Button>
-                    <Button size="sm" variant="outline" className="gap-1.5" disabled={!selectedLearner?.whatsappOptIn} onClick={() => flashMsg(`Password reset link sent via WhatsApp to ${selectedLearner?.phone}.`)}><Smartphone className="h-3.5 w-3.5" /> WhatsApp</Button>
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => drawerNote(`Password reset link sent to ${selected.email}.`)}><Mail className="h-3.5 w-3.5" /> Email</Button>
+                    <Button size="sm" variant="outline" className="gap-1.5" disabled={!selectedLearner?.whatsappOptIn} onClick={() => drawerNote(`Password reset link sent via WhatsApp to ${selectedLearner?.phone}.`)}><Smartphone className="h-3.5 w-3.5" /> WhatsApp</Button>
                   </div>
                   {selectedLearner && !selectedLearner.whatsappOptIn && <p className="text-[11px] text-muted-foreground mt-1.5">WhatsApp reset unavailable — learner has not opted in.</p>}
                 </div>
 
                 {/* Account actions */}
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" className="gap-2 justify-start" onClick={() => flashMsg(`Login help sent to ${selected.email}.`)}><LifeBuoy className="h-4 w-4" /> Login help</Button>
+                  <Button variant="outline" className="gap-2 justify-start" onClick={() => drawerNote(`Login help link resent to ${selected.email}.`)}><LifeBuoy className="h-4 w-4" /> Resend login help</Button>
                   {selected.status === 'suspended' ? (
-                    <Button variant="outline" className="gap-2 justify-start text-emerald-600" onClick={() => { setMemberStatus(selected.id, 'active'); flashMsg(`${selected.name} reactivated.`); }}><RotateCcw className="h-4 w-4" /> Reactivate</Button>
+                    <Button variant="outline" className="gap-2 justify-start text-emerald-600" onClick={() => { setMemberStatus(selected.id, 'active'); drawerNote(`${selected.name} reactivated.`); }}><RotateCcw className="h-4 w-4" /> Reactivate</Button>
                   ) : (
-                    <Button variant="outline" className="gap-2 justify-start text-red-600" onClick={() => { setMemberStatus(selected.id, 'suspended'); flashMsg(`${selected.name} suspended.`); }}><Ban className="h-4 w-4" /> Suspend account</Button>
+                    <Button variant="outline" className="gap-2 justify-start text-red-600" onClick={() => { setMemberStatus(selected.id, 'suspended'); drawerNote(`${selected.name} suspended.`); }}><Ban className="h-4 w-4" /> Suspend account</Button>
+                  )}
+                  {selected.status === 'archived' ? (
+                    <Button variant="outline" className="gap-2 justify-start text-emerald-600" onClick={() => { setMemberStatus(selected.id, 'active'); drawerNote(`${selected.name} restored from archive.`); }}><RotateCcw className="h-4 w-4" /> Restore</Button>
+                  ) : (
+                    <Button variant="outline" className="gap-2 justify-start" onClick={() => { setMemberStatus(selected.id, 'archived'); drawerNote(`${selected.name} archived. Record kept, access removed.`); }}><FileText className="h-4 w-4" /> Archive</Button>
+                  )}
+                  {confirmDelete ? (
+                    <div className="col-span-1 flex items-center gap-1.5">
+                      <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-300" onClick={() => deleteMember(selected.id, selected.name)}>Confirm delete</Button>
+                      <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+                    </div>
+                  ) : (
+                    <Button variant="outline" className="gap-2 justify-start text-red-600" onClick={() => setConfirmDelete(true)}><Trash2 className="h-4 w-4" /> Delete account</Button>
                   )}
                 </div>
+                {confirmDelete && <p className="text-[11px] text-red-600">Deleting permanently removes {selected.name}'s account and record from {d.org.name}. Consider Archive if you may need it later.</p>}
 
                 {selectedLearner && (
                   <>

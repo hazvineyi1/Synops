@@ -1,11 +1,9 @@
-Org Hub: full Classes system + org-level learner records + self-enrolment (ASCII-only)
+Org Hub: richer learner profile drawer + reset-password channel choice (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only, seeded partner data.
 
-CLASSES: new Classes section in the org hub. Create and name classes; each class has its own workspace -- roster (enrol/remove learners, reset learner password), staff assignment (facilitator/coach/admin), course assignment, class gradebook, in-app learner messages with reply, and activity/engagement metrics. New reactive module store (orgClassStore.ts) so classes persist across the class sub-pages. Route /partner/org/:orgId/classes/:classId; Classes added to the org sidebar. Courses section is now a read-only catalog (assignment happens inside a class).
+LEARNER RECORD: OrgLearner now carries date of birth + age, gender, ID/passport (shown masked), nationality, home language, population group (B-BBEE), disability, highest qualification, employment status, current occupation, employer, learner lifecycle status (Active/On break/Graduated/Withdrawn) and emergency contact, all generated deterministically with SA-realistic values.
 
-ORG-LEVEL LEARNER INFO: learners now carry phone, WhatsApp opt-in, address, funder, registered-via/at and last-active, shown in the People learner drawer at the ORG level (not the class level).
+PROFILE DRAWER REDESIGN: wider, scrollable, avatar header with lifecycle badge; grouped sections (Personal, Contact, Education & employment, Programme & funding) via a ProfileRow helper. Reset password now offers a channel choice - Email or WhatsApp - with WhatsApp gated on the learner opt-in.
 
-SELF-ENROLMENT: from People, generate a self-enrolment link and send it by email or WhatsApp.
-
-VALIDATION: parse-check + local-resolution bundle clean; lucide icons and store/data exports verified; class route registered. Message kept short (the 37k-char overflow lesson).
+VALIDATION: parse-check + local-resolution bundle clean; new lucide icons (Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock) confirmed to resolve.
