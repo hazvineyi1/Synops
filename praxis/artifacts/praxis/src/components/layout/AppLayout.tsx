@@ -37,7 +37,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getPartnerHub, orgDetail } from '@/lib/partnerHubData';
+import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Sokratify theme: one dark-navy sidebar + warm off-white content across the
@@ -122,6 +122,35 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const role = user.role;
 
   const getNavGroups = (): NavGroup[] => {
+    // Org context: whenever anyone with tenant oversight (partner admin OR super admin) is inside
+    // an organisation (/partner/org/:id), the whole sidebar becomes that org's own hub. This is
+    // role-independent so the founder testing as super admin gets the same in-org navigation.
+    const orgMatch = location.match(/^\/partner\/org\/([^/]+)/);
+    if (orgMatch && (role === 'partner_admin' || role === 'super_admin')) {
+      const orgId = orgMatch[1];
+      const b = `/partner/org/${orgId}`;
+      const orgHub = findHubByOrgId(orgId) ?? getPartnerHub(user.partnerId);
+      const org = orgDetail(orgHub, orgId).org;
+      const orgName = org?.name ?? t('nav.organisation', 'Organisation');
+      return [
+        { items: [{ label: t('nav.allOrganisations', 'All organisations'), href: '/partner/organisations', icon: ArrowLeft }] },
+        {
+          heading: orgName,
+          items: [
+            { label: t('nav.orgOverview', 'Overview'), href: b, icon: LayoutDashboard },
+            { label: t('nav.orgPeople', 'People'), href: `${b}/people`, icon: Users },
+            { label: t('nav.orgCourses', 'Courses'), href: `${b}/courses`, icon: BookOpen },
+            { label: t('nav.orgCoaching', 'Coaching'), href: `${b}/coaching`, icon: GraduationCap },
+            { label: t('nav.orgGradebook', 'Gradebook'), href: `${b}/gradebook`, icon: ClipboardList },
+            { label: t('nav.orgFunding', 'Funding'), href: `${b}/funding`, icon: Landmark },
+            { label: t('nav.orgDocuments', 'Documents'), href: `${b}/documents`, icon: FileText },
+            { label: t('nav.orgBilling', 'Billing'), href: `${b}/billing`, icon: Wallet },
+            { label: t('nav.orgSettings', 'Settings'), href: `${b}/settings`, icon: Settings },
+          ],
+        },
+      ];
+    }
+
     if (role === 'learner') {
       // Case studies and Activities are reached by learners inside their modules (assigned
       // as part of the module experience), so they are intentionally NOT top-level nav for
@@ -175,36 +204,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (role === 'partner_admin') {
-      // When the partner admin has stepped INTO an organisation (/partner/org/:id), the whole
-      // sidebar becomes that organisation's own hub — every delivery, people, funding, document
-      // and billing surface is scoped to that one org, and the only way out is "All organisations".
-      // Nothing partner-wide leaks in here.
-      const orgMatch = location.match(/^\/partner\/org\/([^/]+)/);
-      if (orgMatch) {
-        const orgId = orgMatch[1];
-        const base = `/partner/org/${orgId}`;
-        const org = orgDetail(getPartnerHub(user.partnerId), orgId).org;
-        const orgName = org?.name ?? t('nav.organisation', 'Organisation');
-        return [
-          { items: [{ label: t('nav.allOrganisations', 'All organisations'), href: '/partner/organisations', icon: ArrowLeft }] },
-          {
-            heading: orgName,
-            items: [
-              { label: t('nav.orgOverview', 'Overview'), href: base, icon: LayoutDashboard },
-              { label: t('nav.orgPeople', 'People'), href: `${base}/people`, icon: Users },
-              { label: t('nav.orgCourses', 'Courses'), href: `${base}/courses`, icon: BookOpen },
-              { label: t('nav.orgCoaching', 'Coaching'), href: `${base}/coaching`, icon: GraduationCap },
-              { label: t('nav.orgGradebook', 'Gradebook'), href: `${base}/gradebook`, icon: ClipboardList },
-              { label: t('nav.orgFunding', 'Funding'), href: `${base}/funding`, icon: Landmark },
-              { label: t('nav.orgDocuments', 'Documents'), href: `${base}/documents`, icon: FileText },
-              { label: t('nav.orgBilling', 'Billing'), href: `${base}/billing`, icon: Wallet },
-              { label: t('nav.orgSettings', 'Settings'), href: `${base}/settings`, icon: Settings },
-            ],
-          },
-        ];
-      }
-
-      // Top level (outside any organisation): only where the partner LOOKS (Overview,
+      // Org context is handled above (shared with super admin). Top level (outside any
+      // organisation): only where the partner LOOKS (Overview,
       // Organisations) and the partner-wide control surface (the Partner Admin Platform).
       // Delivery no longer lives here — it belongs inside each organisation.
       return [
@@ -240,6 +241,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           heading: t('nav.groups.platform', 'Platform'),
           items: [
             { label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ShieldCheck },
+            { label: t('nav.partnerHub', 'Partner Hub'), href: '/partner', icon: Wallet },
+            { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
             { label: t('nav.platformSettings', 'Branding'), href: '/partner/theme', icon: Settings },
           ],
         },

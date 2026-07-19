@@ -230,6 +230,12 @@ export function getPartnerHub(partnerId: string | null | undefined): PartnerHub 
   return (partnerId && HUBS[partnerId]) || TALENTFORGE;
 }
 
+/** Resolve the hub that OWNS a given organisation, so any viewer (incl. super admin) sees the right tenant. */
+export function findHubByOrgId(orgId: string | null | undefined): PartnerHub | undefined {
+  if (!orgId) return undefined;
+  return Object.values(HUBS).find((h) => h.orgs.some((o) => o.id === orgId));
+}
+
 // ── Rollups for the Overview ─────────────────────────────────────────────────
 export function financeRollup(h: PartnerHub) {
   const totalSeats = h.subscriptions.reduce((s, x) => s + x.seats, 0);
@@ -327,6 +333,24 @@ export function orgCoaching(h: PartnerHub, orgId: string): OrgCoachingSummary {
   const learners = d.sub?.activeSeats ?? 24;
   const atRisk = Math.round(learners * (0.1 + (seed % 3) / 20));
   return { sections: 2 + (seed % 3), coaches: Math.max(1, d.coaches.length), onTrack: learners - atRisk, atRisk, avgHealth: 72 + (seed % 20) };
+}
+
+export type OrgClass = { id: string; name: string; learners: number; coach: string };
+
+/** Classes / cohorts within an organisation (deterministic), so courses can be assigned to a group. */
+export function orgClasses(h: PartnerHub, orgId: string): OrgClass[] {
+  const d = orgDetail(h, orgId);
+  const seed = seedOf(orgId);
+  const total = d.sub?.activeSeats ?? 24;
+  const n = 2 + (seed % 2); // 2–3 classes
+  const coachNames = d.coaches.length ? d.coaches.map((c) => c.name) : ['Assigned coach'];
+  const labels = ['Morning Cohort', 'Afternoon Cohort', 'Evening Cohort'];
+  return Array.from({ length: n }).map((_, i) => ({
+    id: `${orgId}_cls${i}`,
+    name: `${labels[i % labels.length]} ${2026}`,
+    learners: Math.max(4, Math.round(total / n)),
+    coach: coachNames[i % coachNames.length],
+  }));
 }
 
 /** Gradebook summary for an organisation. */
