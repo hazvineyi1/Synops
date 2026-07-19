@@ -1,5 +1,9 @@
-Editable module Video section: add/upload a video to a module (ModuleViewer) (ASCII-only)
+Real user management: absolute reset links + Create user in Platform Console (ASCII-only)
 
-The module Video section is now editable for instructors: a ModuleVideoAdmin panel lets you set a title and attach a video by URL, or Upload file (base64 -> /learning/content/upload -> Supabase Storage, returns a URL). Saving PATCHes the video beat's videoUrl, creating a video beat (POST /modules/:id/beats type=video) if the module has none. Learners then see the video in this section. Until Supabase is configured, pasting a hosted URL works; file upload shows a clear message. Panel shows in both the empty and populated states. Icons verified imported.
+Two blockers fixed:
+1) Reset/set-password links were relative (/reset-password?token=...) because APP_URL was unset, so copying them did not work -> could not set a password. platform.ts now builds an ABSOLUTE base from the request host (appBase(): APP_URL if set, else req.protocol+host; trust proxy makes https correct on Railway). Applied to the reset-link endpoint.
+2) No way to add users from the console (users could only be created against an org). New POST /platform/users (super_admin): create a user by email/name/role (any of the 7 roles), status invited, and returns a one-time set-password link in the same response. Frontend: a Create user button + dialog on the Platform Console Users tab that shows the copyable link.
 
-VALIDATION: esbuild bundle clean on ModuleViewer.tsx.
+So: create user -> copy link -> they set a password -> sign in. Set APP_URL on Railway for tidy links (optional now that it falls back to the request host).
+
+VALIDATION: esbuild clean on platform.ts, platformApi.ts, PlatformConsole.tsx.
