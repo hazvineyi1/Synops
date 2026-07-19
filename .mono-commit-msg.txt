@@ -1,5 +1,5 @@
-Super-admin financial roll-ups on live data + real platform filing cabinet (ASCII-only)
+Real platform alerts + health on the Overview (derived from live data) (ASCII-only)
 
-Super-admin Financial Hub is now real. GET /platform/financials aggregates each partner's real subscriptions/invoices/funding into per-partner + platform totals (MRR incl VAT, outstanding, funding value, VAT collected). New platform_filings table + /platform/filings CRUD (self-create) replaces the seeded contracts/MOU store: file/patch-status/delete persist. PlatformFinance both tabs wired to the real endpoints (partner dropdown from GET /partners). PlatformOverview financials panel now shows the REAL aggregate (Sample badge left only on avg coaching health). New schema platform_filings.ts.
+GET /platform/alerts computes real attention-needed signals: funding agreements expiring within 60 days or expired, unpaid invoices, documents flagged action-required, partners still onboarding, courses in draft; plus real health (learner count, active enrolments). PlatformOverview gains an Attention-needed panel + a real health line, replacing the last seeded coaching-health/alerts placeholders. Missing tables count as zero.
 
-VALIDATION: esbuild clean on platform.ts, db index (platform_filings exported), PlatformFinance.tsx, PlatformOverview.tsx.
+VALIDATION: esbuild clean on platform.ts, PlatformOverview.tsx.

@@ -43,3 +43,4 @@ export * from "./billing";
 export * from "./partner_documents";
 export * from "./partner_announcements";
 export * from "./platform_filings";
+export * from "./funded_seat_assignments";

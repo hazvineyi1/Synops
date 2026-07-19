@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { Landmark, Users, ShieldCheck, ExternalLink, CheckCircle2, Plus, Trash2, X, Pencil, FileText } from 'lucide-react';
+import { Landmark, Users, ShieldCheck, ExternalLink, CheckCircle2, Plus, Trash2, X, Pencil, FileText, ChevronDown, ChevronRight } from 'lucide-react';
 import { getActivePartnerId, ZAR } from '@/lib/partnerHubData';
 import { orgLabel, useOrgOverrides } from '@/lib/orgOverridesStore';
 
@@ -22,6 +22,8 @@ interface Agreement {
   status: string; conditions: string[];
 }
 interface OrgLite { id: string; name: string; partnerId: string | null }
+interface Member { id: string; name: string; role: string }
+interface SeatAssignment { id: string; learnerId: string; learnerName: string | null }
 
 const FUNDER_TYPES = ['SETA', 'Corporate CSI', 'NSFAS', 'Government', 'Foundation', 'Other'];
 const fmtMonth = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }) : '—');
@@ -35,6 +37,65 @@ function NumInput({ value, onChange, onCommit, prefix, width = 'w-32' }: { value
         onBlur={() => onCommit?.()}
         className="w-full bg-transparent text-right text-sm tabular-nums outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
     </span>
+  );
+}
+
+// One agreement's funded-seat allocation: assign specific learners to the grant's seats so
+// completion evidence attributes back to the funder. Used = live count; capacity = seatsFunded.
+function AgreementSeats({ partnerId, agreement, learners, used, onChanged }: {
+  partnerId: string | null; agreement: Agreement; learners: Member[]; used: number; onChanged: () => void;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState('');
+  const { data: seats } = useQuery({
+    queryKey: ['funding-seats', agreement.id],
+    queryFn: () => apiFetch<SeatAssignment[]>(`/partners/${partnerId}/funding/${agreement.id}/seats`),
+    enabled: open && !!partnerId,
+  });
+  const liveUsed = open && seats ? seats.length : used;
+  const pct = agreement.seatsFunded > 0 ? Math.min(100, Math.round((liveUsed / agreement.seatsFunded) * 100)) : 0;
+  const refresh = () => { qc.invalidateQueries({ queryKey: ['funding-seats', agreement.id] }); onChanged(); };
+  const assign = useMutation({
+    mutationFn: (m: Member) => apiFetch(`/partners/${partnerId}/funding/${agreement.id}/seats`, { method: 'POST', body: JSON.stringify({ learnerId: m.id, learnerName: m.name }) }),
+    onSuccess: () => { refresh(); setPick(''); },
+    onError: (e: any) => window.alert(e?.message ?? 'Could not assign the seat.'),
+  });
+  const remove = useMutation({ mutationFn: (id: string) => apiFetch(`/partners/${partnerId}/funding/${agreement.id}/seats/${id}`, { method: 'DELETE' }), onSuccess: refresh });
+  const assignedIds = new Set((seats ?? []).map((s) => s.learnerId));
+  const available = learners.filter((l) => !assignedIds.has(l.id));
+  const full = liveUsed >= agreement.seatsFunded;
+
+  return (
+    <Card className="p-4">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex flex-wrap items-center justify-between gap-3 text-left">
+        <div className="flex items-center gap-2 min-w-0">
+          {open ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+          <span className="font-medium truncate">{agreement.funderName}</span>
+          <span className="text-muted-foreground text-sm">· {agreement.orgName ? orgLabel(agreement.orgName) : 'All organisations'}</span>
+        </div>
+        <span className="text-xs text-muted-foreground tabular-nums">{liveUsed} / {agreement.seatsFunded} seats used</span>
+      </button>
+      <Progress value={pct} className="h-2 mt-2" />
+      {open && (
+        <div className="mt-3 space-y-2">
+          {(seats ?? []).map((s) => (
+            <div key={s.id} className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-1.5 text-sm">
+              <span className="flex items-center gap-2"><Users className="h-3.5 w-3.5 text-muted-foreground" /> {s.learnerName ?? s.learnerId}</span>
+              <Button size="sm" variant="ghost" className="h-7 text-red-600" onClick={() => remove.mutate(s.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+            </div>
+          ))}
+          {(seats ?? []).length === 0 && <div className="text-xs text-muted-foreground">No learners assigned yet.</div>}
+          <div className="flex items-center gap-2 pt-1">
+            <select value={pick} onChange={(e) => setPick(e.target.value)} disabled={full || available.length === 0} className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50">
+              <option value="">{full ? 'All funded seats used' : available.length === 0 ? 'No unassigned learners' : 'Assign a learner…'}</option>
+              {available.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+            <Button size="sm" className="gap-1.5" disabled={!pick || assign.isPending} onClick={() => { const m = available.find((l) => l.id === pick); if (m) assign.mutate(m); }}><Plus className="h-3.5 w-3.5" /> Assign</Button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -57,6 +118,11 @@ export function PartnerFunders() {
   });
   const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
   const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
+  const { data: membersData } = useQuery({ queryKey: ['partner-members', partnerId], queryFn: () => apiFetch<Member[]>(`/partners/${partnerId}/members`), enabled: !!partnerId });
+  const learners = (membersData ?? []).filter((m) => m.role === 'learner');
+  const { data: usageData } = useQuery({ queryKey: ['partner-funding-usage', partnerId], queryFn: () => apiFetch<{ used: Record<string, number> }>(`/partners/${partnerId}/funding-usage`), enabled: !!partnerId });
+  const usedMap = usageData?.used ?? {};
+  const refreshUsage = () => qc.invalidateQueries({ queryKey: ['partner-funding-usage', partnerId] });
 
   // Local mirror so inline edits feel instant; commits persist via PATCH.
   const [agreements, setAgreements] = useState<Agreement[]>([]);
@@ -193,20 +259,13 @@ export function PartnerFunders() {
           {!isLoading && agreements.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No funding agreements yet. Add a funder to get started.</Card>}
         </TabsContent>
 
-        {/* Seat Allocation — derived read-only from funded seats */}
+        {/* Seat Allocation — assign real learners to a grant's funded seats */}
         <TabsContent value="allocation" className="mt-4 space-y-3">
           {agreements.map((a) => (
-            <Card key={a.id} className="p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-                <div><span className="font-medium">{a.funderName}</span><span className="text-muted-foreground text-sm"> · {a.orgName ? orgLabel(a.orgName) : 'All organisations'}</span></div>
-                <div className="text-xs text-muted-foreground">{a.seatsFunded} funded seats</div>
-              </div>
-              <Progress value={0} className="h-2" />
-              <div className="mt-1 text-xs text-muted-foreground">{a.seatsFunded} funded seats available to assign</div>
-            </Card>
+            <AgreementSeats key={a.id} partnerId={partnerId} agreement={a} learners={learners} used={usedMap[a.id] ?? 0} onChanged={refreshUsage} />
           ))}
-          {agreements.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No allocations yet.</Card>}
-          <p className="text-xs text-muted-foreground">Assigning a funded seat to a specific learner (so completion evidence attributes back to the grant) is the next step; today this reflects the funded-seat total per agreement.</p>
+          {agreements.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No agreements yet. Add a funder first.</Card>}
+          <p className="text-xs text-muted-foreground">Assigning a learner to a funded seat links them to the grant, so completion evidence attributes back to the right agreement. Capacity is the agreement's funded-seat count.</p>
         </TabsContent>
 
         {/* B-BBEE / SETA Conditions — derived from agreements */}

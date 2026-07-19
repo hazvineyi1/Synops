@@ -7,6 +7,7 @@ import {
   funderScopesTable,
   organisationsTable,
   fundingAgreementsTable,
+  fundedSeatAssignmentsTable,
 } from "@workspace/db";
 import { eq, and, inArray, count, desc, sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
@@ -306,6 +307,84 @@ router.delete("/partners/:partnerId/funding/:id", requireAuth, async (req, res) 
   if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(fundingAgreementsTable).where(and(eq(fundingAgreementsTable.id, id), eq(fundingAgreementsTable.partnerId, partnerId)));
   await logAudit(req, "funding.delete", "funding_agreement", id);
+  res.status(204).send();
+});
+
+// ── Funded-seat assignments (learners occupying a funding agreement's seats) ──
+async function ensureSeatsTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS funded_seat_assignments (
+      id text PRIMARY KEY,
+      partner_id text NOT NULL,
+      agreement_id text NOT NULL,
+      learner_id text NOT NULL,
+      learner_name text,
+      assigned_by text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`);
+}
+
+// GET /partners/:partnerId/funding-usage — { agreementId: usedSeatCount } for the partner.
+router.get("/partners/:partnerId/funding-usage", requireAuth, async (req, res) => {
+  const { partnerId } = req.params;
+  if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const rows = await db.select({ agreementId: fundedSeatAssignmentsTable.agreementId })
+      .from(fundedSeatAssignmentsTable).where(eq(fundedSeatAssignmentsTable.partnerId, partnerId));
+    const used: Record<string, number> = {};
+    for (const r of rows) used[r.agreementId] = (used[r.agreementId] ?? 0) + 1;
+    res.json({ used });
+  } catch {
+    res.json({ used: {} });
+  }
+});
+
+// GET /partners/:partnerId/funding/:agreementId/seats — learners assigned to an agreement.
+router.get("/partners/:partnerId/funding/:agreementId/seats", requireAuth, async (req, res) => {
+  const { partnerId, agreementId } = req.params;
+  if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const rows = await db.select().from(fundedSeatAssignmentsTable)
+      .where(and(eq(fundedSeatAssignmentsTable.partnerId, partnerId), eq(fundedSeatAssignmentsTable.agreementId, agreementId)))
+      .orderBy(desc(fundedSeatAssignmentsTable.createdAt));
+    res.json(rows);
+  } catch {
+    res.json([]);
+  }
+});
+
+// POST /partners/:partnerId/funding/:agreementId/seats — assign a learner (capacity + dup guarded).
+router.post("/partners/:partnerId/funding/:agreementId/seats", requireAuth, async (req, res) => {
+  const { partnerId, agreementId } = req.params;
+  const user = req.dbUser!;
+  if (!canManagePartner(user, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const learnerId = req.body?.learnerId ? String(req.body.learnerId) : "";
+  if (!learnerId) { res.status(400).json({ error: "A learnerId is required." }); return; }
+  await ensureSeatsTable();
+  const agreement = await db.query.fundingAgreementsTable.findFirst({ where: eq(fundingAgreementsTable.id, agreementId) });
+  if (!agreement || agreement.partnerId !== partnerId) { res.status(404).json({ error: "Agreement not found." }); return; }
+  const existing = await db.select().from(fundedSeatAssignmentsTable)
+    .where(and(eq(fundedSeatAssignmentsTable.partnerId, partnerId), eq(fundedSeatAssignmentsTable.agreementId, agreementId)));
+  if (existing.some((r) => r.learnerId === learnerId)) { res.status(409).json({ error: "That learner already occupies a seat on this agreement." }); return; }
+  if (existing.length >= (agreement.seatsFunded || 0)) { res.status(409).json({ error: "No funded seats left on this agreement." }); return; }
+  const [row] = await db.insert(fundedSeatAssignmentsTable).values({
+    partnerId, agreementId, learnerId,
+    learnerName: req.body?.learnerName ? String(req.body.learnerName) : null,
+    assignedBy: user.id,
+  }).returning();
+  await logAudit(req, "funding.seat_assign", "funded_seat", row.id, { agreementId, learnerId });
+  res.status(201).json(row);
+});
+
+// DELETE /partners/:partnerId/funding/:agreementId/seats/:id — unassign.
+router.delete("/partners/:partnerId/funding/:agreementId/seats/:id", requireAuth, async (req, res) => {
+  const { partnerId, agreementId, id } = req.params;
+  if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.delete(fundedSeatAssignmentsTable).where(and(
+    eq(fundedSeatAssignmentsTable.id, id),
+    eq(fundedSeatAssignmentsTable.partnerId, partnerId),
+    eq(fundedSeatAssignmentsTable.agreementId, agreementId),
+  ));
   res.status(204).send();
 });
 
