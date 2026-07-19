@@ -1,10 +1,9 @@
-Super admin nav: Partner Hub = all-partners overview; org/hub items only inside a partner; drop redundant Partners page (ASCII-only)
+Super admin console P1: nav reorg + distinct colour + robust Partner Hub (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only.
 
-Restructures the super-admin Partner Hub to match how it should work:
-1) Organisations (and Financial Hub, Funders, Documents, Accounts, etc.) are no longer top-level for the super admin - the top-level Partner Admin Platform group is removed. Those appear only once you open a specific partner (the focused partner-hub sidebar), so orgs live under their partner.
-2) The Partner Hub entry now shows ALL partners: the super-admin Overview lands on the platform overview (retitled Partner Hub) which lists every partner with their orgs, funders and financials - not a single partner.
-3) Removed the separate Partners page from the nav (and the link to it); the all-partners overview IS the partners list. From there, Open hub / clicking a partner drops into that individual partner hub, with an All partners escape to come back.
+1) Nav reorg under sensible headings: Partner Hub / Learning Hub (was Curriculum) / Delivery and Coaching / Platform. Removed Org members tab and the top-level Partners and Funders tabs (those are reached inside a partner).
+2) Distinct super-admin colour: violet shell + Super Admin Platform ribbon at the platform level; reverts to navy + Inside partner ribbon once you open a partner, so the colour tells you the context.
+3) Robust Partner Hub overview: Alerts at a glance (off-track learners, overdue invoices, expiring funders, pending onboarding, unmarked submissions, suspended accounts) + Platform health and engagement (avg coaching health, engagement rate, active learners, system status).
 
-VALIDATION: parse-check + local-resolution bundle clean; confirmed no per-partner destinations remain at the super-admin top level.
+VALIDATION: local-resolution esbuild bundle clean on AppLayout, PlatformOverview, partnerHubData.

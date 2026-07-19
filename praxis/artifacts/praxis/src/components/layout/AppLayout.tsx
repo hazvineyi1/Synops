@@ -278,7 +278,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {
           heading: t('nav.groups.learningHub', 'Learning Hub'),
           items: [
-            { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: BookOpen },
+            { label: t('nav.learningHub', 'Learning Hub'), href: '/learning', icon: BookOpen },
+            { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: GraduationCap },
             { label: t('nav.studio'), href: '/studio', icon: PenTool },
             { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
             { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },

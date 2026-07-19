@@ -13,6 +13,7 @@
  * and their real organisations, so a partner_admin sees only their own tenant's figures.
  */
 
+import { useEffect, useReducer } from 'react';
 import { orgNameOverride } from './orgOverridesStore';
 
 export const ZAR = (n: number) =>
@@ -256,6 +257,50 @@ export function allPartners(): { id: string; name: string; orgs: number; seats: 
 export function findHubByOrgId(orgId: string | null | undefined): PartnerHub | undefined {
   if (!orgId) return undefined;
   return Object.values(HUBS).find((h) => h.orgs.some((o) => o.id === orgId));
+}
+
+// ── Organisation creation (super admin / partner admin) ──────────────────────
+// A new org is pushed straight into its partner hub, so every downstream view (Organisations list,
+// the org's own hub, financials, platform overview) resolves it exactly like a seeded org. Reactive
+// so open pages re-render the moment an org is created. Reset on reload (prototype, no backend yet).
+const hubListeners = new Set<() => void>();
+const emitHubs = () => hubListeners.forEach((l) => l());
+const createdOrgIds = new Set<string>();
+export function isCreatedOrg(orgId: string): boolean { return createdOrgIds.has(orgId); }
+
+export function useHubData() {
+  const [, force] = useReducer((x) => x + 1, 0);
+  useEffect(() => { hubListeners.add(force); return () => { hubListeners.delete(force); }; }, []);
+  return { version: createdOrgIds.size };
+}
+
+export function createOrg(
+  partnerId: string,
+  input: { name: string; planId: string; seats: number; adminName?: string; adminEmail?: string },
+  actor = 'Super Admin', actorRole = 'Super Admin',
+): string | null {
+  const hub = HUBS[partnerId];
+  const name = input.name.trim();
+  if (!hub || !name) return null;
+  const id = `org_new_${Date.now()}`;
+  const plan = hub.plans.find((p) => p.id === input.planId) ?? hub.plans[0];
+  hub.orgs.push({ id, name });
+  hub.subscriptions.push({ orgId: id, orgName: name, planId: plan.id, seats: input.seats, activeSeats: 0 });
+  if (input.adminEmail?.trim()) {
+    hub.accounts.push({
+      id: `ac_${Date.now()}`, name: input.adminName?.trim() || input.adminEmail.trim(),
+      email: input.adminEmail.trim(), role: 'org_admin', orgName: name,
+      status: 'invited', lastActive: new Date().toISOString().slice(0, 10),
+    });
+  }
+  hub.audit.unshift({
+    id: `au_${Date.now()}`, at: new Date().toISOString(), actor, actorRole,
+    action: 'organisation.create', resource: name, category: 'account',
+    detail: `Organisation created · ${plan.name} plan · ${input.seats} seats`,
+  });
+  createdOrgIds.add(id);
+  emitHubs();
+  return id;
 }
 
 // ── Rollups for the Overview ─────────────────────────────────────────────────

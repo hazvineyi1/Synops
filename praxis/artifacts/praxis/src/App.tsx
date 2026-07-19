@@ -60,6 +60,8 @@ import { PartnerOrgHub } from '@/pages/partner/PartnerOrgHub';
 import { PartnerImpersonateView } from '@/pages/partner/PartnerImpersonateView';
 import { PartnerPartners } from '@/pages/partner/PartnerPartners';
 import { PlatformOverview } from '@/pages/partner/PlatformOverview';
+import { LearningHub } from '@/pages/partner/LearningHub';
+import { CourseDevelopmentSuite } from '@/pages/partner/CourseDevelopmentSuite';
 import { PartnerFinance } from '@/pages/partner/PartnerFinance';
 import { PartnerFunders } from '@/pages/partner/PartnerFunders';
 import { PartnerDocuments } from '@/pages/partner/PartnerDocuments';
@@ -207,6 +209,8 @@ function Routes() {
         {/* Partner Hub (partner_admin tier) */}
         <ProtectedRoute path="/partner" component={PartnerOverview} />
         <ProtectedRoute path="/platform-overview" component={PlatformOverview} />
+        <ProtectedRoute path="/learning/develop" component={CourseDevelopmentSuite} />
+        <ProtectedRoute path="/learning" component={LearningHub} />
         <ProtectedRoute path="/partner/partners" component={PartnerPartners} />
         <ProtectedRoute path="/partner/organisations" component={PartnerOrganisations} />
         <ProtectedRoute path="/partner/impersonate/:orgId/:userId" component={PartnerImpersonateView} />
