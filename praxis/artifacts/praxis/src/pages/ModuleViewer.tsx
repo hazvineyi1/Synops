@@ -17,7 +17,7 @@ import {
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
   Users, Layers, Target, Compass, Info, Save, Settings, Sparkles, Link2,
-  Pause, Square, Headphones,
+  Pause, Square, Headphones, Plus, Trash2,
 } from 'lucide-react';
 import { useReadAloud } from '@/lib/speech';
 
@@ -1897,6 +1897,81 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
   );
 }
 
+/**
+ * Instructor panel in the module's Complete tab: add interactive activities to THIS module, publish
+ * them (a draft activity is not shown to learners until published), or remove them from the module.
+ * Homing an activity in a module (courseId + moduleId) is what surfaces it in this Complete tab.
+ */
+function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: string; moduleId: string; navigate: (to: string) => void }) {
+  const qc = useQueryClient();
+  const [pickOpen, setPickOpen] = useState(false);
+  const { data: inModule } = useQuery({ queryKey: ['module-activities', moduleId], queryFn: () => activitiesApi.list({ moduleId }) });
+  const { data: all } = useQuery({ queryKey: ['activities-all'], queryFn: () => activitiesApi.list({}), enabled: pickOpen });
+  const done = () => { qc.invalidateQueries({ queryKey: ['module-activities', moduleId] }); qc.invalidateQueries({ queryKey: ['activities-all'] }); };
+  const attach = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ courseId, moduleId }) }), onSuccess: done });
+  const publish = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ published: true }) }), onSuccess: done });
+  const unpublish = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ published: false }) }), onSuccess: done });
+  const remove = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ moduleId: null }) }), onSuccess: done });
+  const list = (inModule ?? []) as any[];
+  const candidates = ((all ?? []) as any[]).filter((a) => a.moduleId !== moduleId);
+
+  return (
+    <div className="rounded-xl border border-dashed border-primary/30 p-4 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Activities in this module <span className="text-xs font-normal text-muted-foreground">Instructor</span></div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setPickOpen((v) => !v)}><Plus className="h-3.5 w-3.5" /> Add existing</Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Sparkles className="h-3.5 w-3.5" /> New</Button>
+        </div>
+      </div>
+
+      {pickOpen && (
+        <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="text-xs font-medium mb-1.5">Add an existing activity to this module</div>
+          {candidates.length === 0 ? (
+            <div className="text-xs text-muted-foreground">No other activities available. Use "New" to author one.</div>
+          ) : (
+            <div className="max-h-56 overflow-auto divide-y divide-border">
+              {candidates.map((a) => (
+                <div key={a.id} className="flex items-center justify-between gap-3 py-2">
+                  <div className="min-w-0"><div className="text-sm font-medium truncate">{a.title}</div><div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}{a.moduleId ? ' · in another module' : a.courseId ? ' · in another course' : ' · library'}</div></div>
+                  <Button size="sm" variant="outline" disabled={attach.isPending} onClick={() => attach.mutate(a.id)}>Add</Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {list.length === 0 ? (
+        <div className="text-xs text-muted-foreground">No activities in this module yet. Add one so learners have something to do in the Complete section.</div>
+      ) : (
+        <div className="space-y-2">
+          {list.map((a) => (
+            <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2">
+              <div className="min-w-0">
+                <div className="text-sm font-medium flex items-center gap-2">{a.title}
+                  {a.published
+                    ? <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700">Published</span>
+                    : <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700">Draft</span>}
+                </div>
+                <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}</div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {!a.published
+                  ? <Button size="sm" className="gap-1.5" disabled={publish.isPending} onClick={() => publish.mutate(a.id)}><CheckCircle className="h-3.5 w-3.5" /> Publish activity</Button>
+                  : <Button size="sm" variant="outline" disabled={unpublish.isPending} onClick={() => unpublish.mutate(a.id)}>Unpublish</Button>}
+                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" title="Remove from module"
+                  onClick={() => { if (window.confirm(`Remove "${a.title}" from this module? The activity itself is not deleted.`)) remove.mutate(a.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ModuleHubView({
   mod, allBeats, course, courseId, moduleId, navigate, isLoading,
 }: {
@@ -2535,6 +2610,7 @@ function ModuleHubView({
         {/* COMPLETE — interactive practice + mastery */}
         {tab === 'complete' && (
           <div className="space-y-4">
+            {isInstructor && <ModuleActivitiesAdmin courseId={courseId} moduleId={moduleId} navigate={navigate} />}
             {practiceCount > 0 ? (
               <>
                 <Instruction>Complete each activity below. These give you immediate feedback and help the ideas stick before you demonstrate mastery.</Instruction>

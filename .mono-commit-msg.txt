@@ -1,6 +1,6 @@
-Fix Case-studies-tab white screen (missing PenTool import) + embed activities inline in course (ASCII-only)
+Attached deliverables render ready-to-use inline: interactive activities + case launch cards (ASCII-only)
 
-- Crash: CourseCasesTab used a PenTool icon that was never imported in CourseDetail, so rendering an attached case (right after adding one) hit an undefined component and blanked the page. esbuild did not catch it (lucide is an external package). Imported PenTool (and ChevronDown).
-- Embed: the in-course Activities tab now embeds each interactive inline via ActivityPlayer (Preview/Hide expander) instead of only linking out, so added deliverables render within the course. Activity list response already carries html/embedUrl.
+- Activities: each attached interactive now renders EMBEDDED and INTERACTIVE inline in the course Activities tab (no separate open step), with an Attached badge and a Completed badge once the learner submits (ActivityPlayer onSubmit). Full screen + Remove remain.
+- Cases: each attached case now shows an inline launch card (header with title + Attached badge, a Start case button that opens the Socratic runner, plus Edit for instructors), instead of a bare link. Draft cases show Start disabled with a publish hint.
 
 VALIDATION: esbuild bundle clean on CourseDetail.tsx.
