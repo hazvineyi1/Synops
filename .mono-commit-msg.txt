@@ -1,5 +1,5 @@
-Platform-owned courses assigned to partners from the super admin (ASCII-only)
+Generate course learning objectives on the course page (ASCII-only)
 
-Courses now belong to the platform (super admin) and are assigned OUT to partners. Backend: new course_partner_assignments table; POST /courses sets tenantId=platform for hub roles; GET /courses is additive (a partner sees courses their tenant owns PLUS courses assigned to their partner); POST /courses/setup-platform creates the table and brings every existing course under platform ownership (idempotent, no psql needed); GET/PUT /courses/:id/partners manage assignments; canStaffActOnCourse grants a partner admin/coach access to courses assigned to their partner. Frontend: super-admin Assign-to-partners card on the course page, and an Adopt-all-to-platform button on the Courses list.
+The Course learning objectives card (CourseDetail) gets a Generate button: pick Bloom's cognitive levels (Remember..Create), and one measurable objective is drafted per level from the course title/description using the existing courseDevEngine.generateObjectives, appended to the editor for review before Save. No new endpoint; reuses the client-side Bloom engine already used by the Course Development Suite.
 
-VALIDATION: esbuild clean on scope.ts, courses.ts, db index (new table exported), CourseDetail.tsx, Courses.tsx.
+VALIDATION: esbuild clean on CourseDetail.tsx.

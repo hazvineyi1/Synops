@@ -273,6 +273,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           heading: t('nav.groups.partnerHub', 'Partner Hub'),
           items: [
             { label: t('nav.overview', 'Overview'), href: '/platform-overview', icon: LayoutDashboard },
+            { label: t('nav.partnerManagement', 'Partner management'), href: '/admin/partners', icon: Building },
           ],
         },
         {

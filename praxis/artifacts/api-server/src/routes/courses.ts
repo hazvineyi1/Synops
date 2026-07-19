@@ -131,6 +131,44 @@ router.put("/courses/:courseId/partners", requireAuth, requireRole("super_admin"
   res.json({ partnerIds });
 });
 
+// GET /partners/:partnerId/courses (super admin) — course ids assigned to a partner.
+router.get("/partners/:partnerId/courses", requireAuth, requireRole("super_admin"), async (req, res) => {
+  try {
+    const rows = await db
+      .select({ courseId: coursePartnerAssignmentsTable.courseId })
+      .from(coursePartnerAssignmentsTable)
+      .where(eq(coursePartnerAssignmentsTable.partnerId, req.params.partnerId));
+    res.json({ courseIds: [...new Set(rows.map((r) => r.courseId))] });
+  } catch {
+    res.json({ courseIds: [] });
+  }
+});
+
+// PUT /partners/:partnerId/courses (super admin) — replace the set of courses assigned to a
+// partner. Self-creates the assignment table so the create-partner flow works before the
+// one-time setup-platform has ever run.
+router.put("/partners/:partnerId/courses", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const partnerId = req.params.partnerId;
+  const courseIds = Array.isArray(req.body?.courseIds)
+    ? [...new Set(req.body.courseIds.filter((c: unknown): c is string => typeof c === "string" && c.length > 0))]
+    : [];
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS course_partner_assignments (
+      id text PRIMARY KEY,
+      course_id text NOT NULL,
+      partner_id text NOT NULL,
+      assigned_by text,
+      assigned_at timestamptz NOT NULL DEFAULT now()
+    )`);
+  await db.delete(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.partnerId, partnerId));
+  if (courseIds.length) {
+    await db.insert(coursePartnerAssignmentsTable).values(
+      courseIds.map((courseId) => ({ courseId, partnerId, assignedBy: req.dbUser!.id })),
+    );
+  }
+  res.json({ courseIds });
+});
+
 // GET /courses/:courseId
 router.get("/courses/:courseId", requireAuth, async (req, res) => {
   const course = await db.query.coursesTable.findFirst({
