@@ -1,9 +1,7 @@
-Partner Hub: full navigability for super admin - hub sidebar on every partner page + escape to platform (ASCII-only)
+Partner Hub: remove em dashes from all partner-hub surfaces (ASCII-only)
 
-NO MIGRATION REQUIRED. Frontend only.
+NO MIGRATION REQUIRED. Frontend only, copy/style change.
 
-PROBLEM: as super admin, the partner sub-pages (Financial Hub, Funders, Documents, Accounts, Audit, etc.) fell back to the platform sidebar, so there was no Overview link and no way to move across the hub or back.
+Replaced every em dash with a hyphen across the partner pages (Overview, Organisations, Org hub, Class detail, Finance, Funders, Documents, Accounts, Comms, Settings, Audit, Branding), plus partnerHubData and the AppLayout partner nav/comments. Scoped to the partner hub (app-wide would exceed the commit file cap and touch unrelated features).
 
-FIX: extracted a shared partnerHubGroups nav (Overview, Organisations, and the Partner Admin Platform group) used by partner_admin AND by super_admin whenever the location is under /partner. Super admin also gets a Platform Console item at the top to exit back to their world. So from any partner page the sidebar always has Overview + every hub destination. Verified every partner nav href maps to a registered route.
-
-VALIDATION: parse-check + local-resolution bundle clean; href->route coverage checked.
+VALIDATION: all edited files parse-check clean; no em dashes remain in the partner-hub files.
