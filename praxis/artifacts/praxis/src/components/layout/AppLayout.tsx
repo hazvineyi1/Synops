@@ -159,6 +159,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {
         items: [
           { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
+          // Only the super admin oversees multiple partners.
+          ...(role === 'super_admin' ? [{ label: t('nav.partners', 'Partners'), href: '/partner/partners', icon: Building }] : []),
           { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
         ],
       },
@@ -256,6 +258,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           heading: t('nav.groups.partnerPlatform', 'Partner Admin Platform'),
           items: [
             { label: t('nav.partnerOverview', 'Partner Overview'), href: '/partner', icon: Wallet },
+            { label: t('nav.partners', 'Partners'), href: '/partner/partners', icon: Building },
             { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
             { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
             { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },

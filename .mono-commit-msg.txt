@@ -1,7 +1,7 @@
-Funders Hub: add funders + edit figures/content (agreements, seats, allocations, conditions) (ASCII-only)
+Super admin: full Partner Admin Platform access + same layout in the sidebar (ASCII-only)
 
-NO MIGRATION REQUIRED. Frontend only, seeded partner data.
+NO MIGRATION REQUIRED. Frontend only.
 
-The Funders Hub is now editable. Add funder opens a dialog (funder name, type, organisation, agreement value, funded seats, start/expiry, conditions) that creates an agreement and a matching seat allocation. On each agreement card the value, funded seats and status are editable inline and conditions can be added/removed; agreements can be deleted. Seat Allocation tab: used and allocated are editable with the progress recomputing. The KPI cards (funders, funded seats, agreement value) now derive from the live agreement state. Persistence and funder KYC remain the backend phase.
+The super-admin sidebar now carries the complete Partner Admin Platform group with the same items and labels as the partner admin: Partner Overview, Organisations, Financial Hub, Funders Hub, Documents, Accounts & Roles, Communications, Branding, Audit & Impersonation, Settings. The platform-owner tools (Platform Console, Partners, Funders admin) and the Curriculum / Delivery / Quality groups remain. Stepping into /partner still hands the super admin the identical focused partner-hub sidebar as the partner admin (with a Platform Console escape), and org context + impersonation already work for them - so the super admin now has everything and all access the partner admin has.
 
-VALIDATION: parse-check + local-resolution bundle clean; FunderAgreement/SeatAllocation types + Plus/Trash2/X/Pencil icons confirmed.
+VALIDATION: AppLayout parse-check + local-resolution bundle clean; all 9 partner destinations present in the super-admin nav.

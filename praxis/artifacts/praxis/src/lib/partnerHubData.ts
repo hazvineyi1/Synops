@@ -227,9 +227,29 @@ const HUBS: Record<string, PartnerHub> = {
   partner_skillbridge: SKILLBRIDGE,
 };
 
-/** Resolve the hub bundle for a partner id; falls back to TalentForge so the exemplar always renders. */
+// Active-partner override: a super admin has no partnerId of their own, so they can select which
+// partner to view from the Partners list; that selection resolves here. A real partner_admin always
+// has their own partnerId and this override is ignored for them.
+let activePartnerId: string | null = null;
+export function setActivePartner(id: string | null) { activePartnerId = id; }
+export function getActivePartnerId(): string | null { return activePartnerId; }
+
+/** Resolve the hub bundle for a partner id; a super admin gets the selected partner, else TalentForge. */
 export function getPartnerHub(partnerId: string | null | undefined): PartnerHub {
-  return (partnerId && HUBS[partnerId]) || TALENTFORGE;
+  if (partnerId && HUBS[partnerId]) return HUBS[partnerId];
+  if (activePartnerId && HUBS[activePartnerId]) return HUBS[activePartnerId];
+  return TALENTFORGE;
+}
+
+/** Summary of every partner on the platform (super-admin view). */
+export function allPartners(): { id: string; name: string; orgs: number; seats: number; funders: number; accounts: number; delegated: number; agreementValue: number }[] {
+  return Object.entries(HUBS).map(([id, hub]) => ({
+    id, name: hub.partnerName, orgs: hub.orgs.length,
+    seats: hub.subscriptions.reduce((s, x) => s + x.seats, 0),
+    funders: new Set(hub.agreements.map((a) => a.funder)).size,
+    accounts: hub.accounts.length, delegated: hub.delegatedAdmins.length,
+    agreementValue: hub.agreements.reduce((s, a) => s + a.value, 0),
+  }));
 }
 
 /** Resolve the hub that OWNS a given organisation, so any viewer (incl. super admin) sees the right tenant. */
