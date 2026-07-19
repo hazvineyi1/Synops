@@ -1,5 +1,6 @@
-Fix ModuleViewer white-screen crash (React #31 on object-valued beat fields) (ASCII-only)
+Fix Case-studies-tab white screen (missing PenTool import) + embed activities inline in course (ASCII-only)
 
-Opening a module blanked/froze the page whenever a beat had a scenario (or other field) stored as a structured object (e.g. an AI/seeded quiz-scenario with keys situation/question/options/correctOption/explanation) rather than plain text - rendering an object as a React child throws React error 31 and takes down the whole module. Same class as the earlier Studio fix. Added toBeatText() to ModuleViewer and routed every rendered beat field (narration, scenario, points, compare items) through it so object fields render as readable text.
+- Crash: CourseCasesTab used a PenTool icon that was never imported in CourseDetail, so rendering an attached case (right after adding one) hit an undefined component and blanked the page. esbuild did not catch it (lucide is an external package). Imported PenTool (and ChevronDown).
+- Embed: the in-course Activities tab now embeds each interactive inline via ActivityPlayer (Preview/Hide expander) instead of only linking out, so added deliverables render within the course. Activity list response already carries html/embedUrl.
 
-VALIDATION: esbuild bundle clean on ModuleViewer.tsx.
+VALIDATION: esbuild bundle clean on CourseDetail.tsx.

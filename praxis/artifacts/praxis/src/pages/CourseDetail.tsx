@@ -527,8 +527,8 @@ function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isI
     onSuccess: () => qc.invalidateQueries({ queryKey: ['course-activities', courseId] }),
   });
   const candidates = (allActs || []).filter((a) => a.courseId !== courseId);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpand = (id: string) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const markComplete = (id: string) => setCompleted((s) => { const n = new Set(s); n.add(id); return n; });
 
   return (
     <div className="space-y-3">
@@ -564,25 +564,26 @@ function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isI
         <div className="text-center text-muted-foreground py-12">No interactives on this course yet.{isInstructor && ' Attach an existing one or create a new interactive.'}</div>
       )}
       {attached?.map((a) => {
-        const isOpen = expanded.has(a.id);
+        const isDone = completed.has(a.id);
         return (
           <Card key={a.id}>
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between gap-4">
-                <button className="flex-1 min-w-0 text-left" onClick={() => toggleExpand(a.id)}>
-                  <div className="font-medium text-foreground flex items-center gap-2">
-                    <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', !isOpen && '-rotate-90')} />
-                    {a.title}{!a.published && <Badge variant="outline" className="text-[10px]">Draft</Badge>}
+            <CardContent className="py-4 space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="font-medium text-foreground flex flex-wrap items-center gap-2">
+                    {a.title}
+                    <Badge className="bg-emerald-100 text-emerald-700 text-[10px] gap-1"><CheckCircle className="h-3 w-3" /> Attached</Badge>
+                    {isDone && <Badge className="bg-blue-100 text-blue-700 text-[10px] gap-1"><CheckCircle className="h-3 w-3" /> Completed</Badge>}
+                    {!a.published && <Badge variant="outline" className="text-[10px]">Draft</Badge>}
                   </div>
-                  <div className="text-xs text-muted-foreground capitalize flex flex-wrap gap-2 mt-0.5 pl-6">
+                  <div className="text-xs text-muted-foreground capitalize flex flex-wrap gap-2 mt-0.5">
                     <span>{a.kind}</span>
                     {a.bloomsLevel && <span className="text-purple-600">{a.bloomsLevel}</span>}
                     {a.difficulty && <span>{a.difficulty}</span>}
                   </div>
-                </button>
+                </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <Button size="sm" variant="ghost" onClick={() => toggleExpand(a.id)}>{isOpen ? 'Hide' : 'Preview'}</Button>
-                  <Button size="sm" variant="ghost" onClick={() => navigate(`/activities/${a.id}/play`)}><Play className="h-3.5 w-3.5 mr-1.5" /> Open</Button>
+                  <Button size="sm" variant="ghost" onClick={() => navigate(`/activities/${a.id}/play`)}><Play className="h-3.5 w-3.5 mr-1.5" /> Full screen</Button>
                   {isInstructor && (
                     <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" title="Remove from course"
                       onClick={() => { if (window.confirm(`Remove "${a.title}" from this course? The activity itself is not deleted.`)) detach.mutate(a.id); }}>
@@ -591,11 +592,10 @@ function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isI
                   )}
                 </div>
               </div>
-              {isOpen && (
-                <div className="mt-3 rounded-lg border border-border overflow-hidden">
-                  <ActivityPlayer html={a.html ?? ''} embedUrl={a.embedUrl ?? null} disabled />
-                </div>
-              )}
+              {/* Embedded and ready to use: the interactive activity runs right here in the course. */}
+              <div className="rounded-lg border border-border overflow-hidden">
+                <ActivityPlayer html={a.html ?? ''} embedUrl={a.embedUrl ?? null} onSubmit={() => markComplete(a.id)} />
+              </div>
             </CardContent>
           </Card>
         );
@@ -659,25 +659,36 @@ function CourseCasesTab({ courseId, isInstructor }: { courseId: string; isInstru
       {attached?.length === 0 && !isLoading && (
         <div className="text-center text-muted-foreground py-12">No case studies on this course yet.{isInstructor && ' Attach an existing one or author a new case study.'}</div>
       )}
-      {attached?.map((c) => (
-        <Card key={c.itemId}>
-          <CardContent className="py-4 flex items-center justify-between gap-4">
-            <button className="flex-1 min-w-0 text-left" onClick={() => navigate(`/cases/${c.caseId}/edit`)}>
-              <div className="font-medium text-foreground flex items-center gap-2">{c.title}{c.status && c.status !== 'published' && <Badge variant="outline" className="text-[10px] capitalize">{c.status}</Badge>}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Graded case column on this course</div>
-            </button>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <Button size="sm" variant="ghost" onClick={() => navigate(`/cases/${c.caseId}/edit`)}><PenTool className="h-3.5 w-3.5 mr-1.5" /> Open</Button>
+      {attached?.map((c) => {
+        const isDraft = c.status && c.status !== 'published';
+        return (
+          <Card key={c.itemId} className="overflow-hidden">
+            <div className="flex items-center gap-2 bg-amber-500/10 px-5 py-2.5 border-b border-amber-200/60">
+              <MessageSquare className="h-4 w-4 text-amber-600" />
+              <span className="font-medium text-sm">{c.title}</span>
+              <Badge className="bg-emerald-100 text-emerald-700 text-[10px] gap-1 ml-1"><CheckCircle className="h-3 w-3" /> Attached</Badge>
+              {isDraft && <Badge variant="outline" className="text-[10px] capitalize">{c.status}</Badge>}
               {isInstructor && (
-                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" title="Remove from course"
+                <Button size="sm" variant="ghost" className="ml-auto text-muted-foreground hover:text-red-600 h-7" title="Remove from course"
                   onClick={() => { if (window.confirm(`Remove "${c.title}" from this course? The case itself is not deleted.`)) detach.mutate(c.itemId); }}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               )}
             </div>
-          </CardContent>
-        </Card>
-      ))}
+            <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground max-w-md">
+                Interactive Socratic case study, graded on this course. {isDraft ? 'Publish the case to let learners start it.' : 'Start to work through the scenario with guided questioning.'}
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Button size="sm" disabled={!!isDraft} onClick={() => navigate(`/cases/${c.caseId}/begin`)}><Play className="h-3.5 w-3.5 mr-1.5" /> Start case</Button>
+                {isInstructor && (
+                  <Button size="sm" variant="outline" onClick={() => navigate(`/cases/${c.caseId}/edit`)}><PenTool className="h-3.5 w-3.5 mr-1.5" /> Edit</Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
