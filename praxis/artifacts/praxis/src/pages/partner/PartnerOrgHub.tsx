@@ -15,6 +15,7 @@ import {
   UserPlus, KeyRound, Ban, RotateCcw, Settings2, Layers, Check, Send, LifeBuoy,
   Phone, MapPin, Mail, Smartphone, Link2, Plus,
   Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock, Trash2, Eye, Lock,
+  Sparkles,
 } from 'lucide-react';
 import { startImpersonation } from '@/lib/impersonationStore';
 import { renameOrg, useOrgOverrides } from '@/lib/orgOverridesStore';
@@ -23,6 +24,7 @@ import {
   DELEGATABLE_POWERS, ZAR, VAT_RATE, type Invoice, type PartnerDoc, type DocCategory,
 } from '@/lib/partnerHubData';
 import { useOrgClasses, createClass } from '@/lib/orgClassStore';
+import { useLearningHub, learningTemplates, coursesForPartner } from '@/lib/learningHubStore';
 import { PartnerClassDetail } from './PartnerClassDetail';
 
 const SECTION_META: Record<string, { title: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -98,6 +100,12 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const [orgNameDraft, setOrgNameDraft] = useState<string | null>(null);
 
   const courses = useMemo(() => orgCourses(h, orgId), [h, orgId]);
+  // Courses the super admin granted this partner from the Learning Hub (surfaced in the org catalog).
+  useLearningHub();
+  const assignedCourses = useMemo(() => {
+    const ids = coursesForPartner(h.partnerId);
+    return learningTemplates().filter((t) => ids.includes(t.id));
+  }, [h.partnerId]);
   const seededLearners = useMemo(() => orgLearners(h, orgId), [h, orgId]);
   const coaching = useMemo(() => orgCoaching(h, orgId), [h, orgId]);
   const gradebook = useMemo(() => orgGradebook(h, orgId), [h, orgId]);
@@ -346,6 +354,28 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
             <BookOpen className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <div className="text-muted-foreground">The course catalog for {d.org.name}. Courses are delivered to learners by assigning them to a <button className="text-primary underline" onClick={() => navigate(`${base}/classes`)}>class</button>.</div>
           </Card>
+
+          {assignedCourses.length > 0 && (
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold">Assigned from the Learning Hub</h3>
+                <Badge variant="secondary" className="ml-auto">{assignedCourses.length}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mb-3">Courses the platform granted {h.partnerName}. Available for every organisation under this partner to deliver.</p>
+              <div className="grid sm:grid-cols-2 gap-2">
+                {assignedCourses.map((t) => (
+                  <div key={t.id} className="rounded-lg border border-border p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm">{t.title}</span>
+                      <Badge className="bg-emerald-100 text-emerald-700 shrink-0">Granted</Badge>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">{t.level} · {t.modules} modules · {t.hours}h · {t.standard}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">

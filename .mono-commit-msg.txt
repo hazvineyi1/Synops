@@ -1,11 +1,7 @@
-Super admin console P1-P3: nav+colour+alerts, Learning Hub, org creation, Course Dev Suite (ASCII-only)
+Super admin console P4: platform Financial Hub + Filing cabinet (contracts/MOUs) (ASCII-only)
 
 NO MIGRATION REQUIRED. Frontend only.
 
-P1: nav reorg (Partner Hub / Learning Hub / Delivery / Platform), removed Members + top-level Partners/Funders; distinct violet super-admin shell + context ribbon (navy inside a partner); Partner Hub overview gains Alerts at a glance + Platform health and engagement.
+Adds /platform-finance under the Platform nav group: a Financials tab (platform-wide MRR / outstanding / funding / VAT rollup + per-partner table with platform totals) and a Contracts and MOUs filing cabinet (search + type/partner filters, upload/file a document, inline status, backed by the new platformFilingStore with seeded MSAs, MOUs, SLAs, DPA and funder agreements for both partners).
 
-P2: Learning Hub page (content library with video/file/link upload + review gate, course/lesson templates, assign courses to partners) backed by learningHubStore; super admin / partner admin can CREATE an organisation in a partner (createOrg pushes a real org+subscription so it behaves like a seeded one).
-
-P3: Course Development Suite - Bloom verb engine + objective generator with measurability checks, scaffolded assessment suggestions with cluster warnings, and interactive-video authoring (transcribe/segment/draft/REQUIRED human review gate/publish).
-
-VALIDATION: local-resolution esbuild bundle clean on all 8 changed/new files.
+VALIDATION: local-resolution esbuild bundle clean on platformFilingStore, PlatformFinance, App, AppLayout.

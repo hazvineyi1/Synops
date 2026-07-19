@@ -389,9 +389,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {role === 'super_admin' && (
-          <div className="px-4 py-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider"
-            style={{ color: isSuperPlatform ? '#c4b5fd' : '#fbbf24', background: 'rgba(255,255,255,0.05)', borderBottom: `1px solid ${HAIRLINE}` }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: isSuperPlatform ? '#a78bfa' : '#fbbf24' }} />
+          <div className="px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide"
+            style={{ color: '#ffffff', background: 'rgba(255,255,255,0.08)', borderBottom: `1px solid ${HAIRLINE}` }}>
+            <span className="h-2 w-2 rounded-full" style={{ background: isSuperPlatform ? '#c4b5fd' : '#fbbf24' }} />
             {isSuperPlatform ? t('nav.superAdminPlatform', 'Super Admin · Platform') : `${t('nav.insidePartner', 'Inside partner')} · ${activePartnerName ?? ''}`}
           </div>
         )}

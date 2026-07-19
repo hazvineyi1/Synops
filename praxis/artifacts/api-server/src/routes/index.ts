@@ -43,6 +43,7 @@ import promptTemplatesRouter from "./promptTemplates";
 import casesRouter from "./cases";
 import caseEmbedRouter from "./caseEmbed";
 import tutorFiguresRouter from "./tutorFigures";
+import learningHubRouter from "./learningHub";
 import devRouter from "./dev";
 
 const router = Router();
@@ -91,6 +92,7 @@ router.use(promptTemplatesRouter);
 router.use(casesRouter);
 router.use(caseEmbedRouter);
 router.use(tutorFiguresRouter);
+router.use(learningHubRouter);
 router.use(devRouter);
 
 export default router;
