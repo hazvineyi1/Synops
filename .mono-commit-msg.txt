@@ -1,7 +1,13 @@
-Super admin console P4: platform Financial Hub + Filing cabinet (contracts/MOUs) (ASCII-only)
+Learning Hub persistence B: DB tables + Supabase Storage upload + CRUD API (additive) (ASCII-only)
 
-NO MIGRATION REQUIRED. Frontend only.
+MIGRATION REQUIRED: run praxis/migration-learning-hub.sql against the Praxis Postgres (creates learning_content, course_templates, course_assignments + seeds). Additive/idempotent.
 
-Adds /platform-finance under the Platform nav group: a Financials tab (platform-wide MRR / outstanding / funding / VAT rollup + per-partner table with platform totals) and a Contracts and MOUs filing cabinet (search + type/partner filters, upload/file a document, inline status, backed by the new platformFilingStore with seeded MSAs, MOUs, SLAs, DPA and funder agreements for both partners).
+Backend only, no frontend behaviour change yet (UI still uses in-session state until the C increment rewires it, so this deploy is safe).
 
-VALIDATION: local-resolution esbuild bundle clean on platformFilingStore, PlatformFinance, App, AppLayout.
+- New Drizzle tables in lib/db schema/learning_hub.ts (exported from schema index).
+- New api-server route learningHub.ts mounted in routes/index: GET/POST content, POST content/upload (forwards file to Supabase Storage via REST), PATCH review, DELETE, templates GET/POST, assignments GET/PUT/toggle. Writes gated to super_admin.
+- src/lib/supabaseStorage.ts (REST, no SDK): reads SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY at call time; storageEnabled() so missing config fails cleanly.
+
+ENV (for uploads): set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the Praxis service and create a Storage bucket (default name learning-hub).
+
+VALIDATION: esbuild syntax-check clean on supabaseStorage, learningHub route, schema, routes index.

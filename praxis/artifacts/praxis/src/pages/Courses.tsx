@@ -1,16 +1,20 @@
-import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useListCourses } from "@workspace/api-client-react";
-import { BookOpen, ArrowRight, CheckCircle2, Layers, Award } from "lucide-react";
+import { BookOpen, ArrowRight, CheckCircle2, Layers, Award, Plus, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
+import { useSession } from "@/context/SessionContext";
 import { courseAccent } from "@/lib/courseColor";
 import { PageHeader } from "@/components/PageHeader";
+
+const CAN_AUTHOR = ["super_admin", "instructional_designer", "partner_admin", "org_admin", "coach"];
 
 /**
  * My Courses.
@@ -36,11 +40,42 @@ interface ProgressMe {
 
 export function Courses() {
   const [, navigate] = useLocation();
+  const { user } = useSession();
+  const queryClient = useQueryClient();
   const { data: catalog, isLoading } = useListCourses();
   const { data: prog } = useQuery({
     queryKey: ["progress", "me"],
     queryFn: () => apiFetch<ProgressMe>("/progress/me"),
   });
+
+  const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [nc, setNc] = useState({ title: "", description: "", nqfLevel: "" });
+  const [creating, setCreating] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
+
+  const createCourse = async () => {
+    if (!nc.title.trim()) return;
+    setCreating(true); setCreateErr(null);
+    try {
+      const course = await apiFetch<{ id: string }>("/courses", {
+        method: "POST",
+        body: JSON.stringify({
+          title: nc.title.trim(),
+          description: nc.description.trim() || undefined,
+          nqfLevel: nc.nqfLevel ? Number(nc.nqfLevel) : undefined,
+        }),
+      });
+      await queryClient.invalidateQueries();
+      setCreateOpen(false);
+      setNc({ title: "", description: "", nqfLevel: "" });
+      navigate(`/courses/${course.id}`);
+    } catch (e) {
+      setCreateErr(e instanceof Error ? e.message : "Could not create the course.");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const enrolled = prog?.courses ?? [];
   const enrolledIds = new Set(enrolled.map((c) => c.courseId));
@@ -56,6 +91,9 @@ export function Courses() {
         title={hasEnrolled ? "My Courses" : "Course Catalog"}
         icon={BookOpen}
         subtitle={hasEnrolled ? "Pick up a course in progress, or explore something new." : "Browse available programs and begin your mastery journey."}
+        action={canAuthor ? (
+          <Button className="gap-1.5" onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> New course</Button>
+        ) : undefined}
       />
 
       {/* Enrolled */}
@@ -166,6 +204,32 @@ export function Courses() {
           </div>
         )}
       </section>
+
+      {/* Create course (authors) */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> New course</DialogTitle>
+            <DialogDescription>Create a course, then add modules, case studies, interactives and assignments inside it.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Course title</span>
+              <input value={nc.title} autoFocus onChange={(e) => setNc((s) => ({ ...s, title: e.target.value }))} placeholder="e.g. Customer Service Excellence"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+            <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Description</span>
+              <textarea value={nc.description} onChange={(e) => setNc((s) => ({ ...s, description: e.target.value }))} rows={3} placeholder="What the course covers and who it is for."
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
+            <label className="text-xs block max-w-[160px]"><span className="mb-1 block font-medium text-muted-foreground">NQF level (optional)</span>
+              <input value={nc.nqfLevel} onChange={(e) => setNc((s) => ({ ...s, nqfLevel: e.target.value.replace(/[^0-9]/g, "") }))} placeholder="e.g. 4"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+            {createErr && <div className="text-xs text-red-600">{createErr}</div>}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button className="gap-1.5" disabled={!nc.title.trim() || creating} onClick={createCourse}><Plus className="h-4 w-4" /> {creating ? "Creating…" : "Create course"}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -41,8 +41,8 @@ router.get("/courses", requireAuth, async (req, res) => {
   res.json(courses.map(toCourseResponse));
 });
 
-// POST /courses
-router.post("/courses", requireAuth, async (req, res) => {
+// POST /courses -- author tiers only (was requireAuth-only, which let any signed-in user create).
+router.post("/courses", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
   const user = req.dbUser!;
   const tenantId = user.partnerId ?? user.organisationId ?? user.id;
   const { title, description, competencyTags, nqfLevel, thumbnailUrl } = req.body;
