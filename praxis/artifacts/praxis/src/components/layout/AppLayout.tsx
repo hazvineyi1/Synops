@@ -152,6 +152,41 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       ];
     }
 
+    // Partner hub nav (Overview + Organisations + the Partner Admin Platform group). Shared by
+    // the partner_admin AND by a super_admin browsing the partner hub, so from any partner page
+    // there is always an Overview and every hub destination in the sidebar.
+    const partnerHubGroups = (): NavGroup[] => [
+      {
+        items: [
+          { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
+          { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
+        ],
+      },
+      {
+        heading: t('nav.groups.partnerPlatform', 'Partner Admin Platform'),
+        items: [
+          { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
+          { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },
+          { label: t('nav.documents', 'Documents'), href: '/partner/documents', icon: FileText },
+          { label: t('nav.accountsRoles', 'Accounts & Roles'), href: '/partner/accounts', icon: Users },
+          { label: t('nav.communications', 'Communications'), href: '/partner/comms', icon: Megaphone },
+          { label: t('nav.branding', 'Branding'), href: '/partner/theme', icon: Palette },
+          { label: t('nav.audit', 'Audit & Impersonation'), href: '/partner/audit', icon: ShieldCheck },
+          { label: t('nav.partnerSettings', 'Settings'), href: '/partner/settings', icon: Settings },
+        ],
+      },
+      { items: [{ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy }] },
+    ];
+
+    // Super admin anywhere inside the partner hub gets the full partner nav plus an escape back
+    // to their platform console. (Org context is already handled above.)
+    if (role === 'super_admin' && (location === '/partner' || location.startsWith('/partner/'))) {
+      return [
+        { items: [{ label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ArrowLeft }] },
+        ...partnerHubGroups(),
+      ];
+    }
+
     if (role === 'learner') {
       // Case studies and Activities are reached by learners inside their modules (assigned
       // as part of the module experience), so they are intentionally NOT top-level nav for
@@ -205,32 +240,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (role === 'partner_admin') {
-      // Org context is handled above (shared with super admin). Top level (outside any
-      // organisation): only where the partner LOOKS (Overview,
-      // Organisations) and the partner-wide control surface (the Partner Admin Platform).
-      // Delivery no longer lives here — it belongs inside each organisation.
-      return [
-        {
-          items: [
-            { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
-            { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
-          ],
-        },
-        {
-          heading: t('nav.groups.partnerPlatform', 'Partner Admin Platform'),
-          items: [
-            { label: t('nav.financialHub', 'Financial Hub'), href: '/partner/finance', icon: Wallet },
-            { label: t('nav.fundersHub', 'Funders Hub'), href: '/partner/funders', icon: Landmark },
-            { label: t('nav.documents', 'Documents'), href: '/partner/documents', icon: FileText },
-            { label: t('nav.accountsRoles', 'Accounts & Roles'), href: '/partner/accounts', icon: Users },
-            { label: t('nav.communications', 'Communications'), href: '/partner/comms', icon: Megaphone },
-            { label: t('nav.branding', 'Branding'), href: '/partner/theme', icon: Palette },
-            { label: t('nav.audit', 'Audit & Impersonation'), href: '/partner/audit', icon: ShieldCheck },
-            { label: t('nav.partnerSettings', 'Settings'), href: '/partner/settings', icon: Settings },
-          ],
-        },
-        { items: [{ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy }] },
-      ];
+      // Org context is handled above. Everywhere else the partner_admin gets the partner hub nav
+      // (Overview, Organisations, and the Partner Admin Platform group).
+      return partnerHubGroups();
     }
 
     // Super admin: full access to every surface the other roles have, grouped so
