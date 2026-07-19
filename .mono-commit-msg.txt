@@ -1,5 +1,6 @@
-Fix Studio Edit white-screen crash (React error 31 on object-valued beat fields) (ASCII-only)
+Studio cleanup: rename to Module Builder + lock down backend routes (ASCII-only)
 
-StudioEdit blanked to a white screen whenever a draft had a beat whose scenario (or other field) was a structured object (e.g. an AI-generated quiz object with keys situation/question/options/correctOption/explanation) instead of plain text - rendering an object as a React child throws React error 31 and takes down the whole Edit + Publish page. Added toBeatText() which coerces any beat field to a readable string (formatting quiz/scenario objects into situation + question + labelled options + explanation), and routed every rendered/edited beat field (title, narration, bullet points, scenario) and the form-state init through it. Studio generate -> edit -> publish-to-course now works end to end (backend was already fine).
+- Renamed the page from Animation Studio to Studio - Module Builder with an accurate subtitle (turn source material into a lesson, publish as a module in a course).
+- Backend hardening (studio.ts): generate-script, PATCH draft, and publish now require an author role (super_admin/partner_admin/org_admin/coach/instructional_designer) instead of any signed-in user; publish additionally checks canStaffActOnCourse for the target course, so you cannot publish a module into a course you do not staff. Reads stay auth-only.
 
-VALIDATION: esbuild bundle clean on StudioEdit.tsx.
+VALIDATION: esbuild clean on Studio.tsx and studio.ts.

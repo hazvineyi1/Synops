@@ -6,12 +6,33 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Link, useLocation } from 'wouter';
-import { PlusCircle, PenTool, Clock, Settings2 } from 'lucide-react';
+import { PlusCircle, PenTool, Clock, Settings2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { apiFetch } from '@/lib/api';
+import { useSession } from '@/context/SessionContext';
+
+const CAN_AUTHOR = ['super_admin', 'instructional_designer', 'partner_admin', 'org_admin', 'coach'];
 
 export function Studio() {
-  const { data: drafts, isLoading } = useListScriptDrafts();
+  const { data: drafts, isLoading, refetch } = useListScriptDrafts();
   const [, setLocation] = useLocation();
+  const { user } = useSession();
+  const { toast } = useToast();
+  const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const deleteDraft = async (id: string, title: string) => {
+    if (!window.confirm(`Delete draft "${title}"? This cannot be undone.`)) return;
+    setDeletingId(id);
+    try {
+      await apiFetch(`/studio/scripts/${id}`, { method: 'DELETE' });
+      await refetch();
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Could not delete', description: e instanceof Error ? e.message : '' });
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in">
@@ -54,9 +75,18 @@ export function Studio() {
                 <div className="text-sm text-muted-foreground font-medium">
                   {draft.beats?.length || 0} Beats
                 </div>
-                <Button variant="secondary" size="sm" onClick={() => setLocation(`/studio/${draft.id}`)} disabled={draft.status === 'generating'}>
-                  <PenTool className="h-4 w-4 mr-2" /> Edit Draft
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  {canAuthor && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                      title="Delete draft" disabled={deletingId === draft.id}
+                      onClick={() => deleteDraft(draft.id, draft.title)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button variant="secondary" size="sm" onClick={() => setLocation(`/studio/${draft.id}`)} disabled={draft.status === 'generating'}>
+                    <PenTool className="h-4 w-4 mr-2" /> Edit Draft
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

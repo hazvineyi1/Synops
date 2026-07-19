@@ -171,6 +171,18 @@ router.patch("/studio/scripts/:draftId", requireAuth, requireAuthor, async (req,
   res.json(toDraftResponse(updated));
 });
 
+// DELETE /studio/scripts/:draftId -- authors may delete drafts in their own tenant; hub roles any.
+router.delete("/studio/scripts/:draftId", requireAuth, requireAuthor, async (req, res) => {
+  const draft = await db.query.scriptDraftsTable.findFirst({ where: eq(scriptDraftsTable.id, req.params.draftId) });
+  if (!draft) { res.status(404).json({ error: "Not found" }); return; }
+  const user = req.dbUser!;
+  const tenantId = user.partnerId ?? user.organisationId ?? user.id;
+  const isHub = user.role === "super_admin" || user.role === "instructional_designer";
+  if (!isHub && draft.tenantId !== tenantId) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.delete(scriptDraftsTable).where(eq(scriptDraftsTable.id, draft.id));
+  res.status(204).send();
+});
+
 // POST /studio/scripts/:draftId/publish
 router.post("/studio/scripts/:draftId/publish", requireAuth, requireAuthor, async (req, res) => {
   const draft = await db.query.scriptDraftsTable.findFirst({
