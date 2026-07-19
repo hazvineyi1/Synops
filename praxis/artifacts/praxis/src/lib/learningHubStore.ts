@@ -1,10 +1,13 @@
 import { useEffect, useReducer } from 'react';
+import { apiFetch } from '@/lib/api';
 
 /**
- * Learning Hub store (super-admin content home). Holds the platform content library (uploaded
- * videos / documents / links), a library of reusable course + lesson templates, and the mapping of
- * which courses are assigned to which partners. Client-side + reactive (subscribe/emit) - real
- * storage/upload is a backend step, exactly like the rest of the seeded Partner Hub prototype.
+ * Learning Hub store, backed by the real API (/api/learning/*).
+ *
+ * The module keeps in-memory caches of content / templates / assignments that the UI reads
+ * synchronously (so existing components need no async plumbing), hydrates them once from the
+ * backend on first use, and writes every mutation through to the API (optimistic where it helps).
+ * File blobs go to Supabase Storage via the upload endpoint; links and metadata persist in Postgres.
  */
 
 export type ContentKind = 'video' | 'document' | 'image' | 'link' | 'scorm';
@@ -12,12 +15,13 @@ export type ContentItem = {
   id: string;
   title: string;
   kind: ContentKind;
-  meta: string;        // size for files, url for links, etc.
+  meta: string;
+  url?: string | null;
   tags: string[];
-  addedAt: string;     // ISO date
+  addedAt: string;
   addedBy: string;
   status: 'ready' | 'processing';
-  reviewed: boolean;   // human-review gate (interactive assets start unreviewed)
+  reviewed: boolean;
 };
 
 export type CourseTemplate = {
@@ -27,88 +31,153 @@ export type CourseTemplate = {
   modality: 'Online' | 'Hybrid' | 'In-person';
   modules: number;
   hours: number;
-  standard: string;     // aligned accreditor / framework
+  standard: string;
   description: string;
   kind: 'course' | 'lesson' | 'assessment';
 };
 
 export type CourseAssignment = { courseId: string; partnerId: string; assignedAt: string };
 
-// ── Seeded starting content ──────────────────────────────────────────────────
-const SEED_CONTENT: ContentItem[] = [
-  { id: 'ct_v1', title: 'Traditional vs Digital Marketing (source lecture)', kind: 'video', meta: '04:22 · 148 MB', tags: ['marketing', 'lecture'], addedAt: '2026-06-02', addedBy: 'Instructional Design', status: 'ready', reviewed: true },
-  { id: 'ct_v2', title: 'Customer Service Role-play Walkthrough', kind: 'video', meta: '11:38 · 402 MB', tags: ['customer-service'], addedAt: '2026-06-14', addedBy: 'Instructional Design', status: 'ready', reviewed: false },
-  { id: 'ct_d1', title: 'Financial Literacy Workbook', kind: 'document', meta: 'PDF · 2.1 MB', tags: ['finance', 'workbook'], addedAt: '2026-05-28', addedBy: 'Instructional Design', status: 'ready', reviewed: true },
-  { id: 'ct_d2', title: 'OHS Compliance Checklist', kind: 'document', meta: 'DOCX · 340 KB', tags: ['safety', 'compliance'], addedAt: '2026-06-20', addedBy: 'Instructional Design', status: 'ready', reviewed: true },
-  { id: 'ct_l1', title: 'SETA Unit Standard 114974 reference', kind: 'link', meta: 'saqa.org.za', tags: ['seta', 'reference'], addedAt: '2026-06-21', addedBy: 'Instructional Design', status: 'ready', reviewed: true },
-];
+let content: ContentItem[] = [];
+let templates: CourseTemplate[] = [];
+let assignments: CourseAssignment[] = [];
 
-const SEED_TEMPLATES: CourseTemplate[] = [
-  { id: 'tpl_cs', title: 'Customer Service Excellence', level: 'Foundational', modality: 'Hybrid', modules: 6, hours: 24, standard: 'Services SETA US 252210', description: 'Frontline service skills, complaint handling and service recovery.', kind: 'course' },
-  { id: 'tpl_ds', title: 'Digital Skills Foundations', level: 'Foundational', modality: 'Online', modules: 8, hours: 32, standard: 'MICT SETA · NQF 3', description: 'Core computer, internet and productivity skills for the workplace.', kind: 'course' },
-  { id: 'tpl_ll', title: 'Team Leadership', level: 'Intermediate', modality: 'Hybrid', modules: 5, hours: 20, standard: 'Services SETA · NQF 5', description: 'Supervisory leadership, delegation and performance conversations.', kind: 'course' },
-  { id: 'tpl_fl', title: 'Financial Literacy at Work', level: 'Foundational', modality: 'Online', modules: 4, hours: 12, standard: 'BANKSETA · NQF 4', description: 'Budgeting, credit, and workplace financial decision-making.', kind: 'course' },
-  { id: 'tpl_ohs', title: 'Occupational Health & Safety', level: 'Foundational', modality: 'In-person', modules: 4, hours: 16, standard: 'OHS Act 85 of 1993', description: 'Workplace hazard identification, PPE and incident reporting.', kind: 'course' },
-  { id: 'tpl_lesson_bloom', title: 'Lesson template: Bloom-aligned module', level: 'Intermediate', modality: 'Online', modules: 1, hours: 2, standard: "Bloom's Taxonomy", description: 'Reusable module scaffold: objectives, formative check, application task.', kind: 'lesson' },
-];
-
-let content: ContentItem[] = [...SEED_CONTENT];
-let templates: CourseTemplate[] = [...SEED_TEMPLATES];
-let assignments: CourseAssignment[] = [
-  { courseId: 'tpl_cs', partnerId: 'partner_talentforge', assignedAt: '2026-06-05' },
-  { courseId: 'tpl_ds', partnerId: 'partner_talentforge', assignedAt: '2026-06-05' },
-  { courseId: 'tpl_ohs', partnerId: 'partner_skillbridge', assignedAt: '2026-06-11' },
-];
+let loaded = false;
+let loading: Promise<void> | null = null;
 
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
-const today = () => new Date().toISOString().slice(0, 10);
 
+// ── mappers (API row -> UI shape) ────────────────────────────────────────────
+function mapContent(r: any): ContentItem {
+  return {
+    id: r.id, title: r.title, kind: r.kind, meta: r.meta ?? '', url: r.url ?? null,
+    tags: typeof r.tags === 'string' && r.tags ? r.tags.split(',').filter(Boolean) : [],
+    addedAt: (r.createdAt ?? r.created_at ?? new Date().toISOString()).slice(0, 10),
+    addedBy: r.addedBy ?? r.added_by ?? 'System', status: 'ready', reviewed: !!r.reviewed,
+  };
+}
+function mapTemplate(r: any): CourseTemplate {
+  return {
+    id: r.id, title: r.title, level: r.level, modality: r.modality,
+    modules: r.modules ?? 1, hours: r.hours ?? 1, standard: r.standard ?? '',
+    description: r.description ?? '', kind: r.kind ?? 'course',
+  };
+}
+function mapAssignment(r: any): CourseAssignment {
+  return { courseId: r.courseId ?? r.course_id, partnerId: r.partnerId ?? r.partner_id, assignedAt: (r.assignedAt ?? r.assigned_at ?? '').slice(0, 10) };
+}
+
+async function load(): Promise<void> {
+  if (loaded) return;
+  if (loading) return loading;
+  loading = (async () => {
+    const [c, t, a] = await Promise.all([
+      apiFetch<any[]>('/learning/content'),
+      apiFetch<any[]>('/learning/templates'),
+      apiFetch<any[]>('/learning/assignments'),
+    ]);
+    content = c.map(mapContent);
+    templates = t.map(mapTemplate);
+    assignments = a.map(mapAssignment);
+    loaded = true;
+    emit();
+  })().catch((e) => { console.error('Learning Hub load failed', e); }).finally(() => { loading = null; });
+  return loading;
+}
+
+// ── reads (sync, from cache) ─────────────────────────────────────────────────
 export function learningContent(): ContentItem[] { return content; }
 export function learningTemplates(): CourseTemplate[] { return templates; }
 export function courseAssignments(): CourseAssignment[] { return assignments; }
+export function partnersForCourse(courseId: string): string[] { return assignments.filter((a) => a.courseId === courseId).map((a) => a.partnerId); }
+export function coursesForPartner(partnerId: string): string[] { return assignments.filter((a) => a.partnerId === partnerId).map((a) => a.courseId); }
 
-export function partnersForCourse(courseId: string): string[] {
-  return assignments.filter((a) => a.courseId === courseId).map((a) => a.partnerId);
-}
-export function coursesForPartner(partnerId: string): string[] {
-  return assignments.filter((a) => a.partnerId === partnerId).map((a) => a.courseId);
-}
-
-export function addContent(item: Omit<ContentItem, 'id' | 'addedAt' | 'status'>): ContentItem {
-  const rec: ContentItem = { ...item, id: `ct_${Date.now()}`, addedAt: today(), status: 'ready' };
+// ── writes (persist to API, update cache) ────────────────────────────────────
+export async function addContent(item: { title: string; kind: ContentKind; meta?: string; url?: string | null; tags?: string[]; addedBy?: string; reviewed?: boolean }): Promise<ContentItem> {
+  const row = await apiFetch<any>('/learning/content', {
+    method: 'POST',
+    body: JSON.stringify({ title: item.title, kind: item.kind, meta: item.meta, url: item.url, tags: item.tags ?? [], reviewed: item.reviewed }),
+  });
+  const rec = mapContent(row);
   content = [rec, ...content];
   emit();
   return rec;
 }
-export function removeContent(id: string) { content = content.filter((c) => c.id !== id); emit(); }
-export function markReviewed(id: string) { content = content.map((c) => (c.id === id ? { ...c, reviewed: true } : c)); emit(); }
 
-export function addTemplate(tpl: Omit<CourseTemplate, 'id'>): CourseTemplate {
-  const rec: CourseTemplate = { ...tpl, id: `tpl_${Date.now()}` };
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+/** Upload a real file to Supabase Storage via the backend, then record it. */
+export async function uploadContent(file: File): Promise<ContentItem> {
+  const dataBase64 = await fileToBase64(file);
+  const row = await apiFetch<any>('/learning/content/upload', {
+    method: 'POST',
+    body: JSON.stringify({ filename: file.name, dataBase64, title: file.name }),
+  });
+  const rec = mapContent(row);
+  content = [rec, ...content];
+  emit();
+  return rec;
+}
+
+export async function removeContent(id: string): Promise<void> {
+  const prev = content;
+  content = content.filter((c) => c.id !== id); emit(); // optimistic
+  try { await apiFetch(`/learning/content/${id}`, { method: 'DELETE' }); }
+  catch (e) { content = prev; emit(); throw e; }
+}
+
+export async function markReviewed(id: string): Promise<void> {
+  content = content.map((c) => (c.id === id ? { ...c, reviewed: true } : c)); emit(); // optimistic
+  try { await apiFetch(`/learning/content/${id}/review`, { method: 'PATCH' }); }
+  catch { /* reload on next mount */ }
+}
+
+export async function addTemplate(tpl: Omit<CourseTemplate, 'id'>): Promise<CourseTemplate> {
+  const row = await apiFetch<any>('/learning/templates', { method: 'POST', body: JSON.stringify(tpl) });
+  const rec = mapTemplate(row);
   templates = [rec, ...templates];
   emit();
   return rec;
 }
 
-/** Set the exact set of partners a course is assigned to. */
-export function setCourseAssignments(courseId: string, partnerIds: string[]) {
-  assignments = assignments.filter((a) => a.courseId !== courseId);
-  const add = partnerIds.map((partnerId) => ({ courseId, partnerId, assignedAt: today() }));
-  assignments = [...assignments, ...add];
-  emit();
-}
-export function toggleAssignment(courseId: string, partnerId: string) {
-  const has = assignments.some((a) => a.courseId === courseId && a.partnerId === partnerId);
-  assignments = has
-    ? assignments.filter((a) => !(a.courseId === courseId && a.partnerId === partnerId))
-    : [...assignments, { courseId, partnerId, assignedAt: today() }];
+export async function setCourseAssignments(courseId: string, partnerIds: string[]): Promise<void> {
+  const rows = await apiFetch<any[]>(`/learning/assignments/${courseId}`, { method: 'PUT', body: JSON.stringify({ partnerIds }) });
+  assignments = [...assignments.filter((a) => a.courseId !== courseId), ...rows.map(mapAssignment)];
   emit();
 }
 
-/** Reactive hook: any component using it re-renders on library / template / assignment change. */
+export async function toggleAssignment(courseId: string, partnerId: string): Promise<void> {
+  const has = assignments.some((a) => a.courseId === courseId && a.partnerId === partnerId);
+  // optimistic
+  assignments = has
+    ? assignments.filter((a) => !(a.courseId === courseId && a.partnerId === partnerId))
+    : [...assignments, { courseId, partnerId, assignedAt: new Date().toISOString().slice(0, 10) }];
+  emit();
+  try { await apiFetch('/learning/assignments/toggle', { method: 'POST', body: JSON.stringify({ courseId, partnerId }) }); }
+  catch (e) {
+    // revert on failure
+    assignments = has
+      ? [...assignments, { courseId, partnerId, assignedAt: new Date().toISOString().slice(0, 10) }]
+      : assignments.filter((a) => !(a.courseId === courseId && a.partnerId === partnerId));
+    emit(); throw e;
+  }
+}
+
+/** Reactive hook: hydrates on first mount, re-renders on any change. */
 export function useLearningHub() {
   const [, force] = useReducer((x) => x + 1, 0);
-  useEffect(() => { listeners.add(force); return () => { listeners.delete(force); }; }, []);
-  return { content, templates, assignments };
+  useEffect(() => {
+    listeners.add(force);
+    void load();
+    return () => { listeners.delete(force); };
+  }, []);
+  return { content, templates, assignments, loaded };
 }

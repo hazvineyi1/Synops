@@ -1,6 +1,5 @@
-Studio: delete-draft endpoint + delete button on cards (ASCII-only)
+Learning Hub schema bootstrap endpoint (no psql needed) (ASCII-only)
 
-- Backend: new DELETE /studio/scripts/:draftId gated to author roles; non-hub authors may only delete drafts in their own tenant, hub roles (super_admin/instructional_designer) any.
-- Frontend: trash button on each Studio draft card (author roles only) with a confirm, then refetch; clears the accumulated test drafts.
+Adds POST /api/learning/_migrate (super_admin only): runs the same additive/idempotent DDL + seed as praxis/migration-learning-hub.sql using the server's own DATABASE_URL connection, so the learning_content / course_templates / course_assignments tables can be created in environments without psql or DB-console access. Safe to call repeatedly (IF NOT EXISTS / ON CONFLICT DO NOTHING). Returns row counts.
 
-VALIDATION: esbuild clean on Studio.tsx and studio.ts.
+VALIDATION: esbuild syntax-check clean on learningHub.ts.

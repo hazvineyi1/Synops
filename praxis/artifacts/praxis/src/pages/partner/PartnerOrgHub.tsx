@@ -24,7 +24,7 @@ import {
   DELEGATABLE_POWERS, ZAR, VAT_RATE, type Invoice, type PartnerDoc, type DocCategory,
 } from '@/lib/partnerHubData';
 import { useOrgClasses, createClass } from '@/lib/orgClassStore';
-import { useLearningHub, learningTemplates, coursesForPartner } from '@/lib/learningHubStore';
+import { useLearningHub } from '@/lib/learningHubStore';
 import { PartnerClassDetail } from './PartnerClassDetail';
 
 const SECTION_META: Record<string, { title: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -101,11 +101,11 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
 
   const courses = useMemo(() => orgCourses(h, orgId), [h, orgId]);
   // Courses the super admin granted this partner from the Learning Hub (surfaced in the org catalog).
-  useLearningHub();
+  const lh = useLearningHub();
   const assignedCourses = useMemo(() => {
-    const ids = coursesForPartner(h.partnerId);
-    return learningTemplates().filter((t) => ids.includes(t.id));
-  }, [h.partnerId]);
+    const ids = lh.assignments.filter((a) => a.partnerId === h.partnerId).map((a) => a.courseId);
+    return lh.templates.filter((t) => ids.includes(t.id));
+  }, [lh.assignments, lh.templates, h.partnerId]);
   const seededLearners = useMemo(() => orgLearners(h, orgId), [h, orgId]);
   const coaching = useMemo(() => orgCoaching(h, orgId), [h, orgId]);
   const gradebook = useMemo(() => orgGradebook(h, orgId), [h, orgId]);

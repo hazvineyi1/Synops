@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { allPartners } from '@/lib/partnerHubData';
 import {
-  useLearningHub, addContent, removeContent, markReviewed, toggleAssignment,
+  useLearningHub, addContent, uploadContent, removeContent, markReviewed, toggleAssignment,
   partnersForCourse, type ContentKind, type ContentItem, type CourseTemplate,
 } from '@/lib/learningHubStore';
 
@@ -52,23 +52,23 @@ export function LearningHub() {
   const [urlValue, setUrlValue] = useState('');
   const [urlKind, setUrlKind] = useState<ContentKind>('link');
 
-  const onFiles = (files: FileList | null) => {
+  const onFiles = async (files: FileList | null) => {
     if (!files) return;
-    let added = 0;
-    Array.from(files).forEach((f) => {
-      const kind = kindFromFile(f.type || '');
-      addContent({ title: f.name, kind, meta: bytes(f.size), tags: [], addedBy: 'You', reviewed: kind !== 'video' });
-      added += 1;
-    });
-    if (added) flashMsg(`${added} file${added === 1 ? '' : 's'} uploaded to the content library.`);
+    const arr = Array.from(files);
+    for (const f of arr) {
+      try { await uploadContent(f); flashMsg(`Uploaded "${f.name}" to the content library.`); }
+      catch (e) { flashMsg(e instanceof Error ? e.message : 'Upload failed.'); }
+    }
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  const addUrl = () => {
+  const addUrl = async () => {
     if (!urlTitle.trim() || !urlValue.trim()) return;
-    addContent({ title: urlTitle.trim(), kind: urlKind, meta: urlValue.trim(), tags: [], addedBy: 'You', reviewed: urlKind !== 'video' });
-    setUrlTitle(''); setUrlValue(''); setUrlOpen(false);
-    flashMsg('Added to the content library.');
+    try {
+      await addContent({ title: urlTitle.trim(), kind: urlKind, meta: urlValue.trim(), url: urlValue.trim(), tags: [], addedBy: 'You', reviewed: urlKind !== 'video' });
+      setUrlTitle(''); setUrlValue(''); setUrlOpen(false);
+      flashMsg('Added to the content library.');
+    } catch (e) { flashMsg(e instanceof Error ? e.message : 'Could not add that.'); }
   };
 
   const videos = content.filter((c) => c.kind === 'video').length;
