@@ -6,8 +6,9 @@ import {
   credentialsTable,
   funderScopesTable,
   organisationsTable,
+  fundingAgreementsTable,
 } from "@workspace/db";
-import { eq, and, inArray, count } from "drizzle-orm";
+import { eq, and, inArray, count, desc, sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { isSuperAdmin, isFunder } from "../lib/roles";
 import { funderOrgIds, orgCoachingHours } from "../lib/scope";
@@ -195,6 +196,116 @@ router.post("/funders/:id/scopes", requireAuth, requireSuperAdmin, async (req, r
 router.delete("/funder-scopes/:scopeId", requireAuth, requireSuperAdmin, async (req, res) => {
   await db.delete(funderScopesTable).where(eq(funderScopesTable.id, req.params.scopeId));
   await logAudit(req, "funder.scope_revoke", "funder_scope", req.params.scopeId);
+  res.status(204).send();
+});
+
+// ── Funding agreements (real, per partner) ───────────────────────────────────
+// The Partner Funders Hub's real backing store. Super admin manages any partner; a partner_admin
+// manages their own. Endpoints self-create the table so no separate migration step is needed.
+
+async function ensureFundingTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS funding_agreements (
+      id text PRIMARY KEY,
+      partner_id text NOT NULL,
+      funder_name text NOT NULL,
+      funder_type text NOT NULL DEFAULT 'SETA',
+      org_id text,
+      org_name text,
+      seats_funded integer NOT NULL DEFAULT 0,
+      value integer NOT NULL DEFAULT 0,
+      start_date text,
+      expiry text,
+      status text NOT NULL DEFAULT 'active',
+      conditions jsonb NOT NULL DEFAULT '[]'::jsonb,
+      created_by text,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`);
+}
+
+function canManagePartner(user: { role: string; partnerId?: string | null }, partnerId: string) {
+  return isSuperAdmin(user.role) || user.partnerId === partnerId;
+}
+
+const cleanConditions = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((c): c is string => typeof c === "string" && c.trim().length > 0).map((c) => c.trim()) : [];
+
+// GET /partners/:partnerId/funding — list a partner's funding agreements.
+router.get("/partners/:partnerId/funding", requireAuth, async (req, res) => {
+  const { partnerId } = req.params;
+  if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const rows = await db
+      .select()
+      .from(fundingAgreementsTable)
+      .where(eq(fundingAgreementsTable.partnerId, partnerId))
+      .orderBy(desc(fundingAgreementsTable.createdAt));
+    res.json(rows);
+  } catch {
+    res.json([]); // table not created yet
+  }
+});
+
+// POST /partners/:partnerId/funding — create an agreement.
+router.post("/partners/:partnerId/funding", requireAuth, async (req, res) => {
+  const { partnerId } = req.params;
+  const user = req.dbUser!;
+  if (!canManagePartner(user, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const b = req.body ?? {};
+  if (!b.funderName || !String(b.funderName).trim()) { res.status(400).json({ error: "A funder name is required." }); return; }
+  await ensureFundingTable();
+  const [row] = await db
+    .insert(fundingAgreementsTable)
+    .values({
+      partnerId,
+      funderName: String(b.funderName).trim(),
+      funderType: b.funderType ? String(b.funderType) : "SETA",
+      orgId: b.orgId ? String(b.orgId) : null,
+      orgName: b.orgName ? String(b.orgName) : null,
+      seatsFunded: Number.isFinite(+b.seatsFunded) ? Math.max(0, Math.trunc(+b.seatsFunded)) : 0,
+      value: Number.isFinite(+b.value) ? Math.max(0, Math.trunc(+b.value)) : 0,
+      startDate: b.startDate ? String(b.startDate) : null,
+      expiry: b.expiry ? String(b.expiry) : null,
+      status: b.status ? String(b.status) : "active",
+      conditions: cleanConditions(b.conditions),
+      createdBy: user.id,
+    })
+    .returning();
+  await logAudit(req, "funding.create", "funding_agreement", row.id, { funder: row.funderName, value: row.value });
+  res.status(201).json(row);
+});
+
+// PATCH /partners/:partnerId/funding/:id — edit an agreement.
+router.patch("/partners/:partnerId/funding/:id", requireAuth, async (req, res) => {
+  const { partnerId, id } = req.params;
+  if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const b = req.body ?? {};
+  const patch: Record<string, unknown> = {};
+  if (b.funderName !== undefined) patch.funderName = String(b.funderName).trim();
+  if (b.funderType !== undefined) patch.funderType = String(b.funderType);
+  if (b.orgId !== undefined) patch.orgId = b.orgId ? String(b.orgId) : null;
+  if (b.orgName !== undefined) patch.orgName = b.orgName ? String(b.orgName) : null;
+  if (b.seatsFunded !== undefined) patch.seatsFunded = Math.max(0, Math.trunc(+b.seatsFunded) || 0);
+  if (b.value !== undefined) patch.value = Math.max(0, Math.trunc(+b.value) || 0);
+  if (b.startDate !== undefined) patch.startDate = b.startDate ? String(b.startDate) : null;
+  if (b.expiry !== undefined) patch.expiry = b.expiry ? String(b.expiry) : null;
+  if (b.status !== undefined) patch.status = String(b.status);
+  if (b.conditions !== undefined) patch.conditions = cleanConditions(b.conditions);
+  const [row] = await db
+    .update(fundingAgreementsTable)
+    .set(patch)
+    .where(and(eq(fundingAgreementsTable.id, id), eq(fundingAgreementsTable.partnerId, partnerId)))
+    .returning();
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
+});
+
+// DELETE /partners/:partnerId/funding/:id — remove an agreement.
+router.delete("/partners/:partnerId/funding/:id", requireAuth, async (req, res) => {
+  const { partnerId, id } = req.params;
+  if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.delete(fundingAgreementsTable).where(and(eq(fundingAgreementsTable.id, id), eq(fundingAgreementsTable.partnerId, partnerId)));
+  await logAudit(req, "funding.delete", "funding_agreement", id);
   res.status(204).send();
 });
 

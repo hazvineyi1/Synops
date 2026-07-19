@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { partnersTable, usersTable, organisationsTable } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { eq, count, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -96,6 +96,33 @@ router.get("/partners/:partnerId/stats", requireAuth, async (req, res) => {
     completionRate: 0,
     orgCount: Number(orgCountResult.count),
   });
+});
+
+// GET /partners/:partnerId/members — the real staff/learner accounts belonging to a partner
+// (super admin sees any partner; a partner_admin sees their own). Powers the Accounts & Roles page.
+router.get("/partners/:partnerId/members", requireAuth, async (req, res) => {
+  const { partnerId } = req.params;
+  const user = req.dbUser!;
+  if (user.role !== "super_admin" && user.partnerId !== partnerId) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const rows = await db.select().from(usersTable).where(eq(usersTable.partnerId, partnerId));
+  const orgIds = [...new Set(rows.map((r) => r.organisationId).filter((v): v is string => !!v))];
+  const orgs = orgIds.length ? await db.select().from(organisationsTable).where(inArray(organisationsTable.id, orgIds)) : [];
+  const orgName = new Map(orgs.map((o) => [o.id, o.name]));
+  res.json(
+    rows.map((u) => ({
+      id: u.id,
+      name: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      organisationId: u.organisationId,
+      orgName: u.organisationId ? (orgName.get(u.organisationId) ?? null) : null,
+      updatedAt: u.updatedAt.toISOString(),
+    })),
+  );
 });
 
 export default router;

@@ -1,4 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
@@ -9,78 +11,118 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { Landmark, Users, ShieldCheck, ExternalLink, CheckCircle2, Plus, Trash2, X, Pencil } from 'lucide-react';
-import { getPartnerHub, fundersRollup, ZAR, type FunderAgreement, type SeatAllocation } from '@/lib/partnerHubData';
+import { Landmark, Users, ShieldCheck, ExternalLink, CheckCircle2, Plus, Trash2, X, Pencil, FileText } from 'lucide-react';
+import { getActivePartnerId, ZAR } from '@/lib/partnerHubData';
 import { orgLabel, useOrgOverrides } from '@/lib/orgOverridesStore';
 
-const agStatus = (s: string) =>
-  s === 'active' ? 'bg-emerald-600' : s === 'expiring' ? 'bg-amber-500' : 'bg-muted text-muted-foreground';
+// A real funding agreement from GET /partners/:id/funding.
+interface Agreement {
+  id: string; funderName: string; funderType: string; orgId: string | null; orgName: string | null;
+  seatsFunded: number; value: number; startDate: string | null; expiry: string | null;
+  status: string; conditions: string[];
+}
+interface OrgLite { id: string; name: string; partnerId: string | null }
 
 const FUNDER_TYPES = ['SETA', 'Corporate CSI', 'NSFAS', 'Government', 'Foundation', 'Other'];
+const fmtMonth = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }) : '—');
 
-function NumInput({ value, onChange, prefix, width = 'w-32' }: { value: number; onChange: (n: number) => void; prefix?: string; width?: string }) {
+function NumInput({ value, onChange, onCommit, prefix, width = 'w-32' }: { value: number; onChange: (n: number) => void; onCommit?: () => void; prefix?: string; width?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-1 rounded-md border border-input bg-background px-2 h-8 focus-within:ring-2 focus-within:ring-primary/30', width)}>
       {prefix && <span className="text-xs text-muted-foreground">{prefix}</span>}
       <input type="number" min={0} value={Number.isFinite(value) ? value : 0}
         onChange={(e) => onChange(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+        onBlur={() => onCommit?.()}
         className="w-full bg-transparent text-right text-sm tabular-nums outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
     </span>
   );
 }
 
 /**
- * Funders Hub (spec §4). Funding agreements, funded-seat allocation, funder portal and grant
- * conditions. Editable on seeded data: add funders/agreements, edit figures (value, funded seats,
- * allocation) and manage grant conditions. Persistence + funder KYC are the backend phase.
+ * Funders Hub (spec §4) — now backed by real funding_agreements. A partner's funding agreements,
+ * funded-seat totals and grant conditions persist via /partners/:id/funding. Seat-level assignment
+ * to individual learners is still to come, so the allocation view is derived read-only from the
+ * funded-seat count on each agreement.
  */
 export function PartnerFunders() {
   const { user } = useSession();
   useOrgOverrides();
-  const h = getPartnerHub(user?.partnerId);
-  const fun = fundersRollup(h);
+  const partnerId = user?.partnerId ?? getActivePartnerId();
+  const qc = useQueryClient();
 
-  const [agreements, setAgreements] = useState<FunderAgreement[]>(h.agreements);
-  const [allocations, setAllocations] = useState<SeatAllocation[]>(h.allocations);
+  const { data: apiAgreements, isLoading } = useQuery({
+    queryKey: ['partner-funding', partnerId],
+    queryFn: () => apiFetch<Agreement[]>(`/partners/${partnerId}/funding`),
+    enabled: !!partnerId,
+  });
+  const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
+  const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
+
+  // Local mirror so inline edits feel instant; commits persist via PATCH.
+  const [agreements, setAgreements] = useState<Agreement[]>([]);
+  useEffect(() => { setAgreements(apiAgreements ?? []); }, [apiAgreements]);
+
   const [flash, setFlash] = useState<string | null>(null);
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 2800); };
 
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['partner-funding', partnerId] });
+  const patchM = useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<Agreement> }) =>
+      apiFetch(`/partners/${partnerId}/funding/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+    onSuccess: invalidate,
+  });
+  const createM = useMutation({
+    mutationFn: (body: Record<string, unknown>) => apiFetch(`/partners/${partnerId}/funding`, { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => { invalidate(); flashMsg('Funding agreement added.'); setAddOpen(false); setForm(blankForm); },
+    onError: (e: any) => flashMsg(e?.message ?? 'Could not add the agreement.'),
+  });
+  const deleteM = useMutation({
+    mutationFn: (id: string) => apiFetch(`/partners/${partnerId}/funding/${id}`, { method: 'DELETE' }),
+    onSuccess: () => { invalidate(); flashMsg('Agreement removed.'); },
+  });
+
+  const setLocal = (id: string, patch: Partial<Agreement>) => setAgreements((xs) => xs.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  const commit = (id: string, patch: Partial<Agreement>) => { setLocal(id, patch); patchM.mutate({ id, patch }); };
+  const commitField = (id: string, key: keyof Agreement) => {
+    const cur = agreements.find((a) => a.id === id);
+    if (cur) patchM.mutate({ id, patch: { [key]: cur[key] } as Partial<Agreement> });
+  };
+  const addCondition = (id: string, c: string) => {
+    const v = c.trim(); if (!v) return;
+    const cur = agreements.find((a) => a.id === id);
+    commit(id, { conditions: [...(cur?.conditions ?? []), v] });
+  };
+  const removeCondition = (id: string, c: string) => {
+    const cur = agreements.find((a) => a.id === id);
+    commit(id, { conditions: (cur?.conditions ?? []).filter((x) => x !== c) });
+  };
+
   // Add-agreement dialog state
   const [addOpen, setAddOpen] = useState(false);
-  const blankForm = { funder: '', funderType: 'SETA', orgName: h.orgs[0]?.name ?? '', value: 0, seatsFunded: 0, start: '2026-04-01', expiry: '2027-03-31', status: 'active' as FunderAgreement['status'], conditions: '' };
+  const blankForm = { funder: '', funderType: 'SETA', orgName: '', value: 0, seatsFunded: 0, start: '2026-04-01', expiry: '2027-03-31', status: 'active', conditions: '' };
   const [form, setForm] = useState(blankForm);
+  const [condDraft, setCondDraft] = useState<Record<string, string>>({});
 
-  const setAg = (id: string, patch: Partial<FunderAgreement>) => setAgreements((xs) => xs.map((a) => (a.id === id ? { ...a, ...patch } : a)));
-  const removeAg = (id: string) => setAgreements((xs) => xs.filter((a) => a.id !== id));
-  const addCondition = (id: string, c: string) => { const v = c.trim(); if (v) setAg(id, { conditions: [...(agreements.find((a) => a.id === id)?.conditions ?? []), v] }); };
-  const removeCondition = (id: string, c: string) => setAg(id, { conditions: (agreements.find((a) => a.id === id)?.conditions ?? []).filter((x) => x !== c) });
-
-  const addAgreement = () => {
+  const submitAdd = () => {
     if (!form.funder.trim()) return;
-    const a: FunderAgreement = {
-      id: `ag_${Date.now()}`, funder: form.funder.trim(), funderType: form.funderType,
-      scopeOrgs: [form.orgName], seatsFunded: form.seatsFunded, value: form.value,
-      start: form.start, expiry: form.expiry, status: form.status,
-      conditions: form.conditions.split(',').map((c) => c.trim()).filter(Boolean),
-    };
-    setAgreements((xs) => [a, ...xs]);
-    // seed a matching allocation so it appears in the allocation tab
-    setAllocations((xs) => [{ id: `al_${Date.now()}`, funder: a.funder, orgName: form.orgName, allocated: form.seatsFunded, used: 0 }, ...xs]);
-    setForm(blankForm); setAddOpen(false);
-    flashMsg(`Funding agreement added for ${a.funder}.`);
+    createM.mutate({
+      funderName: form.funder.trim(), funderType: form.funderType,
+      orgId: orgs.find((o) => o.name === form.orgName)?.id ?? null, orgName: form.orgName || null,
+      value: form.value, seatsFunded: form.seatsFunded, startDate: form.start, expiry: form.expiry,
+      status: form.status, conditions: form.conditions.split(',').map((c) => c.trim()).filter(Boolean),
+    });
   };
 
   const roll = useMemo(() => ({
-    funders: new Set(agreements.map((a) => a.funder)).size,
-    fundedSeats: agreements.reduce((s, a) => s + a.seatsFunded, 0),
-    funderValue: agreements.reduce((s, a) => s + a.value, 0),
+    funders: new Set(agreements.map((a) => a.funderName)).size,
+    fundedSeats: agreements.reduce((s, a) => s + (a.seatsFunded || 0), 0),
+    funderValue: agreements.reduce((s, a) => s + (a.value || 0), 0),
+    count: agreements.length,
   }), [agreements]);
-
-  const [condDraft, setCondDraft] = useState<Record<string, string>>({});
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Funders Hub" icon={Landmark} subtitle={`${h.partnerName} - funding agreements, seat allocation and grant conditions.`}
+      <PageHeader title="Funders Hub" icon={Landmark} subtitle="Funding agreements, funded-seat totals and grant conditions."
         action={<Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add funder</Button>} />
 
       {flash && (
@@ -90,10 +132,10 @@ export function PartnerFunders() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={Landmark} label="Active funders" value={roll.funders} tint="bg-violet-500/10 text-violet-600" />
+        <StatCard icon={Landmark} label="Funders" value={roll.funders} tint="bg-violet-500/10 text-violet-600" />
         <StatCard icon={Users} label="Funded seats" value={roll.fundedSeats} tint="bg-indigo-500/10 text-indigo-600" />
         <StatCard icon={ShieldCheck} label="Agreement value" value={ZAR(roll.funderValue)} tint="bg-emerald-500/10 text-emerald-600" />
-        <StatCard icon={ExternalLink} label="Scheduled disbursement" value={ZAR(fun.scheduled)} tint="bg-blue-500/10 text-blue-600" />
+        <StatCard icon={FileText} label="Agreements" value={roll.count} tint="bg-blue-500/10 text-blue-600" />
       </div>
 
       <Tabs defaultValue="agreements">
@@ -104,31 +146,32 @@ export function PartnerFunders() {
           <TabsTrigger value="portal">Funder Portal</TabsTrigger>
         </TabsList>
 
-        {/* Funding Agreements & Terms - editable */}
+        {/* Funding Agreements — real, editable */}
         <TabsContent value="agreements" className="mt-4 space-y-3">
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Pencil className="h-3 w-3" /> Value, funded seats, status and conditions are editable. Add a funder with the button above.</p>
+          <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Pencil className="h-3 w-3" /> Value, funded seats, status and conditions save automatically. Add a funder with the button above.</p>
+          {isLoading && <Card className="p-6 text-center text-sm text-muted-foreground">Loading agreements…</Card>}
           {agreements.map((a) => (
             <Card key={a.id} className="p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold">{a.funder}</span>
+                    <span className="font-semibold">{a.funderName}</span>
                     <Badge variant="outline" className="text-[10px]">{a.funderType}</Badge>
-                    <select value={a.status} onChange={(e) => setAg(a.id, { status: e.target.value as FunderAgreement['status'] })}
+                    <select value={a.status} onChange={(e) => commit(a.id, { status: e.target.value })}
                       className="h-6 rounded border border-input bg-background px-1 text-[11px]">
-                      <option value="active">active</option><option value="expiring">expiring</option><option value="pending">pending</option>
+                      <option value="active">active</option><option value="expiring">expiring</option><option value="pending">pending</option><option value="expired">expired</option>
                     </select>
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    {a.scopeOrgs.map(orgLabel).join(', ')} · {new Date(a.start).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })} - {new Date(a.expiry).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' })}
+                    {a.orgName ? orgLabel(a.orgName) : 'All organisations'} · {fmtMonth(a.startDate)} - {fmtMonth(a.expiry)}
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="space-y-1.5 text-right">
-                    <div className="flex items-center justify-end gap-1.5"><span className="text-[10px] uppercase tracking-wide text-muted-foreground">Value</span><NumInput value={a.value} onChange={(n) => setAg(a.id, { value: n })} prefix="R" width="w-36" /></div>
-                    <div className="flex items-center justify-end gap-1.5"><span className="text-[10px] uppercase tracking-wide text-muted-foreground">Funded seats</span><NumInput value={a.seatsFunded} onChange={(n) => setAg(a.id, { seatsFunded: n })} width="w-24" /></div>
+                    <div className="flex items-center justify-end gap-1.5"><span className="text-[10px] uppercase tracking-wide text-muted-foreground">Value</span><NumInput value={a.value} onChange={(n) => setLocal(a.id, { value: n })} onCommit={() => commitField(a.id, 'value')} prefix="R" width="w-36" /></div>
+                    <div className="flex items-center justify-end gap-1.5"><span className="text-[10px] uppercase tracking-wide text-muted-foreground">Funded seats</span><NumInput value={a.seatsFunded} onChange={(n) => setLocal(a.id, { seatsFunded: n })} onCommit={() => commitField(a.id, 'seatsFunded')} width="w-24" /></div>
                   </div>
-                  <Button size="sm" variant="ghost" className="h-8 text-red-600" onClick={() => { removeAg(a.id); flashMsg('Agreement removed.'); }}><Trash2 className="h-4 w-4" /></Button>
+                  <Button size="sm" variant="ghost" className="h-8 text-red-600" onClick={() => deleteM.mutate(a.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -147,35 +190,26 @@ export function PartnerFunders() {
               </div>
             </Card>
           ))}
-          {agreements.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No funding agreements yet. Add a funder to get started.</Card>}
+          {!isLoading && agreements.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No funding agreements yet. Add a funder to get started.</Card>}
         </TabsContent>
 
-        {/* Seat Allocation - editable */}
+        {/* Seat Allocation — derived read-only from funded seats */}
         <TabsContent value="allocation" className="mt-4 space-y-3">
-          {allocations.map((al) => {
-            const pct = al.allocated > 0 ? Math.round((al.used / al.allocated) * 100) : 0;
-            return (
-              <Card key={al.id} className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-                  <div>
-                    <span className="font-medium">{al.funder}</span>
-                    <span className="text-muted-foreground text-sm"> · {orgLabel(al.orgName)}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>Used</span><NumInput value={al.used} onChange={(n) => setAllocations((xs) => xs.map((x) => (x.id === al.id ? { ...x, used: Math.min(n, x.allocated) } : x)))} width="w-20" />
-                    <span>of</span><NumInput value={al.allocated} onChange={(n) => setAllocations((xs) => xs.map((x) => (x.id === al.id ? { ...x, allocated: n } : x)))} width="w-20" /><span>seats</span>
-                  </div>
-                </div>
-                <Progress value={pct} className="h-2" />
-                <div className="mt-1 text-xs text-muted-foreground">{Math.max(0, al.allocated - al.used)} funded seats still available to assign</div>
-              </Card>
-            );
-          })}
-          {allocations.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No allocations yet.</Card>}
-          <p className="text-xs text-muted-foreground">Assigning a funded seat links a specific learner to a funder's grant, so completion evidence attributes back to the right agreement.</p>
+          {agreements.map((a) => (
+            <Card key={a.id} className="p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                <div><span className="font-medium">{a.funderName}</span><span className="text-muted-foreground text-sm"> · {a.orgName ? orgLabel(a.orgName) : 'All organisations'}</span></div>
+                <div className="text-xs text-muted-foreground">{a.seatsFunded} funded seats</div>
+              </div>
+              <Progress value={0} className="h-2" />
+              <div className="mt-1 text-xs text-muted-foreground">{a.seatsFunded} funded seats available to assign</div>
+            </Card>
+          ))}
+          {agreements.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No allocations yet.</Card>}
+          <p className="text-xs text-muted-foreground">Assigning a funded seat to a specific learner (so completion evidence attributes back to the grant) is the next step; today this reflects the funded-seat total per agreement.</p>
         </TabsContent>
 
-        {/* B-BBEE / SETA Conditions */}
+        {/* B-BBEE / SETA Conditions — derived from agreements */}
         <TabsContent value="conditions" className="mt-4">
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
@@ -185,7 +219,7 @@ export function PartnerFunders() {
               <tbody className="divide-y divide-border">
                 {agreements.flatMap((a) => a.conditions.map((c, i) => (
                   <tr key={a.id + i}>
-                    <td className="p-3 font-medium whitespace-nowrap">{a.funder}</td>
+                    <td className="p-3 font-medium whitespace-nowrap">{a.funderName}</td>
                     <td className="p-3">{c}</td>
                     <td className="p-3"><span className="inline-flex items-center gap-1 text-emerald-600 text-xs"><CheckCircle2 className="h-3.5 w-3.5" /> On track</span></td>
                   </tr>
@@ -194,15 +228,15 @@ export function PartnerFunders() {
               </tbody>
             </table>
           </Card>
-          <p className="mt-2 text-xs text-muted-foreground">Grant-specific compliance (distinct from general platform compliance). Completion and outcome evidence is drawn from learner Progress data and rolls up into the SETA/QCTO reports.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Grant-specific compliance. Completion and outcome evidence is drawn from learner Progress data and rolls up into the SETA/QCTO reports.</p>
         </TabsContent>
 
-        {/* Funder Portal */}
+        {/* Funder Portal — derived from agreement funders */}
         <TabsContent value="portal" className="mt-4 space-y-3">
           <Card className="p-4 text-sm text-muted-foreground">
             Each funder gets a scoped, read-only dashboard showing only the seats and outcomes tied to their own agreement - never other funders' data or the partner's finances.
           </Card>
-          {Array.from(new Set(agreements.map((a) => a.funder))).map((f) => (
+          {Array.from(new Set(agreements.map((a) => a.funderName))).map((f) => (
             <Card key={f} className="p-4 flex items-center justify-between gap-3">
               <div>
                 <div className="font-medium">{f}</div>
@@ -211,6 +245,7 @@ export function PartnerFunders() {
               <Button size="sm" variant="outline" className="gap-1.5"><ExternalLink className="h-3.5 w-3.5" /> Portal link</Button>
             </Card>
           ))}
+          {agreements.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No funders yet.</Card>}
         </TabsContent>
       </Tabs>
 
@@ -231,7 +266,8 @@ export function PartnerFunders() {
                 </select></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Organisation</span>
                 <select value={form.orgName} onChange={(e) => setForm((f) => ({ ...f, orgName: e.target.value }))} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
-                  {h.orgs.map((o) => <option key={o.id} value={o.name}>{orgLabel(o.name)}</option>)}
+                  <option value="">All organisations</option>
+                  {orgs.map((o) => <option key={o.id} value={o.name}>{orgLabel(o.name)}</option>)}
                 </select></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Agreement value (R)</span>
                 <input type="number" min={0} value={form.value} onChange={(e) => setForm((f) => ({ ...f, value: Math.max(0, Number(e.target.value)) }))} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
@@ -244,7 +280,7 @@ export function PartnerFunders() {
               <label className="text-xs col-span-2"><span className="mb-1 block font-medium text-muted-foreground">Conditions (comma-separated)</span>
                 <input value={form.conditions} onChange={(e) => setForm((f) => ({ ...f, conditions: e.target.value }))} placeholder="B-BBEE skills spend, Min. 70% completion" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
             </div>
-            <Button className="w-full gap-1.5" disabled={!form.funder.trim()} onClick={addAgreement}><Plus className="h-4 w-4" /> Add funding agreement</Button>
+            <Button className="w-full gap-1.5" disabled={!form.funder.trim() || createM.isPending} onClick={submitAdd}><Plus className="h-4 w-4" /> {createM.isPending ? 'Adding…' : 'Add funding agreement'}</Button>
           </div>
         </DialogContent>
       </Dialog>

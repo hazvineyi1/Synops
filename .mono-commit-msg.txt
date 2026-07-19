@@ -1,5 +1,5 @@
-Full Create-partner flow: logo->AI brand kit, first admin, starter courses (ASCII-only)
+Partner Hub Overview reads real partners; unbacked panels marked Sample (ASCII-only)
 
-AdminPartners (/admin/partners) create dialog upgraded from name/slug/email into the full flow: details (name auto-slugs) + website; upload a logo and Generate colours from it (POST /brand/ai-generate) with an editable palette + live preview; a first partner_admin (optional) created scoped to the new partner and emailed a set-password link (result panel shows the copyable link + emailed state); optional starter courses ticked from the platform catalogue. Orchestrates POST /partners -> PUT /brand/partner/:id -> POST /platform/users {partnerId} -> PUT /partners/:id/courses. Backend: new GET/PUT /partners/:partnerId/courses (self-creates course_partner_assignments, additive). Nav: super-admin Partner Hub group gets a Partner management link to /admin/partners.
+Platform Overview no longer shows the seeded TalentForge/SkillBridge demo. It now fetches real partners (GET /partners) and organisations (GET /organisations), rendering the partner list, per-partner org drill-in, and KPIs (partners, orgs, learners) from live data with an empty-state CTA to create the first partner. Financials/funders/coaching-health have no live backend, so those panels are clearly badged Sample data. partnerHubData: registerRealPartners + emptyHub fallback so opening a REAL partner's hub shows an empty, correctly-named hub instead of another partner's demo figures.
 
-VALIDATION: esbuild clean on courses.ts, AdminPartners.tsx, AppLayout.tsx.
+VALIDATION: esbuild clean on partnerHubData.ts, PlatformOverview.tsx.

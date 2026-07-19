@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -14,9 +16,12 @@ import {
   Clock, Settings2, UserPlus, CheckCircle2, Info,
 } from 'lucide-react';
 import {
-  getPartnerHub, accountActivity, DELEGATABLE_POWERS,
-  type Account, type Invite, type DelegatedAdmin,
+  getPartnerHub, getActivePartnerId, accountActivity, DELEGATABLE_POWERS,
+  type Invite, type DelegatedAdmin,
 } from '@/lib/partnerHubData';
+
+// A real account row from GET /partners/:id/members.
+interface Member { id: string; name: string; email: string; role: string; status: string; orgName: string | null; updatedAt: string }
 
 const CAPS = [
   'View all organisations',
@@ -55,16 +60,39 @@ const roleBadge = (r: string) =>
 export function PartnerAccounts() {
   const { user } = useSession();
   const h = getPartnerHub(user?.partnerId);
+  const partnerId = user?.partnerId ?? getActivePartnerId();
+  const isSuper = user?.role === 'super_admin';
+  const qc = useQueryClient();
 
-  const [accounts, setAccounts] = useState<Account[]>(h.accounts);
+  // Real accounts belonging to this partner.
+  const { data: members, isLoading: membersLoading } = useQuery({
+    queryKey: ['partner-members', partnerId],
+    queryFn: () => apiFetch<Member[]>(`/partners/${partnerId}/members`),
+    enabled: !!partnerId,
+  });
+  const accounts: Member[] = members ?? [];
+
   const [invites, setInvites] = useState<Invite[]>(h.invites);
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'coach' | 'org_admin'>('coach');
   const [org, setOrg] = useState(h.orgs[0]?.name ?? '');
 
   // Account detail drawer
-  const [selected, setSelected] = useState<Account | null>(null);
+  const [selected, setSelected] = useState<Member | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+
+  // Lifecycle actions (super admin only) hit the real platform-user endpoints.
+  const lifecycle = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'suspend' | 'reactivate' }) =>
+      apiFetch(`/platform/users/${id}/${action}`, { method: 'POST' }),
+    onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ['partner-members', partnerId] }); setSelected(null); flashMsg(v.action === 'suspend' ? 'Account suspended.' : 'Account reactivated.'); },
+    onError: () => flashMsg('Could not update the account.'),
+  });
+  const resetLink = useMutation({
+    mutationFn: (id: string) => apiFetch<{ emailed?: boolean; link?: string }>(`/platform/users/${id}/reset-link`, { method: 'POST' }),
+    onSuccess: (r) => flashMsg(r.emailed ? 'Password-reset link emailed.' : 'Password-reset link created (copy from Platform Console).'),
+    onError: () => flashMsg('Could not create a reset link.'),
+  });
 
   // Delegated admins (PU7)
   const [delegates, setDelegates] = useState<DelegatedAdmin[]>(h.delegatedAdmins);
@@ -79,10 +107,6 @@ export function PartnerAccounts() {
     setEmail('');
   };
 
-  const setStatus = (id: string, status: Account['status']) => {
-    setAccounts((xs) => xs.map((a) => (a.id === id ? { ...a, status } : a)));
-    setSelected((s) => (s && s.id === id ? { ...s, status } : s));
-  };
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3500); };
 
   const togglePower = (key: string) =>
@@ -99,7 +123,7 @@ export function PartnerAccounts() {
   };
   const revokeDelegate = (id: string) => setDelegates((xs) => xs.filter((d) => d.id !== id));
 
-  const activity = useMemo(() => (selected ? accountActivity(selected.id, selected.lastActive) : []), [selected]);
+  const activity = useMemo(() => (selected ? accountActivity(selected.id, selected.updatedAt) : []), [selected]);
 
   return (
     <div className="space-y-6">
@@ -128,13 +152,15 @@ export function PartnerAccounts() {
                 <tr><th className="text-left p-3">Name</th><th className="text-left p-3">Role</th><th className="text-left p-3">Organisation</th><th className="text-left p-3">Status</th><th className="text-left p-3">Last active</th><th className="p-3"></th></tr>
               </thead>
               <tbody className="divide-y divide-border">
+                {membersLoading && (<tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Loading accounts…</td></tr>)}
+                {!membersLoading && accounts.length === 0 && (<tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No accounts for this partner yet.</td></tr>)}
                 {accounts.map((a) => (
                   <tr key={a.id} className="hover:bg-muted/20">
                     <td className="p-3"><div className="font-medium">{a.name}</div><div className="text-xs text-muted-foreground">{a.email}</div></td>
-                    <td className="p-3"><span className={cn('rounded px-2 py-0.5 text-xs font-medium capitalize', roleBadge(a.role))}>{a.role.replace('_', ' ')}</span></td>
-                    <td className="p-3">{a.orgName}</td>
+                    <td className="p-3"><span className={cn('rounded px-2 py-0.5 text-xs font-medium capitalize', roleBadge(a.role))}>{a.role.replace(/_/g, ' ')}</span></td>
+                    <td className="p-3">{a.orgName ?? '—'}</td>
                     <td className="p-3"><Badge variant={a.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', a.status === 'suspended' && 'border-red-300 text-red-600')}>{a.status}</Badge></td>
-                    <td className="p-3 text-muted-foreground">{new Date(a.lastActive).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</td>
+                    <td className="p-3 text-muted-foreground">{new Date(a.updatedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</td>
                     <td className="p-3 text-right"><Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => setSelected(a)}><Settings2 className="h-3.5 w-3.5" /> Manage</Button></td>
                   </tr>
                 ))}
@@ -307,8 +333,8 @@ export function PartnerAccounts() {
                 {accounts.map((a) => (
                   <tr key={a.id}>
                     <td className="p-3 font-medium">{a.name}</td>
-                    <td className="p-3 capitalize">{a.role.replace('_', ' ')}</td>
-                    <td className="p-3">{a.orgName}</td>
+                    <td className="p-3 capitalize">{a.role.replace(/_/g, ' ')}</td>
+                    <td className="p-3">{a.orgName ?? '—'}</td>
                   </tr>
                 ))}
                 {delegates.map((d) => (
@@ -336,31 +362,34 @@ export function PartnerAccounts() {
             <>
               <DialogHeader>
                 <DialogTitle>{selected.name}</DialogTitle>
-                <DialogDescription>{selected.email} · <span className="capitalize">{selected.role.replace('_', ' ')}</span> · {selected.orgName}</DialogDescription>
+                <DialogDescription>{selected.email} · <span className="capitalize">{selected.role.replace(/_/g, ' ')}</span> · {selected.orgName ?? '—'}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
-                {/* Lifecycle actions */}
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline" className="gap-2 justify-start" onClick={() => flashMsg(`Password reset link sent to ${selected.email}.`)}>
-                    <KeyRound className="h-4 w-4" /> Reset password
-                  </Button>
-                  <Button variant="outline" className="gap-2 justify-start" onClick={() => flashMsg(`Login help email sent to ${selected.email}.`)}>
-                    <LifeBuoy className="h-4 w-4" /> Login help
-                  </Button>
-                  {selected.status === 'suspended' ? (
-                    <Button variant="outline" className="gap-2 justify-start text-emerald-600" onClick={() => { setStatus(selected.id, 'active'); flashMsg(`${selected.name} reactivated.`); }}>
-                      <RotateCcw className="h-4 w-4" /> Reactivate
+                {/* Lifecycle actions — wired to the real platform-user endpoints (super admin). */}
+                {isSuper ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" className="gap-2 justify-start" disabled={resetLink.isPending} onClick={() => resetLink.mutate(selected.id)}>
+                      <KeyRound className="h-4 w-4" /> Reset password
                     </Button>
-                  ) : (
-                    <Button variant="outline" className="gap-2 justify-start text-red-600" onClick={() => { setStatus(selected.id, 'suspended'); flashMsg(`${selected.name} suspended.`); }}>
-                      <Ban className="h-4 w-4" /> Suspend
-                    </Button>
-                  )}
-                  <div className="flex items-center gap-2 rounded-md border border-border px-3 text-sm text-muted-foreground">
-                    Status: <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>
+                    {selected.status === 'suspended' ? (
+                      <Button variant="outline" className="gap-2 justify-start text-emerald-600" disabled={lifecycle.isPending} onClick={() => lifecycle.mutate({ id: selected.id, action: 'reactivate' })}>
+                        <RotateCcw className="h-4 w-4" /> Reactivate
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className="gap-2 justify-start text-red-600" disabled={lifecycle.isPending} onClick={() => lifecycle.mutate({ id: selected.id, action: 'suspend' })}>
+                        <Ban className="h-4 w-4" /> Suspend
+                      </Button>
+                    )}
+                    <div className="col-span-2 flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+                      Status: <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Password resets and suspend/reactivate are performed by the platform team. Status: <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>
+                  </div>
+                )}
 
                 {/* Login activity */}
                 <div>
