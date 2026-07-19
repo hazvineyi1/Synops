@@ -1,5 +1,5 @@
-Financial Hub on live data: real billing_subscriptions + billing_invoices (ASCII-only)
+Documents and Filing on live data: real partner_documents register (ASCII-only)
 
-Partner Financial Hub is now backed by real tables. New billing router (mounted): GET /partners/:id/billing plus POST/PATCH/DELETE for /subscriptions and /invoices (self-create tables, additive; super admin any partner, partner_admin own). Subscriptions tab: real rows, add subscription (org + plan + price + seats), edit price/seats on blur, delete; monthly MRR derived. Invoicing tab: create invoice, edit net on blur, Mark paid (status), delete; VAT + totals derived. Funder Disbursement tab now derives from the REAL funding agreements. Tax/VAT derived from real invoices. New schema billing.ts (billing_subscriptions, billing_invoices).
+Partner Documents and Filing is now a real persistent register. New documents router (mounted): GET/POST/PATCH/DELETE /partners/:id/documents (self-create table, additive; super admin any partner, partner_admin own). Upload files -> each recorded as a filing entry (name, category, org, size, status); per-row status change (pending/filed/action-required) and delete persist; counts/filters from real data. New schema partner_documents.ts. File BYTES storage (virus scan + retention) noted as a further step needing storage creds.
 
-VALIDATION: esbuild clean on billing.ts, routes/index.ts, db index (billing tables exported), PartnerFinance.tsx.
+VALIDATION: esbuild clean on documents.ts, routes/index.ts, db index (partner_documents exported), PartnerDocuments.tsx.
