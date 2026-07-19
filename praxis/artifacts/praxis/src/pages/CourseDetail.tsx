@@ -587,11 +587,90 @@ function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isI
   );
 }
 
+interface CourseCase { itemId: string; caseId: string; title: string; status?: string | null; }
+interface LibraryCase { id: string; title: string; status?: string; }
+
+/** In-course Case studies: list cases attached to this course (via gradebook), attach or author. */
+function CourseCasesTab({ courseId, isInstructor }: { courseId: string; isInstructor: boolean }) {
+  const [, navigate] = useLocation();
+  const qc = useQueryClient();
+  const [attachOpen, setAttachOpen] = useState(false);
+  const { data: attached, isLoading } = useQuery({ queryKey: ['course-cases', courseId], queryFn: () => apiFetch<CourseCase[]>(`/courses/${courseId}/cases`) });
+  const { data: allCases } = useQuery({ queryKey: ['all-cases'], queryFn: () => apiFetch<LibraryCase[]>(`/cases`), enabled: attachOpen });
+
+  const attach = useMutation({
+    mutationFn: (caseId: string) => apiFetch(`/courses/${courseId}/gradebook-items`, { method: 'POST', body: JSON.stringify({ sourceType: 'case', sourceId: caseId }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['course-cases', courseId] }),
+  });
+  const detach = useMutation({
+    mutationFn: (itemId: string) => apiFetch(`/gradebook-items/${itemId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['course-cases', courseId] }),
+  });
+  const attachedIds = new Set((attached || []).map((a) => a.caseId));
+  const candidates = (allCases || []).filter((c) => !attachedIds.has(c.id));
+
+  return (
+    <div className="space-y-3">
+      {isInstructor && (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAttachOpen((v) => !v)}><Plus className="h-4 w-4" /> Attach existing</Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate('/cases')}><FileText className="h-4 w-4" /> New case study</Button>
+        </div>
+      )}
+
+      {isInstructor && attachOpen && (
+        <Card className="border-dashed border-primary/30">
+          <CardContent className="pt-5 space-y-2">
+            <div className="text-sm font-semibold">Attach an existing case study to this course</div>
+            {candidates.length === 0 ? (
+              <div className="text-sm text-muted-foreground">No unattached case studies available. Author one with "New case study".</div>
+            ) : (
+              <div className="max-h-64 overflow-auto divide-y divide-border">
+                {candidates.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 py-2">
+                    <div className="min-w-0"><div className="text-sm font-medium truncate">{c.title}</div>{c.status && <div className="text-xs text-muted-foreground capitalize">{c.status}</div>}</div>
+                    <Button size="sm" variant="outline" disabled={attach.isPending} onClick={() => attach.mutate(c.id)}>Attach</Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {isLoading && <div className="space-y-2">{[1, 2].map((i) => <Skeleton key={i} className="h-16" />)}</div>}
+      {attached?.length === 0 && !isLoading && (
+        <div className="text-center text-muted-foreground py-12">No case studies on this course yet.{isInstructor && ' Attach an existing one or author a new case study.'}</div>
+      )}
+      {attached?.map((c) => (
+        <Card key={c.itemId}>
+          <CardContent className="py-4 flex items-center justify-between gap-4">
+            <button className="flex-1 min-w-0 text-left" onClick={() => navigate(`/cases/${c.caseId}/edit`)}>
+              <div className="font-medium text-foreground flex items-center gap-2">{c.title}{c.status && c.status !== 'published' && <Badge variant="outline" className="text-[10px] capitalize">{c.status}</Badge>}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Graded case column on this course</div>
+            </button>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <Button size="sm" variant="ghost" onClick={() => navigate(`/cases/${c.caseId}/edit`)}><PenTool className="h-3.5 w-3.5 mr-1.5" /> Open</Button>
+              {isInstructor && (
+                <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-red-600" title="Remove from course"
+                  onClick={() => { if (window.confirm(`Remove "${c.title}" from this course? The case itself is not deleted.`)) detach.mutate(c.itemId); }}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 const TABS = [
   { id: 'overview', label: 'Overview', icon: BookOpen },
   { id: 'modules', label: 'Modules', icon: BookOpen },
   { id: 'assignments', label: 'Assignments', icon: ClipboardList },
   { id: 'activities', label: 'Activities', icon: Sparkles },
+  { id: 'cases', label: 'Case studies', icon: FileText },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'gradebook', label: 'Gradebook', icon: BarChart2 },
@@ -1366,6 +1445,11 @@ export function CourseDetail() {
         {/* ACTIVITIES (interactives linked to this course) */}
         {activeTab === 'activities' && (
           <CourseActivitiesTab courseId={courseId} isInstructor={isInstructor} />
+        )}
+
+        {/* CASE STUDIES attached to this course */}
+        {activeTab === 'cases' && (
+          <CourseCasesTab courseId={courseId} isInstructor={isInstructor} />
         )}
 
         {/* DISCUSSIONS */}

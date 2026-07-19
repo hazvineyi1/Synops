@@ -15,6 +15,7 @@ import {
   modulesTable,
   courseGroupsTable,
   courseGroupMembersTable,
+  gradebookItemsTable,
   type CaseScenario,
   type CaseAssignment,
   type RubricCriterion,
@@ -111,6 +112,21 @@ function caseResponse(c: CaseScenario) {
 }
 
 /* ───────────────────────────── Authoring CRUD ───────────────────────────── */
+
+// GET /courses/:courseId/cases — case studies attached to a course (via gradebook case columns).
+router.get("/courses/:courseId/cases", requireAuth, async (req, res) => {
+  const items = await db.select().from(gradebookItemsTable)
+    .where(and(eq(gradebookItemsTable.courseId, req.params.courseId), eq(gradebookItemsTable.sourceType, "case")));
+  if (items.length === 0) { res.json([]); return; }
+  const caseIds = items.map((i) => i.sourceId).filter((x): x is string => !!x);
+  const cases = caseIds.length ? await db.select().from(caseScenariosTable).where(inArray(caseScenariosTable.id, caseIds)) : [];
+  const byId = new Map(cases.map((c) => [c.id, c]));
+  res.json(items.map((i) => ({
+    itemId: i.id, caseId: i.sourceId,
+    title: (i.sourceId && byId.get(i.sourceId)?.title) || "Case study",
+    status: (i.sourceId && byId.get(i.sourceId)?.status) || null,
+  })));
+});
 
 // GET /cases — list cases visible to the caller.
 router.get("/cases", requireAuth, async (req, res) => {

@@ -1,5 +1,7 @@
-Learning Hub schema bootstrap endpoint (no psql needed) (ASCII-only)
+Learning Hub increment C: rewire frontend from in-session state to the real API (ASCII-only)
 
-Adds POST /api/learning/_migrate (super_admin only): runs the same additive/idempotent DDL + seed as praxis/migration-learning-hub.sql using the server's own DATABASE_URL connection, so the learning_content / course_templates / course_assignments tables can be created in environments without psql or DB-console access. Safe to call repeatedly (IF NOT EXISTS / ON CONFLICT DO NOTHING). Returns row counts.
+learningHubStore now hydrates from and writes through /api/learning/* instead of holding seed data in memory: hydrates content/templates/assignments once on first use, and persists every mutation (addContent link, uploadContent file->Supabase Storage, review, delete, assignment toggle/set) to Postgres with optimistic cache updates. LearningHub upload path now does a real file upload (surfaces the storage-not-configured error until SUPABASE env is set); URL/link add persists. PartnerOrgHub 'Assigned from the Learning Hub' now reads the reactive loaded assignments/templates so it reflects real, persisted grants. Data survives reload.
 
-VALIDATION: esbuild syntax-check clean on learningHub.ts.
+NOTE: file uploads need SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY + a learning-hub bucket; templates/links/assignments persist with just DATABASE_URL.
+
+VALIDATION: esbuild bundle clean on learningHubStore, LearningHub, PartnerOrgHub, CourseDevelopmentSuite.
