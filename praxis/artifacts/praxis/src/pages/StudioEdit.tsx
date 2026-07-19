@@ -11,6 +11,40 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BeatUpdate, PublishDraftInputLessonType } from '@workspace/api-client-react';
 
+/**
+ * Coerce any beat field to a display string. The AI generator sometimes returns a scenario (or other
+ * field) as a structured object (e.g. {situation, question, options, correctOption, explanation})
+ * rather than plain text. Rendering an object as a React child throws (React error #31) and blanks
+ * the whole Edit page, so every rendered/edited beat field passes through here first.
+ */
+function toBeatText(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map(toBeatText).filter(Boolean).join('\n');
+  if (typeof v === 'object') {
+    const o = v as Record<string, any>;
+    if (o.situation || o.question || o.options || o.prompt) {
+      const parts: string[] = [];
+      if (o.situation) parts.push(String(o.situation));
+      if (o.prompt) parts.push(String(o.prompt));
+      if (o.question) parts.push(String(o.question));
+      if (Array.isArray(o.options)) {
+        parts.push(o.options.map((op: any, i: number) => {
+          const label = String.fromCharCode(65 + i);
+          const text = typeof op === 'string' ? op : (op?.text ?? op?.label ?? JSON.stringify(op));
+          const correct = o.correctOption != null && (o.correctOption === i || o.correctOption === op || o.correctOption === text);
+          return `${label}. ${text}${correct ? '  (correct)' : ''}`;
+        }).join('\n'));
+      }
+      if (o.explanation) parts.push(`Why: ${o.explanation}`);
+      return parts.filter(Boolean).join('\n\n');
+    }
+    try { return JSON.stringify(v, null, 2); } catch { return String(v); }
+  }
+  return String(v);
+}
+
 export function StudioEdit({ params }: { params: { draftId: string } }) {
   const { draftId } = params;
   const [, setLocation] = useLocation();
@@ -35,10 +69,10 @@ export function StudioEdit({ params }: { params: { draftId: string } }) {
       const initialForm: Record<string, BeatUpdate> = {};
       draft.beats.forEach(b => {
         initialForm[b.id] = {
-          title: b.title,
-          narration: b.narration,
-          bulletPoints: b.bulletPoints || [],
-          scenario: b.scenario || '',
+          title: toBeatText(b.title),
+          narration: toBeatText(b.narration),
+          bulletPoints: (b.bulletPoints || []).map(toBeatText),
+          scenario: toBeatText(b.scenario),
         };
       });
       setBeatsForm(initialForm);
@@ -162,7 +196,7 @@ export function StudioEdit({ params }: { params: { draftId: string } }) {
                         className="font-serif text-xl font-bold"
                       />
                     ) : (
-                      <CardTitle className="text-xl font-serif">{beat.title}</CardTitle>
+                      <CardTitle className="text-xl font-serif">{toBeatText(beat.title)}</CardTitle>
                     )}
                   </div>
                 </CardHeader>
@@ -175,23 +209,23 @@ export function StudioEdit({ params }: { params: { draftId: string } }) {
                       
                       {/* Rough visual representations based on type */}
                       {beat.type === 'title_card' && (
-                        <h3 className="font-serif text-2xl font-bold text-foreground animate-in zoom-in duration-700">{formState.title || beat.title}</h3>
+                        <h3 className="font-serif text-2xl font-bold text-foreground animate-in zoom-in duration-700">{toBeatText(formState.title || beat.title)}</h3>
                       )}
                       
                       {beat.type === 'points' && (
                         <ul className="text-left w-full space-y-2">
-                          {(formState.bulletPoints || beat.bulletPoints || []).map((pt: string, i: number) => (
+                          {(formState.bulletPoints || beat.bulletPoints || []).map((pt: unknown, i: number) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-foreground animate-in slide-in-from-left-4" style={{ animationDelay: `${i * 200}ms`, animationFillMode: 'both' }}>
                               <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                              <span>{pt}</span>
+                              <span>{toBeatText(pt)}</span>
                             </li>
                           ))}
                         </ul>
                       )}
 
                       {beat.type === 'scenario' && (
-                        <div className="bg-background rounded-lg p-4 shadow-sm border border-border w-full text-left text-sm italic text-foreground">
-                          "{formState.scenario || beat.scenario}"
+                        <div className="bg-background rounded-lg p-4 shadow-sm border border-border w-full text-left text-sm italic text-foreground whitespace-pre-wrap">
+                          "{toBeatText(formState.scenario ?? beat.scenario)}"
                         </div>
                       )}
 
@@ -218,7 +252,7 @@ export function StudioEdit({ params }: { params: { draftId: string } }) {
                             className="min-h-[100px] text-sm"
                           />
                         ) : (
-                          <p className="text-sm leading-relaxed text-foreground bg-muted/30 p-3 rounded-md border border-border/50">{beat.narration}</p>
+                          <p className="text-sm leading-relaxed text-foreground bg-muted/30 p-3 rounded-md border border-border/50 whitespace-pre-wrap">{toBeatText(beat.narration)}</p>
                         )}
                       </div>
 

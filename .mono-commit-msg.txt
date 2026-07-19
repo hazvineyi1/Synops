@@ -1,13 +1,8 @@
-Learning Hub persistence backend + create-course UI + ribbon/catalog polish (ASCII-only)
+Course clone + link activities into a course (ASCII-only)
 
-MIGRATION REQUIRED: run praxis/migration-learning-hub.sql against the Praxis Postgres (creates learning_content, course_templates, course_assignments + seeds). Additive/idempotent. Nothing calls those tables from the UI yet, so this deploy is safe even before the migration runs.
+- Clone: new backend POST /courses/:id/clone deep-copies the course + its modules, beats, assignments and course-linked interactive activities into a fresh draft (author roles; super_admin passes). Clone button on the catalog cards.
+- Link activities to a course: the in-course Add-interactive / Add-case buttons now pass ?courseId; ActivitiesAdmin reads it and preselects the course on new activities (+ hint banner) so a new activity is linked to the course.
 
-LEARNING HUB PERSISTENCE (backend, additive): Drizzle tables in lib/db schema/learning_hub.ts; new api-server route learningHub.ts (content GET/POST + upload to Supabase Storage, review, delete; templates GET/POST; assignments GET/PUT/toggle), writes gated to super_admin; src/lib/supabaseStorage.ts REST helper (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY, storageEnabled()).
+NOTE: this deploy also carries the earlier uncommitted set (course authoring: edit course + assignment builder + in-course authoring bar; Learning Hub persistence backend; create-course UI; ribbon/catalog polish). Learning Hub migration (praxis/migration-learning-hub.sql) still pending; nothing calls those tables from the UI, so safe.
 
-COURSE AUTHORING (real /courses): New course button on the catalog for author roles -> POST /courses -> opens the course. Tightened POST /courses to author roles only (was any authenticated user).
-
-POLISH: super-admin ribbon lettering now solid white/bolder; org Courses tab shows an Assigned from the Learning Hub card.
-
-ENV (for uploads later): SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY on the Praxis service + a Storage bucket named learning-hub.
-
-VALIDATION: esbuild clean on Courses.tsx, courses.ts, learningHub route/schema/storage, AppLayout, PartnerOrgHub.
+VALIDATION: esbuild clean on courses.ts, Courses.tsx, CourseDetail.tsx, ActivitiesAdmin.tsx.
