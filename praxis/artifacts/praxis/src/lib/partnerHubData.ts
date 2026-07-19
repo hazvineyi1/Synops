@@ -236,9 +236,28 @@ export function setActivePartner(id: string | null) { activePartnerId = id; }
 export function getActivePartnerId(): string | null { return activePartnerId; }
 
 /** Resolve the hub bundle for a partner id; a super admin gets the selected partner, else TalentForge. */
+// Real partners (created via /admin/partners and listed on the Platform Overview) are not in the
+// seeded HUBS. Registering their id->name lets getPartnerHub return an EMPTY, correctly-named hub
+// for them instead of falling back to TalentForge's demo data (which would show one partner's fake
+// figures under another partner's name). In-session only; the overview repopulates it on load.
+const realPartnerNames = new Map<string, string>();
+export function registerRealPartners(list: { id: string; name: string }[]) {
+  for (const p of list) realPartnerNames.set(p.id, p.name);
+}
+
+function emptyHub(partnerId: string, partnerName: string): PartnerHub {
+  return {
+    partnerId, partnerName, orgs: [], plans: PLANS, subscriptions: [], invoices: [],
+    disbursements: [], agreements: [], allocations: [], accounts: [], invites: [], audit: [],
+    impersonations: [], documents: [], delegatedAdmins: [],
+  };
+}
+
 export function getPartnerHub(partnerId: string | null | undefined): PartnerHub {
   if (partnerId && HUBS[partnerId]) return HUBS[partnerId];
+  if (partnerId && realPartnerNames.has(partnerId)) return emptyHub(partnerId, realPartnerNames.get(partnerId)!);
   if (activePartnerId && HUBS[activePartnerId]) return HUBS[activePartnerId];
+  if (activePartnerId && realPartnerNames.has(activePartnerId)) return emptyHub(activePartnerId, realPartnerNames.get(activePartnerId)!);
   return TALENTFORGE;
 }
 

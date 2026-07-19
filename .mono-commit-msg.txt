@@ -1,5 +1,5 @@
-Generate course learning objectives on the course page (ASCII-only)
+Full Create-partner flow: logo->AI brand kit, first admin, starter courses (ASCII-only)
 
-The Course learning objectives card (CourseDetail) gets a Generate button: pick Bloom's cognitive levels (Remember..Create), and one measurable objective is drafted per level from the course title/description using the existing courseDevEngine.generateObjectives, appended to the editor for review before Save. No new endpoint; reuses the client-side Bloom engine already used by the Course Development Suite.
+AdminPartners (/admin/partners) create dialog upgraded from name/slug/email into the full flow: details (name auto-slugs) + website; upload a logo and Generate colours from it (POST /brand/ai-generate) with an editable palette + live preview; a first partner_admin (optional) created scoped to the new partner and emailed a set-password link (result panel shows the copyable link + emailed state); optional starter courses ticked from the platform catalogue. Orchestrates POST /partners -> PUT /brand/partner/:id -> POST /platform/users {partnerId} -> PUT /partners/:id/courses. Backend: new GET/PUT /partners/:partnerId/courses (self-creates course_partner_assignments, additive). Nav: super-admin Partner Hub group gets a Partner management link to /admin/partners.
 
-VALIDATION: esbuild clean on CourseDetail.tsx.
+VALIDATION: esbuild clean on courses.ts, AdminPartners.tsx, AppLayout.tsx.
