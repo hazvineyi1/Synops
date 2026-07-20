@@ -831,7 +831,7 @@ const FileCheckIcon = () => <CheckCircle className="h-4 w-4 text-primary" />;
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export function AssignmentDetail() {
-  const { courseId, assignmentId } = useParams<{ courseId: string; assignmentId: string }>();
+  const { courseId: routeCourseId, assignmentId } = useParams<{ courseId?: string; assignmentId: string }>();
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const { data: me } = useGetMe();
@@ -862,9 +862,12 @@ export function AssignmentDetail() {
     queryKey: ['my-submission', assignmentId],
     queryFn: () => apiFetch<any | null>(`/assignments/${assignmentId}/my-submission`),
   });
+  // Course id may come from the route, or (for a bare /assignments/:id link) from the assignment.
+  const courseId = routeCourseId ?? assignment?.courseId ?? '';
   const { data: course } = useQuery({
     queryKey: ['course', courseId],
     queryFn: () => apiFetch<any>(`/courses/${courseId}`),
+    enabled: !!courseId,
   });
 
   const submitMutation = useMutation({

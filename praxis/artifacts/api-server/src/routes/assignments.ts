@@ -84,7 +84,7 @@ async function applyGrade(opts: {
     type: "assignment_graded",
     title: "Your assignment has been graded",
     body: `Score: ${opts.score ?? "--"} — ${opts.feedback?.slice(0, 80) ?? "View feedback in gradebook"}`,
-    link: `/assignments/${opts.assignmentId}`,
+    link: `/courses/${opts.courseId}/assignments/${opts.assignmentId}`,
     courseId: opts.courseId,
     actorId: opts.graderId,
   });

@@ -1,5 +1,5 @@
-Landing = hero only; brand the sign-in page in the partner palette (ASCII-only)
+Stop Enza branding leaking onto the shared login; add /enzaglobalmedia vanity path (ASCII-only)
 
-Simplified the partner landing page to just the nav + hero (Connect.Create.Elevate / 'Growth comes from skilling your people' + Enter the platform) - removed the Explore-programmes button and the programmes/principles/stats/stakeholders/testimonials/footer sections. Enter the platform and Sign in now link to /sign-in?p=<slug> so the sign-in carries the brand. Rebuilt the sign-in page to follow the partner's colour palette: background from the brand primary (Enza near-black), the Sign in button and focus/links from the brand accent (Enza lime) with an auto-contrast text colour, and a white-backed logo chip - reading the brand from ?p=<slug> or the host brand. No more default indigo/navy.
+The regular login was showing Enza branding because resolvePublicBrandByHost fell back to the platform theme (which had picked up Enza colours/logo). Changed it: a partner brand only applies to a PUBLIC page on that partner's own custom domain; on the app's own domain it now returns the neutral Synops default. So the regular sign-in has no Enza branding again, while the Enza sign-in stays branded because its links carry ?p=enza-global. Also added a clean /enzaglobalmedia route that renders the Enza landing (alongside /p/:slug), and the admin Landing button opens /enzaglobalmedia for Enza.
 
-VALIDATION: esbuild clean on PartnerLanding.tsx, SignIn.tsx.
+VALIDATION: esbuild clean on brandResolve.ts, App.tsx, AdminPartners.tsx.

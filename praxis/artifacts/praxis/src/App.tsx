@@ -207,6 +207,11 @@ function Routes() {
           path="/courses/:courseId/assignments/:assignmentId"
           component={AssignmentDetail}
         />
+        {/* Bare assignment link (from older notifications) - resolves its course from the assignment. */}
+        <ProtectedRoute
+          path="/assignments/:assignmentId"
+          component={AssignmentDetail}
+        />
         <ProtectedRoute
           path="/courses/:courseId/discussions/:discussionId"
           component={DiscussionThread}
