@@ -16,6 +16,7 @@ export const partnerDocumentsTable = pgTable("partner_documents", {
   status: text("status").notNull().default("pending"),
   size: text("size"),
   fileUrl: text("file_url"),
+  templateKey: text("template_key"),
   uploadedBy: text("uploaded_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

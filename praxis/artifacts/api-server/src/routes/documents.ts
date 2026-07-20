@@ -34,6 +34,7 @@ async function ensureTable() {
       uploaded_by text,
       created_at timestamptz NOT NULL DEFAULT now()
     )`);
+  await db.execute(sql`ALTER TABLE partner_documents ADD COLUMN IF NOT EXISTS template_key text`);
 }
 
 // GET /partners/:partnerId/documents

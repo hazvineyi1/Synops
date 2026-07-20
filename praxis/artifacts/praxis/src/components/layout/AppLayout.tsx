@@ -302,6 +302,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ShieldCheck },
             { label: t('nav.financialHub', 'Financial Hub'), href: '/platform-finance', icon: Wallet },
+            { label: t('nav.documentLibrary', 'Document Library'), href: '/admin/document-templates', icon: FileText },
             { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
             { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
             { label: t('nav.reports'), href: '/reports', icon: FileText },

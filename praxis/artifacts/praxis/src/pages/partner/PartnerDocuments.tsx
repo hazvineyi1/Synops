@@ -7,17 +7,18 @@ import { StatCard } from '@/components/StatCard';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
   FileText, Upload, Receipt, FileSignature, Landmark, ShieldCheck, Folder,
-  Search, CheckCircle2, Clock, AlertTriangle, Trash2,
+  Search, CheckCircle2, Clock, AlertTriangle, Trash2, Eye,
 } from 'lucide-react';
 import { getActivePartnerId } from '@/lib/partnerHubData';
 import { orgLabel, useOrgOverrides } from '@/lib/orgOverridesStore';
 
 type DocCategory = 'invoice' | 'contract' | 'funder' | 'compliance' | 'other';
 type DocStatus = 'filed' | 'pending' | 'action-required';
-interface Doc { id: string; orgId: string | null; orgName: string | null; name: string; category: DocCategory; status: DocStatus; size: string | null; fileUrl: string | null; createdAt: string }
+interface Doc { id: string; orgId: string | null; orgName: string | null; name: string; category: DocCategory; status: DocStatus; size: string | null; fileUrl: string | null; templateKey: string | null; createdAt: string }
 interface OrgLite { id: string; name: string; partnerId: string | null }
 
 const CATS: { key: DocCategory; label: string; icon: React.ComponentType<{ className?: string }>; hint: string }[] = [
@@ -60,6 +61,14 @@ export function PartnerDocuments() {
   const create = useMutation({ mutationFn: (body: Record<string, unknown>) => apiFetch(`/partners/${partnerId}/documents`, { method: 'POST', body: JSON.stringify(body) }), onSuccess: invalidate });
   const patch = useMutation({ mutationFn: ({ id, body }: { id: string; body: Record<string, unknown> }) => apiFetch(`/partners/${partnerId}/documents/${id}`, { method: 'PATCH', body: JSON.stringify(body) }), onSuccess: invalidate });
   const del = useMutation({ mutationFn: (id: string) => apiFetch(`/partners/${partnerId}/documents/${id}`, { method: 'DELETE' }), onSuccess: invalidate });
+
+  // View a template document sent by Synops (on-platform content).
+  const [viewKey, setViewKey] = useState<{ key: string; name: string } | null>(null);
+  const { data: viewContent, isLoading: viewLoading } = useQuery({
+    queryKey: ['doc-template', viewKey?.key],
+    queryFn: () => apiFetch<{ title: string; contentHtml: string }>(`/document-templates/${viewKey!.key}`),
+    enabled: !!viewKey,
+  });
 
   const [cat, setCat] = useState<DocCategory | 'all'>('all');
   const [orgFilter, setOrgFilter] = useState<string>('all');
@@ -173,7 +182,10 @@ export function PartnerDocuments() {
                   </td>
                   <td className="p-3 text-muted-foreground whitespace-nowrap">{new Date(d.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                   <td className="p-3 text-right tabular-nums text-muted-foreground">{d.size ?? '—'}</td>
-                  <td className="p-3 text-right"><Button size="sm" variant="ghost" className="h-7 text-red-600" onClick={() => del.mutate(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button></td>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    {d.templateKey && <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => setViewKey({ key: d.templateKey!, name: d.name })}><Eye className="h-3.5 w-3.5" /> View</Button>}
+                    <Button size="sm" variant="ghost" className="h-7 text-red-600" onClick={() => del.mutate(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </td>
                 </tr>
               );
             })}
@@ -183,6 +195,19 @@ export function PartnerDocuments() {
           </tbody>
         </table>
       </Card>
+      {/* View a Synops template document sent to this partner */}
+      <Dialog open={!!viewKey} onOpenChange={(o) => { if (!o) setViewKey(null); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewKey?.name}</DialogTitle>
+            <DialogDescription>Document sent by Synops. Template pending independent legal review.</DialogDescription>
+          </DialogHeader>
+          {viewLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : (
+            <div className="prose prose-sm max-w-none dark:prose-invert [&_table]:w-full [&_table]:text-sm [&_th]:text-left [&_th]:border-b [&_th]:p-2 [&_td]:p-2 [&_td]:border-b [&_h1]:text-lg [&_h2]:text-base [&_h1]:font-semibold [&_h2]:font-semibold" dangerouslySetInnerHTML={{ __html: viewContent?.contentHtml ?? '' }} />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <p className="text-xs text-muted-foreground">The filing register (names, categories, org, status) is stored persistently. Durable storage of the file contents themselves — with virus scan and retention policy — is a further step that needs live storage credentials.</p>
     </div>
   );

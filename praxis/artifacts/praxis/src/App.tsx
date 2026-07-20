@@ -30,6 +30,7 @@ import { CoachingMatching } from '@/pages/CoachingMatching';
 import { CoachingHealth } from '@/pages/CoachingHealth';
 import { CoachSubmissions } from '@/pages/CoachSubmissions';
 import { AdminPartners } from '@/pages/AdminPartners';
+import { AdminDocumentTemplates } from '@/pages/AdminDocumentTemplates';
 import { PartnerTheme } from '@/pages/PartnerTheme';
 import { Reports } from '@/pages/Reports';
 import { CoachHub } from '@/pages/CoachHub';
@@ -243,6 +244,7 @@ function Routes() {
         <ProtectedRoute path="/coach" component={CoachLearners} />
         <ProtectedRoute path="/org/members" component={OrgMembers} />
         <ProtectedRoute path="/admin/partners" component={AdminPartners} />
+        <ProtectedRoute path="/admin/document-templates" component={AdminDocumentTemplates} />
         <ProtectedRoute path="/admin/funders" component={AdminFunders} />
         <ProtectedRoute path="/delivery" component={Delivery} />
         <ProtectedRoute path="/my-attendance" component={MyAttendance} />
