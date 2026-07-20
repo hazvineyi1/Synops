@@ -187,6 +187,8 @@ function Routes() {
         {/* Public */}
         <PublicRoute path="/join/:code" component={JoinCohort} />
         <PublicRoute path="/p/:slug" component={PartnerLanding} />
+        {/* Clean vanity path for the Enza landing page. */}
+        <PublicRoute path="/enzaglobalmedia" component={() => <PartnerLanding params={{ slug: 'enza-global' }} />} />
         <PublicRoute path="/verify/:credentialId" component={Verify} />
         <PublicRoute path="/c/:token" component={CaseEmbed} />
         <PublicRoute path="/a/:token" component={ActivityEmbed} />

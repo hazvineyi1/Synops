@@ -477,7 +477,7 @@ export function AdminPartners() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <a href={`/p/${partner.slug}`} target="_blank" rel="noreferrer">
+                        <a href={partner.slug === 'enza-global' ? '/enzaglobalmedia' : `/p/${partner.slug}`} target="_blank" rel="noreferrer">
                           <Button variant="outline" size="sm" className="gap-1.5"><Building className="h-3.5 w-3.5" />Landing</Button>
                         </a>
                         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSelectedPartner(partner)}><Palette className="h-3.5 w-3.5" />Configure</Button>

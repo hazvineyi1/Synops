@@ -63,10 +63,12 @@ export function normaliseHost(host?: string | null): string {
 export async function resolvePublicBrandByHost(host?: string | null): Promise<PublicBrand> {
   const h = normaliseHost(host);
   try {
+    // A partner's branding only takes over a PUBLIC page when the request comes in on that partner's
+    // own custom domain. On the app's own domain (no custom-domain match) we return the neutral
+    // platform default - a partner's colours/logo must NOT leak onto the shared login page. Partner-
+    // branded pre-auth pages are reached explicitly (e.g. the sign-in link carries ?p=<slug>).
     const t = h ? await db.query.brandThemesTable.findFirst({ where: eq(brandThemesTable.customDomain, h) }) : null;
-    // A custom-domain match wins; otherwise fall back to the platform theme (not the bare default),
-    // so the login page on the app's own domain still reflects the configured platform brand.
-    return t ? toPublicBrand(t) : await resolvePublicBrand(null);
+    return t ? toPublicBrand(t) : DEFAULT_PUBLIC_BRAND;
   } catch {
     return DEFAULT_PUBLIC_BRAND;
   }
