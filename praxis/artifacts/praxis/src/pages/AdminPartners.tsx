@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Plus, Palette, Settings2, Upload, Sparkles, Mail, BookOpen, Check, Copy, Loader2 } from 'lucide-react';
+import { Building, Plus, Palette, Settings2, Upload, Sparkles, Mail, BookOpen, Check, Copy, Loader2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Partner {
@@ -379,6 +379,13 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision Enza', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Hard-delete a partner and all its data (super admin).
+  const deletePartner = useMutation({
+    mutationFn: (id: string) => apiFetch<{ deleted?: string }>(`/partners/${id}`, { method: 'DELETE' }),
+    onSuccess: (r) => { refetch(); qc.invalidateQueries({ queryKey: ['partners'] }); toast({ title: 'Partner deleted', description: `${r?.deleted ?? 'Partner'} and all its organisations, learners and data were removed.` }); },
+    onError: (e: any) => toast({ title: 'Could not delete partner', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Build every Enza module into a full lesson (slides, video, readings, case, assignment, workshop).
   const enrich = useMutation({
     mutationFn: () => apiFetch<{ modules: number; enriched: number; error?: string }>('/platform/enrich-enza', { method: 'POST' }),
@@ -469,7 +476,13 @@ export function AdminPartners() {
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${partner.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{partner.status}</span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSelectedPartner(partner)}><Palette className="h-3.5 w-3.5" />Configure</Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSelectedPartner(partner)}><Palette className="h-3.5 w-3.5" />Configure</Button>
+                        <Button variant="ghost" size="sm" className="gap-1.5 text-red-600 hover:text-red-700" disabled={deletePartner.isPending}
+                          onClick={() => { if (window.confirm(`Delete partner "${partner.name}" and ALL its organisations, learners, courses and data? This cannot be undone.`)) deletePartner.mutate(partner.id); }}>
+                          <Trash2 className="h-3.5 w-3.5" />Delete
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

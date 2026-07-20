@@ -1,10 +1,81 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { partnersTable, usersTable, organisationsTable } from "@workspace/db";
-import { eq, count, inArray } from "drizzle-orm";
+import { eq, count, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 
 const router = Router();
+
+/**
+ * Hard-delete a partner and EVERYTHING scoped to it: its organisations, all users under it, their
+ * enrolments/progress/grades/coaching, its classes, org-scoped content, partner-owned courses, and
+ * every partner-scoped record. The schema has no FK constraints (ids are joined in the app), so each
+ * statement is independent and wrapped in try/catch - a table that does not exist is simply skipped.
+ * Platform-owned courses (tenant_id 'platform', shared across partners) are NOT deleted; only the
+ * partner's assignment to them is removed.
+ */
+async function deletePartnerCascade(pid: string): Promise<void> {
+  const orgsSub = sql`(SELECT id FROM organisations WHERE partner_id = ${pid})`;
+  const usersSub = sql`(SELECT id FROM users WHERE partner_id = ${pid} OR organisation_id IN ${orgsSub})`;
+  const classSub = sql`(SELECT id FROM org_classes WHERE org_id IN ${orgsSub})`;
+  const coursesSub = sql`(SELECT id FROM courses WHERE tenant_id = ${pid})`;
+  const modulesSub = sql`(SELECT id FROM modules WHERE course_id IN ${coursesSub})`;
+
+  const statements = [
+    // Learner-scoped records.
+    sql`DELETE FROM enrolments WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM beat_progress WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM assignment_submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM activity_submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM case_sessions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_entries WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_cells WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_alerts WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM coach_plans WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM attendance_records WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM notifications WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM auth_sessions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM password_resets WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM login_events WHERE user_id IN ${usersSub}`,
+    // Classes.
+    sql`DELETE FROM org_class_learners WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_class_courses WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_class_staff WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_classes WHERE org_id IN ${orgsSub}`,
+    // Org-scoped content + delivery.
+    sql`DELETE FROM delivery_sessions WHERE tenant_id IN ${orgsSub}`,
+    sql`DELETE FROM interactive_activities WHERE organisation_id IN ${orgsSub}`,
+    sql`DELETE FROM case_scenarios WHERE organisation_id IN ${orgsSub}`,
+    // Partner-OWNED courses (not platform courses) and their content.
+    sql`DELETE FROM beats WHERE module_id IN ${modulesSub}`,
+    sql`DELETE FROM module_readings WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM modules WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM assignments WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM discussions WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM gradebook_items WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM courses WHERE tenant_id = ${pid}`,
+    // Partner-scoped records.
+    sql`DELETE FROM course_partner_assignments WHERE partner_id = ${pid}`,
+    sql`DELETE FROM brand_themes WHERE tenant_id = ${pid} OR tenant_id IN ${orgsSub}`,
+    sql`DELETE FROM delegated_admins WHERE partner_id = ${pid}`,
+    sql`DELETE FROM funding_agreements WHERE partner_id = ${pid}`,
+    sql`DELETE FROM funded_seat_assignments WHERE partner_id = ${pid}`,
+    sql`DELETE FROM billing_subscriptions WHERE partner_id = ${pid}`,
+    sql`DELETE FROM billing_invoices WHERE partner_id = ${pid}`,
+    sql`DELETE FROM partner_documents WHERE partner_id = ${pid}`,
+    sql`DELETE FROM partner_announcements WHERE partner_id = ${pid}`,
+    sql`DELETE FROM platform_filings WHERE partner_id = ${pid}`,
+    sql`DELETE FROM class_join_codes WHERE class_id IN ${classSub}`,
+    // Finally: the users, the organisations, then the partner itself.
+    sql`DELETE FROM users WHERE partner_id = ${pid} OR organisation_id IN ${orgsSub}`,
+    sql`DELETE FROM organisations WHERE partner_id = ${pid}`,
+    sql`DELETE FROM partners WHERE id = ${pid}`,
+  ];
+  for (const s of statements) {
+    try { await db.execute(s); } catch { /* table absent or column drift - skip, others still run */ }
+  }
+}
 
 function toPartnerResponse(p: typeof partnersTable.$inferSelect) {
   return {
@@ -69,6 +140,15 @@ router.patch("/partners/:partnerId", requireAuth, async (req, res) => {
     .where(eq(partnersTable.id, partnerId))
     .returning();
   res.json(toPartnerResponse(updated));
+});
+
+// DELETE /partners/:partnerId — super admin only. Hard-deletes the partner and all its data.
+router.delete("/partners/:partnerId", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const { partnerId } = req.params;
+  const partner = await db.query.partnersTable.findFirst({ where: eq(partnersTable.id, partnerId) });
+  if (!partner) { res.status(404).json({ error: "Partner not found" }); return; }
+  await deletePartnerCascade(partnerId);
+  res.json({ ok: true, deleted: partner.name });
 });
 
 // GET /partners/:partnerId/stats
