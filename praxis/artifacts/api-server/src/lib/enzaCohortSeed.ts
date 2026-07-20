@@ -7,7 +7,7 @@ import {
   beatProgressTable, submissionsTable, gradebookAlertsTable, coachMessagesTable,
   deliverySessionsTable, attendanceRecordsTable,
 } from "@workspace/db";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../lib/auth";
 
 /**
@@ -30,6 +30,23 @@ const ORG_NAME = "Enza BizAscend Programme";
 
 function firstOrNull<T>(rows: T[]): T | null {
   return rows.length > 0 ? rows[0] : null;
+}
+
+/**
+ * Heal the org_classes / org_class_* tables. `CREATE TABLE IF NOT EXISTS` from earlier deploys never
+ * adds columns to a table that already existed, so a table created before partner_id / created_by were
+ * introduced is missing them - and then EVERY Drizzle query (which selects all columns) fails. Adding
+ * the columns idempotently repairs that drift so the cohort seed and the classes UI both work.
+ */
+async function healClassTables(): Promise<void> {
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS org_classes (id text PRIMARY KEY, org_id text NOT NULL, partner_id text, name text NOT NULL, created_by text, created_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`ALTER TABLE org_classes ADD COLUMN IF NOT EXISTS partner_id text`);
+  await db.execute(sql`ALTER TABLE org_classes ADD COLUMN IF NOT EXISTS created_by text`);
+  await db.execute(sql`ALTER TABLE org_classes ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS org_class_learners (id text PRIMARY KEY, class_id text NOT NULL, learner_id text NOT NULL)`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS org_class_courses (id text PRIMARY KEY, class_id text NOT NULL, course_id text NOT NULL)`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS org_class_staff (id text PRIMARY KEY, class_id text NOT NULL, staff_id text NOT NULL, role text NOT NULL DEFAULT 'facilitator')`);
+  await db.execute(sql`ALTER TABLE org_class_staff ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'facilitator'`);
 }
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
@@ -239,6 +256,9 @@ async function upsertUser(u: {
 export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: string; learners?: number; message?: string }> {
   const partner = firstOrNull(await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_SLUG)));
   if (!partner) return { created: false, message: "Provision Enza Global first (the partner and its courses must exist)." };
+
+  // Repair any org_classes column drift BEFORE we touch those tables (this was the seed's real failure).
+  await healClassTables();
 
   // Idempotent: if the cohort org already exists, do nothing.
   const existingOrg = firstOrNull(
