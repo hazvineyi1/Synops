@@ -449,8 +449,38 @@ async function createCourseContent(c: (typeof COURSES)[number], orgId: string, f
  * or creates it, and ensures it is assigned to the Enza partner. Each course is isolated in try/catch so
  * one failing course cannot stop the rest, and the first error is returned so a real bug is diagnosable.
  */
+// Heal the assignments table: older deploys created it before several columns existed, and
+// `CREATE TABLE IF NOT EXISTS` never backfills columns - so the Drizzle insert (which lists every
+// column) failed with "column ... does not exist", which is what stopped every course from seeding.
+async function healAssignmentsTable(): Promise<void> {
+  const cols: string[] = [
+    "module_id text",
+    "description text",
+    "instructions text",
+    "assignment_type text NOT NULL DEFAULT 'essay'",
+    "due_date timestamptz",
+    "available_from timestamptz",
+    "available_until timestamptz",
+    "points_possible numeric(7,2) NOT NULL DEFAULT 100",
+    "allow_late_submissions boolean NOT NULL DEFAULT true",
+    "late_penalty_percent integer NOT NULL DEFAULT 0",
+    "rubric_id text",
+    "group_assignment boolean NOT NULL DEFAULT false",
+    "peer_review_required boolean NOT NULL DEFAULT false",
+    "peer_review_count integer NOT NULL DEFAULT 0",
+    "published boolean NOT NULL DEFAULT false",
+    "position integer NOT NULL DEFAULT 0",
+    "created_at timestamptz NOT NULL DEFAULT now()",
+    "updated_at timestamptz NOT NULL DEFAULT now()",
+  ];
+  for (const c of cols) {
+    await db.execute(sql.raw(`ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ${c}`));
+  }
+}
+
 async function ensureEnzaCourses(partnerId: string): Promise<{ total: number; created: number; error: string | null }> {
   await db.execute(sql`CREATE TABLE IF NOT EXISTS course_partner_assignments (id text PRIMARY KEY, course_id text NOT NULL, partner_id text NOT NULL, assigned_by text, assigned_at timestamptz NOT NULL DEFAULT now())`);
+  await healAssignmentsTable();
 
   let org = await firstOrNull(await db.select().from(organisationsTable).where(and(eq(organisationsTable.partnerId, partnerId), eq(organisationsTable.name, "Enza SMME Academy"))));
   if (!org) {
@@ -469,6 +499,21 @@ async function ensureEnzaCourses(partnerId: string): Promise<{ total: number; cr
       let courseId: string;
       if (course) { courseId = course.id; }
       else { courseId = await createCourseContent(c, org.id, faculty.id); created++; }
+
+      // Backfill the applied-project assignment on courses that an earlier run created before the
+      // assignments table was healed (they have every other piece but no assignment).
+      const hasAssignment = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(eq(assignmentsTable.courseId, courseId)).limit(1);
+      if (hasAssignment.length === 0) {
+        const firstMod = await firstOrNull(await db.select({ id: modulesTable.id }).from(modulesTable).where(eq(modulesTable.courseId, courseId)));
+        await db.insert(assignmentsTable).values({
+          courseId, moduleId: firstMod?.id ?? null,
+          title: `Applied project: ${c.title}`,
+          description: `A practical, real-world application of everything in this course to a business of your choice.`,
+          instructions: `Choose a real business (your own or one you can access). Produce a short, practical output (2-4 pages or a completed template) that demonstrates the course objectives:\n\n${c.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\nGround every recommendation in the real numbers and context of the business. Be specific and actionable - Enza values implementation over theory.`,
+          submissionType: "project", pointsPossible: "100", published: true, position: 0,
+        });
+      }
+
       const has = await db.select({ id: coursePartnerAssignmentsTable.id }).from(coursePartnerAssignmentsTable)
         .where(and(eq(coursePartnerAssignmentsTable.courseId, courseId), eq(coursePartnerAssignmentsTable.partnerId, partnerId)));
       if (has.length === 0) await db.insert(coursePartnerAssignmentsTable).values({ courseId, partnerId, assignedBy: faculty.id });

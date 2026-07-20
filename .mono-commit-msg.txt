@@ -1,5 +1,5 @@
-Enza cohort: isolate each enrolment insert + report course counts in the toast (ASCII-only)
+Enza courses: self-healing, per-course provisioning so Provision Enza Global (re)creates + assigns all 15 (ASCII-only)
 
-Logins now work but learners had no courses because PASS 2 wrapped all enrolments in one try/catch - so a single failing insert (e.g. a beat-progress drift) silently skipped the rest. Each enrolment and each progress insert is now isolated in its own try/catch, so one failure can never block a learner's other course enrolments. The verification now also reports how many courses Enza has assigned and how many each learner is enrolled in (e.g. 'Enza has 15 courses assigned. enza@student1.test: OK 4c'), so if courses still do not appear the toast says whether the gap is missing assignments or the enrolment step.
+Root cause of '0 courses assigned': seedEnza's course loop had no per-course error handling, so a single failing insert aborted the whole loop before assigning anything, and the partner-exists guard meant re-provisioning skipped courses forever. Extracted createCourseContent() and added ensureEnzaCourses(): find-or-creates the org + faculty, then for each of the 15 courses reuses an existing same-title course or creates it and ensures it is assigned to Enza, each isolated in try/catch with the first error captured and returned. Both the fresh-provision path and the partner-exists path now call it, so clicking Provision Enza Global completes any courses a prior partial run missed and the toast reports 'N courses assigned' (and the first error if one course still fails). With courses assigned, Seed Enza Cohort enrols the learners.
 
-VALIDATION: esbuild clean on enzaCohortSeed.ts.
+VALIDATION: esbuild clean on enzaSeed.ts.
