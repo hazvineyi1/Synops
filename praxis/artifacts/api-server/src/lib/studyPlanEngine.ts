@@ -83,7 +83,31 @@ export async function generateStudyPlan(opts: {
       e.n += 1;
       perCat.set(col.category, e);
     }
-    if (perCat.size === 0) return null;
+    // No graded gaps? Fall back to CONTENT gaps: the modules the learner has not worked through.
+    // This is what lets a learner who is simply behind (low completion, no low grades) still get a
+    // real catch-up plan and stop the coach from saying "on track".
+    if (perCat.size === 0) {
+      const compCols = columns.filter((c) => c.sourceType === "completion" && c.sourceId);
+      const incomplete = compCols
+        .map((c) => ({ col: c, frac: computed.cells[c.key]?.fraction ?? 0 }))
+        .filter((x) => x.frac < 0.8)
+        .sort((a, b) => a.frac - b.frac)
+        .slice(0, MAX_ITEMS);
+      if (incomplete.length === 0) return null;
+      const items: StudyPlanItem[] = incomplete.map((x) => ({
+        kind: "review",
+        refType: "module",
+        refId: x.col.sourceId,
+        title: (x.col.title || "Review module").replace(/^Completion:\s*/, ""),
+        why: `You have completed about ${Math.round(x.frac * 100)}% of this module. Work through its video, readings and activities to catch up.`,
+        category: "Course completion",
+        done: false,
+      }));
+      return {
+        items,
+        rationale: "You are behind on the course content. Work through these modules, in order, to catch up and get back on track.",
+      };
+    }
 
     const weakCategories = [...perCat.entries()]
       .map(([category, v]) => ({ category, avg: v.n ? v.sum / v.n : 0 }))

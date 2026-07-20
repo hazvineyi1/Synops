@@ -469,6 +469,17 @@ export function evaluateOffTrack(
   });
   if (missingOverdue) reasons.push("missing_summative");
 
+  // Behind on the actual content: engagement matters, not just grades. A learner who has STARTED
+  // the course but worked through less than half of the module content is falling behind even if
+  // they have no low grades yet - so the coach reflects that instead of a misleading "on track".
+  const completionCols = columns.filter((c) => c.sourceType === "completion");
+  if (completionCols.length > 0) {
+    const fracs = completionCols.map((c) => computed.cells[c.key]?.fraction ?? 0);
+    const started = fracs.some((f) => f > 0.05);
+    const avgCompletion = fracs.reduce((a, b) => a + b, 0) / fracs.length;
+    if (started && avgCompletion < 0.5) reasons.push("low_completion");
+  }
+
   let status: OffTrackResult["status"] = "on_track";
   if (reasons.length > 0) status = "off_track";
   else if (overallFrac !== null && overallFrac < AT_RISK) status = "at_risk";
@@ -541,4 +552,5 @@ export const REASON_LABEL: Record<string, string> = {
   mastery_low: "Overall mastery below 70%",
   trend_down: "Recent summative scores trending down",
   missing_summative: "A graded assessment is overdue and not submitted",
+  low_completion: "Behind on the module content (low completion)",
 };

@@ -1,5 +1,7 @@
-Redesign slide visuals: clean concept-matched panels instead of random overlapping stock photos (ASCII-only)
+Auto-graded assignments (in-module quiz -> 50pts) that trigger the AI coach + gap plan when off track (ASCII-only)
 
-The old slide lesson overlaid text on random LoremFlickr photos (a cat statue for 'shop owner') - irrelevant and unreadable. Replaced with a professional two-panel slide: a solid dark text panel (heading + points, fully readable, no overlap) beside an on-brand illustration panel showing a concept-matched icon (welcome/objectives/idea/shop/loop/next) on the Enza colours with a subtle ring motif. enzaEnrich now tags each slide with a isual keyword instead of a random photo URL, and re-running Build Full Courses upgrades older slides. Even un-rebuilt slides now show the clean icon panel rather than a random photo.
+ASSIGNMENTS: enzaEnrich now builds each assignment as an inline auto-graded worksheet - a 5-question applied quiz (varied correct positions) stored as a {__type:quiz} config, worth 50 pts, completed entirely in the module. Upload is optional and secondary, not the centre. The submit endpoint scores it server-side (maybeAutoGradeQuiz -> applyGrade), so the learner gets an instant grade instead of 'awaiting grade'. Re-running Build Full Courses upgrades existing plain-text assignments to the auto-graded config.
 
-VALIDATION: esbuild clean on ModuleViewer.tsx, enzaEnrich.ts.
+OFF-TRACK: because auto-grading calls applyGrade, it fires the existing onGradeEvent chain - a low score now automatically raises the off-track alert, generates the gap-targeted adaptive study plan (generateStudyPlan) and pushes the learner into the AI coach (catch-up), with the gap = weak categories. Previously this never fired because assignments sat un-graded. Optional attach added below the quiz on the assignment page.
+
+VALIDATION: esbuild clean on assignments.ts, enzaEnrich.ts, AssignmentDetail.tsx.

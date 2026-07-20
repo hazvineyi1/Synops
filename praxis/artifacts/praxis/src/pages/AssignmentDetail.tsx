@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import {
   ChevronRight, CheckCircle, Clock, AlertCircle, BookOpen,
   FileText, MessageCircle, Layers, HelpCircle, X, Upload,
-  ChevronDown, ChevronUp, Star, Sparkles,
+  ChevronDown, ChevronUp, Star, Sparkles, Trophy, Award, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -218,17 +218,26 @@ function QuizForm({ questions, passingScore = 70, value, onChange, submitted, on
   const passed = score >= passingScore;
 
   if (submitted) {
+    const correctCount = questions.filter(q => value[q.id] === q.correct).length;
+    const xp = correctCount * 10; // 10 XP per correct answer
+    const tier = score >= 90 ? { label: 'Gold', icon: Trophy, cls: 'text-amber-500', bg: 'from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20', ring: 'border-amber-300 dark:border-amber-700' }
+      : score >= 70 ? { label: 'Silver', icon: Award, cls: 'text-slate-400', bg: 'from-slate-50 to-slate-100 dark:from-slate-900/40 dark:to-slate-900/20', ring: 'border-slate-300 dark:border-slate-700' }
+      : score >= 50 ? { label: 'Bronze', icon: Award, cls: 'text-orange-600', bg: 'from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/20', ring: 'border-orange-300 dark:border-orange-800' }
+      : { label: 'Keep going', icon: Zap, cls: 'text-rose-500', bg: 'from-rose-50 to-rose-100 dark:from-rose-950/30 dark:to-rose-950/20', ring: 'border-rose-300 dark:border-rose-800' };
+    const TierIcon = tier.icon;
     return (
       <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="space-y-4">
-        <div className={cn(
-          'rounded-2xl p-6 text-center border',
-          passed
-            ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800'
-            : 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800',
-        )}>
-          <div className="text-5xl font-black mb-1">{score}%</div>
-          <div className={cn('text-sm font-semibold', passed ? 'text-emerald-700' : 'text-rose-700')}>
-            {passed ? '🎉 Passed!' : `Needs improvement — ${passingScore}% required`}
+        <div className={cn('rounded-2xl p-6 text-center border bg-gradient-to-br', tier.bg, tier.ring)}>
+          <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', delay: 0.1 }}>
+            <TierIcon className={cn('h-12 w-12 mx-auto mb-2', tier.cls)} />
+          </motion.div>
+          <div className="text-4xl font-black">{score}%</div>
+          <div className="text-sm font-bold mt-0.5">{tier.label} · {correctCount} of {questions.length} correct</div>
+          <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-semibold">
+            <Sparkles className="h-4 w-4" /> +{xp} XP earned
+          </div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            {passed ? 'Passed! Submit to record your grade.' : `${passingScore}% to pass — you can review below and resubmit to improve.`}
           </div>
           <Progress value={score} className="mt-4 h-2" />
         </div>

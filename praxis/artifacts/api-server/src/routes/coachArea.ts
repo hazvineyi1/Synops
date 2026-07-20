@@ -21,6 +21,7 @@ import { isDue, sm2Update } from "../lib/sm2";
 import { ensureRemediationSet, createUploadSet, getUploadSets, bumpGamification, getGamification } from "../lib/remediationEngine";
 import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
 import { generateSocraticTurn, generateAnswerOptions, type SocraticContext } from "../lib/socraticEngine";
+import { ensureLearnerCoachPlans } from "../lib/gradebookAlerts";
 
 /**
  * The in-LMS "Coach" area for off-track learners: a native, remedial-scoped surface
@@ -57,6 +58,9 @@ function planItems(p: typeof coachPlansTable.$inferSelect): StudyPlanItem[] {
 // Materials list + Tutor's recent sessions. Active = the learner has remedial work.
 router.get("/learn/coach/overview", requireAuth, async (req, res) => {
   const userId = req.userId!;
+  // Reflect reality on open: recompute off-track state and build a catch-up plan for any course the
+  // learner is behind on, so the coach is never a stale "on track" when they are falling behind.
+  await ensureLearnerCoachPlans(userId);
   const plans = await activeRemedialPlans(userId);
 
   const gapSet = new Set<string>();

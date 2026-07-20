@@ -285,3 +285,35 @@ export async function scanCourse(courseId: string): Promise<{ evaluated: number;
   }
   return { evaluated, offTrack, alerted };
 }
+
+/**
+ * On-demand, self-serve version for the learner opening their Coach hub: recompute the learner's own
+ * off-track status across every enrolled course and, for any course where they are off track and have
+ * no active plan yet, build the gap-targeted catch-up plan. This is what makes the Coach reflect
+ * reality (instead of a stale "on track") the moment a learner is behind, even without a grade event.
+ * Best-effort and never throws.
+ */
+export async function ensureLearnerCoachPlans(userId: string): Promise<void> {
+  try {
+    const enrols = await db.select({ courseId: enrolmentsTable.courseId }).from(enrolmentsTable).where(eq(enrolmentsTable.userId, userId));
+    const courseIds = [...new Set(enrols.map((e) => e.courseId))];
+    for (const courseId of courseIds) {
+      let transition: AlertTransition;
+      try { transition = await recomputeLearnerAlert(courseId, userId); } catch { continue; }
+      if (transition.status !== "off_track") continue;
+      const existing = await db.query.coachPlansTable.findFirst({
+        where: and(eq(coachPlansTable.userId, userId), eq(coachPlansTable.courseId, courseId), eq(coachPlansTable.source, "gradebook_alert"), eq(coachPlansTable.status, "active")),
+      });
+      if (existing) continue;
+      const learner = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
+      const plan = await generateStudyPlan({ courseId, userId, learnerName: learner?.firstName ?? null });
+      if (!plan) continue;
+      const [row] = await db.insert(coachPlansTable).values({
+        userId, planDate: today(), rationale: plan.rationale, items: plan.items, status: "active", courseId, source: "gradebook_alert",
+      }).returning();
+      if (row) {
+        await db.update(gradebookAlertsTable).set({ planId: row.id, updatedAt: new Date() }).where(and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)));
+      }
+    }
+  } catch { /* best-effort - the hub still renders */ }
+}

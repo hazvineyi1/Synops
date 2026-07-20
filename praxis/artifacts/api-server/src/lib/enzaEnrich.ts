@@ -155,9 +155,18 @@ function landscapeReading(course: Crs, mod: Mod): { title: string; content: stri
 // Stored as a JSON config in the assignment's `instructions`; the assignment page renders it as an
 // inline quiz and the submit endpoint auto-scores it. Correct-option positions are varied so it is
 // not "always B". Upload stays optional (allowUpload) and is not the centre of the task.
-function buildAssignmentConfig(course: Crs, mod: Mod) {
+// Rotating challenge themes so assignments feel varied module to module (not identical quizzes).
+const CHALLENGE_THEMES = [
+  { name: "Decision Challenge", intro: (t: string) => `Decision Challenge. You are the owner. For each situation, choose the smartest move for applying "${t}". Instant, auto-graded score out of 50 - all in the module.` },
+  { name: "Scenario Sprint", intro: (t: string) => `Scenario Sprint. Five quick real-world calls that test how you would put "${t}" to work. Auto-graded out of 50, earn XP as you go.` },
+  { name: "Best-Move Challenge", intro: (t: string) => `Best-Move Challenge. Each question has a strongest answer for a real SMME. Pick it to apply "${t}" and score out of 50 instantly.` },
+  { name: "Reality Check", intro: (t: string) => `Reality Check. Judge these true-to-life business situations and show you can apply "${t}". Auto-graded out of 50 - no upload needed.` },
+];
+
+function buildAssignmentConfig(course: Crs, mod: Mod, mi: number) {
   const objs = mod.objectives.length ? mod.objectives : [mod.title];
   const s = scenarioFor(mod.id + "aq");
+  const theme = CHALLENGE_THEMES[mi % CHALLENGE_THEMES.length];
   const questions = [
     {
       id: "q1",
@@ -190,12 +199,15 @@ function buildAssignmentConfig(course: Crs, mod: Mod) {
       correct: 1,
     },
   ];
+  // Vary question order per module so two modules never present the same sequence.
+  const rotated = questions.slice(hashInt(mod.id) % questions.length).concat(questions.slice(0, hashInt(mod.id) % questions.length));
   return {
     __type: "quiz",
-    intro: `Answer these 5 questions to show how you would apply "${mod.title}" to a real business. You get an instant, auto-graded score out of 50 - all done here in the module. Attaching supporting work is optional, not required.`,
+    theme: theme.name,
+    intro: theme.intro(mod.title),
     passingScore: 60,
     allowUpload: true,
-    questions,
+    questions: rotated,
   };
 }
 
@@ -355,17 +367,19 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
         // Assignments: a module-level AUTO-GRADED applied worksheet (5 questions -> 50 pts), done
         // in the module. Upgrades any earlier plain-text assignment to the auto-graded config too.
         const asg = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(eq(assignmentsTable.moduleId, m.id));
-        const asgConfig = JSON.stringify(buildAssignmentConfig(crs, mod));
-        const asgDesc = `Auto-graded worksheet: apply "${mod.title.toLowerCase()}" to a real business, entirely within the module. Instant score out of 50.`;
+        const asgConfig = JSON.stringify(buildAssignmentConfig(crs, mod, mi));
+        const asgTheme = CHALLENGE_THEMES[mi % CHALLENGE_THEMES.length].name;
+        const asgTitle = `${asgTheme}: ${mod.title}`;
+        const asgDesc = `A gamified, auto-graded challenge - apply "${mod.title.toLowerCase()}" to a real business, entirely within the module. Earn XP and a Bronze/Silver/Gold tier, instant score out of 50.`;
         if (asg.length === 0) {
           await db.insert(assignmentsTable).values({
-            courseId, moduleId: m.id, title: `Apply it: ${mod.title}`,
+            courseId, moduleId: m.id, title: asgTitle,
             description: asgDesc, instructions: asgConfig,
             submissionType: "file_upload", pointsPossible: "50", published: true, position: mi,
           } as any);
         } else {
           await db.update(assignmentsTable)
-            .set({ description: asgDesc, instructions: asgConfig, pointsPossible: "50", published: true, updatedAt: new Date() })
+            .set({ title: asgTitle, description: asgDesc, instructions: asgConfig, pointsPossible: "50", published: true, updatedAt: new Date() })
             .where(eq(assignmentsTable.id, asg[0].id));
         }
 
