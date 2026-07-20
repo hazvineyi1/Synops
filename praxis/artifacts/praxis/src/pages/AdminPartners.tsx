@@ -379,6 +379,16 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision Enza', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Build every Enza module into a full lesson (slides, video, readings, case, assignment, workshop).
+  const enrich = useMutation({
+    mutationFn: () => apiFetch<{ modules: number; enriched: number; error?: string }>('/platform/enrich-enza', { method: 'POST' }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['courses'] });
+      toast({ title: 'Full courses built', description: `${r.modules} modules processed, ${r.enriched} newly built out.${r.error ? ' First error: ' + r.error : ''}` });
+    },
+    onError: (e: any) => toast({ title: 'Could not build courses', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Seed a realistic delivery cohort (org + admin + coach + 4 learners at different levels) under Enza.
   const seedCohort = useMutation({
     mutationFn: () => apiFetch<{ created: boolean; learners?: number; message?: string }>('/platform/seed-enza-cohort', { method: 'POST' }),
@@ -399,6 +409,9 @@ export function AdminPartners() {
         <div className="flex items-center gap-2">
           <Button variant="outline" disabled={seedEnza.isPending} onClick={() => seedEnza.mutate()} title="Provision Enza Global Media with brand + 15 courses">
             {seedEnza.isPending ? 'Provisioning…' : 'Provision Enza Global'}
+          </Button>
+          <Button variant="outline" disabled={enrich.isPending} onClick={() => enrich.mutate()} title="Build every Enza module into a full lesson (slides, video, readings, case, assignment, workshop)">
+            {enrich.isPending ? 'Building…' : 'Build Full Courses'}
           </Button>
           <Button variant="outline" disabled={seedCohort.isPending} onClick={() => seedCohort.mutate()} title="Seed a realistic Enza delivery cohort (org, admin, coach, 4 learners)">
             {seedCohort.isPending ? 'Seeding…' : 'Seed Enza Cohort'}

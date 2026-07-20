@@ -51,7 +51,7 @@ interface Beat {
   narration: string;
   bulletPoints?: string[] | null;
   scenario?: string | null;
-  visualData?: { quiz?: Quiz; interactive?: Interactive; subtype?: string; columns?: [string, string] } | null;
+  visualData?: { quiz?: Quiz; interactive?: Interactive; subtype?: string; columns?: [string, string]; slides?: VideoSlide[] } | null;
   videoUrl?: string | null;
   /** Authored word-for-word transcript. Absent means we only have narration/notes. */
   transcript?: string | null;
@@ -329,7 +329,56 @@ function CloseBeat({ beat }: { beat: Beat }) {
   );
 }
 
+interface VideoSlide { heading: string; script: string; points?: string[] }
+
+/**
+ * NotebookLM-style narrated slide lesson: an autoplaying deck rendered from structured slides when a
+ * module has no uploaded video. Fully readable content (not a placeholder), with play/pause and manual
+ * navigation. The "script" is the spoken narration shown under each slide.
+ */
+function SlideLesson({ slides }: { slides: VideoSlide[] }) {
+  const [i, setI] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const clampedI = Math.min(i, slides.length - 1);
+  useEffect(() => {
+    if (!playing) return;
+    const t = setTimeout(() => {
+      setI((prev) => (prev + 1 < slides.length ? prev + 1 : (setPlaying(false), prev)));
+    }, 7000);
+    return () => clearTimeout(t);
+  }, [playing, clampedI, slides.length]);
+
+  const s = slides[clampedI];
+  return (
+    <div className="rounded-xl overflow-hidden border border-border shadow-md">
+      <div className="aspect-video bg-gradient-to-br from-slate-900 to-slate-800 text-white flex flex-col justify-center px-8 py-6 relative">
+        <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CDF00' }}>Slide {clampedI + 1} of {slides.length}</div>
+        <h3 className="text-2xl font-bold mb-4 leading-tight">{s.heading}</h3>
+        {s.points && s.points.length > 0 && (
+          <ul className="space-y-1.5">
+            {s.points.map((p, k) => (
+              <li key={k} className="flex gap-2 text-sm text-slate-100"><span style={{ color: '#9CDF00' }}>▸</span>{p}</li>
+            ))}
+          </ul>
+        )}
+        <div className="absolute bottom-0 left-0 h-1 bg-[#9CDF00] transition-all" style={{ width: `${((clampedI + 1) / slides.length) * 100}%` }} />
+      </div>
+      <div className="bg-card px-5 py-3">
+        <p className="text-sm text-muted-foreground leading-relaxed min-h-[3rem]">{s.script}</p>
+        <div className="flex items-center gap-2 mt-3">
+          <Button size="sm" variant="outline" onClick={() => setPlaying((p) => !p)} className="gap-1.5">
+            <Play className="h-3.5 w-3.5" /> {playing ? 'Pause' : 'Play'}
+          </Button>
+          <Button size="sm" variant="ghost" disabled={clampedI === 0} onClick={() => { setPlaying(false); setI(clampedI - 1); }}>Prev</Button>
+          <Button size="sm" variant="ghost" disabled={clampedI === slides.length - 1} onClick={() => { setPlaying(false); setI(clampedI + 1); }}>Next</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VideoBeat({ beat }: { beat: Beat }) {
+  const slides = beat.visualData?.slides;
   return (
     <div className="px-8 py-12 max-w-3xl mx-auto">
       <p className="text-muted-foreground mb-6 leading-relaxed">{toBeatText(beat.narration)}</p>
@@ -337,6 +386,8 @@ function VideoBeat({ beat }: { beat: Beat }) {
         <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-md">
           <video src={beat.videoUrl} controls className="w-full h-full" />
         </div>
+      ) : slides && slides.length > 0 ? (
+        <SlideLesson slides={slides} />
       ) : (
         <div className="aspect-video rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/20">
           <div className="text-center text-muted-foreground">
@@ -1087,6 +1138,8 @@ export function ModuleViewer() {
                     className="w-full h-full"
                   />
                 </div>
+              ) : allBeats.find(b => b.visualData?.slides && b.visualData.slides.length > 0) ? (
+                <SlideLesson slides={allBeats.find(b => b.visualData?.slides && b.visualData.slides.length > 0)!.visualData!.slides!} />
               ) : (
                 <div className="aspect-video rounded-xl border-2 border-dashed border-border flex items-center justify-center bg-muted/20">
                   <div className="text-center text-muted-foreground">

@@ -24,6 +24,7 @@ import { logAudit as audit } from "../lib/audit";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort } from "../lib/enzaCohortSeed";
+import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
   sessionExpiry,
@@ -821,6 +822,22 @@ router.post("/platform/seed-enza-cohort", requireAuth, requireSuperAdmin, async 
   } catch (err) {
     const message = err instanceof Error ? err.message : "Seed failed";
     res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * POST /platform/enrich-enza - builds every Enza module into a full, comprehensive lesson (no greyed
+ * tabs): slide-deck lesson + quizzes, a narrated video lesson, two readings, an interactive case-study
+ * workshop, a case scenario, a module assignment, a discussion, and a live workshop. Idempotent per
+ * module. Super admin only.
+ */
+router.post("/platform/enrich-enza", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await enrichEnzaCourses();
+    await audit(req, "platform.enrich_enza", "partner", "enza", { modules: r.modules, enriched: r.enriched });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Enrich failed" });
   }
 });
 
