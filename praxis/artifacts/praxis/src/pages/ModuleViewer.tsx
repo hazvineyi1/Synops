@@ -939,6 +939,9 @@ export function ModuleViewer() {
 
   // ── Viewer-mode derived state (computed before any early returns) ──────────
   const mode = modeParam ?? '';
+  // Which hub section this player was opened from, so finishing returns there (with its forward
+  // "Next: ..." button) instead of dropping the learner back on Overview.
+  const backTab = mode === 'reading' ? 'readings' : (mode === 'video' || mode === 'slides') ? 'video' : 'complete';
   const isSlides = mode === 'slides';
   const beats = mode === 'quiz'
     ? allBeats.filter(b => !!b.visualData?.quiz)
@@ -991,6 +994,7 @@ export function ModuleViewer() {
         moduleId={moduleId ?? ''}
         navigate={navigate}
         isLoading={isLoading}
+        initialTab={new URLSearchParams(search).get('tab')}
       />
     );
   }
@@ -1235,7 +1239,7 @@ export function ModuleViewer() {
               <p className="text-sm text-muted-foreground mb-4">
                 You've worked through all {beats.length} pages. Continue to the next learning experience.
               </p>
-              <Button onClick={() => navigate(`/courses/${courseId}/modules/${moduleId}`)}>
+              <Button onClick={() => navigate(`/courses/${courseId}/modules/${moduleId}?tab=${backTab}`)}>
                 Continue <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </motion.div>
@@ -1266,7 +1270,7 @@ export function ModuleViewer() {
           {currentIndex === beats.length - 1 ? (
             <Button
               size="sm"
-              onClick={() => { markCurrentComplete(); navigate(`/courses/${courseId}/modules/${moduleId}`); }}
+              onClick={() => { markCurrentComplete(); navigate(`/courses/${courseId}/modules/${moduleId}?tab=${backTab}`); }}
               className="gap-1.5"
             >
               <CheckCircle className="h-4 w-4" /> Finish
@@ -2213,7 +2217,7 @@ function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBea
 }
 
 function ModuleHubView({
-  mod, allBeats, course, courseId, moduleId, navigate, isLoading,
+  mod, allBeats, course, courseId, moduleId, navigate, isLoading, initialTab,
 }: {
   mod: ModuleDetail | undefined;
   allBeats: Beat[];
@@ -2222,8 +2226,12 @@ function ModuleHubView({
   moduleId: string;
   navigate: (to: string) => void;
   isLoading: boolean;
+  initialTab?: string | null;
 }) {
-  const [tab, setTab] = useState<HubTab>('overview');
+  const VALID_TABS: HubTab[] = ['overview', 'structure', 'video', 'readings', 'complete', 'cases', 'participate', 'assignments', 'workshop'];
+  const [tab, setTab] = useState<HubTab>(
+    initialTab && VALID_TABS.includes(initialTab as HubTab) ? (initialTab as HubTab) : 'overview',
+  );
 
   // Same query key as WorkshopSection, so React Query serves both from one fetch.
   const { data: moduleWorkshops } = useQuery({

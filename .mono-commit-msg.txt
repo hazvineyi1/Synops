@@ -1,5 +1,5 @@
-Translation: remove Shona, keep read-aloud audio in English (ASCII-only)
+Remove Shona from the case-runner language list too (ASCII-only)
 
-Removed Shona from the language options (frontend LANGS + backend LANG_NAMES), leaving English, isiZulu, isiXhosa and Afrikaans. Translation now applies to WRITTEN content only: the reader's read-aloud (ReadAloudBar) always speaks the original English text even when the written content is shown translated - no audio translations.
+Follow-up: Shona still appeared because the case runner had its own language list in casesApi.ts. Removed the sn/Shona entry there as well, so no surface offers Shona - leaving English, isiZulu, isiXhosa, Afrikaans everywhere (chips, reader, slide lesson, case coach).
 
-VALIDATION: esbuild clean on ModuleViewer.tsx, caseEngine.ts, translate.ts.
+VALIDATION: esbuild clean on casesApi.ts.
