@@ -5,7 +5,7 @@ import {
   caseScenariosTable, interactiveActivitiesTable, discussionsTable, assignmentsTable,
   coursePartnerAssignmentsTable,
 } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 /**
  * One-off seed for the real partner "Enza Global Media" (SMME development, coaching, incubation and
@@ -370,13 +370,125 @@ async function applyBrand(partnerId: string): Promise<void> {
   }
 }
 
+// Create one course and all of its content (modules, beats, reading, case, interactive, discussion,
+// assignment). Returns the new course id. Thrown errors are handled per-course by ensureEnzaCourses.
+async function createCourseContent(c: (typeof COURSES)[number], orgId: string, facultyId: string): Promise<string> {
+  const [course] = await db.insert(coursesTable).values({
+    title: c.title, description: c.description, tenantId: "platform", status: "published",
+    competencyTags: c.tags, objectives: c.objectives, nqfLevel: c.nqf,
+  }).returning();
+
+  let firstModuleId = "";
+  for (let mi = 0; mi < c.modules.length; mi++) {
+    const m = c.modules[mi];
+    const [mod] = await db.insert(modulesTable).values({
+      courseId: course.id, title: m.title, status: "published", lessonType: "slides",
+      modality: "async", order: mi, objectives: m.objectives, estimatedMinutes: m.minutes,
+      description: `Part of ${c.title}. This module covers ${m.title.toLowerCase()}.`,
+    }).returning();
+    if (mi === 0) firstModuleId = mod.id;
+    await db.insert(beatsTable).values([
+      { moduleId: mod.id, type: "title_card", order: 0, title: m.title, narration: `Welcome to "${m.title}". In this module you will focus on ${c.focus}. By the end you will be able to: ${m.objectives.join(" ")}` },
+      { moduleId: mod.id, type: "points", order: 1, title: "Key ideas", narration: `The core ideas in ${m.title} that you will apply to your own business.`, bulletPoints: m.objectives },
+      { moduleId: mod.id, type: "close", order: 2, title: "Wrap up", narration: `You have completed ${m.title}. Apply what you learned to your own business before the next module, and bring your questions to the discussion.` },
+    ]);
+    await db.update(modulesTable).set({ beatCount: 3 }).where(eq(modulesTable.id, mod.id));
+  }
+  await db.update(coursesTable).set({ moduleCount: c.modules.length }).where(eq(coursesTable.id, course.id));
+
+  const readingBody = `# Reading: ${c.title}\n\nThis short reading anchors the course. ${c.description}\n\n## Why this matters for your business\n\n${c.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\n## How to use this course\n\nWork through the modules in order, complete the interactive and the assignment, and take part in the discussion. Bring a real business - your own or one you know - and apply every idea to it. Enza's approach is implementation over theory: break the work into small, costed, actionable steps.`;
+  await db.insert(moduleReadingsTable).values({
+    moduleId: firstModuleId, courseId: course.id, title: `Course reader: ${c.title}`,
+    kind: "note", content: readingBody, chars: readingBody.length, order: 0, published: true, createdBy: facultyId,
+  });
+
+  await db.insert(caseScenariosTable).values({
+    organisationId: orgId, moduleId: firstModuleId, createdBy: facultyId, createdByName: "Enza Faculty",
+    title: `Case study: ${c.title}`,
+    learningObjective: c.objectives[0],
+    contextBlock: c.caseScenario,
+    openingQuestion: "Where would you start, and why? Talk me through your thinking as an entrepreneur.",
+    focusAreas: c.objectives.slice(0, 3),
+    difficulty: c.nqf >= 6 ? "advanced" : c.nqf >= 5 ? "intermediate" : "foundational",
+    status: "published", isLibrary: true, tags: c.tags,
+    guidingInstructions: `Coach the learner through the scenario using questions, not answers. Keep them focused on ${c.focus}. Push for concrete, costed, actionable steps in a South African SMME context.`,
+  });
+
+  const items = c.objectives.map((o) => `<li><label><input type="checkbox"> ${o}</label></li>`).join("");
+  const html = `<!doctype html><meta charset="utf-8"><style>body{font-family:Heebo,system-ui,sans-serif;color:#111;margin:0;padding:20px;background:#fff}h2{color:#111}li{margin:.5rem 0;list-style:none}.bar{height:8px;background:#eee;border-radius:6px;overflow:hidden;margin:12px 0}.fill{height:100%;width:0;background:#9CDF00;transition:.3s}button{background:#111;color:#fff;border:0;border-radius:6px;padding:.6rem 1rem;font:inherit;cursor:pointer}.hint{color:#666;font-size:.9rem}</style><h2>${c.title} - readiness check</h2><p class="hint">Tick each capability you can honestly do in your own business today.</p><ul id="l">${items}</ul><div class="bar"><div class="fill" id="f"></div></div><p id="s" class="hint">0% ready</p><button onclick="save()">Save my score</button><script>const cs=[...document.querySelectorAll('input')];function upd(){const n=cs.filter(x=>x.checked).length,p=Math.round(n/cs.length*100);document.getElementById('f').style.width=p+'%';document.getElementById('s').textContent=p+'% ready ('+n+' of '+cs.length+')';}cs.forEach(x=>x.addEventListener('change',upd));function save(){upd();alert('Saved. Focus next on the items you left unticked.');}<\/script>`;
+  await db.insert(interactiveActivitiesTable).values({
+    organisationId: orgId, courseId: course.id, moduleId: firstModuleId,
+    title: `${c.title}: readiness self-check`,
+    instructions: `Use this checklist to rate your own business against the course objectives. Revisit it at the end of the course to see your growth.`,
+    html, source: "html", kind: "checklist", bloomsLevel: "Evaluate",
+    difficulty: c.nqf >= 6 ? "advanced" : c.nqf >= 5 ? "intermediate" : "foundational",
+    isLibrary: true, tags: c.tags, published: true, createdByUserId: facultyId,
+  });
+
+  await db.insert(discussionsTable).values({
+    courseId: course.id, authorId: facultyId, moduleId: firstModuleId,
+    title: `Discussion: applying ${c.title} to your business`,
+    body: `Share how you will apply this course to a real business - your own or one you know well. In your first post (100-150 words): (1) name the business and the single biggest challenge it faces related to ${c.focus}; (2) describe one specific action you will take based on this course; and (3) what result you expect. Then reply thoughtfully to at least two classmates with a practical suggestion.`,
+    aiFacilitated: true, requireInitialPost: true, graded: false,
+  });
+
+  await db.insert(assignmentsTable).values({
+    courseId: course.id, moduleId: firstModuleId,
+    title: `Applied project: ${c.title}`,
+    description: `A practical, real-world application of everything in this course to a business of your choice.`,
+    instructions: `Choose a real business (your own or one you can access). Produce a short, practical output (2-4 pages or a completed template) that demonstrates the course objectives:\n\n${c.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\nGround every recommendation in the real numbers and context of the business. Be specific and actionable - Enza values implementation over theory. Submit your work and be ready to present it in coaching.`,
+    submissionType: "project", pointsPossible: "100", published: true, position: 0,
+  });
+
+  return course.id;
+}
+
+/**
+ * Self-healing course provisioning for Enza. Find-or-creates the org + faculty author, then for each of
+ * the 15 courses: reuses an existing course of the same title (so a partial prior run is not duplicated)
+ * or creates it, and ensures it is assigned to the Enza partner. Each course is isolated in try/catch so
+ * one failing course cannot stop the rest, and the first error is returned so a real bug is diagnosable.
+ */
+async function ensureEnzaCourses(partnerId: string): Promise<{ total: number; created: number; error: string | null }> {
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS course_partner_assignments (id text PRIMARY KEY, course_id text NOT NULL, partner_id text NOT NULL, assigned_by text, assigned_at timestamptz NOT NULL DEFAULT now())`);
+
+  let org = await firstOrNull(await db.select().from(organisationsTable).where(and(eq(organisationsTable.partnerId, partnerId), eq(organisationsTable.name, "Enza SMME Academy"))));
+  if (!org) {
+    [org] = await db.insert(organisationsTable).values({ name: "Enza SMME Academy", partnerId, industry: "Enterprise & Supplier Development" }).returning();
+  }
+  let faculty = await firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, "curriculum@enzaglobalmedia.co.za")));
+  if (!faculty) {
+    [faculty] = await db.insert(usersTable).values({ email: "curriculum@enzaglobalmedia.co.za", firstName: "Enza", lastName: "Faculty", role: "instructional_designer", status: "active", partnerId, organisationId: org.id }).returning();
+  }
+
+  let created = 0;
+  let error: string | null = null;
+  for (const c of COURSES) {
+    try {
+      let course = await firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
+      let courseId: string;
+      if (course) { courseId = course.id; }
+      else { courseId = await createCourseContent(c, org.id, faculty.id); created++; }
+      const has = await db.select({ id: coursePartnerAssignmentsTable.id }).from(coursePartnerAssignmentsTable)
+        .where(and(eq(coursePartnerAssignmentsTable.courseId, courseId), eq(coursePartnerAssignmentsTable.partnerId, partnerId)));
+      if (has.length === 0) await db.insert(coursePartnerAssignmentsTable).values({ courseId, partnerId, assignedBy: faculty.id });
+    } catch (e) {
+      if (!error) error = (e instanceof Error ? e.message : String(e)).slice(0, 240);
+    }
+  }
+  const total = (await db.select({ id: coursePartnerAssignmentsTable.id }).from(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.partnerId, partnerId))).length;
+  return { total, created, error };
+}
+
 export async function seedEnza(): Promise<{ created: boolean; partnerId?: string; courses?: number; message?: string }> {
   // Idempotent: if the partner already exists, don't re-create courses, but DO (re)apply the
   // full brand kit (logo, favicon, colours) so branding stays in sync with the website.
   const existing = await firstOrNull(await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_SLUG)));
   if (existing) {
     await applyBrand(existing.id);
-    return { created: false, partnerId: existing.id, message: "Enza already provisioned - branding (logo + colours) refreshed." };
+    // Re-run course provisioning: this completes courses that a prior partial run never created/assigned.
+    const r = await ensureEnzaCourses(existing.id);
+    return { created: false, partnerId: existing.id, courses: r.total, message: `Branding refreshed. ${r.total} courses assigned to Enza (created ${r.created} new).${r.error ? " First error: " + r.error : ""}` };
   }
 
   // Make sure the assignment table exists (in case setup-platform never ran).
@@ -406,86 +518,8 @@ export async function seedEnza(): Promise<{ created: boolean; partnerId?: string
 
   await db.update(partnersTable).set({ orgCount: 1 }).where(eq(partnersTable.id, partner.id));
 
-  // 5. Courses + content
-  let courseCount = 0;
-  for (const c of COURSES) {
-    const [course] = await db.insert(coursesTable).values({
-      title: c.title, description: c.description, tenantId: "platform", status: "published",
-      competencyTags: c.tags, objectives: c.objectives, nqfLevel: c.nqf,
-    }).returning();
+  // 5. Courses + content - shared, self-healing, per-course resilient provisioning.
+  const seeded = await ensureEnzaCourses(partner.id);
 
-    // Modules with beats (title card + points + close) and objectives
-    let firstModuleId = "";
-    for (let mi = 0; mi < c.modules.length; mi++) {
-      const m = c.modules[mi];
-      const [mod] = await db.insert(modulesTable).values({
-        courseId: course.id, title: m.title, status: "published", lessonType: "slides",
-        modality: "async", order: mi, objectives: m.objectives, estimatedMinutes: m.minutes,
-        description: `Part of ${c.title}. This module covers ${m.title.toLowerCase()}.`,
-      }).returning();
-      if (mi === 0) firstModuleId = mod.id;
-      await db.insert(beatsTable).values([
-        { moduleId: mod.id, type: "title_card", order: 0, title: m.title, narration: `Welcome to "${m.title}". In this module you will focus on ${c.focus}. By the end you will be able to: ${m.objectives.join(" ")}` },
-        { moduleId: mod.id, type: "points", order: 1, title: "Key ideas", narration: `The core ideas in ${m.title} that you will apply to your own business.`, bulletPoints: m.objectives },
-        { moduleId: mod.id, type: "close", order: 2, title: "Wrap up", narration: `You have completed ${m.title}. Apply what you learned to your own business before the next module, and bring your questions to the discussion.` },
-      ]);
-      await db.update(modulesTable).set({ beatCount: 3 }).where(eq(modulesTable.id, mod.id));
-    }
-    await db.update(coursesTable).set({ moduleCount: c.modules.length }).where(eq(coursesTable.id, course.id));
-
-    // Reading (attached to module 1)
-    const readingBody = `# Reading: ${c.title}\n\nThis short reading anchors the course. ${c.description}\n\n## Why this matters for your business\n\n${c.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\n## How to use this course\n\nWork through the modules in order, complete the interactive and the assignment, and take part in the discussion. Bring a real business - your own or one you know - and apply every idea to it. Enza's approach is implementation over theory: break the work into small, costed, actionable steps.`;
-    await db.insert(moduleReadingsTable).values({
-      moduleId: firstModuleId, courseId: course.id, title: `Course reader: ${c.title}`,
-      kind: "note", content: readingBody, chars: readingBody.length, order: 0, published: true, createdBy: faculty.id,
-    });
-
-    // Case study (Socratic scenario) attached to module 1
-    await db.insert(caseScenariosTable).values({
-      organisationId: org.id, moduleId: firstModuleId, createdBy: faculty.id, createdByName: "Enza Faculty",
-      title: `Case study: ${c.title}`,
-      learningObjective: c.objectives[0],
-      contextBlock: c.caseScenario,
-      openingQuestion: "Where would you start, and why? Talk me through your thinking as an entrepreneur.",
-      focusAreas: c.objectives.slice(0, 3),
-      difficulty: c.nqf >= 6 ? "advanced" : c.nqf >= 5 ? "intermediate" : "foundational",
-      status: "published", isLibrary: true, tags: c.tags,
-      guidingInstructions: `Coach the learner through the scenario using questions, not answers. Keep them focused on ${c.focus}. Push for concrete, costed, actionable steps in a South African SMME context.`,
-    });
-
-    // Interactive activity (a self-assessment / action checklist tool)
-    const items = c.objectives.map((o) => `<li><label><input type="checkbox"> ${o}</label></li>`).join("");
-    const html = `<!doctype html><meta charset="utf-8"><style>body{font-family:Heebo,system-ui,sans-serif;color:#111;margin:0;padding:20px;background:#fff}h2{color:#111}li{margin:.5rem 0;list-style:none}.bar{height:8px;background:#eee;border-radius:6px;overflow:hidden;margin:12px 0}.fill{height:100%;width:0;background:#9CDF00;transition:.3s}button{background:#111;color:#fff;border:0;border-radius:6px;padding:.6rem 1rem;font:inherit;cursor:pointer}.hint{color:#666;font-size:.9rem}</style><h2>${c.title} - readiness check</h2><p class="hint">Tick each capability you can honestly do in your own business today.</p><ul id="l">${items}</ul><div class="bar"><div class="fill" id="f"></div></div><p id="s" class="hint">0% ready</p><button onclick="save()">Save my score</button><script>const cs=[...document.querySelectorAll('input')];function upd(){const n=cs.filter(x=>x.checked).length,p=Math.round(n/cs.length*100);document.getElementById('f').style.width=p+'%';document.getElementById('s').textContent=p+'% ready ('+n+' of '+cs.length+')';}cs.forEach(x=>x.addEventListener('change',upd));function save(){upd();alert('Saved. Focus next on the items you left unticked.');}<\/script>`;
-    await db.insert(interactiveActivitiesTable).values({
-      organisationId: org.id, courseId: course.id, moduleId: firstModuleId,
-      title: `${c.title}: readiness self-check`,
-      instructions: `Use this checklist to rate your own business against the course objectives. Revisit it at the end of the course to see your growth.`,
-      html, source: "html", kind: "checklist", bloomsLevel: "Evaluate",
-      difficulty: c.nqf >= 6 ? "advanced" : c.nqf >= 5 ? "intermediate" : "foundational",
-      isLibrary: true, tags: c.tags, published: true, createdByUserId: faculty.id,
-    });
-
-    // Discussion (AI-facilitated)
-    await db.insert(discussionsTable).values({
-      courseId: course.id, authorId: faculty.id, moduleId: firstModuleId,
-      title: `Discussion: applying ${c.title} to your business`,
-      body: `Share how you will apply this course to a real business - your own or one you know well. In your first post (100-150 words): (1) name the business and the single biggest challenge it faces related to ${c.focus}; (2) describe one specific action you will take based on this course; and (3) what result you expect. Then reply thoughtfully to at least two classmates with a practical suggestion.`,
-      aiFacilitated: true, requireInitialPost: true, graded: false,
-    });
-
-    // Assignment
-    await db.insert(assignmentsTable).values({
-      courseId: course.id, moduleId: firstModuleId,
-      title: `Applied project: ${c.title}`,
-      description: `A practical, real-world application of everything in this course to a business of your choice.`,
-      instructions: `Choose a real business (your own or one you can access). Produce a short, practical output (2-4 pages or a completed template) that demonstrates the course objectives:\n\n${c.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\nGround every recommendation in the real numbers and context of the business. Be specific and actionable - Enza values implementation over theory. Submit your work and be ready to present it in coaching.`,
-      submissionType: "project", pointsPossible: "100", published: true, position: 0,
-    });
-
-    // Assign the course to the Enza partner
-    await db.insert(coursePartnerAssignmentsTable).values({ courseId: course.id, partnerId: partner.id, assignedBy: faculty.id });
-    courseCount++;
-  }
-
-  return { created: true, partnerId: partner.id, courses: courseCount };
+  return { created: true, partnerId: partner.id, courses: seeded.total, message: `Enza provisioned with ${seeded.total} courses.${seeded.error ? " First error: " + seeded.error : ""}` };
 }
