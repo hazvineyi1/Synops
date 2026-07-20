@@ -1840,7 +1840,7 @@ function ReadAloudBar({ text }: { text: string }) {
  * document becomes a readable article rather than a download.
  */
 // Languages the content can be translated into on demand (matches the server's LANG_NAMES).
-const LANGS: [string, string][] = [['en', 'English'], ['zu', 'isiZulu'], ['xh', 'isiXhosa'], ['af', 'Afrikaans'], ['sn', 'Shona']];
+const LANGS: [string, string][] = [['en', 'English'], ['zu', 'isiZulu'], ['xh', 'isiXhosa'], ['af', 'Afrikaans']];
 
 /** A row of language chips. The parent runs the actual translation for the content it owns. */
 function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onPick: (code: string) => void }) {
@@ -1979,7 +1979,8 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
               </a>
             )}
             <div className="mt-4"><LangChips value={tLang} busy={tBusy} onPick={translateReading} /></div>
-            {reader?.content ? <div className="mt-3 mb-2"><ReadAloudBar text={(tReading?.content ?? reader.content)} /></div> : null}
+            {/* Read-aloud always uses the original English text - only the written content is translated. */}
+            {reader?.content ? <div className="mt-3 mb-2"><ReadAloudBar text={reader.content} /></div> : null}
             <div className="mt-4 border-t border-border/60 pt-5">
               <MarkdownView text={tReading?.content ?? reader?.content ?? ''} />
             </div>

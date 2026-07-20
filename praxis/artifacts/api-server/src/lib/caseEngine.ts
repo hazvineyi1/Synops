@@ -19,7 +19,6 @@ export const LANG_NAMES: Record<string, string> = {
   zu: "isiZulu",
   xh: "isiXhosa",
   af: "Afrikaans",
-  sn: "Shona",
 };
 export function languageName(code?: string | null): string {
   return LANG_NAMES[code ?? "en"] ?? "English";

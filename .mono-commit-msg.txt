@@ -1,5 +1,7 @@
-Module UX: solid header, reading next/prev, finish quiz, case instructions + gradebook link (ASCII-only)
+Gradebook covers everything + on-demand content translation (ASCII-only)
 
-(1) Module header is now solid (bg-card, higher z, shadow) so scrolled content no longer bleeds through it. (2) The document reader gains Previous / Next reading navigation and a reading N of M counter, so you can move between readings without returning to the list. (3) The slide/quiz player's last-page button is now an enabled Finish (marks complete + returns to the module) instead of a dead greyed Next. (4) Case coach relabelled from 'your Socratic coach' to 'your case coach'. (5) The Case Studies tab now leads with full instructions - read the fact pattern first, converse with questions-not-answers, about 8 exchanges with a progress bar, press Finish to get a written analysis, and that analysis is recorded in the gradebook. enzaEnrich now creates a gradebook item (sourceType case) per case so the end-of-session analysis is graded.
+GRADEBOOK: every learning object now appears as a column. Added a new 'completion' gradebook source in gradebookEngine that scores each module as the fraction of its beats a learner has viewed (readings/video/lesson completion, formative). enzaEnrich now creates gradebook items per module for the interactive activity (activity), the workshop (attendance), module completion, plus the case (already) - and assignments are auto-included. So assignments, case studies, activities, workshops and completion all show in the gradebook.
 
-VALIDATION: esbuild clean on ModuleViewer.tsx, CaseSession.tsx, enzaEnrich.ts.
+TRANSLATION: new POST /translate {texts,lang} (and GET /translate/languages) using the existing AI translator (English, isiZulu, isiXhosa, Afrikaans, Shona). Added on-demand language chips to the reading reader and the narrated slide lesson, so learners can read any reading or slide deck in their language with a click and toggle back to English. Discussions and case coach already translate.
+
+VALIDATION: esbuild clean on gradebookEngine.ts, enzaEnrich.ts, translate.ts, routes/index.ts, ModuleViewer.tsx.
