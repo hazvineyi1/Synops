@@ -155,18 +155,89 @@ function landscapeReading(course: Crs, mod: Mod): { title: string; content: stri
 // Stored as a JSON config in the assignment's `instructions`; the assignment page renders it as an
 // inline quiz and the submit endpoint auto-scores it. Correct-option positions are varied so it is
 // not "always B". Upload stays optional (allowUpload) and is not the centre of the task.
-// Rotating challenge themes so assignments feel varied module to module (not identical quizzes).
-const CHALLENGE_THEMES = [
-  { name: "Decision Challenge", intro: (t: string) => `Decision Challenge. You are the owner. For each situation, choose the smartest move for applying "${t}". Instant, auto-graded score out of 50 - all in the module.` },
-  { name: "Scenario Sprint", intro: (t: string) => `Scenario Sprint. Five quick real-world calls that test how you would put "${t}" to work. Auto-graded out of 50, earn XP as you go.` },
-  { name: "Best-Move Challenge", intro: (t: string) => `Best-Move Challenge. Each question has a strongest answer for a real SMME. Pick it to apply "${t}" and score out of 50 instantly.` },
-  { name: "Reality Check", intro: (t: string) => `Reality Check. Judge these true-to-life business situations and show you can apply "${t}". Auto-graded out of 50 - no upload needed.` },
-];
+// Different auto-graded GAME per module so only one is a quiz and the rest are real games.
+// 0 = quiz, 1 = sequence puzzle, 2 = match-up, 3 = Jeopardy board (cycles for longer courses).
+function buildAssignmentConfig(course: Crs, mod: Mod, mi: number): any {
+  const kind = mi % 4;
+  if (kind === 1) return buildOrderGame(mod);
+  if (kind === 2) return buildMatchGame(mod);
+  if (kind === 3) return buildJeopardyGame(mod);
+  return buildQuizGame(course, mod);
+}
 
-function buildAssignmentConfig(course: Crs, mod: Mod, mi: number) {
+// --- Sequence puzzle: put the steps in the right order --------------------------------------
+function buildOrderGame(mod: Mod) {
+  const s = scenarioFor(mod.id + "ord");
+  const items = [
+    { id: "a", text: "See the real numbers you already have (what came in, went out, is left)" },
+    { id: "b", text: "Decide ONE small, specific change to make" },
+    { id: "c", text: "Do it within the week in the real business" },
+    { id: "d", text: "Check what actually changed in the money or the customer" },
+    { id: "e", text: "Repeat the loop to keep improving" },
+  ];
+  return {
+    __type: "order", theme: "Sequence Puzzle",
+    intro: `Sequence Puzzle. ${s.owner} wants to improve ${mod.title.toLowerCase()} at ${s.biz}. Put the steps in the correct order. Get the sequence right to score out of 50.`,
+    passingScore: 60, allowUpload: true,
+    items, order: ["a", "b", "c", "d", "e"],
+  };
+}
+
+// --- Match-up: pair each idea with the example that fits ------------------------------------
+function buildMatchGame(mod: Mod) {
+  const objs = mod.objectives.length ? mod.objectives : [mod.title];
+  const pairs = [
+    { left: "Owner mindset", right: "Stays to finish the shelf because unsold stock is lost money" },
+    { left: "Employee mindset", right: "Leaves at 5pm whatever state the business is in" },
+    { left: "Working from real numbers", right: "Writing down what came in, went out and is left" },
+    { left: "One small action this week", right: "Phoning one supplier to compare a price" },
+    { left: "A real customer pain", right: "Something people already pay or queue to solve" },
+  ];
+  return {
+    __type: "match", theme: "Match-Up",
+    intro: `Match-Up. Pair each idea about ${mod.title.toLowerCase()} with the example that fits. Match them all to score out of 50.`,
+    passingScore: 60, allowUpload: true, pairs,
+    note: objs[0],
+  };
+}
+
+// --- Jeopardy board: pick a tile, answer, bank the points -----------------------------------
+function buildJeopardyGame(mod: Mod) {
+  const s = scenarioFor(mod.id + "jep");
+  const categories = [
+    {
+      name: "Mindset",
+      tiles: [
+        { id: "m1", value: 100, question: "An owner mindset means you:", options: ["Do only what you are told", "Take responsibility for the result, not just the task", "Wait for a salary", "Avoid risk at all costs"], correct: 1 },
+        { id: "m2", value: 200, question: "The best reason to start small is:", options: ["It looks impressive", "You build habits that carry you when you grow", "It avoids all work", "Banks require it"], correct: 1 },
+      ],
+    },
+    {
+      name: "Numbers",
+      tiles: [
+        { id: "n1", value: 100, question: `Before deciding, ${s.owner} should first:`, options: ["Guess", "Look at the real numbers already in the business", "Ask a stranger", "Do nothing"], correct: 1 },
+        { id: "n2", value: 200, question: "Keeping every slip matters because:", options: ["It looks neat", "What you cannot prove you spent, you cannot deduct or learn from", "The bank collects them", "It is the law to frame them"], correct: 1 },
+      ],
+    },
+    {
+      name: "Action",
+      tiles: [
+        { id: "a1", value: 100, question: "A good weekly action is:", options: ["Vague and big", "Small, specific and measurable", "Something you cannot check", "Buying software"], correct: 1 },
+        { id: "a2", value: 200, question: "You know an idea worked when:", options: ["You feel good", "A number or the customer experience actually changed", "Your to-do list grew", "More stock piled up"], correct: 1 },
+      ],
+    },
+  ];
+  return {
+    __type: "jeopardy", theme: "Enza Jeopardy",
+    intro: `Enza Jeopardy. Pick a tile, answer the question, bank the points. Clear the board to score out of 50.`,
+    passingScore: 60, allowUpload: true, categories,
+  };
+}
+
+// --- Quiz (only one per course) -------------------------------------------------------------
+function buildQuizGame(course: Crs, mod: Mod) {
   const objs = mod.objectives.length ? mod.objectives : [mod.title];
   const s = scenarioFor(mod.id + "aq");
-  const theme = CHALLENGE_THEMES[mi % CHALLENGE_THEMES.length];
   const questions = [
     {
       id: "q1",
@@ -199,12 +270,12 @@ function buildAssignmentConfig(course: Crs, mod: Mod, mi: number) {
       correct: 1,
     },
   ];
-  // Vary question order per module so two modules never present the same sequence.
+  // Vary question order so the quiz is not identical to any other.
   const rotated = questions.slice(hashInt(mod.id) % questions.length).concat(questions.slice(0, hashInt(mod.id) % questions.length));
   return {
     __type: "quiz",
-    theme: theme.name,
-    intro: theme.intro(mod.title),
+    theme: "Decision Challenge",
+    intro: `Decision Challenge. You are the owner. For each situation, choose the smartest move for applying "${mod.title}". Auto-graded out of 50, earn XP as you go.`,
     passingScore: 60,
     allowUpload: true,
     questions: rotated,
@@ -367,10 +438,10 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
         // Assignments: a module-level AUTO-GRADED applied worksheet (5 questions -> 50 pts), done
         // in the module. Upgrades any earlier plain-text assignment to the auto-graded config too.
         const asg = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(eq(assignmentsTable.moduleId, m.id));
-        const asgConfig = JSON.stringify(buildAssignmentConfig(crs, mod, mi));
-        const asgTheme = CHALLENGE_THEMES[mi % CHALLENGE_THEMES.length].name;
-        const asgTitle = `${asgTheme}: ${mod.title}`;
-        const asgDesc = `A gamified, auto-graded challenge - apply "${mod.title.toLowerCase()}" to a real business, entirely within the module. Earn XP and a Bronze/Silver/Gold tier, instant score out of 50.`;
+        const cfg = buildAssignmentConfig(crs, mod, mi);
+        const asgConfig = JSON.stringify(cfg);
+        const asgTitle = `${cfg.theme}: ${mod.title}`;
+        const asgDesc = `A gamified, auto-graded challenge (${cfg.theme}) - apply "${mod.title.toLowerCase()}" to a real business, entirely within the module. Earn XP and a Bronze/Silver/Gold tier, instant score out of 50.`;
         if (asg.length === 0) {
           await db.insert(assignmentsTable).values({
             courseId, moduleId: m.id, title: asgTitle,

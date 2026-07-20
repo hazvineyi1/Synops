@@ -95,30 +95,68 @@ async function applyGrade(opts: {
   return updated;
 }
 
+// Auto-graded game formats: a single quiz, plus sequencing puzzles, matching, Jeopardy and level-up.
+const GAME_TYPES = ["quiz", "order", "match", "jeopardy", "spot", "levels"];
+
+/** Flatten any question-style game (quiz/spot/levels/jeopardy) into scoreable {id, correct} items. */
+function flattenGameQuestions(config: any): { id: string; correct: number }[] {
+  if (Array.isArray(config.questions)) return config.questions.map((q: any, i: number) => ({ id: q.id ?? `q${i}`, correct: q.correct }));
+  if (Array.isArray(config.rounds)) return config.rounds.map((r: any, i: number) => ({ id: r.id ?? `r${i}`, correct: r.correct }));
+  if (Array.isArray(config.levels)) return config.levels.map((l: any, i: number) => ({ id: l.id ?? `l${i}`, correct: l.correct }));
+  if (Array.isArray(config.categories)) {
+    const out: { id: string; correct: number }[] = [];
+    config.categories.forEach((c: any, ci: number) => (c.tiles ?? []).forEach((t: any, ti: number) => out.push({ id: t.id ?? `c${ci}t${ti}`, correct: t.correct })));
+    return out;
+  }
+  return [];
+}
+
+/** Recompute correct/total for any supported game type from its config + the learner's submission. */
+function gradeGame(config: any, body: any): { correct: number; total: number } | null {
+  const t = config.__type;
+  if (t === "match" && Array.isArray(config.pairs)) {
+    const total = config.pairs.length || 1;
+    const matches = body?.matches ?? {};
+    const correct = config.pairs.filter((p: any, i: number) => matches[p.left] === p.right || matches[String(i)] === p.right).length;
+    return { correct, total };
+  }
+  if (t === "order" && Array.isArray(config.order)) {
+    const total = config.order.length || 1;
+    const submitted: string[] = Array.isArray(body?.order) ? body.order : [];
+    const correct = config.order.filter((id: string, i: number) => submitted[i] === id).length;
+    return { correct, total };
+  }
+  const qs = flattenGameQuestions(config);
+  if (qs.length) {
+    const answers = body?.answers ?? {};
+    const correct = qs.filter((q) => answers[q.id] === q.correct).length;
+    return { correct, total: qs.length };
+  }
+  return null;
+}
+
 /**
- * If the assignment is an auto-graded quiz (its instructions carry a {__type:'quiz',questions:[...]}
- * config), score the submission server-side (never trusting the client's number) and grade it via
- * applyGrade - which writes the score, the gradebook cell, notifies, and fires onGradeEvent (so a low
- * score raises the off-track alert, builds the gap-targeted study plan, and pushes the AI coach).
- * Returns the graded submission, or null if this is not an auto-graded quiz.
+ * If the assignment is an auto-graded GAME (its instructions carry a {__type:...} config for quiz,
+ * order, match, jeopardy, spot or levels), score it server-side (never trusting the client's number)
+ * and grade via applyGrade - which writes the score, the gradebook cell, notifies, and fires
+ * onGradeEvent (off-track alert + gap plan + AI coach). Returns the graded submission, or null.
  */
-async function maybeAutoGradeQuiz(
+async function maybeAutoGradeGame(
   assignment: typeof assignmentsTable.$inferSelect,
   submissionId: string,
   submissionBody: string | undefined,
   learnerId: string,
 ) {
   let config: any = null;
-  try { const p = JSON.parse(assignment.instructions ?? ""); if (p && p.__type === "quiz" && Array.isArray(p.questions)) config = p; } catch { /* not a config */ }
+  try { const p = JSON.parse(assignment.instructions ?? ""); if (p && GAME_TYPES.includes(p.__type)) config = p; } catch { /* not a config */ }
   if (!config) return null;
-  let answers: Record<string, number> = {};
-  try { const b = JSON.parse(submissionBody ?? ""); if (b && b.type === "quiz" && b.answers) answers = b.answers; } catch { /* ignore */ }
-  const qs = config.questions as { id: string; correct: number }[];
-  const total = qs.length || 1;
-  const correct = qs.filter((q) => answers[q.id] === q.correct).length;
-  const pct = Math.round((correct / total) * 100);
-  const points = Math.round((correct / total) * Number(assignment.pointsPossible));
-  const feedback = `Auto-graded: ${correct} of ${total} correct (${pct}%). ${pct >= (config.passingScore ?? 60) ? "Well done - you have got the key ideas." : "Review the module readings and slides, then you can resubmit to improve."}`;
+  let body: any = {};
+  try { body = JSON.parse(submissionBody ?? "") ?? {}; } catch { /* ignore */ }
+  const g = gradeGame(config, body);
+  if (!g) return null;
+  const pct = Math.round((g.correct / g.total) * 100);
+  const points = Math.round((g.correct / g.total) * Number(assignment.pointsPossible));
+  const feedback = `Auto-graded: ${g.correct} of ${g.total} correct (${pct}%). ${pct >= (config.passingScore ?? 60) ? "Well done - you have got the key ideas." : "Review the module readings and slides, then you can play again to improve."}`;
   return await applyGrade({
     submissionId, assignmentId: assignment.id, learnerId, courseId: assignment.courseId,
     graderId: "auto", score: points, feedback,
@@ -341,9 +379,9 @@ router.post("/assignments/:assignmentId/submit", requireAuth, async (req, res) =
       .where(and(eq(gradebookEntriesTable.assignmentId, req.params.assignmentId), eq(gradebookEntriesTable.userId, req.userId!)));
   }
 
-  // Auto-graded quiz? Score it now so the learner gets an instant grade (this also fires the
+  // Auto-graded game? Score it now so the learner gets an instant grade (this also fires the
   // off-track engine: gap analysis + study plan + AI coach for a low score).
-  const autoGraded = await maybeAutoGradeQuiz(assignment, submission.id, submissionBody, req.userId!);
+  const autoGraded = await maybeAutoGradeGame(assignment, submission.id, submissionBody, req.userId!);
 
   // Respond with the graded submission when auto-graded, else the saved submission.
   res.status(201).json(autoGraded ?? submission);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -354,6 +354,150 @@ function QuizForm({ questions, passingScore = 70, value, onChange, submitted, on
   );
 }
 
+// ─── Shared gamified result card (tier + XP) ──────────────────────────────────
+function GameResult({ correct, total, passingScore = 60 }: { correct: number; total: number; passingScore?: number }) {
+  const score = Math.round((correct / Math.max(1, total)) * 100);
+  const xp = correct * 10;
+  const passed = score >= passingScore;
+  const tier = score >= 90 ? { label: 'Gold', icon: Trophy, cls: 'text-amber-500', bg: 'from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20', ring: 'border-amber-300 dark:border-amber-700' }
+    : score >= 70 ? { label: 'Silver', icon: Award, cls: 'text-slate-400', bg: 'from-slate-50 to-slate-100 dark:from-slate-900/40 dark:to-slate-900/20', ring: 'border-slate-300 dark:border-slate-700' }
+    : score >= 50 ? { label: 'Bronze', icon: Award, cls: 'text-orange-600', bg: 'from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/20', ring: 'border-orange-300 dark:border-orange-800' }
+    : { label: 'Keep going', icon: Zap, cls: 'text-rose-500', bg: 'from-rose-50 to-rose-100 dark:from-rose-950/30 dark:to-rose-950/20', ring: 'border-rose-300 dark:border-rose-800' };
+  const TierIcon = tier.icon;
+  return (
+    <div className={cn('rounded-2xl p-6 text-center border bg-gradient-to-br', tier.bg, tier.ring)}>
+      <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', delay: 0.1 }}>
+        <TierIcon className={cn('h-12 w-12 mx-auto mb-2', tier.cls)} />
+      </motion.div>
+      <div className="text-4xl font-black">{score}%</div>
+      <div className="text-sm font-bold mt-0.5">{tier.label} · {correct} of {total} correct</div>
+      <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-semibold">
+        <Sparkles className="h-4 w-4" /> +{xp} XP earned
+      </div>
+      <div className="mt-2 text-xs text-muted-foreground">{passed ? 'Passed! Submit to record your grade.' : `${passingScore}% to pass — you can play again to improve.`}</div>
+      <Progress value={score} className="mt-4 h-2" />
+    </div>
+  );
+}
+
+function shuffleSeeded<T>(arr: T[], seed: number): T[] {
+  const a = [...arr]; let s = seed || 1;
+  for (let i = a.length - 1; i > 0; i--) { s = (s * 9301 + 49297) % 233280; const j = Math.floor((s / 233280) * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+// ─── Sequence puzzle: order the steps ─────────────────────────────────────────
+function OrderGame({ items, correctOrder, submitted, onChange, onSubmit }: {
+  items: { id: string; text: string }[]; correctOrder: string[]; submitted: boolean;
+  onChange: (order: string[]) => void; onSubmit: (score: number, passed: boolean) => void;
+}) {
+  const [order, setOrder] = useState<string[]>(() => shuffleSeeded(items.map(i => i.id), items.length * 7 + 3));
+  const byId = new Map(items.map(i => [i.id, i.text]));
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir; if (j < 0 || j >= order.length) return;
+    const next = [...order]; [next[idx], next[j]] = [next[j], next[idx]]; setOrder(next); onChange(next);
+  };
+  const correctCount = order.filter((id, i) => id === correctOrder[i]).length;
+  if (submitted) return <div className="space-y-4"><GameResult correct={correctCount} total={correctOrder.length} />
+    <div className="space-y-2">{order.map((id, i) => { const ok = id === correctOrder[i]; return (
+      <div key={id} className={cn('flex items-center gap-3 rounded-xl border p-3 text-sm', ok ? 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-rose-200 bg-rose-50/50 dark:bg-rose-950/20')}>
+        <span className="font-bold w-5">{i + 1}</span>{ok ? <CheckCircle className="h-4 w-4 text-emerald-600" /> : <X className="h-4 w-4 text-rose-600" />}<span className="flex-1">{byId.get(id)}</span></div>); })}</div></div>;
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        {order.map((id, i) => (
+          <div key={id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 text-sm">
+            <span className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span>
+            <span className="flex-1">{byId.get(id)}</span>
+            <div className="flex flex-col">
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="p-0.5 disabled:opacity-20"><ChevronUp className="h-4 w-4" /></button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === order.length - 1} className="p-0.5 disabled:opacity-20"><ChevronDown className="h-4 w-4" /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Button className="w-full" onClick={() => { const s = Math.round((correctCount / correctOrder.length) * 100); onSubmit(s, s >= 60); }}>Check my order</Button>
+    </div>
+  );
+}
+
+// ─── Match-up: pair left to right ─────────────────────────────────────────────
+function MatchGame({ pairs, submitted, onChange, onSubmit }: {
+  pairs: { left: string; right: string }[]; submitted: boolean;
+  onChange: (matches: Record<string, string>) => void; onSubmit: (score: number, passed: boolean) => void;
+}) {
+  const rights = useMemo(() => shuffleSeeded(pairs.map(p => p.right), pairs.length * 5 + 2), [pairs]);
+  const [matches, setMatches] = useState<Record<string, string>>({});
+  const pick = (left: string, right: string) => { const next = { ...matches, [left]: right }; setMatches(next); onChange(next); };
+  const correctCount = pairs.filter(p => matches[p.left] === p.right).length;
+  const allPicked = pairs.every(p => matches[p.left]);
+  if (submitted) return <div className="space-y-4"><GameResult correct={correctCount} total={pairs.length} />
+    <div className="space-y-2">{pairs.map(p => { const ok = matches[p.left] === p.right; return (
+      <div key={p.left} className={cn('rounded-xl border p-3 text-sm', ok ? 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-rose-200 bg-rose-50/50 dark:bg-rose-950/20')}>
+        <div className="flex items-center gap-2 font-medium">{ok ? <CheckCircle className="h-4 w-4 text-emerald-600" /> : <X className="h-4 w-4 text-rose-600" />}{p.left}</div>
+        <div className="ml-6 text-xs text-muted-foreground mt-0.5">You matched: {matches[p.left] ?? '—'}{!ok && <> · Correct: <span className="text-emerald-700">{p.right}</span></>}</div></div>); })}</div></div>;
+  return (
+    <div className="space-y-3">
+      {pairs.map(p => (
+        <div key={p.left} className="rounded-xl border border-border bg-card p-3">
+          <div className="text-sm font-semibold mb-2">{p.left}</div>
+          <select value={matches[p.left] ?? ''} onChange={e => pick(p.left, e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
+            <option value="">Choose the matching example…</option>
+            {rights.map((r, i) => <option key={i} value={r}>{r}</option>)}
+          </select>
+        </div>
+      ))}
+      <Button className="w-full" disabled={!allPicked} onClick={() => { const s = Math.round((correctCount / pairs.length) * 100); onSubmit(s, s >= 60); }}>Check my matches</Button>
+    </div>
+  );
+}
+
+// ─── Jeopardy board: pick a tile, answer, bank points ─────────────────────────
+function JeopardyGame({ categories, submitted, onChange, onSubmit }: {
+  categories: { name: string; tiles: { id: string; value: number; question: string; options: string[]; correct: number }[] }[];
+  submitted: boolean; onChange: (answers: Record<string, number>) => void; onSubmit: (score: number, passed: boolean) => void;
+}) {
+  const tiles = categories.flatMap(c => c.tiles);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [active, setActive] = useState<string | null>(null);
+  const answer = (tileId: string, opt: number) => { const next = { ...answers, [tileId]: opt }; setAnswers(next); onChange(next); setActive(null); };
+  const correctCount = tiles.filter(t => answers[t.id] === t.correct).length;
+  const allDone = tiles.every(t => answers[t.id] !== undefined);
+  const activeTile = tiles.find(t => t.id === active);
+  if (submitted) return <GameResult correct={correctCount} total={tiles.length} />;
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${categories.length}, minmax(0,1fr))` }}>
+        {categories.map(c => (
+          <div key={c.name} className="space-y-2">
+            <div className="text-center text-xs font-bold uppercase tracking-wide text-primary py-1">{c.name}</div>
+            {c.tiles.map(t => {
+              const done = answers[t.id] !== undefined; const ok = answers[t.id] === t.correct;
+              return (
+                <button key={t.id} type="button" onClick={() => !done && setActive(t.id)} disabled={done}
+                  className={cn('w-full rounded-lg py-3 text-lg font-black transition-colors', done ? (ok ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white') : 'bg-indigo-600 text-white hover:bg-indigo-700')}>
+                  {done ? (ok ? '✓' : '✗') : t.value}
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      {activeTile && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-4">
+          <div className="text-sm font-semibold mb-3">{activeTile.value} — {activeTile.question}</div>
+          <div className="space-y-2">
+            {activeTile.options.map((o, oi) => (
+              <button key={oi} type="button" onClick={() => answer(activeTile.id, oi)} className="w-full text-left text-sm rounded-lg border border-border hover:bg-muted/50 p-3">{o}</button>
+            ))}
+          </div>
+        </motion.div>
+      )}
+      <Button className="w-full" disabled={!allDone} onClick={() => { const s = Math.round((correctCount / tiles.length) * 100); onSubmit(s, s >= 60); }}>{allDone ? 'Finish the board' : `Answer all ${tiles.length} tiles`}</Button>
+    </div>
+  );
+}
+
 // ─── Discussion submission ────────────────────────────────────────────────────
 function DiscussionForm({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const wc = wordCount(value);
@@ -700,6 +844,13 @@ export function AssignmentDetail() {
   const [reflectionAnswers, setReflectionAnswers] = useState<Record<string, string>>({});
   const [caseStudyAnswers, setCaseStudyAnswers] = useState<Record<string, string>>({});
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
+  // Game states (order / match / jeopardy) share a submitted flag + score.
+  const [orderState, setOrderState] = useState<string[]>([]);
+  const [matchState, setMatchState] = useState<Record<string, string>>({});
+  const [jeopardyState, setJeopardyState] = useState<Record<string, number>>({});
+  const [gameSubmitted, setGameSubmitted] = useState(false);
+  const [gameScore, setGameScore] = useState<{ score: number; passed: boolean } | null>(null);
+  const onGameSubmit = (score: number, passed: boolean) => { setGameScore({ score, passed }); setGameSubmitted(true); };
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState<{ score: number; passed: boolean } | null>(null);
 
@@ -775,6 +926,15 @@ export function AssignmentDetail() {
   } else if (subType === 'quiz') {
     submissionBody = JSON.stringify({ type: 'quiz', answers: quizAnswers, ...quizScore });
     canSubmit = quizSubmitted;
+  } else if (subType === 'order') {
+    submissionBody = JSON.stringify({ type: 'order', order: orderState, ...gameScore });
+    canSubmit = gameSubmitted;
+  } else if (subType === 'match') {
+    submissionBody = JSON.stringify({ type: 'match', matches: matchState, ...gameScore });
+    canSubmit = gameSubmitted;
+  } else if (subType === 'jeopardy') {
+    submissionBody = JSON.stringify({ type: 'jeopardy', answers: jeopardyState, ...gameScore });
+    canSubmit = gameSubmitted;
   } else {
     // essay, discussion, file_upload and any generic type: a typed/pasted response OR an
     // attached document both count. Requiring the text box blocked the learner who uploaded
@@ -789,6 +949,9 @@ export function AssignmentDetail() {
     reflection:  { icon: MessageCircle, label: 'Reflection',   color: 'text-violet-600' },
     case_study:  { icon: Layers,        label: 'Case Study',   color: 'text-amber-600' },
     quiz:        { icon: HelpCircle,    label: 'Quiz',         color: 'text-rose-600' },
+    order:       { icon: Layers,        label: 'Sequence Puzzle', color: 'text-cyan-600' },
+    match:       { icon: Layers,        label: 'Match-Up',     color: 'text-fuchsia-600' },
+    jeopardy:    { icon: Trophy,        label: 'Jeopardy',     color: 'text-indigo-600' },
     discussion:  { icon: MessageCircle, label: 'Discussion',   color: 'text-emerald-600' },
     file_upload: { icon: FileText,      label: 'File Upload',  color: 'text-slate-600' },
   };
@@ -1017,6 +1180,30 @@ export function AssignmentDetail() {
                   </>
                 )}
 
+                {/* ── Sequence puzzle ── */}
+                {subType === 'order' && (
+                  <>
+                    {config?.intro && <p className="text-sm text-muted-foreground leading-relaxed">{config.intro}</p>}
+                    <OrderGame items={config?.items ?? []} correctOrder={config?.order ?? []} submitted={gameSubmitted} onChange={setOrderState} onSubmit={onGameSubmit} />
+                  </>
+                )}
+
+                {/* ── Match-up ── */}
+                {subType === 'match' && (
+                  <>
+                    {config?.intro && <p className="text-sm text-muted-foreground leading-relaxed">{config.intro}</p>}
+                    <MatchGame pairs={config?.pairs ?? []} submitted={gameSubmitted} onChange={setMatchState} onSubmit={onGameSubmit} />
+                  </>
+                )}
+
+                {/* ── Jeopardy ── */}
+                {subType === 'jeopardy' && (
+                  <>
+                    {config?.intro && <p className="text-sm text-muted-foreground leading-relaxed">{config.intro}</p>}
+                    <JeopardyGame categories={config?.categories ?? []} submitted={gameSubmitted} onChange={setJeopardyState} onSubmit={onGameSubmit} />
+                  </>
+                )}
+
                 {/* ── Discussion ── */}
                 {subType === 'discussion' && (
                   <DiscussionForm value={essay} onChange={setEssay} />
@@ -1028,7 +1215,7 @@ export function AssignmentDetail() {
                 )}
 
                 {/* ── Essay (default) — type, paste, or attach a document ── */}
-                {(subType === 'essay' || !['reflection','case_study','quiz','discussion','file_upload'].includes(subType)) && (
+                {(subType === 'essay' || !['reflection','case_study','quiz','order','match','jeopardy','discussion','file_upload'].includes(subType)) && (
                   <WrittenSubmission value={essay} onChange={setEssay} file={upload} onFileChange={setUpload} minWords={assignment.minWords} />
                 )}
 
