@@ -1238,19 +1238,19 @@ export function ModuleViewer() {
         </span>
 
         <div className="flex items-center gap-2">
-          {currentBeat && !completedIds.has(currentBeat.id) && currentIndex === beats.length - 1 && (
-            <Button size="sm" variant="outline" onClick={markCurrentComplete} className="gap-1.5">
-              <CheckCircle className="h-4 w-4" /> Mark Complete
+          {currentIndex === beats.length - 1 ? (
+            <Button
+              size="sm"
+              onClick={() => { markCurrentComplete(); navigate(`/courses/${courseId}/modules/${moduleId}`); }}
+              className="gap-1.5"
+            >
+              <CheckCircle className="h-4 w-4" /> Finish
+            </Button>
+          ) : (
+            <Button size="sm" onClick={goNext} className="gap-1.5">
+              Next <ChevronRight className="h-4 w-4" />
             </Button>
           )}
-          <Button
-            size="sm"
-            onClick={goNext}
-            disabled={currentIndex === beats.length - 1}
-            className="gap-1.5"
-          >
-            Next <ChevronRight className="h-4 w-4" />
-          </Button>
         </div>
       </footer>
     </div>
@@ -1889,13 +1889,20 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
     } finally { setBusy(false); }
   };
 
-  // Inline reader for a parsed document.
+  // Inline reader for a parsed document, with next/previous navigation across the module's readings.
   if (readerId) {
+    const list = readings ?? [];
+    const idx = list.findIndex((r) => r.id === readerId);
+    const prevR = idx > 0 ? list[idx - 1] : null;
+    const nextR = idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null;
     return (
       <div className="space-y-3">
-        <Button variant="ghost" size="sm" onClick={() => setReaderId(null)} className="gap-1.5">
-          <ChevronLeft className="h-4 w-4" /> Back to readings
-        </Button>
+        <div className="flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => setReaderId(null)} className="gap-1.5">
+            <ChevronLeft className="h-4 w-4" /> Back to readings
+          </Button>
+          {idx >= 0 && <span className="text-xs text-muted-foreground">Reading {idx + 1} of {list.length}</span>}
+        </div>
         {readerLoading ? <Skeleton className="h-64" /> : (
           <article className="rounded-2xl border border-border bg-card shadow-sm px-6 sm:px-10 py-8 max-w-3xl mx-auto">
             <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{reader?.title}</h3>
@@ -1913,6 +1920,21 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
             )}
           </article>
         )}
+        {/* Navigate between readings without going back to the list each time. */}
+        <div className="flex items-center justify-between gap-3 max-w-3xl mx-auto pt-1">
+          <Button variant="outline" size="sm" disabled={!prevR} onClick={() => prevR && setReaderId(prevR.id)} className="gap-1.5">
+            <ChevronLeft className="h-4 w-4" /> Previous
+          </Button>
+          {nextR ? (
+            <Button size="sm" onClick={() => setReaderId(nextR.id)} className="gap-1.5">
+              Next reading <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => setReaderId(null)} className="gap-1.5">
+              Done <CheckCircle className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     );
   }
@@ -2397,7 +2419,7 @@ function ModuleHubView({
   return (
     <div className="min-h-screen bg-background">
       {/* Sticky top bar */}
-      <header className="border-b border-border bg-card/95 backdrop-blur sticky top-0 z-20">
+      <header className="border-b border-border bg-card sticky top-0 z-30 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-[68px] flex items-center gap-3">
           <Button
             variant="ghost"
@@ -2773,7 +2795,17 @@ function ModuleHubView({
         {/* CASE STUDIES */}
         {tab === 'cases' && (
           <div className="space-y-4">
-            <SectionHead title="Case studies" sub="Work through a real-world scenario with an AI coach who guides you with questions, not answers." />
+            <SectionHead title="Case studies" sub="Apply this module to a realistic business scenario with an AI coach who guides you with questions, not answers." />
+            <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-500/5 p-4 text-sm space-y-2">
+              <div className="font-semibold text-teal-800 dark:text-teal-300">How this works - read before you start</div>
+              <ol className="list-decimal pl-5 space-y-1 text-foreground/85">
+                <li><span className="font-medium">Read the scenario (the fact pattern) first.</span> When the case opens, read the context carefully before you answer - your reasoning should be grounded in those facts.</li>
+                <li><span className="font-medium">Then work through it as a conversation.</span> The coach asks questions rather than giving answers. Reply in your own words, think like an entrepreneur, and explain your reasoning.</li>
+                <li><span className="font-medium">Length:</span> plan for about 8 exchanges. A progress bar shows how many you have left, so you always know how close you are to the end.</li>
+                <li><span className="font-medium">How it ends:</span> when you reach the end of the exchanges (or you feel you have reasoned it through), press <span className="font-medium">Finish</span>. The coach then produces a written analysis of your thinking.</li>
+                <li><span className="font-medium">Your grade:</span> that end analysis is recorded against this case in your gradebook, so your coach can see how you did.</li>
+              </ol>
+            </div>
             {caseErr && (
               <div className="rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 p-3 text-sm">{caseErr}</div>
             )}

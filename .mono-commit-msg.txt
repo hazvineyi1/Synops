@@ -1,5 +1,5 @@
-Module polish: render reading markdown, linear nav, drop mastery block, open-able case studies (ASCII-only)
+Fix readings white screen: React.Fragment used as a value but React is only named-imported (ASCII-only)
 
-Five follow-up fixes to the built-out modules. (1) Readings now render Markdown properly (headings, bold, lists) via a new dependency-free MarkdownView instead of showing literal # and ** - and the reader is restyled as a clean, centred article. (2) Same change makes reading pages look professional. (3) The bottom Next button now walks strictly FORWARD, section by section, in order (Readings -> Complete -> Case studies -> ...), never jumping back. (4) Removed the Demonstrate-mastery block entirely (rail item, Complete-tab card, Structure row, and the mastery states in the nav) - completion just follows working through the sections. (5) Case studies now open: they were 404ing because the case was owned by the content org while learners sit in a different org - enzaEnrich now creates/repairs them as LIBRARY cases (organisationId null, isLibrary true, published), which the module's course-enrolment check gates; and the Case Studies tab is redesigned as a full card with a Start case study button (with error surfacing).
+The Readings reader crashed to a blank screen because MarkdownView rendered <React.Fragment>, but ModuleViewer imports React with named imports only (no default React value), so React.Fragment was undefined at runtime. Replaced it with a keyed <span>. Readings now render their Markdown as expected.
 
-VALIDATION: esbuild clean on enzaEnrich.ts, cases.ts, ModuleViewer.tsx.
+VALIDATION: esbuild clean on ModuleViewer.tsx; grep confirms no other React.<value> uses.

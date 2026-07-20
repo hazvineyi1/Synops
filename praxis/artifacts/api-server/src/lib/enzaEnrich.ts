@@ -3,7 +3,7 @@ import {
   partnersTable, organisationsTable, usersTable,
   coursesTable, modulesTable, beatsTable, moduleReadingsTable,
   caseScenariosTable, interactiveActivitiesTable, discussionsTable, assignmentsTable,
-  deliverySessionsTable, coursePartnerAssignmentsTable,
+  deliverySessionsTable, coursePartnerAssignmentsTable, gradebookItemsTable,
 } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
 
@@ -266,21 +266,31 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
         // than the content author, so an org-owned case 404s for them - a library case + the module's
         // course-enrolment check is the correct gate.
         const cases = await db.select().from(caseScenariosTable).where(eq(caseScenariosTable.moduleId, m.id));
+        let caseId: string | null = cases[0]?.id ?? null;
         if (cases.length === 0 && facultyId) {
           const s = scenarioFor(mod.id + "sc");
-          await db.insert(caseScenariosTable).values({
+          const [createdCase] = await db.insert(caseScenariosTable).values({
             organisationId: null, moduleId: m.id, createdBy: facultyId, createdByName: "Enza Faculty",
             title: `Case study: ${crs.title}`, learningObjective: mod.objectives[0] ?? mod.title,
             contextBlock: `${s.owner} runs ${s.biz} in ${s.place}, where ${s.detail}. ${s.owner} must get ${mod.title.toLowerCase()} right on a tight budget while serving customers every day.`,
             openingQuestion: "Where would you start, and why? Talk me through your thinking as an entrepreneur.",
             focusAreas: mod.objectives.slice(0, 3), difficulty: "foundational", status: "published", isLibrary: true, tags: crs.tags,
             guidingInstructions: `Coach through questions, not answers. Keep the learner focused on ${mod.title.toLowerCase()} and push for concrete, costed, actionable steps in a South African SMME context.`,
-          } as any);
+          } as any).returning();
+          caseId = createdCase?.id ?? null;
         } else if (cases.length > 0) {
           // Repair earlier cases so they are reachable by learners (library, published).
           await db.update(caseScenariosTable)
             .set({ organisationId: null, isLibrary: true, status: "published", updatedAt: new Date() })
             .where(eq(caseScenariosTable.moduleId, m.id));
+        }
+        // Connect the case to the gradebook, so the end-of-session analysis is recorded as a grade.
+        if (caseId) {
+          await db.insert(gradebookItemsTable).values({
+            courseId, sourceType: "case", sourceId: caseId,
+            title: `Case study: ${mod.title}`, category: "Case studies", itemType: "formative",
+            pointsPossible: "100", includeInGrade: true, position: mi, createdBy: facultyId,
+          } as any).onConflictDoNothing();
         }
 
         // Assignments: a module-level applied task.

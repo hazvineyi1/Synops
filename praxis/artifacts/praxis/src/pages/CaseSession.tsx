@@ -150,7 +150,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
           <TutorAvatar avatar={tutorAvatar} size={40} speaking={speaking && animate} ring />
           <div className="leading-tight min-w-0">
             <p className="text-sm font-medium truncate">{tutorName}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{speaking ? "speaking…" : "your Socratic coach"}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{speaking ? "speaking…" : "your case coach"}</p>
           </div>
         </div>
 
