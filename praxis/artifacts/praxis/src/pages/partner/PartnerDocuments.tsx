@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, API } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { cn } from '@/lib/utils';
 import {
   FileText, Upload, Receipt, FileSignature, Landmark, ShieldCheck, Folder,
-  Search, CheckCircle2, Clock, AlertTriangle, Trash2, Eye,
+  Search, CheckCircle2, Clock, AlertTriangle, Trash2, Eye, Download,
 } from 'lucide-react';
 import { getActivePartnerId } from '@/lib/partnerHubData';
 import { orgLabel, useOrgOverrides } from '@/lib/orgOverridesStore';
@@ -184,6 +184,8 @@ export function PartnerDocuments() {
                   <td className="p-3 text-right tabular-nums text-muted-foreground">{d.size ?? '—'}</td>
                   <td className="p-3 text-right whitespace-nowrap">
                     {d.templateKey && <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => setViewKey({ key: d.templateKey!, name: d.name })}><Eye className="h-3.5 w-3.5" /> View</Button>}
+                    {d.templateKey && <a href={`${API}/document-templates/${d.templateKey}/download?format=docx`} title="Download Word"><Button size="sm" variant="ghost" className="h-7 gap-1 text-xs"><Download className="h-3.5 w-3.5" /> Word</Button></a>}
+                    {d.templateKey && <a href={`${API}/document-templates/${d.templateKey}/download?format=pdf`} title="Download PDF"><Button size="sm" variant="ghost" className="h-7 gap-1 text-xs"><Download className="h-3.5 w-3.5" /> PDF</Button></a>}
                     <Button size="sm" variant="ghost" className="h-7 text-red-600" onClick={() => del.mutate(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </td>
                 </tr>

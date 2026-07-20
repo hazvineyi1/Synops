@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, API } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { FileText, Send, Eye, CheckCircle2, Users } from 'lucide-react';
+import { FileText, Send, Eye, CheckCircle2, Users, Download } from 'lucide-react';
 
 interface Template { key: string; title: string; docType: string }
 interface PartnerLite { id: string; name: string }
@@ -66,9 +66,15 @@ export function AdminDocumentTemplates() {
               </div>
               <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
             </div>
-            <div className="mt-auto flex gap-2">
-              <Button size="sm" variant="outline" className="gap-1.5 flex-1" onClick={() => setViewing(t)}><Eye className="h-3.5 w-3.5" /> View</Button>
-              <Button size="sm" className="gap-1.5 flex-1" onClick={() => openSend(t)}><Send className="h-3.5 w-3.5" /> Send</Button>
+            <div className="mt-auto space-y-2">
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="gap-1.5 flex-1" onClick={() => setViewing(t)}><Eye className="h-3.5 w-3.5" /> View</Button>
+                <Button size="sm" className="gap-1.5 flex-1" onClick={() => openSend(t)}><Send className="h-3.5 w-3.5" /> Send</Button>
+              </div>
+              <div className="flex gap-2">
+                <a href={`${API}/document-templates/${t.key}/download?format=docx`} className="flex-1"><Button size="sm" variant="ghost" className="gap-1.5 w-full text-xs"><Download className="h-3.5 w-3.5" /> Word</Button></a>
+                <a href={`${API}/document-templates/${t.key}/download?format=pdf`} className="flex-1"><Button size="sm" variant="ghost" className="gap-1.5 w-full text-xs"><Download className="h-3.5 w-3.5" /> PDF</Button></a>
+              </div>
             </div>
           </Card>
         ))}

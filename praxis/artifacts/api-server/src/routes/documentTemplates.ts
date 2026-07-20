@@ -5,6 +5,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { logAudit } from "../lib/audit";
 import templatesData from "../data/documentTemplates.json";
+import filesData from "../data/documentFiles.json";
 
 /**
  * Standard document library (Synops's letterhead legal pack). The templates live on the platform
@@ -40,6 +41,27 @@ router.get("/document-templates/:key", requireAuth, (req, res) => {
   const t = byKey(req.params.key);
   if (!t) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ key: t.key, title: t.title, docType: t.docType, contentHtml: t.contentHtml });
+});
+
+interface DocFile { docxName: string; pdfName: string; docx: string; pdf: string | null }
+const FILES = filesData as Record<string, DocFile>;
+
+// GET /document-templates/:key/download?format=docx|pdf — the real letterhead file (any authed user).
+router.get("/document-templates/:key/download", requireAuth, (req, res) => {
+  const f = FILES[req.params.key];
+  if (!f) { res.status(404).json({ error: "Not found" }); return; }
+  const fmt = req.query.format === "pdf" ? "pdf" : "docx";
+  const b64 = fmt === "pdf" ? f.pdf : f.docx;
+  if (!b64) { res.status(404).json({ error: "File not available" }); return; }
+  const name = fmt === "pdf" ? f.pdfName : f.docxName;
+  const mime = fmt === "pdf"
+    ? "application/pdf"
+    : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  const buf = Buffer.from(b64, "base64");
+  res.setHeader("Content-Type", mime);
+  res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+  res.setHeader("Content-Length", String(buf.length));
+  res.send(buf);
 });
 
 // POST /platform/document-templates/:key/send { partnerIds } — file this template into each partner's
