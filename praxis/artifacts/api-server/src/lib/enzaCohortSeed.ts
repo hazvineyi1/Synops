@@ -129,22 +129,25 @@ async function ensureTestLearners(partnerId: string, orgId: string): Promise<str
     }
   }
 
-  // PASS 2 - best-effort enrolments + progress. Cosmetic relative to login, so a hiccup here (e.g. a
-  // duplicate beat-progress row) must never undo the guaranteed accounts above.
-  try {
-    for (let i = 0; i < PERSONAS.length; i++) {
-      const p = PERSONAS[i];
-      const learnerId = learnerIds[i];
-      const hasEnrol = await db.select({ id: enrolmentsTable.id }).from(enrolmentsTable).where(eq(enrolmentsTable.userId, learnerId)).limit(1);
-      if (hasEnrol.length > 0 || courseIds.length === 0) continue;
-      const myCourses = courseIds.slice(0, p.courseCount);
-      for (let ci = 0; ci < myCourses.length; ci++) {
-        const courseId = myCourses[ci];
-        const completed = ci < p.completedCount;
+  // PASS 2 - enrolments + progress. Each insert is isolated so a hiccup on one (e.g. a beat-progress
+  // drift or duplicate) can never stop the OTHER enrolments - which is what makes a learner see courses.
+  for (let i = 0; i < PERSONAS.length; i++) {
+    const p = PERSONAS[i];
+    const learnerId = learnerIds[i];
+    let already = 0;
+    try { already = (await db.select({ id: enrolmentsTable.id }).from(enrolmentsTable).where(eq(enrolmentsTable.userId, learnerId))).length; } catch { /* ignore */ }
+    if (already > 0 || courseIds.length === 0) continue;
+    const myCourses = courseIds.slice(0, p.courseCount);
+    for (let ci = 0; ci < myCourses.length; ci++) {
+      const courseId = myCourses[ci];
+      const completed = ci < p.completedCount;
+      try {
         await db.insert(enrolmentsTable).values({
           userId: learnerId, courseId, status: completed ? "completed" : "active",
           enrolledAt: daysAgo(45 - ci * 3), completedAt: completed ? daysAgo(7 + ci * 5) : null,
         });
+      } catch { /* one enrolment failing must not block the rest */ }
+      try {
         const beats = courseBeats[courseId] ?? [];
         const frac = completed ? 1 : p.progress;
         const viewCount = Math.max(p.key === "novice" ? 1 : 0, Math.ceil(beats.length * frac));
@@ -154,9 +157,9 @@ async function ensureTestLearners(partnerId: string, orgId: string): Promise<str
           firstViewedAt: daysAgo(40 - ci * 4), lastViewedAt: daysAgo(Math.max(1, 28 - ci * 4)),
         }));
         if (rows.length > 0) await db.insert(beatProgressTable).values(rows).onConflictDoNothing();
-      }
+      } catch { /* progress is cosmetic */ }
     }
-  } catch { /* accounts are already guaranteed; progress is non-essential */ }
+  }
 
   return emails;
 }
@@ -166,20 +169,24 @@ async function ensureTestLearners(partnerId: string, orgId: string): Promise<str
  * active + unique. Returns a human-readable verification the endpoint surfaces, so a login failure can
  * be diagnosed from the seed's own response instead of guesswork.
  */
-async function verifyTestLearners(): Promise<{ ok: number; total: number; detail: string }> {
+async function verifyTestLearners(partnerId: string): Promise<{ ok: number; total: number; assigned: number; detail: string }> {
+  let assigned = 0;
+  try { assigned = (await db.select().from(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.partnerId, partnerId))).length; } catch { /* ignore */ }
   const parts: string[] = [];
   let ok = 0;
   for (let i = 0; i < PERSONAS.length; i++) {
     const email = learnerTestEmail(i + 1);
     const rows = await db.select().from(usersTable).where(eq(usersTable.email, email));
     if (rows.length === 0) { parts.push(`${email}: MISSING`); continue; }
-    if (rows.length > 1) { parts.push(`${email}: ${rows.length} duplicates`); }
     const u = rows[0];
     const pwOk = verifyPassword(LEARNER_TEST_PASSWORD, u.passwordHash);
-    if (pwOk && u.status === "active") { ok++; if (rows.length === 1) parts.push(`${email}: OK`); }
-    else parts.push(`${email}: ${!pwOk ? "bad-password" : u.status}`);
+    let courses = 0;
+    try { courses = (await db.select({ id: enrolmentsTable.id }).from(enrolmentsTable).where(eq(enrolmentsTable.userId, u.id))).length; } catch { /* ignore */ }
+    const dup = rows.length > 1 ? ` (${rows.length} dupes)` : "";
+    if (pwOk && u.status === "active") { ok++; parts.push(`${email}: OK ${courses}c${dup}`); }
+    else parts.push(`${email}: ${!pwOk ? "bad-password" : u.status} ${courses}c${dup}`);
   }
-  return { ok, total: PERSONAS.length, detail: parts.join("; ") };
+  return { ok, total: PERSONAS.length, assigned, detail: parts.join("; ") };
 }
 
 // People in the cohort. Learner emails use their own micro-business domains for realism.
@@ -267,8 +274,8 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
   );
   if (existingOrg) {
     const emails = await ensureTestLearners(partner.id, existingOrg.id);
-    const v = await verifyTestLearners();
-    return { created: false, orgId: existingOrg.id, learners: emails.length, message: `Logins ${v.ok}/${v.total} verified with password ${LEARNER_TEST_PASSWORD}. ${v.detail}` };
+    const v = await verifyTestLearners(partner.id);
+    return { created: false, orgId: existingOrg.id, learners: emails.length, message: `Logins ${v.ok}/${v.total} verified (password ${LEARNER_TEST_PASSWORD}). Enza has ${v.assigned} courses assigned. ${v.detail}` };
   }
 
   // 1. Organisation (the delivery tenant) + its cohort class
@@ -451,9 +458,9 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
 
   // 9. Standardise learner test logins (enza@student1.test .. , shared password) + heal any gaps.
   const emails = await ensureTestLearners(partner.id, org.id);
-  const v = await verifyTestLearners();
+  const v = await verifyTestLearners(partner.id);
 
-  return { created: true, orgId: org.id, learners: emails.length, message: `Cohort seeded. Logins ${v.ok}/${v.total} verified with password ${LEARNER_TEST_PASSWORD}. ${v.detail}` };
+  return { created: true, orgId: org.id, learners: emails.length, message: `Cohort seeded. Logins ${v.ok}/${v.total} verified (password ${LEARNER_TEST_PASSWORD}). Enza has ${v.assigned} courses assigned. ${v.detail}` };
 }
 
 function feedbackFor(level: Persona["key"], score: number): string {
