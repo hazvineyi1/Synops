@@ -49,6 +49,7 @@ import documentsRouter from "./documents";
 import partnerCommsRouter from "./partnerComms";
 import delegatedAdminsRouter from "./delegatedAdmins";
 import classesRouter from "./classes";
+import enrolRouter from "./enrol";
 import documentTemplatesRouter from "./documentTemplates";
 import devRouter, { devRoutesEnabled } from "./dev";
 
@@ -104,6 +105,7 @@ router.use(documentsRouter);
 router.use(partnerCommsRouter);
 router.use(delegatedAdminsRouter);
 router.use(classesRouter);
+router.use(enrolRouter);
 router.use(documentTemplatesRouter);
 // Defense in depth: the dev router is not even mounted unless explicitly enabled (see routes/dev.ts).
 if (devRoutesEnabled) router.use(devRouter);

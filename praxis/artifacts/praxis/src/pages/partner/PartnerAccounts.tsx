@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   Users, Check, X, Send, ShieldCheck, KeyRound, LifeBuoy, Ban, RotateCcw,
-  Clock, Settings2, UserPlus, CheckCircle2, Info,
+  Clock, Settings2, UserPlus, CheckCircle2, Info, Eye,
 } from 'lucide-react';
 import { getActivePartnerId, DELEGATABLE_POWERS, type Invite } from '@/lib/partnerHubData';
 
@@ -73,12 +73,16 @@ export function PartnerAccounts() {
 
   // Real organisations for the invite / delegate dropdowns.
   const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
-  const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
+  // A super admin has no partnerId of their own, so the backend already returns every org they may
+  // administer; only a partner-scoped admin needs the extra client-side narrowing. (This was the bug
+  // that left the invite dropdown empty for super admins.)
+  const orgs = isSuper ? (orgsData ?? []) : (orgsData ?? []).filter((o) => o.partnerId === partnerId);
 
   const [invites, setInvites] = useState<Invite[]>([]);
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'coach' | 'org_admin'>('coach');
-  const [org, setOrg] = useState('');
+  const [role, setRole] = useState<'coach' | 'org_admin' | 'learner'>('coach');
+  const [org, setOrg] = useState(''); // holds the organisation ID
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   // Account detail drawer
   const [selected, setSelected] = useState<Member | null>(null);
@@ -95,6 +99,12 @@ export function PartnerAccounts() {
     mutationFn: (id: string) => apiFetch<{ emailed?: boolean; link?: string }>(`/platform/users/${id}/reset-link`, { method: 'POST' }),
     onSuccess: (r) => flashMsg(r.emailed ? 'Password-reset link emailed.' : 'Password-reset link created (copy from Platform Console).'),
     onError: () => flashMsg('Could not create a reset link.'),
+  });
+  // Real "View as" - become the account for a short session and land in their own view of the app.
+  const impersonateM = useMutation({
+    mutationFn: (id: string) => apiFetch(`/partners/${partnerId ?? 'platform'}/impersonate/${id}`, { method: 'POST' }),
+    onSuccess: () => { window.location.href = '/'; },
+    onError: (e: any) => flashMsg(e?.message ?? 'Could not start the session.'),
   });
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3500); };
@@ -114,11 +124,27 @@ export function PartnerAccounts() {
   });
   const revokeDelegateM = useMutation({ mutationFn: (id: string) => apiFetch(`/partners/${partnerId}/delegated-admins/${id}`, { method: 'DELETE' }), onSuccess: invalidateDelegates });
 
-  const sendInvite = () => {
-    if (!email.trim()) return;
-    setInvites((xs) => [{ id: Math.random().toString(36).slice(2), email: email.trim(), role, orgName: org, sentAt: new Date().toISOString().slice(0, 10) }, ...xs]);
-    setEmail('');
-  };
+  // Real provisioning: creates the account (invited) and returns a one-time set-password link.
+  const inviteM = useMutation({
+    mutationFn: () => {
+      const selOrg = orgs.find((o) => o.id === org);
+      const pid = selOrg?.partnerId ?? partnerId;
+      return apiFetch<{ email: string; role: string; link: string; emailed: boolean }>(`/partners/${pid}/members`, {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim(), role, organisationId: org }),
+      });
+    },
+    onSuccess: (r) => {
+      const selOrg = orgs.find((o) => o.id === org);
+      setInvites((xs) => [{ id: Math.random().toString(36).slice(2), email: r.email, role: r.role, orgName: selOrg?.name ?? '', sentAt: new Date().toISOString().slice(0, 10) }, ...xs]);
+      setInviteLink(r.link);
+      qc.invalidateQueries({ queryKey: ['partner-members', partnerId] });
+      flashMsg(r.emailed ? 'Invite emailed with a set-password link.' : 'Account created. Copy the set-password link below to share it.');
+      setEmail('');
+    },
+    onError: (e: any) => flashMsg(e?.message ?? 'Could not create the account.'),
+  });
+  const sendInvite = () => { if (!email.trim() || !org) return; setInviteLink(null); inviteM.mutate(); };
   const togglePower = (key: string) => setDPowers((xs) => (xs.includes(key) ? xs.filter((k) => k !== key) : [...xs, key]));
   const addDelegate = () => {
     if (!dName.trim() || !dEmail.trim() || dPowers.length === 0) return;
@@ -267,7 +293,7 @@ export function PartnerAccounts() {
         {/* Create & Invite */}
         <TabsContent value="invite" className="mt-4">
           <Card className="p-5 max-w-xl space-y-3">
-            <div className="text-sm text-muted-foreground">A Partner may provision the tiers below it - Coach and Org-admin accounts. Learner accounts are created by Organisations.</div>
+            <div className="text-sm text-muted-foreground">A Partner may provision the tiers below it - Coach, Org-admin and Learner accounts, each scoped to one organisation. (Learners can also self-enrol via a cohort link - see a cohort's Share link.)</div>
             <div>
               <label className="text-xs font-medium text-muted-foreground">Email</label>
               <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.co.za" className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
@@ -278,17 +304,27 @@ export function PartnerAccounts() {
                 <select value={role} onChange={(e) => setRole(e.target.value as any)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
                   <option value="coach">Coach</option>
                   <option value="org_admin">Org-admin</option>
+                  <option value="learner">Learner</option>
                 </select>
               </div>
               <div>
                 <label className="text-xs font-medium text-muted-foreground">Organisation</label>
                 <select value={org} onChange={(e) => setOrg(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
                   <option value="">Select organisation…</option>
-                  {orgs.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+                  {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                 </select>
               </div>
             </div>
-            <Button onClick={sendInvite} disabled={!email.trim()} className="gap-1.5"><Send className="h-4 w-4" /> Send invite</Button>
+            <Button onClick={sendInvite} disabled={!email.trim() || !org || inviteM.isPending} className="gap-1.5"><Send className="h-4 w-4" /> {inviteM.isPending ? 'Creating…' : 'Send invite'}</Button>
+            {inviteLink && (
+              <div className="rounded-md border border-primary/30 bg-primary/5 p-3 text-xs space-y-1.5">
+                <div className="font-medium text-foreground">Set-password link (share with the invitee):</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 truncate rounded bg-background px-2 py-1 border">{inviteLink}</code>
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => { navigator.clipboard?.writeText(inviteLink); flashMsg('Link copied.'); }}>Copy</Button>
+                </div>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">The invitee receives a set-password link; the account is inactive until they accept. All invites are written to the Partner Activity Audit Log.</p>
           </Card>
         </TabsContent>
@@ -400,6 +436,13 @@ export function PartnerAccounts() {
                   <div className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
                     <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Password resets and suspend/reactivate are performed by the platform team. Status: <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>
                   </div>
+                )}
+
+                {/* Real "View as" impersonation - see and navigate the app exactly as this account. */}
+                {selected.role !== 'partner_admin' && selected.role !== 'super_admin' && (
+                  <Button variant="outline" className="w-full gap-2 justify-start border-primary/40 text-primary" disabled={impersonateM.isPending} onClick={() => impersonateM.mutate(selected.id)}>
+                    <Eye className="h-4 w-4" /> {impersonateM.isPending ? 'Opening…' : `View as ${selected.name.split(' ')[0]} (open their courses)`}
+                  </Button>
                 )}
 
                 {/* Login activity — real sign-in trail (super admin) */}

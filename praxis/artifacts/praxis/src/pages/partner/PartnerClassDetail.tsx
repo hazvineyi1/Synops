@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Users, GraduationCap, BookOpen, Check, Pencil, Layers, Search, Trash2,
-  CheckCircle2, UserCheck, ArrowRight,
+  CheckCircle2, UserCheck, ArrowRight, Share2, Copy, MessageCircle,
 } from 'lucide-react';
 
 interface ClassDetail { id: string; orgId: string; name: string; learnerIds: string[]; courseIds: string[]; staff: { staffId: string; role: string }[] }
@@ -60,6 +60,8 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
   const saveCourses = useMutation({ mutationFn: () => apiFetch(`/classes/${classId}/courses`, { method: 'PUT', body: JSON.stringify({ courseIds: [...selCourses] }) }), onSuccess: () => { invalidate(); flashMsg('Courses saved.'); } });
   const saveStaff = useMutation({ mutationFn: () => apiFetch(`/classes/${classId}/staff`, { method: 'PUT', body: JSON.stringify({ staff: [...selStaff].map((k) => { const [staffId, role] = k.split('::'); return { staffId, role }; }) }) }), onSuccess: () => { invalidate(); flashMsg('Staff saved.'); } });
   const enrol = useMutation({ mutationFn: () => apiFetch<{ enrolled: number; message?: string }>(`/classes/${classId}/enrol`, { method: 'POST' }), onSuccess: (r) => flashMsg(r.message ? r.message : `Enrolled ${r.enrolled} learner-course place${r.enrolled === 1 ? '' : 's'}.`) });
+  const [joinUrl, setJoinUrl] = useState<string | null>(null);
+  const joinLink = useMutation({ mutationFn: () => apiFetch<{ code: string; url: string }>(`/classes/${classId}/join-link`, { method: 'POST' }), onSuccess: (r) => { setJoinUrl(r.url); flashMsg('Self-enrol link ready to share.'); }, onError: () => flashMsg('Could not create the link.') });
   const del = useMutation({ mutationFn: () => apiFetch(`/classes/${classId}`, { method: 'DELETE' }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['org-classes', orgId] }); navigate(`/partner/org/${orgId}/classes`); } });
 
   const [editingName, setEditingName] = useState(false);
@@ -106,12 +108,29 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
           <p className="text-sm text-muted-foreground mt-1">{cls.learnerIds.length} learners · {cls.staff.length} staff · {cls.courseIds.length} courses</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={joinLink.isPending} onClick={() => joinLink.mutate()} title="Create a link learners can open to self-enrol into this cohort">
+            <Share2 className="h-3.5 w-3.5" /> {joinLink.isPending ? 'Preparing…' : 'Share join link'}
+          </Button>
           <Button size="sm" variant="outline" className="gap-1.5" disabled={enrol.isPending || cls.learnerIds.length === 0 || cls.courseIds.length === 0} onClick={() => enrol.mutate()} title="Create real enrolments for every learner in every assigned course">
             <UserCheck className="h-3.5 w-3.5" /> {enrol.isPending ? 'Enrolling…' : 'Enrol into courses'}
           </Button>
           <Button size="sm" variant="ghost" className="gap-1.5 text-red-600" onClick={() => { if (window.confirm(`Delete the class "${cls.name}"? This does not remove learners or courses, only the class grouping.`)) del.mutate(); }}><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
         </div>
       </div>
+
+      {joinUrl && (
+        <Card className="p-4 border-primary/30 bg-primary/5">
+          <div className="flex items-center gap-2 text-sm font-semibold"><Share2 className="h-4 w-4 text-primary" /> Self-enrol link for this cohort</div>
+          <p className="mt-1 text-xs text-muted-foreground">Share this on WhatsApp. Anyone who opens it can register and is enrolled straight into this cohort's courses.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <code className="flex-1 min-w-[220px] truncate rounded bg-background px-2 py-1.5 border text-xs">{joinUrl}</code>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { navigator.clipboard?.writeText(joinUrl); flashMsg('Link copied.'); }}><Copy className="h-3.5 w-3.5" /> Copy</Button>
+            <a href={`https://wa.me/?text=${encodeURIComponent(`Join our programme "${cls.name}" on Synops Praxis: ${joinUrl}`)}`} target="_blank" rel="noreferrer">
+              <Button size="sm" className="gap-1.5 bg-[#25D366] hover:bg-[#1eb457] text-white"><MessageCircle className="h-3.5 w-3.5" /> Share on WhatsApp</Button>
+            </a>
+          </div>
+        </Card>
+      )}
 
       {flash && <Card className="p-3 border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> {flash}</Card>}
 

@@ -731,6 +731,83 @@ router.post("/platform/seed-enza", requireAuth, requireSuperAdmin, async (req, r
 });
 
 /**
+ * POST /partners/:partnerId/members - a Partner (or super admin) provisions an account in one of its
+ * organisations: a coach, an org admin, or a learner. Creates the user as "invited" and returns a
+ * one-time set-password link (also emailed if mail is configured) so the Partner can hand it over or
+ * share it. Delegated admins keep their own endpoint (/partners/:id/delegated-admins).
+ */
+const PARTNER_ASSIGNABLE_ROLES = ["coach", "org_admin", "learner"];
+router.post("/partners/:partnerId/members", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const { partnerId } = req.params;
+  const isSuper = actor.role === "super_admin";
+  const isPartnerAdmin = actor.role === "partner_admin" && actor.partnerId === partnerId;
+  if (!isSuper && !isPartnerAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  const email = String(req.body?.email ?? "").toLowerCase().trim();
+  const role = String(req.body?.role ?? "");
+  const organisationId = req.body?.organisationId ? String(req.body.organisationId) : null;
+  const firstName = (req.body?.firstName ?? "").trim() || null;
+  const lastName = (req.body?.lastName ?? "").trim() || null;
+
+  if (!email || !email.includes("@")) { res.status(400).json({ error: "A valid email is required." }); return; }
+  if (!PARTNER_ASSIGNABLE_ROLES.includes(role)) { res.status(400).json({ error: "Role must be coach, org_admin or learner." }); return; }
+  if (!organisationId) { res.status(400).json({ error: "Select an organisation for this account." }); return; }
+
+  const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, organisationId) });
+  if (!org || org.partnerId !== partnerId) { res.status(400).json({ error: "That organisation does not belong to this partner." }); return; }
+
+  const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  if (existing.length) { res.status(409).json({ error: "A user with that email already exists." }); return; }
+
+  const [created] = await db.insert(usersTable).values({
+    email, firstName, lastName, role: role as any, status: "invited", partnerId, organisationId,
+  }).returning();
+
+  const token = newSessionToken();
+  const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+  await db.insert(passwordResetsTable).values({ userId: created.id, tokenHash: sha256(token), issuedBy: "admin", issuedByUserId: actor.id, expiresAt });
+  await audit(req, "partner.member_create", "user", created.id, { email, role, organisationId, partnerId });
+
+  const link = `${appBase(req)}/reset-password?token=${token}`;
+  const emailed = emailEnabled() ? (await sendSetPasswordEmail(email, firstName, link, "invite")).ok : false;
+  res.status(201).json({ id: created.id, email, role, status: "invited", link, expiresAt, emailed });
+});
+
+/**
+ * POST /partners/:partnerId/impersonate/:userId - real "View as learner". A Partner admin (scoped to
+ * its own accounts) or a super admin becomes the target user for a short-lived session, so they see
+ * and navigate the app exactly as that learner does. Mirrors /platform/users/:id/impersonate but is
+ * available to partner_admin for users inside their own partner.
+ */
+router.post("/partners/:partnerId/impersonate/:userId", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const { partnerId, userId } = req.params;
+  const isSuper = actor.role === "super_admin";
+  const isPartnerAdmin = actor.role === "partner_admin" && actor.partnerId === partnerId;
+  if (!isSuper && !isPartnerAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (userId === req.userId) { res.status(400).json({ error: "You are already yourself." }); return; }
+
+  const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!target) { res.status(404).json({ error: "User not found" }); return; }
+  if (!isSuper && target.partnerId !== partnerId) { res.status(403).json({ error: "You can only view accounts inside your own partner." }); return; }
+
+  const adminToken = req.cookies?.[SESSION_COOKIE];
+  const token = newSessionToken();
+  await db.insert(authSessionsTable).values({
+    token, userId: target.id, impersonatorId: req.userId!,
+    ipAddress: clientIp(req as any), userAgent: (req.headers["user-agent"] as string) ?? null,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  });
+  await db.insert(loginEventsTable).values({ userId: target.id, email: target.email, outcome: "impersonated", ipAddress: clientIp(req as any), impersonatorId: req.userId! });
+  await audit(req, "user.impersonate", "user", target.id, { email: target.email, via: "partner" });
+
+  if (adminToken) res.cookie(IMPERSONATOR_COOKIE, adminToken, cookieOptions(60 * 60 * 1000));
+  res.cookie(SESSION_COOKIE, token, cookieOptions(60 * 60 * 1000));
+  res.json({ ok: true, impersonating: { id: target.id, email: target.email } });
+});
+
+/**
  * POST /platform/seed-enza-cohort - seeds a realistic delivery organisation under the Enza partner:
  * a cohort of four township/rural SMME learners at four distinct levels of understanding, an org
  * admin and a coach, enrolments into Enza's assigned courses, and progress / grades / coaching data.

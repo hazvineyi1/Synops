@@ -39,6 +39,7 @@ import { SignInPage } from '@/pages/SignIn';
 import { RequestAccess } from '@/pages/RequestAccess';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
+import { JoinCohort } from '@/pages/JoinCohort';
 import { PlatformConsole } from '@/pages/PlatformConsole';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
@@ -183,6 +184,7 @@ function Routes() {
         <PublicRoute path="/dev-login" component={DevLogin} />
 
         {/* Public */}
+        <PublicRoute path="/join/:code" component={JoinCohort} />
         <PublicRoute path="/verify/:credentialId" component={Verify} />
         <PublicRoute path="/c/:token" component={CaseEmbed} />
         <PublicRoute path="/a/:token" component={ActivityEmbed} />
