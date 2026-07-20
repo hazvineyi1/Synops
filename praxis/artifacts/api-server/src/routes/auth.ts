@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   usersTable,
+  organisationsTable,
   authSessionsTable,
   passwordResetsTable,
   loginEventsTable,
@@ -123,9 +124,37 @@ router.post("/auth/logout", async (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * Heal a facilitator-tier account that is missing its partnerId. A partner_admin/org_admin
+ * created through some provisioning paths ended up with organisationId set but partnerId
+ * null. The dashboard keys the partner-stats query off partnerId, and the generated hook
+ * DISABLES the query when partnerId is null/undefined — so the Overview hung on an infinite
+ * loading skeleton. Backfill partnerId from the owning organisation (and persist it so the
+ * repair is permanent), then the query enables and real numbers render.
+ */
+async function healPartnerId(u: typeof usersTable.$inferSelect): Promise<typeof usersTable.$inferSelect> {
+  if (u.partnerId || !u.organisationId) return u;
+  if (u.role !== "partner_admin" && u.role !== "org_admin" && u.role !== "coach") return u;
+  try {
+    const [org] = await db
+      .select({ partnerId: organisationsTable.partnerId })
+      .from(organisationsTable)
+      .where(eq(organisationsTable.id, u.organisationId))
+      .limit(1);
+    if (org?.partnerId) {
+      await db.update(usersTable).set({ partnerId: org.partnerId }).where(eq(usersTable.id, u.id));
+      return { ...u, partnerId: org.partnerId };
+    }
+  } catch {
+    /* best-effort; fall through to the un-healed user */
+  }
+  return u;
+}
+
 /** GET /auth/me */
 router.get("/auth/me", requireAuth, async (req, res) => {
-  res.json({ user: publicUser(req.dbUser!, req.impersonatorId) });
+  const healed = await healPartnerId(req.dbUser!);
+  res.json({ user: publicUser(healed, req.impersonatorId) });
 });
 
 /**

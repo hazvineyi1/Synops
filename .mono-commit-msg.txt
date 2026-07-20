@@ -1,5 +1,5 @@
-Fix notification 404: assignment notifications linked to a non-existent route (ASCII-only)
+Resync Learner Progress: re-point demo learners at current content, fix off-track + notifications (ASCII-only)
 
-A graded-assignment notification linked to /assignments/:id, but the only route was /courses/:courseId/assignments/:id - so clicking it 404'd. Fixed the notification link in applyGrade to include the course id, and added a fallback route /assignments/:assignmentId that resolves the course from the assignment itself (so older notifications with the bare link also work). AssignmentDetail now derives courseId from the route OR the loaded assignment.
+Rebuilding courses (Build Full Courses) gives beats new IDs, which orphaned the seeded learners' progress - so completion read artificially low and an advanced learner could be wrongly flagged as falling behind. New resyncEnzaProgress() + POST /platform/resync-enza-progress (super admin) wipes each demo learner's stale beat progress, rebuilds it against today's beats at their persona level (advanced ~92pct, on-track ~58pct, at-risk ~30pct, novice ~8pct), recomputes their gradebook off-track alert so the coach reflects reality, and clears stale system notifications. Partner Management gains a Resync Learner Progress button.
 
-VALIDATION: esbuild clean on assignments.ts, AssignmentDetail.tsx, App.tsx.
+VALIDATION: esbuild clean on enzaCohortSeed.ts, platform.ts, AdminPartners.tsx.

@@ -31,7 +31,7 @@ export function Dashboard() {
       </div>
 
       {user.role === 'super_admin' && <SuperAdminDashboard />}
-      {user.role === 'partner_admin' && <PartnerAdminDashboard partnerId={user.partnerId!} />}
+      {user.role === 'partner_admin' && <PartnerAdminDashboard partnerId={user.partnerId ?? undefined} />}
       {user.role === 'org_admin' && <OrgAdminDashboard />}
       {user.role === 'coach' && <CoachDashboard />}
       {user.role === 'instructional_designer' && <InstructionalDesignerDashboard />}
@@ -84,19 +84,30 @@ function SuperAdminDashboard() {
   );
 }
 
-function PartnerAdminDashboard({ partnerId }: { partnerId: string }) {
-  const { data: stats } = useGetPartnerStats(partnerId);
-  const { data: orgs } = useListOrganisations();
+function PartnerAdminDashboard({ partnerId }: { partnerId?: string }) {
+  // NOTE: the generated hook disables the query when partnerId is null/undefined, so
+  // `statsLoading` is only ever true while an ENABLED query is genuinely fetching. Never
+  // gate the whole page on `!stats` — a disabled/errored query would hang the skeleton
+  // forever (that was the infinite-loading Overview bug). Fall back to the orgs list.
+  const { data: stats, isLoading: statsLoading } = useGetPartnerStats(partnerId as string);
+  const { data: orgs, isLoading: orgsLoading } = useListOrganisations();
 
-  if (!stats) return <LoadingSkeleton />;
+  if ((partnerId && statsLoading) || orgsLoading) return <LoadingSkeleton />;
+
+  const s = stats ?? {
+    orgCount: orgs?.length ?? 0,
+    totalLearners: 0,
+    activeEnrolments: 0,
+    completionRate: 0,
+  };
 
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Organisations" value={stats.orgCount} icon={Building} />
-        <StatCard title="Total Learners" value={stats.totalLearners} icon={Users} />
-        <StatCard title="Active Enrolments" value={stats.activeEnrolments} icon={BookOpen} />
-        <StatCard title="Completion Rate" value={`${(stats.completionRate * 100).toFixed(0)}%`} icon={TrendingUp} />
+        <StatCard title="Organisations" value={s.orgCount} icon={Building} />
+        <StatCard title="Total Learners" value={s.totalLearners} icon={Users} />
+        <StatCard title="Active Enrolments" value={s.activeEnrolments} icon={BookOpen} />
+        <StatCard title="Completion Rate" value={`${(s.completionRate * 100).toFixed(0)}%`} icon={TrendingUp} />
       </div>
 
       <Card>
@@ -125,17 +136,18 @@ function PartnerAdminDashboard({ partnerId }: { partnerId: string }) {
 }
 
 function OrgAdminDashboard() {
-  // Assuming useGetOrgStats would be used if available, fallback to analytics overview for mockup
-  const { data: analytics } = useGetAnalyticsOverview();
-  
-  if (!analytics) return <LoadingSkeleton />;
+  const { data: analytics, isLoading } = useGetAnalyticsOverview();
+
+  if (isLoading) return <LoadingSkeleton />;
+
+  const a = analytics ?? { totalLearners: 0, activeEnrolments: 0, credentialsIssued: 0 };
 
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Team Members" value={analytics.totalLearners} icon={Users} />
-        <StatCard title="Active Training" value={analytics.activeEnrolments} icon={BookOpen} />
-        <StatCard title="Credentials Earned" value={analytics.credentialsIssued} icon={Award} />
+        <StatCard title="Team Members" value={a.totalLearners} icon={Users} />
+        <StatCard title="Active Training" value={a.activeEnrolments} icon={BookOpen} />
+        <StatCard title="Credentials Earned" value={a.credentialsIssued} icon={Award} />
       </div>
 
       {/* Workforce diagnostics would go here */}
