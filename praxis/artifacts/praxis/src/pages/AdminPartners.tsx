@@ -477,6 +477,9 @@ export function AdminPartners() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <a href={`/p/${partner.slug}`} target="_blank" rel="noreferrer">
+                          <Button variant="outline" size="sm" className="gap-1.5"><Building className="h-3.5 w-3.5" />Landing</Button>
+                        </a>
                         <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSelectedPartner(partner)}><Palette className="h-3.5 w-3.5" />Configure</Button>
                         <Button variant="ghost" size="sm" className="gap-1.5 text-red-600 hover:text-red-700" disabled={deletePartner.isPending}
                           onClick={() => { if (window.confirm(`Delete partner "${partner.name}" and ALL its organisations, learners, courses and data? This cannot be undone.`)) deletePartner.mutate(partner.id); }}>

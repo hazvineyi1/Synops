@@ -40,6 +40,7 @@ import { RequestAccess } from '@/pages/RequestAccess';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
 import { JoinCohort } from '@/pages/JoinCohort';
+import { PartnerLanding } from '@/pages/PartnerLanding';
 import { PlatformConsole } from '@/pages/PlatformConsole';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
@@ -185,6 +186,7 @@ function Routes() {
 
         {/* Public */}
         <PublicRoute path="/join/:code" component={JoinCohort} />
+        <PublicRoute path="/p/:slug" component={PartnerLanding} />
         <PublicRoute path="/verify/:credentialId" component={Verify} />
         <PublicRoute path="/c/:token" component={CaseEmbed} />
         <PublicRoute path="/a/:token" component={ActivityEmbed} />
