@@ -21,12 +21,14 @@ const ENZA_SLUG = "enza-global";
 // Brand palette from enzaglobalmedia.co.za (signature lime + olive + rust on near-black; Heebo).
 const BRAND = {
   displayName: "Enza Global Media",
-  primaryColor: "#111111",
-  secondaryColor: "#9CDF00",
-  accentColor: "#D8613C",
+  primaryColor: "#111111",   // near-black (headers/buttons; carries white text)
+  secondaryColor: "#9CDF00", // signature lime green
+  accentColor: "#D8613C",    // warm rust accent
   fontFamily: "Heebo, system-ui, sans-serif",
   credentialTitle: "Enza Global Certificate",
   emailSenderName: "Enza Global Media",
+  logoUrl: "https://enzaglobalmedia.co.za/wp-content/uploads/2025/09/cropped-logo-300x235-1.jpg",
+  faviconUrl: "https://enzaglobalmedia.co.za/wp-content/uploads/2025/09/cropped-fav-enza-270x270.jpg",
 };
 
 interface SeedModule { title: string; objectives: string[]; minutes: number }
@@ -346,10 +348,36 @@ const COURSES: SeedCourse[] = [
 
 async function firstOrNull<T>(rows: T[]): Promise<T | null> { return rows.length ? rows[0] : null; }
 
+// Upsert the Enza brand theme (logo, favicon, colours, font) for the partner tenant. Safe to re-run.
+async function applyBrand(partnerId: string): Promise<void> {
+  const fields = {
+    displayName: BRAND.displayName,
+    primaryColor: BRAND.primaryColor,
+    secondaryColor: BRAND.secondaryColor,
+    accentColor: BRAND.accentColor,
+    logoUrl: BRAND.logoUrl,
+    faviconUrl: BRAND.faviconUrl,
+    fontFamily: BRAND.fontFamily,
+    credentialTitle: BRAND.credentialTitle,
+    emailSenderName: BRAND.emailSenderName,
+    updatedAt: new Date(),
+  };
+  const current = await firstOrNull(await db.select().from(brandThemesTable).where(eq(brandThemesTable.tenantId, partnerId)));
+  if (current) {
+    await db.update(brandThemesTable).set(fields).where(eq(brandThemesTable.tenantId, partnerId));
+  } else {
+    await db.insert(brandThemesTable).values({ ...fields, tenantId: partnerId, tenantType: "partner" });
+  }
+}
+
 export async function seedEnza(): Promise<{ created: boolean; partnerId?: string; courses?: number; message?: string }> {
-  // Idempotent: skip if the partner already exists.
+  // Idempotent: if the partner already exists, don't re-create courses, but DO (re)apply the
+  // full brand kit (logo, favicon, colours) so branding stays in sync with the website.
   const existing = await firstOrNull(await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_SLUG)));
-  if (existing) return { created: false, partnerId: existing.id, message: "Enza partner already exists - skipped." };
+  if (existing) {
+    await applyBrand(existing.id);
+    return { created: false, partnerId: existing.id, message: "Enza already provisioned - branding (logo + colours) refreshed." };
+  }
 
   // Make sure the assignment table exists (in case setup-platform never ran).
   await db.execute(sql`
@@ -362,13 +390,8 @@ export async function seedEnza(): Promise<{ created: boolean; partnerId?: string
     name: "Enza Global Media", slug: ENZA_SLUG, status: "active", contactEmail: "connect@enzaglobalmedia.co.za",
   }).returning();
 
-  // 2. Brand theme (partner tenant)
-  await db.insert(brandThemesTable).values({
-    tenantId: partner.id, tenantType: "partner",
-    displayName: BRAND.displayName, primaryColor: BRAND.primaryColor, secondaryColor: BRAND.secondaryColor,
-    accentColor: BRAND.accentColor, fontFamily: BRAND.fontFamily, credentialTitle: BRAND.credentialTitle,
-    emailSenderName: BRAND.emailSenderName,
-  });
+  // 2. Brand theme (partner tenant) - logo, favicon, colours from the website
+  await applyBrand(partner.id);
 
   // 3. Organisation
   const [org] = await db.insert(organisationsTable).values({
