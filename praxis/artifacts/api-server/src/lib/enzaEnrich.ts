@@ -250,14 +250,23 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
 
         // Complete: an interactive case-study workshop homed in this module.
         const acts = await db.select({ id: interactiveActivitiesTable.id }).from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.moduleId, m.id));
+        let activityId: string | null = acts[0]?.id ?? null;
         if (acts.length === 0) {
-          await db.insert(interactiveActivitiesTable).values({
+          const [createdAct] = await db.insert(interactiveActivitiesTable).values({
             organisationId: orgId, courseId, moduleId: m.id,
             title: `${mod.title}: case-study workshop`,
             instructions: "Work through the case, rate yourself against the objectives, and plan one real action to take this week.",
             html: caseWorkshopHtml(crs, mod), source: "html", kind: "checklist", bloomsLevel: "Apply",
             isLibrary: false, tags: crs.tags, published: true, createdByUserId: facultyId,
-          } as any);
+          } as any).returning();
+          activityId = createdAct?.id ?? null;
+        }
+        if (activityId) {
+          await db.insert(gradebookItemsTable).values({
+            courseId, sourceType: "activity", sourceId: activityId,
+            title: `Activity: ${mod.title}`, category: "Activities", itemType: "formative",
+            pointsPossible: "100", includeInGrade: false, position: mi, createdBy: facultyId,
+          } as any).onConflictDoNothing();
         }
 
         // A Socratic case scenario homed in this module. It MUST be a library case with no owning
@@ -316,15 +325,32 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
 
         // Workshop: a live facilitated session on this module.
         const sess = await db.select({ id: deliverySessionsTable.id }).from(deliverySessionsTable).where(eq(deliverySessionsTable.moduleId, m.id));
+        let sessionId: string | null = sess[0]?.id ?? null;
         if (sess.length === 0) {
-          await db.insert(deliverySessionsTable).values({
+          const [createdSess] = await db.insert(deliverySessionsTable).values({
             tenantId: orgId, courseId, moduleId: m.id, facilitatorId: facultyId,
             title: `Workshop: ${mod.title}`, sessionType: "workshop",
             scheduledAt: soon(7 + mi * 3), durationMinutes: 90,
             joinUrl: "https://meet.google.com/enza-bizascend",
             notes: `Bring the action you took from "${mod.title}". We will troubleshoot together and plan the next step.`,
-          } as any);
+          } as any).returning();
+          sessionId = createdSess?.id ?? null;
         }
+        // Workshop attendance as a gradebook column.
+        if (sessionId) {
+          await db.insert(gradebookItemsTable).values({
+            courseId, sourceType: "attendance", sourceId: sessionId,
+            title: `Workshop: ${mod.title}`, category: "Workshops", itemType: "formative",
+            pointsPossible: "100", includeInGrade: false, position: mi, createdBy: facultyId,
+          } as any).onConflictDoNothing();
+        }
+
+        // Module completion as a gradebook column (fraction of the module's beats viewed).
+        await db.insert(gradebookItemsTable).values({
+          courseId, sourceType: "completion", sourceId: m.id,
+          title: `Completion: ${mod.title}`, category: "Completion", itemType: "formative",
+          pointsPossible: "100", includeInGrade: false, position: mi, createdBy: facultyId,
+        } as any).onConflictDoNothing();
       } catch (e) {
         if (!error) error = (e instanceof Error ? e.message : String(e)).slice(0, 240);
       }

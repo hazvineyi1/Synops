@@ -17,7 +17,7 @@ import {
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
   Users, Layers, Target, Compass, Info, Save, Settings, Sparkles, Link2,
-  Pause, Square, Headphones, Plus, Trash2,
+  Pause, Square, Headphones, Plus, Trash2, Languages,
 } from 'lucide-react';
 import { useReadAloud } from '@/lib/speech';
 
@@ -339,16 +339,40 @@ interface VideoSlide { heading: string; script: string; points?: string[]; image
 function SlideLesson({ slides }: { slides: VideoSlide[] }) {
   const [i, setI] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const clampedI = Math.min(i, slides.length - 1);
+  // On-demand translation of the slide lesson.
+  const [tLang, setTLang] = useState('en');
+  const [tBusy, setTBusy] = useState(false);
+  const [tSlides, setTSlides] = useState<VideoSlide[] | null>(null);
+  const shown = tSlides ?? slides;
+  const clampedI = Math.min(i, shown.length - 1);
   useEffect(() => {
     if (!playing) return;
     const t = setTimeout(() => {
-      setI((prev) => (prev + 1 < slides.length ? prev + 1 : (setPlaying(false), prev)));
+      setI((prev) => (prev + 1 < shown.length ? prev + 1 : (setPlaying(false), prev)));
     }, 7000);
     return () => clearTimeout(t);
-  }, [playing, clampedI, slides.length]);
+  }, [playing, clampedI, shown.length]);
 
-  const s = slides[clampedI];
+  const translateSlides = async (code: string) => {
+    setTLang(code);
+    if (code === 'en') { setTSlides(null); return; }
+    setTBusy(true);
+    const flat: string[] = [];
+    const counts: number[] = [];
+    for (const sl of slides) { flat.push(sl.heading, sl.script); const pts = sl.points ?? []; counts.push(pts.length); flat.push(...pts); }
+    const out = await translateContent(flat, code);
+    let idx = 0;
+    const rebuilt: VideoSlide[] = slides.map((sl, si) => {
+      const heading = out[idx++]; const script = out[idx++];
+      const points: string[] = [];
+      for (let k = 0; k < counts[si]; k++) points.push(out[idx++]);
+      return { ...sl, heading, script, points };
+    });
+    setTSlides(rebuilt);
+    setTBusy(false);
+  };
+
+  const s = shown[clampedI];
   return (
     <div className="rounded-xl overflow-hidden border border-border shadow-md">
       <div className="aspect-video bg-gradient-to-br from-slate-900 to-slate-800 text-white relative overflow-hidden">
@@ -356,7 +380,7 @@ function SlideLesson({ slides }: { slides: VideoSlide[] }) {
           <img src={s.image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
         )}
         <div className="relative h-full flex flex-col justify-center px-8 py-6">
-          <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CDF00' }}>Slide {clampedI + 1} of {slides.length}</div>
+          <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CDF00' }}>Slide {clampedI + 1} of {shown.length}</div>
           <h3 className="text-2xl font-bold mb-4 leading-tight drop-shadow">{s.heading}</h3>
           {s.points && s.points.length > 0 && (
             <ul className="space-y-1.5">
@@ -366,17 +390,18 @@ function SlideLesson({ slides }: { slides: VideoSlide[] }) {
             </ul>
           )}
         </div>
-        <div className="absolute bottom-0 left-0 h-1 bg-[#9CDF00] transition-all" style={{ width: `${((clampedI + 1) / slides.length) * 100}%` }} />
+        <div className="absolute bottom-0 left-0 h-1 bg-[#9CDF00] transition-all" style={{ width: `${((clampedI + 1) / shown.length) * 100}%` }} />
       </div>
-      <div className="bg-card px-5 py-3">
+      <div className="bg-card px-5 py-3 space-y-3">
         <p className="text-sm text-muted-foreground leading-relaxed min-h-[3rem]">{s.script}</p>
-        <div className="flex items-center gap-2 mt-3">
+        <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={() => setPlaying((p) => !p)} className="gap-1.5">
             <Play className="h-3.5 w-3.5" /> {playing ? 'Pause' : 'Play'}
           </Button>
           <Button size="sm" variant="ghost" disabled={clampedI === 0} onClick={() => { setPlaying(false); setI(clampedI - 1); }}>Prev</Button>
-          <Button size="sm" variant="ghost" disabled={clampedI === slides.length - 1} onClick={() => { setPlaying(false); setI(clampedI + 1); }}>Next</Button>
+          <Button size="sm" variant="ghost" disabled={clampedI === shown.length - 1} onClick={() => { setPlaying(false); setI(clampedI + 1); }}>Next</Button>
         </div>
+        <LangChips value={tLang} busy={tBusy} onPick={translateSlides} />
       </div>
     </div>
   );
@@ -1814,6 +1839,35 @@ function ReadAloudBar({ text }: { text: string }) {
  * inline or open the link. We store parsed text (no binary storage in this stack), so a
  * document becomes a readable article rather than a download.
  */
+// Languages the content can be translated into on demand (matches the server's LANG_NAMES).
+const LANGS: [string, string][] = [['en', 'English'], ['zu', 'isiZulu'], ['xh', 'isiXhosa'], ['af', 'Afrikaans'], ['sn', 'Shona']];
+
+/** A row of language chips. The parent runs the actual translation for the content it owns. */
+function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onPick: (code: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Languages className="h-3.5 w-3.5" /> Read in:</span>
+      {LANGS.map(([code, name]) => (
+        <button key={code} type="button" disabled={busy} onClick={() => onPick(code)}
+          className={cn('text-xs rounded-full px-2.5 py-1 border transition-colors disabled:opacity-50',
+            value === code ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted')}>
+          {name}
+        </button>
+      ))}
+      {busy && <span className="text-xs text-muted-foreground animate-pulse">translating…</span>}
+    </div>
+  );
+}
+
+/** Translate an array of strings into a language code via the shared AI translator. */
+async function translateContent(texts: string[], lang: string): Promise<string[]> {
+  if (lang === 'en') return texts;
+  try {
+    const r = await apiFetch<{ texts: string[] }>('/translate', { method: 'POST', body: JSON.stringify({ texts, lang }) });
+    return Array.isArray(r.texts) && r.texts.length === texts.length ? r.texts : texts;
+  } catch { return texts; }
+}
+
 /** Inline **bold** rendering inside a line of markdown. */
 function mdInline(s: string, kb: string): React.ReactNode[] {
   return s.split(/\*\*/).map((p, i) => (i % 2 === 1 ? <strong key={kb + i} className="font-semibold text-foreground">{p}</strong> : <span key={kb + i}>{p}</span>));
@@ -1858,6 +1912,19 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
     queryFn: () => apiFetch<ModuleReadingRow & { content: string }>(`/readings/${readerId}`),
     enabled: !!readerId,
   });
+  // On-demand translation of the open reading.
+  const [tLang, setTLang] = useState('en');
+  const [tBusy, setTBusy] = useState(false);
+  const [tReading, setTReading] = useState<{ title: string; content: string } | null>(null);
+  useEffect(() => { setTLang('en'); setTReading(null); }, [readerId]);
+  const translateReading = async (code: string) => {
+    setTLang(code);
+    if (code === 'en' || !reader?.content) { setTReading(null); return; }
+    setTBusy(true);
+    const [title, content] = await translateContent([reader.title ?? '', reader.content], code);
+    setTReading({ title, content });
+    setTBusy(false);
+  };
 
   const [mode, setMode] = useState<'file' | 'link'>('file');
   const [linkUrl, setLinkUrl] = useState('');
@@ -1905,15 +1972,16 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
         </div>
         {readerLoading ? <Skeleton className="h-64" /> : (
           <article className="rounded-2xl border border-border bg-card shadow-sm px-6 sm:px-10 py-8 max-w-3xl mx-auto">
-            <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{reader?.title}</h3>
+            <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{tReading?.title ?? reader?.title}</h3>
             {reader?.sourceUrl && (
               <a href={reader.sourceUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
                 Open the original in a new window
               </a>
             )}
-            {reader?.content ? <div className="mt-4 mb-2"><ReadAloudBar text={reader.content} /></div> : null}
+            <div className="mt-4"><LangChips value={tLang} busy={tBusy} onPick={translateReading} /></div>
+            {reader?.content ? <div className="mt-3 mb-2"><ReadAloudBar text={(tReading?.content ?? reader.content)} /></div> : null}
             <div className="mt-4 border-t border-border/60 pt-5">
-              <MarkdownView text={reader?.content ?? ''} />
+              <MarkdownView text={tReading?.content ?? reader?.content ?? ''} />
             </div>
             {(reader?.chars ?? 0) >= 200000 && (
               <p className="mt-4 text-xs text-amber-600">This document was long and has been truncated.</p>

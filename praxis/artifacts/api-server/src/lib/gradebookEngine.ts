@@ -11,6 +11,8 @@ import {
   activitySubmissionsTable,
   attendanceRecordsTable,
   gradebookSettingsTable,
+  beatProgressTable,
+  beatsTable,
   type GradebookItem,
   type LetterBand,
 } from "@workspace/db";
@@ -42,7 +44,7 @@ const AT_RISK = 0.8; // [PASS, AT_RISK) with no harder signal => "at_risk"
 export interface GradebookColumn {
   key: string; // stable client key
   itemId: string | null; // gradebook_items.id, or null for a default assignment column
-  sourceType: "assignment" | "case" | "activity" | "manual" | "attendance";
+  sourceType: "assignment" | "case" | "activity" | "manual" | "attendance" | "completion";
   sourceId: string | null;
   title: string;
   category: string;
@@ -195,7 +197,7 @@ export async function getCourseColumns(courseId: string): Promise<GradebookColum
     columns.push({
       key: `item:${it.id}`,
       itemId: it.id,
-      sourceType: it.sourceType as "case" | "activity" | "manual" | "attendance",
+      sourceType: it.sourceType as "case" | "activity" | "manual" | "attendance" | "completion",
       sourceId: it.sourceId,
       title: it.title,
       category: it.category,
@@ -340,6 +342,36 @@ export async function getScoreData(
         if (!col) continue;
         if (r.status === "excused") continue; // neither credit nor penalty
         setFrac(r.userId, col.key, r.status === "absent" ? 0 : 1);
+      }
+    })(),
+    // Completion — one column per module, scored as the fraction of that module's beats the learner
+    // has viewed (0..1). This is how readings/video/lesson completion is recorded in the gradebook:
+    // it is engagement, not a mark, so these columns are formative (visible, not counted in the grade).
+    (async () => {
+      const completionCols = columns.filter((c) => c.sourceType === "completion" && c.sourceId);
+      if (completionCols.length === 0) return;
+      const moduleIds = completionCols.map((c) => c.sourceId!);
+      const colByModule = new Map(completionCols.map((c) => [c.sourceId!, c]));
+      const [beats, progress] = await Promise.all([
+        db.select({ id: beatsTable.id, moduleId: beatsTable.moduleId }).from(beatsTable).where(inArray(beatsTable.moduleId, moduleIds)),
+        db.select({ userId: beatProgressTable.userId, moduleId: beatProgressTable.moduleId }).from(beatProgressTable).where(inArray(beatProgressTable.moduleId, moduleIds)),
+      ]);
+      const totalByModule = new Map<string, number>();
+      for (const b of beats) totalByModule.set(b.moduleId, (totalByModule.get(b.moduleId) ?? 0) + 1);
+      const viewedByUserModule = new Map<string, number>();
+      for (const p of progress) {
+        if (!uSet.has(p.userId)) continue;
+        const k = `${p.userId}::${p.moduleId}`;
+        viewedByUserModule.set(k, (viewedByUserModule.get(k) ?? 0) + 1);
+      }
+      for (const uid of userIds) {
+        for (const mId of moduleIds) {
+          const total = totalByModule.get(mId) ?? 0;
+          if (total === 0) continue;
+          const viewed = viewedByUserModule.get(`${uid}::${mId}`) ?? 0;
+          const col = colByModule.get(mId)!;
+          setFrac(uid, col.key, Math.max(0, Math.min(1, viewed / total)));
+        }
       }
     })(),
     // Manual scores + per-cell notes (any item that has a registry row).
