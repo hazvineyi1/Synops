@@ -1,5 +1,5 @@
-Fix flow: finishing an activity returns to its section (with forward Next), not Overview (ASCII-only)
+Video tab: render the narrated slide lesson (with images) instead of a 'no file' placeholder (ASCII-only)
 
-Finishing the Complete activities (or video/quiz player) dropped the learner back on the module Overview showing 'Start: Video', losing their place. The player now returns to the hub with ?tab=<section it was opened from> (video/readings/complete), and ModuleHubView reads an initialTab from the URL. So after finishing Complete you land on the Complete tab where the forward button reads 'Next: Case studies', keeping the linear order intact.
+The hub Video tab only checked for an uploaded videoUrl and otherwise showed 'Video file not uploaded yet' - ignoring the NotebookLM-style slide lesson. It now renders the SlideLesson (which carries per-slide images) whenever the video beat has slides but no uploaded file, so the Video section shows real visuals. Matches what the in-beat and prominent players already do.
 
 VALIDATION: esbuild clean on ModuleViewer.tsx.

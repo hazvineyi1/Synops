@@ -18,6 +18,7 @@ import {
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
   Users, Layers, Target, Compass, Info, Save, Settings, Sparkles, Link2,
   Pause, Square, Headphones, Plus, Trash2, Languages,
+  Lightbulb, Store, Repeat, ListChecks, Rocket,
 } from 'lucide-react';
 import { useReadAloud } from '@/lib/speech';
 
@@ -329,7 +330,14 @@ function CloseBeat({ beat }: { beat: Beat }) {
   );
 }
 
-interface VideoSlide { heading: string; script: string; points?: string[]; image?: string }
+interface VideoSlide { heading: string; script: string; points?: string[]; image?: string; visual?: string }
+
+// Concept-matched icon for a slide's `visual` keyword. Clean, on-brand, always relevant - no random
+// stock photos, and the visual sits in its own panel so it never overlaps the text.
+const SLIDE_VISUAL: Record<string, React.ElementType> = {
+  welcome: Rocket, objectives: Target, idea: Lightbulb, shop: Store,
+  loop: Repeat, next: ListChecks, scenario: Users, process: Layers,
+};
 
 /**
  * NotebookLM-style narrated slide lesson: an autoplaying deck rendered from structured slides when a
@@ -375,20 +383,24 @@ function SlideLesson({ slides }: { slides: VideoSlide[] }) {
   const s = shown[clampedI];
   return (
     <div className="rounded-xl overflow-hidden border border-border shadow-md">
-      <div className="aspect-video bg-gradient-to-br from-slate-900 to-slate-800 text-white relative overflow-hidden">
-        {s.image && (
-          <img src={s.image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-        )}
-        <div className="relative h-full flex flex-col justify-center px-8 py-6">
+      <div className="aspect-video relative overflow-hidden flex">
+        {/* Text panel - solid, fully readable; text never sits on the visual. */}
+        <div className="flex-1 min-w-0 bg-gradient-to-br from-slate-900 to-slate-800 text-white flex flex-col justify-center px-8 py-6">
           <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CDF00' }}>Slide {clampedI + 1} of {shown.length}</div>
-          <h3 className="text-2xl font-bold mb-4 leading-tight drop-shadow">{s.heading}</h3>
+          <h3 className="text-2xl font-bold mb-4 leading-tight">{s.heading}</h3>
           {s.points && s.points.length > 0 && (
             <ul className="space-y-1.5">
               {s.points.map((p, k) => (
-                <li key={k} className="flex gap-2 text-sm text-slate-50 drop-shadow"><span style={{ color: '#9CDF00' }}>▸</span>{p}</li>
+                <li key={k} className="flex gap-2 text-sm text-slate-50"><span style={{ color: '#9CDF00' }}>▸</span>{p}</li>
               ))}
             </ul>
           )}
+        </div>
+        {/* Visual panel - a concept-matched illustration on the Enza brand colours. */}
+        <div className="hidden sm:flex w-[38%] shrink-0 relative items-center justify-center overflow-hidden" style={{ background: 'linear-gradient(135deg, #111 0%, #1c2a10 100%)' }}>
+          <div className="absolute w-56 h-56 rounded-full border-2" style={{ borderColor: '#9CDF0033' }} />
+          <div className="absolute w-40 h-40 rounded-full border-2" style={{ borderColor: '#9CDF0055' }} />
+          {(() => { const Ico = SLIDE_VISUAL[s.visual ?? 'welcome'] ?? Sparkles; return <Ico className="h-20 w-20 relative" style={{ color: '#9CDF00' }} strokeWidth={1.5} />; })()}
         </div>
         <div className="absolute bottom-0 left-0 h-1 bg-[#9CDF00] transition-all" style={{ width: `${((clampedI + 1) / shown.length) * 100}%` }} />
       </div>
