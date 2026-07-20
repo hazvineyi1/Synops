@@ -1,5 +1,5 @@
-Remove Shona from the case-runner language list too (ASCII-only)
+Fix flow: finishing an activity returns to its section (with forward Next), not Overview (ASCII-only)
 
-Follow-up: Shona still appeared because the case runner had its own language list in casesApi.ts. Removed the sn/Shona entry there as well, so no surface offers Shona - leaving English, isiZulu, isiXhosa, Afrikaans everywhere (chips, reader, slide lesson, case coach).
+Finishing the Complete activities (or video/quiz player) dropped the learner back on the module Overview showing 'Start: Video', losing their place. The player now returns to the hub with ?tab=<section it was opened from> (video/readings/complete), and ModuleHubView reads an initialTab from the URL. So after finishing Complete you land on the Complete tab where the forward button reads 'Next: Case studies', keeping the linear order intact.
 
-VALIDATION: esbuild clean on casesApi.ts.
+VALIDATION: esbuild clean on ModuleViewer.tsx.

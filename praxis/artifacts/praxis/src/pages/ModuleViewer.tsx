@@ -2751,6 +2751,8 @@ function ModuleHubView({
                       <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-sm">
                         <video src={b.videoUrl} controls className="w-full h-full" />
                       </div>
+                    ) : (b.visualData?.slides && b.visualData.slides.length > 0) ? (
+                      <SlideLesson slides={b.visualData.slides} />
                     ) : (
                       <EmptyState icon={PlayCircle} title="Video file not uploaded yet"
                         note="This lesson is marked as a video but no file is attached yet. It can be added in the Studio editor." />
