@@ -1814,6 +1814,36 @@ function ReadAloudBar({ text }: { text: string }) {
  * inline or open the link. We store parsed text (no binary storage in this stack), so a
  * document becomes a readable article rather than a download.
  */
+/** Inline **bold** rendering inside a line of markdown. */
+function mdInline(s: string, kb: string): React.ReactNode[] {
+  return s.split(/\*\*/).map((p, i) => (i % 2 === 1 ? <strong key={kb + i} className="font-semibold text-foreground">{p}</strong> : <React.Fragment key={kb + i}>{p}</React.Fragment>));
+}
+
+/**
+ * Lightweight, dependency-free Markdown renderer for reading content: headings, bullet/numbered lists,
+ * bold and paragraphs, styled for comfortable reading. Plain text passes through unharmed. Replaces the
+ * old raw whitespace-pre render that showed literal '#' and '**'.
+ */
+function MarkdownView({ text }: { text: string }) {
+  const lines = (text ?? '').split('\n');
+  const out: React.ReactNode[] = [];
+  let list: React.ReactNode[] = [];
+  let k = 0;
+  const flush = () => { if (list.length) { out.push(<ul key={'ul' + k++} className="list-disc pl-6 space-y-2 my-4 marker:text-primary">{list}</ul>); list = []; } };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (/^###\s+/.test(line)) { flush(); out.push(<h4 key={k++} className="font-serif font-semibold text-base mt-6 mb-2">{mdInline(line.replace(/^###\s+/, ''), 'h' + k)}</h4>); }
+    else if (/^##\s+/.test(line)) { flush(); out.push(<h3 key={k++} className="font-serif font-bold text-lg mt-7 mb-2.5 pb-1 border-b border-border/60">{mdInline(line.replace(/^##\s+/, ''), 'h' + k)}</h3>); }
+    else if (/^#\s+/.test(line)) { flush(); out.push(<h2 key={k++} className="font-serif font-bold text-2xl mt-3 mb-4">{mdInline(line.replace(/^#\s+/, ''), 'h' + k)}</h2>); }
+    else if (/^\s*[-*]\s+/.test(line)) { list.push(<li key={k++} className="leading-relaxed pl-1">{mdInline(line.replace(/^\s*[-*]\s+/, ''), 'li' + k)}</li>); }
+    else if (/^\s*\d+\.\s+/.test(line)) { list.push(<li key={k++} className="leading-relaxed pl-1">{mdInline(line.replace(/^\s*\d+\.\s+/, ''), 'li' + k)}</li>); }
+    else if (line.trim() === '') { flush(); }
+    else { flush(); out.push(<p key={k++} className="my-3 leading-[1.75] text-[15px] text-foreground/85">{mdInline(line, 'p' + k)}</p>); }
+  }
+  flush();
+  return <div className="font-sans">{out}</div>;
+}
+
 function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstructor: boolean }) {
   const qc = useQueryClient();
   const { data: readings } = useQuery({
@@ -1867,19 +1897,21 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
           <ChevronLeft className="h-4 w-4" /> Back to readings
         </Button>
         {readerLoading ? <Skeleton className="h-64" /> : (
-          <div className="rounded-2xl border border-border bg-card p-6">
-            <h3 className="text-lg font-serif font-semibold mb-1">{reader?.title}</h3>
+          <article className="rounded-2xl border border-border bg-card shadow-sm px-6 sm:px-10 py-8 max-w-3xl mx-auto">
+            <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{reader?.title}</h3>
             {reader?.sourceUrl && (
               <a href={reader.sourceUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
                 Open the original in a new window
               </a>
             )}
-            {reader?.content ? <div className="mt-3"><ReadAloudBar text={reader.content} /></div> : null}
-            <p className="mt-4 text-sm leading-relaxed text-foreground/85 whitespace-pre-line">{reader?.content}</p>
+            {reader?.content ? <div className="mt-4 mb-2"><ReadAloudBar text={reader.content} /></div> : null}
+            <div className="mt-4 border-t border-border/60 pt-5">
+              <MarkdownView text={reader?.content ?? ''} />
+            </div>
             {(reader?.chars ?? 0) >= 200000 && (
               <p className="mt-4 text-xs text-amber-600">This document was long and has been truncated.</p>
             )}
-          </div>
+          </article>
         )}
       </div>
     );
@@ -2147,9 +2179,11 @@ function ModuleHubView({
     queryFn: () => apiFetch<{ id: string; title: string; openingQuestion?: string; difficulty?: string }[]>(`/modules/${moduleId}/cases`),
     enabled: !!moduleId,
   });
+  const [caseErr, setCaseErr] = useState<string | null>(null);
   const startCase = useMutation({
     mutationFn: (caseId: string) => apiFetch<{ id: string }>(`/cases/${caseId}/sessions`, { method: 'POST', body: JSON.stringify({}) }),
     onSuccess: (s) => navigate(`/case-run/${s.id}`),
+    onError: (e: any) => setCaseErr(e?.message ?? 'Could not open the case study. Please try again.'),
   });
   // Uploaded readings (documents/links) attached to this module. Shares its cache key with
   // ReadingsSection, so this is one request, not two.
@@ -2316,58 +2350,33 @@ function ModuleHubView({
    * open -- the old version prompted "Demonstrate mastery" simply because you had clicked
    * a tab outside the flow, whether or not you had done anything.
    */
-  // Prefer FORWARD progression: from the current tab, the next unfinished deliverable that comes AFTER
-  // it in the flow (so from Readings you go on to Complete, not back to an earlier unfinished Video).
-  // Fall back to the first unfinished anywhere if nothing remains ahead.
+  // Simple, predictable LINEAR progression: from the current section, move to the NEXT section in the
+  // module's order (Overview/Structure -> the first deliverable). No done-gating and no mastery step -
+  // the bottom button always just walks the learner forward through the sections, then on to the next
+  // module. This removes the confusing "jump back to an unfinished earlier tab" behaviour.
   const curFlowIdx = flow.findIndex((d) => d.id === tab);
-  const nextUndone =
-    (curFlowIdx >= 0 ? flow.slice(curFlowIdx + 1).find((d) => !tabState[d.id].done) : undefined)
-    ?? flow.find((d) => d.id !== tab && !tabState[d.id].done)
-    ?? flow.find((d) => !tabState[d.id].done);
+  const nextFlow = curFlowIdx >= 0 ? flow[curFlowIdx + 1] : flow.find((d) => d.id !== tab);
 
-  let continueLabel = 'Demonstrate mastery';
-  let continueAction: () => void = () => startSession.mutate();
-  let continueIsMastery = true;
-  if (nextUndone) {
-    continueIsMastery = false;
-    continueLabel = `${tab === 'overview' ? 'Start' : 'Next'}: ${nextUndone.label}`;
-    continueAction = () => setTab(nextUndone.id);
+  let continueLabel: string;
+  let continueAction: () => void;
+  if (nextFlow) {
+    continueLabel = `${tab === 'overview' || tab === 'structure' ? 'Start' : 'Next'}: ${nextFlow.label}`;
+    continueAction = () => setTab(nextFlow.id);
+  } else if (nextMod) {
+    continueLabel = 'Next module';
+    continueAction = () => navigate(`/courses/${courseId}/modules/${nextMod.id}`);
+  } else {
+    continueLabel = 'Back to the course';
+    continueAction = () => navigate(`/courses/${courseId}`);
   }
 
-  /**
-   * The forward step an empty section should point at, so a section with nothing in it
-   * still tells the learner where to go rather than leaving them at a dead end.
-   */
+  /** The forward step an empty section points at, so a section with nothing still guides the learner. */
   const nextStep: { label: string; onClick: () => void; note: string } =
-    nextUndone
-      ? {
-          label: `Go to ${nextUndone.label}`,
-          onClick: () => setTab(nextUndone.id),
-          note: `There is nothing to do in this section. Next up in this module: ${nextUndone.label}.`,
-        }
-      : masteryUnlocked && !moduleComplete
-        ? {
-            label: 'Demonstrate mastery',
-            onClick: () => startSession.mutate(),
-            note: 'Nothing to do here, and you have worked through everything else in this module.',
-          }
-        : nextMod
-          ? {
-              label: 'Next module',
-              onClick: () => navigate(`/courses/${courseId}/modules/${nextMod.id}`),
-              note: `Nothing to do in this section. Up next: ${nextMod.title}.`,
-            }
-          : allModulesComplete
-            ? {
-                label: 'Back to the course',
-                onClick: () => navigate(`/courses/${courseId}`),
-                note: 'Nothing to do here, and you have completed every module on this course.',
-              }
-            : {
-                label: 'Back to the course',
-                onClick: () => navigate(`/courses/${courseId}`),
-                note: 'There is nothing in this section for this module.',
-              };
+    nextFlow
+      ? { label: `Go to ${nextFlow.label}`, onClick: () => setTab(nextFlow.id), note: `Next up in this module: ${nextFlow.label}.` }
+      : nextMod
+        ? { label: 'Next module', onClick: () => navigate(`/courses/${courseId}/modules/${nextMod.id}`), note: `Up next: ${nextMod.title}.` }
+        : { label: 'Back to the course', onClick: () => navigate(`/courses/${courseId}`), note: 'You have reached the end of this module.' };
 
   if (isLoading) {
     return (
@@ -2471,26 +2480,6 @@ function ModuleHubView({
               );
             })}
 
-            {/* Mastery is the end of the rail, and only becomes available once everything
-                the learner can finish on their own is finished. */}
-            <li className="shrink-0 lg:shrink lg:pt-2 lg:mt-2 lg:border-t lg:border-border">
-              <button
-                onClick={() => masteryUnlocked && startSession.mutate()}
-                disabled={!masteryUnlocked || startSession.isPending}
-                title={masteryUnlocked ? undefined : 'Finish the sections above first'}
-                className={cn(
-                  'w-full flex items-center gap-2.5 rounded-md border-2 px-3 py-2.5 text-sm font-medium transition-colors text-left',
-                  masteryUnlocked
-                    ? 'border-transparent bg-rose-600 text-white shadow-sm hover:bg-rose-700'
-                    : 'border-dashed border-border bg-transparent text-muted-foreground/70 cursor-not-allowed',
-                )}
-              >
-                <GraduationCap className="h-4 w-4 shrink-0" />
-                <span className="flex-1 min-w-0 truncate">
-                  {startSession.isPending ? 'Starting...' : 'Demonstrate mastery'}
-                </span>
-              </button>
-            </li>
           </ol>
         </nav>
 
@@ -2545,15 +2534,10 @@ function ModuleHubView({
               </div>
             </div>
 
-            {/* One forward action. Mastery is deliberately NOT offered here as a parallel
-                choice: it is the end of the module, not an alternative to doing it, so it
-                only appears once the work is actually done. */}
+            {/* One forward action - walk through the module's sections in order. */}
             <div className="flex flex-col sm:flex-row gap-3 pt-1">
-              <Button className="flex-1 h-12" onClick={continueAction}
-                disabled={continueIsMastery && (!masteryUnlocked || startSession.isPending)}>
-                {continueIsMastery
-                  ? <><GraduationCap className="h-4 w-4 mr-2" /> Demonstrate mastery</>
-                  : <><Play className="h-4 w-4 mr-2" /> {continueLabel}</>}
+              <Button className="flex-1 h-12" onClick={continueAction}>
+                <Play className="h-4 w-4 mr-2" /> {continueLabel}
               </Button>
             </div>
           </div>
@@ -2593,16 +2577,6 @@ function ModuleHubView({
                 {flow.length === 0 && (
                   <EmptyState icon={List} title="Nothing has been added to this module yet" />
                 )}
-              </div>
-              {/* Mastery closes the module, so it belongs at the end of its structure too. */}
-              <div className="mt-1.5 flex items-center gap-3 rounded-xl border border-dashed border-border p-3.5">
-                <span className="h-7 w-7 rounded-lg bg-muted text-muted-foreground flex items-center justify-center shrink-0">
-                  <GraduationCap className="h-4 w-4" />
-                </span>
-                <span className="flex-1 text-sm font-medium">Demonstrate mastery</span>
-                <span className="text-xs text-muted-foreground shrink-0">
-                  {masteryUnlocked ? 'Available now' : 'After the above'}
-                </span>
               </div>
             </div>
 
@@ -2793,16 +2767,6 @@ function ModuleHubView({
             ) : (
               <NothingHere icon={Zap} title="No interactive activities for this module" next={nextStep} />
             )}
-
-            <MasteryCard
-              unlocked={masteryUnlocked}
-              earned={alreadyCertified}
-              blocking={blocking}
-              waiting={waiting}
-              pending={startSession.isPending}
-              onStart={() => startSession.mutate()}
-              onGo={setTab}
-            />
           </div>
         )}
 
@@ -2810,23 +2774,30 @@ function ModuleHubView({
         {tab === 'cases' && (
           <div className="space-y-4">
             <SectionHead title="Case studies" sub="Work through a real-world scenario with an AI coach who guides you with questions, not answers." />
+            {caseErr && (
+              <div className="rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 p-3 text-sm">{caseErr}</div>
+            )}
             {(moduleCases && moduleCases.length > 0) ? (
-              <>
-                <Instruction>Open a case to start a guided Socratic conversation. Think it through like an entrepreneur - there is rarely one right answer, but always a clearer way to reason.</Instruction>
-                <div className="space-y-2">
-                  {moduleCases.map((c) => (
-                    <button key={c.id} onClick={() => startCase.mutate(c.id)} disabled={startCase.isPending}
-                      className="w-full flex items-center gap-4 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-500/5 p-4 text-left hover:shadow-sm transition-shadow disabled:opacity-60">
-                      <span className="h-10 w-10 rounded-xl bg-teal-100 dark:bg-teal-900/40 text-teal-600 flex items-center justify-center shrink-0"><Layers className="h-5 w-5" /></span>
+              <div className="space-y-4">
+                {moduleCases.map((c) => (
+                  <div key={c.id} className="rounded-2xl border border-teal-200 dark:border-teal-800 bg-teal-500/5 p-5">
+                    <div className="flex items-start gap-3">
+                      <span className="h-11 w-11 rounded-xl bg-teal-100 dark:bg-teal-900/40 text-teal-600 flex items-center justify-center shrink-0"><Layers className="h-6 w-6" /></span>
                       <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm truncate">{c.title}</div>
-                        {c.difficulty && <div className="text-xs text-muted-foreground capitalize">{c.difficulty}</div>}
+                        <div className="font-serif font-bold text-lg leading-tight">{c.title}</div>
+                        <div className="text-xs text-muted-foreground capitalize mt-0.5">{c.difficulty ?? 'foundational'} case study · guided by an AI coach</div>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              </>
+                    </div>
+                    <p className="text-sm text-foreground/85 leading-relaxed mt-3">
+                      {c.openingQuestion || 'Work through a realistic scenario. The AI coach guides you with questions, not answers - reason it through like an entrepreneur.'}
+                    </p>
+                    <Button className="mt-4 h-11 gap-2 bg-teal-600 hover:bg-teal-700 text-white" disabled={startCase.isPending}
+                      onClick={() => { setCaseErr(null); startCase.mutate(c.id); }}>
+                      <Play className="h-4 w-4" /> {startCase.isPending ? 'Starting…' : 'Start case study'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
             ) : (
               <NothingHere icon={Layers} title="No case studies for this module" next={nextStep} />
             )}
@@ -2929,20 +2900,11 @@ function ModuleHubView({
           <div className="rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm">Keep going</p>
-              <p className="text-sm text-muted-foreground">
-                {continueIsMastery
-                  ? "You've been through the material. Demonstrate mastery to complete this module."
-                  : 'Work through each learning experience in order.'}
-              </p>
+              <p className="text-sm text-muted-foreground">Work through each learning experience in order.</p>
             </div>
-            <Button
-              className="shrink-0"
-              disabled={continueIsMastery && (!masteryUnlocked || startSession.isPending)}
-              onClick={continueAction}
-            >
-              {continueIsMastery && <GraduationCap className="h-4 w-4 mr-2" />}
+            <Button className="shrink-0" onClick={continueAction}>
               {continueLabel}
-              {!continueIsMastery && <ChevronRight className="h-4 w-4 ml-1" />}
+              <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
         )}

@@ -260,18 +260,27 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
           } as any);
         }
 
-        // A Socratic case scenario homed in this module.
-        const cases = await db.select({ id: caseScenariosTable.id }).from(caseScenariosTable).where(eq(caseScenariosTable.moduleId, m.id));
+        // A Socratic case scenario homed in this module. It MUST be a library case with no owning
+        // org (organisationId null + isLibrary true): a learner starts a case only if it is in scope,
+        // and scope for a module case = "library OR my tenant". The learners live in a different org
+        // than the content author, so an org-owned case 404s for them - a library case + the module's
+        // course-enrolment check is the correct gate.
+        const cases = await db.select().from(caseScenariosTable).where(eq(caseScenariosTable.moduleId, m.id));
         if (cases.length === 0 && facultyId) {
           const s = scenarioFor(mod.id + "sc");
           await db.insert(caseScenariosTable).values({
-            organisationId: orgId, moduleId: m.id, createdBy: facultyId, createdByName: "Enza Faculty",
-            title: `Case: ${mod.title}`, learningObjective: mod.objectives[0] ?? mod.title,
+            organisationId: null, moduleId: m.id, createdBy: facultyId, createdByName: "Enza Faculty",
+            title: `Case study: ${crs.title}`, learningObjective: mod.objectives[0] ?? mod.title,
             contextBlock: `${s.owner} runs ${s.biz} in ${s.place}, where ${s.detail}. ${s.owner} must get ${mod.title.toLowerCase()} right on a tight budget while serving customers every day.`,
             openingQuestion: "Where would you start, and why? Talk me through your thinking as an entrepreneur.",
-            focusAreas: mod.objectives.slice(0, 3), difficulty: "foundational", status: "published", isLibrary: false, tags: crs.tags,
+            focusAreas: mod.objectives.slice(0, 3), difficulty: "foundational", status: "published", isLibrary: true, tags: crs.tags,
             guidingInstructions: `Coach through questions, not answers. Keep the learner focused on ${mod.title.toLowerCase()} and push for concrete, costed, actionable steps in a South African SMME context.`,
           } as any);
+        } else if (cases.length > 0) {
+          // Repair earlier cases so they are reachable by learners (library, published).
+          await db.update(caseScenariosTable)
+            .set({ organisationId: null, isLibrary: true, status: "published", updatedAt: new Date() })
+            .where(eq(caseScenariosTable.moduleId, m.id));
         }
 
         // Assignments: a module-level applied task.
