@@ -384,7 +384,7 @@ export function AdminPartners() {
     mutationFn: () => apiFetch<{ created: boolean; learners?: number; message?: string }>('/platform/seed-enza-cohort', { method: 'POST' }),
     onSuccess: (r) => {
       refetch(); qc.invalidateQueries({ queryKey: ['partners'] });
-      toast({ title: r.created ? 'Enza cohort seeded' : 'Nothing to seed', description: r.created ? `Organisation, org admin, coach and ${r.learners} learners created with realistic progress.` : (r.message ?? 'Cohort already exists.') });
+      toast({ title: r.created ? 'Enza cohort seeded' : 'Learner logins refreshed', description: r.message ?? (r.created ? `Organisation, org admin, coach and ${r.learners} learners created.` : 'Cohort already exists.') });
     },
     onError: (e: any) => toast({ title: 'Could not seed cohort', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });

@@ -8,6 +8,7 @@ import {
   deliverySessionsTable, attendanceRecordsTable,
 } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
+import { hashPassword } from "../lib/auth";
 
 /**
  * Seeds a realistic delivery ORGANISATION under the "Enza Global Media" partner: a cohort of real-
@@ -32,6 +33,29 @@ function firstOrNull<T>(rows: T[]): T | null {
 }
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+
+// Standardised test sign-in for the four demo learners, so the founder can log in as each level.
+// student1 = advanced, student2 = on-track, student3 = at-risk, student4 = novice (creation order).
+const LEARNER_TEST_PASSWORD = "Enzatest123";
+const learnerTestEmail = (index1Based: number) => `enza@student${index1Based}.test`;
+
+/**
+ * Give the cohort's learners deterministic test credentials: enza@student1.test .. enza@studentN.test
+ * (ordered by creation, so student1 is the advanced learner) and the shared password above. Applied on
+ * every seed run so re-clicking "Seed Enza Cohort" refreshes them. Password is hashed server-side.
+ */
+async function applyLearnerCredentials(orgId: string): Promise<number> {
+  const learners = await db.select().from(usersTable)
+    .where(and(eq(usersTable.organisationId, orgId), eq(usersTable.role, "learner")))
+    .orderBy(asc(usersTable.createdAt));
+  const hash = hashPassword(LEARNER_TEST_PASSWORD);
+  for (let i = 0; i < learners.length; i++) {
+    await db.update(usersTable)
+      .set({ email: learnerTestEmail(i + 1), passwordHash: hash, status: "active", updatedAt: new Date() })
+      .where(eq(usersTable.id, learners[i].id));
+  }
+  return learners.length;
+}
 
 // People in the cohort. Learner emails use their own micro-business domains for realism.
 const ORG_ADMIN = { email: "zanele.mthembu@enzaglobalmedia.co.za", firstName: "Zanele", lastName: "Mthembu" };
@@ -113,7 +137,10 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
     await db.select().from(organisationsTable)
       .where(and(eq(organisationsTable.partnerId, partner.id), eq(organisationsTable.name, ORG_NAME))),
   );
-  if (existingOrg) return { created: false, orgId: existingOrg.id, message: "Enza cohort already seeded - skipped." };
+  if (existingOrg) {
+    const n = await applyLearnerCredentials(existingOrg.id);
+    return { created: false, orgId: existingOrg.id, learners: n, message: `Cohort already seeded - refreshed ${n} learner test logins (enza@student1.test .. enza@student${n}.test, password ${LEARNER_TEST_PASSWORD}).` };
+  }
 
   // 1. Organisation (the delivery tenant) + its cohort class
   const [org] = await db.insert(organisationsTable).values({
@@ -290,7 +317,10 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
     .set({ memberCount: learnerCount + 2, updatedAt: new Date() })
     .where(eq(organisationsTable.id, org.id));
 
-  return { created: true, orgId: org.id, learners: learnerCount };
+  // 9. Standardise learner test logins (enza@student1.test .. , shared password).
+  await applyLearnerCredentials(org.id);
+
+  return { created: true, orgId: org.id, learners: learnerCount, message: `Cohort seeded. Learner logins: enza@student1.test .. enza@student${learnerCount}.test, password ${LEARNER_TEST_PASSWORD}.` };
 }
 
 function feedbackFor(level: Persona["key"], score: number): string {
