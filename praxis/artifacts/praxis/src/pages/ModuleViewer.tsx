@@ -1816,7 +1816,7 @@ function ReadAloudBar({ text }: { text: string }) {
  */
 /** Inline **bold** rendering inside a line of markdown. */
 function mdInline(s: string, kb: string): React.ReactNode[] {
-  return s.split(/\*\*/).map((p, i) => (i % 2 === 1 ? <strong key={kb + i} className="font-semibold text-foreground">{p}</strong> : <React.Fragment key={kb + i}>{p}</React.Fragment>));
+  return s.split(/\*\*/).map((p, i) => (i % 2 === 1 ? <strong key={kb + i} className="font-semibold text-foreground">{p}</strong> : <span key={kb + i}>{p}</span>));
 }
 
 /**
