@@ -96,6 +96,36 @@ async function applyGrade(opts: {
 }
 
 /**
+ * If the assignment is an auto-graded quiz (its instructions carry a {__type:'quiz',questions:[...]}
+ * config), score the submission server-side (never trusting the client's number) and grade it via
+ * applyGrade - which writes the score, the gradebook cell, notifies, and fires onGradeEvent (so a low
+ * score raises the off-track alert, builds the gap-targeted study plan, and pushes the AI coach).
+ * Returns the graded submission, or null if this is not an auto-graded quiz.
+ */
+async function maybeAutoGradeQuiz(
+  assignment: typeof assignmentsTable.$inferSelect,
+  submissionId: string,
+  submissionBody: string | undefined,
+  learnerId: string,
+) {
+  let config: any = null;
+  try { const p = JSON.parse(assignment.instructions ?? ""); if (p && p.__type === "quiz" && Array.isArray(p.questions)) config = p; } catch { /* not a config */ }
+  if (!config) return null;
+  let answers: Record<string, number> = {};
+  try { const b = JSON.parse(submissionBody ?? ""); if (b && b.type === "quiz" && b.answers) answers = b.answers; } catch { /* ignore */ }
+  const qs = config.questions as { id: string; correct: number }[];
+  const total = qs.length || 1;
+  const correct = qs.filter((q) => answers[q.id] === q.correct).length;
+  const pct = Math.round((correct / total) * 100);
+  const points = Math.round((correct / total) * Number(assignment.pointsPossible));
+  const feedback = `Auto-graded: ${correct} of ${total} correct (${pct}%). ${pct >= (config.passingScore ?? 60) ? "Well done - you have got the key ideas." : "Review the module readings and slides, then you can resubmit to improve."}`;
+  return await applyGrade({
+    submissionId, assignmentId: assignment.id, learnerId, courseId: assignment.courseId,
+    graderId: "auto", score: points, feedback,
+  });
+}
+
+/**
  * Draft an AI assessment for a submission, after the submission itself is safely stored.
  *
  * Best-effort and deliberately fire-and-forget: a slow or failed model call must never cost
@@ -311,11 +341,18 @@ router.post("/assignments/:assignmentId/submit", requireAuth, async (req, res) =
       .where(and(eq(gradebookEntriesTable.assignmentId, req.params.assignmentId), eq(gradebookEntriesTable.userId, req.userId!)));
   }
 
-  // Respond first: the learner's work is saved and nothing below should delay confirming that.
-  res.status(201).json(submission);
+  // Auto-graded quiz? Score it now so the learner gets an instant grade (this also fires the
+  // off-track engine: gap analysis + study plan + AI coach for a low score).
+  const autoGraded = await maybeAutoGradeQuiz(assignment, submission.id, submissionBody, req.userId!);
 
-  const assessable = [parsedText, submissionBody].filter(Boolean).join("\n\n").trim();
-  if (assessable) void draftAiAssessment(submission.id, assignment, assessable);
+  // Respond with the graded submission when auto-graded, else the saved submission.
+  res.status(201).json(autoGraded ?? submission);
+
+  // Only draft AI feedback for open-ended work - an auto-graded quiz already has its grade.
+  if (!autoGraded) {
+    const assessable = [parsedText, submissionBody].filter(Boolean).join("\n\n").trim();
+    if (assessable) void draftAiAssessment(submission.id, assignment, assessable);
+  }
 });
 
 // GET /assignments/:assignmentId/my-submission

@@ -151,6 +151,54 @@ function landscapeReading(course: Crs, mod: Mod): { title: string; content: stri
   return { title: `Reading: ${mod.title} (SA landscape & resources)`, content };
 }
 
+// ---- Auto-graded assignment (a 5-question applied worksheet, scored out of the points) ---------
+// Stored as a JSON config in the assignment's `instructions`; the assignment page renders it as an
+// inline quiz and the submit endpoint auto-scores it. Correct-option positions are varied so it is
+// not "always B". Upload stays optional (allowUpload) and is not the centre of the task.
+function buildAssignmentConfig(course: Crs, mod: Mod) {
+  const objs = mod.objectives.length ? mod.objectives : [mod.title];
+  const s = scenarioFor(mod.id + "aq");
+  const questions = [
+    {
+      id: "q1",
+      text: `${s.owner} runs ${s.biz} in ${s.place}. To apply "${objs[0]}", what should ${s.owner} do FIRST?`,
+      options: ["Guess what will work and fix it at month-end", "Write down the real numbers and pick one small, specific action for this week", "Wait until the business is bigger", "Copy the shop next door exactly"],
+      correct: 1,
+    },
+    {
+      id: "q2",
+      text: "What is the correct order of the improvement loop taught in this module?",
+      options: ["Do, then Check, then See, then Decide", "Decide, then Do, then Check, then See", "See, then Decide, then Do, then Check", "Check, then See, then Do, then Decide"],
+      correct: 2,
+    },
+    {
+      id: "q3",
+      text: `Which is the strongest sign that ${s.owner} has ACTUALLY applied what this module teaches?`,
+      options: ["A measurable change in the numbers or the customer experience", "A longer to-do list", "A general feeling that things are better", "More stock sitting in the back room"],
+      correct: 0,
+    },
+    {
+      id: "q4",
+      text: `In practice, "${objs[1] ?? objs[0]}" is best achieved by:`,
+      options: ["Keeping everything in your head", "Doing it perfectly once and never again", "Waiting for someone else to handle it", "Breaking it into small, repeatable steps you do each week"],
+      correct: 3,
+    },
+    {
+      id: "q5",
+      text: "For a township or rural SMME on a tight budget, the most important move when applying this module is to:",
+      options: ["Buy expensive software before anything else", "Take one small, costed, specific action and measure the result", "Avoid writing anything down", "Only plan, and never actually act"],
+      correct: 1,
+    },
+  ];
+  return {
+    __type: "quiz",
+    intro: `Answer these 5 questions to show how you would apply "${mod.title}" to a real business. You get an instant, auto-graded score out of 50 - all done here in the module. Attaching supporting work is optional, not required.`,
+    passingScore: 60,
+    allowUpload: true,
+    questions,
+  };
+}
+
 // ---- Interactive case-study workshop (Complete tab) ------------------------------------------
 function caseWorkshopHtml(course: Crs, mod: Mod): string {
   const objs = mod.objectives.length ? mod.objectives : [mod.title];
@@ -304,15 +352,21 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
           } as any).onConflictDoNothing();
         }
 
-        // Assignments: a module-level applied task.
+        // Assignments: a module-level AUTO-GRADED applied worksheet (5 questions -> 50 pts), done
+        // in the module. Upgrades any earlier plain-text assignment to the auto-graded config too.
         const asg = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(eq(assignmentsTable.moduleId, m.id));
+        const asgConfig = JSON.stringify(buildAssignmentConfig(crs, mod));
+        const asgDesc = `Auto-graded worksheet: apply "${mod.title.toLowerCase()}" to a real business, entirely within the module. Instant score out of 50.`;
         if (asg.length === 0) {
           await db.insert(assignmentsTable).values({
             courseId, moduleId: m.id, title: `Apply it: ${mod.title}`,
-            description: `A short, practical task applying "${mod.title.toLowerCase()}" to a real business.`,
-            instructions: `Using a real business (your own or one you can access), complete this task:\n\n${mod.objectives.map((o, i) => `${i + 1}. Show how you would: ${o}`).join("\n")}\n\nKeep it to one page or a filled-in template. Use real numbers. Then take ONE action this week and note what changed.`,
+            description: asgDesc, instructions: asgConfig,
             submissionType: "file_upload", pointsPossible: "50", published: true, position: mi,
           } as any);
+        } else {
+          await db.update(assignmentsTable)
+            .set({ description: asgDesc, instructions: asgConfig, pointsPossible: "50", published: true, updatedAt: new Date() })
+            .where(eq(assignmentsTable.id, asg[0].id));
         }
 
         // Participate: a module discussion.

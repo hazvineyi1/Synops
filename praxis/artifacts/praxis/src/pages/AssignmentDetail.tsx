@@ -980,16 +980,32 @@ export function AssignmentDetail() {
                   />
                 )}
 
-                {/* ── Quiz ── */}
+                {/* ── Quiz (auto-graded, completed in the module) ── */}
                 {subType === 'quiz' && (
-                  <QuizForm
-                    questions={config?.questions ?? []}
-                    passingScore={config?.passingScore ?? 70}
-                    value={quizAnswers}
-                    onChange={setQuizAnswers}
-                    submitted={quizSubmitted}
-                    onSubmit={(score, passed) => { setQuizScore({ score, passed }); setQuizSubmitted(true); }}
-                  />
+                  <>
+                    {config?.intro && <p className="text-sm text-muted-foreground leading-relaxed">{config.intro}</p>}
+                    <QuizForm
+                      questions={config?.questions ?? []}
+                      passingScore={config?.passingScore ?? 70}
+                      value={quizAnswers}
+                      onChange={setQuizAnswers}
+                      submitted={quizSubmitted}
+                      onSubmit={(score, passed) => { setQuizScore({ score, passed }); setQuizSubmitted(true); }}
+                    />
+                    {config?.allowUpload && (
+                      <div className="mt-2 rounded-lg border border-dashed border-border p-3">
+                        <div className="text-xs font-medium text-foreground">Optional: attach supporting work</div>
+                        <p className="text-xs text-muted-foreground mt-0.5 mb-2">Not required - your score comes from the questions above. Attach a file only if your coach asked for one.</p>
+                        <input type="file" accept=".pdf,.doc,.docx,.txt" className="text-xs"
+                          onChange={async (e) => {
+                            const f = e.target.files?.[0]; if (!f) return;
+                            const b64 = await new Promise<string>((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1] || ''); r.readAsDataURL(f); });
+                            setUpload({ filename: f.name, dataBase64: b64 });
+                          }} />
+                        {upload && <div className="text-xs text-foreground mt-1">Attached: {upload.filename}</div>}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* ── Discussion ── */}

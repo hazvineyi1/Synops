@@ -1,5 +1,5 @@
-Video tab: render the narrated slide lesson (with images) instead of a 'no file' placeholder (ASCII-only)
+Redesign slide visuals: clean concept-matched panels instead of random overlapping stock photos (ASCII-only)
 
-The hub Video tab only checked for an uploaded videoUrl and otherwise showed 'Video file not uploaded yet' - ignoring the NotebookLM-style slide lesson. It now renders the SlideLesson (which carries per-slide images) whenever the video beat has slides but no uploaded file, so the Video section shows real visuals. Matches what the in-beat and prominent players already do.
+The old slide lesson overlaid text on random LoremFlickr photos (a cat statue for 'shop owner') - irrelevant and unreadable. Replaced with a professional two-panel slide: a solid dark text panel (heading + points, fully readable, no overlap) beside an on-brand illustration panel showing a concept-matched icon (welcome/objectives/idea/shop/loop/next) on the Enza colours with a subtle ring motif. enzaEnrich now tags each slide with a isual keyword instead of a random photo URL, and re-running Build Full Courses upgrades older slides. Even un-rebuilt slides now show the clean icon panel rather than a random photo.
 
-VALIDATION: esbuild clean on ModuleViewer.tsx.
+VALIDATION: esbuild clean on ModuleViewer.tsx, enzaEnrich.ts.
