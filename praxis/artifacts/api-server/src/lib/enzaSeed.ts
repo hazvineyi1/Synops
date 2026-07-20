@@ -437,7 +437,7 @@ async function createCourseContent(c: (typeof COURSES)[number], orgId: string, f
     title: `Applied project: ${c.title}`,
     description: `A practical, real-world application of everything in this course to a business of your choice.`,
     instructions: `Choose a real business (your own or one you can access). Produce a short, practical output (2-4 pages or a completed template) that demonstrates the course objectives:\n\n${c.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\nGround every recommendation in the real numbers and context of the business. Be specific and actionable - Enza values implementation over theory. Submit your work and be ready to present it in coaching.`,
-    submissionType: "project", pointsPossible: "100", published: true, position: 0,
+    submissionType: "file_upload", pointsPossible: "100", published: true, position: 0,
   });
 
   return course.id;
@@ -510,7 +510,7 @@ async function ensureEnzaCourses(partnerId: string): Promise<{ total: number; cr
           title: `Applied project: ${c.title}`,
           description: `A practical, real-world application of everything in this course to a business of your choice.`,
           instructions: `Choose a real business (your own or one you can access). Produce a short, practical output (2-4 pages or a completed template) that demonstrates the course objectives:\n\n${c.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\nGround every recommendation in the real numbers and context of the business. Be specific and actionable - Enza values implementation over theory.`,
-          submissionType: "project", pointsPossible: "100", published: true, position: 0,
+          submissionType: "file_upload", pointsPossible: "100", published: true, position: 0,
         });
       }
 

@@ -329,7 +329,7 @@ function CloseBeat({ beat }: { beat: Beat }) {
   );
 }
 
-interface VideoSlide { heading: string; script: string; points?: string[] }
+interface VideoSlide { heading: string; script: string; points?: string[]; image?: string }
 
 /**
  * NotebookLM-style narrated slide lesson: an autoplaying deck rendered from structured slides when a
@@ -351,16 +351,21 @@ function SlideLesson({ slides }: { slides: VideoSlide[] }) {
   const s = slides[clampedI];
   return (
     <div className="rounded-xl overflow-hidden border border-border shadow-md">
-      <div className="aspect-video bg-gradient-to-br from-slate-900 to-slate-800 text-white flex flex-col justify-center px-8 py-6 relative">
-        <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CDF00' }}>Slide {clampedI + 1} of {slides.length}</div>
-        <h3 className="text-2xl font-bold mb-4 leading-tight">{s.heading}</h3>
-        {s.points && s.points.length > 0 && (
-          <ul className="space-y-1.5">
-            {s.points.map((p, k) => (
-              <li key={k} className="flex gap-2 text-sm text-slate-100"><span style={{ color: '#9CDF00' }}>▸</span>{p}</li>
-            ))}
-          </ul>
+      <div className="aspect-video bg-gradient-to-br from-slate-900 to-slate-800 text-white relative overflow-hidden">
+        {s.image && (
+          <img src={s.image} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
         )}
+        <div className="relative h-full flex flex-col justify-center px-8 py-6">
+          <div className="text-xs uppercase tracking-widest mb-3" style={{ color: '#9CDF00' }}>Slide {clampedI + 1} of {slides.length}</div>
+          <h3 className="text-2xl font-bold mb-4 leading-tight drop-shadow">{s.heading}</h3>
+          {s.points && s.points.length > 0 && (
+            <ul className="space-y-1.5">
+              {s.points.map((p, k) => (
+                <li key={k} className="flex gap-2 text-sm text-slate-50 drop-shadow"><span style={{ color: '#9CDF00' }}>▸</span>{p}</li>
+              ))}
+            </ul>
+          )}
+        </div>
         <div className="absolute bottom-0 left-0 h-1 bg-[#9CDF00] transition-all" style={{ width: `${((clampedI + 1) / slides.length) * 100}%` }} />
       </div>
       <div className="bg-card px-5 py-3">
@@ -1265,7 +1270,7 @@ interface HubAssignment {
 interface HubDiscussion { id: string; title: string; replyCount?: number; iHaveReplied?: boolean }
 interface HubCourse { id: string; title: string; description?: string }
 
-type HubTab = 'overview' | 'structure' | 'video' | 'readings' | 'complete' | 'participate' | 'assignments' | 'workshop';
+type HubTab = 'overview' | 'structure' | 'video' | 'readings' | 'complete' | 'cases' | 'participate' | 'assignments' | 'workshop';
 
 const READING_TYPES = ['title_card', 'points', 'scenario', 'compare', 'close'];
 
@@ -1285,6 +1290,7 @@ const TAB_COLOR: Record<HubTab, { border: string; text: string; activeBg: string
   video:       { border: 'border-blue-300 dark:border-blue-800',       text: 'text-blue-700 dark:text-blue-300',       activeBg: 'bg-blue-600' },
   readings:    { border: 'border-emerald-300 dark:border-emerald-800', text: 'text-emerald-700 dark:text-emerald-300', activeBg: 'bg-emerald-600' },
   complete:    { border: 'border-violet-300 dark:border-violet-800',   text: 'text-violet-700 dark:text-violet-300',   activeBg: 'bg-violet-600' },
+  cases:       { border: 'border-teal-300 dark:border-teal-800',       text: 'text-teal-700 dark:text-teal-300',       activeBg: 'bg-teal-600' },
   participate: { border: 'border-sky-300 dark:border-sky-800',         text: 'text-sky-700 dark:text-sky-300',         activeBg: 'bg-sky-600' },
   assignments: { border: 'border-amber-300 dark:border-amber-800',     text: 'text-amber-700 dark:text-amber-300',     activeBg: 'bg-amber-600' },
   workshop:    { border: 'border-rose-300 dark:border-rose-800',       text: 'text-rose-700 dark:text-rose-300',       activeBg: 'bg-rose-600' },
@@ -2135,6 +2141,16 @@ function ModuleHubView({
     queryFn: () => activitiesApi.list({ moduleId }),
     enabled: !!moduleId,
   });
+  // Case studies homed in this module -- their own tab.
+  const { data: moduleCases } = useQuery({
+    queryKey: ['module-cases', moduleId],
+    queryFn: () => apiFetch<{ id: string; title: string; openingQuestion?: string; difficulty?: string }[]>(`/modules/${moduleId}/cases`),
+    enabled: !!moduleId,
+  });
+  const startCase = useMutation({
+    mutationFn: (caseId: string) => apiFetch<{ id: string }>(`/cases/${caseId}/sessions`, { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: (s) => navigate(`/case-run/${s.id}`),
+  });
   // Uploaded readings (documents/links) attached to this module. Shares its cache key with
   // ReadingsSection, so this is one request, not two.
   const { data: moduleReadings } = useQuery({
@@ -2176,9 +2192,11 @@ function ModuleHubView({
   const moduleAssignments = (assignments ?? []).filter(a => a.moduleId === moduleId);
   const activityCount     = moduleActivities?.length ?? 0;
   const practiceCount     = interactiveBeats.length + quizBeats.length + activityCount;
-  // Readings = in-module reading beats PLUS uploaded documents/links. Both must count, or
-  // a module with only uploaded readings would drop out of the flow and show an empty tab.
-  const readingCount      = readingBeats.length + (moduleReadings?.length ?? 0);
+  // Readings tab counts the actual reading DOCUMENTS when there are any (the numbered lesson slides
+  // are the lesson, shown in Structure/Video/mastery - counting them here inflated the badge to "10").
+  // Falls back to reading-type beats only for modules that have no uploaded documents.
+  const readingDocs       = moduleReadings?.length ?? 0;
+  const readingCount      = readingDocs > 0 ? readingDocs : readingBeats.length;
 
   const modality = (mod?.modality ?? 'async') as string;
   const mm = MODALITY_META[modality] ?? MODALITY_META.async;
@@ -2196,6 +2214,7 @@ function ModuleHubView({
     { id: 'video',       label: 'Video',       icon: PlayCircle,    count: videoBeats.length },
     { id: 'readings',    label: 'Readings',    icon: BookOpen,      count: readingCount },
     { id: 'complete',    label: 'Complete',    icon: Zap,           count: practiceCount },
+    { id: 'cases',       label: 'Case studies', icon: Layers,       count: moduleCases?.length ?? 0 },
     { id: 'participate', label: 'Participate', icon: MessageSquare, count: discussions?.length ?? 0 },
     { id: 'assignments', label: 'Assignments', icon: FileText,      count: moduleAssignments.length },
     { id: 'workshop',    label: 'Workshop',    icon: Users,         count: moduleWorkshops?.length ?? 0 },
@@ -2213,7 +2232,7 @@ function ModuleHubView({
   // of the gate. A module whose readings are ONLY uploaded files therefore has nothing
   // trackable to satisfy -- without this branch that module would lock mastery forever,
   // because allViewed([]) is false and there would be no beat the learner could ever view.
-  const readingsDone = readingBeats.length === 0 ? true : allViewed(readingBeats);
+  const readingsDone = readingDocs > 0 ? true : (readingBeats.length === 0 ? true : allViewed(readingBeats));
   const practiceDone =
     (interactiveBeats.length + quizBeats.length === 0 || allViewed([...interactiveBeats, ...quizBeats])) &&
     (moduleActivities ?? []).every((a) => !!(a as { mySubmitted?: boolean }).mySubmitted) &&
@@ -2230,6 +2249,7 @@ function ModuleHubView({
     video:       { has: videoBeats.length > 0,             done: videoDone },
     readings:    { has: readingCount > 0,                  done: readingsDone },
     complete:    { has: practiceCount > 0,                 done: practiceDone },
+    cases:       { has: (moduleCases?.length ?? 0) > 0,    done: (moduleCases?.length ?? 0) > 0 },
     participate: { has: (discussions?.length ?? 0) > 0,    done: discussionsDone },
     assignments: { has: moduleAssignments.length > 0,      done: assignmentsDone },
     workshop:    { has: (moduleWorkshops?.length ?? 0) > 0, done: workshopsDone },
@@ -2241,6 +2261,7 @@ function ModuleHubView({
     { id: 'video', label: 'Video' },
     { id: 'readings', label: 'Readings' },
     { id: 'complete', label: 'Activities' },
+    { id: 'cases', label: 'Case studies' },
     { id: 'participate', label: 'Discussion' },
     { id: 'assignments', label: 'Assignments' },
     { id: 'workshop', label: 'Workshop' },
@@ -2295,7 +2316,13 @@ function ModuleHubView({
    * open -- the old version prompted "Demonstrate mastery" simply because you had clicked
    * a tab outside the flow, whether or not you had done anything.
    */
-  const nextUndone = flow.find((d) => d.id !== tab && !tabState[d.id].done)
+  // Prefer FORWARD progression: from the current tab, the next unfinished deliverable that comes AFTER
+  // it in the flow (so from Readings you go on to Complete, not back to an earlier unfinished Video).
+  // Fall back to the first unfinished anywhere if nothing remains ahead.
+  const curFlowIdx = flow.findIndex((d) => d.id === tab);
+  const nextUndone =
+    (curFlowIdx >= 0 ? flow.slice(curFlowIdx + 1).find((d) => !tabState[d.id].done) : undefined)
+    ?? flow.find((d) => d.id !== tab && !tabState[d.id].done)
     ?? flow.find((d) => !tabState[d.id].done);
 
   let continueLabel = 'Demonstrate mastery';
@@ -2695,7 +2722,7 @@ function ModuleHubView({
               <Instruction>Work through the readings at your own pace. Your progress is tracked automatically.</Instruction>
             )}
 
-            {readingBeats.length > 0 && (
+            {readingDocs === 0 && readingBeats.length > 0 && (
               <>
                 <div className="space-y-2">
                   {readingBeats.map((b, i) => (
@@ -2776,6 +2803,33 @@ function ModuleHubView({
               onStart={() => startSession.mutate()}
               onGo={setTab}
             />
+          </div>
+        )}
+
+        {/* CASE STUDIES */}
+        {tab === 'cases' && (
+          <div className="space-y-4">
+            <SectionHead title="Case studies" sub="Work through a real-world scenario with an AI coach who guides you with questions, not answers." />
+            {(moduleCases && moduleCases.length > 0) ? (
+              <>
+                <Instruction>Open a case to start a guided Socratic conversation. Think it through like an entrepreneur - there is rarely one right answer, but always a clearer way to reason.</Instruction>
+                <div className="space-y-2">
+                  {moduleCases.map((c) => (
+                    <button key={c.id} onClick={() => startCase.mutate(c.id)} disabled={startCase.isPending}
+                      className="w-full flex items-center gap-4 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-500/5 p-4 text-left hover:shadow-sm transition-shadow disabled:opacity-60">
+                      <span className="h-10 w-10 rounded-xl bg-teal-100 dark:bg-teal-900/40 text-teal-600 flex items-center justify-center shrink-0"><Layers className="h-5 w-5" /></span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm truncate">{c.title}</div>
+                        {c.difficulty && <div className="text-xs text-muted-foreground capitalize">{c.difficulty}</div>}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <NothingHere icon={Layers} title="No case studies for this module" next={nextStep} />
+            )}
           </div>
         )}
 

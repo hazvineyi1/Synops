@@ -128,6 +128,17 @@ router.get("/courses/:courseId/cases", requireAuth, async (req, res) => {
   })));
 });
 
+// GET /modules/:moduleId/cases — case studies homed in a specific module. Any authenticated learner
+// working through the module can see its published cases, regardless of which org owns the case.
+router.get("/modules/:moduleId/cases", requireAuth, async (req, res) => {
+  const u = req.dbUser! as U;
+  let rows = await db.select().from(caseScenariosTable)
+    .where(eq(caseScenariosTable.moduleId, req.params.moduleId))
+    .orderBy(desc(caseScenariosTable.updatedAt));
+  if (!canAuthorCases(u.role)) rows = rows.filter((c) => c.status === "published");
+  res.json(rows.map(caseResponse));
+});
+
 // GET /cases — list cases visible to the caller.
 router.get("/cases", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;

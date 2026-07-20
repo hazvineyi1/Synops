@@ -117,13 +117,16 @@ function buildBeats(course: Crs, mod: Mod, moduleIndex: number) {
 function buildVideoBeat(course: Crs, mod: Mod) {
   const objs = mod.objectives.length ? mod.objectives : [mod.title];
   const s = scenarioFor(mod.id + "v");
+  // Keyword-based, freely-licensed photos (LoremFlickr serves CC images from Flickr, no API key).
+  // `lock` makes each slide's image stable across reloads. Keywords match township/SMME themes.
+  const img = (kw: string, n: number) => `https://loremflickr.com/1280/720/${encodeURIComponent(kw)}?lock=${(hashInt(mod.id) % 900) + n}`;
   const slides = [
-    { heading: mod.title, script: `This is your narrated overview of "${mod.title}", part of ${course.title}. In a few minutes you will get the big picture before you dive into the detail.`, points: ["What you will be able to do", "Why it matters", "How to apply it this week"] },
-    { heading: "What you will be able to do", script: `By the end you will be able to: ${objs.join("; ")}. Keep a real business in mind - your own, or one like ${s.owner}'s ${s.biz}.`, points: objs.slice(0, 4) },
-    { heading: "The core idea", script: `${objs[0]}. The trick is to work from real numbers, not feelings, and to take small, specific actions you can actually do this week.`, points: ["Work from real numbers", "Small, specific actions", "Do it this week"] },
-    { heading: "In real life", script: `${s.owner} runs ${s.biz} in ${s.place}, where ${s.detail}. Every idea in this module maps onto decisions ${s.owner} makes every day.`, points: ["Everyday decisions", "No big budget needed", "Notebook and honesty to start"] },
-    { heading: "The loop to remember", script: `See the real numbers. Decide one small change. Do it this week. Check what happened. Then repeat. That simple loop is how ${mod.title.toLowerCase()} keeps improving.`, points: ["See", "Decide", "Do", "Check"] },
-    { heading: "Your next steps", script: `Read the two readings, complete the workshop under Complete, post in the discussion, and submit the assignment. Then bring your result to the live workshop.`, points: ["Readings", "Complete workshop", "Discussion", "Assignment", "Live workshop"] },
+    { heading: mod.title, script: `This is your narrated overview of "${mod.title}", part of ${course.title}. In a few minutes you will get the big picture before you dive into the detail.`, points: ["What you will be able to do", "Why it matters", "How to apply it this week"], image: img("south,africa,business", 1) },
+    { heading: "What you will be able to do", script: `By the end you will be able to: ${objs.join("; ")}. Keep a real business in mind - your own, or one like ${s.owner}'s ${s.biz}.`, points: objs.slice(0, 4), image: img("entrepreneur,africa", 2) },
+    { heading: "The core idea", script: `${objs[0]}. The trick is to work from real numbers, not feelings, and to take small, specific actions you can actually do this week.`, points: ["Work from real numbers", "Small, specific actions", "Do it this week"], image: img("notebook,planning,business", 3) },
+    { heading: "In real life", script: `${s.owner} runs ${s.biz} in ${s.place}, where ${s.detail}. Every idea in this module maps onto decisions ${s.owner} makes every day.`, points: ["Everyday decisions", "No big budget needed", "Notebook and honesty to start"], image: img("market,vendor,africa", 4) },
+    { heading: "The loop to remember", script: `See the real numbers. Decide one small change. Do it this week. Check what happened. Then repeat. That simple loop is how ${mod.title.toLowerCase()} keeps improving.`, points: ["See", "Decide", "Do", "Check"], image: img("small,shop,owner", 5) },
+    { heading: "Your next steps", script: `Read the two readings, complete the workshop under Complete, post in the discussion, and submit the assignment. Then bring your result to the live workshop.`, points: ["Readings", "Complete workshop", "Discussion", "Assignment", "Live workshop"], image: img("teamwork,training,africa", 6) },
   ];
   return {
     type: "video", order: 11, title: `Video lesson: ${mod.title}`,
@@ -220,7 +223,11 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
       const mod: Mod = { id: m.id, title: m.title, objectives: (m.objectives as string[]) ?? [] };
       try {
         const existingBeats = await db.select().from(beatsTable).where(eq(beatsTable.moduleId, m.id));
-        const alreadyEnriched = existingBeats.some((b) => b.type === "video");
+        // "Enriched" only if the module already has a video lesson whose slides carry images - so an
+        // earlier build that predates slide images is upgraded on the next run rather than skipped.
+        const videoBeat = existingBeats.find((b) => b.type === "video");
+        const hasSlideImages = !!(videoBeat && (videoBeat.visualData as any)?.slides?.[0]?.image);
+        const alreadyEnriched = hasSlideImages;
         if (!alreadyEnriched) {
           // Replace placeholder beats with the full slide-deck lesson + video lesson.
           await db.delete(beatsTable).where(eq(beatsTable.moduleId, m.id));
@@ -274,7 +281,7 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
             courseId, moduleId: m.id, title: `Apply it: ${mod.title}`,
             description: `A short, practical task applying "${mod.title.toLowerCase()}" to a real business.`,
             instructions: `Using a real business (your own or one you can access), complete this task:\n\n${mod.objectives.map((o, i) => `${i + 1}. Show how you would: ${o}`).join("\n")}\n\nKeep it to one page or a filled-in template. Use real numbers. Then take ONE action this week and note what changed.`,
-            submissionType: "project", pointsPossible: "50", published: true, position: mi,
+            submissionType: "file_upload", pointsPossible: "50", published: true, position: mi,
           } as any);
         }
 
