@@ -40,21 +40,99 @@ const LEARNER_TEST_PASSWORD = "Enzatest123";
 const learnerTestEmail = (index1Based: number) => `enza@student${index1Based}.test`;
 
 /**
- * Give the cohort's learners deterministic test credentials: enza@student1.test .. enza@studentN.test
- * (ordered by creation, so student1 is the advanced learner) and the shared password above. Applied on
- * every seed run so re-clicking "Seed Enza Cohort" refreshes them. Password is hashed server-side.
+ * Self-healing: GUARANTEES the four demo learners exist with working test logins
+ * (enza@student1.test .. enza@student4.test, shared password, active) AND are enrolled in the cohort's
+ * courses at their level. Reuses learners already in the org (renaming them in creation order so
+ * student1 is the advanced learner); creates any that are missing; and only adds enrolments/progress
+ * for a learner who has none yet, so it never duplicates a good seed. Runs on every seed click, so a
+ * partially-seeded cohort is repaired into a known-good, loggable state. Passwords are hashed server-side.
  */
-async function applyLearnerCredentials(orgId: string): Promise<number> {
-  const learners = await db.select().from(usersTable)
+async function ensureTestLearners(partnerId: string, orgId: string): Promise<string[]> {
+  // Cohort class (first one) and its course list; fall back to the partner's assigned courses.
+  const cls = firstOrNull(await db.select().from(orgClassesTable).where(eq(orgClassesTable.orgId, orgId)).orderBy(asc(orgClassesTable.createdAt)));
+  let courseIds: string[] = [];
+  if (cls) {
+    const links = await db.select({ courseId: orgClassCoursesTable.courseId }).from(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id));
+    courseIds = links.map((l) => l.courseId);
+  }
+  if (courseIds.length === 0) {
+    const assigned = await db.select().from(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.partnerId, partnerId));
+    courseIds = assigned.map((a) => a.courseId).slice(0, 4);
+  }
+
+  // Ordered beats per course, for realistic progress.
+  const courseBeats: Record<string, { beatId: string; moduleId: string }[]> = {};
+  for (const courseId of courseIds) {
+    const mods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, courseId)).orderBy(asc(modulesTable.order));
+    const list: { beatId: string; moduleId: string }[] = [];
+    for (const m of mods) {
+      const bs = await db.select().from(beatsTable).where(eq(beatsTable.moduleId, m.id)).orderBy(asc(beatsTable.createdAt));
+      for (const b of bs) list.push({ beatId: b.id, moduleId: m.id });
+    }
+    courseBeats[courseId] = list;
+  }
+
+  const existing = await db.select().from(usersTable)
     .where(and(eq(usersTable.organisationId, orgId), eq(usersTable.role, "learner")))
     .orderBy(asc(usersTable.createdAt));
   const hash = hashPassword(LEARNER_TEST_PASSWORD);
-  for (let i = 0; i < learners.length; i++) {
-    await db.update(usersTable)
-      .set({ email: learnerTestEmail(i + 1), passwordHash: hash, status: "active", updatedAt: new Date() })
-      .where(eq(usersTable.id, learners[i].id));
+  const emails: string[] = [];
+
+  for (let i = 0; i < PERSONAS.length; i++) {
+    const p = PERSONAS[i];
+    const email = learnerTestEmail(i + 1);
+    const profile = {
+      email, passwordHash: hash, status: "active" as const, role: "learner" as const,
+      partnerId, organisationId: orgId, firstName: p.firstName, lastName: p.lastName,
+      phone: p.phone, learningStyle: p.learningStyle, updatedAt: new Date(),
+    };
+
+    // Prefer an existing account already on the target email; else reuse the i-th learner; else create.
+    const byEmail = firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, email)));
+    let learnerId: string;
+    if (byEmail) {
+      learnerId = byEmail.id;
+      await db.update(usersTable).set(profile).where(eq(usersTable.id, learnerId));
+    } else if (existing[i]) {
+      learnerId = existing[i].id;
+      await db.update(usersTable).set(profile).where(eq(usersTable.id, learnerId));
+    } else {
+      const [created] = await db.insert(usersTable).values(profile).returning();
+      learnerId = created.id;
+    }
+    emails.push(email);
+
+    // Roster membership.
+    if (cls) {
+      const link = await db.select({ id: orgClassLearnersTable.id }).from(orgClassLearnersTable)
+        .where(and(eq(orgClassLearnersTable.classId, cls.id), eq(orgClassLearnersTable.learnerId, learnerId)));
+      if (link.length === 0) await db.insert(orgClassLearnersTable).values({ classId: cls.id, learnerId });
+    }
+
+    // Enrolments + progress only if this learner has none (don't duplicate a good seed).
+    const hasEnrol = await db.select({ id: enrolmentsTable.id }).from(enrolmentsTable).where(eq(enrolmentsTable.userId, learnerId)).limit(1);
+    if (hasEnrol.length === 0 && courseIds.length > 0) {
+      const myCourses = courseIds.slice(0, p.courseCount);
+      for (let ci = 0; ci < myCourses.length; ci++) {
+        const courseId = myCourses[ci];
+        const completed = ci < p.completedCount;
+        await db.insert(enrolmentsTable).values({
+          userId: learnerId, courseId, status: completed ? "completed" : "active",
+          enrolledAt: daysAgo(45 - ci * 3), completedAt: completed ? daysAgo(7 + ci * 5) : null,
+        });
+        const beats = courseBeats[courseId] ?? [];
+        const frac = completed ? 1 : p.progress;
+        const viewCount = Math.max(p.key === "novice" ? 1 : 0, Math.ceil(beats.length * frac));
+        const rows = beats.slice(0, viewCount).map((b, idx) => ({
+          userId: learnerId, beatId: b.beatId, moduleId: b.moduleId, courseId,
+          secondsSpent: 60 + (idx % 5) * 20,
+          firstViewedAt: daysAgo(40 - ci * 4), lastViewedAt: daysAgo(Math.max(1, 28 - ci * 4)),
+        }));
+        if (rows.length > 0) await db.insert(beatProgressTable).values(rows);
+      }
+    }
   }
-  return learners.length;
+  return emails;
 }
 
 // People in the cohort. Learner emails use their own micro-business domains for realism.
@@ -138,8 +216,8 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
       .where(and(eq(organisationsTable.partnerId, partner.id), eq(organisationsTable.name, ORG_NAME))),
   );
   if (existingOrg) {
-    const n = await applyLearnerCredentials(existingOrg.id);
-    return { created: false, orgId: existingOrg.id, learners: n, message: `Cohort already seeded - refreshed ${n} learner test logins (enza@student1.test .. enza@student${n}.test, password ${LEARNER_TEST_PASSWORD}).` };
+    const emails = await ensureTestLearners(partner.id, existingOrg.id);
+    return { created: false, orgId: existingOrg.id, learners: emails.length, message: `Cohort ready. Learner logins: ${emails.join(", ")} - password ${LEARNER_TEST_PASSWORD}.` };
   }
 
   // 1. Organisation (the delivery tenant) + its cohort class
@@ -317,10 +395,10 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
     .set({ memberCount: learnerCount + 2, updatedAt: new Date() })
     .where(eq(organisationsTable.id, org.id));
 
-  // 9. Standardise learner test logins (enza@student1.test .. , shared password).
-  await applyLearnerCredentials(org.id);
+  // 9. Standardise learner test logins (enza@student1.test .. , shared password) + heal any gaps.
+  const emails = await ensureTestLearners(partner.id, org.id);
 
-  return { created: true, orgId: org.id, learners: learnerCount, message: `Cohort seeded. Learner logins: enza@student1.test .. enza@student${learnerCount}.test, password ${LEARNER_TEST_PASSWORD}.` };
+  return { created: true, orgId: org.id, learners: emails.length, message: `Cohort seeded. Learner logins: ${emails.join(", ")} - password ${LEARNER_TEST_PASSWORD}.` };
 }
 
 function feedbackFor(level: Persona["key"], score: number): string {
