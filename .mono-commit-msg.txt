@@ -1,7 +1,5 @@
-Gradebook covers everything + on-demand content translation (ASCII-only)
+Translation: remove Shona, keep read-aloud audio in English (ASCII-only)
 
-GRADEBOOK: every learning object now appears as a column. Added a new 'completion' gradebook source in gradebookEngine that scores each module as the fraction of its beats a learner has viewed (readings/video/lesson completion, formative). enzaEnrich now creates gradebook items per module for the interactive activity (activity), the workshop (attendance), module completion, plus the case (already) - and assignments are auto-included. So assignments, case studies, activities, workshops and completion all show in the gradebook.
+Removed Shona from the language options (frontend LANGS + backend LANG_NAMES), leaving English, isiZulu, isiXhosa and Afrikaans. Translation now applies to WRITTEN content only: the reader's read-aloud (ReadAloudBar) always speaks the original English text even when the written content is shown translated - no audio translations.
 
-TRANSLATION: new POST /translate {texts,lang} (and GET /translate/languages) using the existing AI translator (English, isiZulu, isiXhosa, Afrikaans, Shona). Added on-demand language chips to the reading reader and the narrated slide lesson, so learners can read any reading or slide deck in their language with a click and toggle back to English. Discussions and case coach already translate.
-
-VALIDATION: esbuild clean on gradebookEngine.ts, enzaEnrich.ts, translate.ts, routes/index.ts, ModuleViewer.tsx.
+VALIDATION: esbuild clean on ModuleViewer.tsx, caseEngine.ts, translate.ts.
