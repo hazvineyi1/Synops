@@ -1,5 +1,5 @@
-Real partner Enza Global Media: branded hub + 15 professional SMME courses, one-click provision (ASCII-only)
+Enza branding: real logo + favicon + full colour palette applied to the partner hub (ASCII-only)
 
-Provisions the real partner Enza Global Media (enzaglobalmedia.co.za: SMME development, coaching, incubation, ESD). New src/lib/enzaSeed.ts + POST /platform/seed-enza (super admin, idempotent): creates the Enza partner, a brand theme built from their site palette (near-black #111 primary, signature lime #9CDF00 secondary, rust #D8613C accent, Heebo font), an organisation, a faculty author, and a catalogue of 15 professional entrepreneurship courses - each with a rich description, course + module learning objectives, 3-4 modules (with title/points/close beats), a Socratic case study, a course reader, an interactive readiness self-check, an AI-facilitated discussion, and an applied-project assignment - all published, platform-owned, and ASSIGNED to Enza via course_partner_assignments. Super-admin Partner Management gains a Provision Enza Global button.
+Completes Enza Global Media branding from their website. The seed brand kit now includes the real hosted logo (cropped-logo) and favicon plus the full palette (near-black #111 primary, signature lime #9CDF00 secondary, rust #D8613C accent, Heebo font). Refactored the brand write into an idempotent applyBrand() upsert that runs on EVERY provision - so clicking Provision Enza Global when the partner already exists now refreshes logo + favicon + colours instead of skipping. First-time provision still creates partner + org + faculty + 15 courses and assigns them to Enza.
 
-VALIDATION: esbuild clean on enzaSeed.ts, platform.ts, AdminPartners.tsx.
+VALIDATION: esbuild clean on enzaSeed.ts, platform.ts.

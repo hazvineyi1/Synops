@@ -23,6 +23,7 @@ import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { logAudit as audit } from "../lib/audit";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
+import { seedEnzaCohort } from "../lib/enzaCohortSeed";
 import {
   newSessionToken,
   sessionExpiry,
@@ -722,6 +723,23 @@ router.post("/platform/seed-enza", requireAuth, requireSuperAdmin, async (req, r
   try {
     const result = await seedEnza();
     await audit(req, "platform.seed_enza", "partner", result.partnerId ?? "enza", { created: result.created, courses: result.courses });
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Seed failed";
+    res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * POST /platform/seed-enza-cohort - seeds a realistic delivery organisation under the Enza partner:
+ * a cohort of four township/rural SMME learners at four distinct levels of understanding, an org
+ * admin and a coach, enrolments into Enza's assigned courses, and progress / grades / coaching data.
+ * Requires seed-enza to have run first. Idempotent - safe to click more than once.
+ */
+router.post("/platform/seed-enza-cohort", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await seedEnzaCohort();
+    await audit(req, "platform.seed_enza_cohort", "organisation", result.orgId ?? "enza-cohort", { created: result.created, learners: result.learners });
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Seed failed";

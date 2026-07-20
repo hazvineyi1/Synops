@@ -379,6 +379,16 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision Enza', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Seed a realistic delivery cohort (org + admin + coach + 4 learners at different levels) under Enza.
+  const seedCohort = useMutation({
+    mutationFn: () => apiFetch<{ created: boolean; learners?: number; message?: string }>('/platform/seed-enza-cohort', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] });
+      toast({ title: r.created ? 'Enza cohort seeded' : 'Nothing to seed', description: r.created ? `Organisation, org admin, coach and ${r.learners} learners created with realistic progress.` : (r.message ?? 'Cohort already exists.') });
+    },
+    onError: (e: any) => toast({ title: 'Could not seed cohort', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -389,6 +399,9 @@ export function AdminPartners() {
         <div className="flex items-center gap-2">
           <Button variant="outline" disabled={seedEnza.isPending} onClick={() => seedEnza.mutate()} title="Provision Enza Global Media with brand + 15 courses">
             {seedEnza.isPending ? 'Provisioning…' : 'Provision Enza Global'}
+          </Button>
+          <Button variant="outline" disabled={seedCohort.isPending} onClick={() => seedCohort.mutate()} title="Seed a realistic Enza delivery cohort (org, admin, coach, 4 learners)">
+            {seedCohort.isPending ? 'Seeding…' : 'Seed Enza Cohort'}
           </Button>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
