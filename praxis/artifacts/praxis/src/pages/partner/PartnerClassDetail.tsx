@@ -1,53 +1,81 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
-import { useSession } from '@/context/SessionContext';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import {
-  ArrowLeft, Users, GraduationCap, BookOpen, ClipboardList, MessageSquare, Activity,
-  Check, KeyRound, Pencil, UserPlus, CheckCircle2, Clock, Send, Layers,
+  ArrowLeft, Users, GraduationCap, BookOpen, Check, Pencil, Layers, Search, Trash2,
+  CheckCircle2, UserCheck, ArrowRight,
 } from 'lucide-react';
-import {
-  getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgStaff,
-} from '@/lib/partnerHubData';
-import {
-  useOrgClasses, renameClass, toggleLearner, toggleCourse, setStaffAssignment, markMessageRead,
-  learnerSignals, type ClassRole,
-} from '@/lib/orgClassStore';
 
-const TABS = ['roster', 'staff', 'courses', 'gradebook', 'messages', 'activity'] as const;
-type Tab = typeof TABS[number];
-const TAB_LABEL: Record<Tab, string> = {
-  roster: 'Roster', staff: 'Staff', courses: 'Courses', gradebook: 'Gradebook', messages: 'Messages', activity: 'Activity',
-};
-const TAB_ICON: Record<Tab, React.ComponentType<{ className?: string }>> = {
-  roster: Users, staff: GraduationCap, courses: BookOpen, gradebook: ClipboardList, messages: MessageSquare, activity: Activity,
-};
-const CLASS_ROLES: ClassRole[] = ['facilitator', 'coach', 'admin'];
+interface ClassDetail { id: string; orgId: string; name: string; learnerIds: string[]; courseIds: string[]; staff: { staffId: string; role: string }[] }
+interface Member { id: string; firstName?: string | null; lastName?: string | null; email: string | null; role: string }
+interface Course { id: string; title: string; status?: string }
+
+const CLASS_ROLES = ['facilitator', 'coach', 'admin'] as const;
+type ClassRole = typeof CLASS_ROLES[number];
 const roleLabel: Record<ClassRole, string> = { facilitator: 'Facilitator', coach: 'Coach', admin: 'Admin' };
+const memberName = (m: Member) => [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email || m.id;
+const STAFF_ROLES = ['coach', 'org_admin', 'partner_admin', 'instructional_designer'];
+const eqSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
+
+const TABS = ['roster', 'courses', 'staff'] as const;
+type Tab = typeof TABS[number];
+const TAB_LABEL: Record<Tab, string> = { roster: 'Roster', courses: 'Courses', staff: 'Staff' };
+const TAB_ICON: Record<Tab, React.ComponentType<{ className?: string }>> = { roster: Users, courses: BookOpen, staff: GraduationCap };
 
 export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId: string }) {
-  const { user } = useSession();
   const [, navigate] = useLocation();
-  const h = findHubByOrgId(orgId) ?? getPartnerHub(user?.partnerId);
-  const d = orgDetail(h, orgId);
-  const classes = useOrgClasses(orgId);
-  const cls = classes.find((c) => c.id === classId);
-
-  const allLearners = useMemo(() => orgLearners(h, orgId), [h, orgId]);
-  const allStaff = useMemo(() => orgStaff(h, orgId), [h, orgId]);
-  const allCourses = useMemo(() => orgCourses(h, orgId), [h, orgId]);
-
+  const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('roster');
+  const [flash, setFlash] = useState<string | null>(null);
+  const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
+
+  const { data: cls, isLoading } = useQuery({ queryKey: ['class', classId], queryFn: () => apiFetch<ClassDetail>(`/classes/${classId}`), enabled: !!classId });
+  const { data: membersData } = useQuery({ queryKey: ['organisation-members', orgId], queryFn: () => apiFetch<Member[]>(`/organisations/${orgId}/members`), enabled: !!orgId });
+  const { data: coursesData } = useQuery({ queryKey: ['courses'], queryFn: () => apiFetch<Course[]>('/courses') });
+  const learners = (membersData ?? []).filter((m) => m.role === 'learner');
+  const staff = (membersData ?? []).filter((m) => STAFF_ROLES.includes(m.role));
+  const courses = coursesData ?? [];
+
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['class', classId] }); qc.invalidateQueries({ queryKey: ['org-classes', orgId] }); };
+
+  // Local editable selections, seeded from the class and saved in one PUT (bulk).
+  const [selLearners, setSelLearners] = useState<Set<string>>(new Set());
+  const [selCourses, setSelCourses] = useState<Set<string>>(new Set());
+  const [selStaff, setSelStaff] = useState<Set<string>>(new Set()); // key = `${staffId}::${role}`
+  useEffect(() => {
+    if (cls) {
+      setSelLearners(new Set(cls.learnerIds));
+      setSelCourses(new Set(cls.courseIds));
+      setSelStaff(new Set(cls.staff.map((s) => `${s.staffId}::${s.role}`)));
+    }
+  }, [cls]);
+
+  const rename = useMutation({ mutationFn: (name: string) => apiFetch(`/classes/${classId}`, { method: 'PATCH', body: JSON.stringify({ name }) }), onSuccess: () => { invalidate(); flashMsg('Class renamed.'); } });
+  const saveLearners = useMutation({ mutationFn: () => apiFetch(`/classes/${classId}/learners`, { method: 'PUT', body: JSON.stringify({ learnerIds: [...selLearners] }) }), onSuccess: () => { invalidate(); flashMsg('Roster saved.'); } });
+  const saveCourses = useMutation({ mutationFn: () => apiFetch(`/classes/${classId}/courses`, { method: 'PUT', body: JSON.stringify({ courseIds: [...selCourses] }) }), onSuccess: () => { invalidate(); flashMsg('Courses saved.'); } });
+  const saveStaff = useMutation({ mutationFn: () => apiFetch(`/classes/${classId}/staff`, { method: 'PUT', body: JSON.stringify({ staff: [...selStaff].map((k) => { const [staffId, role] = k.split('::'); return { staffId, role }; }) }) }), onSuccess: () => { invalidate(); flashMsg('Staff saved.'); } });
+  const enrol = useMutation({ mutationFn: () => apiFetch<{ enrolled: number; message?: string }>(`/classes/${classId}/enrol`, { method: 'POST' }), onSuccess: (r) => flashMsg(r.message ? r.message : `Enrolled ${r.enrolled} learner-course place${r.enrolled === 1 ? '' : 's'}.`) });
+  const del = useMutation({ mutationFn: () => apiFetch(`/classes/${classId}`, { method: 'DELETE' }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['org-classes', orgId] }); navigate(`/partner/org/${orgId}/classes`); } });
+
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
-  const [reply, setReply] = useState<Record<string, string>>({});
-  const [flash, setFlash] = useState<string | null>(null);
-  const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 2800); };
+  const [q, setQ] = useState('');
 
+  const learnersDirty = cls ? !eqSet(selLearners, new Set(cls.learnerIds)) : false;
+  const coursesDirty = cls ? !eqSet(selCourses, new Set(cls.courseIds)) : false;
+  const staffDirty = cls ? !eqSet(selStaff, new Set(cls.staff.map((s) => `${s.staffId}::${s.role}`))) : false;
+
+  const filteredLearners = useMemo(() => learners.filter((l) => memberName(l).toLowerCase().includes(q.trim().toLowerCase()) || (l.email ?? '').toLowerCase().includes(q.trim().toLowerCase())), [learners, q]);
+  const filteredCourses = useMemo(() => courses.filter((c) => c.title.toLowerCase().includes(q.trim().toLowerCase())), [courses, q]);
+
+  const toggle = (set: Set<string>, id: string, apply: (s: Set<string>) => void) => { const n = new Set(set); n.has(id) ? n.delete(id) : n.add(id); apply(n); };
+
+  if (isLoading) return <Card className="p-6 text-center text-muted-foreground">Loading class…</Card>;
   if (!cls) {
     return (
       <div className="space-y-4">
@@ -57,22 +85,16 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
     );
   }
 
-  const classLearners = allLearners.filter((l) => cls.learnerIds.includes(l.id));
-  const classCourses = allCourses.filter((c) => cls.courseIds.includes(c.id));
-  const unreadCount = cls.messages.filter((m) => m.unread).length;
-  const staffName = (id: string) => allStaff.find((s) => s.id === id)?.name ?? 'Unknown';
-
   return (
     <div className="space-y-5">
       <button onClick={() => navigate(`/partner/org/${orgId}/classes`)} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> All classes</button>
 
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           {editingName ? (
             <div className="flex items-center gap-2">
-              <input autoFocus defaultValue={cls.name} onChange={(e) => setNameDraft(e.target.value)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-lg font-semibold" />
-              <Button size="sm" onClick={() => { renameClass(orgId, classId, nameDraft || cls.name); setEditingName(false); flashMsg('Class renamed.'); }}>Save</Button>
+              <input autoFocus defaultValue={cls.name} onChange={(e) => setNameDraft(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 text-lg font-semibold" />
+              <Button size="sm" onClick={() => { rename.mutate(nameDraft.trim() || cls.name); setEditingName(false); }}>Save</Button>
               <Button size="sm" variant="ghost" onClick={() => setEditingName(false)}>Cancel</Button>
             </div>
           ) : (
@@ -81,7 +103,13 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
               <button onClick={() => { setNameDraft(cls.name); setEditingName(true); }} className="text-muted-foreground hover:text-foreground"><Pencil className="h-4 w-4" /></button>
             </div>
           )}
-          <p className="text-sm text-muted-foreground mt-1">{d.org?.name} · {classLearners.length} learners · {cls.staff.length} staff · {classCourses.length} courses</p>
+          <p className="text-sm text-muted-foreground mt-1">{cls.learnerIds.length} learners · {cls.staff.length} staff · {cls.courseIds.length} courses</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={enrol.isPending || cls.learnerIds.length === 0 || cls.courseIds.length === 0} onClick={() => enrol.mutate()} title="Create real enrolments for every learner in every assigned course">
+            <UserCheck className="h-3.5 w-3.5" /> {enrol.isPending ? 'Enrolling…' : 'Enrol into courses'}
+          </Button>
+          <Button size="sm" variant="ghost" className="gap-1.5 text-red-600" onClick={() => { if (window.confirm(`Delete the class "${cls.name}"? This does not remove learners or courses, only the class grouping.`)) del.mutate(); }}><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
         </div>
       </div>
 
@@ -91,11 +119,10 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
       <div className="flex flex-wrap gap-1.5 border-b border-border">
         {TABS.map((tb) => {
           const Icon = TAB_ICON[tb];
+          const dirty = (tb === 'roster' && learnersDirty) || (tb === 'courses' && coursesDirty) || (tb === 'staff' && staffDirty);
           return (
-            <button key={tb} onClick={() => setTab(tb)}
-              className={cn('inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition', tab === tb ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
-              <Icon className="h-4 w-4" /> {TAB_LABEL[tb]}
-              {tb === 'messages' && unreadCount > 0 && <span className="ml-1 rounded-full bg-red-500 text-white text-[10px] px-1.5">{unreadCount}</span>}
+            <button key={tb} onClick={() => { setTab(tb); setQ(''); }} className={cn('inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition', tab === tb ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+              <Icon className="h-4 w-4" /> {TAB_LABEL[tb]}{dirty && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-amber-500" />}
             </button>
           );
         })}
@@ -103,191 +130,104 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
 
       {/* ROSTER */}
       {tab === 'roster' && (
-        <div className="grid lg:grid-cols-2 gap-4">
-          <Card className="p-4">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Enrolled learners ({classLearners.length})</h3>
-            <div className="space-y-1.5 max-h-96 overflow-auto">
-              {classLearners.map((l) => (
-                <div key={l.id} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                  <div className="min-w-0"><div className="font-medium truncate">{l.name}</div><div className="text-xs text-muted-foreground truncate">{l.email}</div></div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => flashMsg(`Password reset link sent to ${l.email}.`)}><KeyRound className="h-3 w-3" /> Reset</Button>
-                    <Button size="sm" variant="ghost" className="h-7 text-xs text-red-600" onClick={() => toggleLearner(orgId, classId, l.id)}>Remove</Button>
-                  </div>
-                </div>
-              ))}
-              {classLearners.length === 0 && <div className="text-sm text-muted-foreground py-4 text-center">No learners enrolled yet. Add them from the right.</div>}
+        <Card className="p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold flex items-center gap-2"><Users className="h-4 w-4 text-primary" /> Learners <span className="text-muted-foreground font-normal">({selLearners.size} selected)</span></h3>
+            <div className="flex items-center gap-2">
+              <div className="relative"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search learners" className="h-8 w-48 rounded-md border border-input bg-background pl-8 pr-3 text-xs" /></div>
+              <Button size="sm" variant="outline" onClick={() => setSelLearners((s) => { const n = new Set(s); filteredLearners.forEach((l) => n.add(l.id)); return n; })}>Select all{q ? ' (filtered)' : ''}</Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelLearners((s) => { const n = new Set(s); filteredLearners.forEach((l) => n.delete(l.id)); return n; })}>Clear</Button>
             </div>
-          </Card>
-          <Card className="p-4">
-            <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><UserPlus className="h-4 w-4 text-primary" /> Enrol learners</h3>
-            <div className="space-y-1.5 max-h-96 overflow-auto">
-              {allLearners.map((l) => {
-                const on = cls.learnerIds.includes(l.id);
-                return (
-                  <button key={l.id} onClick={() => toggleLearner(orgId, classId, l.id)}
-                    className={cn('w-full flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm transition', on ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40')}>
-                    <div className="min-w-0"><div className="font-medium truncate">{l.name}</div><div className="text-xs text-muted-foreground truncate">{l.course}</div></div>
-                    <span className={cn('flex h-5 w-5 items-center justify-center rounded border shrink-0', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
-                  </button>
-                );
-              })}
+          </div>
+          <div className="grid sm:grid-cols-2 gap-1.5 max-h-[28rem] overflow-auto">
+            {filteredLearners.map((l) => {
+              const on = selLearners.has(l.id);
+              return (
+                <button key={l.id} onClick={() => toggle(selLearners, l.id, setSelLearners)} className={cn('flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm transition', on ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40')}>
+                  <div className="min-w-0"><div className="font-medium truncate">{memberName(l)}</div><div className="text-xs text-muted-foreground truncate">{l.email}</div></div>
+                  <span className={cn('flex h-5 w-5 items-center justify-center rounded border shrink-0', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                </button>
+              );
+            })}
+            {filteredLearners.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center sm:col-span-2">{learners.length === 0 ? 'No learners in this organisation yet. Add them under People.' : 'No learners match your search.'}</div>}
+          </div>
+          <div className="flex justify-end gap-2 border-t border-border pt-3">
+            {learnersDirty && <Button size="sm" variant="ghost" onClick={() => setSelLearners(new Set(cls.learnerIds))}>Reset</Button>}
+            <Button size="sm" disabled={!learnersDirty || saveLearners.isPending} onClick={() => saveLearners.mutate()}>{saveLearners.isPending ? 'Saving…' : 'Save roster'}</Button>
+          </div>
+        </Card>
+      )}
+
+      {/* COURSES */}
+      {tab === 'courses' && (
+        <Card className="p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold flex items-center gap-2"><BookOpen className="h-4 w-4 text-primary" /> Assigned courses <span className="text-muted-foreground font-normal">({selCourses.size} selected)</span></h3>
+            <div className="relative"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search courses" className="h-8 w-48 rounded-md border border-input bg-background pl-8 pr-3 text-xs" /></div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-1.5 max-h-[28rem] overflow-auto">
+            {filteredCourses.map((c) => {
+              const on = selCourses.has(c.id);
+              return (
+                <button key={c.id} onClick={() => toggle(selCourses, c.id, setSelCourses)} className={cn('flex items-center justify-between gap-2 rounded-lg border p-3 text-left text-sm transition', on ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40')}>
+                  <div className="min-w-0"><div className="font-medium truncate">{c.title}</div>{c.status && <div className="text-xs text-muted-foreground capitalize">{c.status}</div>}</div>
+                  <span className={cn('flex h-5 w-5 items-center justify-center rounded border shrink-0', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                </button>
+              );
+            })}
+            {filteredCourses.length === 0 && <div className="text-sm text-muted-foreground py-6 text-center sm:col-span-2">{courses.length === 0 ? 'No courses in the catalogue yet.' : 'No courses match your search.'}</div>}
+          </div>
+          <div className="flex items-center justify-between gap-2 border-t border-border pt-3">
+            <span className="text-xs text-muted-foreground">After saving, use "Enrol into courses" above to enrol this class's learners.</span>
+            <div className="flex gap-2">
+              {coursesDirty && <Button size="sm" variant="ghost" onClick={() => setSelCourses(new Set(cls.courseIds))}>Reset</Button>}
+              <Button size="sm" disabled={!coursesDirty || saveCourses.isPending} onClick={() => saveCourses.mutate()}>{saveCourses.isPending ? 'Saving…' : 'Save courses'}</Button>
             </div>
-          </Card>
-        </div>
+          </div>
+        </Card>
       )}
 
       {/* STAFF */}
       {tab === 'staff' && (
-        <div className="space-y-4">
-          <Card className="p-4 text-sm text-muted-foreground">Assign facilitators, coaches and admins to this class. A person can hold more than one role.</Card>
-          <Card className="overflow-hidden">
+        <Card className="p-4 space-y-3">
+          <p className="text-sm text-muted-foreground">Assign facilitators, coaches and admins to this class. A person can hold more than one role.</p>
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="text-left p-3">Staff member</th><th className="text-left p-3">Default</th>{CLASS_ROLES.map((r) => <th key={r} className="p-3 text-center">{roleLabel[r]}</th>)}</tr>
+                <tr><th className="text-left p-3">Staff member</th><th className="text-left p-3">Org role</th>{CLASS_ROLES.map((r) => <th key={r} className="p-3 text-center">{roleLabel[r]}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {allStaff.map((s) => (
+                {staff.map((s) => (
                   <tr key={s.id}>
-                    <td className="p-3"><div className="font-medium">{s.name}</div><div className="text-xs text-muted-foreground">{s.email}</div></td>
-                    <td className="p-3"><Badge variant="secondary" className="capitalize text-[10px]">{s.kind}</Badge></td>
+                    <td className="p-3"><div className="font-medium">{memberName(s)}</div><div className="text-xs text-muted-foreground">{s.email}</div></td>
+                    <td className="p-3"><Badge variant="secondary" className="capitalize text-[10px]">{s.role.replace(/_/g, ' ')}</Badge></td>
                     {CLASS_ROLES.map((r) => {
-                      const on = cls.staff.some((a) => a.staffId === s.id && a.role === r);
+                      const key = `${s.id}::${r}`;
+                      const on = selStaff.has(key);
                       return (
                         <td key={r} className="p-3 text-center">
-                          <button onClick={() => setStaffAssignment(orgId, classId, s.id, r, !on)}
-                            className={cn('mx-auto flex h-5 w-5 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40 hover:border-primary/50')}>
-                            {on && <Check className="h-3 w-3" />}
-                          </button>
+                          <button onClick={() => toggle(selStaff, key, setSelStaff)} className={cn('mx-auto flex h-5 w-5 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40 hover:border-primary/50')}>{on && <Check className="h-3 w-3" />}</button>
                         </td>
                       );
                     })}
                   </tr>
                 ))}
+                {staff.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No coaches or admins in this organisation yet.</td></tr>}
               </tbody>
             </table>
-          </Card>
-          <div className="flex flex-wrap gap-2">
-            {cls.staff.length === 0 ? <span className="text-sm text-muted-foreground">No staff assigned yet.</span> :
-              cls.staff.map((a, i) => <span key={i} className="rounded-lg border border-border px-3 py-1.5 text-xs"><span className="font-medium">{staffName(a.staffId)}</span> <span className="text-muted-foreground">· {roleLabel[a.role]}</span></span>)}
           </div>
-        </div>
-      )}
-
-      {/* COURSES */}
-      {tab === 'courses' && (
-        <Card className="p-4">
-          <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><BookOpen className="h-4 w-4 text-primary" /> Assign courses to this class</h3>
-          <div className="grid sm:grid-cols-2 gap-2">
-            {allCourses.map((c) => {
-              const on = cls.courseIds.includes(c.id);
-              return (
-                <button key={c.id} onClick={() => toggleCourse(orgId, classId, c.id)}
-                  className={cn('flex items-center justify-between gap-2 rounded-lg border p-3 text-left text-sm transition', on ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40')}>
-                  <div className="min-w-0"><div className="font-medium truncate">{c.title}</div><div className="text-xs text-muted-foreground">{c.modality}</div></div>
-                  <span className={cn('flex h-5 w-5 items-center justify-center rounded border shrink-0', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
-                </button>
-              );
-            })}
+          <div className="flex justify-end gap-2 border-t border-border pt-3">
+            {staffDirty && <Button size="sm" variant="ghost" onClick={() => setSelStaff(new Set(cls.staff.map((s) => `${s.staffId}::${s.role}`)))}>Reset</Button>}
+            <Button size="sm" disabled={!staffDirty || saveStaff.isPending} onClick={() => saveStaff.mutate()}>{saveStaff.isPending ? 'Saving…' : 'Save staff'}</Button>
           </div>
         </Card>
       )}
 
-      {/* GRADEBOOK */}
-      {tab === 'gradebook' && (
-        <Card className="overflow-hidden">
-          <div className="p-3 text-sm font-semibold border-b border-border flex items-center gap-2"><ClipboardList className="h-4 w-4 text-primary" /> Class gradebook</div>
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-              <tr><th className="text-left p-3">Learner</th><th className="text-right p-3">Grade</th><th className="text-left p-3">Progress</th><th className="text-right p-3">Submissions</th><th className="text-right p-3">Attendance</th><th className="p-3"></th></tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {classLearners.map((l) => {
-                const s = learnerSignals(l.id, l.progress);
-                return (
-                  <tr key={l.id}>
-                    <td className="p-3"><div className="font-medium">{l.name}</div><div className="text-xs text-muted-foreground">{l.email}</div></td>
-                    <td className="p-3 text-right tabular-nums font-medium">{s.grade}%</td>
-                    <td className="p-3"><div className="flex items-center gap-2"><Progress value={l.progress} className="h-1.5 w-20" /><span className="text-xs tabular-nums text-muted-foreground">{l.progress}%</span></div></td>
-                    <td className="p-3 text-right tabular-nums">{s.submissions}</td>
-                    <td className="p-3 text-right tabular-nums">{s.attendance}%</td>
-                    <td className="p-3 text-right"><Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => flashMsg(`Password reset link sent to ${l.email}.`)}><KeyRound className="h-3 w-3" /> Reset</Button></td>
-                  </tr>
-                );
-              })}
-              {classLearners.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No learners in this class yet.</td></tr>}
-            </tbody>
-          </table>
-        </Card>
-      )}
-
-      {/* MESSAGES */}
-      {tab === 'messages' && (
-        <div className="space-y-3">
-          <Card className="p-4 text-sm text-muted-foreground">In-app messages from learners in this class. Marking read or replying is functional; delivery is a backend step.</Card>
-          {cls.messages.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No messages yet.</Card>}
-          {cls.messages.map((m) => (
-            <Card key={m.id} className={cn('p-4', m.unread && 'border-primary/40 bg-primary/5')}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2"><span className="font-medium">{m.from}</span>{m.unread && <Badge className="bg-red-500 text-[10px]">New</Badge>}</div>
-                  <p className="text-sm mt-1">{m.body}</p>
-                  <div className="text-xs text-muted-foreground mt-1">{new Date(m.at).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
-                </div>
-                {m.unread && <Button size="sm" variant="ghost" className="shrink-0" onClick={() => markMessageRead(orgId, classId, m.id)}>Mark read</Button>}
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <input value={reply[m.id] ?? ''} onChange={(e) => setReply((r) => ({ ...r, [m.id]: e.target.value }))} placeholder={`Reply to ${m.from.split(' ')[0]}...`} className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm" />
-                <Button size="sm" className="gap-1.5" disabled={!(reply[m.id] ?? '').trim()} onClick={() => { markMessageRead(orgId, classId, m.id); setReply((r) => ({ ...r, [m.id]: '' })); flashMsg(`Reply sent to ${m.from}.`); }}><Send className="h-3.5 w-3.5" /> Send</Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      )}
-
-      {/* ACTIVITY */}
-      {tab === 'activity' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {(() => {
-              const sig = classLearners.map((l) => learnerSignals(l.id, l.progress));
-              const avg = (arr: number[]) => (arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0);
-              const active7 = classLearners.filter((l) => learnerSignals(l.id, l.progress).lastActiveDays <= 7).length;
-              return [
-                { label: 'Active last 7 days', value: `${active7}/${classLearners.length}` },
-                { label: 'Avg attendance', value: `${avg(sig.map((s) => s.attendance))}%` },
-                { label: 'Avg time on task', value: `${avg(sig.map((s) => s.timeOnTaskHrs))} h` },
-                { label: 'Avg grade', value: `${avg(sig.map((s) => s.grade))}%` },
-              ].map((k) => (
-                <Card key={k.label} className="p-4"><div className="text-2xl font-bold">{k.value}</div><div className="text-xs text-muted-foreground mt-1">{k.label}</div></Card>
-              ));
-            })()}
-          </div>
-          <Card className="overflow-hidden">
-            <div className="p-3 text-sm font-semibold border-b border-border flex items-center gap-2"><Activity className="h-4 w-4 text-primary" /> Learner engagement</div>
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="text-left p-3">Learner</th><th className="text-right p-3">Time on task</th><th className="text-right p-3">Submissions</th><th className="text-left p-3">Last active</th><th className="text-left p-3">Status</th></tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {classLearners.map((l) => {
-                  const s = learnerSignals(l.id, l.progress);
-                  return (
-                    <tr key={l.id}>
-                      <td className="p-3 font-medium">{l.name}</td>
-                      <td className="p-3 text-right tabular-nums">{s.timeOnTaskHrs} h</td>
-                      <td className="p-3 text-right tabular-nums">{s.submissions}</td>
-                      <td className="p-3 text-muted-foreground"><span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{s.lastActiveDays === 0 ? 'Today' : `${s.lastActiveDays}d ago`}</span></td>
-                      <td className="p-3"><Badge variant="outline" className={cn('capitalize text-[10px]', l.status === 'at-risk' && 'border-amber-300 text-amber-600')}>{l.status.replace('-', ' ')}</Badge></td>
-                    </tr>
-                  );
-                })}
-                {classLearners.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No learners in this class yet.</td></tr>}
-              </tbody>
-            </table>
-          </Card>
-        </div>
-      )}
+      <Card className="p-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <span>Delivery, coaching sections and the gradebook for these learners live in the organisation's real tools.</span>
+        <button onClick={() => navigate(`/partner/org/${orgId}/coaching`)} className="inline-flex items-center gap-1 text-primary hover:underline">Coaching <ArrowRight className="h-3 w-3" /></button>
+        <button onClick={() => navigate(`/partner/org/${orgId}/gradebook`)} className="inline-flex items-center gap-1 text-primary hover:underline">Gradebook <ArrowRight className="h-3 w-3" /></button>
+      </Card>
     </div>
   );
 }

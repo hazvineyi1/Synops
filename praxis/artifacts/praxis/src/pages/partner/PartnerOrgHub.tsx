@@ -1,4 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import { useLocation } from 'wouter';
 import { useSession } from '@/context/SessionContext';
 import { PageHeader } from '@/components/PageHeader';
@@ -23,9 +25,10 @@ import {
   getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgCoaching, orgGradebook,
   DELEGATABLE_POWERS, ZAR, VAT_RATE, type Invoice, type PartnerDoc, type DocCategory,
 } from '@/lib/partnerHubData';
-import { useOrgClasses, createClass } from '@/lib/orgClassStore';
 import { useLearningHub } from '@/lib/learningHubStore';
 import { PartnerClassDetail } from './PartnerClassDetail';
+
+interface ClassRow { id: string; name: string; learnerCount: number; courseCount: number; staffCount: number; createdAt: string }
 
 const SECTION_META: Record<string, { title: string; icon: React.ComponentType<{ className?: string }> }> = {
   overview: { title: 'Overview', icon: Building },
@@ -109,7 +112,13 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const seededLearners = useMemo(() => orgLearners(h, orgId), [h, orgId]);
   const coaching = useMemo(() => orgCoaching(h, orgId), [h, orgId]);
   const gradebook = useMemo(() => orgGradebook(h, orgId), [h, orgId]);
-  const classes = useOrgClasses(orgId);
+  const qcHub = useQueryClient();
+  const { data: classesData } = useQuery({ queryKey: ['org-classes', orgId], queryFn: () => apiFetch<ClassRow[]>(`/organisations/${orgId}/classes`), enabled: !!orgId });
+  const classes = classesData ?? [];
+  const createClassM = useMutation({
+    mutationFn: (name: string) => apiFetch<{ id: string }>(`/organisations/${orgId}/classes`, { method: 'POST', body: JSON.stringify({ name }) }),
+    onSuccess: (r) => { qcHub.invalidateQueries({ queryKey: ['org-classes', orgId] }); setNewClassName(''); flashMsg('Class created.'); navigate(`${base}/classes/${r.id}`); },
+  });
 
   // Create-class + self-enrolment UI state
   const [newClassName, setNewClassName] = useState('');
@@ -323,7 +332,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 <span className="mb-1 block font-medium text-muted-foreground">Create a class</span>
                 <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} placeholder="e.g. Evening Cohort 2026" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
               </label>
-              <Button className="gap-1.5" disabled={!newClassName.trim()} onClick={() => { const id = createClass(orgId, newClassName); setNewClassName(''); flashMsg('Class created.'); navigate(`${base}/classes/${id}`); }}><Plus className="h-4 w-4" /> Create</Button>
+              <Button className="gap-1.5" disabled={!newClassName.trim() || createClassM.isPending} onClick={() => createClassM.mutate(newClassName.trim())}><Plus className="h-4 w-4" /> {createClassM.isPending ? 'Creating…' : 'Create'}</Button>
             </div>
           </Card>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -335,10 +344,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                   <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 </div>
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span><Users className="inline h-3 w-3 mr-1" />{cl.learnerIds.length} learners</span>
-                  <span><GraduationCap className="inline h-3 w-3 mr-1" />{cl.staff.length} staff</span>
-                  <span><BookOpen className="inline h-3 w-3 mr-1" />{cl.courseIds.length} courses</span>
-                  {cl.messages.some((m) => m.unread) && <span className="text-red-600">{cl.messages.filter((m) => m.unread).length} new messages</span>}
+                  <span><Users className="inline h-3 w-3 mr-1" />{cl.learnerCount} learners</span>
+                  <span><GraduationCap className="inline h-3 w-3 mr-1" />{cl.staffCount} staff</span>
+                  <span><BookOpen className="inline h-3 w-3 mr-1" />{cl.courseCount} courses</span>
                 </div>
               </button>
             ))}
