@@ -1,5 +1,5 @@
-Enza learners: standardised test logins enza@student1..N.test with a shared password (ASCII-only)
+Fix Enza learner logins: self-healing ensureTestLearners guarantees the 4 test accounts exist (ASCII-only)
 
-The four seeded Enza cohort learners now get deterministic sign-in details so the founder can log in as each level. applyLearnerCredentials() sets their emails to enza@student1.test .. enza@studentN.test (ordered by creation, so student1 is the advanced learner, student4 the novice) and a shared password Enzatest123 (hashed server-side), status active. Runs on every Seed Enza Cohort click - the idempotent branch now refreshes the logins instead of skipping - and the button toast reports the exact emails + password.
+Login as enza@student1.test failed because a partially-seeded cohort left the org existing but its learners incomplete, so the old rename-only step had nothing (or too few) to rename. Replaced it with ensureTestLearners(), which GUARANTEES the four demo accounts: it reuses learners already in the org (renaming in creation order so student1 is advanced), CREATES any that are missing, sets email enza@studentN.test + password Enzatest123 (hashed) + active, adds them to the cohort roster, and enrols them into the cohort courses with level-appropriate progress if they have none yet. Runs on every Seed Enza Cohort click (create path and the already-exists branch), so clicking once now repairs a broken cohort into a loggable state. Toast reports the exact emails + password.
 
-VALIDATION: esbuild clean on enzaCohortSeed.ts, AdminPartners.tsx.
+VALIDATION: esbuild clean on enzaCohortSeed.ts.

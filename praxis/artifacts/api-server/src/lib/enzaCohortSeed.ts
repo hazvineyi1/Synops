@@ -8,7 +8,7 @@ import {
   deliverySessionsTable, attendanceRecordsTable,
 } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
-import { hashPassword } from "../lib/auth";
+import { hashPassword, verifyPassword } from "../lib/auth";
 
 /**
  * Seeds a realistic delivery ORGANISATION under the "Enza Global Media" partner: a cohort of real-
@@ -77,7 +77,9 @@ async function ensureTestLearners(partnerId: string, orgId: string): Promise<str
     .orderBy(asc(usersTable.createdAt));
   const hash = hashPassword(LEARNER_TEST_PASSWORD);
   const emails: string[] = [];
+  const learnerIds: string[] = [];
 
+  // PASS 1 - GUARANTEE THE ACCOUNTS. This is all that login needs, so nothing below may throw here.
   for (let i = 0; i < PERSONAS.length; i++) {
     const p = PERSONAS[i];
     const email = learnerTestEmail(i + 1);
@@ -87,12 +89,12 @@ async function ensureTestLearners(partnerId: string, orgId: string): Promise<str
       phone: p.phone, learningStyle: p.learningStyle, updatedAt: new Date(),
     };
 
-    // Prefer an existing account already on the target email; else reuse the i-th learner; else create.
-    const byEmail = firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, email)));
+    // Update EVERY row already on this email (so a stray duplicate can never shadow the real account
+    // with a null password at login time); else adopt the i-th existing learner; else create fresh.
+    const updated = await db.update(usersTable).set(profile).where(eq(usersTable.email, email)).returning({ id: usersTable.id });
     let learnerId: string;
-    if (byEmail) {
-      learnerId = byEmail.id;
-      await db.update(usersTable).set(profile).where(eq(usersTable.id, learnerId));
+    if (updated.length > 0) {
+      learnerId = updated[0].id;
     } else if (existing[i]) {
       learnerId = existing[i].id;
       await db.update(usersTable).set(profile).where(eq(usersTable.id, learnerId));
@@ -101,17 +103,23 @@ async function ensureTestLearners(partnerId: string, orgId: string): Promise<str
       learnerId = created.id;
     }
     emails.push(email);
+    learnerIds.push(learnerId);
 
-    // Roster membership.
     if (cls) {
       const link = await db.select({ id: orgClassLearnersTable.id }).from(orgClassLearnersTable)
         .where(and(eq(orgClassLearnersTable.classId, cls.id), eq(orgClassLearnersTable.learnerId, learnerId)));
       if (link.length === 0) await db.insert(orgClassLearnersTable).values({ classId: cls.id, learnerId });
     }
+  }
 
-    // Enrolments + progress only if this learner has none (don't duplicate a good seed).
-    const hasEnrol = await db.select({ id: enrolmentsTable.id }).from(enrolmentsTable).where(eq(enrolmentsTable.userId, learnerId)).limit(1);
-    if (hasEnrol.length === 0 && courseIds.length > 0) {
+  // PASS 2 - best-effort enrolments + progress. Cosmetic relative to login, so a hiccup here (e.g. a
+  // duplicate beat-progress row) must never undo the guaranteed accounts above.
+  try {
+    for (let i = 0; i < PERSONAS.length; i++) {
+      const p = PERSONAS[i];
+      const learnerId = learnerIds[i];
+      const hasEnrol = await db.select({ id: enrolmentsTable.id }).from(enrolmentsTable).where(eq(enrolmentsTable.userId, learnerId)).limit(1);
+      if (hasEnrol.length > 0 || courseIds.length === 0) continue;
       const myCourses = courseIds.slice(0, p.courseCount);
       for (let ci = 0; ci < myCourses.length; ci++) {
         const courseId = myCourses[ci];
@@ -128,11 +136,33 @@ async function ensureTestLearners(partnerId: string, orgId: string): Promise<str
           secondsSpent: 60 + (idx % 5) * 20,
           firstViewedAt: daysAgo(40 - ci * 4), lastViewedAt: daysAgo(Math.max(1, 28 - ci * 4)),
         }));
-        if (rows.length > 0) await db.insert(beatProgressTable).values(rows);
+        if (rows.length > 0) await db.insert(beatProgressTable).values(rows).onConflictDoNothing();
       }
     }
-  }
+  } catch { /* accounts are already guaranteed; progress is non-essential */ }
+
   return emails;
+}
+
+/**
+ * Re-reads each test learner and confirms the shared password actually validates and the account is
+ * active + unique. Returns a human-readable verification the endpoint surfaces, so a login failure can
+ * be diagnosed from the seed's own response instead of guesswork.
+ */
+async function verifyTestLearners(): Promise<{ ok: number; total: number; detail: string }> {
+  const parts: string[] = [];
+  let ok = 0;
+  for (let i = 0; i < PERSONAS.length; i++) {
+    const email = learnerTestEmail(i + 1);
+    const rows = await db.select().from(usersTable).where(eq(usersTable.email, email));
+    if (rows.length === 0) { parts.push(`${email}: MISSING`); continue; }
+    if (rows.length > 1) { parts.push(`${email}: ${rows.length} duplicates`); }
+    const u = rows[0];
+    const pwOk = verifyPassword(LEARNER_TEST_PASSWORD, u.passwordHash);
+    if (pwOk && u.status === "active") { ok++; if (rows.length === 1) parts.push(`${email}: OK`); }
+    else parts.push(`${email}: ${!pwOk ? "bad-password" : u.status}`);
+  }
+  return { ok, total: PERSONAS.length, detail: parts.join("; ") };
 }
 
 // People in the cohort. Learner emails use their own micro-business domains for realism.
@@ -217,7 +247,8 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
   );
   if (existingOrg) {
     const emails = await ensureTestLearners(partner.id, existingOrg.id);
-    return { created: false, orgId: existingOrg.id, learners: emails.length, message: `Cohort ready. Learner logins: ${emails.join(", ")} - password ${LEARNER_TEST_PASSWORD}.` };
+    const v = await verifyTestLearners();
+    return { created: false, orgId: existingOrg.id, learners: emails.length, message: `Logins ${v.ok}/${v.total} verified with password ${LEARNER_TEST_PASSWORD}. ${v.detail}` };
   }
 
   // 1. Organisation (the delivery tenant) + its cohort class
@@ -262,7 +293,9 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
     courseAssignment[courseId] = asg ? asg.id : null;
   }
 
-  // 4. Each learner: enrol, mark progress, grade, and (for the struggler) open a coach intervention.
+  // 4-8. Rich delivery data (progress, grades, alerts, coaching thread, attendance). Wrapped so that a
+  // failure in any of this cosmetic seeding can NEVER stop the guaranteed learner logins in step 9.
+  try {
   let learnerCount = 0;
   for (const p of PERSONAS) {
     const userId = await upsertUser({
@@ -394,11 +427,13 @@ export async function seedEnzaCohort(): Promise<{ created: boolean; orgId?: stri
   await db.update(organisationsTable)
     .set({ memberCount: learnerCount + 2, updatedAt: new Date() })
     .where(eq(organisationsTable.id, org.id));
+  } catch { /* cosmetic delivery data failed; the learner logins below are still guaranteed */ }
 
   // 9. Standardise learner test logins (enza@student1.test .. , shared password) + heal any gaps.
   const emails = await ensureTestLearners(partner.id, org.id);
+  const v = await verifyTestLearners();
 
-  return { created: true, orgId: org.id, learners: emails.length, message: `Cohort seeded. Learner logins: ${emails.join(", ")} - password ${LEARNER_TEST_PASSWORD}.` };
+  return { created: true, orgId: org.id, learners: emails.length, message: `Cohort seeded. Logins ${v.ok}/${v.total} verified with password ${LEARNER_TEST_PASSWORD}. ${v.detail}` };
 }
 
 function feedbackFor(level: Persona["key"], score: number): string {
