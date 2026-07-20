@@ -22,6 +22,7 @@ import { eq, and, isNull, desc, sql, or, ilike, gte, type SQL } from "drizzle-or
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { logAudit as audit } from "../lib/audit";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
+import { seedEnza } from "../lib/enzaSeed";
 import {
   newSessionToken,
   sessionExpiry,
@@ -709,6 +710,23 @@ router.delete("/platform/filings/:id", requireAuth, requireSuperAdmin, async (re
   await db.delete(platformFilingsTable).where(eq(platformFilingsTable.id, req.params.id));
   await audit(req, "filing.delete", "platform_filing", req.params.id);
   res.status(204).send();
+});
+
+/**
+ * POST /platform/seed-enza - one-click provisioning of the real partner Enza Global Media: partner,
+ * brand theme, organisation, faculty author, and a catalogue of 15 professional SMME courses (each
+ * with modules, objectives, a case study, a reading, an interactive, a discussion and an assignment),
+ * all assigned to the Enza partner. Idempotent - safe to click more than once.
+ */
+router.post("/platform/seed-enza", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await seedEnza();
+    await audit(req, "platform.seed_enza", "partner", result.partnerId ?? "enza", { created: result.created, courses: result.courses });
+    res.json(result);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Seed failed";
+    res.status(500).json({ error: message });
+  }
 });
 
 export default router;

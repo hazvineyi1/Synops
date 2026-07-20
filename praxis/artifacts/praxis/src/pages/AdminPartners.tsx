@@ -364,9 +364,20 @@ function PartnerDetailDialog({ partner, onClose }: { partner: Partner | null; on
 export function AdminPartners() {
   const { data: partners, isLoading, refetch } = useListPartners();
   const qc = useQueryClient();
+  const { toast } = useToast();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
+
+  // One-click provisioning of the real Enza Global Media partner (brand + 15 courses + content).
+  const seedEnza = useMutation({
+    mutationFn: () => apiFetch<{ created: boolean; courses?: number; message?: string }>('/platform/seed-enza', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] }); qc.invalidateQueries({ queryKey: ['courses'] });
+      toast({ title: r.created ? 'Enza Global provisioned' : 'Already provisioned', description: r.created ? `${r.courses} branded courses created and assigned to Enza Global Media.` : (r.message ?? 'Enza partner already exists.') });
+    },
+    onError: (e: any) => toast({ title: 'Could not provision Enza', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
 
   return (
     <div className="space-y-8 animate-in fade-in">
@@ -375,17 +386,22 @@ export function AdminPartners() {
           <h1 className="text-4xl font-serif font-bold tracking-tight">Partner Management</h1>
           <p className="text-muted-foreground">Provision partner tenants with white-label branding, a first admin, and starter courses.</p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="h-4 w-4 mr-2" /> Create partner</Button>
-          </DialogTrigger>
-          {createOpen && (
-            <CreatePartnerDialog
-              onClose={() => setCreateOpen(false)}
-              onCreated={() => { refetch(); qc.invalidateQueries({ queryKey: ['courses'] }); }}
-            />
-          )}
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" disabled={seedEnza.isPending} onClick={() => seedEnza.mutate()} title="Provision Enza Global Media with brand + 15 courses">
+            {seedEnza.isPending ? 'Provisioning…' : 'Provision Enza Global'}
+          </Button>
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="h-4 w-4 mr-2" /> Create partner</Button>
+            </DialogTrigger>
+            {createOpen && (
+              <CreatePartnerDialog
+                onClose={() => setCreateOpen(false)}
+                onCreated={() => { refetch(); qc.invalidateQueries({ queryKey: ['courses'] }); }}
+              />
+            )}
+          </Dialog>
+        </div>
       </div>
 
       <Card>
