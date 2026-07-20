@@ -1,5 +1,5 @@
-Stop Enza branding leaking onto the shared login; add /enzaglobalmedia vanity path (ASCII-only)
+Fix notification 404: assignment notifications linked to a non-existent route (ASCII-only)
 
-The regular login was showing Enza branding because resolvePublicBrandByHost fell back to the platform theme (which had picked up Enza colours/logo). Changed it: a partner brand only applies to a PUBLIC page on that partner's own custom domain; on the app's own domain it now returns the neutral Synops default. So the regular sign-in has no Enza branding again, while the Enza sign-in stays branded because its links carry ?p=enza-global. Also added a clean /enzaglobalmedia route that renders the Enza landing (alongside /p/:slug), and the admin Landing button opens /enzaglobalmedia for Enza.
+A graded-assignment notification linked to /assignments/:id, but the only route was /courses/:courseId/assignments/:id - so clicking it 404'd. Fixed the notification link in applyGrade to include the course id, and added a fallback route /assignments/:assignmentId that resolves the course from the assignment itself (so older notifications with the bare link also work). AssignmentDetail now derives courseId from the route OR the loaded assignment.
 
-VALIDATION: esbuild clean on brandResolve.ts, App.tsx, AdminPartners.tsx.
+VALIDATION: esbuild clean on assignments.ts, AssignmentDetail.tsx, App.tsx.

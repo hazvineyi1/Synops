@@ -396,6 +396,13 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not build courses', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Re-point the demo learners' progress at the current content after a rebuild (fixes low completion / wrong off-track).
+  const resync = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; learners?: number; beats?: number; message?: string }>('/platform/resync-enza-progress', { method: 'POST' }),
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['courses'] }); toast({ title: r.ok ? 'Learner progress resynced' : 'Nothing to resync', description: r.ok ? `${r.learners} learners re-pointed to current content (${r.beats} progress records), off-track status recomputed, stale notifications cleared.` : (r.message ?? 'Seed the cohort first.') }); },
+    onError: (e: any) => toast({ title: 'Could not resync', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Seed a realistic delivery cohort (org + admin + coach + 4 learners at different levels) under Enza.
   const seedCohort = useMutation({
     mutationFn: () => apiFetch<{ created: boolean; learners?: number; message?: string }>('/platform/seed-enza-cohort', { method: 'POST' }),
@@ -422,6 +429,9 @@ export function AdminPartners() {
           </Button>
           <Button variant="outline" disabled={seedCohort.isPending} onClick={() => seedCohort.mutate()} title="Seed a realistic Enza delivery cohort (org, admin, coach, 4 learners)">
             {seedCohort.isPending ? 'Seeding…' : 'Seed Enza Cohort'}
+          </Button>
+          <Button variant="outline" disabled={resync.isPending} onClick={() => resync.mutate()} title="Re-point the demo learners' progress at the current content and fix off-track/notifications">
+            {resync.isPending ? 'Resyncing…' : 'Resync Learner Progress'}
           </Button>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>

@@ -23,7 +23,7 @@ import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { logAudit as audit } from "../lib/audit";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
-import { seedEnzaCohort } from "../lib/enzaCohortSeed";
+import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
@@ -822,6 +822,21 @@ router.post("/platform/seed-enza-cohort", requireAuth, requireSuperAdmin, async 
   } catch (err) {
     const message = err instanceof Error ? err.message : "Seed failed";
     res.status(500).json({ error: message });
+  }
+});
+
+/**
+ * POST /platform/resync-enza-progress - re-points the demo learners' progress at the current content
+ * (rebuilding courses orphans their beat progress), recomputes off-track state and clears stale
+ * notifications. Super admin only.
+ */
+router.post("/platform/resync-enza-progress", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await resyncEnzaProgress();
+    await audit(req, "platform.resync_enza_progress", "partner", "enza", { learners: r.learners, beats: r.beats });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Resync failed" });
   }
 });
 

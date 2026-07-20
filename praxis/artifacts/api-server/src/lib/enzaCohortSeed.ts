@@ -5,10 +5,11 @@ import {
   coursePartnerAssignmentsTable,
   enrolmentsTable, orgClassesTable, orgClassLearnersTable, orgClassCoursesTable, orgClassStaffTable,
   beatProgressTable, submissionsTable, gradebookAlertsTable, coachMessagesTable,
-  deliverySessionsTable, attendanceRecordsTable,
+  deliverySessionsTable, attendanceRecordsTable, notificationsTable,
 } from "@workspace/db";
 import { eq, and, asc, sql } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../lib/auth";
+import { recomputeLearnerAlert } from "../lib/gradebookEngine";
 
 /**
  * Seeds a realistic delivery ORGANISATION under the "Enza Global Media" partner: a cohort of real-
@@ -467,4 +468,72 @@ function feedbackFor(level: Persona["key"], score: number): string {
   if (level === "advanced") return `Outstanding work (${score}%). Your reasoning is evidence-based and you clearly applied it to your own venture. Push yourself on the financial detail next.`;
   if (level === "on_track") return `Solid submission (${score}%). The core is right; tighten your assumptions and show the numbers behind your pricing to move into the top band.`;
   return `Passing (${score}%) but the numbers need work. Let's rebuild the costing section together in our next session - you're closer than it feels.`;
+}
+
+/**
+ * Re-point the four demo learners' progress at the CURRENT module content. Rebuilding courses (Build
+ * Full Courses) gives beats new IDs, which orphans the seeded beat_progress - so completion reads
+ * artificially low and an advanced learner can be wrongly shown as behind. This wipes each learner's
+ * stale progress, re-inserts it against today's beats at their persona level, recomputes their
+ * gradebook alert so off-track reflects reality, and clears the stale system notifications.
+ */
+export async function resyncEnzaProgress(): Promise<{ ok: boolean; learners: number; beats: number; message?: string }> {
+  const partner = firstOrNull(await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_SLUG)));
+  if (!partner) return { ok: false, learners: 0, beats: 0, message: "Provision Enza Global first." };
+  const org = firstOrNull(await db.select().from(organisationsTable).where(and(eq(organisationsTable.partnerId, partner.id), eq(organisationsTable.name, ORG_NAME))));
+  if (!org) return { ok: false, learners: 0, beats: 0, message: "Seed the Enza cohort first." };
+
+  // Cohort courses (class courses, else the partner's assigned courses).
+  const cls = firstOrNull(await db.select().from(orgClassesTable).where(eq(orgClassesTable.orgId, org.id)).orderBy(asc(orgClassesTable.createdAt)));
+  let courseIds: string[] = [];
+  if (cls) {
+    const links = await db.select({ courseId: orgClassCoursesTable.courseId }).from(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id));
+    courseIds = links.map((l) => l.courseId);
+  }
+  if (courseIds.length === 0) {
+    const assigned = await db.select().from(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.partnerId, partner.id));
+    courseIds = [...new Set(assigned.map((a) => a.courseId))].slice(0, 4);
+  }
+
+  // Current beats per course.
+  const courseBeats: Record<string, { beatId: string; moduleId: string }[]> = {};
+  for (const cid of courseIds) {
+    const mods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, cid)).orderBy(asc(modulesTable.order));
+    const list: { beatId: string; moduleId: string }[] = [];
+    for (const mm of mods) {
+      const bs = await db.select().from(beatsTable).where(eq(beatsTable.moduleId, mm.id)).orderBy(asc(beatsTable.order));
+      for (const b of bs) list.push({ beatId: b.id, moduleId: mm.id });
+    }
+    courseBeats[cid] = list;
+  }
+
+  let learnersCount = 0, beatsCount = 0;
+  for (let i = 0; i < PERSONAS.length; i++) {
+    const p = PERSONAS[i];
+    const learner = firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, learnerTestEmail(i + 1))));
+    if (!learner) continue;
+    learnersCount++;
+
+    // Wipe stale (orphaned) progress across all cohort courses, then rebuild it at this learner's level.
+    for (const cid of courseIds) { try { await db.delete(beatProgressTable).where(and(eq(beatProgressTable.userId, learner.id), eq(beatProgressTable.courseId, cid))); } catch { /* ignore */ } }
+    const myCourses = courseIds.slice(0, p.courseCount);
+    for (let ci = 0; ci < myCourses.length; ci++) {
+      const cid = myCourses[ci];
+      const completed = ci < p.completedCount;
+      const frac = completed ? 1 : p.progress;
+      const beats = courseBeats[cid] ?? [];
+      const viewCount = Math.max(p.key === "novice" ? 1 : 0, Math.ceil(beats.length * frac));
+      const rows = beats.slice(0, viewCount).map((b, idx) => ({
+        userId: learner.id, beatId: b.beatId, moduleId: b.moduleId, courseId: cid,
+        secondsSpent: 60 + (idx % 5) * 20, firstViewedAt: daysAgo(40 - ci * 4), lastViewedAt: daysAgo(Math.max(1, 28 - ci * 4)),
+      }));
+      if (rows.length > 0) { try { await db.insert(beatProgressTable).values(rows).onConflictDoNothing(); beatsCount += rows.length; } catch { /* ignore */ } }
+    }
+
+    // Recompute off-track state so the coach/gradebook reflect reality, and clear stale notifications.
+    for (const cid of courseIds) { try { await recomputeLearnerAlert(cid, learner.id); } catch { /* ignore */ } }
+    try { await db.delete(notificationsTable).where(and(eq(notificationsTable.userId, learner.id), eq(notificationsTable.type, "system"))); } catch { /* ignore */ }
+  }
+
+  return { ok: true, learners: learnersCount, beats: beatsCount };
 }
