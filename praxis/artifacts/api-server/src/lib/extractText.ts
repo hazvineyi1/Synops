@@ -25,11 +25,12 @@ const ext = (name: string) => (name.split(".").pop() || "").toLowerCase();
 const TEXT_EXTS = ["txt", "md", "markdown", "csv", "tsv", "json", "rtf", "log"];
 
 async function pdfToText(buf: Buffer): Promise<string> {
-  // Import the lib file directly to avoid pdf-parse's index.js debug/test harness.
-  const mod: any = await import("pdf-parse/lib/pdf-parse.js");
-  const pdf = mod.default ?? mod;
-  const data = await pdf(buf);
-  return String(data?.text ?? "");
+  // unpdf (maintained pdf.js build) replaces pdf-parse, which is unmaintained since 2018 and bundles
+  // an old pdf.js — a risk on this attacker-controlled upload path.
+  const mod: any = await import("unpdf");
+  const pdf = await mod.getDocumentProxy(new Uint8Array(buf));
+  const { text } = await mod.extractText(pdf, { mergePages: true });
+  return Array.isArray(text) ? text.join("\n") : String(text ?? "");
 }
 async function docxToText(buf: Buffer): Promise<string> {
   const mod: any = await import("mammoth");
@@ -38,10 +39,22 @@ async function docxToText(buf: Buffer): Promise<string> {
   return String(r?.value ?? "");
 }
 async function xlsxToText(buf: Buffer): Promise<string> {
-  const mod: any = await import("xlsx");
-  const XLSX = mod.default ?? mod;
-  const wb = XLSX.read(buf, { type: "buffer" });
-  return wb.SheetNames.map((n: string) => "# " + n + "\n" + XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n\n");
+  // ExcelJS replaces SheetJS/xlsx (unpatchable CVEs on npm 0.18.5), reachable from this upload path.
+  const mod: any = await import("exceljs");
+  const ExcelJS = mod.default ?? mod;
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  const cell = (v: any): string => {
+    if (v == null) return "";
+    const s = typeof v === "object" ? (v.text ?? v.result ?? v.hyperlink ?? "") : v;
+    const str = String(s);
+    return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+  };
+  return wb.worksheets.map((ws: any) => {
+    const lines: string[] = [];
+    ws.eachRow((row: any) => { lines.push((row.values as any[]).slice(1).map(cell).join(",")); });
+    return "# " + ws.name + "\n" + lines.join("\n");
+  }).join("\n\n");
 }
 async function pptxToText(buf: Buffer): Promise<string> {
   const mod: any = await import("jszip");

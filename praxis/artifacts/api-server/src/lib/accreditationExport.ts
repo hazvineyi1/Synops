@@ -2,10 +2,10 @@ import type { AccreditationReport, StandardRow } from "./accreditationEngine";
 
 /**
  * Renders an AccreditationReport to downloadable files.
- *  - Excel via SheetJS (xlsx) — Summary, Standards coverage matrix, Gaps sheets.
+ *  - Excel via ExcelJS — Summary, Standards coverage matrix, Gaps sheets. (Replaced SheetJS/xlsx,
+ *    which is stuck on 0.18.5 on npm with unpatched CVEs.)
  *  - PDF via pdfkit — a formatted self-study document organised by framework + standard.
- * Both libraries are dynamically imported (matching extractText.ts) and are externalised in
- * build.mjs so their runtime file reads resolve from node_modules.
+ * Both libraries are dynamically imported and externalised in build.mjs.
  */
 
 const val = (v: number | null | undefined, suffix = ""): string =>
@@ -13,9 +13,9 @@ const val = (v: number | null | undefined, suffix = ""): string =>
 
 // ── Excel ──────────────────────────────────────────────────────────────────────
 export async function buildWorkbook(report: AccreditationReport): Promise<Buffer> {
-  const mod: any = await import("xlsx");
-  const XLSX = mod.default ?? mod;
-  const wb = XLSX.utils.book_new();
+  const mod: any = await import("exceljs");
+  const ExcelJS = mod.default ?? mod;
+  const wb = new ExcelJS.Workbook();
 
   const s = report.summary;
   const summaryAoa: (string | number)[][] = [
@@ -33,7 +33,8 @@ export async function buildWorkbook(report: AccreditationReport): Promise<Buffer
     ["Courses in scope", s.coursesInScope],
     ["Courses unmapped to any standard", s.coursesUnmapped],
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryAoa), "Summary");
+  const summary = wb.addWorksheet("Summary");
+  for (const row of summaryAoa) summary.addRow(row);
 
   const header = [
     "Framework", "Code", "Title", "NQF", "Credits", "Coverage", "Status",
@@ -46,12 +47,10 @@ export async function buildWorkbook(report: AccreditationReport): Promise<Buffer
     r.learnersAssessed, r.masteryPct ?? "", r.passRatePct ?? "", r.evidenceCount,
     r.deliverables.map((d) => d.name).join("; "),
   ]);
-  const stdSheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  stdSheet["!cols"] = [
-    { wch: 10 }, { wch: 14 }, { wch: 40 }, { wch: 6 }, { wch: 8 }, { wch: 12 }, { wch: 10 },
-    { wch: 9 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 8 }, { wch: 15 }, { wch: 50 },
-  ];
-  XLSX.utils.book_append_sheet(wb, stdSheet, "Standards coverage");
+  const stdSheet = wb.addWorksheet("Standards coverage");
+  stdSheet.addRow(header);
+  for (const r of rows) stdSheet.addRow(r);
+  [10, 14, 40, 6, 8, 12, 10, 9, 10, 12, 16, 10, 8, 15, 50].forEach((w, i) => { stdSheet.getColumn(i + 1).width = w; });
 
   const gapsAoa: (string | number)[][] = [
     ["Standards covered on paper but with no learner evidence yet"],
@@ -62,9 +61,11 @@ export async function buildWorkbook(report: AccreditationReport): Promise<Buffer
     ["Course"],
     ...report.gaps.unmappedCourses.map((c) => [c.title]),
   ];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gapsAoa), "Gaps");
+  const gaps = wb.addWorksheet("Gaps");
+  for (const row of gapsAoa) gaps.addRow(row);
 
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf as ArrayBuffer);
 }
 
 // ── PDF ──────────────────────────────────────────────────────────────────────

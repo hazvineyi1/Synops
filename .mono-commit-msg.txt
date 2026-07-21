@@ -1,7 +1,7 @@
-Partner Hub mock->real: Overview, Partners list, LearningHub targets (ASCII-only)
+Partner audit trail on real data: new /partners/:id/audit endpoint + rewire PartnerAudit (ASCII-only)
 
-The last high-traffic Partner Hub screens still read the client mock (which now returns an empty hub, so they showed blanks). Rewired to real endpoints: PartnerOverview aggregates /organisations + /partners/:id/billing + /funding + /delegated-admins (real MRR, seats, funded seats, outstanding, per-org cards, finance/funder snapshots); the removed 'recent activity' card had no real partner-audit source. PartnerPartners (super-admin partner selector) lists the real /partners and registers their names so getPartnerHub resolves correctly. LearningHub's assign-to-partners targets come from real /partners (was the fake TalentForge/SkillBridge list).
+New GET /partners/:partnerId/audit returns the real append-only audit trail (auditEventsTable) scoped to the partner, gated to super admin OR a facilitator of that partner, with actor names resolved and an action->category mapping (financial/funder/account/impersonation/branding). PartnerAudit's Activity Log now reads it (was the partnerHubData mock, which rendered blank), and the impersonation target picker lists the partner's REAL accounts from /partners/:id/members instead of the fake impersonatableUsers. Empty states added.
 
-Still mock (render empty/safe, flagged): PartnerAudit (needs a partner-scoped audit endpoint) and the client-side PartnerImpersonateView preview (redundant with the real /platform impersonation session).
+Only remaining mock partner surface: the client-side PartnerImpersonateView preview (redundant with the real /platform impersonation session).
 
-VALIDATION: esbuild clean on PartnerOverview.tsx, PartnerPartners.tsx, LearningHub.tsx.
+VALIDATION: esbuild clean on partners.ts and PartnerAudit.tsx.

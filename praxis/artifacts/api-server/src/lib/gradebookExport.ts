@@ -1,6 +1,7 @@
 /**
  * Renders a course gradebook matrix to a downloadable Excel workbook or CSV.
- * XLSX via SheetJS (dynamic import, already externalised in build.mjs).
+ * XLSX via ExcelJS (dynamic import, externalised in build.mjs). Replaced SheetJS/xlsx, which is
+ * stuck on 0.18.5 on npm and carries unpatched CVEs (prototype pollution, ReDoS).
  */
 
 export interface GbExportCell {
@@ -55,22 +56,22 @@ function matrixRows(report: GbExportReport): { header: (string | number)[]; rows
 }
 
 export async function buildGradebookWorkbook(report: GbExportReport): Promise<Buffer> {
-  const mod: any = await import("xlsx");
-  const XLSX = mod.default ?? mod;
-  const wb = XLSX.utils.book_new();
+  const mod: any = await import("exceljs");
+  const ExcelJS = mod.default ?? mod;
+  const wb = new ExcelJS.Workbook();
 
   const { header, rows } = matrixRows(report);
-  const info: (string | number)[][] = [
-    [report.courseTitle + (report.cohortName ? ` - ${report.cohortName}` : "")],
-    ["Generated", new Date(report.generatedAt).toLocaleString()],
-    [],
-  ];
-  const sheet = XLSX.utils.aoa_to_sheet([...info, header, ...rows]);
-  sheet["!cols"] = [{ wch: 24 }, { wch: 28 }, ...report.columns.map(() => ({ wch: 16 })), { wch: 10 }, ...(report.lettersEnabled ? [{ wch: 8 }] : [])];
-  XLSX.utils.book_append_sheet(wb, sheet, "Gradebook");
+  const sheet = wb.addWorksheet("Gradebook");
+  sheet.addRow([report.courseTitle + (report.cohortName ? ` - ${report.cohortName}` : "")]);
+  sheet.addRow(["Generated", new Date(report.generatedAt).toLocaleString()]);
+  sheet.addRow([]);
+  sheet.addRow(header);
+  for (const r of rows) sheet.addRow(r);
+  const widths = [24, 28, ...report.columns.map(() => 16), 10, ...(report.lettersEnabled ? [8] : [])];
+  widths.forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
 
   // Notes sheet.
-  const noteRows: (string)[][] = [];
+  const noteRows: string[][] = [];
   for (const l of report.learners) {
     for (const c of report.columns) {
       const note = l.cells[c.key]?.note;
@@ -78,12 +79,14 @@ export async function buildGradebookWorkbook(report: GbExportReport): Promise<Bu
     }
   }
   if (noteRows.length) {
-    const ns = XLSX.utils.aoa_to_sheet([["Learner", "Item", "Feedback note"], ...noteRows]);
-    ns["!cols"] = [{ wch: 24 }, { wch: 30 }, { wch: 60 }];
-    XLSX.utils.book_append_sheet(wb, ns, "Notes");
+    const ns = wb.addWorksheet("Notes");
+    ns.addRow(["Learner", "Item", "Feedback note"]);
+    for (const nr of noteRows) ns.addRow(nr);
+    [24, 30, 60].forEach((w, i) => { ns.getColumn(i + 1).width = w; });
   }
 
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf as ArrayBuffer);
 }
 
 export function buildGradebookCsv(report: GbExportReport): string {

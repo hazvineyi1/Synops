@@ -29,13 +29,13 @@ async function buildAll() {
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
       "*.node",
-      // Document-extraction parsers (activity content import) — kept external so their
-      // dynamic-require internals (pdf-parse's pdf.js, xlsx, etc.) resolve from node_modules
-      // at runtime instead of being bundled. node_modules persists in the runtime image.
-      "pdf-parse",
-      "pdf-parse/*",
+      // Document-extraction + export parsers (activity content import / gradebook + accreditation
+      // export) — kept external so their dynamic-require internals (unpdf's pdf.js, exceljs) resolve
+      // from node_modules at runtime instead of being bundled. node_modules persists in the image.
+      "unpdf",
+      "unpdf/*",
+      "exceljs",
       "mammoth",
-      "xlsx",
       "jszip",
       "pdfkit",
       "pdfkit/*",
