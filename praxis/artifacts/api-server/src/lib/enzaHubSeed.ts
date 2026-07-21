@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   partnersTable,
   organisationsTable,
+  usersTable,
   billingSubscriptionsTable,
   billingInvoicesTable,
   fundingAgreementsTable,
@@ -81,10 +82,29 @@ export async function seedEnzaHub(): Promise<{ ok: boolean; seeded: boolean; mes
   const orgs = await db.select().from(organisationsTable).where(eq(organisationsTable.partnerId, pid));
   if (orgs.length === 0) return { ok: false, seeded: false, message: "Seed the Enza cohort first (no organisations)." };
 
-  // Idempotent guard: if billing already seeded, do nothing (avoid duplicating on repeat clicks).
+  // Active seats must reflect REALITY, not a fabricated 80%: an org's active seats = its actual
+  // active learners. Without this the Seats card (billing) contradicts the People/Classes cards.
+  const activeLearners = async (orgId: string): Promise<number> => {
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(usersTable)
+      .where(and(eq(usersTable.organisationId, orgId), eq(usersTable.role, "learner"), eq(usersTable.status, "active")));
+    return Number(row?.n ?? 0);
+  };
+  const learnerCount = new Map<string, number>();
+  for (const o of orgs) learnerCount.set(o.id, await activeLearners(o.id));
+
+  // Already seeded? Don't duplicate — RECONCILE instead: correct each subscription's active seats
+  // (and lift the contracted total if it somehow sits below actual usage) to match real learners.
   const existing = await db.select().from(billingSubscriptionsTable).where(eq(billingSubscriptionsTable.partnerId, pid));
   if (existing.length > 0) {
-    return { ok: true, seeded: false, message: `Hub data already present for Enza (${orgs.length} orgs).` };
+    for (const s of existing) {
+      const active = learnerCount.get(s.orgId ?? "") ?? 0;
+      const seats = Math.max(s.seats ?? 0, active);
+      await db.update(billingSubscriptionsTable).set({ activeSeats: active, seats }).where(eq(billingSubscriptionsTable.id, s.id));
+    }
+    const totalActive = [...learnerCount.values()].reduce((a, b) => a + b, 0);
+    return { ok: true, seeded: false, message: `Hub data present; reconciled active seats to real learners (${totalActive} active across ${existing.length} org(s)).` };
   }
 
   const now = new Date();
@@ -99,8 +119,9 @@ export async function seedEnzaHub(): Promise<{ ok: boolean; seeded: boolean; mes
   const subs: any[] = [];
   const invoices: any[] = [];
   orgs.forEach((o, i) => {
-    const seats = 40 + i * 20;
-    const activeSeats = Math.round(seats * 0.8);
+    const active = learnerCount.get(o.id) ?? 0;
+    const seats = Math.max(40 + i * 20, active); // contracted plan size, never below real usage
+    const activeSeats = active;                  // active seats = real active learners
     const price = 450; // R450 / seat / month
     subs.push({
       id: randomUUID(), partnerId: pid, orgId: o.id, orgName: o.name,
