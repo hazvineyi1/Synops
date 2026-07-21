@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Plus, Palette, Settings2, Upload, Sparkles, Mail, BookOpen, Check, Copy, Loader2, Trash2 } from 'lucide-react';
+import { Building, Plus, Palette, Settings2, Upload, Sparkles, Mail, BookOpen, Check, Copy, Loader2, Trash2, Wrench, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Partner {
@@ -367,6 +367,7 @@ export function AdminPartners() {
   const { toast } = useToast();
 
   const [createOpen, setCreateOpen] = useState(false);
+  const [showDevTools, setShowDevTools] = useState(false);
   const [selectedPartner, setSelectedPartner] = useState<Partner | null>(null);
 
   // One-click provisioning of the real Enza Global Media partner (brand + 15 courses + content).
@@ -416,22 +417,13 @@ export function AdminPartners() {
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-4xl font-serif font-bold tracking-tight">Partner Management</h1>
           <p className="text-muted-foreground">Provision partner tenants with white-label branding, a first admin, and starter courses.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" disabled={seedEnza.isPending} onClick={() => seedEnza.mutate()} title="Provision Enza Global Media with brand + 15 courses">
-            {seedEnza.isPending ? 'Provisioning…' : 'Provision Enza Global'}
-          </Button>
-          <Button variant="outline" disabled={enrich.isPending} onClick={() => enrich.mutate()} title="Build every Enza module into a full lesson (slides, video, readings, case, assignment, workshop)">
-            {enrich.isPending ? 'Building…' : 'Build Full Courses'}
-          </Button>
-          <Button variant="outline" disabled={seedCohort.isPending} onClick={() => seedCohort.mutate()} title="Seed a realistic Enza delivery cohort (org, admin, coach, 4 learners)">
-            {seedCohort.isPending ? 'Seeding…' : 'Seed Enza Cohort'}
-          </Button>
-          <Button variant="outline" disabled={resync.isPending} onClick={() => resync.mutate()} title="Re-point the demo learners' progress at the current content and fix off-track/notifications">
-            {resync.isPending ? 'Resyncing…' : 'Resync Learner Progress'}
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="ghost" size="sm" onClick={() => setShowDevTools((v) => !v)} title="Data-seeding / maintenance tools">
+            <Wrench className="h-4 w-4 mr-2" /> Internal tools
           </Button>
           <Dialog open={createOpen} onOpenChange={setCreateOpen}>
             <DialogTrigger asChild>
@@ -446,6 +438,39 @@ export function AdminPartners() {
           </Dialog>
         </div>
       </div>
+
+      {showDevTools && (
+        <Card className="border-amber-300 bg-amber-50/50 dark:bg-amber-950/20">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <p><strong>Data-seeding &amp; maintenance tools.</strong> These write demo data and can overwrite partner/course/learner records. Each asks for confirmation. Do not run casually against live tenants.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" disabled={seedEnza.isPending}
+                onClick={() => { if (window.confirm('Provision Enza Global Media (brand + 15 courses)? This writes/overwrites partner + course records.')) seedEnza.mutate(); }}
+                title="Provision Enza Global Media with brand + 15 courses">
+                {seedEnza.isPending ? 'Provisioning…' : 'Provision Enza Global'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={enrich.isPending}
+                onClick={() => { if (window.confirm('Build Full Courses? This REBUILDS every Enza module (replaces beats/readings). Learner progress may need a resync afterward.')) enrich.mutate(); }}
+                title="Build every Enza module into a full lesson">
+                {enrich.isPending ? 'Building…' : 'Build Full Courses'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedCohort.isPending}
+                onClick={() => { if (window.confirm('Seed the Enza demo cohort (org, admin, coach, 4 learners)? This writes demo accounts.')) seedCohort.mutate(); }}
+                title="Seed a realistic Enza delivery cohort">
+                {seedCohort.isPending ? 'Seeding…' : 'Seed Enza Cohort'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={resync.isPending}
+                onClick={() => { if (window.confirm('Resync demo learner progress against the current content?')) resync.mutate(); }}
+                title="Re-point the demo learners' progress at the current content">
+                {resync.isPending ? 'Resyncing…' : 'Resync Learner Progress'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-0">

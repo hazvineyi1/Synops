@@ -102,7 +102,12 @@ export function ThemeApplier() {
     if (theme.secondaryColor) root.style.setProperty("--brand-secondary", theme.secondaryColor);
     if (theme.accentColor) root.style.setProperty("--brand-accent", theme.accentColor);
     if (theme.fontFamily) document.body.style.fontFamily = theme.fontFamily;
-    if (theme.displayName) document.title = theme.displayName;
+    // Always set the tab title from the RESOLVED brand so it can't be left showing a previous
+    // tenant's (or the base platform's) name after navigation. Partner/learner users are always
+    // under their partner brand; only the platform operator's own platform theme reads "Synops
+    // Praxis". Falling back to a neutral "Praxis" avoids leaking the base name when a brand has no
+    // display name set.
+    document.title = theme.displayName || "Praxis";
     if (theme.faviconUrl) {
       let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
       if (!link) {

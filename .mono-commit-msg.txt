@@ -1,13 +1,17 @@
-QA sprint: gradebook rollup, off-track, coach queue, counts, content templates, UX (ASCII-only)
+Learner QA: grades reconcile, per-module completion, catalog links, video complete, dashboard, content rebuild (ASCII-only)
 
-GRADEBOOK (critical): grading wrote the submission score but mirrored to gradebook_entries via UPDATE-only, which no-oped for any learner who enrolled after the assignment was created - so graded work showed as dashes and Overall was blank, and this falsely tripped off-track. applyGrade + the submit path now UPSERT the entry, and the gradebook GET/scan self-heal by reconciling already-graded submissions into entries. Off-track no longer flags a learner with strong grades merely for low content-views.
+LEARNER GRADES (critical): the learner /grades endpoints (/courses/:id/gradebook/me and /gradebook/mine) never ran the reconcile the staff gradebook does, so graded assignments showed dashes and Overall said 'not enough data'. Both now reconcile submissions into gradebook_entries first.
 
-COACH QUEUE: /coach/submissions now also surfaces pending assignment_submissions (not just the legacy submissions table), scoped to the coach's courses; the queue's Evaluate routes assignment work to the assignment page.
+PER-MODULE COMPLETION (critical): completion counted beat_progress by the denormalized module_id, so after a rebuild (new beat ids) every module collapsed to one shared percent. Progress + engine now JOIN through beats so only current beats count, attributed to their real module.
 
-COUNTS: /partners computes learner/org counts live instead of stale stored columns. Funder report + Overview share one real avgMastery (was hardcoded 0.73 vs 0.72) and reconcile completions so they can't be fewer than credentials.
+CATALOG LINKS (critical): GET /courses/:id gated on enrolment and 403'd every non-enrolled catalogue course (client showed 'Course not found'). Now allows catalogue-scope viewing (tenant-owned or partner-assigned); coursework stays enrolment-gated.
 
-CONTENT: fixed the broken 'sits or falls' and 'must get <title> right on a tight budget' template sentences and the repeated per-bullet boilerplate in enzaEnrich (rebuild courses to apply).
+VIDEO COMPLETE: the slide-lesson never marked the video beat viewed; it now fires a completion when the learner reaches the final slide, so the Video tab earns its green check.
 
-UX: formatted quiz/game submission summary instead of raw JSON; quiz progress counter scoped to visible beats (no more 13/2); support ticket detail resolves requester name (no more Unknown); learner-scoped nav while previewing 'View as'; '1 Coach' pluralization; Settings save banner fires on first save; Create-class surfaces errors instead of failing silently; Message-my-coach preview button disabled with a note.
+DASHBOARD: course badge/counter now driven by real percent, not a stale 'completed' status (no more Completed badge at 17% with 'in progress: 0').
 
-VALIDATION: esbuild clean across all changed backend + frontend files.
+CONTENT: bumped a CONTENT_VERSION so Build Full Courses rebuilds stale modules (regenerates fixed readings + distinct CFU q2 + case briefs) instead of skipping them.
+
+UX: discussions scoped to the module (Participate tab); XP proportional to score (Jeopardy no longer pays 60 for a 50-pt game); hardened submission panel against raw JSON; module ?tab deep-link now persists on reload.
+
+VALIDATION: esbuild clean across all changed files.
