@@ -16,6 +16,12 @@ import { logger } from "./logger";
  */
 export async function ensureIntegrityConstraints(): Promise<void> {
   const steps: Array<[string, ReturnType<typeof sql>[]]> = [
+    // Soft-lifecycle columns for account archive / delete. Added here (not via a migration runner)
+    // so every full-row select of users stays valid the instant the new schema deploys.
+    ["users", [
+      sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS archived_at timestamptz`,
+      sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`,
+    ]],
     ["gradebook_entries", [
       sql`DELETE FROM gradebook_entries a USING gradebook_entries b
           WHERE a.assignment_id = b.assignment_id AND a.user_id = b.user_id AND a.ctid < b.ctid`,

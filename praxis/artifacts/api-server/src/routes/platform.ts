@@ -819,6 +819,91 @@ router.post("/partners/:partnerId/members/:userId/credentials", requireAuth, asy
   res.json({ email: target.email, link, expiresAt, emailed });
 });
 
+// Defensive: the archived_at / deleted_at soft-lifecycle columns are added to the schema, but if a
+// migration lagged behind a deploy we create them idempotently the first time a lifecycle action runs
+// (same pattern used for the hub tables). Cheap, runs once, safe to repeat.
+let lifecycleColsReady = false;
+async function ensureLifecycleColumns() {
+  if (lifecycleColsReady) return;
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS archived_at timestamptz`);
+  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`);
+  lifecycleColsReady = true;
+}
+
+/**
+ * POST /partners/:partnerId/members/:userId/lifecycle  { action }
+ * Partner-admin (own partner) or super admin account-lifecycle control. Actions:
+ *  - suspend / reactivate : block or restore sign-in (status enum). Suspend revokes live sessions.
+ *  - archive / restore    : soft-remove from the active roster but keep everything; restore un-hides.
+ *  - delete               : SOFT delete (deletedAt set, sessions revoked) - recoverable via restore.
+ * A partner admin can never manage another partner_admin or super_admin, nor act outside its partner.
+ */
+router.post("/partners/:partnerId/members/:userId/lifecycle", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const { partnerId, userId } = req.params;
+  const isSuper = actor.role === "super_admin";
+  const isPartnerAdmin = actor.role === "partner_admin" && actor.partnerId === partnerId;
+  if (!isSuper && !isPartnerAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+  await ensureLifecycleColumns();
+  const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!target) { res.status(404).json({ error: "User not found" }); return; }
+  if (!isSuper && target.partnerId !== partnerId) { res.status(403).json({ error: "You can only manage accounts inside your own partner." }); return; }
+  if (target.id === actor.id) { res.status(400).json({ error: "You cannot change your own account here." }); return; }
+  // A partner admin may not touch peer/senior tiers; only a super admin can.
+  if (!isSuper && (target.role === "partner_admin" || target.role === "super_admin")) {
+    res.status(403).json({ error: "Only the platform team can manage admin accounts." }); return;
+  }
+
+  const action = String(req.body?.action ?? "");
+  const revoke = () => db.update(authSessionsTable).set({ revokedAt: new Date() }).where(eq(authSessionsTable.userId, target.id));
+  switch (action) {
+    case "suspend":
+      await db.update(usersTable).set({ status: "suspended" }).where(eq(usersTable.id, target.id));
+      await revoke();
+      break;
+    case "reactivate":
+      await db.update(usersTable).set({ status: "active" }).where(eq(usersTable.id, target.id));
+      break;
+    case "archive":
+      await db.execute(sql`UPDATE users SET archived_at = now() WHERE id = ${target.id}`);
+      await revoke();
+      break;
+    case "restore":
+      await db.execute(sql`UPDATE users SET archived_at = NULL, deleted_at = NULL WHERE id = ${target.id}`);
+      break;
+    case "delete":
+      await db.execute(sql`UPDATE users SET deleted_at = now() WHERE id = ${target.id}`);
+      await revoke();
+      break;
+    default:
+      res.status(400).json({ error: "Unknown action." }); return;
+  }
+  await audit(req, `user.lifecycle_${action}`, "user", target.id, { email: target.email, partnerId });
+  res.json({ id: target.id, action });
+});
+
+/**
+ * POST /partners/:partnerId/members/:userId/organisation  { organisationId }
+ * Move any member (coach / org-admin / learner) to a different organisation, or to none (null).
+ */
+router.post("/partners/:partnerId/members/:userId/organisation", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const { partnerId, userId } = req.params;
+  const isSuper = actor.role === "super_admin";
+  const isPartnerAdmin = actor.role === "partner_admin" && actor.partnerId === partnerId;
+  if (!isSuper && !isPartnerAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+  const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!target || (!isSuper && target.partnerId !== partnerId)) { res.status(404).json({ error: "Member not found in this partner." }); return; }
+  const organisationId = req.body?.organisationId ? String(req.body.organisationId) : null;
+  if (organisationId) {
+    const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, organisationId) });
+    if (!org || (!isSuper && org.partnerId !== partnerId)) { res.status(400).json({ error: "That organisation does not belong to this partner." }); return; }
+  }
+  await db.update(usersTable).set({ organisationId }).where(eq(usersTable.id, target.id));
+  await audit(req, "partner.member_reassign", "user", target.id, { organisationId, partnerId });
+  res.json({ id: target.id, organisationId });
+});
+
 /**
  * PARTNER LEARNER POOL. A learner can belong to the PARTNER before being placed into an
  * organisation (organisationId null = unassigned pool), then assigned into one or more orgs.

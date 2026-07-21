@@ -12,13 +12,13 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
-  Users, Check, X, Send, ShieldCheck, KeyRound, LifeBuoy, Ban, RotateCcw,
-  Clock, Settings2, UserPlus, CheckCircle2, Info, Eye,
+  Users, Check, X, Send, ShieldCheck, KeyRound, Ban, RotateCcw,
+  Clock, Settings2, UserPlus, CheckCircle2, Info, Eye, Archive, Trash2, Building2, Copy,
 } from 'lucide-react';
 import { getActivePartnerId, DELEGATABLE_POWERS, type Invite } from '@/lib/partnerHubData';
 
 // A real account row from GET /partners/:id/members.
-interface Member { id: string; name: string; email: string; role: string; status: string; orgName: string | null; updatedAt: string }
+interface Member { id: string; name: string; email: string; role: string; status: string; orgName: string | null; organisationId: string | null; archived?: boolean; deleted?: boolean; updatedAt: string }
 interface DelegatedAdmin { id: string; name: string; email: string; orgName: string | null; powers: string[]; status: string; createdAt: string }
 interface OrgLite { id: string; name: string; partnerId: string | null }
 interface LoginEv { at: string; outcome: string; ip: string; device: string; impersonated: boolean }
@@ -88,18 +88,6 @@ export function PartnerAccounts() {
   const [selected, setSelected] = useState<Member | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
 
-  // Lifecycle actions (super admin only) hit the real platform-user endpoints.
-  const lifecycle = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'suspend' | 'reactivate' }) =>
-      apiFetch(`/platform/users/${id}/${action}`, { method: 'POST' }),
-    onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: ['partner-members', partnerId] }); setSelected(null); flashMsg(v.action === 'suspend' ? 'Account suspended.' : 'Account reactivated.'); },
-    onError: () => flashMsg('Could not update the account.'),
-  });
-  const resetLink = useMutation({
-    mutationFn: (id: string) => apiFetch<{ emailed?: boolean; link?: string }>(`/platform/users/${id}/reset-link`, { method: 'POST' }),
-    onSuccess: (r) => flashMsg(r.emailed ? 'Password-reset link emailed.' : 'Password-reset link created (copy from Platform Console).'),
-    onError: () => flashMsg('Could not create a reset link.'),
-  });
   // Real "View as" - become the account for a short session and land in their own view of the app.
   const impersonateM = useMutation({
     mutationFn: (id: string) => apiFetch(`/partners/${partnerId ?? 'platform'}/impersonate/${id}`, { method: 'POST' }),
@@ -160,6 +148,41 @@ export function PartnerAccounts() {
   });
   const activity = loginActivity ?? [];
 
+  // ── Manage-drawer account actions (partner-admin OR super admin) ────────────────────────────
+  // Credential result (temp password / reset link) shown inside the drawer for the selected account.
+  const [cred, setCred] = useState<{ link?: string; password?: string; emailed?: boolean } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState(false); // two-step confirm for (soft) delete
+  const invalidateMembers = () => qc.invalidateQueries({ queryKey: ['partner-members', partnerId] });
+
+  const credM = useMutation({
+    mutationFn: ({ id, mode }: { id: string; mode: 'temp' | 'link' }) =>
+      apiFetch<{ link?: string; password?: string; emailed?: boolean }>(`/partners/${partnerId}/members/${id}/credentials`, { method: 'POST', body: JSON.stringify({ mode }) }),
+    onSuccess: (r, v) => { setCred(r); flashMsg(v.mode === 'temp' ? 'Temporary password set.' : (r.emailed ? 'Reset link emailed.' : 'Reset link created — copy it below.')); },
+    onError: (e: any) => flashMsg(e?.message ?? 'Could not update credentials.'),
+  });
+  const lifecycleM = useMutation({
+    mutationFn: ({ id, action }: { id: string; action: 'suspend' | 'reactivate' | 'archive' | 'restore' | 'delete' }) =>
+      apiFetch(`/partners/${partnerId}/members/${id}/lifecycle`, { method: 'POST', body: JSON.stringify({ action }) }),
+    onSuccess: (_r, v) => {
+      invalidateMembers();
+      const msg: Record<string, string> = { suspend: 'Account suspended.', reactivate: 'Account reactivated.', archive: 'Account archived.', restore: 'Account restored.', delete: 'Account removed (recoverable).' };
+      flashMsg(msg[v.action] ?? 'Account updated.');
+      setSelected(null); setPendingDelete(false); setCred(null);
+    },
+    onError: (e: any) => flashMsg(e?.message ?? 'Could not update the account.'),
+  });
+  const reassignM = useMutation({
+    mutationFn: ({ id, organisationId }: { id: string; organisationId: string | null }) =>
+      apiFetch(`/partners/${partnerId}/members/${id}/organisation`, { method: 'POST', body: JSON.stringify({ organisationId }) }),
+    onSuccess: (_r, v) => { invalidateMembers(); setSelected((s) => (s ? { ...s, organisationId: v.organisationId, orgName: orgs.find((o) => o.id === v.organisationId)?.name ?? null } : s)); flashMsg('Organisation updated.'); },
+    onError: (e: any) => flashMsg(e?.message ?? 'Could not move the account.'),
+  });
+
+  // Roster split: active roster vs archived/removed (shown only when the toggle is on).
+  const [showRemoved, setShowRemoved] = useState(false);
+  const liveAccounts = accounts.filter((a) => !a.archived && !a.deleted);
+  const removedAccounts = accounts.filter((a) => a.archived || a.deleted);
+
   // Learner pool: learners attached to the PARTNER (not yet in any org), then assigned into orgs.
   const [poolEmail, setPoolEmail] = useState('');
   const [poolTest, setPoolTest] = useState(false);
@@ -203,6 +226,14 @@ export function PartnerAccounts() {
 
         {/* Accounts */}
         <TabsContent value="accounts" className="mt-4">
+          {removedAccounts.length > 0 && (
+            <div className="mb-3 flex items-center justify-end">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+                <input type="checkbox" checked={showRemoved} onChange={(e) => setShowRemoved(e.target.checked)} />
+                Show archived &amp; removed ({removedAccounts.length})
+              </label>
+            </div>
+          )}
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
@@ -210,15 +241,19 @@ export function PartnerAccounts() {
               </thead>
               <tbody className="divide-y divide-border">
                 {membersLoading && (<tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Loading accounts…</td></tr>)}
-                {!membersLoading && accounts.length === 0 && (<tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No accounts for this partner yet.</td></tr>)}
-                {accounts.map((a) => (
-                  <tr key={a.id} className="hover:bg-muted/20">
+                {!membersLoading && liveAccounts.length === 0 && !showRemoved && (<tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No active accounts for this partner yet.</td></tr>)}
+                {(showRemoved ? accounts : liveAccounts).map((a) => (
+                  <tr key={a.id} className={cn('hover:bg-muted/20', (a.archived || a.deleted) && 'opacity-60')}>
                     <td className="p-3"><div className="font-medium">{a.name}</div><div className="text-xs text-muted-foreground">{a.email}</div></td>
                     <td className="p-3"><span className={cn('rounded px-2 py-0.5 text-xs font-medium capitalize', roleBadge(a.role))}>{a.role.replace(/_/g, ' ')}</span></td>
                     <td className="p-3">{a.orgName ?? '—'}</td>
-                    <td className="p-3"><Badge variant={a.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', a.status === 'suspended' && 'border-red-300 text-red-600')}>{a.status}</Badge></td>
+                    <td className="p-3">
+                      {a.deleted ? <Badge variant="outline" className="border-red-300 text-red-600">Removed</Badge>
+                        : a.archived ? <Badge variant="outline" className="border-amber-300 text-amber-600">Archived</Badge>
+                        : <Badge variant={a.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', a.status === 'suspended' && 'border-red-300 text-red-600')}>{a.status}</Badge>}
+                    </td>
                     <td className="p-3 text-muted-foreground">{new Date(a.updatedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</td>
-                    <td className="p-3 text-right"><Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => setSelected(a)}><Settings2 className="h-3.5 w-3.5" /> Manage</Button></td>
+                    <td className="p-3 text-right"><Button size="sm" variant="ghost" className="gap-1.5 h-8" onClick={() => { setCred(null); setPendingDelete(false); setSelected(a); }}><Settings2 className="h-3.5 w-3.5" /> Manage</Button></td>
                   </tr>
                 ))}
               </tbody>
@@ -476,43 +511,110 @@ export function PartnerAccounts() {
       </Tabs>
 
       {/* Account detail drawer (PU6) */}
-      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-lg">
-          {selected && (
-            <>
+      <Dialog open={!!selected} onOpenChange={(o) => { if (!o) { setSelected(null); setCred(null); setPendingDelete(false); } }}>
+        <DialogContent className="max-w-lg max-h-[88vh] overflow-y-auto">
+          {selected && (() => {
+            const isSelf = selected.id === user?.id;
+            const isAdminTarget = selected.role === 'partner_admin' || selected.role === 'super_admin';
+            // Who may run lifecycle/credential actions on this target: never yourself; a partner admin
+            // may not manage another admin tier (the backend enforces this too).
+            const canManage = !isSelf && (isSuper || !isAdminTarget);
+            const removed = !!(selected.archived || selected.deleted);
+            return (
+              <>
               <DialogHeader>
                 <DialogTitle>{selected.name}</DialogTitle>
                 <DialogDescription>{selected.email} · <span className="capitalize">{selected.role.replace(/_/g, ' ')}</span> · {selected.orgName ?? '—'}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
-                {/* Lifecycle actions — wired to the real platform-user endpoints (super admin). */}
-                {isSuper ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button variant="outline" className="gap-2 justify-start" disabled={resetLink.isPending} onClick={() => resetLink.mutate(selected.id)}>
-                      <KeyRound className="h-4 w-4" /> Reset password
-                    </Button>
-                    {selected.status === 'suspended' ? (
-                      <Button variant="outline" className="gap-2 justify-start text-emerald-600" disabled={lifecycle.isPending} onClick={() => lifecycle.mutate({ id: selected.id, action: 'reactivate' })}>
-                        <RotateCcw className="h-4 w-4" /> Reactivate
-                      </Button>
-                    ) : (
-                      <Button variant="outline" className="gap-2 justify-start text-red-600" disabled={lifecycle.isPending} onClick={() => lifecycle.mutate({ id: selected.id, action: 'suspend' })}>
-                        <Ban className="h-4 w-4" /> Suspend
-                      </Button>
-                    )}
-                    <div className="col-span-2 flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-                      Status: <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>
-                    </div>
+                {/* Current state */}
+                <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+                  Status:
+                  {selected.deleted ? <Badge variant="outline" className="border-red-300 text-red-600">Removed</Badge>
+                    : selected.archived ? <Badge variant="outline" className="border-amber-300 text-amber-600">Archived</Badge>
+                    : <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>}
+                </div>
+
+                {!canManage ? (
+                  <div className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" /> {isSelf ? 'You cannot run account actions on your own account here.' : 'Admin accounts can only be managed by the platform team.'}
                   </div>
                 ) : (
-                  <div className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" /> Password resets and suspend/reactivate are performed by the platform team. Status: <Badge variant={selected.status === 'active' ? 'secondary' : 'outline'} className={cn('capitalize', selected.status === 'suspended' && 'border-red-300 text-red-600')}>{selected.status}</Badge>
-                  </div>
+                  <>
+                    {/* Credentials */}
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Credentials</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline" className="gap-2 justify-start" disabled={credM.isPending} onClick={() => credM.mutate({ id: selected.id, mode: 'link' })}>
+                          <KeyRound className="h-4 w-4" /> {selected.status === 'invited' ? 'Resend invite link' : 'Email reset link'}
+                        </Button>
+                        <Button variant="outline" className="gap-2 justify-start" disabled={credM.isPending} onClick={() => credM.mutate({ id: selected.id, mode: 'temp' })}>
+                          <KeyRound className="h-4 w-4" /> Set temp password
+                        </Button>
+                      </div>
+                      {cred && (
+                        <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
+                          {cred.password && <>Temporary password <code className="rounded bg-background border px-1.5 py-0.5 font-semibold">{cred.password}</code><Button size="sm" variant="outline" className="h-6 px-2 gap-1" onClick={() => { navigator.clipboard?.writeText(cred.password!); flashMsg('Password copied.'); }}><Copy className="h-3 w-3" /> Copy</Button></>}
+                          {cred.link && <>{cred.emailed ? 'Emailed. Link: ' : 'Set-password link: '}<code className="truncate max-w-[260px] rounded bg-background border px-1.5 py-0.5">{cred.link}</code><Button size="sm" variant="outline" className="h-6 px-2 gap-1" onClick={() => { navigator.clipboard?.writeText(cred.link!); flashMsg('Link copied.'); }}><Copy className="h-3 w-3" /> Copy</Button></>}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Reassign organisation */}
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Organisation</div>
+                      <select value={selected.organisationId ?? ''} disabled={reassignM.isPending} onChange={(e) => reassignM.mutate({ id: selected.id, organisationId: e.target.value || null })} className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm">
+                        <option value="">Unassigned</option>
+                        {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                      </select>
+                    </div>
+
+                    {/* Lifecycle */}
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Account lifecycle</div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selected.status === 'suspended' ? (
+                          <Button variant="outline" className="gap-2 justify-start text-emerald-600" disabled={lifecycleM.isPending} onClick={() => lifecycleM.mutate({ id: selected.id, action: 'reactivate' })}>
+                            <RotateCcw className="h-4 w-4" /> Reactivate
+                          </Button>
+                        ) : (
+                          <Button variant="outline" className="gap-2 justify-start text-red-600" disabled={lifecycleM.isPending || removed} onClick={() => lifecycleM.mutate({ id: selected.id, action: 'suspend' })}>
+                            <Ban className="h-4 w-4" /> Suspend
+                          </Button>
+                        )}
+                        {removed ? (
+                          <Button variant="outline" className="gap-2 justify-start text-emerald-600" disabled={lifecycleM.isPending} onClick={() => lifecycleM.mutate({ id: selected.id, action: 'restore' })}>
+                            <RotateCcw className="h-4 w-4" /> Restore
+                          </Button>
+                        ) : (
+                          <Button variant="outline" className="gap-2 justify-start text-amber-600" disabled={lifecycleM.isPending} onClick={() => lifecycleM.mutate({ id: selected.id, action: 'archive' })}>
+                            <Archive className="h-4 w-4" /> Archive
+                          </Button>
+                        )}
+                      </div>
+                      {/* Soft delete with a two-step confirm */}
+                      {!selected.deleted && (
+                        pendingDelete ? (
+                          <div className="mt-2 rounded-md border border-red-300 bg-red-50/60 dark:bg-red-950/20 px-3 py-2 text-xs space-y-2">
+                            <div className="text-red-700 dark:text-red-300">Remove <span className="font-medium">{selected.name}</span>? They lose access immediately. This is recoverable — the account moves to “archived &amp; removed” and can be restored.</div>
+                            <div className="flex gap-2">
+                              <Button size="sm" variant="outline" className="h-7 gap-1 text-red-600 border-red-300" disabled={lifecycleM.isPending} onClick={() => lifecycleM.mutate({ id: selected.id, action: 'delete' })}><Trash2 className="h-3.5 w-3.5" /> Confirm remove</Button>
+                              <Button size="sm" variant="ghost" className="h-7" onClick={() => setPendingDelete(false)}>Cancel</Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button variant="ghost" className="mt-2 gap-2 justify-start text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setPendingDelete(true)}>
+                            <Trash2 className="h-4 w-4" /> Delete account…
+                          </Button>
+                        )
+                      )}
+                    </div>
+                  </>
                 )}
 
                 {/* Real "View as" impersonation - see and navigate the app exactly as this account. */}
-                {selected.role !== 'partner_admin' && selected.role !== 'super_admin' && (
+                {!isAdminTarget && !removed && (
                   <Button variant="outline" className="w-full gap-2 justify-start border-primary/40 text-primary" disabled={impersonateM.isPending} onClick={() => impersonateM.mutate(selected.id)}>
                     <Eye className="h-4 w-4" /> {impersonateM.isPending ? 'Opening…' : `View as ${selected.name.split(' ')[0]} (open their courses)`}
                   </Button>
@@ -545,7 +647,8 @@ export function PartnerAccounts() {
                 )}
               </div>
             </>
-          )}
+            );
+          })()}
         </DialogContent>
       </Dialog>
     </div>

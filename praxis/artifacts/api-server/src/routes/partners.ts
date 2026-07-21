@@ -234,6 +234,9 @@ router.get("/partners/:partnerId/members", requireAuth, async (req, res) => {
       email: u.email,
       role: u.role,
       status: u.status,
+      // Soft-lifecycle flags (columns healed at boot; guard in case an old row predates them).
+      archived: !!(u as { archivedAt?: Date | null }).archivedAt,
+      deleted: !!(u as { deletedAt?: Date | null }).deletedAt,
       organisationId: u.organisationId,
       orgName: u.organisationId ? (orgName.get(u.organisationId) ?? null) : null,
       updatedAt: u.updatedAt.toISOString(),

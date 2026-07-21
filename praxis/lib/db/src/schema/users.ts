@@ -46,6 +46,11 @@ export const usersTable = pgTable("users", {
    */
   passwordHash: text("password_hash"),
   status: userStatusEnum("status").notNull().default("active"),
+  // Soft-lifecycle timestamps (kept OUTSIDE the status enum so we never have to migrate the enum).
+  // archivedAt: hidden from the active roster but fully recoverable, all data retained.
+  // deletedAt: soft delete - removed from lists and blocked from sign-in, restorable by an admin.
+  archivedAt: timestamp("archived_at"),
+  deletedAt: timestamp("deleted_at"),
   lastLoginAt: timestamp("last_login_at"),
   email: text("email").notNull(),
   firstName: text("first_name"),
