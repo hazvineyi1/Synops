@@ -11,7 +11,8 @@ import {
   BookOpen, Upload, Video, FileText, Link2, Image as ImageIcon, Package, Layers,
   Building2, Check, CheckCircle2, Clock, Trash2, Sparkles, GraduationCap, ArrowRight, Send,
 } from 'lucide-react';
-import { allPartners } from '@/lib/partnerHubData';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import {
   useLearningHub, addContent, uploadContent, removeContent, markReviewed, toggleAssignment,
   partnersForCourse, type ContentKind, type ContentItem, type CourseTemplate,
@@ -41,7 +42,7 @@ function kindFromFile(type: string): ContentKind {
 export function LearningHub() {
   const [, navigate] = useLocation();
   const { content, templates } = useLearningHub();
-  const partners = useMemo(() => allPartners(), []);
+  const { data: partners = [] } = useQuery({ queryKey: ['partners'], queryFn: () => apiFetch<{ id: string; name: string }[]>('/partners') });
   const fileRef = useRef<HTMLInputElement>(null);
   const [flash, setFlash] = useState<string | null>(null);
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3500); };

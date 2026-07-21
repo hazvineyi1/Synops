@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/context/SessionContext';
+import { apiFetch } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Building, Users, Landmark, ShieldCheck, ChevronRight, Wallet, Lock, CheckCircle2 } from 'lucide-react';
-import { allPartners, setActivePartner, getActivePartnerId, ZAR } from '@/lib/partnerHubData';
+import { Building, Users, ShieldCheck, ChevronRight, Lock, CheckCircle2 } from 'lucide-react';
+import { setActivePartner, getActivePartnerId, registerRealPartners } from '@/lib/partnerHubData';
+
+type PartnerRow = { id: string; name: string; slug?: string; status?: string; orgCount?: number; learnerCount?: number };
 
 /**
  * Partners (super-admin). Every partner on the platform. Selecting one makes it the active partner
@@ -18,10 +21,12 @@ import { allPartners, setActivePartner, getActivePartnerId, ZAR } from '@/lib/pa
 export function PartnerPartners() {
   const { user } = useSession();
   const [, navigate] = useLocation();
-  const partners = allPartners();
-  const [activeId, setActiveId] = useState<string | null>(getActivePartnerId());
-
   const isSuper = user?.role === 'super_admin';
+  const { data: partners = [] } = useQuery({ queryKey: ['partners'], queryFn: () => apiFetch<PartnerRow[]>('/partners'), enabled: isSuper });
+  const [activeId, setActiveId] = useState<string | null>(getActivePartnerId());
+  // Register real partner id->name so getPartnerHub resolves the correct name when a super admin
+  // opens a partner's hub (instead of an empty/neutral fallback).
+  useEffect(() => { if (partners.length) registerRealPartners(partners.map((p) => ({ id: p.id, name: p.name }))); }, [partners]);
 
   const open = (id: string) => {
     setActivePartner(id);
@@ -41,17 +46,16 @@ export function PartnerPartners() {
     );
   }
 
-  const totals = partners.reduce((t, p) => ({ orgs: t.orgs + p.orgs, seats: t.seats + p.seats, value: t.value + p.agreementValue }), { orgs: 0, seats: 0, value: 0 });
+  const totals = partners.reduce((t, p) => ({ orgs: t.orgs + (p.orgCount ?? 0), learners: t.learners + (p.learnerCount ?? 0) }), { orgs: 0, learners: 0 });
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Partners" icon={Building} subtitle={`${partners.length} partners on the platform. Open one to work inside its Partner Hub with full access.`} />
+      <PageHeader title="Partners" icon={Building} subtitle={`${partners.length} partner${partners.length === 1 ? '' : 's'} on the platform. Open one to work inside its Partner Hub with full access.`} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard icon={Building} label="Partners" value={partners.length} tint="bg-indigo-500/10 text-indigo-600" />
         <StatCard icon={Building} label="Organisations" value={totals.orgs} tint="bg-emerald-500/10 text-emerald-600" />
-        <StatCard icon={Users} label="Total seats" value={totals.seats} tint="bg-violet-500/10 text-violet-600" />
-        <StatCard icon={Landmark} label="Funding value" value={ZAR(totals.value)} tint="bg-blue-500/10 text-blue-600" />
+        <StatCard icon={Users} label="Learners" value={totals.learners} tint="bg-violet-500/10 text-violet-600" />
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
@@ -65,23 +69,21 @@ export function PartnerPartners() {
                   <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary font-semibold shrink-0">{p.name.charAt(0)}</span>
                   <div className="min-w-0">
                     <div className="font-semibold truncate flex items-center gap-2">{p.name} {active && <Badge className="bg-emerald-600 text-[10px] gap-1"><CheckCircle2 className="h-3 w-3" /> Active</Badge>}</div>
-                    <div className="text-xs text-muted-foreground">{p.id}</div>
+                    <div className="text-xs text-muted-foreground">{p.slug ?? p.id}</div>
                   </div>
                 </div>
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </div>
               <div className="mt-3 grid grid-cols-2 gap-y-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Building className="h-3.5 w-3.5" />{p.orgs} organisation{p.orgs === 1 ? '' : 's'}</span>
-                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{p.seats} seats</span>
-                <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" />{p.funders} funder{p.funders === 1 ? '' : 's'}</span>
-                <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5" />{p.delegated} delegated</span>
-                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{p.accounts} staff accounts</span>
-                <span className="flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" />{ZAR(p.agreementValue)} funded</span>
+                <span className="flex items-center gap-1.5"><Building className="h-3.5 w-3.5" />{p.orgCount ?? 0} organisation{(p.orgCount ?? 0) === 1 ? '' : 's'}</span>
+                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{p.learnerCount ?? 0} learners</span>
+                {p.status && <span className="flex items-center gap-1.5 capitalize"><ShieldCheck className="h-3.5 w-3.5" />{p.status}</span>}
               </div>
               <div className="mt-3 text-xs font-medium text-primary">{active ? 'Currently viewing - open hub' : 'Open partner hub'} -&gt;</div>
             </button>
           );
         })}
+        {partners.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground sm:col-span-2 border-dashed">No partners yet. Create one from Partner Management.</Card>}
       </div>
 
       <Card className="p-4 flex items-start gap-3 text-sm border-dashed">
