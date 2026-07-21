@@ -1,7 +1,9 @@
-Fix Create-partner slug editing + add logo upload to branding edit (ASCII-only)
+Fix unenrolled course modules 403 hang: allow catalogue view + graceful error UI (ASCII-only)
 
-SLUG BUG: the tenant-slug field ignored deletions and appended to the name-derived value ('test-partner-inc' + 'hello' = 'test-partner-inchello'). Cause: the displayed slug fell back to slugify(name) whenever the edited field was empty (form.slugTouched && form.slug), so clearing it snapped back to the name slug and every keystroke re-appended. Now once touched the field shows exactly what was typed (even empty); a separate finalSlug = slugify(slug) is what gets submitted/validated. The per-keystroke sanitiser also no longer strips trailing hyphens, so multi-word custom slugs can actually be typed. A custom slug that differs from the name now works.
+Browsing an unenrolled catalogue course and opening the Modules tab hung on gray skeletons forever. Two causes: (1) GET /courses/:id/modules was enrolment-gated (participantOn), so a catalogue viewer got 403; (2) the CourseDetail Modules tab rendered its skeleton on '!modules', which stays undefined on error, so a 403 span the skeleton indefinitely.
 
-BRANDING PARITY: the Configure -> Branding edit panel only had a raw 'Logo URL' text box while Create-partner had an upload button. Added an 'Upload logo' file input to the branding panel (reuses readImage, stores a data URL) so both flows can upload, not only paste a URL.
+BACKEND: new shared scope helper canViewCourseCatalog (tenant-owned OR partner-assigned OR platform OR hub/enrolled) now gates the module LIST (titles/order only - catalogue overview info); actual content (beats/readings/cases) stays enrolment-gated. Refactored the course-detail route to use the same helper.
 
-VALIDATION: esbuild clean on AdminPartners.tsx.
+FRONTEND: the Modules tab now distinguishes loading vs error (retry:false) and shows 'Enrol in this course to view its modules' on a genuine 403 instead of an infinite skeleton.
+
+VALIDATION: esbuild clean on scope.ts, modules.ts, courses.ts, CourseDetail.tsx.

@@ -27,7 +27,7 @@ const flagStyle: Record<string, string> = {
 const flagLabel: Record<string, string> = { off_track: 'Off track', at_risk: 'At risk' };
 
 export function CoachingMatching() {
-  const { data: courses } = useQuery<CourseLite[]>({ queryKey: ['courses-lite'], queryFn: () => apiFetch<CourseLite[]>('/courses') });
+  const { data: courses, isLoading: coursesLoading, isError: coursesError } = useQuery<CourseLite[]>({ queryKey: ['courses-lite'], queryFn: () => apiFetch<CourseLite[]>('/courses'), retry: false });
   const [courseId, setCourseId] = React.useState<string>('');
   React.useEffect(() => { if (!courseId && courses && courses.length) setCourseId(courses[0].id); }, [courses, courseId]);
 
@@ -41,12 +41,21 @@ export function CoachingMatching() {
       <div className="flex items-center gap-3">
         <label className="text-sm font-medium text-muted-foreground">Course</label>
         <select value={courseId} onChange={(e) => setCourseId(e.target.value)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm min-w-[280px] focus:outline-none focus:ring-1 focus:ring-primary">
-          {(!courses || courses.length === 0) && <option value="">No courses</option>}
+          {coursesLoading && <option value="">Loading…</option>}
+          {!coursesLoading && (!courses || courses.length === 0) && <option value="">No courses</option>}
           {courses?.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
         </select>
       </div>
 
-      {courseId ? <MatchingBoard courseId={courseId} /> : <p className="text-muted-foreground">Create a course first.</p>}
+      {/* Distinguish loading / error / empty so a slow or failed /courses call doesn't masquerade
+          as "no courses exist" (the old code showed "Create a course first" in all three cases). */}
+      {courseId
+        ? <MatchingBoard courseId={courseId} />
+        : coursesLoading
+          ? <p className="text-muted-foreground">Loading courses…</p>
+          : coursesError
+            ? <p className="text-muted-foreground">Could not load courses. Please refresh.</p>
+            : <p className="text-muted-foreground">No courses yet. Create a course first.</p>}
     </div>
   );
 }
