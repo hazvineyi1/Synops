@@ -60,7 +60,14 @@ function CreatePartnerDialog({ onClose, onCreated }: { onClose: () => void; onCr
   const [courseIds, setCourseIds] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ partnerName: string; adminLink?: string; adminEmail?: string; emailed?: boolean } | null>(null);
 
-  const slug = form.slugTouched && form.slug ? form.slug : slugify(form.name);
+  // Once the user edits the slug, ALWAYS show exactly what they typed (even empty) — the old
+  // `form.slugTouched && form.slug` fell back to the name-derived slug whenever the field was
+  // cleared, so deletions were ignored and new keystrokes appended to the name-derived value
+  // ("test-partner-inc" + "hello" = "test-partner-inchello"). Before they touch it, auto-derive.
+  const slug = form.slugTouched ? form.slug : slugify(form.name);
+  // What actually gets submitted / validated: a fully cleaned slug (trailing hyphens stripped).
+  // We keep those NOT stripped in the live field so a hyphen can be typed mid-word.
+  const finalSlug = slugify(slug);
 
   const { data: courses } = useQuery({
     queryKey: ['courses'],
@@ -101,7 +108,7 @@ function CreatePartnerDialog({ onClose, onCreated }: { onClose: () => void; onCr
     mutationFn: async () => {
       const partner = await apiFetch<{ id: string; name: string }>('/partners', {
         method: 'POST',
-        body: JSON.stringify({ name: form.name.trim(), slug, contactEmail: form.contactEmail.trim() }),
+        body: JSON.stringify({ name: form.name.trim(), slug: finalSlug, contactEmail: form.contactEmail.trim() }),
       });
       const pid = partner.id;
       // Brand (only if a logo or a non-default palette was set).
@@ -137,7 +144,7 @@ function CreatePartnerDialog({ onClose, onCreated }: { onClose: () => void; onCr
     onError: (e: any) => toast({ title: 'Could not create partner', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
-  const canCreate = form.name.trim().length > 1 && !!slug && form.contactEmail.includes('@');
+  const canCreate = form.name.trim().length > 1 && !!finalSlug && form.contactEmail.includes('@');
 
   if (result) {
     return (
@@ -186,7 +193,7 @@ function CreatePartnerDialog({ onClose, onCreated }: { onClose: () => void; onCr
             </div>
             <div className="space-y-1.5">
               <Label>Tenant slug</Label>
-              <Input value={slug} onChange={(e) => setForm((f) => ({ ...f, slug: slugify(e.target.value), slugTouched: true }))} className="font-mono text-sm" />
+              <Input value={slug} onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 40), slugTouched: true }))} className="font-mono text-sm" />
             </div>
             <div className="space-y-1.5">
               <Label>Website <span className="text-muted-foreground font-normal">(optional)</span></Label>
@@ -293,8 +300,18 @@ function BrandingPanel({ partner, onClose }: { partner: Partner; onClose: () => 
         <p className="text-xs text-muted-foreground">Shown to learners in place of "Synops Praxis".</p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="logo-url">Logo URL</Label>
+        <Label htmlFor="logo-url">Logo</Label>
         <Input id="logo-url" type="url" value={form.logoUrl} onChange={e => setForm(f => ({ ...f, logoUrl: e.target.value }))} placeholder="https://cdn.example.com/logo.svg" />
+        {/* Parity with the Create-partner flow: let admins UPLOAD a logo, not only paste a URL. */}
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer text-primary hover:underline">
+          <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            try { const img = await readImage(file); setForm(f => ({ ...f, logoUrl: img.dataUrl })); } catch { toast({ title: 'Could not read that image', variant: 'destructive' }); }
+          }} />
+          <Upload className="h-4 w-4" /> Upload logo
+        </label>
+        <p className="text-xs text-muted-foreground">Paste a hosted URL or upload an image file.</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">
