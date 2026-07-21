@@ -1,5 +1,5 @@
-Section B perf: SQL-count the platform alerts + bound roster queries (ASCII-only)
+Add unit tests for the permission matrix + gradebook math, run in CI (ASCII-only)
 
-/platform/alerts pulled SIX whole tables (invoices, documents, partners, courses, users, enrolments) into Node and filtered with .length - full-table scans that grow linearly with platform size (users/enrolments worst). Replaced with SQL count(*) WHERE. Roster reads (/partners/:id/members, /organisations/:id/members) were unbounded - added a LIMIT 2000 bound (cursor pagination is a follow-up) so a very large partner can't return an unbounded result set.
+The highest-risk logic in the system - roles.ts (gates every scoped route) and gradebookEngine.ts (mastery math that feeds credentials + off-track alerts) - had NO tests. Added vitest + 18 unit tests: roles.test.ts asserts the tier predicates, the assignment ceiling (a facilitator can only mint coach/learner, never an admin), and org/course tenant scoping (denies cross-tenant); gradebookEngine.test.ts asserts overall-percent math and the off-track signals - crucially that a learner with STRONG grades is NOT flagged for low content-completion (the 100pct-learner fix), while genuine mastery-low / missing-summative still fire. All 18 pass locally. Wired a 'Test Praxis API' step into the build-praxis CI job so a regression in permissions or grading fails CI before it can reach Railway.
 
-VALIDATION: esbuild clean on platform.ts, partners.ts, organisations.ts.
+VALIDATION: 18/18 vitest pass; ci.yml parses with the new step.

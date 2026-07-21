@@ -550,20 +550,30 @@ router.get("/platform/financials", requireAuth, requireSuperAdmin, async (_req, 
   try { invs = await db.select().from(billingInvoicesTable); } catch { /* table not created */ }
   try { funds = await db.select().from(fundingAgreementsTable); } catch { /* table not created */ }
 
-  const byPartner = partners.map((p) => {
-    const mrrNet = subs.filter((s) => s.partnerId === p.id).reduce((a, s) => a + (s.pricePerSeat || 0) * (s.seats || 0), 0);
-    const outstandingNet = invs.filter((i) => i.partnerId === p.id && i.status !== "paid").reduce((a, i) => a + (i.net || 0), 0);
-    const paidNet = invs.filter((i) => i.partnerId === p.id && i.status === "paid").reduce((a, i) => a + (i.net || 0), 0);
-    const funderValue = funds.filter((f) => f.partnerId === p.id).reduce((a, f) => a + (f.value || 0), 0);
-    return {
-      id: p.id, name: p.name,
-      mrrGross: Math.round(mrrNet * (1 + VAT)),
-      outstanding: Math.round(outstandingNet * (1 + VAT)),
-      funderValue,
-      vatCollected: Math.round(paidNet * VAT),
-      overdue: invs.some((i) => i.partnerId === p.id && i.status === "overdue"),
-    };
-  });
+  // Pre-index each dataset by partner in a SINGLE pass, instead of filtering the whole arrays once
+  // per partner (that was O(partners x rows) and fanned out with both tenant count and history).
+  const mrrNetBy = new Map<string, number>();
+  const outstandingNetBy = new Map<string, number>();
+  const paidNetBy = new Map<string, number>();
+  const funderValueBy = new Map<string, number>();
+  const overdueBy = new Map<string, boolean>();
+  const add = (m: Map<string, number>, k: string, v: number) => m.set(k, (m.get(k) ?? 0) + v);
+  for (const s of subs) add(mrrNetBy, s.partnerId, (s.pricePerSeat || 0) * (s.seats || 0));
+  for (const i of invs) {
+    if (i.status === "paid") add(paidNetBy, i.partnerId, i.net || 0);
+    else add(outstandingNetBy, i.partnerId, i.net || 0);
+    if (i.status === "overdue") overdueBy.set(i.partnerId, true);
+  }
+  for (const f of funds) add(funderValueBy, f.partnerId, f.value || 0);
+
+  const byPartner = partners.map((p) => ({
+    id: p.id, name: p.name,
+    mrrGross: Math.round((mrrNetBy.get(p.id) ?? 0) * (1 + VAT)),
+    outstanding: Math.round((outstandingNetBy.get(p.id) ?? 0) * (1 + VAT)),
+    funderValue: funderValueBy.get(p.id) ?? 0,
+    vatCollected: Math.round((paidNetBy.get(p.id) ?? 0) * VAT),
+    overdue: overdueBy.get(p.id) ?? false,
+  }));
   const totals = byPartner.reduce(
     (t, p) => ({ mrrGross: t.mrrGross + p.mrrGross, outstanding: t.outstanding + p.outstanding, funderValue: t.funderValue + p.funderValue, vatCollected: t.vatCollected + p.vatCollected, overdue: t.overdue || p.overdue }),
     { mrrGross: 0, outstanding: 0, funderValue: 0, vatCollected: 0, overdue: false },

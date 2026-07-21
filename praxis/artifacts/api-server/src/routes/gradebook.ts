@@ -554,22 +554,24 @@ router.get("/gradebook/mine", requireAuth, async (req, res) => {
   const alertByCourse = new Map(alerts.map((a) => [a.courseId, a]));
   const titleById = new Map(courses.map((c) => [c.id, c.title]));
 
-  const out = [];
-  for (const cid of courseIds) {
+  // Compute each course's summary in PARALLEL — the courses are independent, so the old serial
+  // per-course loop (reconcile + columns + scores, each awaited before the next) needlessly
+  // multiplied latency by the learner's course count.
+  const out = await Promise.all(courseIds.map(async (cid) => {
     await reconcileAssignmentEntries(cid);
     const columns = await getCourseColumns(cid);
     const sd = await getScoreData(columns, [userId]);
     const computed = computeLearner(columns, sd.fractions.get(userId), sd.notes.get(userId), false);
     const alert = alertByCourse.get(cid);
-    out.push({
+    return {
       courseId: cid,
       courseTitle: titleById.get(cid) ?? "Course",
       overallPercent: computed.overallPercent,
       band: computed.band,
       alertStatus: alert?.status ?? "on_track",
       planId: alert?.planId ?? null,
-    });
-  }
+    };
+  }));
   res.json({ courses: out });
 });
 
