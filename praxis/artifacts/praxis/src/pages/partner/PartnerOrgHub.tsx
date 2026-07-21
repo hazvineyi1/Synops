@@ -23,6 +23,7 @@ import { startImpersonation } from '@/lib/impersonationStore';
 import { renameOrg, useOrgOverrides } from '@/lib/orgOverridesStore';
 import {
   getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgCoaching, orgGradebook,
+  getActivePartnerId,
   DELEGATABLE_POWERS, ZAR, VAT_RATE, type Invoice, type PartnerDoc, type DocCategory,
 } from '@/lib/partnerHubData';
 import { useLearningHub } from '@/lib/learningHubStore';
@@ -192,28 +193,59 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   // Look up the full learner record for the People detail drawer (org-level personal info).
   const selectedLearner = selected?.role === 'learner' ? seededLearners.find((l) => l.id === selected.id) : undefined;
 
-  // ── Documents & invoices (scoped) ──
-  const [invoices, setInvoices] = useState<Invoice[]>(() => h.invoices.filter((i) => i.orgName === d.name));
-  const [docs, setDocs] = useState<PartnerDoc[]>(() => h.documents.filter((doc) => doc.orgName === d.name));
+  // ── Documents, invoices, funding, subscription — REAL, scoped to this org ──
+  // Resolve the org's real partner (super admin browsing has no partnerId of their own), then read
+  // the same partner-scoped billing/funding/documents endpoints the Financial/Funders/Documents
+  // hubs use, filtered to this organisation. Replaces the old client-side mock (h.invoices etc.).
+  const { data: realOrg } = useQuery({ queryKey: ['org-real', orgId], queryFn: () => apiFetch<{ id: string; name: string; partnerId: string }>(`/organisations/${orgId}`), enabled: !!orgId, retry: false });
+  const partnerId = realOrg?.partnerId ?? user?.partnerId ?? getActivePartnerId() ?? '';
+  const { data: billing } = useQuery({ queryKey: ['partner-billing', partnerId], queryFn: () => apiFetch<{ subscriptions: any[]; invoices: any[] }>(`/partners/${partnerId}/billing`), enabled: !!partnerId });
+  const { data: fundingRows = [] } = useQuery({ queryKey: ['partner-funding', partnerId], queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/funding`), enabled: !!partnerId });
+  const { data: docRows = [] } = useQuery({ queryKey: ['partner-documents', partnerId], queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/documents`), enabled: !!partnerId });
+
+  const orgSub = (billing?.subscriptions ?? []).find((s) => s.orgId === orgId) ?? null;
+  const orgPlan = orgSub ? { name: orgSub.planName as string, pricePerSeat: Number(orgSub.pricePerSeat) } : null;
+  const invoices = (billing?.invoices ?? []).filter((i) => i.orgId === orgId);
+  const openInvoiceCount = invoices.filter((i) => (i.status ?? 'due') !== 'paid').length;
+  // Map real funding/doc field names onto what the render expects (funder<-funderName, uploadedAt<-createdAt).
+  const orgFunders = fundingRows.filter((f) => f.orgId === orgId).map((f) => ({ ...f, funder: f.funderName, expiry: f.expiry ?? new Date().toISOString() }));
+  const orgAllocations: { id: string; funder: string; used: number; allocated: number }[] = [];
+  const docs = docRows.filter((dd) => dd.orgId === orgId).map((dd) => ({ ...dd, uploadedAt: dd.createdAt }));
+
   const [uploadCat, setUploadCat] = useState<DocCategory>('invoice');
   const fileRef = useRef<HTMLInputElement>(null);
-  const markPaid = (id: string) => setInvoices((xs) => xs.map((i) => (i.id === id ? { ...i, status: 'paid' } : i)));
+
+  const markPaidM = useMutation({
+    mutationFn: (id: string) => apiFetch(`/partners/${partnerId}/invoices/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'paid' }) }),
+    onSuccess: () => { qcHub.invalidateQueries({ queryKey: ['partner-billing', partnerId] }); flashMsg('Invoice marked paid.'); },
+    onError: () => flashMsg('Could not update the invoice.'),
+  });
+  const markPaid = (id: string) => markPaidM.mutate(id);
+
+  const uploadDocM = useMutation({
+    mutationFn: (body: any) => apiFetch(`/partners/${partnerId}/documents`, { method: 'POST', body: JSON.stringify(body) }),
+    onSuccess: () => { qcHub.invalidateQueries({ queryKey: ['partner-documents', partnerId] }); flashMsg('Document filed for this organisation.'); },
+    onError: () => flashMsg('Could not file the document.'),
+  });
   const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const added: PartnerDoc[] = Array.from(files).map((f, i) => ({
-      id: `up_${Date.now()}_${i}`, name: f.name, category: uploadCat, orgName: d.name,
-      status: 'pending', uploadedAt: new Date().toISOString().slice(0, 10),
+    if (!files || files.length === 0 || !partnerId) return;
+    Array.from(files).forEach((f) => uploadDocM.mutate({
+      name: f.name, category: uploadCat, orgId, orgName: realOrg?.name ?? d.org?.name ?? d.name, status: 'filed',
       size: f.size > 1_000_000 ? `${(f.size / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1024))} KB`,
     }));
-    setDocs((prev) => [...added, ...prev]);
     if (fileRef.current) fileRef.current.value = '';
-    flashMsg('Document filed for this organisation.');
   };
+
+  // Resolve the org identity from REAL data. A real org id isn't in the client mock, so orgDetail's
+  // d.org would be undefined and the page would 404 "not found" even though the org exists — which
+  // now happens because the Organisations overview lists real orgs. Fall back to the mock only for
+  // legacy/demo org ids.
+  const orgObj = d.org ?? (realOrg ? { id: orgId, name: realOrg.name } : null);
 
   // A specific class is open (/partner/org/:id/classes/:classId) -> the class workspace.
   if (classId) return <PartnerClassDetail orgId={orgId} classId={classId} />;
 
-  if (!d.org) {
+  if (!orgObj) {
     return (
       <div className="space-y-4">
         <PageHeader title="Organisation not found" icon={Building} subtitle="This organisation is not under your partner account." />
@@ -226,10 +258,10 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   return (
     <div className="space-y-6">
       <PageHeader
-        title={d.org.name}
+        title={orgObj.name}
         icon={meta.icon}
-        subtitle={`${meta.title} - scoped entirely to ${d.org.name}.`}
-        action={d.plan ? <Badge variant="outline" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> {d.plan.name}</Badge> : undefined}
+        subtitle={`${meta.title} - scoped entirely to ${orgObj.name}.`}
+        action={orgPlan ? <Badge variant="outline" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> {orgPlan.name}</Badge> : undefined}
       />
 
       {flash && (
@@ -242,10 +274,10 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       {section === 'overview' && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard icon={Users} label="Seats (active)" value={d.sub ? `${d.sub.activeSeats}/${d.sub.seats}` : '-'} tint="bg-indigo-500/10 text-indigo-600" />
+            <StatCard icon={Users} label="Seats (active)" value={orgSub ? `${orgSub.activeSeats}/${orgSub.seats}` : '-'} tint="bg-indigo-500/10 text-indigo-600" />
             <StatCard icon={BookOpen} label="Courses" value={courses.length} tint="bg-emerald-500/10 text-emerald-600" />
             <StatCard icon={TrendingUp} label="Coaching health" value={`${coaching.avgHealth}%`} tint="bg-violet-500/10 text-violet-600" />
-            <StatCard icon={Receipt} label="Open invoices" value={d.openInvoices} tint={d.openInvoices ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground'} />
+            <StatCard icon={Receipt} label="Open invoices" value={openInvoiceCount} tint={openInvoiceCount ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground'} />
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
@@ -322,7 +354,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
               </tbody>
             </table>
           </Card>
-          <p className="text-xs text-muted-foreground">Learners shown are the active roster for {d.org.name}. Role changes, password resets and suspensions apply to this organisation only.</p>
+          <p className="text-xs text-muted-foreground">Learners shown are the active roster for {orgObj.name}. Role changes, password resets and suspensions apply to this organisation only.</p>
         </div>
       )}
 
@@ -363,7 +395,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         <div className="space-y-4">
           <Card className="p-4 flex items-start gap-3 text-sm">
             <BookOpen className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div className="text-muted-foreground">The course catalog for {d.org.name}. Courses are delivered to learners by assigning them to a <button className="text-primary underline" onClick={() => navigate(`${base}/classes`)}>class</button>.</div>
+            <div className="text-muted-foreground">The course catalog for {orgObj.name}. Courses are delivered to learners by assigning them to a <button className="text-primary underline" onClick={() => navigate(`${base}/classes`)}>class</button>.</div>
           </Card>
 
           {assignedCourses.length > 0 && (
@@ -467,7 +499,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 <tr><th className="text-left p-3">Funder</th><th className="text-right p-3">Seats</th><th className="text-right p-3">Value</th><th className="text-left p-3">Expiry</th><th className="text-left p-3">Status</th></tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {d.funders.map((f) => (
+                {orgFunders.map((f) => (
                   <tr key={f.id}>
                     <td className="p-3 font-medium">{f.funder}</td>
                     <td className="p-3 text-right tabular-nums">{f.seatsFunded}</td>
@@ -476,15 +508,15 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <td className="p-3"><Badge className={cn('text-[10px]', f.status === 'expiring' ? 'bg-amber-500' : f.status === 'pending' ? 'bg-muted text-muted-foreground' : 'bg-emerald-600')}>{f.status}</Badge></td>
                   </tr>
                 ))}
-                {d.funders.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No funder agreements scoped to this organisation.</td></tr>}
+                {orgFunders.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No funder agreements scoped to this organisation.</td></tr>}
               </tbody>
             </table>
           </Card>
-          {d.allocations.length > 0 && (
+          {orgAllocations.length > 0 && (
             <Card className="p-5">
               <h3 className="text-sm font-semibold mb-3">Seat allocation</h3>
               <div className="space-y-3">
-                {d.allocations.map((a) => (
+                {orgAllocations.map((a) => (
                   <div key={a.id}>
                     <div className="flex items-center justify-between text-sm"><span>{a.funder}</span><span className="text-muted-foreground tabular-nums">{a.used}/{a.allocated} used</span></div>
                     <Progress value={(a.used / a.allocated) * 100} className="h-1.5 mt-1" />
@@ -509,7 +541,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 </select>
               </label>
               <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-              <Button className="gap-2" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Upload to {d.org.name}</Button>
+              <Button className="gap-2" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Upload to {orgObj.name}</Button>
             </div>
           </Card>
           <Card className="overflow-hidden">
@@ -538,9 +570,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       {section === 'billing' && (
         <div className="space-y-4">
           <div className="grid sm:grid-cols-3 gap-3">
-            <StatCard icon={Wallet} label="Plan" value={d.plan?.name ?? '-'} tint="bg-indigo-500/10 text-indigo-600" />
-            <StatCard icon={Users} label="Seats" value={d.sub ? `${d.sub.activeSeats}/${d.sub.seats}` : '-'} tint="bg-emerald-500/10 text-emerald-600" />
-            <StatCard icon={Receipt} label="Monthly (excl. VAT)" value={d.plan && d.sub ? ZAR(d.plan.pricePerSeat * d.sub.seats) : '-'} tint="bg-violet-500/10 text-violet-600" />
+            <StatCard icon={Wallet} label="Plan" value={orgPlan?.name ?? '-'} tint="bg-indigo-500/10 text-indigo-600" />
+            <StatCard icon={Users} label="Seats" value={orgSub ? `${orgSub.activeSeats}/${orgSub.seats}` : '-'} tint="bg-emerald-500/10 text-emerald-600" />
+            <StatCard icon={Receipt} label="Monthly (excl. VAT)" value={orgPlan && orgSub ? ZAR(orgPlan.pricePerSeat * orgSub.seats) : '-'} tint="bg-violet-500/10 text-violet-600" />
           </div>
           <Card className="overflow-hidden">
             <div className="p-3 text-sm font-semibold border-b border-border">Invoices</div>
@@ -563,17 +595,17 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
               </tbody>
             </table>
           </Card>
-          <p className="text-xs text-muted-foreground">This is {d.org.name}'s billing slice. The partner-wide consolidated Financial Hub lives in the Partner Admin Platform, outside any organisation.</p>
+          <p className="text-xs text-muted-foreground">This is {orgObj.name}'s billing slice. The partner-wide consolidated Financial Hub lives in the Partner Admin Platform, outside any organisation.</p>
         </div>
       )}
 
       {/* ── SETTINGS ── */}
       {section === 'settings' && (() => {
-        const nameValue = orgNameDraft ?? d.org.name;
-        const nameChanged = nameValue.trim() !== '' && nameValue.trim() !== d.org.name;
+        const nameValue = orgNameDraft ?? orgObj.name;
+        const nameChanged = nameValue.trim() !== '' && nameValue.trim() !== orgObj.name;
         const saveOrgName = () => {
           if (!canManageOrg) return;
-          const ok = renameOrg(orgId, d.name, d.org.name, nameValue, actorName, (user?.role ?? 'partner_admin').replace('_', ' '));
+          const ok = renameOrg(orgId, d.name, orgObj.name, nameValue, actorName, (user?.role ?? 'partner_admin').replace('_', ' '));
           setOrgNameDraft(null);
           flashMsg(ok ? `Organisation renamed to "${nameValue.trim()}". Change recorded in the activity log.` : 'Organisation settings saved.');
         };
@@ -592,9 +624,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Primary admin</span>
                 <input defaultValue={d.admins[0]?.email ?? ''} readOnly={!canManageOrg} className={cn('h-10 w-full rounded-md border border-input px-3 text-sm', canManageOrg ? 'bg-background' : 'bg-muted/40 text-muted-foreground')} /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Plan</span>
-                <input defaultValue={d.plan?.name ?? ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
+                <input defaultValue={orgPlan?.name ?? ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Seats</span>
-                <input defaultValue={d.sub ? String(d.sub.seats) : ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
+                <input defaultValue={orgSub ? String(orgSub.seats) : ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
             </div>
             {canManageOrg && (
               <div className="flex items-center gap-3">
@@ -611,7 +643,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add member to {d.org.name}</DialogTitle>
+            <DialogTitle>Add member to {orgObj.name}</DialogTitle>
             <DialogDescription>Invite a member and set their role in this organisation. They receive a set-password link.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -641,7 +673,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                       {selectedLearner && <span className={cn('rounded px-2 py-0.5 text-[10px] font-medium', lifecyclePill(selectedLearner.lifecycleStatus))}>{selectedLearner.lifecycleStatus}</span>}
                       {(selected.status === 'suspended' || selected.status === 'archived') && <span className="rounded px-2 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 capitalize">{selected.status}</span>}
                     </DialogTitle>
-                    <DialogDescription>{selected.email} · <span className="capitalize">{ROLE_LABEL[selected.role]}</span> · {d.org.name}</DialogDescription>
+                    <DialogDescription>{selected.email} · <span className="capitalize">{ROLE_LABEL[selected.role]}</span> · {orgObj.name}</DialogDescription>
                   </div>
                 </div>
               </DialogHeader>
@@ -697,7 +729,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <Button variant="outline" className="gap-2 justify-start text-red-600" onClick={() => setConfirmDelete(true)}><Trash2 className="h-4 w-4" /> Delete account</Button>
                   )}
                 </div>
-                {confirmDelete && <p className="text-[11px] text-red-600">Deleting permanently removes {selected.name}'s account and record from {d.org.name}. Consider Archive if you may need it later.</p>}
+                {confirmDelete && <p className="text-[11px] text-red-600">Deleting permanently removes {selected.name}'s account and record from {orgObj.name}. Consider Archive if you may need it later.</p>}
 
                 {selectedLearner && (
                   <>
@@ -755,7 +787,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                   </>
                 )}
 
-                <p className="text-xs text-muted-foreground">Actions apply only within {d.org.name} and are written to the audit trail. Delivery of emails / WhatsApp messages is a backend step.</p>
+                <p className="text-xs text-muted-foreground">Actions apply only within {orgObj.name} and are written to the audit trail. Delivery of emails / WhatsApp messages is a backend step.</p>
               </div>
             </>
           )}
@@ -767,7 +799,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Learner self-enrolment</DialogTitle>
-            <DialogDescription>Send a self-enrolment link so learners can register themselves into {d.org.name}. Registration works by email or WhatsApp.</DialogDescription>
+            <DialogDescription>Send a self-enrolment link so learners can register themselves into {orgObj.name}. Registration works by email or WhatsApp.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -789,7 +821,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
               <input value={enrollTo} onChange={(e) => setEnrollTo(e.target.value)} placeholder={enrollChannel === 'email' ? 'name@example.com, ...' : '+27 82 000 0000, ...'} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
             </label>
             <Button className="w-full gap-1.5" disabled={!enrollTo.trim()} onClick={() => { setEnrollTo(''); setEnrollOpen(false); flashMsg(`Self-enrolment link sent via ${enrollChannel === 'email' ? 'email' : 'WhatsApp'}.`); }}><Send className="h-4 w-4" /> Send invitation</Button>
-            <p className="text-xs text-muted-foreground">Learners who register through this link are added to {d.org.name} and can then be placed into a class.</p>
+            <p className="text-xs text-muted-foreground">Learners who register through this link are added to {orgObj.name} and can then be placed into a class.</p>
           </div>
         </DialogContent>
       </Dialog>
