@@ -404,6 +404,13 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not resync', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Seed real partner-hub records (billing/funding/documents/delegated admins) for Enza.
+  const seedHub = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; seeded: boolean; message?: string }>('/platform/seed-enza-hub', { method: 'POST' }),
+    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['partners'] }); toast({ title: r.seeded ? 'Enza hub data seeded' : 'Hub data unchanged', description: r.message ?? '' }); },
+    onError: (e: any) => toast({ title: 'Could not seed hub data', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Seed a realistic delivery cohort (org + admin + coach + 4 learners at different levels) under Enza.
   const seedCohort = useMutation({
     mutationFn: () => apiFetch<{ created: boolean; learners?: number; message?: string }>('/platform/seed-enza-cohort', { method: 'POST' }),
@@ -466,6 +473,11 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Resync demo learner progress against the current content?')) resync.mutate(); }}
                 title="Re-point the demo learners' progress at the current content">
                 {resync.isPending ? 'Resyncing…' : 'Resync Learner Progress'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedHub.isPending}
+                onClick={() => { if (window.confirm('Seed real partner-hub data (billing, funding, documents, delegated admins) for Enza?')) seedHub.mutate(); }}
+                title="Seed billing/funding/documents/delegated-admins for the Enza partner hubs">
+                {seedHub.isPending ? 'Seeding…' : 'Seed Hub Data'}
               </Button>
             </div>
           </CardContent>

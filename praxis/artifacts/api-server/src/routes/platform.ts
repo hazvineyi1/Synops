@@ -24,6 +24,7 @@ import { logAudit as audit } from "../lib/audit";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
+import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
@@ -837,6 +838,21 @@ router.post("/platform/resync-enza-progress", requireAuth, requireSuperAdmin, as
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Resync failed" });
+  }
+});
+
+/**
+ * POST /platform/seed-enza-hub - seed REAL partner-hub records (billing, funding, documents,
+ * delegated admins) for the live Enza partner so the Financial/Funders/Documents/Accounts hubs
+ * show genuine figures instead of empty. Idempotent. Super admin only.
+ */
+router.post("/platform/seed-enza-hub", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await seedEnzaHub();
+    await audit(req, "platform.seed_enza_hub", "partner", "enza", { seeded: r.seeded });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }
 });
 
