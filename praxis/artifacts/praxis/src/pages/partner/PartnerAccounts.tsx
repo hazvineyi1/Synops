@@ -191,46 +191,10 @@ export function PartnerAccounts() {
         </Card>
       )}
 
-      {/* Learner pool: add learners to the partner, then assign them to organisations */}
-      <Card className="p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Users className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold">Learner pool</h3>
-          <span className="text-xs text-muted-foreground">Add learners to your partner account, then assign each into an organisation.</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input value={poolEmail} onChange={(e) => setPoolEmail(e.target.value)} placeholder="learner@email.com" className="h-9 flex-1 min-w-[220px] rounded-md border border-input bg-background px-3 text-sm" />
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground"><input type="checkbox" checked={poolTest} onChange={(e) => setPoolTest(e.target.checked)} /> Test account (set a login password now)</label>
-          <Button size="sm" disabled={addPoolM.isPending || !poolEmail.trim()} onClick={() => { setPoolResult(null); addPoolM.mutate(); }}>{addPoolM.isPending ? 'Adding…' : 'Add learner'}</Button>
-        </div>
-        {poolResult && (
-          <div className="rounded-md border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
-            <span className="font-medium">{poolResult.email}</span>
-            {poolResult.password && <>· temporary password <code className="rounded bg-background border px-1.5 py-0.5 font-semibold">{poolResult.password}</code><Button size="sm" variant="outline" className="h-6 px-2" onClick={() => navigator.clipboard?.writeText(poolResult.password!)}>Copy</Button></>}
-            {poolResult.link && <>· <code className="truncate max-w-[280px] rounded bg-background border px-1.5 py-0.5">{poolResult.link}</code><Button size="sm" variant="outline" className="h-6 px-2" onClick={() => navigator.clipboard?.writeText(poolResult.link!)}>Copy link</Button></>}
-          </div>
-        )}
-        {pool.length > 0 && (
-          <div className="rounded-lg border border-border divide-y divide-border max-h-72 overflow-auto">
-            {pool.map((l) => (
-              <div key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
-                <div className="min-w-0">
-                  <div className="font-medium truncate">{[l.firstName, l.lastName].filter(Boolean).join(' ') || l.email}</div>
-                  <div className="text-xs text-muted-foreground truncate">{l.email} · {l.orgName ? `in ${l.orgName}` : <span className="text-amber-600 font-medium">Unassigned</span>}</div>
-                </div>
-                <select value={l.organisationId ?? ''} onChange={(e) => assignPoolM.mutate({ userId: l.id, organisationId: e.target.value || null })} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
-                  <option value="">Unassigned (pool)</option>
-                  {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
       <Tabs defaultValue="accounts">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
+          <TabsTrigger value="pool">Learner Pool</TabsTrigger>
           <TabsTrigger value="delegates">Delegated Admins</TabsTrigger>
           <TabsTrigger value="invite">Create &amp; Invite</TabsTrigger>
           <TabsTrigger value="roles">Role Definitions</TabsTrigger>
@@ -273,6 +237,57 @@ export function PartnerAccounts() {
               </div>
             </div>
           )}
+        </TabsContent>
+
+        {/* Learner Pool — provision learners to the Partner, then assign into organisations */}
+        <TabsContent value="pool" className="mt-4 space-y-4">
+          <Card className="p-4 flex items-start gap-3 text-sm">
+            <Users className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <div className="text-muted-foreground">
+              Add learners to your <span className="text-foreground font-medium">partner account</span> without picking an organisation yet, then assign each into an organisation when you're ready. Tick <span className="text-foreground font-medium">Test account</span> to set a login password immediately instead of sending an invite.
+            </div>
+          </Card>
+
+          <Card className="p-5 space-y-3">
+            <div className="flex items-center gap-2"><UserPlus className="h-4 w-4 text-primary" /><h3 className="text-sm font-semibold">Add a learner</h3></div>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-xs flex-1 min-w-[240px]"><span className="mb-1 block font-medium text-muted-foreground">Email</span>
+                <input value={poolEmail} onChange={(e) => setPoolEmail(e.target.value)} placeholder="learner@email.com" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground pb-2.5"><input type="checkbox" checked={poolTest} onChange={(e) => setPoolTest(e.target.checked)} /> Test account (set a login password now)</label>
+              <Button className="gap-1.5 mb-0.5" disabled={addPoolM.isPending || !poolEmail.trim()} onClick={() => { setPoolResult(null); addPoolM.mutate(); }}><UserPlus className="h-4 w-4" /> {addPoolM.isPending ? 'Adding…' : 'Add learner'}</Button>
+            </div>
+            {poolResult && (
+              <div className="rounded-md border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
+                <span className="font-medium">{poolResult.email}</span>
+                {poolResult.password && <>· temporary password <code className="rounded bg-background border px-1.5 py-0.5 font-semibold">{poolResult.password}</code><Button size="sm" variant="outline" className="h-6 px-2" onClick={() => { navigator.clipboard?.writeText(poolResult.password!); flashMsg('Password copied.'); }}>Copy</Button></>}
+                {poolResult.link && <>· set-password link <code className="truncate max-w-[280px] rounded bg-background border px-1.5 py-0.5">{poolResult.link}</code><Button size="sm" variant="outline" className="h-6 px-2" onClick={() => { navigator.clipboard?.writeText(poolResult.link!); flashMsg('Link copied.'); }}>Copy</Button></>}
+              </div>
+            )}
+          </Card>
+
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Learners ({pool.length})</div>
+            <Card className="overflow-hidden">
+              {pool.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">No learners in the pool yet. Add one above.</div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {pool.map((l) => (
+                    <div key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-muted/20">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{[l.firstName, l.lastName].filter(Boolean).join(' ') || l.email}</div>
+                        <div className="text-xs text-muted-foreground truncate">{l.email} · {l.orgName ? `in ${l.orgName}` : <span className="text-amber-600 font-medium">Unassigned</span>}</div>
+                      </div>
+                      <select value={l.organisationId ?? ''} onChange={(e) => assignPoolM.mutate({ userId: l.id, organisationId: e.target.value || null })} className="h-9 rounded-md border border-input bg-background px-2 text-xs">
+                        <option value="">Unassigned (pool)</option>
+                        {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Delegated Admins (PU7) */}
