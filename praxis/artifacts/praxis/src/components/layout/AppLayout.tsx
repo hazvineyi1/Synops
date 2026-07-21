@@ -92,7 +92,7 @@ function ShellNavLink({
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
-  const { user, loading, signOut } = useSession();
+  const { user, loading, signOut, stopImpersonating } = useSession();
   const { data: brand, isLoading: brandLoading } = useBrandTheme();
   // While the tenant brand is still resolving, show nothing rather than flashing a default brand
   // name; once resolved use the tenant's name, falling back to a neutral product name.
@@ -380,7 +380,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             Viewing as <strong>{user.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : user.email}</strong> ({user.role.replace('_', ' ')})
           </span>
           <button
-            onClick={handleSignOut}
+            onClick={() => { void stopImpersonating(); }}
             className="rounded-full bg-amber-950/15 hover:bg-amber-950/25 px-3 py-0.5 text-xs font-semibold transition-colors"
           >
             Stop impersonating

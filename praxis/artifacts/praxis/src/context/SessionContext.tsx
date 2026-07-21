@@ -37,6 +37,8 @@ interface SessionState {
   signIn: (email: string, password: string) => Promise<void>;
   /** One-click demo sign-in (no credentials). role: "student" | "admin". */
   demoSignIn: (role: "student" | "admin") => Promise<void>;
+  /** End a server-side impersonation and restore the admin's OWN session (not a sign-out). */
+  stopImpersonating: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -47,6 +49,7 @@ const SessionContext = createContext<SessionState>({
   refresh: async () => {},
   signIn: async () => {},
   demoSignIn: async () => {},
+  stopImpersonating: async () => {},
   signOut: async () => {},
 });
 
@@ -105,6 +108,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
+  const stopImpersonating = useCallback(async () => {
+    // Restores the admin's own session from the praxis_impersonator cookie (server-side),
+    // then a FULL reload so every cached query resets to the restored admin identity. This
+    // must NOT be signOut — that would revoke the session and drop the admin at /sign-in.
+    await fetch(`${API}/platform/stop-impersonating`, { method: "POST", credentials: "include" }).catch(
+      () => {},
+    );
+    window.location.href = "/dashboard";
+  }, []);
+
   const signOut = useCallback(async () => {
     await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" }).catch(
       () => {},
@@ -119,7 +132,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SessionContext.Provider
-      value={{ user, isSignedIn: !!user, loading, refresh, signIn, demoSignIn, signOut }}
+      value={{ user, isSignedIn: !!user, loading, refresh, signIn, demoSignIn, stopImpersonating, signOut }}
     >
       {children}
     </SessionContext.Provider>
