@@ -47,6 +47,20 @@ async function ensureHubTables(): Promise<void> {
     id text PRIMARY KEY, partner_id text NOT NULL, org_id text, org_name text, name text NOT NULL,
     email text NOT NULL, powers jsonb NOT NULL DEFAULT '[]'::jsonb, status text NOT NULL DEFAULT 'invited',
     created_by text, created_at timestamptz NOT NULL DEFAULT now())`);
+
+  // Heal schema drift: older deploys (and the route-level DDL) created these tables with fewer
+  // columns, and CREATE TABLE IF NOT EXISTS never backfills. The seed's typed SELECT/INSERT lists
+  // every column, so a missing one throws ("column ... does not exist"). ADD COLUMN IF NOT EXISTS
+  // brings a pre-existing table up to the current shape. NOT NULL columns all carry a default so the
+  // ALTER succeeds even when rows already exist.
+  const heal = async (table: string, cols: string[]) => {
+    for (const c of cols) await db.execute(sql.raw(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${c}`));
+  };
+  await heal("billing_subscriptions", ["org_id text", "org_name text", "plan_name text NOT NULL DEFAULT 'Standard'", "price_per_seat integer NOT NULL DEFAULT 0", "seats integer NOT NULL DEFAULT 0", "active_seats integer NOT NULL DEFAULT 0", "created_at timestamptz NOT NULL DEFAULT now()"]);
+  await heal("billing_invoices", ["org_id text", "org_name text", "number text", "period text", "net integer NOT NULL DEFAULT 0", "status text NOT NULL DEFAULT 'due'", "issued text", "due text", "created_at timestamptz NOT NULL DEFAULT now()"]);
+  await heal("funding_agreements", ["funder_type text NOT NULL DEFAULT 'SETA'", "org_id text", "org_name text", "seats_funded integer NOT NULL DEFAULT 0", "value integer NOT NULL DEFAULT 0", "start_date text", "expiry text", "status text NOT NULL DEFAULT 'active'", "conditions jsonb NOT NULL DEFAULT '[]'::jsonb", "created_by text", "created_at timestamptz NOT NULL DEFAULT now()"]);
+  await heal("partner_documents", ["org_id text", "org_name text", "category text NOT NULL DEFAULT 'other'", "status text NOT NULL DEFAULT 'pending'", "size text", "file_url text", "uploaded_by text", "template_key text", "created_at timestamptz NOT NULL DEFAULT now()"]);
+  await heal("delegated_admins", ["org_id text", "org_name text", "powers jsonb NOT NULL DEFAULT '[]'::jsonb", "status text NOT NULL DEFAULT 'invited'", "created_by text", "created_at timestamptz NOT NULL DEFAULT now()"]);
 }
 
 /**
@@ -60,6 +74,9 @@ export async function seedEnzaHub(): Promise<{ ok: boolean; seeded: boolean; mes
   const partner = firstOrNull(await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_SLUG)));
   if (!partner) return { ok: false, seeded: false, message: "Provision Enza Global first." };
   const pid = partner.id;
+
+  // Create the hub tables if missing AND heal any column drift, before the typed reads/writes below.
+  await ensureHubTables();
 
   const orgs = await db.select().from(organisationsTable).where(eq(organisationsTable.partnerId, pid));
   if (orgs.length === 0) return { ok: false, seeded: false, message: "Seed the Enza cohort first (no organisations)." };
