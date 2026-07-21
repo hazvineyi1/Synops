@@ -1,5 +1,3 @@
-Swap CVE-affected file parsers: xlsx->exceljs, pdf-parse->unpdf (ASCII-only)
+Enza subdomain root renders Enza landing (no /enzaglobalmedia path)
 
-Replaced two vulnerable, upload-path parsers. SheetJS/xlsx is stuck on 0.18.5 on npm (unpatchable prototype-pollution CVE-2023-30533 + ReDoS CVE-2024-22363); pdf-parse is unmaintained since 2018 and bundles an old pdf.js. Both parse attacker-controlled uploads. Migrated all three usages to maintained libs: gradebookExport + accreditationExport (workbook writing) and extractText (spreadsheet reading) now use exceljs; extractText PDF reading uses unpdf (getDocumentProxy + extractText). Removed xlsx + pdf-parse from package.json (exceljs already added, unpdf added); updated build.mjs external list to exceljs/unpdf. Railway + CI install with --no-frozen-lockfile so they resolve fresh.
-
-VALIDATION: esbuild clean on gradebookExport.ts, extractText.ts, accreditationExport.ts; no xlsx/pdf-parse imports remain.
+HomeRedirect now maps branded partner subdomains to their landing page: on enza.synops-consulting.com the root path renders PartnerLanding (slug enza-global) directly, keeping the URL clean. Signed-in users still redirect to /dashboard. Added PARTNER_SUBDOMAIN_SLUGS map for future partner subdomains.

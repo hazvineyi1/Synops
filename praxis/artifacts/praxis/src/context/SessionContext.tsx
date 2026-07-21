@@ -35,6 +35,8 @@ interface SessionState {
   loading: boolean;
   refresh: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  /** One-click demo sign-in (no credentials). role: "student" | "admin". */
+  demoSignIn: (role: "student" | "admin") => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -44,6 +46,7 @@ const SessionContext = createContext<SessionState>({
   loading: true,
   refresh: async () => {},
   signIn: async () => {},
+  demoSignIn: async () => {},
   signOut: async () => {},
 });
 
@@ -87,6 +90,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
+  const demoSignIn = useCallback(async (role: "student" | "admin") => {
+    const res = await fetch(`${API}/auth/demo-login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ role }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error((body as { error?: string }).error ?? "Could not start the demo.");
+    }
+    setUser((body as { user: SessionUser }).user);
+    setLoading(false);
+  }, []);
+
   const signOut = useCallback(async () => {
     await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" }).catch(
       () => {},
@@ -101,7 +119,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SessionContext.Provider
-      value={{ user, isSignedIn: !!user, loading, refresh, signIn, signOut }}
+      value={{ user, isSignedIn: !!user, loading, refresh, signIn, demoSignIn, signOut }}
     >
       {children}
     </SessionContext.Provider>

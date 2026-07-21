@@ -16,7 +16,7 @@ function textOn(hex: string): string {
 interface PBrand { displayName?: string | null; primaryColor?: string | null; secondaryColor?: string | null; accentColor?: string | null; logoUrl?: string | null }
 
 export function SignInPage() {
-  const { signIn } = useSession();
+  const { signIn, demoSignIn } = useSession();
   const { data: hostBrand } = usePublicBrandByHost();
   const search = useSearch();
   const slug = new URLSearchParams(search).get("p");
@@ -28,6 +28,23 @@ export function SignInPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [demoBusy, setDemoBusy] = useState<"student" | "admin" | null>(null);
+
+  // Demo buttons are only offered on the Enza site, where the demo accounts live.
+  const showDemo = typeof window !== "undefined" && window.location.hostname === "enza.synops-consulting.com";
+
+  const onDemo = async (role: "student" | "admin") => {
+    setError(null);
+    setDemoBusy(role);
+    try {
+      await demoSignIn(role);
+      // Full reload so every cached query starts fresh for the demo identity.
+      window.location.href = "/dashboard";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not start the demo.");
+      setDemoBusy(null);
+    }
+  };
 
   const brand: PBrand = (pBrand ?? (hostBrand as PBrand | undefined)) ?? {};
   const brandName = brand.displayName || "Synops Praxis";
@@ -99,6 +116,29 @@ export function SignInPage() {
             {busy ? "Signing in..." : "Sign in"}
           </button>
         </form>
+
+        {showDemo && (
+          <div className="mt-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-xs uppercase tracking-wide text-white/40">Or explore a live demo</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => onDemo("student")} disabled={demoBusy !== null}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60">
+                {demoBusy === "student" ? "Opening..." : "Demo learner"}
+              </button>
+              <button type="button" onClick={() => onDemo("admin")} disabled={demoBusy !== null}
+                className="rounded-lg border border-white/15 bg-white/5 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60">
+                {demoBusy === "admin" ? "Opening..." : "Demo admin"}
+              </button>
+            </div>
+            <p className="mt-2 text-center text-xs text-white/40">
+              One click, no password. A safe demo account for exploring the platform.
+            </p>
+          </div>
+        )}
 
         <p className="mt-6 text-center text-xs text-white/40">
           Not enrolled yet? Contact your organisation administrator.

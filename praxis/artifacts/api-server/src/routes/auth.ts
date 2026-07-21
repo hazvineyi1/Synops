@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   usersTable,
   organisationsTable,
+  partnersTable,
   authSessionsTable,
   passwordResetsTable,
   loginEventsTable,
@@ -106,6 +107,97 @@ router.post("/auth/login", async (req, res) => {
     .where(eq(usersTable.id, user.id));
 
   await logAttempt("success");
+
+  res.cookie(SESSION_COOKIE, token, cookieOptions());
+  res.json({ user: publicUser(user) });
+});
+
+/**
+ * POST /auth/demo-login  { role: "student" | "admin" }
+ *
+ * One-click, password-free sign-in for sales/demo use on the Enza site. DELIBERATELY
+ * NARROW: it can only ever produce a session for one of two fixed demo identities, chosen
+ * by an allow-listed keyword — never an arbitrary user id or email from the request. So it
+ * cannot be turned into "log me in as anyone".
+ *
+ *   student -> enza@student1.test  (an existing seeded demo learner)
+ *   admin   -> demo.admin@enzaglobalmedia.co.za  (a dedicated demo partner_admin, lazily
+ *              created against the Enza partner; it holds no secret — its password is random
+ *              and unusable, the only way in is this button)
+ *
+ * Guarded by ENABLE_DEMO_LOGIN: set it to "0" to switch the whole feature off without a
+ * code change. Anything else (including unset) leaves it ON, which is what the demo needs.
+ */
+const DEMO_STUDENT_EMAIL = "enza@student1.test";
+const DEMO_ADMIN_EMAIL = "demo.admin@enzaglobalmedia.co.za";
+const ENZA_PARTNER_SLUG = "enza-global";
+
+router.post("/auth/demo-login", async (req, res) => {
+  if (process.env.ENABLE_DEMO_LOGIN === "0") {
+    res.status(404).json({ error: "Not found." });
+    return;
+  }
+  const role = String(req.body?.role ?? "").toLowerCase().trim();
+  if (role !== "student" && role !== "admin") {
+    res.status(400).json({ error: "Unknown demo role." });
+    return;
+  }
+
+  const ip = clientIp(req as any);
+  const ua = req.headers["user-agent"];
+
+  let user: typeof usersTable.$inferSelect | undefined;
+
+  if (role === "student") {
+    [user] = await db.select().from(usersTable).where(eq(usersTable.email, DEMO_STUDENT_EMAIL)).limit(1);
+    if (!user) {
+      res.status(503).json({ error: "The demo learner is not provisioned yet. Seed the Enza cohort first." });
+      return;
+    }
+  } else {
+    // admin: find-or-create a dedicated demo partner_admin on the Enza partner.
+    [user] = await db.select().from(usersTable).where(eq(usersTable.email, DEMO_ADMIN_EMAIL)).limit(1);
+    if (!user) {
+      const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_PARTNER_SLUG)).limit(1);
+      if (!partner) {
+        res.status(503).json({ error: "The Enza partner is not provisioned yet." });
+        return;
+      }
+      [user] = await db
+        .insert(usersTable)
+        .values({
+          email: DEMO_ADMIN_EMAIL,
+          firstName: "Demo",
+          lastName: "Admin",
+          role: "partner_admin",
+          status: "active",
+          partnerId: partner.id,
+          organisationId: null,
+          // Random, unusable password: this account is reachable only via this button.
+          passwordHash: hashPassword(newSessionToken()),
+        })
+        .returning();
+    }
+  }
+
+  if (!user) {
+    res.status(500).json({ error: "Could not start the demo session." });
+    return;
+  }
+
+  const token = newSessionToken();
+  await db.insert(authSessionsTable).values({
+    token,
+    userId: user.id,
+    ipAddress: ip,
+    userAgent: typeof ua === "string" ? ua : null,
+    expiresAt: sessionExpiry(),
+  });
+  await db.update(usersTable).set({ lastLoginAt: new Date() }).where(eq(usersTable.id, user.id));
+  await db
+    .insert(loginEventsTable)
+    .values({ userId: user.id, email: user.email, outcome: "success", ipAddress: ip, userAgent: typeof ua === "string" ? ua : null })
+    .catch(() => {});
 
   res.cookie(SESSION_COOKIE, token, cookieOptions());
   res.json({ user: publicUser(user) });
