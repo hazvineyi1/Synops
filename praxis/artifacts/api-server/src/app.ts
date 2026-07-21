@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { registerPwa } from "./pwa";
 import { logger } from "./lib/logger";
+import { captureError } from "./lib/observability";
 
 const app: Express = express();
 
@@ -112,6 +113,8 @@ app.use((err: unknown, req: Request, res: Response, _next: NextFunction) => {
   // isn't in scope at type-check time.
   const log = (req as unknown as { log?: typeof logger }).log ?? logger;
   log.error({ err, url: req.originalUrl }, "unhandled route error");
+  // Report to Sentry (no-op unless SENTRY_DSN is configured) so 500s are visible in production.
+  captureError(err, { url: req.originalUrl, method: req.method });
   if (res.headersSent) return;
   res.status(500).json({ error: "Internal server error", detail: message });
 });

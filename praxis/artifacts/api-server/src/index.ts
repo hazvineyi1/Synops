@@ -1,5 +1,9 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { initObservability } from "./lib/observability";
+
+// Fire-and-forget: enables Sentry when SENTRY_DSN is set, otherwise a no-op. Never blocks boot.
+void initObservability();
 
 const rawPort = process.env["PORT"];
 
