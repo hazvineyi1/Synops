@@ -25,6 +25,7 @@ import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
 import { seedEnzaHub } from "../lib/enzaHubSeed";
+import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
@@ -851,6 +852,23 @@ router.post("/platform/seed-enza-hub", requireAuth, requireSuperAdmin, async (re
   try {
     const r = await seedEnzaHub();
     await audit(req, "platform.seed_enza_hub", "partner", "enza", { seeded: r.seeded });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * POST /platform/seed-skills-catalog - seeds 10 full, high-demand South African vocational courses
+ * (digital & data literacy, web/software dev, data analytics, digital marketing, solar PV, skilled
+ * trades, BPO/GBS, tourism, financial literacy/SMME, ECD/care economy). Each is platform-owned,
+ * NQF-levelled and SETA-mapped, built as a full curriculum, and assigned to the Enza partner. Run
+ * enrich-enza afterwards to fully build every module. Idempotent. Super admin only.
+ */
+router.post("/platform/seed-skills-catalog", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await seedSkillsCatalog();
+    await audit(req, "platform.seed_skills_catalog", "partner", "enza", { created: r.created, assigned: r.assigned });
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
