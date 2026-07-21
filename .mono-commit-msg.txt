@@ -1,7 +1,5 @@
-Partner audit trail on real data: new /partners/:id/audit endpoint + rewire PartnerAudit (ASCII-only)
+Swap CVE-affected file parsers: xlsx->exceljs, pdf-parse->unpdf (ASCII-only)
 
-New GET /partners/:partnerId/audit returns the real append-only audit trail (auditEventsTable) scoped to the partner, gated to super admin OR a facilitator of that partner, with actor names resolved and an action->category mapping (financial/funder/account/impersonation/branding). PartnerAudit's Activity Log now reads it (was the partnerHubData mock, which rendered blank), and the impersonation target picker lists the partner's REAL accounts from /partners/:id/members instead of the fake impersonatableUsers. Empty states added.
+Replaced two vulnerable, upload-path parsers. SheetJS/xlsx is stuck on 0.18.5 on npm (unpatchable prototype-pollution CVE-2023-30533 + ReDoS CVE-2024-22363); pdf-parse is unmaintained since 2018 and bundles an old pdf.js. Both parse attacker-controlled uploads. Migrated all three usages to maintained libs: gradebookExport + accreditationExport (workbook writing) and extractText (spreadsheet reading) now use exceljs; extractText PDF reading uses unpdf (getDocumentProxy + extractText). Removed xlsx + pdf-parse from package.json (exceljs already added, unpdf added); updated build.mjs external list to exceljs/unpdf. Railway + CI install with --no-frozen-lockfile so they resolve fresh.
 
-Only remaining mock partner surface: the client-side PartnerImpersonateView preview (redundant with the real /platform impersonation session).
-
-VALIDATION: esbuild clean on partners.ts and PartnerAudit.tsx.
+VALIDATION: esbuild clean on gradebookExport.ts, extractText.ts, accreditationExport.ts; no xlsx/pdf-parse imports remain.

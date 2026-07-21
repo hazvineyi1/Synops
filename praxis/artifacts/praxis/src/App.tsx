@@ -103,10 +103,28 @@ function SessionGate() {
   );
 }
 
+/**
+ * Branded partner subdomains: the root of the subdomain renders that partner's
+ * landing page directly, so the URL stays clean (e.g. https://enza.synops-consulting.com
+ * shows the Enza landing with no /enzaglobalmedia path). Signed-in users still go to
+ * their dashboard. Add future partner subdomains here.
+ */
+const PARTNER_SUBDOMAIN_SLUGS: Record<string, string> = {
+  'enza.synops-consulting.com': 'enza-global',
+};
+
+function partnerSlugForHost(): string | null {
+  if (typeof window === 'undefined') return null;
+  return PARTNER_SUBDOMAIN_SLUGS[window.location.hostname] ?? null;
+}
+
 function HomeRedirect() {
   const { isSignedIn, loading } = useSession();
   if (loading) return <SessionGate />;
-  return isSignedIn ? <Redirect to="/dashboard" /> : <Home />;
+  if (isSignedIn) return <Redirect to="/dashboard" />;
+  const partnerSlug = partnerSlugForHost();
+  if (partnerSlug) return <PartnerLanding params={{ slug: partnerSlug }} />;
+  return <Home />;
 }
 
 /**
