@@ -211,7 +211,9 @@ router.get("/partners/:partnerId/members", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const rows = await db.select().from(usersTable).where(eq(usersTable.partnerId, partnerId));
+  // Bounded: cap the roster so a very large partner can't return an unbounded result set in one
+  // request. (Cursor pagination is a follow-up; this prevents a pathological full-table return.)
+  const rows = await db.select().from(usersTable).where(eq(usersTable.partnerId, partnerId)).limit(2000);
   const orgIds = [...new Set(rows.map((r) => r.organisationId).filter((v): v is string => !!v))];
   const orgs = orgIds.length ? await db.select().from(organisationsTable).where(inArray(organisationsTable.id, orgIds)) : [];
   const orgName = new Map(orgs.map((o) => [o.id, o.name]));

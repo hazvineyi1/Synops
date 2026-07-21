@@ -591,30 +591,21 @@ router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res)
       return Number.isFinite(t) && t <= soon;
     }).length;
   });
-  const unpaidInvoices = await safeCount(async () => {
-    const rows = await db.select({ status: billingInvoicesTable.status }).from(billingInvoicesTable);
-    return rows.filter((r) => r.status !== "paid").length;
-  });
-  const actionDocs = await safeCount(async () => {
-    const rows = await db.select({ status: partnerDocumentsTable.status }).from(partnerDocumentsTable);
-    return rows.filter((r) => r.status === "action-required").length;
-  });
-  const onboardingPartners = await safeCount(async () => {
-    const rows = await db.select({ status: partnersTable.status }).from(partnersTable);
-    return rows.filter((r) => r.status === "onboarding").length;
-  });
-  const draftCourses = await safeCount(async () => {
-    const rows = await db.select({ status: coursesTable.status }).from(coursesTable);
-    return rows.filter((r) => r.status === "draft").length;
-  });
-  const learners = await safeCount(async () => {
-    const rows = await db.select({ role: usersTable.role }).from(usersTable);
-    return rows.filter((r) => r.role === "learner").length;
-  });
-  const activeEnrolments = await safeCount(async () => {
-    const rows = await db.select({ status: enrolmentsTable.status }).from(enrolmentsTable);
-    return rows.filter((r) => r.status === "active").length;
-  });
+  // Count in SQL (WHERE ... ) instead of pulling whole tables into Node and filtering — these grow
+  // linearly with platform size; the users/enrolments scans especially would hurt at scale.
+  const sqlCount = async (q: Promise<Array<{ c: number }>>) => { const [r] = await q; return Number(r?.c ?? 0); };
+  const unpaidInvoices = await safeCount(() => sqlCount(
+    db.select({ c: sql<number>`count(*)` }).from(billingInvoicesTable).where(sql`${billingInvoicesTable.status} <> 'paid'`)));
+  const actionDocs = await safeCount(() => sqlCount(
+    db.select({ c: sql<number>`count(*)` }).from(partnerDocumentsTable).where(eq(partnerDocumentsTable.status, "action-required"))));
+  const onboardingPartners = await safeCount(() => sqlCount(
+    db.select({ c: sql<number>`count(*)` }).from(partnersTable).where(eq(partnersTable.status, "onboarding"))));
+  const draftCourses = await safeCount(() => sqlCount(
+    db.select({ c: sql<number>`count(*)` }).from(coursesTable).where(eq(coursesTable.status, "draft"))));
+  const learners = await safeCount(() => sqlCount(
+    db.select({ c: sql<number>`count(*)` }).from(usersTable).where(eq(usersTable.role, "learner"))));
+  const activeEnrolments = await safeCount(() => sqlCount(
+    db.select({ c: sql<number>`count(*)` }).from(enrolmentsTable).where(eq(enrolmentsTable.status, "active"))));
 
   const alerts = [
     { id: "funding", label: "funding agreements expiring", count: expiringFunding, severity: expiringFunding ? "warn" : "ok", detail: "Within 60 days or already expired" },

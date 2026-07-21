@@ -105,7 +105,8 @@ router.get("/organisations/:orgId/members", requireAuth, async (req, res) => {
   const members = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.organisationId, req.params.orgId));
+    .where(eq(usersTable.organisationId, req.params.orgId))
+    .limit(2000); // bounded — avoids an unbounded roster return; cursor pagination is a follow-up
   res.json(members.map(toUserResponse));
 });
 
