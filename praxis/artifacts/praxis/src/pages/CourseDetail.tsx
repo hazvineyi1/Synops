@@ -1091,14 +1091,14 @@ export function CourseDetail() {
   });
   // Also needed on the discussions tab, where a new thread can be scoped to a module.
   const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: activeTab === 'modules' || activeTab === 'overview' || activeTab === 'discussions', retry: false });
-  const { data: assignments } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<Assignment[]>(`/courses/${courseId}/assignments`), enabled: activeTab === 'assignments' || activeTab === 'overview' });
-  const { data: discussions } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' || activeTab === 'overview' });
+  const { data: assignments, isLoading: assignmentsLoading } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<Assignment[]>(`/courses/${courseId}/assignments`), enabled: activeTab === 'assignments' || activeTab === 'overview', retry: false });
+  const { data: discussions, isLoading: discussionsLoading } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' || activeTab === 'overview', retry: false });
   const { data: announcements, isLoading: announcementsLoading } = useQuery({ queryKey: ['announcements', courseId], queryFn: () => apiFetch<Announcement[]>(`/courses/${courseId}/announcements`), enabled: activeTab === 'announcements' || activeTab === 'overview', retry: false });
   const { data: myGrades } = useQuery({ queryKey: ['grades', courseId, 'me'], queryFn: () => apiFetch<{ grades: GradeEntry[]; totalEarned: number; totalPossible: number; overallPercent: number; }>(`/courses/${courseId}/gradebook/me`), enabled: activeTab === 'gradebook' && !isInstructor });
   const { data: events } = useQuery({ queryKey: ['events', courseId], queryFn: () => apiFetch<Event[]>(`/courses/${courseId}/events`), enabled: activeTab === 'calendar' || activeTab === 'overview' });
   const { data: pages, isLoading: pagesLoading } = useQuery({ queryKey: ['pages', courseId], queryFn: () => apiFetch<Page[]>(`/courses/${courseId}/pages`), enabled: activeTab === 'pages', retry: false });
   const { data: roster, isLoading: rosterLoading } = useQuery({ queryKey: ['roster', courseId], queryFn: () => apiFetch<RosterEntry[]>(`/courses/${courseId}/roster`), enabled: activeTab === 'people', retry: false });
-  const { data: groups } = useQuery({ queryKey: ['groups', courseId], queryFn: () => apiFetch<Group[]>(`/courses/${courseId}/groups`), enabled: activeTab === 'groups' });
+  const { data: groups, isLoading: groupsLoading } = useQuery({ queryKey: ['groups', courseId], queryFn: () => apiFetch<Group[]>(`/courses/${courseId}/groups`), enabled: activeTab === 'groups', retry: false });
   const { data: enrolment } = useQuery({ queryKey: ['enrolment', courseId, 'me'], queryFn: () => apiFetch<Enrolment | null>(`/courses/${courseId}/my-enrolment`) });
   // Enrolled learners get the clean single-flow course page (no tab rail). Instructors and
   // catalog visitors keep the tabbed course-management shell. Declared AFTER the enrolment
@@ -1188,7 +1188,10 @@ export function CourseDetail() {
           </div>
         </div>
         {role === 'learner' && !enrolment && (
-          <Button onClick={() => enrolMutation.mutate()} disabled={enrolMutation.isPending}>
+          <Button
+            onClick={() => { if (window.confirm(`Enrol in "${course.title}"? This adds the course to your learning and may count toward your training record.`)) enrolMutation.mutate(); }}
+            disabled={enrolMutation.isPending}
+          >
             {enrolMutation.isPending ? 'Enrolling...' : 'Enrol Now'}
           </Button>
         )}
@@ -1559,7 +1562,8 @@ export function CourseDetail() {
         {activeTab === 'assignments' && (
           <div className="space-y-3">
             {isInstructor && <NewAssignment courseId={courseId} />}
-            {!assignments && <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>}
+            {assignmentsLoading && <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>}
+            {!assignmentsLoading && !assignments && <div className="text-center text-muted-foreground py-12">{enrolment ? 'Could not load assignments. Please refresh.' : 'Enrol in this course to view its assignments.'}</div>}
             {assignments?.length === 0 && <div className="text-center text-muted-foreground py-12">No assignments yet.</div>}
             {assignments?.map((a) => (
               isInstructor ? (
@@ -1603,7 +1607,8 @@ export function CourseDetail() {
             {isInstructor && (
               <NewDiscussion courseId={courseId} modules={modules ?? []} />
             )}
-            {!discussions && <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>}
+            {discussionsLoading && <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>}
+            {!discussionsLoading && !discussions && <div className="text-center text-muted-foreground py-12">{enrolment ? 'Could not load discussions. Please refresh.' : 'Enrol in this course to join its discussions.'}</div>}
             {discussions?.length === 0 && <div className="text-center text-muted-foreground py-12">No discussions yet.</div>}
             {discussions?.map((d) => (
               <Card key={d.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/courses/${courseId}/discussions/${d.id}`)}>
@@ -1840,7 +1845,8 @@ export function CourseDetail() {
         {activeTab === 'groups' && (
           <div className="space-y-4">
             {isInstructor && <NewGroup courseId={courseId} />}
-            {!groups && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[1,2].map(i => <Skeleton key={i} className="h-32" />)}</div>}
+            {groupsLoading && <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{[1,2].map(i => <Skeleton key={i} className="h-32" />)}</div>}
+            {!groupsLoading && !groups && <div className="text-center text-muted-foreground py-12">{enrolment ? 'Could not load groups. Please refresh.' : 'Enrol in this course to view its groups.'}</div>}
             {groups?.length === 0 && <div className="text-center text-muted-foreground py-12">No groups yet.</div>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {groups?.map((g) => {

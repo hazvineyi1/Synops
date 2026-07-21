@@ -204,7 +204,12 @@ export function CoachHub() {
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard icon={Zap} tone="text-amber-600" label="Points earned" value={game.data?.xp ?? 0} />
         <StatCard icon={Flame} tone="text-orange-600" label="Day streak" value={game.data?.streak ?? 0} />
-        <StatCard icon={BookOpen} tone="text-primary" label={data.materialCount === 1 ? "Material" : "Materials"} value={data.materialCount} />
+        {/* Count the REAL uploaded materials (same source as the Materials page), not the overview's
+            materialCount, which was showing an unrelated figure (module count) while the actual
+            materials list was empty. */}
+        {(() => { const matCount = materials.data?.materials?.length ?? 0; return (
+          <StatCard icon={BookOpen} tone="text-primary" label={matCount === 1 ? "Material" : "Materials"} value={matCount} />
+        ); })()}
         <StatCard icon={Target} tone="text-red-600" label={data.gapCount === 1 ? "Gap to close" : "Gaps to close"} value={data.gapCount} />
       </section>
 

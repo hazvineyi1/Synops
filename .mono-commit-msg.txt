@@ -1,5 +1,7 @@
-Coaching and sections: distinguish loading/error/empty for the course list (ASCII-only)
+Error-pattern sweep: stop pages hanging on a skeleton when a query 403s/500s (ASCII-only)
 
-The Coaching and sections page showed 'Create a course first' whenever no course was selected - which also happened while /courses was still loading OR if it errored, so a slow/failed request masqueraded as 'no courses exist' (the same failure-to-handle-error pattern as the modules hang). Now it shows 'Loading courses...' while fetching, 'Could not load courses. Please refresh.' on error (retry:false), and only 'No courses yet. Create a course first.' when genuinely loaded-and-empty. The Course dropdown shows 'Loading...' instead of 'No courses' during the fetch.
+Audited every learner/staff page for the 'loading UI gated on the ABSENCE of data' anti-pattern (isLoading || !data, or !data && Skeleton). On a 403/500 TanStack sets isLoading=false but leaves data undefined, so these spin the skeleton forever. Fixed each to capture isError (retry:false) and render a clear error/empty state instead of an endless skeleton.
 
-VALIDATION: esbuild clean on CoachingMatching.tsx.
+Learner-facing: LearnSession (tutoring), CaseBegin, CaseSession, Support ticket detail. Staff/partner: CourseDetail (Announcements/Pages/People tabs), CoachingMatching MatchingBoard, CoachSettings, CaseBuilder, PlatformConsole overview, CourseDevelopmentSuite modules. Each now shows a 'could not load' message with a way back rather than hanging.
+
+VALIDATION: esbuild clean on all 10 changed pages.
