@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import {
   ArrowLeft, Users, GraduationCap, BookOpen, Check, Pencil, Layers, Search, Trash2,
-  CheckCircle2, UserCheck, ArrowRight, Share2, Copy, MessageCircle,
+  CheckCircle2, UserCheck, ArrowRight, Share2, Copy, MessageCircle, UserPlus,
 } from 'lucide-react';
+import { AssignWizard } from './AssignWizard';
 
 interface ClassDetail { id: string; orgId: string; name: string; learnerIds: string[]; courseIds: string[]; staff: { staffId: string; role: string }[] }
 interface Member { id: string; firstName?: string | null; lastName?: string | null; email: string | null; role: string }
@@ -67,6 +68,7 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
   const [q, setQ] = useState('');
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const learnersDirty = cls ? !eqSet(selLearners, new Set(cls.learnerIds)) : false;
   const coursesDirty = cls ? !eqSet(selCourses, new Set(cls.courseIds)) : false;
@@ -108,6 +110,9 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
           <p className="text-sm text-muted-foreground mt-1">{cls.learnerIds.length} learners · {cls.staff.length} staff · {cls.courseIds.length} courses</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button size="sm" className="gap-1.5" onClick={() => setWizardOpen(true)} title="Guided flow: add learners, assign courses and enrol in one place">
+            <UserPlus className="h-3.5 w-3.5" /> Assign learners
+          </Button>
           <Button size="sm" variant="outline" className="gap-1.5" disabled={joinLink.isPending} onClick={() => joinLink.mutate()} title="Create a link learners can open to self-enrol into this cohort">
             <Share2 className="h-3.5 w-3.5" /> {joinLink.isPending ? 'Preparing…' : 'Share join link'}
           </Button>
@@ -247,6 +252,8 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
         <button onClick={() => navigate(`/partner/org/${orgId}/coaching`)} className="inline-flex items-center gap-1 text-primary hover:underline">Coaching <ArrowRight className="h-3 w-3" /></button>
         <button onClick={() => navigate(`/partner/org/${orgId}/gradebook`)} className="inline-flex items-center gap-1 text-primary hover:underline">Gradebook <ArrowRight className="h-3 w-3" /></button>
       </Card>
+
+      <AssignWizard orgId={orgId} orgName={undefined} initialClassId={classId} open={wizardOpen} onClose={() => setWizardOpen(false)} onDone={invalidate} />
     </div>
   );
 }

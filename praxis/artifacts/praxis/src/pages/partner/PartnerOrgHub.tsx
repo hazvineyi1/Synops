@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { AssignWizard } from './AssignWizard';
 import { cn } from '@/lib/utils';
 import {
   Building, Users, BookOpen, GraduationCap, ClipboardList, Landmark, FileText, Wallet,
@@ -138,6 +139,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const [roleFilter, setRoleFilter] = useState<OrgRole | 'all'>('all');
   const [selected, setSelected] = useState<Member | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [nm, setNm] = useState(''); const [em, setEm] = useState(''); const [rl, setRl] = useState<OrgRole>('learner');
   const [flash, setFlash] = useState<string | null>(null);
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3000); };
@@ -282,7 +284,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         title={orgObj.name}
         icon={meta.icon}
         subtitle={`${meta.title} - scoped entirely to ${orgObj.name}.`}
-        action={orgPlan ? <Badge variant="outline" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> {orgPlan.name}</Badge> : undefined}
+        action={<div className="flex items-center gap-2">{orgPlan && <Badge variant="outline" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> {orgPlan.name}</Badge>}<Button size="sm" className="gap-1.5" onClick={() => setWizardOpen(true)} title="Guided flow: pick learners, choose a class, assign courses and enrol"><UserPlus className="h-3.5 w-3.5" /> Assign learners</Button></div>}
       />
 
       {flash && (
@@ -334,7 +336,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
             ))}
             <div className="ml-auto flex items-center gap-2">
               <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEnrollOpen(true)}><Link2 className="h-3.5 w-3.5" /> Self-enrolment link</Button>
-              <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}><UserPlus className="h-3.5 w-3.5" /> Add member</Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAddOpen(true)}><UserPlus className="h-3.5 w-3.5" /> Add member</Button>
             </div>
           </div>
 
@@ -846,6 +848,8 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
           </div>
         </DialogContent>
       </Dialog>
+
+      <AssignWizard orgId={orgId} orgName={orgObj.name} open={wizardOpen} onClose={() => setWizardOpen(false)} onDone={() => { qcHub.invalidateQueries({ queryKey: ['org-classes', orgId] }); qcHub.invalidateQueries({ queryKey: ['partner-members', partnerId] }); }} />
     </div>
   );
 }
