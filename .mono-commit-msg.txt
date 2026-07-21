@@ -1,17 +1,9 @@
-Learner QA: grades reconcile, per-module completion, catalog links, video complete, dashboard, content rebuild (ASCII-only)
+Prod-readiness: gate seeding tools, fix admin overflow, stop tab-title brand leak (ASCII-only)
 
-LEARNER GRADES (critical): the learner /grades endpoints (/courses/:id/gradebook/me and /gradebook/mine) never ran the reconcile the staff gradebook does, so graded assignments showed dashes and Overall said 'not enough data'. Both now reconcile submissions into gradebook_entries first.
+SAFETY: the Provision/Build/Seed/Resync data-seeding buttons sat inline in the super-admin Partner Management header. Moved them behind a collapsed 'Internal tools' panel with a warning and a per-action confirm() prompt, so they can't be clicked by accident against a live tenant.
 
-PER-MODULE COMPLETION (critical): completion counted beat_progress by the denormalized module_id, so after a rebuild (new beat ids) every module collapsed to one shared percent. Progress + engine now JOIN through beats so only current beats count, attributed to their real module.
+LAYOUT: that same header row overflowed the viewport and cut off 'Create partner'. The header now holds only 'Internal tools' + 'Create partner' (shrink-0), so nothing is clipped; the partner table already scrolls within its own container.
 
-CATALOG LINKS (critical): GET /courses/:id gated on enrolment and 403'd every non-enrolled catalogue course (client showed 'Course not found'). Now allows catalogue-scope viewing (tenant-owned or partner-assigned); coursework stays enrolment-gated.
+BRANDING: the browser tab title flipped to the base 'Synops Praxis' after navigation because it was only set when a brand displayName existed (stale value otherwise). ThemeProvider now always sets the title from the resolved brand, falling back to a neutral 'Praxis' rather than leaking the base platform name.
 
-VIDEO COMPLETE: the slide-lesson never marked the video beat viewed; it now fires a completion when the learner reaches the final slide, so the Video tab earns its green check.
-
-DASHBOARD: course badge/counter now driven by real percent, not a stale 'completed' status (no more Completed badge at 17% with 'in progress: 0').
-
-CONTENT: bumped a CONTENT_VERSION so Build Full Courses rebuilds stale modules (regenerates fixed readings + distinct CFU q2 + case briefs) instead of skipping them.
-
-UX: discussions scoped to the module (Participate tab); XP proportional to score (Jeopardy no longer pays 60 for a 50-pt game); hardened submission panel against raw JSON; module ?tab deep-link now persists on reload.
-
-VALIDATION: esbuild clean across all changed files.
+VALIDATION: esbuild clean on AdminPartners.tsx and ThemeProvider.tsx.
