@@ -438,6 +438,16 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not seed skills catalogue', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Seed the 3 priority flagship courses (Business Model Canvas, Costing/Pricing/Margin, Compliance), assigned to Enza.
+  const seedFlagship = useMutation({
+    mutationFn: () => apiFetch<{ total: number; created: number; assigned: number; error?: string }>('/platform/seed-flagship-courses', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['courses'] });
+      toast({ title: 'Flagship courses seeded', description: `${r.created} new courses created, ${r.assigned} assigned to Enza (of ${r.total}).${r.error ? ' First error: ' + r.error : ''} Run "Build Full Courses" next to fully build every module.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not seed flagship courses', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Seed a realistic delivery cohort (org + admin + coach + 4 learners at different levels) under Enza.
   const seedCohort = useMutation({
     mutationFn: () => apiFetch<{ created: boolean; learners?: number; message?: string }>('/platform/seed-enza-cohort', { method: 'POST' }),
@@ -490,6 +500,11 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Seed the 10 high-demand SA skills courses (NQF/SETA-mapped) and assign them to Enza? Run "Build Full Courses" afterwards to fully build every module.')) seedSkills.mutate(); }}
                 title="Seed 10 in-demand South African vocational courses and assign to Enza">
                 {seedSkills.isPending ? 'Seeding…' : 'Seed SA Skills Catalogue'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedFlagship.isPending}
+                onClick={() => { if (window.confirm('Seed the 3 flagship courses (Business Model Canvas, Costing/Pricing/Margin, Compliance Essentials) and assign them to Enza? Run "Build Full Courses" afterwards to fully build every module.')) seedFlagship.mutate(); }}
+                title="Seed the 3 priority flagship courses (8-module architecture) and assign to Enza">
+                {seedFlagship.isPending ? 'Seeding…' : 'Seed Flagship Courses'}
               </Button>
               <Button variant="outline" size="sm" disabled={enrich.isPending}
                 onClick={() => { if (window.confirm('Build Full Courses? This REBUILDS every Enza module (replaces beats/readings). Learner progress may need a resync afterward.')) enrich.mutate(); }}

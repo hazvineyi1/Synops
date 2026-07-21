@@ -26,6 +26,7 @@ import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
 import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
+import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
@@ -869,6 +870,23 @@ router.post("/platform/seed-skills-catalog", requireAuth, requireSuperAdmin, asy
   try {
     const r = await seedSkillsCatalog();
     await audit(req, "platform.seed_skills_catalog", "partner", "enza", { created: r.created, assigned: r.assigned });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * POST /platform/seed-flagship-courses - seeds the 3 priority "flagship" courses (Business Model
+ * Canvas, Costing/Pricing/Margin, Compliance Essentials), built to the agreed 8-module architecture:
+ * phone-sized competency units, Socratic scenario openers, an observable DO outcome each, and a
+ * coach-reviewed artifact per course. Platform-owned, assigned to Enza. Run enrich-enza afterwards
+ * to fully build every module. Idempotent. Super admin only.
+ */
+router.post("/platform/seed-flagship-courses", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await seedFlagshipCourses();
+    await audit(req, "platform.seed_flagship_courses", "partner", "enza", { created: r.created, assigned: r.assigned });
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
