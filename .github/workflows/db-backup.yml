@@ -69,3 +69,47 @@ jobs:
           path: ${{ env.BACKUP_FILE }}
           retention-days: 90
           if-no-files-found: error
+
+  # Praxis LMS runs as its OWN Railway service with its OWN Postgres, so it needs its own dump.
+  # Add a PRAXIS_DATABASE_PUBLIC_URL repository secret (Railway -> Praxis Postgres -> Variables ->
+  # DATABASE_PUBLIC_URL). Until that secret exists this job SKIPS gracefully instead of failing the
+  # workflow, so the Coach backup above is never blocked by Praxis not being wired up yet.
+  backup-praxis:
+    name: pg_dump praxis -> artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-18
+          /usr/lib/postgresql/18/bin/pg_dump --version
+
+      - name: Run pg_dump (praxis)
+        env:
+          PRAXIS_DATABASE_PUBLIC_URL: ${{ secrets.PRAXIS_DATABASE_PUBLIC_URL }}
+        run: |
+          if [ -z "$PRAXIS_DATABASE_PUBLIC_URL" ]; then
+            echo "::warning::PRAXIS_DATABASE_PUBLIC_URL secret not set - skipping Praxis backup. Add it in Settings -> Secrets and variables -> Actions to enable."
+            echo "SKIP_PRAXIS=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          STAMP=$(date -u +%Y%m%d-%H%M%S)
+          echo "BACKUP_FILE=praxis-db-$STAMP.dump" >> "$GITHUB_ENV"
+          /usr/lib/postgresql/18/bin/pg_dump "$PRAXIS_DATABASE_PUBLIC_URL" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --file "praxis-db-$STAMP.dump"
+          ls -lh "praxis-db-$STAMP.dump"
+
+      - name: Upload backup artifact
+        if: env.SKIP_PRAXIS != '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 90
+          if-no-files-found: error

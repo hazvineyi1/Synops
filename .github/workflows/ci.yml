@@ -57,3 +57,37 @@ jobs:
           PORT=8080 BASE_PATH=/app/     pnpm --filter @workspace/paideia-app   run build
           PORT=8080 BASE_PATH=/builder/ pnpm --filter @workspace/compass-web   run build
           pnpm --filter @workspace/paideia-api run build
+
+  # Praxis LMS is a SELF-CONTAINED pnpm workspace under praxis/ with its own lockfile, deployed as
+  # its own Railway service (Dockerfile.praxis). The Coach job above never builds it, so a Praxis-
+  # breaking change could pass CI and only fail in the Railway image build. This job reproduces
+  # Dockerfile.praxis exactly so that breakage fails here instead of in production.
+  build-praxis:
+    name: build praxis (SPA + api)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # praxis/ is its own workspace root (own pnpm-workspace.yaml + lockfile), so install and build
+      # from there — exactly as Dockerfile.praxis does (COPY praxis/ ./ then pnpm install).
+      - name: Install (praxis workspace)
+        working-directory: praxis
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build Praxis (SPA + API)
+        working-directory: praxis
+        run: |
+          PORT=8080 BASE_PATH=/ pnpm --filter @workspace/praxis run build
+          pnpm --filter @workspace/api-server run build
