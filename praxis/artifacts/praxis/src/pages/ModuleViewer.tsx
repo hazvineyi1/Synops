@@ -961,7 +961,10 @@ export function ModuleViewer() {
       ? allBeats.filter(b => !!b.visualData?.interactive)
       : allBeats;
   const currentBeat = beats[currentIndex];
-  const completedCount = completedIds.size;
+  // Scope the completed count to the beats CURRENTLY in view. In quiz/interactive mode `beats` is a
+  // filtered subset, but completedIds accumulates every viewed beat in the whole module — using its
+  // raw size against the 2 filtered quiz beats produced nonsense like "13/2".
+  const completedCount = beats.filter(b => completedIds.has(b.id)).length;
   const pct = beats.length > 0 ? (completedCount / beats.length) * 100 : 0;
 
   // Scroll to top whenever beat changes — must be before any early returns

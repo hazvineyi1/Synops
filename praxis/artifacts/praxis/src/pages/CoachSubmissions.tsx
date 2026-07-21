@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'wouter';
 import { useListSubmissions, useReviewSubmission } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ export function CoachSubmissions() {
   const { data: submissions, isLoading, refetch } = useListSubmissions();
   const reviewMutation = useReviewSubmission();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [feedback, setFeedback] = useState('');
@@ -64,7 +66,18 @@ export function CoachSubmissions() {
                     <p className="text-sm text-muted-foreground mb-2">Module: {sub.moduleTitle}</p>
                     <p className="text-sm line-clamp-2 text-foreground/80">{sub.contentText}</p>
                   </div>
-                  <Button onClick={() => setSelectedSubmission(sub)} className="shrink-0">
+                  <Button
+                    onClick={() => {
+                      // Assignment work is score-graded on the assignment page; legacy module
+                      // work uses the inline approve/attest dialog.
+                      if ((sub as any).kind === 'assignment' && (sub as any).assignmentId) {
+                        navigate(`/courses/${(sub as any).courseId}/assignments/${(sub as any).assignmentId}`);
+                      } else {
+                        setSelectedSubmission(sub);
+                      }
+                    }}
+                    className="shrink-0"
+                  >
                     Evaluate
                   </Button>
                 </CardContent>

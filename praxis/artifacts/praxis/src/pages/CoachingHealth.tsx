@@ -46,7 +46,7 @@ export function CoachingHealth() {
             <Kpi label="Flagged learners" value={data.summary.flaggedLearners} sub={`${data.summary.offTrack} off track · ${data.summary.atRisk} at risk`} icon={<AlertTriangle className="h-4 w-4" />} tone={data.summary.flaggedLearners ? 'amber' : undefined} />
             <Kpi label="Flagged & unassigned" value={data.summary.unassignedFlagged} sub="no coach yet" icon={<LifeBuoy className="h-4 w-4" />} tone={data.summary.unassignedFlagged ? 'red' : 'green'} />
             <Kpi label="Resolution rate" value={data.summary.resolutionRate == null ? '—' : `${data.summary.resolutionRate}%`} sub={`${data.summary.resolvedTotal} resolved`} icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
-            <Kpi label="Coaches" value={data.summary.coaches} sub={`${data.summary.courses} course${data.summary.courses === 1 ? '' : 's'}`} icon={<UserCog className="h-4 w-4" />} />
+            <Kpi label={data.summary.coaches === 1 ? 'Coach' : 'Coaches'} value={data.summary.coaches} sub={`${data.summary.courses} course${data.summary.courses === 1 ? '' : 's'}`} icon={<UserCog className="h-4 w-4" />} />
           </div>
 
           {data.summary.unassignedFlagged > 0 && (

@@ -134,6 +134,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const activePartnerName = role === 'super_admin' && inPartnerContext ? getPartnerHub(user.partnerId).partnerName : null;
 
   const getNavGroups = (): NavGroup[] => {
+    // Learner preview ("View as"): while previewing a learner's experience we must NOT show the
+    // full Partner Admin nav (Financial Hub, Funders, Audit, etc.) — that misrepresents "this is
+    // what they see" and is a trust concern. Collapse to a single clear exit back to the org.
+    if (location.startsWith('/partner/impersonate')) {
+      const back = (() => {
+        const m = location.match(/^\/partner\/impersonate\/([^/]+)/);
+        return m ? `/partner/org/${m[1]}/people` : '/partner/organisations';
+      })();
+      return [{ items: [{ label: t('nav.exitLearnerPreview', 'Exit learner preview'), href: back, icon: ArrowLeft }] }];
+    }
+
     // Org context: whenever anyone with tenant oversight (partner admin OR super admin) is inside
     // an organisation (/partner/org/:id), the whole sidebar becomes that org's own hub. This is
     // role-independent so the founder testing as super admin gets the same in-org navigation.

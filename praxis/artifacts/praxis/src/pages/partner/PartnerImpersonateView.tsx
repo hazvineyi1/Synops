@@ -138,7 +138,8 @@ export function PartnerImpersonateView({ params }: { params?: { orgId?: string; 
               const firstCoach = myClasses.flatMap((c) => c.staff).find((s) => s.role === 'coach') ?? myClasses.flatMap((c) => c.staff).find((s) => s.role === 'facilitator');
               return <div className="text-sm">{firstCoach ? staffName(firstCoach.staffId) : 'No coach assigned yet.'}</div>;
             })()}
-            <Button size="sm" variant="outline" className="mt-3 gap-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message my coach</Button>
+            <Button size="sm" variant="outline" disabled title="Messaging is available to the learner in their own session" className="mt-3 gap-1.5"><MessageSquare className="h-3.5 w-3.5" /> Message my coach</Button>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">Preview only — the learner messages their coach from their own account.</p>
           </Card>
           <Card className="p-5">
             <h3 className="text-sm font-semibold mb-2 flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-primary" /> Status</h3>

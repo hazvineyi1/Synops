@@ -1,5 +1,7 @@
-Resync Learner Progress: re-point demo learners at current content, fix off-track + notifications (ASCII-only)
+Fix partner Overview stuck on an infinite loading skeleton (ASCII-only)
 
-Rebuilding courses (Build Full Courses) gives beats new IDs, which orphaned the seeded learners' progress - so completion read artificially low and an advanced learner could be wrongly flagged as falling behind. New resyncEnzaProgress() + POST /platform/resync-enza-progress (super admin) wipes each demo learner's stale beat progress, rebuilds it against today's beats at their persona level (advanced ~92pct, on-track ~58pct, at-risk ~30pct, novice ~8pct), recomputes their gradebook off-track alert so the coach reflects reality, and clears stale system notifications. Partner Management gains a Resync Learner Progress button.
+The partner Overview hung on grey loading cards forever. Root cause: a partner_admin whose partnerId was null (created via a provisioning path that only set organisationId). The dashboard keys the partner-stats query off partnerId, and the generated hook DISABLES the query when partnerId is null - so the data never arrived and the 'if (!stats) return skeleton' guard never cleared.
 
-VALIDATION: esbuild clean on enzaCohortSeed.ts, platform.ts, AdminPartners.tsx.
+Two-part fix. Backend: /auth/me now heals a facilitator-tier account missing partnerId by backfilling it from the owning organisation (and persisting it), so the query enables and real numbers render. Frontend: PartnerAdminDashboard and OrgAdminDashboard no longer gate the whole page on '!data' - they use isLoading and fall back to zeros/orgs list once the query settles, so the Overview can never hang on a skeleton again regardless of role or query error.
+
+VALIDATION: esbuild clean on auth.ts and Dashboard.tsx.

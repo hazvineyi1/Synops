@@ -93,7 +93,31 @@ function toPartnerResponse(p: typeof partnersTable.$inferSelect) {
 // GET /partners
 router.get("/partners", requireAuth, requireRole("super_admin"), async (req, res) => {
   const partners = await db.select().from(partnersTable);
-  res.json(partners.map(toPartnerResponse));
+  // Compute learner/org counts LIVE — the stored partners.orgCount/learnerCount columns are
+  // denormalised and never recomputed when learners are seeded/enrolled, so they read stale 0.
+  // A learner may attach to a partner directly (partner_id) or via their organisation, so resolve
+  // through both. Two grouped queries instead of the stale column.
+  const orgById = new Map<string, number>();
+  const learnerById = new Map<string, number>();
+  try {
+    const orgRows: any = await db.execute(sql`
+      SELECT partner_id AS pid, COUNT(*)::int AS c FROM organisations
+      WHERE partner_id IS NOT NULL GROUP BY partner_id`);
+    for (const r of orgRows.rows ?? []) orgById.set(r.pid, Number(r.c));
+    const learnerRows: any = await db.execute(sql`
+      SELECT COALESCE(u.partner_id, o.partner_id) AS pid, COUNT(*)::int AS c
+      FROM users u LEFT JOIN organisations o ON u.organisation_id = o.id
+      WHERE u.role = 'learner' AND COALESCE(u.partner_id, o.partner_id) IS NOT NULL
+      GROUP BY COALESCE(u.partner_id, o.partner_id)`);
+    for (const r of learnerRows.rows ?? []) learnerById.set(r.pid, Number(r.c));
+  } catch {
+    /* fall back to stored columns below */
+  }
+  res.json(partners.map((p) => ({
+    ...toPartnerResponse(p),
+    orgCount: orgById.get(p.id) ?? p.orgCount ?? 0,
+    learnerCount: learnerById.get(p.id) ?? p.learnerCount ?? 0,
+  })));
 });
 
 // POST /partners

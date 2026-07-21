@@ -7,7 +7,7 @@ import {
   notificationsTable,
   auditEventsTable,
 } from "@workspace/db";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -182,7 +182,27 @@ router.get("/support/tickets/:id", requireAuth, async (req, res) => {
       createdAt: r.message.createdAt.toISOString(),
     }));
 
-  res.json({ ticket: ticketResponse(ticket), messages });
+  // Resolve the requester's (and assignee's) name — the detail response omitted these, so the
+  // thread header and the opening-message bubble fell back to "You"/"Unknown" when staff viewed
+  // someone else's ticket.
+  const nameIds = [ticket.requesterId, ticket.assigneeId].filter((v): v is string => !!v);
+  const nameRows = nameIds.length
+    ? await db.select({ id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email })
+        .from(usersTable).where(inArray(usersTable.id, nameIds))
+    : [];
+  const nameOf = (id: string | null) => {
+    if (!id) return null;
+    const u = nameRows.find((r) => r.id === id);
+    return u ? ([u.firstName, u.lastName].filter(Boolean).join(" ") || u.email) : null;
+  };
+
+  res.json({
+    ticket: ticketResponse(ticket, {
+      requesterName: nameOf(ticket.requesterId) ?? "Unknown",
+      assigneeName: nameOf(ticket.assigneeId),
+    }),
+    messages,
+  });
 });
 
 /** POST /support/tickets/:id/messages — reply. Requester or staff. */

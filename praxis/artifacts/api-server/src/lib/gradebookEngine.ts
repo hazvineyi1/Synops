@@ -477,7 +477,12 @@ export function evaluateOffTrack(
     const fracs = completionCols.map((c) => computed.cells[c.key]?.fraction ?? 0);
     const started = fracs.some((f) => f > 0.05);
     const avgCompletion = fracs.reduce((a, b) => a + b, 0) / fracs.length;
-    if (started && avgCompletion < 0.5) reasons.push("low_completion");
+    // Don't override strong graded performance: a learner who is passing their graded work is
+    // NOT "off track" merely for viewing less of the content (they may be testing out). This is
+    // what wrongly flipped a 100% learner to off-track. Only treat low completion as an off-track
+    // signal when grades aren't already demonstrating mastery.
+    const gradesStrong = overallFrac !== null && overallFrac >= PASS;
+    if (started && avgCompletion < 0.5 && !gradesStrong) reasons.push("low_completion");
   }
 
   let status: OffTrackResult["status"] = "on_track";

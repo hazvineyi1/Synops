@@ -1056,14 +1056,31 @@ export function AssignmentDetail() {
                     <p className="text-sm leading-relaxed bg-muted/50 rounded-lg p-3">{submission.feedback}</p>
                   </div>
                 )}
-                {submission.body && (
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Your Submission</div>
-                    <p className="text-xs text-muted-foreground line-clamp-4">
-                      {(() => { try { return JSON.stringify(JSON.parse(submission.body), null, 2); } catch { return submission.body; } })()}
-                    </p>
-                  </div>
-                )}
+                {submission.body && (() => {
+                  // Game/quiz submissions store a JSON payload ({type, answers, score, passed}).
+                  // Never dump raw JSON at the learner — render a readable summary instead.
+                  let parsed: any = null;
+                  try { parsed = JSON.parse(submission.body); } catch { /* plain text */ }
+                  if (parsed && typeof parsed === 'object' && (parsed.type || parsed.answers || parsed.score !== undefined)) {
+                    const answered = parsed.answers ? Object.keys(parsed.answers).length : (Array.isArray(parsed.order) ? parsed.order.length : (parsed.matches ? Object.keys(parsed.matches).length : null));
+                    return (
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Your Submission</div>
+                        <div className="text-sm text-muted-foreground space-y-0.5">
+                          <div>Activity: {String(parsed.type ?? 'exercise').replace(/^\w/, (c: string) => c.toUpperCase())}</div>
+                          {answered !== null && <div>Responses recorded: {answered}</div>}
+                          {parsed.passed !== undefined && <div>Result: {parsed.passed ? 'Passed' : 'Not yet passed'}</div>}
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Your Submission</div>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-6">{submission.body}</p>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           )}

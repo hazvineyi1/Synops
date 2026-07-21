@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
@@ -39,6 +39,16 @@ export function PartnerSettings() {
   const [pname, setPname] = useState('');
   const [pcontact, setPcontact] = useState('');
   useEffect(() => { if (partner) { setPname(partner.name ?? ''); setPcontact(partner.contactEmail ?? ''); } }, [partner]);
+
+  // Declared BEFORE the mutation that calls it — previously flashMsg was defined after saveProfile,
+  // so the first save's success callback closed over a not-yet-initialised binding and the green
+  // confirmation only appeared on the second save.
+  const [flash, setFlash] = useState<string | null>(null);
+  const flashMsg = useCallback((m: string) => {
+    setFlash(m);
+    window.setTimeout(() => setFlash(null), 3500);
+  }, []);
+
   const saveProfile = useMutation({
     mutationFn: () => apiFetch(`/partners/${partnerId}`, { method: 'PATCH', body: JSON.stringify({ name: pname.trim(), contactEmail: pcontact.trim() }) }),
     onSuccess: () => flashMsg('Partner profile saved.'),
@@ -49,8 +59,6 @@ export function PartnerSettings() {
     invoiceAlerts: true, funderExpiry: true, weeklyDigest: false, delegateActions: true, loginAlerts: true,
   });
   const toggle = (k: keyof typeof prefs) => setPrefs((p) => ({ ...p, [k]: !p[k] }));
-  const [flash, setFlash] = useState<string | null>(null);
-  const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3500); };
 
   return (
     <div className="space-y-6">

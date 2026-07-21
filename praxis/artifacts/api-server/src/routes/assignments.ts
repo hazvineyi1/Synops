@@ -67,17 +67,34 @@ async function applyGrade(opts: {
     .where(eq(assignmentSubmissionsTable.id, opts.submissionId))
     .returning();
 
-  await db.update(gradebookEntriesTable)
-    .set({
-      score: opts.score === null ? null : String(opts.score),
-      letterGrade: opts.letterGrade ?? null,
-      missing: false,
-      updatedAt: new Date(),
-    })
-    .where(and(
+  // Mirror the score into gradebook_entries — the canonical source the gradebook grid reads.
+  // UPSERT, not UPDATE: entry rows are seeded only at assignment-creation time for the learners
+  // enrolled THEN. A learner who enrolled later (the normal case for a seeded cohort) has no row,
+  // so a bare UPDATE matched 0 rows and the grade never reached the grid (dashes + blank Overall,
+  // and a false "missing summative" off-track flip). Insert the row when it's absent.
+  const scoreStr = opts.score === null ? null : String(opts.score);
+  const existingEntry = await db.query.gradebookEntriesTable.findFirst({
+    where: and(
       eq(gradebookEntriesTable.assignmentId, opts.assignmentId),
       eq(gradebookEntriesTable.userId, opts.learnerId),
-    ));
+    ),
+  });
+  if (existingEntry) {
+    await db.update(gradebookEntriesTable)
+      .set({ score: scoreStr, letterGrade: opts.letterGrade ?? null, missing: false, updatedAt: new Date() })
+      .where(eq(gradebookEntriesTable.id, existingEntry.id));
+  } else {
+    const asn = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, opts.assignmentId) });
+    await db.insert(gradebookEntriesTable).values({
+      userId: opts.learnerId,
+      courseId: opts.courseId,
+      assignmentId: opts.assignmentId,
+      score: scoreStr,
+      possibleScore: String(Number(asn?.pointsPossible ?? 100)),
+      letterGrade: opts.letterGrade ?? null,
+      missing: false,
+    });
+  }
 
   await db.insert(notificationsTable).values({
     userId: opts.learnerId,
@@ -373,10 +390,22 @@ router.post("/assignments/:assignmentId/submit", requireAuth, async (req, res) =
       parsedText, sourceFilename,
       status: isLate ? "late" : "submitted", submittedAt: new Date(),
     }).returning();
-    // Update gradebook — mark as submitted
-    await db.update(gradebookEntriesTable)
-      .set({ missing: false, late: isLate ?? false })
-      .where(and(eq(gradebookEntriesTable.assignmentId, req.params.assignmentId), eq(gradebookEntriesTable.userId, req.userId!)));
+    // Update gradebook — mark as submitted (upsert: a learner who enrolled after the
+    // assignment was created has no seeded entry row, so a bare UPDATE would no-op and the
+    // work would still read as "missing").
+    const existingEntry = await db.query.gradebookEntriesTable.findFirst({
+      where: and(eq(gradebookEntriesTable.assignmentId, req.params.assignmentId), eq(gradebookEntriesTable.userId, req.userId!)),
+    });
+    if (existingEntry) {
+      await db.update(gradebookEntriesTable)
+        .set({ missing: false, late: isLate ?? false })
+        .where(eq(gradebookEntriesTable.id, existingEntry.id));
+    } else {
+      await db.insert(gradebookEntriesTable).values({
+        userId: req.userId!, courseId: assignment.courseId, assignmentId: req.params.assignmentId,
+        possibleScore: String(Number(assignment.pointsPossible ?? 100)), missing: false, late: isLate ?? false,
+      });
+    }
   }
 
   // Auto-graded game? Score it now so the learner gets an instant grade (this also fires the

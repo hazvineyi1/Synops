@@ -118,6 +118,9 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const createClassM = useMutation({
     mutationFn: (name: string) => apiFetch<{ id: string }>(`/organisations/${orgId}/classes`, { method: 'POST', body: JSON.stringify({ name }) }),
     onSuccess: (r) => { qcHub.invalidateQueries({ queryKey: ['org-classes', orgId] }); setNewClassName(''); flashMsg('Class created.'); navigate(`${base}/classes/${r.id}`); },
+    // Surface failures instead of failing silently. A create against a demo/seed org id that has no
+    // real record 403s; without this the button appeared to do nothing at all.
+    onError: (e: any) => flashMsg(e?.status === 403 ? 'This organisation is a demo record and cannot hold real classes. Use a live organisation.' : 'Could not create the class. Please try again.'),
   });
 
   // Create-class + self-enrolment UI state

@@ -12,6 +12,7 @@ import { eq, and, desc, sql, count, inArray, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isSuperAdmin, isFacilitator, isCoFacilitator } from "../lib/roles";
 import { learnerIdsForCoFacilitator } from "../lib/scope";
+import { computeAvgMastery } from "./reports";
 
 const EMPTY_OVERVIEW = {
   totalLearners: 0, activeEnrolments: 0, completions: 0, credentialsIssued: 0,
@@ -66,12 +67,18 @@ router.get("/analytics/overview", requireAuth, async (req, res) => {
     return { date: d.toISOString().split("T")[0], value: Math.floor(Math.random() * 5) };
   });
 
+  // Shared, real average mastery (same source as the Funder report) so the two screens agree —
+  // they previously hardcoded 0.72 vs 0.73. And a credential implies a completion, so completions
+  // can't be fewer than credentials.
+  const avgMastery = await computeAvgMastery();
+  const completionsCount = Math.max(Number(completedSessions.count), Number(credentialCount.count));
+
   res.json({
     totalLearners: Number(totalLearners.count),
     activeEnrolments: Number(activeSessions.count),
-    completions: Number(completedSessions.count),
+    completions: completionsCount,
     credentialsIssued: Number(credentialCount.count),
-    avgMastery: 0.72,
+    avgMastery,
     enrolmentTrend: trend,
     completionTrend: trend.map(t => ({ ...t, value: Math.max(0, t.value - 1) })),
   });

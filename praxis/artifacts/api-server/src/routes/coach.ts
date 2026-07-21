@@ -5,6 +5,8 @@ import {
   sessionsTable,
   credentialsTable,
   submissionsTable,
+  assignmentSubmissionsTable,
+  assignmentsTable,
   activityEventsTable,
   gradebookAlertsTable,
   coachPlansTable,
@@ -502,14 +504,14 @@ router.get("/coach/learners/:userId/presession", requireAuth, async (req, res) =
 // GET /coach/submissions
 router.get("/coach/submissions", requireAuth, async (req, res) => {
   const user = req.dbUser!;
-  // Get all submitted work from learners in coach's org
+  // Legacy module-submission work (approve/attest inline).
   const submissions = await db
     .select()
     .from(submissionsTable)
     .where(eq(submissionsTable.status, "submitted"))
     .orderBy(desc(submissionsTable.createdAt))
     .limit(50);
-  res.json(submissions.map(s => ({
+  const legacy = submissions.map(s => ({
     id: s.id,
     userId: s.userId,
     moduleId: s.moduleId,
@@ -520,7 +522,54 @@ router.get("/coach/submissions", requireAuth, async (req, res) => {
     coachFeedback: s.coachFeedback,
     createdAt: s.createdAt.toISOString(),
     reviewedAt: s.reviewedAt?.toISOString() ?? null,
-  })));
+    kind: "module" as const,
+  }));
+
+  // Assignment work awaiting a mark lives in assignment_submissions (a different store), which is
+  // why the queue used to read 0 despite pending assignments. Surface those too, scoped to the
+  // courses this coach leads (super admin sees all), and route grading to the assignment page.
+  let assignmentItems: any[] = [];
+  try {
+    const courseIds = isSuperAdmin(user.role)
+      ? null
+      : [...(await leaderCourseIds(user.id))];
+    if (courseIds === null || courseIds.length > 0) {
+      const pending = await db
+        .select({
+          sub: assignmentSubmissionsTable,
+          aTitle: assignmentsTable.title,
+          aCourse: assignmentsTable.courseId,
+        })
+        .from(assignmentSubmissionsTable)
+        .innerJoin(assignmentsTable, eq(assignmentSubmissionsTable.assignmentId, assignmentsTable.id))
+        .where(
+          courseIds === null
+            ? inArray(assignmentSubmissionsTable.status, ["submitted", "late"])
+            : and(inArray(assignmentSubmissionsTable.status, ["submitted", "late"]), inArray(assignmentsTable.courseId, courseIds)),
+        )
+        .orderBy(desc(assignmentSubmissionsTable.submittedAt))
+        .limit(50);
+      assignmentItems = pending.map(({ sub, aTitle, aCourse }) => ({
+        id: sub.id,
+        userId: sub.userId,
+        moduleId: null,
+        moduleTitle: aTitle,
+        title: aTitle,
+        contentText: sub.parsedText ?? sub.body ?? "",
+        status: "submitted",
+        coachFeedback: null,
+        createdAt: (sub.submittedAt ?? sub.createdAt)?.toISOString?.() ?? new Date().toISOString(),
+        reviewedAt: null,
+        kind: "assignment" as const,
+        assignmentId: sub.assignmentId,
+        courseId: aCourse,
+      }));
+    }
+  } catch {
+    /* best-effort; legacy queue still returns */
+  }
+
+  res.json([...assignmentItems, ...legacy]);
 });
 
 // PATCH /coach/submissions/:submissionId

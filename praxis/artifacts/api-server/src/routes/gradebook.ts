@@ -6,6 +6,7 @@ import {
   gradebookAlertsTable,
   gradebookEntriesTable,
   assignmentsTable,
+  assignmentSubmissionsTable,
   usersTable,
   enrolmentsTable,
   coursesTable,
@@ -49,6 +50,47 @@ async function requireStaffOnCourse(req: any, res: any, courseId: string): Promi
   return true;
 }
 
+/**
+ * Self-heal the gradebook_entries mirror for a course. Grading writes both the submission score
+ * AND a gradebook_entries row, but earlier grades (before the applyGrade upsert fix) only landed
+ * on the submission — their entry row was never created because the learner enrolled after the
+ * assignment existed. Reconcile: for every graded submission in this course, ensure a matching
+ * entry row carries the same score. Cheap (a few small queries) and idempotent, so it can run on
+ * each gradebook load and keep the grid honest without a manual backfill.
+ */
+async function reconcileAssignmentEntries(courseId: string): Promise<void> {
+  try {
+    const assignments = await db.select({ id: assignmentsTable.id, pts: assignmentsTable.pointsPossible })
+      .from(assignmentsTable).where(eq(assignmentsTable.courseId, courseId));
+    if (!assignments.length) return;
+    const ids = assignments.map((a) => a.id);
+    const ptsById = new Map(assignments.map((a) => [a.id, Number(a.pts ?? 100)]));
+    const [subs, entries] = await Promise.all([
+      db.select().from(assignmentSubmissionsTable).where(inArray(assignmentSubmissionsTable.assignmentId, ids)),
+      db.select().from(gradebookEntriesTable).where(inArray(gradebookEntriesTable.assignmentId, ids)),
+    ]);
+    const entryKey = (aId: string, uId: string) => `${aId}::${uId}`;
+    const entryByKey = new Map(entries.map((e) => [entryKey(e.assignmentId!, e.userId), e]));
+    for (const s of subs) {
+      const graded = s.status === "graded" && s.score !== null && s.score !== undefined;
+      if (!graded) continue;
+      const existing = entryByKey.get(entryKey(s.assignmentId, s.userId));
+      const scoreStr = String(s.score);
+      if (!existing) {
+        await db.insert(gradebookEntriesTable).values({
+          userId: s.userId, courseId, assignmentId: s.assignmentId,
+          score: scoreStr, possibleScore: String(ptsById.get(s.assignmentId) ?? 100), missing: false,
+        });
+      } else if (existing.score === null || existing.score === undefined) {
+        await db.update(gradebookEntriesTable).set({ score: scoreStr, missing: false, updatedAt: new Date() })
+          .where(eq(gradebookEntriesTable.id, existing.id));
+      }
+    }
+  } catch {
+    /* best-effort; never block the gradebook render */
+  }
+}
+
 // ── Unified staff matrix ──────────────────────────────────────────────────────────
 // GET /courses/:courseId/gradebook?groupId=
 router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
@@ -56,6 +98,7 @@ router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
   if (!(await requireStaffOnCourse(req, res, courseId))) return;
   const groupId = typeof req.query.groupId === "string" ? req.query.groupId : null;
 
+  await reconcileAssignmentEntries(courseId);
   const columns = await getCourseColumns(courseId);
   const settings = await getGradebookSettings(courseId);
 
@@ -793,6 +836,7 @@ router.patch("/courses/:courseId/gradebook/cell", requireAuth, async (req, res) 
 router.post("/courses/:courseId/gradebook/scan", requireAuth, async (req, res) => {
   const { courseId } = req.params;
   if (!(await requireStaffOnCourse(req, res, courseId))) return;
+  await reconcileAssignmentEntries(courseId);
   const summary = await scanCourse(courseId);
   res.json(summary);
 });
