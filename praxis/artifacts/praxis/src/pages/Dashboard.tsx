@@ -1,7 +1,9 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 import { useGetMe, useGetAnalyticsOverview, useListPartners, useGetPartnerStats, useListOrganisations } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, BookOpen, Award, TrendingUp, Building, FileText } from 'lucide-react';
+import { Users, BookOpen, Award, TrendingUp, Building, FileText, AlertTriangle } from 'lucide-react';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { LearnerHome } from '@/pages/LearnerHome';
@@ -165,20 +167,45 @@ function OrgAdminDashboard() {
 }
 
 function CoachDashboard() {
+  // Real data — the previous version showed hardcoded 24 / 7 / 82% figures, which is not acceptable
+  // to show a coach at a paying partner.
+  const { data: learners, isLoading: learnersLoading } = useQuery<any[]>({ queryKey: ['coach-learners'], queryFn: () => apiFetch('/coach/learners'), retry: false });
+  const { data: submissions } = useQuery<any[]>({ queryKey: ['coach-submissions'], queryFn: () => apiFetch('/coach/submissions'), retry: false });
+
+  const total = learners?.length ?? 0;
+  const flagged = (learners ?? []).filter((l) => l.status === 'off_track' || l.status === 'at_risk');
+  const pending = (submissions ?? []).filter((s) => s.status === 'submitted').length;
+  const withMastery = (learners ?? []).map((l) => (typeof l.masteryPct === 'number' ? l.masteryPct : null)).filter((v): v is number => v !== null);
+  const avgReadiness = withMastery.length ? Math.round(withMastery.reduce((a, b) => a + b, 0) / withMastery.length) : null;
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Learners Assigned" value={24} icon={Users} />
-        <StatCard title="Pending Submissions" value={7} icon={FileText} />
-        <StatCard title="Avg Learner Readiness" value="82%" icon={TrendingUp} />
+        <StatCard title="Learners Assigned" value={learnersLoading ? '—' : total} icon={Users} />
+        <StatCard title="Pending Submissions" value={pending} icon={FileText} />
+        <StatCard title="Avg Learner Readiness" value={avgReadiness == null ? '—' : `${avgReadiness}%`} icon={TrendingUp} />
       </div>
       <Card>
         <CardHeader>
           <CardTitle>Needs Attention</CardTitle>
-          <CardDescription>Learners with dropping readiness scores or pending reviews.</CardDescription>
+          <CardDescription>Learners flagged off-track or at-risk in the gradebook.</CardDescription>
         </CardHeader>
-        <CardContent className="h-32 flex items-center justify-center text-muted-foreground">
-          Go to Learners tab to view list.
+        <CardContent>
+          {learnersLoading ? (
+            <div className="h-24 flex items-center justify-center text-muted-foreground">Loading…</div>
+          ) : flagged.length === 0 ? (
+            <div className="h-24 flex items-center justify-center text-muted-foreground">No learners need attention right now.</div>
+          ) : (
+            <div className="space-y-2">
+              {flagged.slice(0, 6).map((l) => (
+                <Link key={l.userId ?? l.id} href="/learners" className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30">
+                  <span className="flex items-center gap-2 text-sm font-medium"><AlertTriangle className="h-4 w-4 text-amber-500" /> {l.name ?? l.email}</span>
+                  <span className="text-xs text-muted-foreground capitalize">{String(l.status ?? '').replace('_', ' ')}</span>
+                </Link>
+              ))}
+              {flagged.length > 6 && <Link href="/learners" className="block text-sm text-primary hover:underline pt-1">View all {flagged.length} →</Link>}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

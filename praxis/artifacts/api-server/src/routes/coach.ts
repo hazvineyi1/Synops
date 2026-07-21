@@ -29,6 +29,32 @@ import { resolveEmailBrand } from "../lib/emailBrand";
 
 const router = Router();
 
+/**
+ * Which learner ids may this staff user see? null = all (super admin). [] = none (a non-staff
+ * caller, e.g. a learner, has no business on the coach surface). Used to scope coach routes that
+ * previously trusted a path param and leaked cross-tenant / cross-section learner data.
+ */
+async function viewableLearnerIds(user: any): Promise<string[] | null> {
+  if (isSuperAdmin(user.role)) return null;
+  if (isCoFacilitator(user.role)) return await learnerIdsForCoFacilitator(user.id);
+  if (canAdministerOrg(user.role)) {
+    const rows = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        user.organisationId
+          ? and(eq(usersTable.organisationId, user.organisationId), eq(usersTable.role, "learner"))
+          : and(eq(usersTable.partnerId, user.partnerId ?? "__none__"), eq(usersTable.role, "learner")),
+      );
+    return rows.map((r) => r.id);
+  }
+  return [];
+}
+async function canViewLearner(user: any, learnerId: string): Promise<boolean> {
+  const ids = await viewableLearnerIds(user);
+  return ids === null || ids.includes(learnerId);
+}
+
 // ── Coach intervention layer ────────────────────────────────────────────────────
 // Connects off-track detection + the auto-generated adaptive plan to the coach: the coach
 // sees their flagged learners, works the plan with them, gets AI talking points, notes the
@@ -447,6 +473,10 @@ router.get("/coach/learners", requireAuth, async (req, res) => {
 
 // GET /coach/learners/:userId/presession
 router.get("/coach/learners/:userId/presession", requireAuth, async (req, res) => {
+  // Scope: only staff who actually oversee this learner (their section / org / partner) may read
+  // their dossier. Previously any authenticated user could pull any learner's sessions + pending
+  // submission text by id.
+  if (!(await canViewLearner(req.dbUser!, req.params.userId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const learner = await db.query.usersTable.findFirst({
     where: eq(usersTable.id, req.params.userId),
   });
@@ -504,13 +534,14 @@ router.get("/coach/learners/:userId/presession", requireAuth, async (req, res) =
 // GET /coach/submissions
 router.get("/coach/submissions", requireAuth, async (req, res) => {
   const user = req.dbUser!;
-  // Legacy module-submission work (approve/attest inline).
-  const submissions = await db
-    .select()
-    .from(submissionsTable)
-    .where(eq(submissionsTable.status, "submitted"))
-    .orderBy(desc(submissionsTable.createdAt))
-    .limit(50);
+  // Legacy module-submission work (approve/attest inline) — scoped to the caller's learners. The
+  // old query returned every learner's submitted work platform-wide to any authenticated user.
+  const viewIds = await viewableLearnerIds(user);
+  const submissions = viewIds === null
+    ? await db.select().from(submissionsTable).where(eq(submissionsTable.status, "submitted")).orderBy(desc(submissionsTable.createdAt)).limit(50)
+    : viewIds.length
+      ? await db.select().from(submissionsTable).where(and(eq(submissionsTable.status, "submitted"), inArray(submissionsTable.userId, viewIds))).orderBy(desc(submissionsTable.createdAt)).limit(50)
+      : [];
   const legacy = submissions.map(s => ({
     id: s.id,
     userId: s.userId,
@@ -575,6 +606,12 @@ router.get("/coach/submissions", requireAuth, async (req, res) => {
 // PATCH /coach/submissions/:submissionId
 router.patch("/coach/submissions/:submissionId", requireAuth, async (req, res) => {
   const { status, feedback } = req.body;
+  // Only staff who oversee the submitting learner may grade/attest. Previously ANY authenticated
+  // user (including a learner) could approve any submission and stamp themselves as the coach —
+  // and module attestations feed credential issuance.
+  const existing = await db.query.submissionsTable.findFirst({ where: eq(submissionsTable.id, req.params.submissionId) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await canViewLearner(req.dbUser!, existing.userId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const [updated] = await db
     .update(submissionsTable)
     .set({ status, coachFeedback: feedback, coachId: req.userId, reviewedAt: new Date() })

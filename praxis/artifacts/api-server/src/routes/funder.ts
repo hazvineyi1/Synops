@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, count, desc, sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
-import { isSuperAdmin, isFunder } from "../lib/roles";
+import { isSuperAdmin, isFunder, isFacilitator } from "../lib/roles";
 import { funderOrgIds, orgCoachingHours } from "../lib/scope";
 import { logAudit } from "../lib/audit";
 
@@ -225,7 +225,7 @@ async function ensureFundingTable() {
 }
 
 function canManagePartner(user: { role: string; partnerId?: string | null }, partnerId: string) {
-  return isSuperAdmin(user.role) || user.partnerId === partnerId;
+  return isSuperAdmin(user.role) || (isFacilitator(user.role) && user.partnerId === partnerId);
 }
 
 const cleanConditions = (v: unknown): string[] =>

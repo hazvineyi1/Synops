@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SessionProvider, useSession } from '@/context/SessionContext';
 import { ThemeApplier } from '@/context/ThemeProvider';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Pages
 import NotFound from '@/pages/not-found';
@@ -275,17 +276,19 @@ function Routes() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={basePath}>
-          <SessionProvider>
-            <ThemeApplier />
-            <Routes />
-          </SessionProvider>
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={basePath}>
+            <SessionProvider>
+              <ThemeApplier />
+              <Routes />
+            </SessionProvider>
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

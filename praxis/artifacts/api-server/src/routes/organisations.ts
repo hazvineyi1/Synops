@@ -75,11 +75,18 @@ router.get("/organisations/:orgId", requireAuth, async (req, res) => {
     where: eq(organisationsTable.id, req.params.orgId),
   });
   if (!org) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
   res.json(toOrgResponse(org));
 });
 
 // PATCH /organisations/:orgId
 router.patch("/organisations/:orgId", requireAuth, async (req, res) => {
+  // Was requireAuth-only: any user (incl. a learner in another partner) could rename any org.
+  const actor = req.dbUser!;
+  if (!canAdministerOrg(actor.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, req.params.orgId) });
+  if (!org) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessOrg(actor, org)) { res.status(403).json({ error: "Forbidden" }); return; }
   const { name, industry } = req.body;
   const [updated] = await db
     .update(organisationsTable)
@@ -91,6 +98,10 @@ router.patch("/organisations/:orgId", requireAuth, async (req, res) => {
 
 // GET /organisations/:orgId/members
 router.get("/organisations/:orgId/members", requireAuth, async (req, res) => {
+  // Was requireAuth-only: any user could enumerate any org's roster (name/email/role) — PII leak.
+  const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, req.params.orgId) });
+  if (!org) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
   const members = await db
     .select()
     .from(usersTable)

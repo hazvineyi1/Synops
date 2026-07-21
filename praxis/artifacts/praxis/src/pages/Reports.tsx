@@ -4,9 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Download, FileText, CheckCircle2, Award, Users } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { useBrandTheme } from '@/context/ThemeProvider';
 
 export function Reports() {
   const { data: report, isLoading } = useGetFunderReport({});
+  const { data: brand } = useBrandTheme();
+  const brandName = brand?.displayName || 'Praxis';
 
   if (isLoading) {
     return (
@@ -97,7 +100,7 @@ export function Reports() {
 
         {/* Footnote */}
         <div className="mt-16 pt-6 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
-          <p>Generated securely via Synops Praxis</p>
+          <p>Generated securely via {brandName}</p>
           <p>Verification ID: {Math.random().toString(36).substring(2, 10).toUpperCase()}</p>
         </div>
       </div>

@@ -125,7 +125,7 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <code className="flex-1 min-w-[220px] truncate rounded bg-background px-2 py-1.5 border text-xs">{joinUrl}</code>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { navigator.clipboard?.writeText(joinUrl); flashMsg('Link copied.'); }}><Copy className="h-3.5 w-3.5" /> Copy</Button>
-            <a href={`https://wa.me/?text=${encodeURIComponent(`Join our programme "${cls.name}" on Synops Praxis: ${joinUrl}`)}`} target="_blank" rel="noreferrer">
+            <a href={`https://wa.me/?text=${encodeURIComponent(`Join our programme "${cls.name}": ${joinUrl}`)}`} target="_blank" rel="noreferrer">
               <Button size="sm" className="gap-1.5 bg-[#25D366] hover:bg-[#1eb457] text-white"><MessageCircle className="h-3.5 w-3.5" /> Share on WhatsApp</Button>
             </a>
           </div>

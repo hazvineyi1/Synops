@@ -55,7 +55,9 @@ const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 // Standardised test sign-in for the four demo learners, so the founder can log in as each level.
 // student1 = advanced, student2 = on-track, student3 = at-risk, student4 = novice (creation order).
 const LEARNER_TEST_PASSWORD = "Enzatest123";
-const learnerTestEmail = (index1Based: number) => `enza@student${index1Based}.test`;
+// Realistic login domain (was `enza@student{n}.test`, which reads as obviously fake if an account
+// list is ever visible in a demo). Re-run Seed Enza Cohort to apply the new logins.
+const learnerTestEmail = (index1Based: number) => `student${index1Based}@learner.enzaglobalmedia.co.za`;
 
 /**
  * Self-healing: GUARANTEES the four demo learners exist with working test logins

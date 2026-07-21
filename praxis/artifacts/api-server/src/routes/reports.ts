@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sessionsTable, credentialsTable, usersTable, organisationsTable, submissionsTable, gradebookAlertsTable } from "@workspace/db";
-import { eq, and, gte, lte, count, sql } from "drizzle-orm";
+import { eq, and, gte, lte, count, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -36,33 +36,29 @@ router.get("/reports/funder", requireAuth, async (req, res) => {
   const targetOrgId = (orgId as string) ?? user.organisationId;
 
   let orgName = "All Organisations";
+  // Scope the whole report to the target org's learners — it previously counted the WHOLE platform
+  // regardless of org, so two funders scoped to different orgs each saw platform-wide totals.
+  let learnerIds: string[] | null = null; // null = all (no org filter)
   if (targetOrgId) {
     const org = await db.query.organisationsTable.findFirst({
       where: eq(organisationsTable.id, targetOrgId),
     });
     orgName = org?.name ?? orgName;
+    const rows = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.organisationId, targetOrgId));
+    learnerIds = rows.map((r) => r.id);
   }
+  // Helper: count a table's rows for the scoped learners (or all if unscoped).
+  const scoped = (col: any) => (learnerIds === null ? undefined : inArray(col, learnerIds.length ? learnerIds : ["__none__"]));
 
-  const [enrolments] = await db
-    .select({ count: count() })
-    .from(sessionsTable);
+  const [enrolments] = await db.select({ count: count() }).from(sessionsTable).where(scoped(sessionsTable.userId));
+  const [completions] = await db.select({ count: count() }).from(sessionsTable)
+    .where(learnerIds === null ? eq(sessionsTable.status, "mastered") : and(eq(sessionsTable.status, "mastered"), scoped(sessionsTable.userId)));
+  // Only VALID credentials count as issued outcomes (exclude expired/revoked).
+  const [credentialsIssued] = await db.select({ count: count() }).from(credentialsTable)
+    .where(learnerIds === null ? eq(credentialsTable.status, "valid") : and(eq(credentialsTable.status, "valid"), scoped(credentialsTable.userId)));
+  const [coachHandoffs] = await db.select({ count: count() }).from(submissionsTable).where(scoped(submissionsTable.userId));
 
-  const [completions] = await db
-    .select({ count: count() })
-    .from(sessionsTable)
-    .where(eq(sessionsTable.status, "mastered"));
-
-  const [credentialsIssued] = await db
-    .select({ count: count() })
-    .from(credentialsTable);
-
-  const [coachHandoffs] = await db
-    .select({ count: count() })
-    .from(submissionsTable);
-
-  // A credential is itself completion evidence, so completions can never be fewer than credentials
-  // issued. Reconcile the two rather than reading them from unrelated tables (which produced the
-  // "0 completions / 2 credentials" contradiction).
+  // A credential is itself completion evidence, so completions can never be fewer than credentials.
   const completionsCount = Math.max(Number(completions.count), Number(credentialsIssued.count));
   const avgMastery = await computeAvgMastery();
 
@@ -78,10 +74,9 @@ router.get("/reports/funder", requireAuth, async (req, res) => {
     credentialsIssued: Number(credentialsIssued.count),
     coachHandoffs: Number(coachHandoffs.count),
     avgMastery,
-    competencyHighlights: [
-      { tag: "Financial Literacy", avgScore: 0.74, learnerCount: 12, masteredCount: 8 },
-      { tag: "Business Planning", avgScore: 0.61, learnerCount: 10, masteredCount: 5 },
-    ],
+    // Competency highlights are omitted until computed from real per-tag mastery — a funder-facing
+    // report must never show fabricated figures. (Was hardcoded demo data.)
+    competencyHighlights: [] as { tag: string; avgScore: number; learnerCount: number; masteredCount: number }[],
   });
 });
 

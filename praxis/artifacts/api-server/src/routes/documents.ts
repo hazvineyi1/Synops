@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { partnerDocumentsTable } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { isSuperAdmin } from "../lib/roles";
+import { isSuperAdmin, isFacilitator } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 
 /**
@@ -14,7 +14,7 @@ import { logAudit } from "../lib/audit";
 const router = Router();
 
 function canManage(user: { role: string; partnerId?: string | null }, partnerId: string) {
-  return isSuperAdmin(user.role) || user.partnerId === partnerId;
+  return isSuperAdmin(user.role) || (isFacilitator(user.role) && user.partnerId === partnerId);
 }
 const CATEGORIES = ["invoice", "contract", "funder", "compliance", "other"];
 const STATUSES = ["filed", "pending", "action-required"];

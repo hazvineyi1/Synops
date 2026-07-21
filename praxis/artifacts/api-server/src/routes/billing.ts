@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { billingSubscriptionsTable, billingInvoicesTable } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { isSuperAdmin } from "../lib/roles";
+import { isSuperAdmin, isFacilitator } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 
 /**
@@ -14,7 +14,9 @@ import { logAudit } from "../lib/audit";
 const router = Router();
 
 function canManage(user: { role: string; partnerId?: string | null }, partnerId: string) {
-  return isSuperAdmin(user.role) || user.partnerId === partnerId;
+  // Tenant match AND a facilitator-tier role. A learner/coach carries partnerId too, so a bare
+  // tenant match let them read/write billing + invoices — this adds the role gate.
+  return isSuperAdmin(user.role) || (isFacilitator(user.role) && user.partnerId === partnerId);
 }
 const int = (v: unknown, d = 0) => (Number.isFinite(+(v as number)) ? Math.max(0, Math.trunc(+(v as number))) : d);
 

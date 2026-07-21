@@ -223,10 +223,13 @@ const SKILLBRIDGE: PartnerHub = {
   ],
 };
 
-const HUBS: Record<string, PartnerHub> = {
-  partner_talentforge: TALENTFORGE,
-  partner_skillbridge: SKILLBRIDGE,
-};
+// Empty on purpose. The demo partners TalentForge/SkillBridge were reachable in the live product
+// (any partner_admin without a seeded hub, or a super_admin deep-linking to /partner, fell through
+// to TalentForge's fabricated MTN/Vodacom data). They must NEVER render in front of a real partner.
+// Real partner data now comes from the API; this mock map is deliberately empty so nothing fake can
+// surface. TALENTFORGE/SKILLBRIDGE objects are retained only as type/shape references.
+const HUBS: Record<string, PartnerHub> = {};
+void TALENTFORGE; void SKILLBRIDGE;
 
 // Active-partner override: a super admin has no partnerId of their own, so they can select which
 // partner to view from the Partners list; that selection resolves here. A real partner_admin always
@@ -258,7 +261,8 @@ export function getPartnerHub(partnerId: string | null | undefined): PartnerHub 
   if (partnerId && realPartnerNames.has(partnerId)) return emptyHub(partnerId, realPartnerNames.get(partnerId)!);
   if (activePartnerId && HUBS[activePartnerId]) return HUBS[activePartnerId];
   if (activePartnerId && realPartnerNames.has(activePartnerId)) return emptyHub(activePartnerId, realPartnerNames.get(activePartnerId)!);
-  return TALENTFORGE;
+  // No fake fallback: return an empty, neutrally-named hub rather than TalentForge's demo data.
+  return emptyHub(partnerId ?? activePartnerId ?? "", realPartnerNames.get(partnerId ?? activePartnerId ?? "") ?? "Partner");
 }
 
 /** Summary of every partner on the platform (super-admin view). */

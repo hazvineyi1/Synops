@@ -452,11 +452,17 @@ function VideoBeat({ beat }: { beat: Beat }) {
   );
 }
 
-function QuizBeat({ beat }: { beat: Beat }) {
+function QuizBeat({ beat, onCorrect }: { beat: Beat; onCorrect?: (answer: string) => void }) {
   const quiz = beat.visualData!.quiz!;
   const [selected, setSelected] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const isCorrect = submitted && selected === quiz.correctId;
+  // Report a correct answer up so the parent marks this quiz beat viewed (server-validated). Fires
+  // once when the learner submits the right option.
+  useEffect(() => {
+    if (isCorrect && selected) onCorrect?.(selected);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCorrect]);
 
   return (
     <div className="px-8 py-12 max-w-3xl mx-auto">
@@ -888,9 +894,9 @@ function InteractiveBeat({ beat }: { beat: Beat }) {
 
 // ─── Beat router ──────────────────────────────────────────────────────────────
 
-function BeatRenderer({ beat }: { beat: Beat }) {
+function BeatRenderer({ beat, onQuizCorrect }: { beat: Beat; onQuizCorrect?: (beatId: string, answer: string) => void }) {
   if (beat.visualData?.interactive) return <InteractiveBeat key={beat.id} beat={beat} />;
-  if (beat.visualData?.quiz) return <QuizBeat key={beat.id} beat={beat} />;
+  if (beat.visualData?.quiz) return <QuizBeat key={beat.id} beat={beat} onCorrect={(ans) => onQuizCorrect?.(beat.id, ans)} />;
   switch (beat.type) {
     case 'title_card': return <TitleCardBeat beat={beat} />;
     case 'points':     return <PointsBeat beat={beat} />;
@@ -947,7 +953,7 @@ export function ModuleViewer() {
   }, [serverProgress]);
 
   const markBeatViewed = useMutation({
-    mutationFn: (vars: { beatId: string; secondsSpent: number }) =>
+    mutationFn: (vars: { beatId: string; secondsSpent: number; answer?: string }) =>
       apiFetch('/progress/beat', { method: 'POST', body: JSON.stringify(vars) }),
     onSuccess: () => {
       // Course-level completion (and possibly enrolment completion) just changed.
@@ -989,8 +995,13 @@ export function ModuleViewer() {
   // could never complete. Marking on arrival fixes that; the endpoint is idempotent
   // so re-viewing costs nothing.
   const currentBeatId = currentBeat?.id;
+  const currentIsQuiz = !!currentBeat?.visualData?.quiz;
   useEffect(() => {
     if (!currentBeatId || !modeParam) return;
+    // Quiz beats are NOT marked on arrival — the server only counts them when the learner submits
+    // the CORRECT answer (see the onQuizCorrect handler). Marking on arrival would let a learner
+    // complete a module without answering anything.
+    if (currentIsQuiz) return;
 
     markBeatViewed.mutate({ beatId: currentBeatId, secondsSpent: 0 });
     setCompletedIds(prev => new Set([...prev, currentBeatId]));
@@ -1005,7 +1016,7 @@ export function ModuleViewer() {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentBeatId, modeParam]);
+  }, [currentBeatId, modeParam, currentIsQuiz]);
 
   // ── Hub mode: no ?mode= param → show the activity picker ─────────────────
   if (!modeParam) {
@@ -1240,7 +1251,11 @@ export function ModuleViewer() {
               className={isSlides ? 'min-h-[60vh] flex flex-col justify-center' : undefined}
             >
               {currentBeat ? (
-                <BeatRenderer beat={currentBeat} />
+                <BeatRenderer beat={currentBeat} onQuizCorrect={(bId, ans) => {
+                  // Server validates the answer; only a correct submission counts the quiz beat.
+                  markBeatViewed.mutate({ beatId: bId, answer: ans, secondsSpent: 0 });
+                  setCompletedIds(prev => new Set([...prev, bId]));
+                }} />
               ) : mode !== 'quiz' ? (
                 <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
                   No content available for this module yet.

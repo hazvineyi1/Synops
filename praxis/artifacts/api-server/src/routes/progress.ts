@@ -35,7 +35,7 @@ const PUBLISHED = "published";
  * first call inserts, subsequent calls just bump lastViewedAt and add dwell time.
  */
 router.post("/progress/beat", requireAuth, async (req, res) => {
-  const { beatId, secondsSpent } = req.body as { beatId?: string; secondsSpent?: number };
+  const { beatId, secondsSpent, answer } = req.body as { beatId?: string; secondsSpent?: number; answer?: string };
   if (!beatId) {
     res.status(400).json({ error: "beatId is required" });
     return;
@@ -43,13 +43,22 @@ router.post("/progress/beat", requireAuth, async (req, res) => {
 
   // Resolve the beat's module + course so completion queries never need a 3-way join.
   const [beat] = await db
-    .select({ id: beatsTable.id, moduleId: beatsTable.moduleId })
+    .select({ id: beatsTable.id, moduleId: beatsTable.moduleId, type: beatsTable.type, visualData: beatsTable.visualData })
     .from(beatsTable)
     .where(eq(beatsTable.id, beatId))
     .limit(1);
   if (!beat) {
     res.status(404).json({ error: "Beat not found" });
     return;
+  }
+
+  // GATE: a quiz beat only counts as completed when the learner submits the CORRECT answer. The
+  // client used to mark every beat viewed on arrival, so a learner could reach 100% (and inflate
+  // SETA/B-BBEE hours) by POSTing beat ids without answering anything. Validate server-side.
+  const quiz = (beat.visualData as any)?.quiz;
+  if (quiz && quiz.correctId) {
+    if (!answer) { res.json({ ok: false, needsAnswer: true }); return; }
+    if (String(answer) !== String(quiz.correctId)) { res.json({ ok: false, correct: false }); return; }
   }
 
   const [mod] = await db

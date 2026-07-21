@@ -292,10 +292,13 @@ Source content for reference: ${ctx.narration ?? ""} ${ctx.scenario ?? ""}`.trim
   } catch {
     // fall through to a conservative default
   }
-  // Conservative fallback if grading fails.
-  if (isSelection) return { grade: 1, reasoning: "Selected answer (grader unavailable)." };
+  // Conservative fallback if grading fails. CRITICAL: never return a MASTERY-qualifying grade here.
+  // Mastery (and therefore credential issuance) requires grade >= 2; an AI outage must not let a
+  // learner reach mastery by padding an answer to 25+ words. Cap the fallback at 1 so a real grader
+  // is always required to certify. (Selection answers also cap at 1.)
+  if (isSelection) return { grade: 1, reasoning: "Selected answer (grader unavailable) - not counted toward mastery." };
   const words = learnerResponse.trim().split(/\s+/).filter(Boolean).length;
-  return { grade: words > 25 ? 2 : words > 5 ? 1 : 0, reasoning: "Fallback length-based estimate." };
+  return { grade: words > 5 ? 1 : 0, reasoning: "Fallback estimate (grader unavailable) - not counted toward mastery." };
 }
 
 export interface WorkedExample {
