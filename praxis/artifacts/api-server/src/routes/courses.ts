@@ -175,8 +175,31 @@ router.get("/courses/:courseId", requireAuth, async (req, res) => {
     where: eq(coursesTable.id, req.params.courseId),
   });
   if (!course) { res.status(404).json({ error: "Not found" }); return; }
-  // The course record plus all of its modules. Course-scoped, not platform-public.
-  if (!(await canParticipateInCourse(req.dbUser!, course.id))) {
+  // A learner may VIEW any course in their catalogue (their tenant owns it, or it is assigned to
+  // their partner), even before enrolling — the detail page is the enrol/overview surface. Gating
+  // this on enrolment 403'd every non-enrolled catalogue course, and the client rendered that 403
+  // as "Course not found", so 13 of 14 catalogue links looked broken. Enrolment still gates the
+  // actual coursework routes; visibility here only needs catalogue scope.
+  const viewer = req.dbUser!;
+  let canView = await canParticipateInCourse(viewer, course.id);
+  if (!canView) {
+    if (isHub(viewer.role)) canView = true;
+    else {
+      const scope = viewer.partnerId ?? viewer.organisationId ?? viewer.id;
+      if (course.tenantId === scope || course.tenantId === "platform") canView = true;
+      else if (viewer.partnerId) {
+        try {
+          const assigned = await db
+            .select({ courseId: coursePartnerAssignmentsTable.courseId })
+            .from(coursePartnerAssignmentsTable)
+            .where(and(eq(coursePartnerAssignmentsTable.partnerId, viewer.partnerId), eq(coursePartnerAssignmentsTable.courseId, course.id)))
+            .limit(1);
+          if (assigned.length) canView = true;
+        } catch { /* assignment table absent -> no extra visibility */ }
+      }
+    }
+  }
+  if (!canView) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

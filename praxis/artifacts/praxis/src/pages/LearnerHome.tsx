@@ -198,7 +198,10 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
    */
   const courseState = (c: { status?: string; percent: number }): 'in_progress' | 'not_started' | 'completed' | 'withdrawn' => {
     if (c.status === 'withdrawn') return 'withdrawn';
-    if (c.status === 'completed' || c.percent >= 100) return 'completed';
+    // Drive the badge off ACTUAL progress, not a possibly-stale enrolment status. A status of
+    // 'completed' left over from before content grew was showing a green "Completed" badge on a
+    // course sitting at 17%, while the "in progress" counter (derived from this state) read 0.
+    if (c.percent >= 100) return 'completed';
     return c.percent > 0 ? 'in_progress' : 'not_started';
   };
   const STATE_META: Record<string, { label: string; cls: string; rank: number }> = {

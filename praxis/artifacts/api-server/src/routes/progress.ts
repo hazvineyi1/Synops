@@ -216,17 +216,23 @@ router.get("/progress/course/:courseId", requireAuth, async (req, res) => {
         .groupBy(beatsTable.moduleId)
     : [];
 
+  // Count viewed beats by JOINING through beats, not by the denormalized beat_progress.module_id.
+  // After a "Build Full Courses" rebuild, beats get new ids; stale progress rows keep their old
+  // module_id and, counted directly, leaked/collapsed every module's percentage to one shared
+  // value. Joining to beats counts only progress rows whose beat STILL EXISTS and attributes each
+  // to the beat's real module, so every module reads its own true completion.
   const viewedCounts = moduleIds.length
     ? await db
-        .select({ moduleId: beatProgressTable.moduleId, viewed: sql<number>`count(*)::int` })
+        .select({ moduleId: beatsTable.moduleId, viewed: sql<number>`count(*)::int` })
         .from(beatProgressTable)
+        .innerJoin(beatsTable, eq(beatProgressTable.beatId, beatsTable.id))
         .where(
           and(
             eq(beatProgressTable.userId, userId),
-            inArray(beatProgressTable.moduleId, moduleIds),
+            inArray(beatsTable.moduleId, moduleIds),
           ),
         )
-        .groupBy(beatProgressTable.moduleId)
+        .groupBy(beatsTable.moduleId)
     : [];
 
   const totalBy = new Map(beatCounts.map((r) => [r.moduleId, r.total]));

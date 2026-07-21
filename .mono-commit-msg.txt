@@ -1,7 +1,13 @@
-Fix partner Overview stuck on an infinite loading skeleton (ASCII-only)
+QA sprint: gradebook rollup, off-track, coach queue, counts, content templates, UX (ASCII-only)
 
-The partner Overview hung on grey loading cards forever. Root cause: a partner_admin whose partnerId was null (created via a provisioning path that only set organisationId). The dashboard keys the partner-stats query off partnerId, and the generated hook DISABLES the query when partnerId is null - so the data never arrived and the 'if (!stats) return skeleton' guard never cleared.
+GRADEBOOK (critical): grading wrote the submission score but mirrored to gradebook_entries via UPDATE-only, which no-oped for any learner who enrolled after the assignment was created - so graded work showed as dashes and Overall was blank, and this falsely tripped off-track. applyGrade + the submit path now UPSERT the entry, and the gradebook GET/scan self-heal by reconciling already-graded submissions into entries. Off-track no longer flags a learner with strong grades merely for low content-views.
 
-Two-part fix. Backend: /auth/me now heals a facilitator-tier account missing partnerId by backfilling it from the owning organisation (and persisting it), so the query enables and real numbers render. Frontend: PartnerAdminDashboard and OrgAdminDashboard no longer gate the whole page on '!data' - they use isLoading and fall back to zeros/orgs list once the query settles, so the Overview can never hang on a skeleton again regardless of role or query error.
+COACH QUEUE: /coach/submissions now also surfaces pending assignment_submissions (not just the legacy submissions table), scoped to the coach's courses; the queue's Evaluate routes assignment work to the assignment page.
 
-VALIDATION: esbuild clean on auth.ts and Dashboard.tsx.
+COUNTS: /partners computes learner/org counts live instead of stale stored columns. Funder report + Overview share one real avgMastery (was hardcoded 0.73 vs 0.72) and reconcile completions so they can't be fewer than credentials.
+
+CONTENT: fixed the broken 'sits or falls' and 'must get <title> right on a tight budget' template sentences and the repeated per-bullet boilerplate in enzaEnrich (rebuild courses to apply).
+
+UX: formatted quiz/game submission summary instead of raw JSON; quiz progress counter scoped to visible beats (no more 13/2); support ticket detail resolves requester name (no more Unknown); learner-scoped nav while previewing 'View as'; '1 Coach' pluralization; Settings save banner fires on first save; Create-class surfaces errors instead of failing silently; Message-my-coach preview button disabled with a note.
+
+VALIDATION: esbuild clean across all changed backend + frontend files.

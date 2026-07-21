@@ -219,7 +219,7 @@ function QuizForm({ questions, passingScore = 70, value, onChange, submitted, on
 
   if (submitted) {
     const correctCount = questions.filter(q => value[q.id] === q.correct).length;
-    const xp = correctCount * 10; // 10 XP per correct answer
+    const xp = Math.round((score / 100) * 50); // XP proportional to score (up to 50), not item count
     const tier = score >= 90 ? { label: 'Gold', icon: Trophy, cls: 'text-amber-500', bg: 'from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20', ring: 'border-amber-300 dark:border-amber-700' }
       : score >= 70 ? { label: 'Silver', icon: Award, cls: 'text-slate-400', bg: 'from-slate-50 to-slate-100 dark:from-slate-900/40 dark:to-slate-900/20', ring: 'border-slate-300 dark:border-slate-700' }
       : score >= 50 ? { label: 'Bronze', icon: Award, cls: 'text-orange-600', bg: 'from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/20', ring: 'border-orange-300 dark:border-orange-800' }
@@ -357,7 +357,10 @@ function QuizForm({ questions, passingScore = 70, value, onChange, submitted, on
 // ─── Shared gamified result card (tier + XP) ──────────────────────────────────
 function GameResult({ correct, total, passingScore = 60 }: { correct: number; total: number; passingScore?: number }) {
   const score = Math.round((correct / Math.max(1, total)) * 100);
-  const xp = correct * 10;
+  // XP is proportional to the score, not the raw item count, so every 50-point assignment awards
+  // up to 50 XP regardless of how many items it has (Jeopardy has 6 tiles vs 5 elsewhere, which is
+  // why it used to pay 60 XP for the same 50-point value).
+  const xp = Math.round((score / 100) * 50);
   const passed = score >= passingScore;
   const tier = score >= 90 ? { label: 'Gold', icon: Trophy, cls: 'text-amber-500', bg: 'from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/20', ring: 'border-amber-300 dark:border-amber-700' }
     : score >= 70 ? { label: 'Silver', icon: Award, cls: 'text-slate-400', bg: 'from-slate-50 to-slate-100 dark:from-slate-900/40 dark:to-slate-900/20', ring: 'border-slate-300 dark:border-slate-700' }
@@ -1071,6 +1074,17 @@ export function AssignmentDetail() {
                           {answered !== null && <div>Responses recorded: {answered}</div>}
                           {parsed.passed !== undefined && <div>Result: {parsed.passed ? 'Passed' : 'Not yet passed'}</div>}
                         </div>
+                      </div>
+                    );
+                  }
+                  // Never dump a raw JSON/array payload at the learner even if it slipped past the
+                  // parse above (e.g. malformed). Only render plain prose bodies.
+                  const looksJson = /^\s*[{\[]/.test(submission.body);
+                  if (looksJson) {
+                    return (
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Your Submission</div>
+                        <div className="text-sm text-muted-foreground">Submitted and recorded.</div>
                       </div>
                     );
                   }

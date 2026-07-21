@@ -133,9 +133,16 @@ function buildVideoBeat(course: Crs, mod: Mod) {
     narration: `A short narrated slide lesson summarising "${mod.title}". Press play and follow along, then work through the sections.`,
     bulletPoints: [] as string[],
     transcript: slides.map((sl) => `${sl.heading}. ${sl.script}`).join("\n\n"),
-    visualData: { slides },
+    visualData: { slides, v: CONTENT_VERSION },
   };
 }
+
+// Bump when the generated content (readings/quizzes/case briefs/slides) changes in a way that
+// should REPLACE already-built modules on the next "Build Full Courses" run. The enrich guard
+// compares this to the version stamped on each module's video beat; a mismatch forces a rebuild,
+// which is how template fixes (e.g. the "sits or falls" / duplicate-CFU repairs) reach existing
+// content instead of being frozen forever behind the "already enriched" check.
+const CONTENT_VERSION = 2;
 
 // ---- Readings --------------------------------------------------------------------------------
 function deepDiveReading(course: Crs, mod: Mod): { title: string; content: string } {
@@ -360,14 +367,17 @@ export async function enrichEnzaCourses(): Promise<{ modules: number; enriched: 
         // Upgrade to the clean illustrated slides: a beat is only "done" once its slides carry the new
         // `visual` keyword (older builds used random photo `image` URLs and must be rebuilt).
         const hasVisualSlides = !!(videoBeat && (videoBeat.visualData as any)?.slides?.[0]?.visual);
-        const alreadyEnriched = hasVisualSlides;
+        const versionOk = ((videoBeat?.visualData as any)?.v ?? 0) >= CONTENT_VERSION;
+        const alreadyEnriched = hasVisualSlides && versionOk;
         if (!alreadyEnriched) {
-          // Replace placeholder beats with the full slide-deck lesson + video lesson.
+          // Replace placeholder/stale beats with the full slide-deck lesson + video lesson.
           await db.delete(beatsTable).where(eq(beatsTable.moduleId, m.id));
           const beats = buildBeats(crs, mod, mi).map((b) => ({ moduleId: m.id, ...b }));
           const video = { moduleId: m.id, ...buildVideoBeat(crs, mod) };
           await db.insert(beatsTable).values([...beats, video] as any);
           await db.update(modulesTable).set({ beatCount: beats.length + 1, estimatedMinutes: 45, status: "published", updatedAt: new Date() }).where(eq(modulesTable.id, m.id));
+          // Also drop stale readings so the corrected reading templates regenerate below.
+          await db.delete(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, m.id));
           enriched++;
         }
 

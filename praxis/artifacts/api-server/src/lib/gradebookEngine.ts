@@ -354,7 +354,13 @@ export async function getScoreData(
       const colByModule = new Map(completionCols.map((c) => [c.sourceId!, c]));
       const [beats, progress] = await Promise.all([
         db.select({ id: beatsTable.id, moduleId: beatsTable.moduleId }).from(beatsTable).where(inArray(beatsTable.moduleId, moduleIds)),
-        db.select({ userId: beatProgressTable.userId, moduleId: beatProgressTable.moduleId }).from(beatProgressTable).where(inArray(beatProgressTable.moduleId, moduleIds)),
+        // Join through beats so only progress on CURRENTLY EXISTING beats counts, attributed to the
+        // beat's real module. Reading the denormalized beat_progress.module_id counted orphaned rows
+        // (from rebuilt beats) and collapsed every module to the same percentage.
+        db.select({ userId: beatProgressTable.userId, moduleId: beatsTable.moduleId })
+          .from(beatProgressTable)
+          .innerJoin(beatsTable, eq(beatProgressTable.beatId, beatsTable.id))
+          .where(inArray(beatsTable.moduleId, moduleIds)),
       ]);
       const totalByModule = new Map<string, number>();
       for (const b of beats) totalByModule.set(b.moduleId, (totalByModule.get(b.moduleId) ?? 0) + 1);

@@ -344,7 +344,7 @@ const SLIDE_VISUAL: Record<string, React.ElementType> = {
  * module has no uploaded video. Fully readable content (not a placeholder), with play/pause and manual
  * navigation. The "script" is the spoken narration shown under each slide.
  */
-function SlideLesson({ slides }: { slides: VideoSlide[] }) {
+function SlideLesson({ slides, onReachedEnd }: { slides: VideoSlide[]; onReachedEnd?: () => void }) {
   const [i, setI] = useState(0);
   const [playing, setPlaying] = useState(false);
   // On-demand translation of the slide lesson.
@@ -353,6 +353,15 @@ function SlideLesson({ slides }: { slides: VideoSlide[] }) {
   const [tSlides, setTSlides] = useState<VideoSlide[] | null>(null);
   const shown = tSlides ?? slides;
   const clampedI = Math.min(i, shown.length - 1);
+  // Mark the video lesson complete once the learner reaches the final slide (so the Video tab
+  // earns its green check like every other section). Fires once per mount.
+  const firedEnd = useRef(false);
+  useEffect(() => {
+    if (!firedEnd.current && shown.length > 0 && clampedI >= shown.length - 1) {
+      firedEnd.current = true;
+      onReachedEnd?.();
+    }
+  }, [clampedI, shown.length, onReachedEnd]);
   useEffect(() => {
     if (!playing) return;
     const t = setTimeout(() => {
@@ -2247,6 +2256,27 @@ function ModuleHubView({
   const [tab, setTab] = useState<HubTab>(
     initialTab && VALID_TABS.includes(initialTab as HubTab) ? (initialTab as HubTab) : 'overview',
   );
+  // Keep the URL's ?tab in sync with the active tab so a reload / shared link reopens the same
+  // section (initialTab is read from ?tab on mount). replaceState avoids history spam and a remount.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get('tab') !== tab) {
+      sp.set('tab', tab);
+      window.history.replaceState(null, '', `${window.location.pathname}?${sp.toString()}`);
+    }
+  }, [tab]);
+
+  // Mark a beat viewed from the hub (used by the Video tab when the slide lesson reaches its end,
+  // since the deck plays inline here without going through the ?mode= player's arrival effect).
+  const hubQc = useQueryClient();
+  const markHubBeatViewed = useMutation({
+    mutationFn: (beatId: string) => apiFetch('/progress/beat', { method: 'POST', body: JSON.stringify({ beatId, secondsSpent: 0 }) }),
+    onSuccess: () => {
+      hubQc.invalidateQueries({ queryKey: ['module-progress', moduleId] });
+      hubQc.invalidateQueries({ queryKey: ['course-progress', courseId] });
+      hubQc.invalidateQueries({ queryKey: ['my-progress'] });
+    },
+  });
 
   // Same query key as WorkshopSection, so React Query serves both from one fetch.
   const { data: moduleWorkshops } = useQuery({
@@ -2271,8 +2301,10 @@ function ModuleHubView({
     enabled: !!courseId,
   });
   const { data: discussions } = useQuery({
-    queryKey: ['discussions', courseId],
-    queryFn: () => apiFetch<HubDiscussion[]>(`/courses/${courseId}/discussions`),
+    queryKey: ['discussions', courseId, moduleId],
+    // Scope to this module (the backend also returns course-wide threads that carry no moduleId),
+    // so the Participate tab shows this module's discussion, not every module's.
+    queryFn: () => apiFetch<HubDiscussion[]>(`/courses/${courseId}/discussions?moduleId=${moduleId}`),
     enabled: !!courseId,
   });
   // Per-module completion across the course, to drive Next-module / course-complete nav.
@@ -2767,7 +2799,7 @@ function ModuleHubView({
                         <video src={b.videoUrl} controls className="w-full h-full" />
                       </div>
                     ) : (b.visualData?.slides && b.visualData.slides.length > 0) ? (
-                      <SlideLesson slides={b.visualData.slides} />
+                      <SlideLesson slides={b.visualData.slides} onReachedEnd={() => markHubBeatViewed.mutate(b.id)} />
                     ) : (
                       <EmptyState icon={PlayCircle} title="Video file not uploaded yet"
                         note="This lesson is marked as a video but no file is attached yet. It can be added in the Studio editor." />

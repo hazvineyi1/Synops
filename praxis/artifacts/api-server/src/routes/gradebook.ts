@@ -428,6 +428,11 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
+  // Same self-heal the staff gradebook does: mirror already-graded submissions into
+  // gradebook_entries so the learner's own ASSIGNMENTS rows and Overall mastery reflect grades
+  // that only landed on assignment_submissions (this was why the learner saw dashes + "not
+  // enough data" despite 100% scores).
+  await reconcileAssignmentEntries(courseId);
   const columns = await getCourseColumns(courseId);
   const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
@@ -551,6 +556,7 @@ router.get("/gradebook/mine", requireAuth, async (req, res) => {
 
   const out = [];
   for (const cid of courseIds) {
+    await reconcileAssignmentEntries(cid);
     const columns = await getCourseColumns(cid);
     const sd = await getScoreData(columns, [userId]);
     const computed = computeLearner(columns, sd.fractions.get(userId), sd.notes.get(userId), false);
