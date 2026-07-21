@@ -1,9 +1,5 @@
-Prod-readiness: gate seeding tools, fix admin overflow, stop tab-title brand leak (ASCII-only)
+Partner Hub convergence stage 1: seed real Enza hub data (ASCII-only)
 
-SAFETY: the Provision/Build/Seed/Resync data-seeding buttons sat inline in the super-admin Partner Management header. Moved them behind a collapsed 'Internal tools' panel with a warning and a per-action confirm() prompt, so they can't be clicked by accident against a live tenant.
+The Financial/Funders/Documents/Accounts hub pages already query real DB tables by partner_id, but those tables were empty for the live Enza partner, so every hub read as empty (the demo figures lived only in a front-end mock). New seedEnzaHub() creates real records for the live Enza partner + its orgs: billing subscriptions + invoices (paid + due), MICT SETA + foundation funding agreements, filed partner documents (MSA, funding agreement, POPIA addendum, Q1 report), and a delegated admin per org. Idempotent; creates the hub tables IF NOT EXISTS first. Exposed as POST /platform/seed-enza-hub (super admin) and a 'Seed Hub Data' button in the gated Internal tools panel. After seeding, the four hub pages populate with real numbers. (Stage 2 will point the Organisations overview at these same endpoints and retire the mock layer.)
 
-LAYOUT: that same header row overflowed the viewport and cut off 'Create partner'. The header now holds only 'Internal tools' + 'Create partner' (shrink-0), so nothing is clipped; the partner table already scrolls within its own container.
-
-BRANDING: the browser tab title flipped to the base 'Synops Praxis' after navigation because it was only set when a brand displayName existed (stale value otherwise). ThemeProvider now always sets the title from the resolved brand, falling back to a neutral 'Praxis' rather than leaking the base platform name.
-
-VALIDATION: esbuild clean on AdminPartners.tsx and ThemeProvider.tsx.
+VALIDATION: esbuild clean on enzaHubSeed.ts, platform.ts, AdminPartners.tsx.
