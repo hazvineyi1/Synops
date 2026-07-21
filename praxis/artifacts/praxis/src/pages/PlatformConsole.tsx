@@ -99,17 +99,21 @@ function StatCard({ label, value, sub, accent = "hsl(60 5% 14%)" }: { label: str
 }
 
 function OverviewTab() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["platform", "overview"],
     queryFn: () => platformApi.overview(),
+    retry: false,
   });
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
       </div>
     );
+  }
+  if (isError || !data) {
+    return <div className="text-center text-muted-foreground py-12">Could not load platform overview. Please refresh.</div>;
   }
 
   const failedAccent = data.failedLogins24h > 0 ? "hsl(0 65% 45%)" : "hsl(60 5% 14%)";

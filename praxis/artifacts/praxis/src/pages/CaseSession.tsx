@@ -15,7 +15,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const [, navigate] = useLocation();
 
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ["case-session", sessionId], queryFn: () => casesApi.getSession(sessionId), enabled: !!sessionId });
+  const { data, isLoading, isError } = useQuery({ queryKey: ["case-session", sessionId], queryFn: () => casesApi.getSession(sessionId), enabled: !!sessionId, retry: false });
 
   const [messages, setMessages] = useState<CaseMessage[]>([]);
   const [input, setInput] = useState("");
@@ -117,8 +117,16 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     finally { setAnalysing(false); }
   };
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <div className="min-h-screen p-6" style={{ background: "hsl(43 30% 97%)" }}><Skeleton className="h-8 w-64 mb-4" /><Skeleton className="h-96 rounded-xl" /></div>;
+  }
+  if (isError || !data) {
+    return <div className="min-h-screen p-6 flex items-center justify-center text-center" style={{ background: "hsl(43 30% 97%)" }}>
+      <div className="max-w-sm space-y-3">
+        <p className="text-muted-foreground">This case session could not be loaded. It may have ended or you may not have access.</p>
+        <button className="text-sm font-medium text-primary hover:underline" onClick={() => navigate('/dashboard')}>Back to dashboard</button>
+      </div>
+    </div>;
   }
 
   if (analysis) return <AnalysisView a={analysis} onDone={() => navigate("/cases")} />;

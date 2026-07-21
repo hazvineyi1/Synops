@@ -120,7 +120,7 @@ async function streamSSE(
 export function LearnSession({ params }: { params: { sessionId: string } }) {
   const { sessionId } = params;
   const [, setLocation] = useLocation();
-  const { data: session, refetch: refetchSession } = useGetSession(sessionId, { query: { enabled: !!sessionId, queryKey: ['session', sessionId] } });
+  const { data: session, refetch: refetchSession, isLoading: sessionLoading, isError: sessionError } = useGetSession(sessionId, { query: { enabled: !!sessionId, queryKey: ['session', sessionId], retry: false } });
   
   // Try to load module data if we have the session
   const moduleId = session?.moduleId || '';
@@ -163,6 +163,15 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [localTurns, streamingText]);
 
+  // Error (e.g. the session 403s or is gone): show a clear state + a way out, never an endless pulse.
+  if (sessionError || (!sessionLoading && !session)) return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="text-center max-w-sm space-y-3">
+        <p className="text-muted-foreground">This session could not be loaded. It may have ended or you may not have access.</p>
+        <button className="text-sm font-medium text-primary hover:underline" onClick={() => setLocation('/dashboard')}>Back to dashboard</button>
+      </div>
+    </div>
+  );
   if (!session) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="animate-pulse flex flex-col items-center gap-4">

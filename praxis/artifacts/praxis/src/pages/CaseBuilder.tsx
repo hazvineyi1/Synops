@@ -53,7 +53,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<Tab>("case");
 
-  const { data, isLoading } = useQuery({ queryKey: ["case", caseId], queryFn: () => casesApi.get(caseId), enabled: !!caseId });
+  const { data, isLoading, isError } = useQuery({ queryKey: ["case", caseId], queryFn: () => casesApi.get(caseId), enabled: !!caseId, retry: false });
 
   const [form, setForm] = useState<CaseInput>({});
   const [criteria, setCriteria] = useState<RubricCriterion[]>([]);
@@ -116,8 +116,13 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["cases"] }); navigate("/cases"); },
   });
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-96 rounded-xl" /></div>;
+  }
+  // Show an error instead of an endless skeleton when the case can't be loaded (the body below
+  // dereferences `data`, so it must exist past this guard — same contract as before, minus the hang).
+  if (isError || !data) {
+    return <div className="text-center text-muted-foreground py-16">This case could not be loaded. Please refresh or go back.</div>;
   }
   if (!data.canManage) {
     return <Card><CardContent className="py-12 text-center text-muted-foreground">You don't have permission to edit this case.</CardContent></Card>;

@@ -1093,11 +1093,11 @@ export function CourseDetail() {
   const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: activeTab === 'modules' || activeTab === 'overview' || activeTab === 'discussions', retry: false });
   const { data: assignments } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<Assignment[]>(`/courses/${courseId}/assignments`), enabled: activeTab === 'assignments' || activeTab === 'overview' });
   const { data: discussions } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' || activeTab === 'overview' });
-  const { data: announcements } = useQuery({ queryKey: ['announcements', courseId], queryFn: () => apiFetch<Announcement[]>(`/courses/${courseId}/announcements`), enabled: activeTab === 'announcements' || activeTab === 'overview' });
+  const { data: announcements, isLoading: announcementsLoading } = useQuery({ queryKey: ['announcements', courseId], queryFn: () => apiFetch<Announcement[]>(`/courses/${courseId}/announcements`), enabled: activeTab === 'announcements' || activeTab === 'overview', retry: false });
   const { data: myGrades } = useQuery({ queryKey: ['grades', courseId, 'me'], queryFn: () => apiFetch<{ grades: GradeEntry[]; totalEarned: number; totalPossible: number; overallPercent: number; }>(`/courses/${courseId}/gradebook/me`), enabled: activeTab === 'gradebook' && !isInstructor });
   const { data: events } = useQuery({ queryKey: ['events', courseId], queryFn: () => apiFetch<Event[]>(`/courses/${courseId}/events`), enabled: activeTab === 'calendar' || activeTab === 'overview' });
-  const { data: pages } = useQuery({ queryKey: ['pages', courseId], queryFn: () => apiFetch<Page[]>(`/courses/${courseId}/pages`), enabled: activeTab === 'pages' });
-  const { data: roster } = useQuery({ queryKey: ['roster', courseId], queryFn: () => apiFetch<RosterEntry[]>(`/courses/${courseId}/roster`), enabled: activeTab === 'people' });
+  const { data: pages, isLoading: pagesLoading } = useQuery({ queryKey: ['pages', courseId], queryFn: () => apiFetch<Page[]>(`/courses/${courseId}/pages`), enabled: activeTab === 'pages', retry: false });
+  const { data: roster, isLoading: rosterLoading } = useQuery({ queryKey: ['roster', courseId], queryFn: () => apiFetch<RosterEntry[]>(`/courses/${courseId}/roster`), enabled: activeTab === 'people', retry: false });
   const { data: groups } = useQuery({ queryKey: ['groups', courseId], queryFn: () => apiFetch<Group[]>(`/courses/${courseId}/groups`), enabled: activeTab === 'groups' });
   const { data: enrolment } = useQuery({ queryKey: ['enrolment', courseId, 'me'], queryFn: () => apiFetch<Enrolment | null>(`/courses/${courseId}/my-enrolment`) });
   // Enrolled learners get the clean single-flow course page (no tab rail). Instructors and
@@ -1631,7 +1631,8 @@ export function CourseDetail() {
         {activeTab === 'announcements' && (
           <div className="space-y-3">
             {isInstructor && <NewAnnouncement courseId={courseId} />}
-            {!announcements && <Skeleton className="h-32" />}
+            {announcementsLoading && <Skeleton className="h-32" />}
+            {!announcementsLoading && !announcements && <div className="text-center text-muted-foreground py-8 text-sm">Could not load announcements.</div>}
             {announcements?.length === 0 && <div className="text-center text-muted-foreground py-12">No announcements yet.</div>}
             {announcements?.map((a) => (
               <Card key={a.id} className={cn(a.pinned && "border-amber-200")}>
@@ -1768,7 +1769,8 @@ export function CourseDetail() {
               </div>
             ) : (
               <div className="space-y-2">
-                {!pages && <Skeleton className="h-32" />}
+                {pagesLoading && <Skeleton className="h-32" />}
+                {!pagesLoading && !pages && <div className="text-center text-muted-foreground py-8 text-sm">Could not load pages.</div>}
                 {pages?.length === 0 && <div className="text-center text-muted-foreground py-12">No pages yet.</div>}
                 {pages?.map((p) => (
                   <Card key={p.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => setSelectedPage(p)}>
@@ -1792,7 +1794,8 @@ export function CourseDetail() {
         {/* PEOPLE */}
         {activeTab === 'people' && (
           <div className="space-y-4">
-            {!roster && <Skeleton className="h-48" />}
+            {rosterLoading && <Skeleton className="h-48" />}
+            {!rosterLoading && !roster && <div className="text-center text-muted-foreground py-8 text-sm">Could not load the roster.</div>}
             {roster && (
               <>
                 <div className="text-sm text-muted-foreground mb-2">{roster.length} enrolled</div>

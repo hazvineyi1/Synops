@@ -19,7 +19,7 @@ export function CaseBegin({ params }: { params?: { caseId?: string } }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
-  const { data, isLoading } = useQuery({ queryKey: ["case", caseId], queryFn: () => casesApi.get(caseId), enabled: !!caseId });
+  const { data, isLoading, isError } = useQuery({ queryKey: ["case", caseId], queryFn: () => casesApi.get(caseId), enabled: !!caseId, retry: false });
 
   const [name, setName] = useState("");
   const [lang, setLang] = useState("en");
@@ -41,8 +41,16 @@ export function CaseBegin({ params }: { params?: { caseId?: string } }) {
     }
   };
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <div className="min-h-screen p-6" style={{ background: "hsl(43 30% 97%)" }}><Skeleton className="h-8 w-64 mb-4" /><Skeleton className="h-80 rounded-xl" /></div>;
+  }
+  if (isError || !data) {
+    return <div className="min-h-screen p-6 flex items-center justify-center text-center" style={{ background: "hsl(43 30% 97%)" }}>
+      <div className="max-w-sm space-y-3">
+        <p className="text-muted-foreground">This case study could not be loaded. It may not be available to you.</p>
+        <button className="text-sm font-medium text-primary hover:underline" onClick={() => navigate('/dashboard')}>Back to dashboard</button>
+      </div>
+    </div>;
   }
 
   return (

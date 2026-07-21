@@ -63,7 +63,7 @@ export function CoachingMatching() {
 function MatchingBoard({ courseId }: { courseId: string }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const { data, isLoading } = useQuery<Matching>({ queryKey: ['matching', courseId], queryFn: () => apiFetch<Matching>(`/courses/${courseId}/matching`) });
+  const { data, isLoading, isError } = useQuery<Matching>({ queryKey: ['matching', courseId], queryFn: () => apiFetch<Matching>(`/courses/${courseId}/matching`), retry: false });
   const [newSection, setNewSection] = React.useState('');
   const invalidate = () => qc.invalidateQueries({ queryKey: ['matching', courseId] });
 
@@ -88,7 +88,8 @@ function MatchingBoard({ courseId }: { courseId: string }) {
     onSuccess: () => { invalidate(); toast({ title: 'Section deleted' }); },
   });
 
-  if (isLoading || !data) return <div className="h-64 bg-muted rounded-xl animate-pulse" />;
+  if (isLoading) return <div className="h-64 bg-muted rounded-xl animate-pulse" />;
+  if (isError || !data) return <div className="text-center text-muted-foreground py-12">Could not load coaching data for this course. Please refresh.</div>;
 
   const unassigned = data.learners.filter((l) => !l.sectionId);
   const s = data.summary;

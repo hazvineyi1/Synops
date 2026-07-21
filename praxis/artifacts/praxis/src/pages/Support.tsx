@@ -108,9 +108,10 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
   const [reply, setReply] = useState("");
   const [internal, setInternal] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["ticket", ticketId],
     queryFn: () => supportApi.get(ticketId),
+    retry: false,
   });
 
   const invalidate = () => {
@@ -131,8 +132,11 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
     onError: (e) => toast({ title: "Update failed", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return <div className="flex items-center gap-2 text-muted-foreground py-16 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>;
+  }
+  if (isError || !data) {
+    return <div className="text-center text-muted-foreground py-16">This ticket could not be loaded. It may have been closed or you may not have access.</div>;
   }
 
   const { ticket, messages } = data;

@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Check, MessageCircle, Sparkles } from "lucide-react";
 
 export function CoachSettings() {
-  const { data: profile, isLoading } = useCoachProfile();
+  const { data: profile, isLoading, isError } = useCoachProfile();
   const { data: waStatus } = useWhatsappStatus();
   const update = useUpdateCoachProfile();
   const { toast } = useToast();
@@ -33,7 +33,7 @@ export function CoachSettings() {
     } catch { /* ignore */ }
   }, [profile]);
 
-  if (isLoading || !profile) {
+  if (isLoading) {
     return (
       <div className="space-y-6 animate-pulse">
         <div className="h-10 w-64 bg-muted rounded" />
@@ -41,6 +41,9 @@ export function CoachSettings() {
         <div className="h-48 bg-muted rounded-2xl" />
       </div>
     );
+  }
+  if (isError || !profile) {
+    return <div className="text-center text-muted-foreground py-16">Could not load your coach settings. Please refresh.</div>;
   }
 
   const save = (patch: Parameters<typeof update.mutate>[0], label = "Saved") =>

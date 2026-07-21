@@ -158,7 +158,7 @@ function ReviewFinalize() {
   const [courseId, setCourseId] = useState('');
 
   const { data: courses } = useQuery({ queryKey: ['courses'], queryFn: () => apiFetch<any[]>('/courses') });
-  const { data: detail } = useQuery({ queryKey: ['course-detail', courseId], queryFn: () => apiFetch<any>(`/courses/${courseId}`), enabled: !!courseId });
+  const { data: detail, isLoading: detailLoading, isError: detailError } = useQuery({ queryKey: ['course-detail', courseId], queryFn: () => apiFetch<any>(`/courses/${courseId}`), enabled: !!courseId, retry: false });
   const { data: acts } = useQuery({ queryKey: ['course-activities', courseId], queryFn: () => apiFetch<any[]>(`/activities?courseId=${courseId}`), enabled: !!courseId });
   const { data: cases } = useQuery({ queryKey: ['course-cases', courseId], queryFn: () => apiFetch<any[]>(`/courses/${courseId}/cases`), enabled: !!courseId });
   const { data: assigns } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<any[]>(`/courses/${courseId}/assignments`), enabled: !!courseId });
@@ -222,7 +222,9 @@ function ReviewFinalize() {
           {/* Modules — open each to review its content and video */}
           <Card className="p-5">
             <SectionTitle>Modules ({modules.length})</SectionTitle>
-            {!detail ? <Skeleton className="h-16 mt-3" /> : modules.length === 0 ? (
+            {detailLoading ? <Skeleton className="h-16 mt-3" /> : (detailError || !detail) ? (
+              <p className="text-sm text-muted-foreground mt-2">Could not load this course. Please refresh.</p>
+            ) : modules.length === 0 ? (
               <p className="text-sm text-muted-foreground mt-2">No modules yet. Build one in Studio, then it appears here.</p>
             ) : (
               <div className="mt-3 space-y-2">

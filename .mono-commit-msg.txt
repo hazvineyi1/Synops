@@ -1,9 +1,5 @@
-Fix unenrolled course modules 403 hang: allow catalogue view + graceful error UI (ASCII-only)
+Coaching and sections: distinguish loading/error/empty for the course list (ASCII-only)
 
-Browsing an unenrolled catalogue course and opening the Modules tab hung on gray skeletons forever. Two causes: (1) GET /courses/:id/modules was enrolment-gated (participantOn), so a catalogue viewer got 403; (2) the CourseDetail Modules tab rendered its skeleton on '!modules', which stays undefined on error, so a 403 span the skeleton indefinitely.
+The Coaching and sections page showed 'Create a course first' whenever no course was selected - which also happened while /courses was still loading OR if it errored, so a slow/failed request masqueraded as 'no courses exist' (the same failure-to-handle-error pattern as the modules hang). Now it shows 'Loading courses...' while fetching, 'Could not load courses. Please refresh.' on error (retry:false), and only 'No courses yet. Create a course first.' when genuinely loaded-and-empty. The Course dropdown shows 'Loading...' instead of 'No courses' during the fetch.
 
-BACKEND: new shared scope helper canViewCourseCatalog (tenant-owned OR partner-assigned OR platform OR hub/enrolled) now gates the module LIST (titles/order only - catalogue overview info); actual content (beats/readings/cases) stays enrolment-gated. Refactored the course-detail route to use the same helper.
-
-FRONTEND: the Modules tab now distinguishes loading vs error (retry:false) and shows 'Enrol in this course to view its modules' on a genuine 403 instead of an infinite skeleton.
-
-VALIDATION: esbuild clean on scope.ts, modules.ts, courses.ts, CourseDetail.tsx.
+VALIDATION: esbuild clean on CoachingMatching.tsx.
