@@ -1,3 +1,3 @@
-Enza subdomain root renders Enza landing (no /enzaglobalmedia path)
+One-click demo sign-in buttons on the Enza sign-in screen
 
-HomeRedirect now maps branded partner subdomains to their landing page: on enza.synops-consulting.com the root path renders PartnerLanding (slug enza-global) directly, keeping the URL clean. Signed-in users still redirect to /dashboard. Added PARTNER_SUBDOMAIN_SLUGS map for future partner subdomains.
+Backend: POST /auth/demo-login issues a session with no password, scoped to two fixed demo identities only (student -> enza@student1.test; admin -> demo.admin@enzaglobalmedia.co.za, a dedicated partner_admin lazily created on the Enza partner). Cannot log in as an arbitrary user. Guarded by ENABLE_DEMO_LOGIN (set 0 to disable). Frontend: SessionContext.demoSignIn + two buttons (Demo learner / Demo admin) shown on the sign-in page only on the enza.synops-consulting.com host.
