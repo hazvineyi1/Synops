@@ -38,6 +38,22 @@ interface ProgressMe {
   courses: CourseProgress[];
 }
 
+// Derive a browsable category for a course from its title and competency tags, so the catalog can
+// be filtered (IT, Hospitality, etc.) without a schema change. First match wins.
+function courseCategory(c: { title?: string | null; competencyTags?: string[] | null }): string {
+  const t = `${c.title ?? ""} ${(c.competencyTags ?? []).join(" ")}`.toLowerCase();
+  const has = (...k: string[]) => k.some((x) => t.includes(x));
+  if (has("solar", "green econom", "renewable")) return "Green Energy";
+  if (has("tourism", "hospitality", "tour-guid", "tour guid")) return "Hospitality & Tourism";
+  if (has("early childhood", "care economy", " ecd")) return "Care & Education";
+  if (has("compliance", "b-bbee", "cipc", "sars", "registration, tax")) return "Compliance";
+  if (has("global business services", "bpo", "customer experience", "contact centre", "call centre")) return "Customer Service & BPO";
+  if (has("artisan", "skilled trades", "electrical", "plumbing")) return "Trades";
+  if (has("data literacy", "data analytics", "software develop", "web &", "digital marketing", "digital &", "business intelligence", "coding")) return "IT & Digital";
+  if (has("business model", "costing", "pricing", "margin", "financial", "bookkeeping", "sales", "value proposition", "market research", "finance", "entrepreneur", "enterprise & supplier", "pitching", "bankable", "operations", "leadership")) return "Business & Finance";
+  return "Other";
+}
+
 export function Courses() {
   const [, navigate] = useLocation();
   const { user } = useSession();
@@ -113,6 +129,12 @@ export function Courses() {
   // Catalog metadata keyed by id, so enrolled cards can borrow nqf/module counts.
   const meta = new Map((catalog ?? []).map((c) => [c.id, c]));
   const exploreList = (catalog ?? []).filter((c) => !enrolledIds.has(c.id));
+
+  const [catFilter, setCatFilter] = useState<string | null>(null);
+  const catCounts = new Map<string, number>();
+  for (const c of exploreList) { const k = courseCategory(c as any); catCounts.set(k, (catCounts.get(k) ?? 0) + 1); }
+  const cats = Array.from(catCounts.keys()).sort();
+  const shownExplore = catFilter ? exploreList.filter((c) => courseCategory(c as any) === catFilter) : exploreList;
 
   const hasEnrolled = enrolled.length > 0;
 
@@ -203,6 +225,15 @@ export function Courses() {
           <h2 className="text-lg font-serif font-semibold tracking-tight mb-4">Explore the catalog</h2>
         )}
 
+        {cats.length > 1 && (
+          <div className="flex flex-wrap gap-2 mb-5">
+            <button onClick={() => setCatFilter(null)} className={cn("rounded-full border px-3 py-1 text-xs font-medium transition", !catFilter ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/40")}>All ({exploreList.length})</button>
+            {cats.map((cat) => (
+              <button key={cat} onClick={() => setCatFilter(cat)} className={cn("rounded-full border px-3 py-1 text-xs font-medium transition", catFilter === cat ? "border-primary bg-primary/5 text-foreground" : "border-border text-muted-foreground hover:border-primary/40")}>{cat} ({catCounts.get(cat)})</button>
+            ))}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {[1, 2, 3].map((i) => <Skeleton key={i} className="h-52 rounded-xl" />)}
@@ -215,7 +246,7 @@ export function Courses() {
           )
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {exploreList.map((course) => {
+            {shownExplore.map((course) => {
               const a = courseAccent(course.id);
               return (
                 <Card key={course.id} className="p-5 flex flex-col group hover:shadow-md transition-shadow">

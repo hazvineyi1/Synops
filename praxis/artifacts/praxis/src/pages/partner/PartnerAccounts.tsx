@@ -160,6 +160,27 @@ export function PartnerAccounts() {
   });
   const activity = loginActivity ?? [];
 
+  // Learner pool: learners attached to the PARTNER (not yet in any org), then assigned into orgs.
+  const [poolEmail, setPoolEmail] = useState('');
+  const [poolTest, setPoolTest] = useState(false);
+  const [poolResult, setPoolResult] = useState<{ email: string; password?: string; link?: string } | null>(null);
+  const { data: poolData, refetch: refetchPool } = useQuery({
+    queryKey: ['partner-learners', partnerId],
+    queryFn: () => apiFetch<Array<{ id: string; email: string; firstName: string | null; lastName: string | null; status: string; organisationId: string | null; orgName: string | null }>>(`/partners/${partnerId}/learners`),
+    enabled: !!partnerId,
+  });
+  const pool = poolData ?? [];
+  const addPoolM = useMutation({
+    mutationFn: () => apiFetch<{ id: string; email: string; password?: string; link?: string }>(`/partners/${partnerId}/learners`, { method: 'POST', body: JSON.stringify({ email: poolEmail.trim(), test: poolTest }) }),
+    onSuccess: (r) => { setPoolResult(r); setPoolEmail(''); refetchPool(); flashMsg(r.password ? 'Test learner created with a login password.' : 'Learner added to the pool.'); },
+    onError: (e: any) => flashMsg(e?.message ?? 'Could not add the learner.'),
+  });
+  const assignPoolM = useMutation({
+    mutationFn: (b: { userId: string; organisationId: string | null }) => apiFetch(`/partners/${partnerId}/learners/${b.userId}/assign`, { method: 'POST', body: JSON.stringify({ organisationId: b.organisationId }) }),
+    onSuccess: () => { refetchPool(); qc.invalidateQueries({ queryKey: ['partner-members', partnerId] }); flashMsg('Learner assignment updated.'); },
+    onError: (e: any) => flashMsg(e?.message ?? 'Could not assign the learner.'),
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader title="Accounts & Roles" icon={Users} subtitle="Provisioning, account lifecycle, delegated admins and access scope." />
@@ -169,6 +190,43 @@ export function PartnerAccounts() {
           <CheckCircle2 className="h-4 w-4 text-emerald-600" /> {flash}
         </Card>
       )}
+
+      {/* Learner pool: add learners to the partner, then assign them to organisations */}
+      <Card className="p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Users className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Learner pool</h3>
+          <span className="text-xs text-muted-foreground">Add learners to your partner account, then assign each into an organisation.</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input value={poolEmail} onChange={(e) => setPoolEmail(e.target.value)} placeholder="learner@email.com" className="h-9 flex-1 min-w-[220px] rounded-md border border-input bg-background px-3 text-sm" />
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground"><input type="checkbox" checked={poolTest} onChange={(e) => setPoolTest(e.target.checked)} /> Test account (set a login password now)</label>
+          <Button size="sm" disabled={addPoolM.isPending || !poolEmail.trim()} onClick={() => { setPoolResult(null); addPoolM.mutate(); }}>{addPoolM.isPending ? 'Adding…' : 'Add learner'}</Button>
+        </div>
+        {poolResult && (
+          <div className="rounded-md border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 px-3 py-2 text-xs flex flex-wrap items-center gap-2">
+            <span className="font-medium">{poolResult.email}</span>
+            {poolResult.password && <>· temporary password <code className="rounded bg-background border px-1.5 py-0.5 font-semibold">{poolResult.password}</code><Button size="sm" variant="outline" className="h-6 px-2" onClick={() => navigator.clipboard?.writeText(poolResult.password!)}>Copy</Button></>}
+            {poolResult.link && <>· <code className="truncate max-w-[280px] rounded bg-background border px-1.5 py-0.5">{poolResult.link}</code><Button size="sm" variant="outline" className="h-6 px-2" onClick={() => navigator.clipboard?.writeText(poolResult.link!)}>Copy link</Button></>}
+          </div>
+        )}
+        {pool.length > 0 && (
+          <div className="rounded-lg border border-border divide-y divide-border max-h-72 overflow-auto">
+            {pool.map((l) => (
+              <div key={l.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{[l.firstName, l.lastName].filter(Boolean).join(' ') || l.email}</div>
+                  <div className="text-xs text-muted-foreground truncate">{l.email} · {l.orgName ? `in ${l.orgName}` : <span className="text-amber-600 font-medium">Unassigned</span>}</div>
+                </div>
+                <select value={l.organisationId ?? ''} onChange={(e) => assignPoolM.mutate({ userId: l.id, organisationId: e.target.value || null })} className="h-8 rounded-md border border-input bg-background px-2 text-xs">
+                  <option value="">Unassigned (pool)</option>
+                  {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
 
       <Tabs defaultValue="accounts">
         <TabsList className="flex-wrap h-auto">

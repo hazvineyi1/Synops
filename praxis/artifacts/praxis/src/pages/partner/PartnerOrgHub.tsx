@@ -150,11 +150,6 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const [confirmDelete, setConfirmDelete] = useState(false);
   const drawerNote = (m: string) => { setDrawerMsg(m); window.setTimeout(() => setDrawerMsg(null), 4500); };
   const openMember = (m: Member) => { setSelected(m); setDrawerMsg(null); setConfirmDelete(false); };
-  const recordReset = (id: string, channel: 'email' | 'whatsapp') => {
-    const rec: ResetRecord = { at: new Date().toISOString().slice(0, 10), channel };
-    setMembers((xs) => xs.map((m) => (m.id === id ? { ...m, lastReset: rec } : m)));
-    setSelected((s) => (s && s.id === id ? { ...s, lastReset: rec } : s));
-  };
   const deleteMember = (id: string, name: string) => {
     setMembers((xs) => xs.filter((x) => x.id !== id)); setSelected(null); setConfirmDelete(false); flashMsg(`${name}'s account was removed from this organisation.`);
     apiFetch(`/organisations/${orgId}/members/${id}`, { method: 'DELETE' })
@@ -207,6 +202,16 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   // hubs use, filtered to this organisation. Replaces the old client-side mock (h.invoices etc.).
   const { data: realOrg } = useQuery({ queryKey: ['org-real', orgId], queryFn: () => apiFetch<{ id: string; name: string; partnerId: string }>(`/organisations/${orgId}`), enabled: !!orgId, retry: false });
   const partnerId = realOrg?.partnerId ?? user?.partnerId ?? getActivePartnerId() ?? '';
+
+  // Real password reset for a member: a copyable set-password link, or a temporary password shown
+  // to the admin. Replaces the old mock (which only showed a "sent" toast and did nothing).
+  const [credResult, setCredResult] = useState<{ link?: string; password?: string; emailed?: boolean; email?: string } | null>(null);
+  const resetCred = useMutation({
+    mutationFn: (b: { userId: string; mode: 'link' | 'temp' }) =>
+      apiFetch<{ link?: string; password?: string; emailed?: boolean; email?: string }>(`/partners/${partnerId}/members/${b.userId}/credentials`, { method: 'POST', body: JSON.stringify({ mode: b.mode }) }),
+    onSuccess: (r) => { setCredResult(r); drawerNote(r.password ? 'Temporary password set. Copy it below to share.' : r.emailed ? `Reset link emailed to ${r.email}.` : 'Reset link created. Copy it below to share.'); },
+    onError: (e: any) => drawerNote(e?.message ?? 'Could not complete that. Please try again.'),
+  });
   const { data: billing } = useQuery({ queryKey: ['partner-billing', partnerId], queryFn: () => apiFetch<{ subscriptions: any[]; invoices: any[] }>(`/partners/${partnerId}/billing`), enabled: !!partnerId });
   const { data: fundingRows = [] } = useQuery({ queryKey: ['partner-funding', partnerId], queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/funding`), enabled: !!partnerId });
   const { data: docRows = [] } = useQuery({ queryKey: ['partner-documents', partnerId], queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/documents`), enabled: !!partnerId });
@@ -684,7 +689,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       </Dialog>
 
       {/* ── Member / learner profile drawer ── */}
-      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
+      <Dialog open={!!selected} onOpenChange={(o) => { if (!o) { setSelected(null); setCredResult(null); } }}>
         <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
           {selected && (
             <>
@@ -715,18 +720,27 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                     <option value="learner">Learner</option><option value="coach">Coach</option><option value="org_admin">Org admin</option>
                   </select></label>
 
-                {/* Reset password - choose channel */}
+                {/* Reset password - real: emailable link OR a temporary password shown to the admin */}
                 <div className="rounded-lg border border-border p-3">
-                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><KeyRound className="h-3.5 w-3.5" /> Reset password - send link via</div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { recordReset(selected.id, 'email'); drawerNote(`Password reset link sent to ${selected.email}.`); }}><Mail className="h-3.5 w-3.5" /> Email</Button>
-                    <Button size="sm" variant="outline" className="gap-1.5" disabled={!selectedLearner?.whatsappOptIn} onClick={() => { recordReset(selected.id, 'whatsapp'); drawerNote(`Password reset link sent via WhatsApp to ${selectedLearner?.phone}.`); }}><Smartphone className="h-3.5 w-3.5" /> WhatsApp</Button>
+                  <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><KeyRound className="h-3.5 w-3.5" /> Reset password</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" className="gap-1.5" disabled={resetCred.isPending} onClick={() => resetCred.mutate({ userId: selected.id, mode: 'link' })}><Mail className="h-3.5 w-3.5" /> Email a reset link</Button>
+                    <Button size="sm" variant="outline" className="gap-1.5" disabled={resetCred.isPending} onClick={() => resetCred.mutate({ userId: selected.id, mode: 'temp' })}><KeyRound className="h-3.5 w-3.5" /> Set a temporary password</Button>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1.5">
-                    <Clock className="h-3 w-3" />
-                    {selected.lastReset ? <>Last reset {fmtDate(selected.lastReset.at)} via {selected.lastReset.channel === 'whatsapp' ? 'WhatsApp' : 'email'}.</> : <>No password reset on record.</>}
-                  </p>
-                  {selectedLearner && !selectedLearner.whatsappOptIn && <p className="text-[11px] text-muted-foreground mt-0.5">WhatsApp reset unavailable - learner has not opted in.</p>}
+                  {credResult?.link && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <code className="flex-1 min-w-0 truncate rounded bg-muted px-2 py-1.5 border text-xs">{credResult.link}</code>
+                      <Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(credResult.link!); drawerNote('Link copied.'); }}>Copy</Button>
+                    </div>
+                  )}
+                  {credResult?.password && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Temporary password:</span>
+                      <code className="rounded bg-muted px-2 py-1.5 border text-xs font-semibold">{credResult.password}</code>
+                      <Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(credResult.password!); drawerNote('Password copied.'); }}>Copy</Button>
+                    </div>
+                  )}
+                  <p className="text-[11px] text-muted-foreground mt-1.5">Email delivery needs a mail provider configured. Until then, copy the link or the temporary password and share it with the learner.</p>
                 </div>
 
                 {/* Account actions */}

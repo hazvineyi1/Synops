@@ -34,6 +34,7 @@ import {
   cookieOptions,
   sha256,
   newApiKey,
+  hashPassword,
   clientIp,
   SESSION_COOKIE,
 } from "../lib/auth";
@@ -777,6 +778,113 @@ router.post("/partners/:partnerId/members", requireAuth, async (req, res) => {
   const link = `${appBase(req)}/reset-password?token=${token}`;
   const emailed = emailEnabled() ? (await sendSetPasswordEmail(email, firstName, link, "invite")).ok : false;
   res.status(201).json({ id: created.id, email, role, status: "invited", link, expiresAt, emailed });
+});
+
+// A readable temporary password an admin can hand to a locked-out learner. 11 chars, passes the
+// length-first password policy, and is unique enough per reset. Shown once to the admin.
+function tempPassword(): string { return `Praxis-${Math.floor(1000 + Math.random() * 9000)}`; }
+
+/**
+ * POST /partners/:partnerId/members/:userId/credentials  { mode: "temp" | "link" }
+ * Partner-admin (of this partner) or super admin credential management for a member.
+ *  - "temp": set a temporary password and RETURN it, so the admin can hand it over. Works with no
+ *            email provider. Also revokes the user's live sessions.
+ *  - "link": mint a one-time set-password link, returned to the admin, and emailed if a provider is set.
+ */
+router.post("/partners/:partnerId/members/:userId/credentials", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const { partnerId, userId } = req.params;
+  const isSuper = actor.role === "super_admin";
+  const isPartnerAdmin = actor.role === "partner_admin" && actor.partnerId === partnerId;
+  if (!isSuper && !isPartnerAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+  const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!target) { res.status(404).json({ error: "User not found" }); return; }
+  if (!isSuper && target.partnerId !== partnerId) { res.status(403).json({ error: "You can only manage accounts inside your own partner." }); return; }
+
+  const mode = String(req.body?.mode ?? "temp");
+  if (mode === "temp") {
+    const password = tempPassword();
+    await db.update(usersTable).set({ passwordHash: hashPassword(password), status: target.status === "invited" ? "active" : target.status }).where(eq(usersTable.id, target.id));
+    await db.update(authSessionsTable).set({ revokedAt: new Date() }).where(eq(authSessionsTable.userId, target.id));
+    await audit(req, "user.set_temp_password", "user", target.id, { email: target.email });
+    res.json({ email: target.email, password });
+    return;
+  }
+  const token = newSessionToken();
+  const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+  await db.insert(passwordResetsTable).values({ userId: target.id, tokenHash: sha256(token), issuedBy: "admin", issuedByUserId: actor.id, expiresAt });
+  await audit(req, "user.reset_link", "user", target.id, { email: target.email });
+  const link = `${appBase(req)}/reset-password?token=${token}`;
+  const emailed = emailEnabled() ? (await sendSetPasswordEmail(target.email, [target.firstName, target.lastName].filter(Boolean).join(" ") || null, link, "reset")).ok : false;
+  res.json({ email: target.email, link, expiresAt, emailed });
+});
+
+/**
+ * PARTNER LEARNER POOL. A learner can belong to the PARTNER before being placed into an
+ * organisation (organisationId null = unassigned pool), then assigned into one or more orgs.
+ * POST creates a pool learner; test=true sets a temp password and returns it; GET lists the whole
+ * partner's learners (with org, null = pool); assign sets/clears the learner's organisation.
+ */
+router.post("/partners/:partnerId/learners", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const { partnerId } = req.params;
+  const isSuper = actor.role === "super_admin";
+  const isPartnerAdmin = actor.role === "partner_admin" && actor.partnerId === partnerId;
+  if (!isSuper && !isPartnerAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+  const email = String(req.body?.email ?? "").toLowerCase().trim();
+  const firstName = (req.body?.firstName ?? "").trim() || null;
+  const lastName = (req.body?.lastName ?? "").trim() || null;
+  const test = req.body?.test === true;
+  if (!email || !email.includes("@")) { res.status(400).json({ error: "A valid email is required." }); return; }
+  const existing = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  if (existing.length) { res.status(409).json({ error: "A user with that email already exists." }); return; }
+
+  if (test) {
+    const password = tempPassword();
+    const [created] = await db.insert(usersTable).values({ email, firstName, lastName, role: "learner", status: "active", partnerId, organisationId: null, passwordHash: hashPassword(password) }).returning();
+    await audit(req, "partner.learner_pool_create", "user", created.id, { email, test: true });
+    res.status(201).json({ id: created.id, email, status: "active", password, test: true });
+    return;
+  }
+  const [created] = await db.insert(usersTable).values({ email, firstName, lastName, role: "learner", status: "invited", partnerId, organisationId: null }).returning();
+  const token = newSessionToken();
+  const expiresAt = new Date(Date.now() + RESET_TTL_MS);
+  await db.insert(passwordResetsTable).values({ userId: created.id, tokenHash: sha256(token), issuedBy: "admin", issuedByUserId: actor.id, expiresAt });
+  await audit(req, "partner.learner_pool_create", "user", created.id, { email });
+  const link = `${appBase(req)}/reset-password?token=${token}`;
+  const emailed = emailEnabled() ? (await sendSetPasswordEmail(email, firstName, link, "invite")).ok : false;
+  res.status(201).json({ id: created.id, email, status: "invited", link, expiresAt, emailed });
+});
+
+router.get("/partners/:partnerId/learners", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const { partnerId } = req.params;
+  const isSuper = actor.role === "super_admin";
+  const isPartnerAdmin = actor.role === "partner_admin" && actor.partnerId === partnerId;
+  if (!isSuper && !isPartnerAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+  const rows = await db.select({ id: usersTable.id, email: usersTable.email, firstName: usersTable.firstName, lastName: usersTable.lastName, status: usersTable.status, organisationId: usersTable.organisationId })
+    .from(usersTable).where(and(eq(usersTable.partnerId, partnerId), eq(usersTable.role, "learner")));
+  const orgs = await db.select({ id: organisationsTable.id, name: organisationsTable.name }).from(organisationsTable).where(eq(organisationsTable.partnerId, partnerId));
+  const orgName: Record<string, string> = Object.fromEntries(orgs.map((o) => [o.id, o.name]));
+  res.json(rows.map((r) => ({ ...r, orgName: r.organisationId ? (orgName[r.organisationId] ?? null) : null })));
+});
+
+router.post("/partners/:partnerId/learners/:userId/assign", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  const { partnerId, userId } = req.params;
+  const isSuper = actor.role === "super_admin";
+  const isPartnerAdmin = actor.role === "partner_admin" && actor.partnerId === partnerId;
+  if (!isSuper && !isPartnerAdmin) { res.status(403).json({ error: "Forbidden" }); return; }
+  const [target] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!target || (!isSuper && target.partnerId !== partnerId)) { res.status(404).json({ error: "Learner not found in this partner." }); return; }
+  const organisationId = req.body?.organisationId ? String(req.body.organisationId) : null;
+  if (organisationId) {
+    const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, organisationId) });
+    if (!org || org.partnerId !== partnerId) { res.status(400).json({ error: "That organisation does not belong to this partner." }); return; }
+  }
+  await db.update(usersTable).set({ organisationId }).where(eq(usersTable.id, target.id));
+  await audit(req, "partner.learner_assign", "user", target.id, { organisationId, partnerId });
+  res.json({ id: target.id, organisationId });
 });
 
 /**
