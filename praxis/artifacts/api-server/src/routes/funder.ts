@@ -363,17 +363,27 @@ router.post("/partners/:partnerId/funding/:agreementId/seats", requireAuth, asyn
   await ensureSeatsTable();
   const agreement = await db.query.fundingAgreementsTable.findFirst({ where: eq(fundingAgreementsTable.id, agreementId) });
   if (!agreement || agreement.partnerId !== partnerId) { res.status(404).json({ error: "Agreement not found." }); return; }
-  const existing = await db.select().from(fundedSeatAssignmentsTable)
-    .where(and(eq(fundedSeatAssignmentsTable.partnerId, partnerId), eq(fundedSeatAssignmentsTable.agreementId, agreementId)));
-  if (existing.some((r) => r.learnerId === learnerId)) { res.status(409).json({ error: "That learner already occupies a seat on this agreement." }); return; }
-  if (existing.length >= (agreement.seatsFunded || 0)) { res.status(409).json({ error: "No funded seats left on this agreement." }); return; }
-  const [row] = await db.insert(fundedSeatAssignmentsTable).values({
-    partnerId, agreementId, learnerId,
-    learnerName: req.body?.learnerName ? String(req.body.learnerName) : null,
-    assignedBy: user.id,
-  }).returning();
-  await logAudit(req, "funding.seat_assign", "funded_seat", row.id, { agreementId, learnerId });
-  res.status(201).json(row);
+  // Race-safe: lock the agreement row so concurrent assignments on the SAME agreement serialize,
+  // re-check the cap + dup INSIDE the transaction, and let the unique index (agreement_id,learner_id)
+  // catch any dup that still slips through. The old check-then-insert let concurrent requests both
+  // pass the cap check and over-allocate funded seats (corrupting funder attribution).
+  const outcome = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT 1 FROM funding_agreements WHERE id = ${agreementId} FOR UPDATE`);
+    const existing = await tx.select().from(fundedSeatAssignmentsTable)
+      .where(and(eq(fundedSeatAssignmentsTable.partnerId, partnerId), eq(fundedSeatAssignmentsTable.agreementId, agreementId)));
+    if (existing.some((r) => r.learnerId === learnerId)) return { code: 409, error: "That learner already occupies a seat on this agreement." } as const;
+    if (existing.length >= (agreement.seatsFunded || 0)) return { code: 409, error: "No funded seats left on this agreement." } as const;
+    const [row] = await tx.insert(fundedSeatAssignmentsTable).values({
+      partnerId, agreementId, learnerId,
+      learnerName: req.body?.learnerName ? String(req.body.learnerName) : null,
+      assignedBy: user.id,
+    }).onConflictDoNothing({ target: [fundedSeatAssignmentsTable.agreementId, fundedSeatAssignmentsTable.learnerId] }).returning();
+    if (!row) return { code: 409, error: "That learner already occupies a seat on this agreement." } as const;
+    return { code: 201, row } as const;
+  });
+  if (outcome.code !== 201) { res.status(outcome.code).json({ error: outcome.error }); return; }
+  await logAudit(req, "funding.seat_assign", "funded_seat", outcome.row.id, { agreementId, learnerId });
+  res.status(201).json(outcome.row);
 });
 
 // DELETE /partners/:partnerId/funding/:agreementId/seats/:id — unassign.

@@ -1,9 +1,13 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { initObservability } from "./lib/observability";
+import { ensureIntegrityConstraints } from "./lib/dbHardening";
 
 // Fire-and-forget: enables Sentry when SENTRY_DSN is set, otherwise a no-op. Never blocks boot.
 void initObservability();
+// Fire-and-forget: dedupe + add the unique indexes that make credential/funded-seat/gradebook
+// writes race-safe. Never throws; skips any table that isn't present yet.
+void ensureIntegrityConstraints();
 
 const rawPort = process.env["PORT"];
 

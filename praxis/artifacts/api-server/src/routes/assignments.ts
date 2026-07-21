@@ -53,60 +53,57 @@ async function applyGrade(opts: {
   feedback?: string | null;
   rubricAssessment?: AssignmentCriterionScore[] | null;
 }) {
-  const [updated] = await db.update(assignmentSubmissionsTable)
-    .set({
-      score: opts.score === null ? null : String(opts.score),
-      letterGrade: opts.letterGrade ?? null,
-      feedback: opts.feedback ?? null,
-      rubricAssessment: opts.rubricAssessment ?? null,
-      gradedBy: opts.graderId,
-      gradedAt: new Date(),
-      status: "graded",
-      updatedAt: new Date(),
-    })
-    .where(eq(assignmentSubmissionsTable.id, opts.submissionId))
-    .returning();
-
-  // Mirror the score into gradebook_entries — the canonical source the gradebook grid reads.
-  // UPSERT, not UPDATE: entry rows are seeded only at assignment-creation time for the learners
-  // enrolled THEN. A learner who enrolled later (the normal case for a seeded cohort) has no row,
-  // so a bare UPDATE matched 0 rows and the grade never reached the grid (dashes + blank Overall,
-  // and a false "missing summative" off-track flip). Insert the row when it's absent.
   const scoreStr = opts.score === null ? null : String(opts.score);
-  const existingEntry = await db.query.gradebookEntriesTable.findFirst({
-    where: and(
-      eq(gradebookEntriesTable.assignmentId, opts.assignmentId),
-      eq(gradebookEntriesTable.userId, opts.learnerId),
-    ),
-  });
-  if (existingEntry) {
-    await db.update(gradebookEntriesTable)
-      .set({ score: scoreStr, letterGrade: opts.letterGrade ?? null, missing: false, updatedAt: new Date() })
-      .where(eq(gradebookEntriesTable.id, existingEntry.id));
-  } else {
-    const asn = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, opts.assignmentId) });
-    await db.insert(gradebookEntriesTable).values({
+  const asn = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, opts.assignmentId) });
+
+  // Atomic: the submission grade, the gradebook mirror and the learner notification either all land
+  // or none do. Previously these were three independent writes, so a failure between them left a
+  // graded submission with no gradebook entry (a "score written but entry missing" window).
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx.update(assignmentSubmissionsTable)
+      .set({
+        score: scoreStr,
+        letterGrade: opts.letterGrade ?? null,
+        feedback: opts.feedback ?? null,
+        rubricAssessment: opts.rubricAssessment ?? null,
+        gradedBy: opts.graderId,
+        gradedAt: new Date(),
+        status: "graded",
+        updatedAt: new Date(),
+      })
+      .where(eq(assignmentSubmissionsTable.id, opts.submissionId))
+      .returning();
+
+    // Mirror the score into gradebook_entries via a real UPSERT — race-safe now that a unique index
+    // on (assignment_id, user_id) exists (see dbHardening). No more findFirst-then-insert drift.
+    await tx.insert(gradebookEntriesTable)
+      .values({
+        userId: opts.learnerId,
+        courseId: opts.courseId,
+        assignmentId: opts.assignmentId,
+        score: scoreStr,
+        possibleScore: String(Number(asn?.pointsPossible ?? 100)),
+        letterGrade: opts.letterGrade ?? null,
+        missing: false,
+      })
+      .onConflictDoUpdate({
+        target: [gradebookEntriesTable.assignmentId, gradebookEntriesTable.userId],
+        set: { score: scoreStr, letterGrade: opts.letterGrade ?? null, missing: false, updatedAt: new Date() },
+      });
+
+    await tx.insert(notificationsTable).values({
       userId: opts.learnerId,
+      type: "assignment_graded",
+      title: "Your assignment has been graded",
+      body: `Score: ${opts.score ?? "--"} — ${opts.feedback?.slice(0, 80) ?? "View feedback in gradebook"}`,
+      link: `/courses/${opts.courseId}/assignments/${opts.assignmentId}`,
       courseId: opts.courseId,
-      assignmentId: opts.assignmentId,
-      score: scoreStr,
-      possibleScore: String(Number(asn?.pointsPossible ?? 100)),
-      letterGrade: opts.letterGrade ?? null,
-      missing: false,
+      actorId: opts.graderId,
     });
-  }
-
-  await db.insert(notificationsTable).values({
-    userId: opts.learnerId,
-    type: "assignment_graded",
-    title: "Your assignment has been graded",
-    body: `Score: ${opts.score ?? "--"} — ${opts.feedback?.slice(0, 80) ?? "View feedback in gradebook"}`,
-    link: `/courses/${opts.courseId}/assignments/${opts.assignmentId}`,
-    courseId: opts.courseId,
-    actorId: opts.graderId,
+    return row;
   });
 
-  // Refresh the learner's unified-gradebook off-track state (+ auto plan / alerts).
+  // Refresh the learner's unified-gradebook off-track state (+ auto plan / alerts). After commit.
   void onGradeEvent({ sourceType: "assignment", sourceId: opts.assignmentId, courseId: opts.courseId, userId: opts.learnerId });
 
   return updated;

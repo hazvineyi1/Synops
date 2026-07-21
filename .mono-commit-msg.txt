@@ -1,9 +1,9 @@
-Org-hub People on real data (Partner Hub convergence complete) (ASCII-only)
+Production-readiness Section A: authz gates, credential/completion integrity, kill fake data (ASCII-only)
 
-The per-org People/roster read the client-side mock (orgDetail d.admins/d.coaches + orgLearners), and add/role/suspend/delete mutated local state only. Rewired the roster to REAL data: it now reads /partners/:pid/members filtered to this org (org_admin/coach/learner). Add member POSTs /organisations/:orgId/members, role change PATCHes, remove DELETEs - each invalidating the roster query so it persists. The settings 'primary admin' field now shows the real org_admin.
+SECURITY (authz was per-route with holes): PATCH /coach/submissions/:id and PATCH /organisations/:orgId were requireAuth-only (a learner could grade any submission / rename any org) - now role+scope gated. billing/funder/documents/delegated-admin canManage checked tenant match but not role (learners carry partnerId) - now require a facilitator role. GET /organisations/:orgId/members, GET /coach/submissions (legacy branch) and GET /coach/learners/:userId/presession were unscoped learner-data reads - now scoped to the caller's learners via a shared viewableLearnerIds helper.
 
-Status (suspend/archive) stays an optimistic local change - it is a super-admin/platform-console op with no org-scoped endpoint - and the learner personal-info drawer (fabricated PII) simply doesn't render for real accounts, which is correct.
+CREDENTIAL/COMPLETION INTEGRITY: the AI-grader outage fallback graded free text by word count high enough to mint a credential - capped below the mastery threshold so a real grader is always required. Module completion was client-asserted (POST /progress/beat marked any beat viewed) - quiz beats are now server-validated: they only count when the correct answer is submitted (ModuleViewer sends the answer; arrival no longer auto-marks quizzes). Funder report was platform-wide and counted invalid credentials + hardcoded competency data - now org-scoped, valid-only, no fabricated figures.
 
-With finance (prior commit) and now People real, the whole per-org hub is off the mock. Remaining mock-ish per-org rollups (courses/coaching/gradebook summary tiles) are separate follow-ups.
+FAKE DATA / TRUST: getPartnerHub no longer falls back to the TalentForge demo tenant and HUBS is emptied, so MTN/Vodacom/TalentForge can never render for a real partner. CoachDashboard shows real learner/submission/readiness data (was hardcoded 24/7/82pct). Brand leaks removed from the exported report footer + WhatsApp invite. Seeded learner logins moved off the .test domain. Added a top-level React ErrorBoundary (no more white-screen on a render throw).
 
-VALIDATION: esbuild clean on PartnerOrgHub.tsx.
+VALIDATION: esbuild clean across all changed backend + frontend files.

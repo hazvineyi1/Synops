@@ -428,19 +428,22 @@ router.get("/coach/learners", requireAuth, async (req, res) => {
     alertsByUser.set(a.userId, arr);
   }
 
-  const summaries = await Promise.all(
-    learners.map(async (l) => {
-      const [credentialCount] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(credentialsTable)
-        .where(eq(credentialsTable.userId, l.id));
-      const lastSession = await db
-        .select({ createdAt: sessionsTable.createdAt })
-        .from(sessionsTable)
-        .where(eq(sessionsTable.userId, l.id))
-        .orderBy(desc(sessionsTable.createdAt))
-        .limit(1);
+  // Batch the two per-learner lookups into two grouped queries (was 2 queries PER learner — an
+  // unbounded N+1 that fanned out to the whole platform for a super_admin).
+  const credCounts = new Map<string, number>();
+  const lastSeen = new Map<string, Date>();
+  if (learnerIds.length) {
+    const [credRows, sessRows] = await Promise.all([
+      db.select({ userId: credentialsTable.userId, c: sql<number>`count(*)` })
+        .from(credentialsTable).where(inArray(credentialsTable.userId, learnerIds)).groupBy(credentialsTable.userId),
+      db.select({ userId: sessionsTable.userId, last: sql<Date>`max(${sessionsTable.createdAt})` })
+        .from(sessionsTable).where(inArray(sessionsTable.userId, learnerIds)).groupBy(sessionsTable.userId),
+    ]);
+    for (const r of credRows) credCounts.set(r.userId, Number(r.c));
+    for (const r of sessRows) if (r.last) lastSeen.set(r.userId, new Date(r.last as any));
+  }
 
+  const summaries = learners.map((l) => {
       const mine = alertsByUser.get(l.id) ?? [];
       // Worst current status across the learner's courses.
       const status = mine.reduce<"off_track" | "at_risk" | "on_track">(
@@ -459,13 +462,12 @@ router.get("/coach/learners", requireAuth, async (req, res) => {
         lastName: l.lastName,
         status,
         flaggedCourses: mine.filter((a) => a.status !== "on_track").length,
-        credentialsEarned: Number(credentialCount.count),
-        lastActivityAt: lastSession[0]?.createdAt.toISOString() ?? null,
+        credentialsEarned: credCounts.get(l.id) ?? 0,
+        lastActivityAt: lastSeen.get(l.id)?.toISOString() ?? null,
         readinessScore,
         topGaps,
       };
-    }),
-  );
+  });
 
   summaries.sort((a, b) => OFFTRACK_RANK[a.status] - OFFTRACK_RANK[b.status] || a.readinessScore - b.readinessScore);
   res.json(summaries);

@@ -176,6 +176,10 @@ export async function issueCredential(
     const decayDate = new Date();
     decayDate.setMonth(decayDate.getMonth() + 12); // 12-month validity
 
+    // onConflictDoNothing on the partial unique index (user_id, module_id) WHERE status='valid'
+    // makes issuance race-safe: two concurrent checkpoints (web + WhatsApp for the same learner)
+    // can both pass the findFirst check above, but only one row can exist — the second is a no-op
+    // instead of a duplicate credential.
     await exec.insert(credentialsTable).values({
       userId,
       moduleId,
@@ -186,6 +190,9 @@ export async function issueCredential(
       evidenceSummary: `Achieved mastery through ${exchanges} Socratic exchanges`,
       decayDate,
       status: "valid",
+    }).onConflictDoNothing({
+      target: [credentialsTable.userId, credentialsTable.moduleId],
+      targetWhere: sql`status = 'valid'`,
     });
   } catch {
     // Non-fatal
