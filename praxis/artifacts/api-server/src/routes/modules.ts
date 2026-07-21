@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { modulesTable, beatsTable, coursesTable } from "@workspace/db";
 import { eq, asc, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
-import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
+import { canStaffActOnCourse, canParticipateInCourse, canViewCourseCatalog } from "../lib/scope";
 
 const router = Router();
 
@@ -64,9 +64,11 @@ function toBeatResponse(b: typeof beatsTable.$inferSelect) {
   };
 }
 
-// GET /courses/:courseId/modules
+// GET /courses/:courseId/modules — the module LIST (titles/order/status) is catalogue overview
+// info, so catalogue viewers (browsing an unenrolled course) may read it. Content within each
+// module (beats/readings/cases via their own routes) stays enrolment-gated.
 router.get("/courses/:courseId/modules", requireAuth, async (req, res) => {
-  if (!(await participantOn(req, res, req.params.courseId))) return;
+  if (!(await canViewCourseCatalog(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const modules = await db
     .select()
     .from(modulesTable)

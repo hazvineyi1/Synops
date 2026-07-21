@@ -3,7 +3,7 @@ import { db } from "@workspace/db";
 import { coursesTable, modulesTable, beatsTable, assignmentsTable, interactiveActivitiesTable, coursePartnerAssignmentsTable } from "@workspace/db";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
-import { canParticipateInCourse, canStaffActOnCourse } from "../lib/scope";
+import { canParticipateInCourse, canStaffActOnCourse, canViewCourseCatalog } from "../lib/scope";
 
 // Courses belong to the super admin (tenantId "platform") and are assigned OUT to partners.
 const HUB_ROLES = new Set(["super_admin", "instructional_designer"]);
@@ -180,26 +180,7 @@ router.get("/courses/:courseId", requireAuth, async (req, res) => {
   // this on enrolment 403'd every non-enrolled catalogue course, and the client rendered that 403
   // as "Course not found", so 13 of 14 catalogue links looked broken. Enrolment still gates the
   // actual coursework routes; visibility here only needs catalogue scope.
-  const viewer = req.dbUser!;
-  let canView = await canParticipateInCourse(viewer, course.id);
-  if (!canView) {
-    if (isHub(viewer.role)) canView = true;
-    else {
-      const scope = viewer.partnerId ?? viewer.organisationId ?? viewer.id;
-      if (course.tenantId === scope || course.tenantId === "platform") canView = true;
-      else if (viewer.partnerId) {
-        try {
-          const assigned = await db
-            .select({ courseId: coursePartnerAssignmentsTable.courseId })
-            .from(coursePartnerAssignmentsTable)
-            .where(and(eq(coursePartnerAssignmentsTable.partnerId, viewer.partnerId), eq(coursePartnerAssignmentsTable.courseId, course.id)))
-            .limit(1);
-          if (assigned.length) canView = true;
-        } catch { /* assignment table absent -> no extra visibility */ }
-      }
-    }
-  }
-  if (!canView) {
+  if (!(await canViewCourseCatalog(req.dbUser!, course.id))) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }

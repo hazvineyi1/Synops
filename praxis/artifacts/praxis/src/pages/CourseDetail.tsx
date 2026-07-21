@@ -1090,7 +1090,7 @@ export function CourseDetail() {
     enabled: !!courseId,
   });
   // Also needed on the discussions tab, where a new thread can be scoped to a module.
-  const { data: modules } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: activeTab === 'modules' || activeTab === 'overview' || activeTab === 'discussions' });
+  const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: activeTab === 'modules' || activeTab === 'overview' || activeTab === 'discussions', retry: false });
   const { data: assignments } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<Assignment[]>(`/courses/${courseId}/assignments`), enabled: activeTab === 'assignments' || activeTab === 'overview' });
   const { data: discussions } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' || activeTab === 'overview' });
   const { data: announcements } = useQuery({ queryKey: ['announcements', courseId], queryFn: () => apiFetch<Announcement[]>(`/courses/${courseId}/announcements`), enabled: activeTab === 'announcements' || activeTab === 'overview' });
@@ -1542,8 +1542,13 @@ export function CourseDetail() {
                 </CardContent>
               </Card>
             )}
-            {!modules && <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div>}
-            {modules?.length === 0 && <div className="text-center text-muted-foreground py-12">No modules yet. Use "Author a module" above to add one.</div>}
+            {modulesLoading && <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div>}
+            {modulesError && !modulesLoading && (
+              <div className="text-center text-muted-foreground py-12">
+                {enrolment ? 'Could not load modules. Please refresh.' : 'Enrol in this course to view its modules.'}
+              </div>
+            )}
+            {!modulesError && modules?.length === 0 && <div className="text-center text-muted-foreground py-12">No modules yet. Use "Author a module" above to add one.</div>}
             {modules?.map((mod) => (
               <ModuleRow key={mod.id} mod={mod} />
             ))}

@@ -205,6 +205,33 @@ export async function canParticipateInCourse(user: StaffUser, courseId: string):
 }
 
 /**
+ * May this user VIEW a course in the catalogue (its overview + module list), even before enrolling?
+ * Broader than participation: a learner browsing the catalogue can see any course their tenant owns
+ * or that is assigned to their partner, plus platform courses. This gates read-only catalogue
+ * surfaces (course detail, module titles) — NOT coursework or content (beats/readings/cases stay on
+ * canParticipateInCourse). Without this, browsing an unenrolled course 403'd and the UI hung.
+ */
+export async function canViewCourseCatalog(user: StaffUser, courseId: string): Promise<boolean> {
+  if (await canParticipateInCourse(user, courseId)) return true;
+  if (hasHubAccess(String((user as ScopedUser).role))) return true;
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
+  if (!course) return false;
+  const scope = user.partnerId ?? user.organisationId ?? user.id;
+  if (course.tenantId === scope || course.tenantId === "platform") return true;
+  if (user.partnerId) {
+    try {
+      const a = await db
+        .select({ courseId: coursePartnerAssignmentsTable.courseId })
+        .from(coursePartnerAssignmentsTable)
+        .where(and(eq(coursePartnerAssignmentsTable.partnerId, user.partnerId), eq(coursePartnerAssignmentsTable.courseId, courseId)))
+        .limit(1);
+      if (a.length) return true;
+    } catch { /* assignment table absent -> no extra visibility */ }
+  }
+  return false;
+}
+
+/**
  * Grading access (decision §4.3): as course-level staff access, but a Co-facilitator is
  * further narrowed to learners in the section(s) they lead for that course.
  */
