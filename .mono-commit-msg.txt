@@ -1,5 +1,7 @@
-Perf: parallelize /gradebook/mine + linear-time /platform/financials (ASCII-only)
+Partner Hub mock->real: Overview, Partners list, LearningHub targets (ASCII-only)
 
-/gradebook/mine computed each course's summary in a SERIAL loop (reconcile + columns + scores awaited per course), multiplying latency by the learner's course count - now runs the independent per-course work in Promise.all. /platform/financials filtered the whole subs/invoices/funding arrays once PER partner (O(partners x rows)) - now pre-indexes each dataset by partner in a single pass, so it's linear in rows+partners.
+The last high-traffic Partner Hub screens still read the client mock (which now returns an empty hub, so they showed blanks). Rewired to real endpoints: PartnerOverview aggregates /organisations + /partners/:id/billing + /funding + /delegated-admins (real MRR, seats, funded seats, outstanding, per-org cards, finance/funder snapshots); the removed 'recent activity' card had no real partner-audit source. PartnerPartners (super-admin partner selector) lists the real /partners and registers their names so getPartnerHub resolves correctly. LearningHub's assign-to-partners targets come from real /partners (was the fake TalentForge/SkillBridge list).
 
-VALIDATION: esbuild clean on gradebook.ts and platform.ts.
+Still mock (render empty/safe, flagged): PartnerAudit (needs a partner-scoped audit endpoint) and the client-side PartnerImpersonateView preview (redundant with the real /platform impersonation session).
+
+VALIDATION: esbuild clean on PartnerOverview.tsx, PartnerPartners.tsx, LearningHub.tsx.

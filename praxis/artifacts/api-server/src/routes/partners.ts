@@ -1,8 +1,18 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { partnersTable, usersTable, organisationsTable } from "@workspace/db";
-import { eq, count, inArray, sql } from "drizzle-orm";
+import { partnersTable, usersTable, organisationsTable, auditEventsTable } from "@workspace/db";
+import { eq, count, inArray, sql, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
+import { isSuperAdmin, isFacilitator } from "../lib/roles";
+
+// Map an audit action onto the partner-audit category the UI colour-codes by.
+function auditCategory(action: string): "financial" | "funder" | "account" | "impersonation" | "branding" {
+  if (/^billing|invoice/i.test(action)) return "financial";
+  if (/^funding|funder/i.test(action)) return "funder";
+  if (/impersonat/i.test(action)) return "impersonation";
+  if (/brand|theme/i.test(action)) return "branding";
+  return "account";
+}
 
 const router = Router();
 
@@ -229,6 +239,44 @@ router.get("/partners/:partnerId/members", requireAuth, async (req, res) => {
       updatedAt: u.updatedAt.toISOString(),
     })),
   );
+});
+
+// GET /partners/:partnerId/audit — the real, append-only audit trail scoped to this partner (the
+// events its own staff generated). Super admin sees any partner; a facilitator sees their own.
+router.get("/partners/:partnerId/audit", requireAuth, async (req, res) => {
+  const { partnerId } = req.params;
+  const user = req.dbUser!;
+  if (!(isSuperAdmin(user.role) || (isFacilitator(user.role) && user.partnerId === partnerId))) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  const limit = Math.min(Number((req.query.limit as string) ?? 200), 500);
+  let events: (typeof auditEventsTable.$inferSelect)[] = [];
+  try {
+    events = await db.select().from(auditEventsTable)
+      .where(eq(auditEventsTable.partnerId, partnerId))
+      .orderBy(desc(auditEventsTable.createdAt))
+      .limit(limit);
+  } catch { events = []; }
+
+  // Resolve actor names in one query.
+  const actorIds = [...new Set(events.map((e) => e.actorId).filter((v): v is string => !!v))];
+  const actors = actorIds.length ? await db.select().from(usersTable).where(inArray(usersTable.id, actorIds)) : [];
+  const actorName = new Map(actors.map((a) => [a.id, [a.firstName, a.lastName].filter(Boolean).join(" ") || a.email]));
+
+  res.json(events.map((e) => {
+    let detail = e.resourceType + (e.resourceId ? ` · ${e.resourceId}` : "");
+    if (e.metadata) { try { const m = JSON.parse(e.metadata); detail = Object.entries(m).map(([k, v]) => `${k}: ${v}`).join(", ") || detail; } catch { /* keep default */ } }
+    return {
+      id: e.id,
+      at: e.createdAt instanceof Date ? e.createdAt.toISOString() : e.createdAt,
+      category: auditCategory(e.action),
+      actor: (e.actorId && actorName.get(e.actorId)) || "System",
+      actorRole: e.actorRole ?? "",
+      action: e.action,
+      detail,
+    };
+  }));
 });
 
 export default router;

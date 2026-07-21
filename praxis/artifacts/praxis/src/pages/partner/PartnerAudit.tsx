@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
 import { useSession } from '@/context/SessionContext';
+import { apiFetch } from '@/lib/api';
+import { useBrandTheme } from '@/context/ThemeProvider';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,9 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { ScrollText, ShieldCheck, Clock, Bell, Lock, Eye, Search, StopCircle } from 'lucide-react';
-import { getPartnerHub, impersonatableUsers, type AuditCategory, type ImpersonatableUser } from '@/lib/partnerHubData';
+import { getActivePartnerId } from '@/lib/partnerHubData';
 import { useImpersonation, startImpersonation, stopImpersonation } from '@/lib/impersonationStore';
-import { useOrgOverrides } from '@/lib/orgOverridesStore';
+
+type AuditCategory = 'financial' | 'funder' | 'account' | 'impersonation' | 'branding';
+type AuditRow = { id: string; at: string; category: AuditCategory; actor: string; actorRole: string; action: string; detail: string };
+type Member = { id: string; name: string; email: string; role: string; organisationId?: string | null; orgName?: string | null };
+type ImpersonatableUser = { id: string; name: string; email: string; role: string; orgId: string; orgName: string };
+const ROLE_DISPLAY: Record<string, string> = { org_admin: 'Org admin', coach: 'Coach', learner: 'Learner' };
 
 const CATS: (AuditCategory | 'all')[] = ['all', 'account', 'financial', 'funder', 'impersonation', 'branding'];
 const catStyle: Record<AuditCategory, string> = {
@@ -36,23 +44,30 @@ const roleBadge = (r: string) =>
 export function PartnerAudit() {
   const { user } = useSession();
   const [, navigate] = useLocation();
-  const h = getPartnerHub(user?.partnerId);
+  const { data: brand } = useBrandTheme();
+  const partnerId = user?.partnerId ?? getActivePartnerId() ?? '';
+  const partnerName = brand?.displayName || 'Your organisation';
   const [cat, setCat] = useState<(AuditCategory | 'all')>('all');
 
-  // Live org-config changes (e.g. renames) are recorded here too and shown newest-first.
-  const { changeLog } = useOrgOverrides();
-  const allAudit = useMemo(() => [...changeLog, ...h.audit], [changeLog, h.audit]);
+  // Real, append-only audit trail scoped to this partner.
+  const { data: allAudit = [] } = useQuery({ queryKey: ['partner-audit', partnerId], queryFn: () => apiFetch<AuditRow[]>(`/partners/${partnerId}/audit`), enabled: !!partnerId });
   const rows = useMemo(
     () => (cat === 'all' ? allAudit : allAudit.filter((e) => e.category === cat)),
     [cat, allAudit],
   );
 
-  // Impersonation via the shared store (persists into the impersonation view).
+  // Real accounts under this partner become the impersonation targets.
+  const { data: members = [] } = useQuery({ queryKey: ['partner-members', partnerId], queryFn: () => apiFetch<Member[]>(`/partners/${partnerId}/members`), enabled: !!partnerId });
+  const targets: ImpersonatableUser[] = useMemo(() =>
+    members
+      .filter((m) => m.role === 'org_admin' || m.role === 'coach' || m.role === 'learner')
+      .map((m) => ({ id: m.id, name: m.name, email: m.email, role: ROLE_DISPLAY[m.role] ?? m.role, orgId: m.organisationId ?? '', orgName: m.orgName ?? '' })),
+    [members]);
+
   const adminName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Partner Admin';
-  const targets = useMemo(() => impersonatableUsers(h), [h]);
   const [query, setQuery] = useState('');
   const { active, log } = useImpersonation();
-  const sessions = useMemo(() => [...log, ...h.impersonations], [log, h.impersonations]);
+  const sessions = log; // client-side session history (the real per-partner impersonation log is a follow-up)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -67,7 +82,7 @@ export function PartnerAudit() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Audit & Impersonation" icon={ShieldCheck} subtitle={`${h.partnerName} - one immutable log for all admin and financial actions, plus impersonation controls.`} />
+      <PageHeader title="Audit & Impersonation" icon={ShieldCheck} subtitle={`${partnerName} - one immutable log for all admin and financial actions, plus impersonation controls.`} />
 
       <Tabs defaultValue="log">
         <TabsList>
@@ -101,6 +116,7 @@ export function PartnerAudit() {
                     <td className="p-3 text-muted-foreground">{e.detail}</td>
                   </tr>
                 ))}
+                {rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No audit events yet.</td></tr>}
               </tbody>
             </table>
           </Card>
