@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { useLocation } from 'wouter';
@@ -131,16 +131,10 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const [enrollTo, setEnrollTo] = useState('');
   const enrollLink = `https://learn.${(d.org?.name ?? 'org').toLowerCase().replace(/[^a-z0-9]+/g, '')}.synops.io/join/${orgId.replace('org_', '')}`;
 
-  // ── Members: staff + learners for this org, all manageable in-place ──
-  const [members, setMembers] = useState<Member[]>(() => [
-    ...d.admins.map((a) => ({ id: a.id, name: a.name, email: a.email, role: 'org_admin' as OrgRole, status: a.status })),
-    ...d.coaches.map((a) => ({ id: a.id, name: a.name, email: a.email, role: 'coach' as OrgRole, status: a.status })),
-    ...seededLearners.map((l) => {
-      const sd = l.id.split('').reduce((x, c) => x + c.charCodeAt(0), 0);
-      const lastReset: ResetRecord | undefined = sd % 3 === 0 ? undefined : { at: new Date(Date.now() - (sd % 120 + 1) * 86400000).toISOString().slice(0, 10), channel: sd % 2 === 0 ? 'email' : 'whatsapp' };
-      return { id: l.id, name: l.name, email: l.email, role: 'learner' as OrgRole, status: 'active' as const, progress: l.progress, course: l.course, lastReset };
-    }),
-  ]);
+  // ── Members: staff + learners for this org, from the REAL partner roster (populated by an effect
+  // once the members query below resolves). Local state so in-place edits feel instant; add/role/
+  // remove also hit the real org-member endpoints so they persist. ──
+  const [members, setMembers] = useState<Member[]>([]);
   const [roleFilter, setRoleFilter] = useState<OrgRole | 'all'>('all');
   const [selected, setSelected] = useState<Member | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -159,8 +153,15 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
     setMembers((xs) => xs.map((m) => (m.id === id ? { ...m, lastReset: rec } : m)));
     setSelected((s) => (s && s.id === id ? { ...s, lastReset: rec } : s));
   };
-  const deleteMember = (id: string, name: string) => { setMembers((xs) => xs.filter((x) => x.id !== id)); setSelected(null); setConfirmDelete(false); flashMsg(`${name}'s account was deleted.`); };
+  const deleteMember = (id: string, name: string) => {
+    setMembers((xs) => xs.filter((x) => x.id !== id)); setSelected(null); setConfirmDelete(false); flashMsg(`${name}'s account was removed from this organisation.`);
+    apiFetch(`/organisations/${orgId}/members/${id}`, { method: 'DELETE' })
+      .then(() => qcHub.invalidateQueries({ queryKey: ['partner-members', partnerId] }))
+      .catch(() => flashMsg('Could not remove on the server; please refresh.'));
+  };
 
+  // Status (suspend/archive) has no org-scoped endpoint (it is a platform-console/super-admin op),
+  // so this stays an optimistic local change; role/add/remove below persist to the server.
   const setMemberStatus = (id: string, status: Member['status']) => {
     setMembers((xs) => xs.map((m) => (m.id === id ? { ...m, status } : m)));
     setSelected((s) => (s && s.id === id ? { ...s, status } : s));
@@ -168,12 +169,17 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const setMemberRole = (id: string, role: OrgRole) => {
     setMembers((xs) => xs.map((m) => (m.id === id ? { ...m, role } : m)));
     setSelected((s) => (s && s.id === id ? { ...s, role } : s));
+    apiFetch(`/organisations/${orgId}/members/${id}`, { method: 'PATCH', body: JSON.stringify({ role }) })
+      .then(() => qcHub.invalidateQueries({ queryKey: ['partner-members', partnerId] }))
+      .catch(() => flashMsg('Could not update the role on the server; please refresh.'));
   };
   const addMember = () => {
-    if (!nm.trim() || !em.trim()) return;
-    setMembers((xs) => [{ id: `m_${Date.now()}`, name: nm.trim(), email: em.trim(), role: rl, status: 'invited' }, ...xs]);
+    if (!em.trim()) return;
+    const email = em.trim(); const role = rl;
     setNm(''); setEm(''); setRl('learner'); setAddOpen(false);
-    flashMsg(`${ROLE_LABEL[rl]} invited to ${d.name}.`);
+    apiFetch(`/organisations/${orgId}/members`, { method: 'POST', body: JSON.stringify({ email, role }) })
+      .then(() => { qcHub.invalidateQueries({ queryKey: ['partner-members', partnerId] }); flashMsg(`${ROLE_LABEL[role]} invited to ${realOrg?.name ?? 'this organisation'}.`); })
+      .catch(() => flashMsg('Could not add that member. Check the email and try again.'));
   };
 
   const roleLabelOf = (r: OrgRole) => (r === 'org_admin' ? 'Org admin' : r === 'coach' ? 'Coach' : 'Learner');
@@ -202,6 +208,21 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const { data: billing } = useQuery({ queryKey: ['partner-billing', partnerId], queryFn: () => apiFetch<{ subscriptions: any[]; invoices: any[] }>(`/partners/${partnerId}/billing`), enabled: !!partnerId });
   const { data: fundingRows = [] } = useQuery({ queryKey: ['partner-funding', partnerId], queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/funding`), enabled: !!partnerId });
   const { data: docRows = [] } = useQuery({ queryKey: ['partner-documents', partnerId], queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/documents`), enabled: !!partnerId });
+
+  // Real roster for THIS org (the partner members endpoint returns every account under the partner;
+  // filter to this organisation and to the three org roles this hub manages).
+  const { data: memberRows = [] } = useQuery({
+    queryKey: ['partner-members', partnerId],
+    queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/members`),
+    enabled: !!partnerId,
+  });
+  useEffect(() => {
+    const rows = memberRows
+      .filter((m) => m.organisationId === orgId && (m.role === 'org_admin' || m.role === 'coach' || m.role === 'learner'))
+      .map((m) => ({ id: m.id, name: m.name || m.email, email: m.email, role: m.role as OrgRole, status: (m.status ?? 'active') as MemberStatus }));
+    setMembers(rows);
+    // Re-sync whenever the server roster changes.
+  }, [memberRows, orgId]);
 
   const orgSub = (billing?.subscriptions ?? []).find((s) => s.orgId === orgId) ?? null;
   const orgPlan = orgSub ? { name: orgSub.planName as string, pricePerSeat: Number(orgSub.pricePerSeat) } : null;
@@ -622,7 +643,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 <input value={nameValue} readOnly={!canManageOrg} onChange={(e) => setOrgNameDraft(e.target.value)}
                   className={cn('h-10 w-full rounded-md border border-input px-3 text-sm', canManageOrg ? 'bg-background' : 'bg-muted/40 text-muted-foreground')} /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Primary admin</span>
-                <input defaultValue={d.admins[0]?.email ?? ''} readOnly={!canManageOrg} className={cn('h-10 w-full rounded-md border border-input px-3 text-sm', canManageOrg ? 'bg-background' : 'bg-muted/40 text-muted-foreground')} /></label>
+                <input key={members.find((m) => m.role === 'org_admin')?.email ?? 'none'} defaultValue={members.find((m) => m.role === 'org_admin')?.email ?? ''} readOnly={!canManageOrg} className={cn('h-10 w-full rounded-md border border-input px-3 text-sm', canManageOrg ? 'bg-background' : 'bg-muted/40 text-muted-foreground')} /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Plan</span>
                 <input defaultValue={orgPlan?.name ?? ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Seats</span>
