@@ -1,7 +1,9 @@
-Org-hub finance on real data + render real orgs (Partner Hub convergence stage 2b) (ASCII-only)
+Org-hub People on real data (Partner Hub convergence complete) (ASCII-only)
 
-The per-org hub's Billing/Funding/Documents tabs (and the overview/settings finance stats) rendered from the client-side mock (orgDetail d.sub/d.plan/d.funders/d.openInvoices, and mock-seeded invoices/docs state), and mark-paid/upload mutated local state only. Rewired them to REAL data: resolve the org's partner via /organisations/:id, then read /partners/:pid/billing, /funding, /documents filtered to this org; mark-paid now PATCHes /partners/:pid/invoices/:id and upload POSTs /partners/:pid/documents, each invalidating its query.
+The per-org People/roster read the client-side mock (orgDetail d.admins/d.coaches + orgLearners), and add/role/suspend/delete mutated local state only. Rewired the roster to REAL data: it now reads /partners/:pid/members filtered to this org (org_admin/coach/learner). Add member POSTs /organisations/:orgId/members, role change PATCHes, remove DELETEs - each invalidating the roster query so it persists. The settings 'primary admin' field now shows the real org_admin.
 
-Also fixed a latent 404: a REAL org id isn't in the client mock, so orgDetail(h,id).org was undefined and the page showed 'Organisation not found' - which the now-real Organisations overview would hit on every click. The page now resolves org identity from /organisations/:id (orgObj) and renders. (People/members still read the mock - a separate follow-up; finance/funding/docs are now real.)
+Status (suspend/archive) stays an optimistic local change - it is a super-admin/platform-console op with no org-scoped endpoint - and the learner personal-info drawer (fabricated PII) simply doesn't render for real accounts, which is correct.
+
+With finance (prior commit) and now People real, the whole per-org hub is off the mock. Remaining mock-ish per-org rollups (courses/coaching/gradebook summary tiles) are separate follow-ups.
 
 VALIDATION: esbuild clean on PartnerOrgHub.tsx.
