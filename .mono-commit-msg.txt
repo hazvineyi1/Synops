@@ -1,9 +1,5 @@
-Production-readiness Section B: DB integrity constraints + concurrency-safe writes + N+1 fix (ASCII-only)
+Section B perf: SQL-count the platform alerts + bound roster queries (ASCII-only)
 
-DB INTEGRITY (new lib/dbHardening, run once at boot): dedupe + add unique indexes that the app-level check-then-insert couldn't guarantee under concurrency (same learner runs on web + WhatsApp) - one gradebook entry per (assignment,user), one VALID credential per (user,module) [partial index], one funded-seat per (agreement,learner). Never throws; skips absent tables.
+/platform/alerts pulled SIX whole tables (invoices, documents, partners, courses, users, enrolments) into Node and filtered with .length - full-table scans that grow linearly with platform size (users/enrolments worst). Replaced with SQL count(*) WHERE. Roster reads (/partners/:id/members, /organisations/:id/members) were unbounded - added a LIMIT 2000 bound (cursor pagination is a follow-up) so a very large partner can't return an unbounded result set.
 
-CONCURRENCY-SAFE WRITES now backed by those indexes: applyGrade is wrapped in a db.transaction (submission grade + gradebook mirror + notification are atomic - no more 'score written but entry missing' window) and mirrors via a real onConflictDoUpdate. Credential issuance uses onConflictDoNothing on the partial index (two concurrent checkpoints can't double-issue). Funded-seat assignment locks the agreement row FOR UPDATE, re-checks the cap inside the transaction, and inserts onConflictDoNothing (no more seat over-allocation / double-count).
-
-PERF: /coach/learners was 2 DB queries PER learner (unbounded N+1, whole platform for a super_admin) - batched into two grouped queries (credential counts + last session).
-
-VALIDATION: esbuild clean on dbHardening.ts, index.ts, assignments.ts, funder.ts, mastery.ts, coach.ts.
+VALIDATION: esbuild clean on platform.ts, partners.ts, organisations.ts.

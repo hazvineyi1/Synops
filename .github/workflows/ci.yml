@@ -86,6 +86,13 @@ jobs:
         working-directory: praxis
         run: pnpm install --no-frozen-lockfile
 
+      # Unit tests over the permission matrix (roles.ts) and gradebook math (gradebookEngine.ts) —
+      # the logic that gates every scoped route and feeds credentials. A regression here re-opens a
+      # security hole or corrupts a grade, so it fails CI before it can reach Railway.
+      - name: Test Praxis API (permissions + gradebook)
+        working-directory: praxis
+        run: pnpm --filter @workspace/api-server run test
+
       - name: Build Praxis (SPA + API)
         working-directory: praxis
         run: |
