@@ -6,6 +6,7 @@ import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import path from "node:path";
 import fs from "node:fs";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { registerPwa } from "./pwa";
@@ -47,6 +48,15 @@ const apiLimiter = rateLimit({
 app.use(
   pinoHttp({
     logger,
+    // One correlation id per request, shared by logs + client + uptime monitor. Honour an inbound
+    // X-Request-Id (so a caller/monitor can trace a request end to end) and always echo it back on
+    // the response, so a 500 seen by the client can be matched to the exact server log line.
+    genReqId: (req, res) => {
+      const incoming = req.headers["x-request-id"];
+      const id = (Array.isArray(incoming) ? incoming[0] : incoming)?.trim() || randomUUID();
+      res.setHeader("x-request-id", id);
+      return id;
+    },
     serializers: {
       req(req) {
         return {

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { partnersTable, usersTable, organisationsTable, auditEventsTable } from "@workspace/db";
-import { eq, count, inArray, sql, desc } from "drizzle-orm";
+import { eq, and, count, inArray, sql, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { isSuperAdmin, isFacilitator } from "../lib/roles";
 
@@ -221,9 +221,34 @@ router.get("/partners/:partnerId/members", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  // Bounded: cap the roster so a very large partner can't return an unbounded result set in one
-  // request. (Cursor pagination is a follow-up; this prevents a pathological full-table return.)
-  const rows = await db.select().from(usersTable).where(eq(usersTable.partnerId, partnerId)).limit(2000);
+  // Bounded + paginated. Callers that pass no params get the historical behaviour (up to 2000 rows,
+  // now stably ordered); the Accounts roster opts into smaller pages with ?limit/&offset and an
+  // optional ?search, and reads the true total from the X-Total-Count header so it can page/"load
+  // more" without ever silently truncating a large partner.
+  const rawLimit = Number((req.query.limit as string) ?? 2000);
+  const limit = Math.min(Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 2000), 2000);
+  const rawOffset = Number((req.query.offset as string) ?? 0);
+  const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+  const search = String((req.query.search as string) ?? "").trim();
+
+  const scope = eq(usersTable.partnerId, partnerId);
+  const where = search
+    ? and(
+        scope,
+        sql`(coalesce(${usersTable.firstName}, '') || ' ' || coalesce(${usersTable.lastName}, '') || ' ' || ${usersTable.email}) ILIKE ${"%" + search + "%"}`,
+      )
+    : scope;
+
+  const [{ value: total }] = await db.select({ value: count() }).from(usersTable).where(where);
+  res.setHeader("X-Total-Count", String(total));
+
+  const rows = await db
+    .select()
+    .from(usersTable)
+    .where(where)
+    .orderBy(desc(usersTable.updatedAt), usersTable.id)
+    .limit(limit)
+    .offset(offset);
   const orgIds = [...new Set(rows.map((r) => r.organisationId).filter((v): v is string => !!v))];
   const orgs = orgIds.length ? await db.select().from(organisationsTable).where(inArray(organisationsTable.id, orgIds)) : [];
   const orgName = new Map(orgs.map((o) => [o.id, o.name]));

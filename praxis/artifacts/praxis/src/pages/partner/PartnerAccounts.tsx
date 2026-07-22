@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiFetchMeta } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   Users, Check, X, Send, ShieldCheck, KeyRound, Ban, RotateCcw,
-  Clock, Settings2, UserPlus, CheckCircle2, Info, Eye, Archive, Trash2, Building2, Copy,
+  Clock, Settings2, UserPlus, CheckCircle2, Info, Eye, Archive, Trash2, Building2, Copy, Search,
 } from 'lucide-react';
 import { getActivePartnerId, DELEGATABLE_POWERS, type Invite } from '@/lib/partnerHubData';
 
@@ -63,13 +63,26 @@ export function PartnerAccounts() {
   const isSuper = user?.role === 'super_admin';
   const qc = useQueryClient();
 
-  // Real accounts belonging to this partner.
-  const { data: members, isLoading: membersLoading } = useQuery({
-    queryKey: ['partner-members', partnerId],
-    queryFn: () => apiFetch<Member[]>(`/partners/${partnerId}/members`),
+  // Real accounts belonging to this partner. Paged server-side: a debounced search hits the backend
+  // (so it finds people beyond the current page), and Load more raises the page size. The true total
+  // comes from the X-Total-Count header, so a large partner is never silently truncated.
+  const [search, setSearch] = useState('');
+  const [q, setQ] = useState(''); // debounced search actually sent to the server
+  const [limit, setLimit] = useState(500);
+  React.useEffect(() => {
+    const t = window.setTimeout(() => { setQ(search.trim()); setLimit(500); }, 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
+  const { data: membersMeta, isLoading: membersLoading } = useQuery({
+    queryKey: ['partner-members', partnerId, q, limit],
+    queryFn: () => apiFetchMeta<Member[]>(
+      `/partners/${partnerId}/members?limit=${limit}${q ? `&search=${encodeURIComponent(q)}` : ''}`,
+    ),
     enabled: !!partnerId,
   });
-  const accounts: Member[] = members ?? [];
+  const accounts: Member[] = membersMeta?.data ?? [];
+  const totalAccounts: number | null = membersMeta?.total ?? null;
+  const hasMore = totalAccounts != null && accounts.length < totalAccounts && limit < 2000;
 
   // Real organisations for the invite / delegate dropdowns.
   const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
@@ -226,14 +239,23 @@ export function PartnerAccounts() {
 
         {/* Accounts */}
         <TabsContent value="accounts" className="mt-4">
-          {removedAccounts.length > 0 && (
-            <div className="mb-3 flex items-center justify-end">
-              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name or email…"
+                className="w-full rounded-md border border-border bg-background pl-8 pr-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            {removedAccounts.length > 0 && (
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
                 <input type="checkbox" checked={showRemoved} onChange={(e) => setShowRemoved(e.target.checked)} />
                 Show archived &amp; removed ({removedAccounts.length})
               </label>
-            </div>
-          )}
+            )}
+          </div>
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
@@ -259,6 +281,14 @@ export function PartnerAccounts() {
               </tbody>
             </table>
           </Card>
+          {totalAccounts != null && accounts.length > 0 && (
+            <div className="mt-3 flex items-center justify-center gap-3 text-xs text-muted-foreground">
+              <span>Showing {accounts.length} of {totalAccounts}{q ? ' matching' : ''}</span>
+              {hasMore && (
+                <Button size="sm" variant="outline" className="h-7" onClick={() => setLimit((l) => Math.min(l + 500, 2000))}>Load more</Button>
+              )}
+            </div>
+          )}
           {invites.length > 0 && (
             <div className="mt-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Pending invites</div>
