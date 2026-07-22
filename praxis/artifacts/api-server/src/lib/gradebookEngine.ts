@@ -49,6 +49,7 @@ export interface GradebookColumn {
   title: string;
   category: string;
   itemType: "formative" | "summative";
+  gradeType: "points" | "pass_fail" | "completion"; // how the score is displayed
   pointsPossible: number;
   dueDate: string | null;
   includeInGrade: boolean;
@@ -60,6 +61,7 @@ export interface CellValue {
   fraction: number | null; // 0..1 of the column, or null if no score yet
   earned: number | null; // fraction * pointsPossible
   note: string | null;
+  auto?: boolean; // fraction was auto-filled from course completion (no explicit grade)
 }
 
 export interface LearnerComputed {
@@ -184,6 +186,7 @@ export async function getCourseColumns(courseId: string): Promise<GradebookColum
       title: ov?.title || a.title,
       category: ov?.category || "Assignments",
       itemType: (ov?.itemType as "formative" | "summative") ?? "summative",
+      gradeType: ((ov as { gradeType?: string } | undefined)?.gradeType as "points" | "pass_fail" | "completion") ?? "points",
       pointsPossible: Number(a.pointsPossible), // native assignment weight is authoritative
       dueDate: (ov?.dueDate ?? a.dueDate)?.toISOString?.() ?? null,
       includeInGrade: ov?.includeInGrade ?? true,
@@ -202,6 +205,10 @@ export async function getCourseColumns(courseId: string): Promise<GradebookColum
       title: it.title,
       category: it.category,
       itemType: it.itemType as "formative" | "summative",
+      // completion columns always render as a %; others use their configured grade type.
+      gradeType: it.sourceType === "completion"
+        ? "completion"
+        : (((it as { gradeType?: string }).gradeType as "points" | "pass_fail" | "completion") ?? "points"),
       pointsPossible: Number(it.pointsPossible),
       dueDate: it.dueDate?.toISOString() ?? null,
       includeInGrade: it.includeInGrade,
@@ -416,12 +423,31 @@ export function computeLearner(
   let possible = 0;
   const summativeSeries: number[] = [];
 
+  // The learner's course-completion fraction (average of the completion columns). Used to
+  // auto-score any GRADED (summative) item that has no explicit grade yet, so a finished course
+  // never shows a graded row as a blank dash. (Config decision: auto-score from completion %.)
+  let compSum = 0;
+  let compN = 0;
   for (const col of columns) {
-    const frac = userFractions?.get(col.key) ?? null;
+    if (col.sourceType !== "completion") continue;
+    const f = userFractions?.get(col.key);
+    if (f !== null && f !== undefined) { compSum += f; compN++; }
+  }
+  const completionFrac = compN > 0 ? compSum / compN : null;
+
+  for (const col of columns) {
+    let frac = userFractions?.get(col.key) ?? null;
+    let auto = false;
+    // Fill an ungraded summative item from completion, so every graded deliverable shows a score.
+    if (frac === null && col.itemType === "summative" && completionFrac !== null) {
+      frac = completionFrac;
+      auto = true;
+    }
     cells[col.key] = {
       fraction: frac,
       earned: frac === null ? null : frac * col.pointsPossible,
       note: userNotes?.get(col.key) ?? null,
+      ...(auto ? { auto: true } : {}),
     };
     const counts = col.includeInGrade && (col.itemType === "summative" || includeFormative);
     if (counts && frac !== null) {

@@ -13,6 +13,7 @@ export interface GradebookColumn {
   title: string;
   category: string;
   itemType: ItemType;
+  gradeType?: "points" | "pass_fail" | "completion";
   pointsPossible: number;
   dueDate: string | null;
   includeInGrade: boolean;
@@ -24,6 +25,7 @@ export interface CellValue {
   fraction: number | null;
   earned: number | null;
   note: string | null;
+  auto?: boolean;
 }
 
 export interface Trend {
@@ -162,6 +164,10 @@ export const gradebookApi = {
 
   scan: (courseId: string) =>
     apiFetch<{ evaluated: number; offTrack: number; alerted: number }>(`/courses/${courseId}/gradebook/scan`, { method: "POST" }),
+
+  // Register every course deliverable (activities, cases, workshops, completion) as a gradebook column.
+  sync: (courseId: string) =>
+    apiFetch<{ ok: boolean; created: { activities: number; cases: number; workshops: number; completion: number } }>(`/courses/${courseId}/gradebook/sync`, { method: "POST" }),
 
   testEmail: () =>
     apiFetch<{ configured: boolean; sent: boolean; to?: string; message?: string }>(`/gradebook/test-email`, { method: "POST" }),

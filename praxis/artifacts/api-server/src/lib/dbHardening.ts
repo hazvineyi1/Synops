@@ -22,6 +22,10 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS archived_at timestamptz`,
       sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`,
     ]],
+    // Per-item grade type (points | pass_fail | completion) for the configurable gradebook.
+    ["gradebook_items", [
+      sql`ALTER TABLE gradebook_items ADD COLUMN IF NOT EXISTS grade_type text NOT NULL DEFAULT 'points'`,
+    ]],
     ["gradebook_entries", [
       sql`DELETE FROM gradebook_entries a USING gradebook_entries b
           WHERE a.assignment_id = b.assignment_id AND a.user_id = b.user_id AND a.ctid < b.ctid`,

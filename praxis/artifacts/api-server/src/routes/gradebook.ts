@@ -17,6 +17,7 @@ import {
   caseRubricsTable,
   deliverySessionsTable,
   attendanceRecordsTable,
+  modulesTable,
 } from "@workspace/db";
 import { eq, and, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -492,6 +493,45 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
     plan: plan ? { id: plan.id, rationale: plan.rationale, items: plan.items, createdAt: plan.createdAt, coachUrl: plan.coachUrl ?? null } : null,
     settings,
   });
+});
+
+// POST /courses/:courseId/gradebook/sync — register EVERY deliverable in the course as a gradebook
+// column, so the gradebook stays in sync with all course activities. Idempotent (onConflictDoNothing):
+// activities, cases, workshops and per-module completion each become a gradebook_items row.
+// Assignments already appear as default columns, so they are not duplicated here. Staff-only.
+router.post("/courses/:courseId/gradebook/sync", requireAuth, async (req, res) => {
+  const { courseId } = req.params;
+  if (!(await requireStaffOnCourse(req, res, courseId))) return;
+  const createdBy = (req.dbUser as U).id;
+  const created = { activities: 0, cases: 0, workshops: 0, completion: 0 };
+  try {
+    const modules = await db.select({ id: modulesTable.id, title: modulesTable.title }).from(modulesTable).where(eq(modulesTable.courseId, courseId));
+    const moduleIds = modules.map((m) => m.id);
+    const posByModule = new Map(modules.map((m, i) => [m.id, i]));
+    const titleByModule = new Map(modules.map((m) => [m.id, m.title]));
+    const [acts, cases, sessions] = await Promise.all([
+      db.select({ id: interactiveActivitiesTable.id, moduleId: interactiveActivitiesTable.moduleId, title: interactiveActivitiesTable.title }).from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.courseId, courseId)),
+      moduleIds.length ? db.select({ id: caseScenariosTable.id, moduleId: caseScenariosTable.moduleId, title: caseScenariosTable.title }).from(caseScenariosTable).where(inArray(caseScenariosTable.moduleId, moduleIds)) : Promise.resolve([]),
+      db.select({ id: deliverySessionsTable.id, moduleId: deliverySessionsTable.moduleId, title: deliverySessionsTable.title, sessionType: deliverySessionsTable.sessionType }).from(deliverySessionsTable).where(eq(deliverySessionsTable.courseId, courseId)),
+    ]);
+    const pos = (mId: string | null) => (mId ? posByModule.get(mId) ?? 0 : 0);
+    const mtitle = (mId: string | null) => (mId ? titleByModule.get(mId) ?? "Module" : "Module");
+    const ins = async (rows: any[]) => { if (rows.length) await db.insert(gradebookItemsTable).values(rows).onConflictDoNothing(); };
+
+    await ins(acts.map((a) => ({ courseId, sourceType: "activity", sourceId: a.id, title: a.title || `Activity: ${mtitle(a.moduleId)}`, category: "Activities", itemType: "formative", gradeType: "pass_fail", pointsPossible: "100", includeInGrade: false, position: pos(a.moduleId), createdBy })));
+    created.activities = acts.length;
+    await ins((cases as { id: string; moduleId: string | null; title: string }[]).map((c) => ({ courseId, sourceType: "case", sourceId: c.id, title: c.title || `Case study: ${mtitle(c.moduleId)}`, category: "Case studies", itemType: "formative", gradeType: "points", pointsPossible: "100", includeInGrade: true, position: pos(c.moduleId), createdBy })));
+    created.cases = (cases as unknown[]).length;
+    const workshops = sessions.filter((s) => (s.sessionType ?? "workshop") === "workshop");
+    await ins(workshops.map((s) => ({ courseId, sourceType: "attendance", sourceId: s.id, title: s.title || `Workshop: ${mtitle(s.moduleId)}`, category: "Workshops", itemType: "formative", gradeType: "pass_fail", pointsPossible: "100", includeInGrade: false, position: pos(s.moduleId), createdBy })));
+    created.workshops = workshops.length;
+    await ins(modules.map((m, i) => ({ courseId, sourceType: "completion", sourceId: m.id, title: `Completion: ${m.title}`, category: "Completion", itemType: "formative", gradeType: "completion", pointsPossible: "100", includeInGrade: false, position: i, createdBy })));
+    created.completion = modules.length;
+
+    res.json({ ok: true, created });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Sync failed" });
+  }
 });
 
 // GET /courses/:courseId/gradebook/learner/:userId — staff drill-in on one learner.

@@ -56,6 +56,14 @@ export function CourseGradebook() {
     mutationFn: () => gradebookApi.scan(courseId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["gradebook", courseId] }),
   });
+  const syncItems = useMutation({
+    mutationFn: () => gradebookApi.sync(courseId),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["gradebook", courseId] });
+      const c = r.created;
+      window.alert(`Gradebook synced with course activities:\n${c.activities} activities · ${c.cases} case studies · ${c.workshops} workshops · ${c.completion} completion.`);
+    },
+  });
   const writeCell = useMutation({
     mutationFn: (b: Parameters<typeof gradebookApi.writeCell>[1]) => gradebookApi.writeCell(courseId, b),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["gradebook", courseId] }),
@@ -190,6 +198,9 @@ export function CourseGradebook() {
           {data?.settings?.weightingEnabled ? "Weighted grading on" : "Count practice (formative) work"}
         </label>
         <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => syncItems.mutate()} disabled={syncItems.isPending} title="Register every activity, case, workshop and completion as a gradebook column">
+            <RefreshCw className={cn("h-4 w-4", syncItems.isPending && "animate-spin")} /> Sync activities
+          </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={addManualItem}>
             <Plus className="h-4 w-4" /> Manual item
           </Button>

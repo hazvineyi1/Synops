@@ -44,6 +44,11 @@ export const gradebookItemsTable = pgTable(
     category: text("category").notNull().default("General"),
     /** Formative practice (excluded from the grade by default) vs summative (counts). */
     itemType: text("item_type", { enum: ["formative", "summative"] }).notNull().default("summative"),
+    /**
+     * How the score is expressed. "points" = X/Y, "pass_fail" = Pass/Fail at a threshold,
+     * "completion" = shown as a %. TS-only enum on a text column so values need no migration.
+     */
+    gradeType: text("grade_type", { enum: ["points", "pass_fail", "completion"] }).notNull().default("points"),
     pointsPossible: numeric("points_possible", { precision: 7, scale: 2 }).notNull().default("100"),
     dueDate: timestamp("due_date"),
     /** If false the column is shown for reference but never counts toward mastery. */

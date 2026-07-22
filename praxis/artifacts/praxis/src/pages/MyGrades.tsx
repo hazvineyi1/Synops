@@ -153,6 +153,16 @@ export function MyGrades() {
                     {g.cols.map((c) => {
                       const cell = me.data!.cells[c.key];
                       const f = cell?.fraction ?? null;
+                      const gt = ((c as { gradeType?: string }).gradeType) ?? "points";
+                      const auto = !!(cell as { auto?: boolean } | undefined)?.auto;
+                      let label = "—";
+                      let tone: "muted" | "green" | "amber" | "red" = "muted";
+                      if (f != null) {
+                        if (gt === "pass_fail") { const pass = f >= 0.5; label = pass ? "Pass" : "Fail"; tone = pass ? "green" : "red"; }
+                        else if (gt === "completion") { label = `${Math.round(f * 100)}%`; tone = f >= 0.9 ? "green" : f >= 0.5 ? "amber" : "red"; }
+                        else { label = `${Math.round(f * c.pointsPossible)}/${c.pointsPossible}`; tone = f >= 0.9 ? "green" : f >= 0.7 ? "amber" : "red"; }
+                      }
+                      const toneCls = tone === "green" ? "bg-green-50 text-green-700" : tone === "amber" ? "bg-amber-50 text-amber-700" : tone === "red" ? "bg-red-50 text-red-700" : "bg-muted text-muted-foreground";
                       return (
                         <div key={c.key} className="flex items-center justify-between gap-3 text-sm">
                           <span className="flex items-center gap-2 text-foreground">
@@ -163,8 +173,9 @@ export function MyGrades() {
                           </span>
                           <span className="flex items-center gap-3">
                             {cell?.note && <span className="max-w-[220px] truncate text-xs italic text-muted-foreground" title={cell.note}>“{cell.note}”</span>}
-                            <span className={cn("rounded px-2 py-0.5 font-mono text-xs", f == null ? "bg-muted text-muted-foreground" : f >= 0.9 ? "bg-green-50 text-green-700" : f >= 0.7 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700")}>
-                              {f == null ? "—" : `${Math.round(f * c.pointsPossible)}/${c.pointsPossible}`}
+                            {auto && <span className="rounded bg-sky-50 px-1 py-px text-[10px] text-sky-700 dark:bg-sky-950/40 dark:text-sky-300" title="Auto-scored from your course completion until a mark is entered">auto</span>}
+                            <span className={cn("rounded px-2 py-0.5 font-mono text-xs", toneCls)}>
+                              {label}
                             </span>
                           </span>
                         </div>
