@@ -15,7 +15,13 @@ export default defineConfig({
   // on every platform. Globbing all files (not the barrel index.ts) also avoids
   // drizzle-kit's unreliable following of `export *` re-exports.
   schema: "./src/schema/*.ts",
+  // Versioned migrations live here (checked into git). `drizzle-kit generate` writes a numbered
+  // .sql file + journal; `drizzle-kit migrate` applies pending ones. This replaces the ad-hoc
+  // `push` + boot-time heals with a reviewable, rollback-able history. See MIGRATION-ADOPTION runbook.
+  out: "./migrations",
   dialect: "postgresql",
+  strict: true,
+  verbose: true,
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
