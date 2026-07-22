@@ -8,6 +8,7 @@ import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isSuperAdmin } from "../lib/roles";
 import { logAudit } from "../lib/audit";
+import { orgCourseIds, aggregateOrgCourses } from "../lib/orgCourseAgg";
 
 /**
  * Organisation classes (cohorts) — real, persistent. Access: super admin, the org's partner_admin,
@@ -97,30 +98,10 @@ router.get("/organisations/:orgId/courses", requireAuth, async (req, res) => {
     const enrolRows = memberIds.length
       ? await db.select({ courseId: enrolmentsTable.courseId, status: enrolmentsTable.status, completedAt: enrolmentsTable.completedAt }).from(enrolmentsTable).where(inArray(enrolmentsTable.userId, memberIds))
       : [];
-    const courseIds = [...new Set<string>([...classCourseRows.map((r) => r.courseId), ...enrolRows.map((r) => r.courseId)])];
+    const courseIds = orgCourseIds(classCourseRows, enrolRows);
     if (!courseIds.length) { res.json([]); return; }
     const courseRows = await db.select({ id: coursesTable.id, title: coursesTable.title, status: coursesTable.status }).from(coursesTable).where(inArray(coursesTable.id, courseIds));
-    const byCourse: Record<string, { enrolled: number; completed: number }> = {};
-    for (const e of enrolRows) {
-      const b = (byCourse[e.courseId] ??= { enrolled: 0, completed: 0 });
-      b.enrolled++;
-      if (e.status === "completed" || e.completedAt) b.completed++;
-    }
-    res.json(
-      courseRows
-        .map((c) => {
-          const b = byCourse[c.id] ?? { enrolled: 0, completed: 0 };
-          return {
-            id: c.id,
-            title: c.title,
-            modality: "",
-            enrolled: b.enrolled,
-            avgProgress: b.enrolled ? Math.round((b.completed / b.enrolled) * 100) : 0,
-            status: c.status === "published" ? "active" : "draft",
-          };
-        })
-        .sort((a, b) => a.title.localeCompare(b.title)),
-    );
+    res.json(aggregateOrgCourses(courseRows, enrolRows));
   } catch {
     res.json([]);
   }
