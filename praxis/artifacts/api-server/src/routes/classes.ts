@@ -46,13 +46,15 @@ router.get("/organisations/:orgId/classes", requireAuth, async (req, res) => {
     const [learners, courses, staff] = ids.length
       ? await Promise.all([
           db.select({ classId: orgClassLearnersTable.classId }).from(orgClassLearnersTable).where(inArray(orgClassLearnersTable.classId, ids)),
-          db.select({ classId: orgClassCoursesTable.classId }).from(orgClassCoursesTable).where(inArray(orgClassCoursesTable.classId, ids)),
+          db.select({ classId: orgClassCoursesTable.classId, courseId: orgClassCoursesTable.courseId }).from(orgClassCoursesTable).where(inArray(orgClassCoursesTable.classId, ids)),
           db.select({ classId: orgClassStaffTable.classId }).from(orgClassStaffTable).where(inArray(orgClassStaffTable.classId, ids)),
         ])
       : [[], [], []];
     const countBy = (rows: { classId: string }[]) => rows.reduce<Record<string, number>>((m, r) => { m[r.classId] = (m[r.classId] ?? 0) + 1; return m; }, {});
+    // Course IDs per class, so the org courses table can show which classes a course sits in.
+    const courseIdsBy = (courses as { classId: string; courseId: string }[]).reduce<Record<string, string[]>>((m, r) => { (m[r.classId] ??= []).push(r.courseId); return m; }, {});
     const lc = countBy(learners), cc = countBy(courses), sc = countBy(staff);
-    res.json(classes.map((c) => ({ id: c.id, name: c.name, createdAt: c.createdAt.toISOString(), learnerCount: lc[c.id] ?? 0, courseCount: cc[c.id] ?? 0, staffCount: sc[c.id] ?? 0 })));
+    res.json(classes.map((c) => ({ id: c.id, name: c.name, createdAt: c.createdAt.toISOString(), learnerCount: lc[c.id] ?? 0, courseCount: cc[c.id] ?? 0, courseIds: courseIdsBy[c.id] ?? [], staffCount: sc[c.id] ?? 0 })));
   } catch {
     res.json([]);
   }

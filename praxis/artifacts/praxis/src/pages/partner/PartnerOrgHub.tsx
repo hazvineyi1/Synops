@@ -30,7 +30,7 @@ import {
 import { useLearningHub } from '@/lib/learningHubStore';
 import { PartnerClassDetail } from './PartnerClassDetail';
 
-interface ClassRow { id: string; name: string; learnerCount: number; courseCount: number; staffCount: number; createdAt: string }
+interface ClassRow { id: string; name: string; learnerCount: number; courseCount: number; courseIds?: string[]; staffCount: number; createdAt: string }
 
 const SECTION_META: Record<string, { title: string; icon: React.ComponentType<{ className?: string }> }> = {
   overview: { title: 'Overview', icon: Building },
@@ -454,7 +454,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
               </thead>
               <tbody className="divide-y divide-border">
                 {courses.map((c) => {
-                  const inClasses = classes.filter((cl) => ((cl as { courseIds?: string[] }).courseIds ?? []).includes(c.id));
+                  const inClasses = classes.filter((cl) => (cl.courseIds ?? []).includes(c.id));
                   return (
                     <tr key={c.id}>
                       <td className="p-3 font-medium">{c.title}</td>
