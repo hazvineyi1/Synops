@@ -98,20 +98,64 @@ export const DEFAULT_SETTINGS: GradebookSettings = {
   weightingEnabled: false, summativeWeight: 100, formativeWeight: 0, categoryWeights: {}, lettersEnabled: false, letterBands: DEFAULT_BANDS,
 };
 
+// ── Tiny in-memory TTL cache for STRUCTURE only (column set + settings) ──────────
+// The gradebook reads everything live on every request, which keeps GRADES from ever drifting but
+// re-runs the same structural queries (which columns exist, weighting/letter bands) on every matrix
+// load and every grade write's alert recompute. Those change only when staff edit the gradebook,
+// not when a score is entered — so we cache them for a few seconds and invalidate on the write paths.
+// Scores/cells are NEVER cached: computeLearner + getScoreData still read fresh, so a grade change is
+// always reflected immediately. Per-instance (single Railway instance today); short TTL bounds any
+// cross-instance staleness if it ever scales horizontally.
+const COLUMNS_TTL_MS = 15_000;
+const SETTINGS_TTL_MS = 30_000;
+const CACHE_MAX = 1000; // hard cap so a burst of course ids can't grow memory unbounded
+type CacheEntry<T> = { value: T; expires: number };
+const columnsCache = new Map<string, CacheEntry<GradebookColumn[]>>();
+const settingsCache = new Map<string, CacheEntry<GradebookSettings>>();
+
+function cacheGet<T>(store: Map<string, CacheEntry<T>>, key: string): T | undefined {
+  const e = store.get(key);
+  if (!e) return undefined;
+  if (Date.now() > e.expires) { store.delete(key); return undefined; }
+  return e.value;
+}
+function cacheSet<T>(store: Map<string, CacheEntry<T>>, key: string, value: T, ttlMs: number): void {
+  if (store.size >= CACHE_MAX) { const first = store.keys().next().value; if (first !== undefined) store.delete(first); }
+  store.set(key, { value, expires: Date.now() + ttlMs });
+}
+
+/**
+ * Drop the cached STRUCTURE for a course after a column / settings / override write, so staff see
+ * their change on the next read instead of waiting out the TTL. Cheap (scores were never cached).
+ * Clears the course's settings entry and every org variant of its column set.
+ */
+export function invalidateGradebookCaches(courseId: string): void {
+  settingsCache.delete(courseId);
+  for (const key of columnsCache.keys()) {
+    if (key.startsWith(`${courseId}::`)) columnsCache.delete(key);
+  }
+}
+
 export async function getGradebookSettings(courseId: string): Promise<GradebookSettings> {
+  const cached = cacheGet(settingsCache, courseId);
+  if (cached) return cached;
   try {
     const row = await db.query.gradebookSettingsTable.findFirst({ where: eq(gradebookSettingsTable.courseId, courseId) });
-    if (!row) return DEFAULT_SETTINGS;
-    return {
-      weightingEnabled: row.weightingEnabled,
-      summativeWeight: row.summativeWeight,
-      formativeWeight: row.formativeWeight,
-      categoryWeights: (row.categoryWeights as Record<string, number>) ?? {},
-      lettersEnabled: row.lettersEnabled,
-      letterBands: row.letterBands?.length ? row.letterBands : DEFAULT_BANDS,
-    };
+    const result: GradebookSettings = row
+      ? {
+          weightingEnabled: row.weightingEnabled,
+          summativeWeight: row.summativeWeight,
+          formativeWeight: row.formativeWeight,
+          categoryWeights: (row.categoryWeights as Record<string, number>) ?? {},
+          lettersEnabled: row.lettersEnabled,
+          letterBands: row.letterBands?.length ? row.letterBands : DEFAULT_BANDS,
+        }
+      : DEFAULT_SETTINGS;
+    cacheSet(settingsCache, courseId, result, SETTINGS_TTL_MS);
+    return result;
   } catch {
-    // Table not migrated yet — fall back to defaults so the gradebook keeps working.
+    // Table not migrated yet — fall back to defaults so the gradebook keeps working. Don't cache the
+    // error fallback, so settings appear the moment the table exists.
     return DEFAULT_SETTINGS;
   }
 }
@@ -178,8 +222,15 @@ async function applyOrgOverrides(columns: GradebookColumn[], courseId: string, o
   }
 }
 
-/** Build the ordered set of gradebook columns for a course, optionally with an org's overrides. */
+/**
+ * Build the ordered set of gradebook columns for a course, optionally with an org's overrides.
+ * Cached (short TTL) keyed by course + org: the returned array is shared and MUST be treated as
+ * read-only by callers (all current callers only read it). Invalidated on any column/config write.
+ */
 export async function getCourseColumns(courseId: string, orgId?: string | null): Promise<GradebookColumn[]> {
+  const cacheKey = `${courseId}::${orgId ?? ""}`;
+  const cached = cacheGet(columnsCache, cacheKey);
+  if (cached) return cached;
   const [items, assignments] = await Promise.all([
     db.select().from(gradebookItemsTable).where(eq(gradebookItemsTable.courseId, courseId)),
     db
@@ -245,6 +296,7 @@ export async function getCourseColumns(courseId: string, orgId?: string | null):
       a.category.localeCompare(b.category) || a.position - b.position || a.title.localeCompare(b.title),
   );
   if (orgId) await applyOrgOverrides(columns, courseId, orgId);
+  cacheSet(columnsCache, cacheKey, columns, COLUMNS_TTL_MS);
   return columns;
 }
 

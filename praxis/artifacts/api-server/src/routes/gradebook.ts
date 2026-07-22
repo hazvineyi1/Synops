@@ -29,6 +29,7 @@ import {
   getScoreData,
   computeLearner,
   getGradebookSettings,
+  invalidateGradebookCaches,
   DEFAULT_BANDS,
   REASON_LABEL,
 } from "../lib/gradebookEngine";
@@ -200,6 +201,7 @@ router.put("/courses/:courseId/gradebook/settings", requireAuth, async (req, res
   const existing = await db.query.gradebookSettingsTable.findFirst({ where: eq(gradebookSettingsTable.courseId, courseId) });
   if (existing) await db.update(gradebookSettingsTable).set(values).where(eq(gradebookSettingsTable.id, existing.id));
   else await db.insert(gradebookSettingsTable).values(values);
+  invalidateGradebookCaches(courseId);
   res.json(await getGradebookSettings(courseId));
 });
 
@@ -532,6 +534,7 @@ router.post("/courses/:courseId/gradebook/sync", requireAuth, async (req, res) =
     await ins(modules.map((m, i) => ({ courseId, sourceType: "completion", sourceId: m.id, title: `Completion: ${m.title}`, category: "Completion", itemType: "formative", gradeType: "completion", pointsPossible: "100", includeInGrade: false, position: i, createdBy })));
     created.completion = modules.length;
 
+    invalidateGradebookCaches(courseId);
     res.json({ ok: true, created });
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : "Sync failed" });
@@ -742,6 +745,7 @@ router.post("/courses/:courseId/gradebook-items", requireAuth, async (req, res) 
         createdBy: req.userId!,
       } as any)
       .returning();
+    invalidateGradebookCaches(courseId);
     res.status(201).json(row);
   } catch (e: any) {
     // Unique (course, source) — already included.
@@ -769,6 +773,7 @@ router.patch("/gradebook-items/:id", requireAuth, async (req, res) => {
   if (b.position != null) patch.position = Number(b.position);
   if (b.dueDate !== undefined) patch.dueDate = b.dueDate ? new Date(b.dueDate) : null;
   const [row] = await db.update(gradebookItemsTable).set(patch).where(eq(gradebookItemsTable.id, item.id)).returning();
+  invalidateGradebookCaches(item.courseId);
   res.json(row);
 });
 
@@ -799,9 +804,11 @@ router.put("/courses/:courseId/gradebook/config", requireAuth, async (req, res) 
     });
     if (found) {
       const [row] = await db.update(gradebookOrgOverridesTable).set(ov).where(eq(gradebookOrgOverridesTable.id, found.id)).returning();
+      invalidateGradebookCaches(courseId);
       res.json(row); return;
     }
     const [row] = await db.insert(gradebookOrgOverridesTable).values({ courseId, orgId, sourceType, sourceId, ...ov } as any).returning();
+    invalidateGradebookCaches(courseId);
     res.json(row); return;
   }
 
@@ -818,6 +825,7 @@ router.put("/courses/:courseId/gradebook/config", requireAuth, async (req, res) 
 
   if (existing) {
     const [row] = await db.update(gradebookItemsTable).set(patch).where(eq(gradebookItemsTable.id, existing.id)).returning();
+    invalidateGradebookCaches(courseId);
     res.json(row); return;
   }
   // No row yet (e.g. a default assignment column): create an override carrying the config.
@@ -838,6 +846,7 @@ router.put("/courses/:courseId/gradebook/config", requireAuth, async (req, res) 
       includeInGrade: b.includeInGrade === false ? false : true,
       createdBy: req.userId!,
     } as any).returning();
+    invalidateGradebookCaches(courseId);
     res.json(row);
   } catch {
     res.status(500).json({ error: "Could not save configuration." });
@@ -851,6 +860,7 @@ router.delete("/gradebook-items/:id", requireAuth, async (req, res) => {
   if (!(await requireStaffOnCourse(req, res, item.courseId))) return;
   await db.delete(gradebookCellsTable).where(eq(gradebookCellsTable.itemId, item.id));
   await db.delete(gradebookItemsTable).where(eq(gradebookItemsTable.id, item.id));
+  invalidateGradebookCaches(item.courseId);
   res.json({ ok: true });
 });
 
@@ -934,6 +944,7 @@ router.patch("/courses/:courseId/gradebook/cell", requireAuth, async (req, res) 
           pointsPossible: String(Number(a?.pointsPossible ?? 100)), createdBy: req.userId!,
         }).returning();
         itemId = created?.id;
+        invalidateGradebookCaches(courseId); // a new column appeared
       }
     }
   }
