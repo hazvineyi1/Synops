@@ -66,6 +66,12 @@ export const usersTable = pgTable("users", {
   // WhatsApp two-way channel
   phone: text("phone"),
   whatsappOptIn: boolean("whatsapp_opt_in").notNull().default(false),
+  // Opt-in TOTP two-factor auth. mfaSecret holds the base32 secret from enrolment (present while
+  // pending); mfaEnabled flips true only after the first code is confirmed. mfaBackupCodes stores
+  // sha256 hashes of unused one-time recovery codes (never the codes themselves).
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  mfaSecret: text("mfa_secret"),
+  mfaBackupCodes: text("mfa_backup_codes").array().notNull().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

@@ -22,6 +22,7 @@ import {
   clientIp,
   SESSION_COOKIE,
 } from "../lib/auth";
+import { generateSecret, verifyTotp, otpauthUrl, generateBackupCodes, normalizeBackupCode } from "../lib/totp";
 
 const router = Router();
 
@@ -92,6 +93,33 @@ router.post("/auth/login", async (req, res) => {
     return;
   }
 
+  // Opt-in second factor. DORMANT for everyone who hasn't enrolled: mfaEnabled defaults false, so
+  // this whole block is skipped and login behaves exactly as before. Only an enrolled user is asked
+  // for a code — the client re-POSTs email+password+code on the same endpoint.
+  if (user.mfaEnabled) {
+    const code = String(req.body?.code ?? req.body?.mfaCode ?? "").trim();
+    if (!code) {
+      // Password was correct; we just need the second factor. No session issued yet.
+      res.status(200).json({ mfaRequired: true });
+      return;
+    }
+    const okTotp = user.mfaSecret ? verifyTotp(user.mfaSecret, code) : false;
+    let okBackup = false;
+    if (!okTotp) {
+      const hash = sha256(normalizeBackupCode(code));
+      const remaining = user.mfaBackupCodes ?? [];
+      if (remaining.includes(hash)) {
+        okBackup = true; // one-time: consume it
+        await db.update(usersTable).set({ mfaBackupCodes: remaining.filter((c) => c !== hash) }).where(eq(usersTable.id, user.id));
+      }
+    }
+    if (!okTotp && !okBackup) {
+      await logAttempt("bad_password");
+      res.status(401).json({ error: "Invalid authentication code.", mfaRequired: true });
+      return;
+    }
+  }
+
   const token = newSessionToken();
   await db.insert(authSessionsTable).values({
     token,
@@ -110,6 +138,58 @@ router.post("/auth/login", async (req, res) => {
 
   res.cookie(SESSION_COOKIE, token, cookieOptions());
   res.json({ user: publicUser(user) });
+});
+
+// ── Opt-in TOTP two-factor auth ─────────────────────────────────────────────────
+// Enrolment is done while signed in. A user turns 2FA on for their own account; nothing here can
+// enable or read another user's secret. Existing accounts are unaffected until they opt in.
+
+/** GET /auth/mfa/status — is 2FA on for me, and how many backup codes are left. */
+router.get("/auth/mfa/status", requireAuth, (req, res) => {
+  const u = req.dbUser!;
+  res.json({ enabled: !!u.mfaEnabled, backupCodesRemaining: (u.mfaBackupCodes ?? []).length });
+});
+
+/** POST /auth/mfa/setup — issue a fresh secret + otpauth URI. NOT active until /enable confirms it. */
+router.post("/auth/mfa/setup", requireAuth, async (req, res) => {
+  const u = req.dbUser!;
+  if (u.mfaEnabled) { res.status(409).json({ error: "Two-factor is already on. Turn it off first to re-enrol." }); return; }
+  const secret = generateSecret();
+  await db.update(usersTable).set({ mfaSecret: secret }).where(eq(usersTable.id, u.id));
+  res.json({ secret, otpauthUrl: otpauthUrl(secret, u.email) });
+});
+
+/** POST /auth/mfa/enable { code } — confirm a live code, activate 2FA, return one-time backup codes. */
+router.post("/auth/mfa/enable", requireAuth, async (req, res) => {
+  const u = req.dbUser!;
+  if (u.mfaEnabled) { res.status(409).json({ error: "Two-factor is already on." }); return; }
+  if (!u.mfaSecret) { res.status(400).json({ error: "Start setup first." }); return; }
+  const code = String(req.body?.code ?? "").trim();
+  if (!verifyTotp(u.mfaSecret, code)) {
+    res.status(400).json({ error: "That code didn't match. Check your authenticator app and try again." });
+    return;
+  }
+  const backupCodes = generateBackupCodes(10);
+  const hashes = backupCodes.map((c) => sha256(normalizeBackupCode(c)));
+  await db.update(usersTable).set({ mfaEnabled: true, mfaBackupCodes: hashes }).where(eq(usersTable.id, u.id));
+  // Backup codes are shown exactly once, here.
+  res.json({ enabled: true, backupCodes });
+});
+
+/** POST /auth/mfa/disable { code } — needs a current authenticator or backup code, so a stolen
+ *  session can't silently strip 2FA off the account. */
+router.post("/auth/mfa/disable", requireAuth, async (req, res) => {
+  const u = req.dbUser!;
+  if (!u.mfaEnabled) { res.json({ enabled: false }); return; }
+  const code = String(req.body?.code ?? "").trim();
+  const okTotp = u.mfaSecret ? verifyTotp(u.mfaSecret, code) : false;
+  const okBackup = (u.mfaBackupCodes ?? []).includes(sha256(normalizeBackupCode(code)));
+  if (!okTotp && !okBackup) {
+    res.status(400).json({ error: "Enter a current authenticator or backup code to turn off two-factor." });
+    return;
+  }
+  await db.update(usersTable).set({ mfaEnabled: false, mfaSecret: null, mfaBackupCodes: [] }).where(eq(usersTable.id, u.id));
+  res.json({ enabled: false });
 });
 
 /**

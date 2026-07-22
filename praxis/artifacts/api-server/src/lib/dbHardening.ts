@@ -21,6 +21,10 @@ export async function ensureIntegrityConstraints(): Promise<void> {
     ["users", [
       sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS archived_at timestamptz`,
       sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`,
+      // Opt-in TOTP two-factor auth (additive; existing logins are unaffected until a user enrols).
+      sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean NOT NULL DEFAULT false`,
+      sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret text`,
+      sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_backup_codes text[] NOT NULL DEFAULT '{}'`,
     ]],
     // Per-item grade type (points | pass_fail | completion) for the configurable gradebook.
     ["gradebook_items", [
