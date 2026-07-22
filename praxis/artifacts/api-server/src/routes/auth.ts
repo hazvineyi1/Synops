@@ -151,8 +151,26 @@ router.post("/auth/demo-login", async (req, res) => {
   if (role === "student") {
     [user] = await db.select().from(usersTable).where(eq(usersTable.email, DEMO_STUDENT_EMAIL)).limit(1);
     if (!user) {
-      res.status(503).json({ error: "The demo learner is not provisioned yet. Seed the Enza cohort first." });
-      return;
+      // Fall back to a real active learner inside the Enza partner, so the demo button works even
+      // if the dedicated demo learner was never seeded. Still narrow: only ever an ACTIVE learner
+      // belonging to the Enza partner, never an arbitrary account from the request.
+      const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_PARTNER_SLUG)).limit(1);
+      if (partner) {
+        const learners = await db
+          .select()
+          .from(usersTable)
+          .where(and(eq(usersTable.partnerId, partner.id), eq(usersTable.role, "learner"), eq(usersTable.status, "active")))
+          .limit(200);
+        const live = learners
+          .filter((u) => !(u as { deletedAt?: Date | null }).deletedAt && !(u as { archivedAt?: Date | null }).archivedAt)
+          .sort((a, b) => a.email.localeCompare(b.email));
+        // Prefer a learner already placed in an organisation (they have real course context).
+        user = live.find((u) => !!u.organisationId) ?? live[0];
+      }
+      if (!user) {
+        res.status(503).json({ error: "The demo learner is not provisioned yet. Seed the Enza cohort first." });
+        return;
+      }
     }
   } else {
     // admin: find-or-create a dedicated demo partner_admin on the Enza partner.

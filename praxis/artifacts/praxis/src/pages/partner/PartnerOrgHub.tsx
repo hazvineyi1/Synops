@@ -454,7 +454,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
               </thead>
               <tbody className="divide-y divide-border">
                 {courses.map((c) => {
-                  const inClasses = classes.filter((cl) => cl.courseIds.includes(c.id));
+                  const inClasses = classes.filter((cl) => ((cl as { courseIds?: string[] }).courseIds ?? []).includes(c.id));
                   return (
                     <tr key={c.id}>
                       <td className="p-3 font-medium">{c.title}</td>
