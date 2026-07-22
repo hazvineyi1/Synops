@@ -31,22 +31,27 @@ app.use(helmet({
   frameguard: false,
 }));
 
-// Tuned Content-Security-Policy, shipped in REPORT-ONLY mode first: the browser reports violations
-// (visible in the console / the report endpoint) but blocks nothing, so it cannot break the live app.
-// Once the reports are clean we flip the header name to "Content-Security-Policy" to enforce.
+// Tuned, ENFORCED Content-Security-Policy. Verified first in report-only mode (zero violations across
+// the app's core pages) before enforcing. Deliberately pragmatic for an LMS: HTTPS media / uploads /
+// embeds (Supabase storage audio+video, external images, framed learning content) and wss realtime
+// are allowed so nothing in the learning flow breaks, while the real wins are enforced — no plugins
+// (object-src none), no base-uri or cross-origin form hijack, and clickjacking protection via
+// frame-ancestors. 'unsafe-inline' stays because the SPA uses pervasive inline styles + bootstrap.
 //
-// frame-ancestors is route-aware: the app itself may only be framed by itself (anti-clickjacking),
-// but the /c/:token and /a/:token embeds are DESIGNED to be embedded on external sites, so they get a
-// permissive frame-ancestors. style-src/img keep the allowances the SPA actually needs (pervasive
-// inline styles; avatars/branding from arbitrary https origins).
+// frame-ancestors is route-aware: the app may only be framed by itself, but the /c/:token and
+// /a/:token embeds are DESIGNED to be embedded on external sites, so they allow any ancestor.
+//
+// ROLLBACK: if an un-tested page trips it, change the header name below back to
+// "Content-Security-Policy-Report-Only" — that instantly stops blocking while keeping the reports.
 const CSP_BASE = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self'",
-  "frame-src 'self'",
+  "connect-src 'self' https: wss:",
+  "media-src 'self' https: blob: data:",
+  "frame-src 'self' https:",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -54,7 +59,7 @@ const CSP_BASE = [
 app.use((req, res, next) => {
   const isEmbed = req.path.startsWith("/c/") || req.path.startsWith("/a/");
   const directives = [...CSP_BASE, isEmbed ? "frame-ancestors *" : "frame-ancestors 'self'"];
-  res.setHeader("Content-Security-Policy-Report-Only", directives.join("; "));
+  res.setHeader("Content-Security-Policy", directives.join("; "));
   next();
 });
 
