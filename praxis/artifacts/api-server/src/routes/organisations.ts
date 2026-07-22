@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { organisationsTable, usersTable } from "@workspace/db";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, count, sql, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canAdministerOrg, canAccessOrg, canAssignRole, assignableRoles } from "../lib/roles";
 import { logAudit } from "../lib/audit";
@@ -104,11 +104,27 @@ router.get("/organisations/:orgId/members", requireAuth, async (req, res) => {
   const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, req.params.orgId) });
   if (!org) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
+  // Bounded + paginated. No-param callers get the historical behaviour (up to 2000, now stably
+  // ordered); ?limit/&offset page and ?search filters, with the true count in X-Total-Count so a
+  // large org is never silently truncated. Body stays a plain array — every existing consumer is safe.
+  const rawLimit = Number((req.query.limit as string) ?? 2000);
+  const limit = Math.min(Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 2000), 2000);
+  const rawOffset = Number((req.query.offset as string) ?? 0);
+  const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+  const search = String((req.query.search as string) ?? "").trim();
+  const scope = eq(usersTable.organisationId, req.params.orgId);
+  const where = search
+    ? and(scope, sql`(coalesce(${usersTable.firstName}, '') || ' ' || coalesce(${usersTable.lastName}, '') || ' ' || ${usersTable.email}) ILIKE ${"%" + search + "%"}`)
+    : scope;
+  const [{ value: total }] = await db.select({ value: count() }).from(usersTable).where(where);
+  res.setHeader("X-Total-Count", String(total));
   const members = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.organisationId, req.params.orgId))
-    .limit(2000); // bounded — avoids an unbounded roster return; cursor pagination is a follow-up
+    .where(where)
+    .orderBy(desc(usersTable.updatedAt), usersTable.id)
+    .limit(limit)
+    .offset(offset);
   res.json(members.map(toUserResponse));
 });
 

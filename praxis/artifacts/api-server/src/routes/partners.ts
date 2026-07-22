@@ -284,13 +284,18 @@ router.get("/partners/:partnerId/audit", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const limit = Math.min(Number((req.query.limit as string) ?? 200), 500);
+  const limit = Math.min(Math.max(1, Number((req.query.limit as string) ?? 200) || 200), 500);
+  const offset = Math.max(0, Number((req.query.offset as string) ?? 0) || 0);
   let events: (typeof auditEventsTable.$inferSelect)[] = [];
   try {
+    const [{ value: total }] = await db.select({ value: count() }).from(auditEventsTable)
+      .where(eq(auditEventsTable.partnerId, partnerId));
+    res.setHeader("X-Total-Count", String(total));
     events = await db.select().from(auditEventsTable)
       .where(eq(auditEventsTable.partnerId, partnerId))
       .orderBy(desc(auditEventsTable.createdAt))
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
   } catch { events = []; }
 
   // Resolve actor names in one query.

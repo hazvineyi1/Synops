@@ -64,6 +64,7 @@ export function OrgMembers() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<OrgRole>('learner');
+  const [search, setSearch] = useState('');
 
   const inviteMutation = useMutation({
     mutationFn: (body: { email: string; role: OrgRole }) =>
@@ -114,6 +115,11 @@ export function OrgMembers() {
     m.firstName || m.lastName
       ? `${m.firstName ?? ''} ${m.lastName ?? ''}`.trim()
       : m.email;
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? members.filter((m) => displayName(m).toLowerCase().includes(q) || m.email.toLowerCase().includes(q))
+    : members;
 
   return (
     <div className="space-y-8 animate-in fade-in">
@@ -207,19 +213,29 @@ export function OrgMembers() {
         })}
       </div>
 
+      {/* Search */}
+      {members.length > 0 && (
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search members by name or email…"
+          className="w-full sm:max-w-xs rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      )}
+
       {/* Member table */}
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-8 text-center text-muted-foreground">{t('common.loading')}</div>
-          ) : members.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
               <UserPlus className="h-8 w-8 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">{t('members.noMembers')}</p>
+              <p className="text-sm">{members.length === 0 ? t('members.noMembers') : 'No members match your search.'}</p>
             </div>
           ) : (
             <div className="divide-y divide-border">
-              {members.map(member => (
+              {filtered.map(member => (
                 <div key={member.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted/30 transition-colors">
                   <Avatar className="h-9 w-9 shrink-0">
                     <AvatarImage src={member.avatarUrl ?? undefined} />
