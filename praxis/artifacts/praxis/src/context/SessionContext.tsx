@@ -34,7 +34,8 @@ interface SessionState {
   /** True until the first /auth/me resolves. Routes must not redirect while true. */
   loading: boolean;
   refresh: () => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
+  /** Returns { mfaRequired: true } when the password was correct but a 2FA code is needed. */
+  signIn: (email: string, password: string, code?: string) => Promise<{ mfaRequired?: boolean }>;
   /** One-click demo sign-in (no credentials). role: "student" | "admin". */
   demoSignIn: (role: "student" | "admin") => Promise<void>;
   /** End a server-side impersonation and restore the admin's OWN session (not a sign-out). */
@@ -47,7 +48,7 @@ const SessionContext = createContext<SessionState>({
   isSignedIn: false,
   loading: true,
   refresh: async () => {},
-  signIn: async () => {},
+  signIn: async () => ({}),
   demoSignIn: async () => {},
   stopImpersonating: async () => {},
   signOut: async () => {},
@@ -78,19 +79,24 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string, code?: string) => {
     const res = await fetch(`${API}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(code ? { email, password, code } : { email, password }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error((body as { error?: string }).error ?? "Sign in failed.");
     }
+    // Password was correct but this account has 2FA on: no session yet, prompt for a code.
+    if ((body as { mfaRequired?: boolean }).mfaRequired) {
+      return { mfaRequired: true };
+    }
     setUser((body as { user: SessionUser }).user);
     setLoading(false);
+    return {};
   }, []);
 
   const demoSignIn = useCallback(async (role: "student" | "admin") => {

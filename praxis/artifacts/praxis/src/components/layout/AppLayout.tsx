@@ -448,6 +448,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </span>
           )}
 
+          <ShellNavLink
+            item={{ label: t('nav.security', 'Security'), href: '/security', icon: ShieldCheck }}
+            active={isNavActive('/security')}
+          />
+
           <div className="px-1"><LanguageSwitcher variant="full" /></div>
 
           <button

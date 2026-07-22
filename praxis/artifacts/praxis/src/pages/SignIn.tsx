@@ -29,6 +29,9 @@ export function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [demoBusy, setDemoBusy] = useState<"student" | "admin" | null>(null);
+  // Second-factor step: revealed only when the server says this account has 2FA on.
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [code, setCode] = useState("");
 
   // Demo buttons are only offered on the Enza site, where the demo accounts live.
   const showDemo = typeof window !== "undefined" && window.location.hostname === "enza.synops-consulting.com";
@@ -58,11 +61,16 @@ export function SignInPage() {
     setError(null);
     setBusy(true);
     try {
-      await signIn(email, password);
+      const result = await signIn(email, password, mfaRequired ? code : undefined);
+      if (result.mfaRequired) {
+        // Correct password; now ask for the authenticator code and re-submit.
+        setMfaRequired(true);
+        setBusy(false);
+        return;
+      }
       setLocation("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed.");
-    } finally {
       setBusy(false);
     }
   };
@@ -106,6 +114,17 @@ export function SignInPage() {
               style={{ ['--tw-ring-color' as any]: accent }} onFocus={(e) => (e.currentTarget.style.borderColor = accent)} onBlur={(e) => (e.currentTarget.style.borderColor = '')} />
           </div>
 
+          {mfaRequired && (
+            <div>
+              <label htmlFor="mfacode" className="block text-sm font-medium text-white/80 mb-1.5">Authentication code</label>
+              <input id="mfacode" inputMode="numeric" autoComplete="one-time-code" autoFocus required value={code}
+                onChange={(e) => setCode(e.target.value)} placeholder="6-digit code"
+                className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white tracking-widest font-mono placeholder:text-white/40 focus:outline-none focus:ring-2"
+                style={{ ['--tw-ring-color' as any]: accent }} onFocus={(e) => (e.currentTarget.style.borderColor = accent)} onBlur={(e) => (e.currentTarget.style.borderColor = '')} />
+              <p className="mt-1.5 text-xs text-white/50">Enter the code from your authenticator app, or a one-time backup code.</p>
+            </div>
+          )}
+
           {error && (
             <div role="alert" className="rounded-lg border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-300">{error}</div>
           )}
@@ -113,7 +132,7 @@ export function SignInPage() {
           <button type="submit" disabled={busy}
             className="w-full rounded-lg px-4 py-2.5 font-semibold transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
             style={{ backgroundColor: accent, color: accentText }}>
-            {busy ? "Signing in..." : "Sign in"}
+            {busy ? (mfaRequired ? "Verifying..." : "Signing in...") : (mfaRequired ? "Verify" : "Sign in")}
           </button>
         </form>
 

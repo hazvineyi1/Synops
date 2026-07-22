@@ -20,6 +20,7 @@ import { CourseDetail } from '@/pages/CourseDetail';
 import { AssignmentDetail } from '@/pages/AssignmentDetail';
 import { DiscussionThread } from '@/pages/DiscussionThread';
 import { NotificationsPage } from '@/pages/NotificationsPage';
+import { AccountSecurity } from '@/pages/AccountSecurity';
 import { CourseGradebook } from '@/pages/CourseGradebook';
 import { DevLogin } from '@/pages/DevLogin';
 import { ModuleViewer } from '@/pages/ModuleViewer';
@@ -266,6 +267,7 @@ function Routes() {
         <ProtectedRoute path="/cases/:caseId/begin" component={CaseBegin} />
         <ProtectedRoute path="/cases" component={Cases} />
         <ProtectedRoute path="/notifications" component={NotificationsPage} />
+        <ProtectedRoute path="/security" component={AccountSecurity} />
         <ProtectedRoute path="/assess/:assessmentId" component={Assess} />
         <ProtectedRoute path="/credentials" component={Credentials} />
         <ProtectedRoute path="/coach/submissions" component={CoachSubmissions} />
