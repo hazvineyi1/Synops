@@ -26,6 +26,22 @@ export async function ensureIntegrityConstraints(): Promise<void> {
     ["gradebook_items", [
       sql`ALTER TABLE gradebook_items ADD COLUMN IF NOT EXISTS grade_type text NOT NULL DEFAULT 'points'`,
     ]],
+    // Per-organisation grading overrides (course default + org override).
+    ["gradebook_org_overrides", [
+      sql`CREATE TABLE IF NOT EXISTS gradebook_org_overrides (
+        id text PRIMARY KEY,
+        course_id text NOT NULL,
+        org_id text NOT NULL,
+        source_type text NOT NULL,
+        source_id text,
+        grade_type text,
+        item_type text,
+        points_possible numeric(7,2),
+        include_in_grade boolean,
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS gradebook_org_overrides_uidx ON gradebook_org_overrides (course_id, org_id, source_type, source_id)`,
+    ]],
     ["gradebook_entries", [
       sql`DELETE FROM gradebook_entries a USING gradebook_entries b
           WHERE a.assignment_id = b.assignment_id AND a.user_id = b.user_id AND a.ctid < b.ctid`,

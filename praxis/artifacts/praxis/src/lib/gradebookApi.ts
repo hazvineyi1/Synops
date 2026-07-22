@@ -2,7 +2,8 @@ import { apiFetch } from "@/lib/api";
 
 /** Client for the unified gradebook routes. */
 
-export type SourceType = "assignment" | "case" | "activity" | "manual";
+export type SourceType = "assignment" | "case" | "activity" | "manual" | "attendance" | "completion";
+export type GradeType = "points" | "pass_fail" | "completion";
 export type ItemType = "formative" | "summative";
 
 export interface GradebookColumn {
@@ -134,8 +135,13 @@ export interface ItemInput {
 }
 
 export const gradebookApi = {
-  matrix: (courseId: string, groupId?: string | null) =>
-    apiFetch<GradebookMatrix>(`/courses/${courseId}/gradebook${groupId ? `?groupId=${groupId}` : ""}`),
+  matrix: (courseId: string, groupId?: string | null, orgId?: string | null) => {
+    const qs = new URLSearchParams();
+    if (groupId) qs.set("groupId", groupId);
+    if (orgId) qs.set("orgId", orgId);
+    const q = qs.toString();
+    return apiFetch<GradebookMatrix>(`/courses/${courseId}/gradebook${q ? `?${q}` : ""}`);
+  },
   me: (courseId: string) => apiFetch<MeGradebook>(`/courses/${courseId}/gradebook/me`),
   settings: (courseId: string) => apiFetch<GradebookSettings>(`/courses/${courseId}/gradebook/settings`),
   saveSettings: (courseId: string, body: GradebookSettings) =>
@@ -168,6 +174,12 @@ export const gradebookApi = {
   // Register every course deliverable (activities, cases, workshops, completion) as a gradebook column.
   sync: (courseId: string) =>
     apiFetch<{ ok: boolean; created: { activities: number; cases: number; workshops: number; completion: number } }>(`/courses/${courseId}/gradebook/sync`, { method: "POST" }),
+
+  // Upsert per-column grading config (grade type, counts vs practice, points, included in grade).
+  configColumn: (
+    courseId: string,
+    body: { sourceType: SourceType; sourceId?: string | null; itemId?: string | null; title?: string; category?: string; gradeType?: GradeType; itemType?: ItemType; pointsPossible?: number; includeInGrade?: boolean; orgId?: string | null },
+  ) => apiFetch(`/courses/${courseId}/gradebook/config`, { method: "PUT", body: JSON.stringify(body) }),
 
   testEmail: () =>
     apiFetch<{ configured: boolean; sent: boolean; to?: string; message?: string }>(`/gradebook/test-email`, { method: "POST" }),

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useSession } from "@/context/SessionContext";
 import { GradebookLearnerDialog } from "@/components/GradebookLearnerDialog";
 import { GradebookSettingsDialog } from "@/components/GradebookSettingsDialog";
+import { GradebookConfigDialog } from "@/components/GradebookConfigDialog";
 import { ChevronRight, MessageSquare, Plus, RefreshCw, TrendingDown, TrendingUp, Minus, AlertTriangle, Mail, SlidersHorizontal, Download } from "lucide-react";
 
 const bandCell = (f: number | null) =>
@@ -39,6 +40,7 @@ export function CourseGradebook() {
   const [includeFormative, setIncludeFormative] = useState(false);
   const [drillUser, setDrillUser] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const exportUrl = (fmt: "xlsx" | "csv") => `${API}/courses/${courseId}/gradebook/export.${fmt}${groupId ? `?groupId=${groupId}` : ""}`;
 
   const { data: course } = useQuery({ queryKey: ["course", courseId], queryFn: () => apiFetch<any>(`/courses/${courseId}`) });
@@ -216,6 +218,9 @@ export function CourseGradebook() {
               <DropdownMenuItem onClick={() => window.open(exportUrl("csv"), "_blank")}>CSV (.csv)</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setConfigOpen(true)}>
+            <SlidersHorizontal className="h-4 w-4" /> Configure grading
+          </Button>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSettingsOpen(true)}>
             <SlidersHorizontal className="h-4 w-4" /> Settings
           </Button>
@@ -356,6 +361,7 @@ export function CourseGradebook() {
 
       <GradebookLearnerDialog courseId={courseId} userId={drillUser} onClose={() => setDrillUser(null)} />
       <GradebookSettingsDialog courseId={courseId} categories={[...new Set((data?.columns ?? []).map((c) => c.category))]} open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <GradebookConfigDialog courseId={courseId} columns={data?.columns ?? []} open={configOpen} onOpenChange={setConfigOpen} />
     </div>
   );
 }

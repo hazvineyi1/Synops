@@ -172,6 +172,31 @@ export const coachMessagesTable = pgTable("coach_messages", {
 
 export type CoachMessage = typeof coachMessagesTable.$inferSelect;
 
+/**
+ * Per-ORGANISATION overrides of a course's grading config. The course sets the default (in
+ * gradebook_items); an org can override how any deliverable is graded FOR THAT ORG only. Keyed by
+ * (course, org, sourceType, sourceId) so it works for default assignment columns too (which have no
+ * gradebook_items row). Only the columns an org actually changes get a row; null fields mean "inherit".
+ */
+export const gradebookOrgOverridesTable = pgTable(
+  "gradebook_org_overrides",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    courseId: text("course_id").notNull(),
+    orgId: text("org_id").notNull(),
+    sourceType: text("source_type").notNull(),
+    sourceId: text("source_id"),
+    gradeType: text("grade_type"), // points | pass_fail | completion | null(inherit)
+    itemType: text("item_type"), // formative | summative | null(inherit)
+    pointsPossible: numeric("points_possible", { precision: 7, scale: 2 }),
+    includeInGrade: boolean("include_in_grade"),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({ orgSourceUnique: unique().on(t.courseId, t.orgId, t.sourceType, t.sourceId) }),
+);
+
+export type GradebookOrgOverride = typeof gradebookOrgOverridesTable.$inferSelect;
+
 /** Shape stored in coach_plans.items for gradebook-generated adaptive study plans. */
 export interface StudyPlanItem {
   kind: "case" | "activity" | "review";

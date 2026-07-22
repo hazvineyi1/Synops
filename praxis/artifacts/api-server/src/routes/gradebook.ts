@@ -19,7 +19,7 @@ import {
   attendanceRecordsTable,
   modulesTable,
 } from "@workspace/db";
-import { eq, and, inArray, desc } from "drizzle-orm";
+import { eq, and, inArray, desc, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isSuperAdmin, isCoFacilitator, canAdministerOrg, canAccessCourse, canAccessOrg, type ScopedUser } from "../lib/roles";
 import { canStaffActOnCourse, leaderCourseIds, learnerIdsForCoFacilitator, canGradeInCourse, canParticipateInCourse } from "../lib/scope";
@@ -32,7 +32,7 @@ import {
   DEFAULT_BANDS,
   REASON_LABEL,
 } from "../lib/gradebookEngine";
-import { gradebookSettingsTable, type LetterBand } from "@workspace/db";
+import { gradebookSettingsTable, gradebookOrgOverridesTable, type LetterBand } from "@workspace/db";
 import { buildGradebookWorkbook, buildGradebookCsv, type GbExportReport } from "../lib/gradebookExport";
 import { onGradeEvent, scanCourse } from "../lib/gradebookAlerts";
 import { mailerConfigured, sendMail, appUrl, emailShell } from "../lib/mailer";
@@ -98,9 +98,11 @@ router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
   const { courseId } = req.params;
   if (!(await requireStaffOnCourse(req, res, courseId))) return;
   const groupId = typeof req.query.groupId === "string" ? req.query.groupId : null;
+  // Optional org scope so the config editor / an org-scoped grid sees that org's overrides.
+  const orgId = typeof req.query.orgId === "string" && req.query.orgId ? req.query.orgId : null;
 
   await reconcileAssignmentEntries(courseId);
-  const columns = await getCourseColumns(courseId);
+  const columns = await getCourseColumns(courseId, orgId);
   const settings = await getGradebookSettings(courseId);
 
   // Roster (optionally limited to a cohort/section).
@@ -434,7 +436,9 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
   // that only landed on assignment_submissions (this was why the learner saw dashes + "not
   // enough data" despite 100% scores).
   await reconcileAssignmentEntries(courseId);
-  const columns = await getCourseColumns(courseId);
+  // Apply this learner's organisation overrides on top of the course default.
+  const learnerOrgId = (req.dbUser as { organisationId?: string | null } | undefined)?.organisationId ?? null;
+  const columns = await getCourseColumns(courseId, learnerOrgId);
   const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
   const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
@@ -542,7 +546,9 @@ router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (r
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const columns = await getCourseColumns(courseId);
+  // Resolve against the target learner's organisation overrides.
+  const target = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
+  const columns = await getCourseColumns(courseId, target?.organisationId ?? null);
   const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
   const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
@@ -728,12 +734,13 @@ router.post("/courses/:courseId/gradebook-items", requireAuth, async (req, res) 
         title,
         category,
         itemType: b.itemType === "formative" ? "formative" : "summative",
+        gradeType: ["points", "pass_fail", "completion"].includes(b.gradeType) ? b.gradeType : "points",
         pointsPossible: String(points),
         dueDate: b.dueDate ? new Date(b.dueDate) : null,
         includeInGrade: b.includeInGrade === false ? false : true,
         position: b.position != null ? Number(b.position) : 0,
         createdBy: req.userId!,
-      })
+      } as any)
       .returning();
     res.status(201).json(row);
   } catch (e: any) {
@@ -756,12 +763,85 @@ router.patch("/gradebook-items/:id", requireAuth, async (req, res) => {
   if (typeof b.title === "string") patch.title = b.title.trim();
   if (typeof b.category === "string") patch.category = b.category.trim() || "General";
   if (b.itemType === "formative" || b.itemType === "summative") patch.itemType = b.itemType;
+  if (["points", "pass_fail", "completion"].includes(b.gradeType)) patch.gradeType = b.gradeType;
   if (b.pointsPossible != null) patch.pointsPossible = String(Number(b.pointsPossible));
   if (b.includeInGrade != null) patch.includeInGrade = Boolean(b.includeInGrade);
   if (b.position != null) patch.position = Number(b.position);
   if (b.dueDate !== undefined) patch.dueDate = b.dueDate ? new Date(b.dueDate) : null;
   const [row] = await db.update(gradebookItemsTable).set(patch).where(eq(gradebookItemsTable.id, item.id)).returning();
   res.json(row);
+});
+
+// PUT /courses/:courseId/gradebook/config — upsert per-column grading config (gradeType, itemType,
+// pointsPossible, includeInGrade) by (sourceType, sourceId). Works for columns that already have an
+// item row AND for default assignment columns that don't (an override row is created). Powers the
+// admin gradebook configuration editor. Staff-only.
+router.put("/courses/:courseId/gradebook/config", requireAuth, async (req, res) => {
+  const { courseId } = req.params;
+  if (!(await requireStaffOnCourse(req, res, courseId))) return;
+  const b = req.body ?? {};
+  const sourceType = b.sourceType as string;
+  const sourceId = (b.sourceId as string | undefined) ?? null;
+  if (!["assignment", "case", "activity", "attendance", "completion", "manual"].includes(sourceType)) {
+    res.status(400).json({ error: "Invalid sourceType" }); return;
+  }
+
+  // Org-scoped override: write to gradebook_org_overrides (course default stays untouched).
+  const orgId = typeof b.orgId === "string" && b.orgId ? b.orgId : null;
+  if (orgId) {
+    const ov: Record<string, unknown> = { updatedAt: new Date() };
+    if (["points", "pass_fail", "completion"].includes(b.gradeType)) ov.gradeType = b.gradeType;
+    if (b.itemType === "formative" || b.itemType === "summative") ov.itemType = b.itemType;
+    ov.pointsPossible = b.pointsPossible != null ? String(Number(b.pointsPossible)) : null;
+    ov.includeInGrade = b.includeInGrade != null ? Boolean(b.includeInGrade) : null;
+    const found = await db.query.gradebookOrgOverridesTable.findFirst({
+      where: and(eq(gradebookOrgOverridesTable.courseId, courseId), eq(gradebookOrgOverridesTable.orgId, orgId), eq(gradebookOrgOverridesTable.sourceType, sourceType), sourceId ? eq(gradebookOrgOverridesTable.sourceId, sourceId) : isNull(gradebookOrgOverridesTable.sourceId)),
+    });
+    if (found) {
+      const [row] = await db.update(gradebookOrgOverridesTable).set(ov).where(eq(gradebookOrgOverridesTable.id, found.id)).returning();
+      res.json(row); return;
+    }
+    const [row] = await db.insert(gradebookOrgOverridesTable).values({ courseId, orgId, sourceType, sourceId, ...ov } as any).returning();
+    res.json(row); return;
+  }
+
+  const existing = sourceId
+    ? await db.query.gradebookItemsTable.findFirst({ where: and(eq(gradebookItemsTable.courseId, courseId), eq(gradebookItemsTable.sourceType, sourceType as any), eq(gradebookItemsTable.sourceId, sourceId)) })
+    : (b.itemId ? await db.query.gradebookItemsTable.findFirst({ where: eq(gradebookItemsTable.id, b.itemId) }) : null);
+
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (["points", "pass_fail", "completion"].includes(b.gradeType)) patch.gradeType = b.gradeType;
+  if (b.itemType === "formative" || b.itemType === "summative") patch.itemType = b.itemType;
+  if (b.pointsPossible != null) patch.pointsPossible = String(Number(b.pointsPossible));
+  if (b.includeInGrade != null) patch.includeInGrade = Boolean(b.includeInGrade);
+  if (typeof b.category === "string" && b.category.trim()) patch.category = b.category.trim();
+
+  if (existing) {
+    const [row] = await db.update(gradebookItemsTable).set(patch).where(eq(gradebookItemsTable.id, existing.id)).returning();
+    res.json(row); return;
+  }
+  // No row yet (e.g. a default assignment column): create an override carrying the config.
+  let title = typeof b.title === "string" && b.title.trim() ? b.title.trim() : "";
+  let category = typeof b.category === "string" && b.category.trim() ? b.category.trim() : "General";
+  if (!title && sourceType === "assignment" && sourceId) {
+    const a = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, sourceId) });
+    title = a?.title ?? "Assignment";
+    if (category === "General") category = "Assignments";
+  }
+  if (!title) title = "Item";
+  try {
+    const [row] = await db.insert(gradebookItemsTable).values({
+      courseId, sourceType: sourceType as any, sourceId, title, category,
+      itemType: b.itemType === "formative" ? "formative" : "summative",
+      gradeType: ["points", "pass_fail", "completion"].includes(b.gradeType) ? b.gradeType : "points",
+      pointsPossible: b.pointsPossible != null ? String(Number(b.pointsPossible)) : "100",
+      includeInGrade: b.includeInGrade === false ? false : true,
+      createdBy: req.userId!,
+    } as any).returning();
+    res.json(row);
+  } catch {
+    res.status(500).json({ error: "Could not save configuration." });
+  }
 });
 
 // DELETE /gradebook-items/:id — removes the column (and its cells).

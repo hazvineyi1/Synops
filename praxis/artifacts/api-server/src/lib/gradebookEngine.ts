@@ -11,6 +11,7 @@ import {
   activitySubmissionsTable,
   attendanceRecordsTable,
   gradebookSettingsTable,
+  gradebookOrgOverridesTable,
   beatProgressTable,
   beatsTable,
   type GradebookItem,
@@ -155,8 +156,30 @@ function weightedOverall(columns: GradebookColumn[], fracs: Map<string, number> 
   return den > 0 ? (num2 / den) * 100 : null;
 }
 
-/** Build the ordered set of gradebook columns for a course. */
-export async function getCourseColumns(courseId: string): Promise<GradebookColumn[]> {
+/**
+ * Apply an organisation's grading overrides on top of the course-default columns, in place.
+ * The course sets the default; an org can change grade type / counts / points / inclusion for its
+ * own learners. Keyed by (sourceType, sourceId) so it also covers default assignment columns.
+ */
+async function applyOrgOverrides(columns: GradebookColumn[], courseId: string, orgId: string): Promise<void> {
+  const ovs = await db
+    .select()
+    .from(gradebookOrgOverridesTable)
+    .where(and(eq(gradebookOrgOverridesTable.courseId, courseId), eq(gradebookOrgOverridesTable.orgId, orgId)));
+  if (ovs.length === 0) return;
+  const byKey = new Map(ovs.map((o) => [`${o.sourceType}:${o.sourceId ?? ""}`, o]));
+  for (const c of columns) {
+    const o = byKey.get(`${c.sourceType}:${c.sourceId ?? ""}`);
+    if (!o) continue;
+    if (o.gradeType) c.gradeType = o.gradeType as GradebookColumn["gradeType"];
+    if (o.itemType) c.itemType = o.itemType as GradebookColumn["itemType"];
+    if (o.pointsPossible != null) c.pointsPossible = Number(o.pointsPossible);
+    if (o.includeInGrade != null) c.includeInGrade = o.includeInGrade;
+  }
+}
+
+/** Build the ordered set of gradebook columns for a course, optionally with an org's overrides. */
+export async function getCourseColumns(courseId: string, orgId?: string | null): Promise<GradebookColumn[]> {
   const [items, assignments] = await Promise.all([
     db.select().from(gradebookItemsTable).where(eq(gradebookItemsTable.courseId, courseId)),
     db
@@ -221,6 +244,7 @@ export async function getCourseColumns(courseId: string): Promise<GradebookColum
     (a, b) =>
       a.category.localeCompare(b.category) || a.position - b.position || a.title.localeCompare(b.title),
   );
+  if (orgId) await applyOrgOverrides(columns, courseId, orgId);
   return columns;
 }
 

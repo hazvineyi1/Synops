@@ -457,7 +457,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="text-left p-3">Course</th><th className="text-left p-3">Modality</th><th className="text-right p-3">Enrolled</th><th className="text-left p-3">In classes</th><th className="text-left p-3">Status</th></tr>
+                <tr><th className="text-left p-3">Course</th><th className="text-left p-3">Modality</th><th className="text-right p-3">Enrolled</th><th className="text-left p-3">In classes</th><th className="text-left p-3">Status</th><th className="p-3"></th></tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {courses.map((c) => {
@@ -469,6 +469,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                       <td className="p-3 text-right tabular-nums">{c.enrolled}</td>
                       <td className="p-3">{inClasses.length === 0 ? <span className="text-xs text-muted-foreground">-</span> : <div className="flex flex-wrap gap-1">{inClasses.map((cl) => <span key={cl.id} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{cl.name}</span>)}</div>}</td>
                       <td className="p-3"><Badge variant={c.status === 'active' ? 'secondary' : 'outline'} className="capitalize">{c.status}</Badge></td>
+                      <td className="p-3 text-right"><button className="text-xs font-medium text-primary hover:underline" onClick={() => navigate(`/courses/${c.id}/gradebook`)}>Gradebook →</button></td>
                     </tr>
                   );
                 })}
