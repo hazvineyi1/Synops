@@ -4,6 +4,7 @@ import { partnersTable, usersTable, organisationsTable, auditEventsTable } from 
 import { eq, and, count, inArray, sql, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { isSuperAdmin, isFacilitator } from "../lib/roles";
+import { validateBody } from "../lib/validate";
 
 // Map an audit action onto the partner-audit category the UI colour-codes by.
 function auditCategory(action: string): "financial" | "funder" | "account" | "impersonation" | "branding" {
@@ -132,6 +133,11 @@ router.get("/partners", requireAuth, requireRole("super_admin"), async (req, res
 
 // POST /partners
 router.post("/partners", requireAuth, requireRole("super_admin"), async (req, res) => {
+  if (!validateBody(req, res, {
+    name: { required: true, maxLength: 200 },
+    slug: { required: true, maxLength: 100 },
+    contactEmail: { type: "email" },
+  })) return;
   const { name, slug, contactEmail } = req.body;
   const [partner] = await db
     .insert(partnersTable)

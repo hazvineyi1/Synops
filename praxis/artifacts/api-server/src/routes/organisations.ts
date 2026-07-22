@@ -5,6 +5,7 @@ import { eq, and, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canAdministerOrg, canAccessOrg, canAssignRole, assignableRoles } from "../lib/roles";
 import { logAudit } from "../lib/audit";
+import { validateBody } from "../lib/validate";
 
 const router = Router();
 
@@ -60,6 +61,7 @@ router.post("/organisations", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
+  if (!validateBody(req, res, { name: { required: true, maxLength: 200 }, industry: { maxLength: 200 } })) return;
   const { name, industry } = req.body;
   const partnerId = user.partnerId!;
   const [org] = await db
@@ -129,6 +131,7 @@ router.post("/organisations/:orgId/members", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
+  if (!validateBody(req, res, { email: { type: "email", required: true }, role: { required: true, maxLength: 40 } })) return;
   if (!canAssignRole(user.role, role)) {
     res.status(403).json({ error: `You may only assign: ${assignableRoles(user.role).join(", ")}` });
     return;

@@ -131,24 +131,26 @@ router.post("/auth/login", async (req, res) => {
 const DEMO_STUDENT_EMAIL = "enza@student1.test";
 const DEMO_ADMIN_EMAIL = "demo.admin@enzaglobalmedia.co.za";
 const ENZA_PARTNER_SLUG = "enza-global";
+// Safe-by-default host allowlist: with DEMO_LOGIN_HOSTS unset, the one-click demo only works on the
+// known demo host and is invisible (404) on every other host — so standing up a new tenant on a new
+// domain can never accidentally expose it. Override with DEMO_LOGIN_HOSTS to add demo hosts.
+const DEFAULT_DEMO_HOSTS = ["enza.synops-consulting.com"];
 
 router.post("/auth/demo-login", async (req, res) => {
   if (process.env.ENABLE_DEMO_LOGIN === "0") {
     res.status(404).json({ error: "Not found." });
     return;
   }
-  // Defence in depth: when DEMO_LOGIN_HOSTS is set (comma-separated), the one-click demo only works
-  // on those hosts (e.g. the Enza demo site) and is invisible everywhere else — so it can never be
-  // used to enter a real production tenant. Unset = allow (backward compatible). Production tenants
-  // should also set ENABLE_DEMO_LOGIN=0.
-  const allowHosts = (process.env.DEMO_LOGIN_HOSTS || "")
+  // Defence in depth: the one-click demo only works on an allow-listed host (defaulting to the Enza
+  // demo site) and is invisible everywhere else — so it can never be used to enter another tenant.
+  // Off entirely with ENABLE_DEMO_LOGIN=0.
+  const configured = (process.env.DEMO_LOGIN_HOSTS || "")
     .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  if (allowHosts.length) {
-    const host = String(req.headers.host || "").toLowerCase().split(":")[0];
-    if (!allowHosts.includes(host)) {
-      res.status(404).json({ error: "Not found." });
-      return;
-    }
+  const allowHosts = configured.length ? configured : DEFAULT_DEMO_HOSTS;
+  const host = String(req.headers.host || "").toLowerCase().split(":")[0];
+  if (!allowHosts.includes(host)) {
+    res.status(404).json({ error: "Not found." });
+    return;
   }
   const role = String(req.body?.role ?? "").toLowerCase().trim();
   if (role !== "student" && role !== "admin") {
