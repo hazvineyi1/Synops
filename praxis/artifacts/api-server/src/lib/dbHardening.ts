@@ -42,6 +42,19 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       )`,
       sql`CREATE UNIQUE INDEX IF NOT EXISTS gradebook_org_overrides_uidx ON gradebook_org_overrides (course_id, org_id, source_type, source_id)`,
     ]],
+    // Performance indexes for the hottest lookups (gradebook matrix, org courses, class rosters,
+    // partner rosters). Non-unique, CREATE IF NOT EXISTS — cheap once present, big win at scale.
+    ["perf_indexes", [
+      sql`CREATE INDEX IF NOT EXISTS enrolments_course_idx ON enrolments (course_id)`,
+      sql`CREATE INDEX IF NOT EXISTS enrolments_user_idx ON enrolments (user_id)`,
+      sql`CREATE INDEX IF NOT EXISTS gradebook_items_course_idx ON gradebook_items (course_id)`,
+      sql`CREATE INDEX IF NOT EXISTS gradebook_cells_item_idx ON gradebook_cells (item_id)`,
+      sql`CREATE INDEX IF NOT EXISTS org_class_courses_class_idx ON org_class_courses (class_id)`,
+      sql`CREATE INDEX IF NOT EXISTS org_class_learners_class_idx ON org_class_learners (class_id)`,
+      sql`CREATE INDEX IF NOT EXISTS org_classes_org_idx ON org_classes (org_id)`,
+      sql`CREATE INDEX IF NOT EXISTS users_partner_idx ON users (partner_id)`,
+      sql`CREATE INDEX IF NOT EXISTS users_organisation_idx ON users (organisation_id)`,
+    ]],
     ["gradebook_entries", [
       sql`DELETE FROM gradebook_entries a USING gradebook_entries b
           WHERE a.assignment_id = b.assignment_id AND a.user_id = b.user_id AND a.ctid < b.ctid`,

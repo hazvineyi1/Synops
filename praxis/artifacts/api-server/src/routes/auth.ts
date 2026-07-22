@@ -137,6 +137,19 @@ router.post("/auth/demo-login", async (req, res) => {
     res.status(404).json({ error: "Not found." });
     return;
   }
+  // Defence in depth: when DEMO_LOGIN_HOSTS is set (comma-separated), the one-click demo only works
+  // on those hosts (e.g. the Enza demo site) and is invisible everywhere else — so it can never be
+  // used to enter a real production tenant. Unset = allow (backward compatible). Production tenants
+  // should also set ENABLE_DEMO_LOGIN=0.
+  const allowHosts = (process.env.DEMO_LOGIN_HOSTS || "")
+    .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (allowHosts.length) {
+    const host = String(req.headers.host || "").toLowerCase().split(":")[0];
+    if (!allowHosts.includes(host)) {
+      res.status(404).json({ error: "Not found." });
+      return;
+    }
+  }
   const role = String(req.body?.role ?? "").toLowerCase().trim();
   if (role !== "student" && role !== "admin") {
     res.status(400).json({ error: "Unknown demo role." });
