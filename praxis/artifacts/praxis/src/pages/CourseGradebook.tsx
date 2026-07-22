@@ -305,6 +305,10 @@ export function CourseGradebook() {
                       const cell = l.cells[c.key];
                       const f = cell?.fraction ?? null;
                       const display = f == null ? "" : String(Math.round((f * c.pointsPossible) * 10) / 10);
+                      // Format the read-only cell per its grade type: Pass/Fail, %, or points.
+                      const gt = ((c as { gradeType?: string }).gradeType) ?? "points";
+                      const label = f == null ? "—" : gt === "pass_fail" ? (f >= 0.5 ? "Pass" : "Fail") : gt === "completion" ? `${Math.round(f * 100)}%` : display;
+                      const auto = !!(cell as { auto?: boolean } | undefined)?.auto;
                       return (
                         <td key={c.key} className="px-2 py-1.5 text-center">
                           <div className="relative inline-flex items-center">
@@ -317,8 +321,8 @@ export function CourseGradebook() {
                                 className={cn("h-8 w-[62px] rounded-md text-center font-mono text-[13px] outline-none focus:ring-2 focus:ring-ring", bandCell(f), c.itemType === "formative" && "opacity-60")}
                               />
                             ) : (
-                              <span className={cn("inline-block h-8 w-[62px] rounded-md pt-1.5 font-mono text-[13px]", bandCell(f), c.itemType === "formative" && "opacity-60")}>
-                                {f == null ? "—" : display}
+                              <span className={cn("inline-flex h-8 w-[62px] items-center justify-center rounded-md text-[13px]", gt === "points" && "font-mono", bandCell(f), c.itemType === "formative" && "opacity-60")} title={auto ? "Auto-scored from completion" : undefined}>
+                                {label}{auto && <span className="ml-0.5 text-[9px] text-sky-600">*</span>}
                               </span>
                             )}
                             <button
