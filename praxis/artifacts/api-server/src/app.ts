@@ -24,13 +24,39 @@ app.set("trust proxy", 1);
 // inline styles and sandboxed activity iframes, and /c/:token /a/:token are DESIGNED to be embedded
 // on external sites (a SAMEORIGIN frame policy would break them). Everything else helmet sets is a
 // safe, non-breaking win: HSTS, X-Content-Type-Options: nosniff, Referrer-Policy, no X-Powered-By.
-// TODO(hardening): add a tuned Content-Security-Policy with frame-ancestors scoped to the embed routes.
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
   crossOriginResourcePolicy: false,
   frameguard: false,
 }));
+
+// Tuned Content-Security-Policy, shipped in REPORT-ONLY mode first: the browser reports violations
+// (visible in the console / the report endpoint) but blocks nothing, so it cannot break the live app.
+// Once the reports are clean we flip the header name to "Content-Security-Policy" to enforce.
+//
+// frame-ancestors is route-aware: the app itself may only be framed by itself (anti-clickjacking),
+// but the /c/:token and /a/:token embeds are DESIGNED to be embedded on external sites, so they get a
+// permissive frame-ancestors. style-src/img keep the allowances the SPA actually needs (pervasive
+// inline styles; avatars/branding from arbitrary https origins).
+const CSP_BASE = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self'",
+  "frame-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+];
+app.use((req, res, next) => {
+  const isEmbed = req.path.startsWith("/c/") || req.path.startsWith("/a/");
+  const directives = [...CSP_BASE, isEmbed ? "frame-ancestors *" : "frame-ancestors 'self'"];
+  res.setHeader("Content-Security-Policy-Report-Only", directives.join("; "));
+  next();
+});
 
 // Rate limiting. In-process store (per instance) — a real backstop for a single Railway instance;
 // swap for a shared store (Redis) before horizontal scaling. Auth/impersonation paths are throttled
