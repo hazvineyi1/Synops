@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   orgClassesTable, orgClassLearnersTable, orgClassCoursesTable, orgClassStaffTable,
-  organisationsTable, enrolmentsTable,
+  organisationsTable, enrolmentsTable, usersTable, coursesTable,
 } from "@workspace/db";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -78,6 +78,53 @@ async function classWithOrg(classId: string) {
   const org = await orgFor(cls.orgId);
   return { cls, org };
 }
+
+// GET /organisations/:orgId/courses — the org's REAL courses, replacing the old synthetic list.
+// A course counts as "in the org" if it is attached to one of the org's classes OR an org member is
+// enrolled in it. Enrolled counts and completion-based progress are computed from real enrolments.
+router.get("/organisations/:orgId/courses", requireAuth, async (req, res) => {
+  const { orgId } = req.params;
+  const org = await orgFor(orgId);
+  if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const members = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.organisationId, orgId));
+    const memberIds = members.map((m) => m.id);
+    const classes = await db.select({ id: orgClassesTable.id }).from(orgClassesTable).where(eq(orgClassesTable.orgId, orgId));
+    const classIds = classes.map((c) => c.id);
+    const classCourseRows = classIds.length
+      ? await db.select({ courseId: orgClassCoursesTable.courseId }).from(orgClassCoursesTable).where(inArray(orgClassCoursesTable.classId, classIds))
+      : [];
+    const enrolRows = memberIds.length
+      ? await db.select({ courseId: enrolmentsTable.courseId, status: enrolmentsTable.status, completedAt: enrolmentsTable.completedAt }).from(enrolmentsTable).where(inArray(enrolmentsTable.userId, memberIds))
+      : [];
+    const courseIds = [...new Set<string>([...classCourseRows.map((r) => r.courseId), ...enrolRows.map((r) => r.courseId)])];
+    if (!courseIds.length) { res.json([]); return; }
+    const courseRows = await db.select({ id: coursesTable.id, title: coursesTable.title, status: coursesTable.status }).from(coursesTable).where(inArray(coursesTable.id, courseIds));
+    const byCourse: Record<string, { enrolled: number; completed: number }> = {};
+    for (const e of enrolRows) {
+      const b = (byCourse[e.courseId] ??= { enrolled: 0, completed: 0 });
+      b.enrolled++;
+      if (e.status === "completed" || e.completedAt) b.completed++;
+    }
+    res.json(
+      courseRows
+        .map((c) => {
+          const b = byCourse[c.id] ?? { enrolled: 0, completed: 0 };
+          return {
+            id: c.id,
+            title: c.title,
+            modality: "",
+            enrolled: b.enrolled,
+            avgProgress: b.enrolled ? Math.round((b.completed / b.enrolled) * 100) : 0,
+            status: c.status === "published" ? "active" : "draft",
+          };
+        })
+        .sort((a, b) => a.title.localeCompare(b.title)),
+    );
+  } catch {
+    res.json([]);
+  }
+});
 
 // GET /classes/:classId — detail.
 router.get("/classes/:classId", requireAuth, async (req, res) => {

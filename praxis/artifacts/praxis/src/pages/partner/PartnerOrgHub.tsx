@@ -23,7 +23,7 @@ import {
 import { startImpersonation } from '@/lib/impersonationStore';
 import { renameOrg, useOrgOverrides } from '@/lib/orgOverridesStore';
 import {
-  getPartnerHub, findHubByOrgId, orgDetail, orgCourses, orgLearners, orgCoaching, orgGradebook,
+  getPartnerHub, findHubByOrgId, orgDetail, orgLearners, orgCoaching, orgGradebook,
   getActivePartnerId,
   DELEGATABLE_POWERS, ZAR, VAT_RATE, type Invoice, type PartnerDoc, type DocCategory,
 } from '@/lib/partnerHubData';
@@ -104,7 +104,14 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   const actorName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || 'Admin';
   const [orgNameDraft, setOrgNameDraft] = useState<string | null>(null);
 
-  const courses = useMemo(() => orgCourses(h, orgId), [h, orgId]);
+  // Real courses delivered in this org (from its classes + member enrolments), with real enrolled
+  // counts and completion-based progress. Replaces the old synthetic orgCourses() placeholder.
+  interface OrgCourseRow { id: string; title: string; modality: string; enrolled: number; avgProgress: number; status: string }
+  const { data: courses = [] } = useQuery({
+    queryKey: ['org-courses', orgId],
+    queryFn: () => apiFetch<OrgCourseRow[]>(`/organisations/${orgId}/courses`),
+    enabled: !!orgId,
+  });
   // Courses the super admin granted this partner from the Learning Hub (surfaced in the org catalog).
   const lh = useLearningHub();
   const assignedCourses = useMemo(() => {
@@ -458,7 +465,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                   return (
                     <tr key={c.id}>
                       <td className="p-3 font-medium">{c.title}</td>
-                      <td className="p-3 text-muted-foreground">{c.modality}</td>
+                      <td className="p-3 text-muted-foreground">{c.modality || '—'}</td>
                       <td className="p-3 text-right tabular-nums">{c.enrolled}</td>
                       <td className="p-3">{inClasses.length === 0 ? <span className="text-xs text-muted-foreground">-</span> : <div className="flex flex-wrap gap-1">{inClasses.map((cl) => <span key={cl.id} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{cl.name}</span>)}</div>}</td>
                       <td className="p-3"><Badge variant={c.status === 'active' ? 'secondary' : 'outline'} className="capitalize">{c.status}</Badge></td>
