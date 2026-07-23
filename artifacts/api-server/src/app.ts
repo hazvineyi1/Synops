@@ -7,6 +7,7 @@ import { existsSync } from "fs";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
+import healthRouter from "./routes/health";
 import { logger } from "./lib/logger";
 import { getAllowedOrigins, isProduction } from "./lib/config";
 import { securityHeaders } from "./middlewares/securityHeaders";
@@ -49,6 +50,12 @@ app.use(
 
 // Baseline security headers on every response.
 app.use(securityHeaders());
+
+// Liveness/health checks are mounted ahead of rate limiting, CORS, and the
+// Clerk auth middleware so they never depend on an external provider or a
+// per-request key parse. Railway's deploy healthcheck hits /api/healthz; a
+// Clerk hiccup or a burst of traffic must not fail an otherwise-healthy deploy.
+app.use("/api", healthRouter);
 
 // Clerk proxy must come before body parsers.
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
