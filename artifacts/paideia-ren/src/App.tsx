@@ -49,6 +49,7 @@ function Router() {
       <Nav />
       <main className="flex-1">
         <Switch>
+          {/* Marketing site routes. Platforms merged into Products. */}
           <Route path="/" component={Home} />
           <Route path="/about" component={About} />
           <Route path="/healthcare" component={Healthcare} />

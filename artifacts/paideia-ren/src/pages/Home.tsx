@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2, Quote } from "lucide-react";
 import { articles } from "@/data/insights";
 
 export default function Home() {
+  // Trimmed home: hero, stats, practices, outcomes, platforms teaser, founder quote, one CTA.
   return (
     <div className="min-h-screen">
       {/* Hero */}

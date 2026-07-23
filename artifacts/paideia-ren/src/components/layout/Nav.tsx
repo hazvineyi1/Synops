@@ -16,6 +16,7 @@ export function Nav() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Top nav: 4 items (Products, Learning & AI, Healthcare, About). Insights lives in the footer.
   const navLinks = [
     { href: "/products", label: "Products" },
     { href: "/learning", label: "Learning & AI" },

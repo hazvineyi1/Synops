@@ -4,6 +4,7 @@ import { Logo } from "./Logo";
 
 export function Footer() {
   return (
+    // Footer: Practices (Learning, Healthcare) + Products + Company (About, Insights, Contact).
     <footer className="bg-background pt-24 pb-12 border-t border-border">
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-20">
