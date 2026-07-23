@@ -172,6 +172,14 @@ reproducible with the committed harness.
   - Reproduce: `node scripts/loadtest.mjs https://<host>/api/readyz -r 2000 -c 100`.
     Run against staging before launch and after any pool/query change; watch that
     p99 stays flat and 5xx stays 0 as concurrency rises.
+  - **SLO gate**: the harness enforces objectives when given thresholds, and exits
+    non-zero on a breach so it can gate a pipeline or a launch sign-off. Starting
+    targets (adjust to the numbers the business agrees, then hold the line):
+    availability ≥ 99.9%, readiness `p99 ≤ 300ms`, error-rate `≤ 0.5%` at the
+    expected peak concurrency. Enforce with:
+    `node scripts/loadtest.mjs https://<host>/api/readyz -r 2000 -c 100 --max-p99 300 --max-error-rate 0.5`
+    (measured baseline on the reference box: p99 ~220ms, 0% errors — comfortably
+    inside target).
 - **Chaos / failure-mode** (DB outage drill): with the service under a live DB,
   stop Postgres, then restart it. Observed and expected behaviour:
   - During the outage: `/api/readyz` → `503 {"status":"not-ready","db":"down"}`

@@ -12,8 +12,10 @@
 //   node scripts/loadtest.mjs http://localhost:5099/api/readyz --requests 2000 --concurrency 100
 //   node scripts/loadtest.mjs https://<staging-host>/api/healthz -r 5000 -c 200
 //
-// Exit code is non-zero if any request errored or returned >= 500, so it can gate
-// a pipeline.
+// SLO gate: pass --max-p99 <ms> and/or --max-error-rate <pct> to assert service
+// objectives. Exit code is non-zero if any request errored, any response was
+// >= 500, or a supplied SLO threshold was breached — so it can gate a pipeline
+// or a pre-launch sign-off against agreed numbers.
 import http from "node:http";
 import https from "node:https";
 
@@ -33,6 +35,8 @@ if (!url || url.startsWith("--")) {
 const total = Number(arg(["--requests", "-r"], "1000"));
 const concurrency = Number(arg(["--concurrency", "-c"], "50"));
 const method = arg(["--method", "-m"], "GET");
+const maxP99 = arg(["--max-p99"], null);
+const maxErrRate = arg(["--max-error-rate"], null);
 const target = new URL(url);
 const client = target.protocol === "https:" ? https : http;
 const agent = new client.Agent({ keepAlive: true, maxSockets: concurrency });
@@ -93,4 +97,22 @@ console.log(`latency ms:  p50=${pct(latencies, 50).toFixed(1)} p90=${pct(latenci
 console.log(`statuses:    ${[...statuses.entries()].map(([s, n]) => `${s}:${n}`).join("  ") || "(none)"}`);
 console.log(`errors:      ${errors}  5xx: ${server5xx}`);
 
-process.exit(errors > 0 || server5xx > 0 ? 1 : 0);
+// SLO evaluation.
+const p99 = pct(latencies, 99);
+const errorRate = done > 0 ? ((errors + server5xx) / done) * 100 : 100;
+let failed = errors > 0 || server5xx > 0;
+const slo = [];
+if (maxP99 !== null) {
+  const ok = p99 <= Number(maxP99);
+  slo.push(`p99 ${p99.toFixed(1)}ms <= ${maxP99}ms: ${ok ? "PASS" : "FAIL"}`);
+  if (!ok) failed = true;
+}
+if (maxErrRate !== null) {
+  const ok = errorRate <= Number(maxErrRate);
+  slo.push(`error-rate ${errorRate.toFixed(2)}% <= ${maxErrRate}%: ${ok ? "PASS" : "FAIL"}`);
+  if (!ok) failed = true;
+}
+if (slo.length) console.log(`SLO:         ${slo.join("  |  ")}`);
+console.log(`result:      ${failed ? "FAIL" : "PASS"}`);
+
+process.exit(failed ? 1 : 0);
