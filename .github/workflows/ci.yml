@@ -58,6 +58,72 @@ jobs:
           PORT=8080 BASE_PATH=/builder/ pnpm --filter @workspace/compass-web   run build
           pnpm --filter @workspace/paideia-api run build
 
+  # DB-backed integration suites for the main workspace. compass-api and kanon-api carry the
+  # tenant-isolation, billing-authz, impersonation-safety, and evidence-packet tests — the logic
+  # that keeps one tenant's data unreachable from another and gates every paid feature. They need a
+  # real Postgres (the db package refuses to import without DATABASE_URL), so this job stands up a
+  # throwaway server, pushes each schema into its own database, and runs the suites. A regression
+  # here is a security or billing hole, so it must fail CI before it reaches Railway.
+  test:
+    name: integration tests (compass + kanon + engine)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SESSION_SECRET: ci-only-secret-32-chars-minimum-length
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create databases
+        run: |
+          psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE compass_test;"
+          psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE kanon_test;"
+
+      - name: Curriculum engine unit tests (no DB)
+        run: pnpm --filter @workspace/compass-curriculum-engine run test
+
+      - name: Compass API integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/compass_test
+        run: |
+          pnpm --filter @workspace/compass-db run push-force
+          pnpm --filter @workspace/compass-api run test
+
+      - name: Kanon API integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kanon_test
+        run: |
+          pnpm --filter @workspace/kanon-db run push-force
+          pnpm --filter @workspace/kanon-api run test
+
   # Praxis LMS is a SELF-CONTAINED pnpm workspace under praxis/ with its own lockfile, deployed as
   # its own Railway service (Dockerfile.praxis). The Coach job above never builds it, so a Praxis-
   # breaking change could pass CI and only fail in the Railway image build. This job reproduces
