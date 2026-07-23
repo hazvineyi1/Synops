@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "./lib/logger";
 import { handleStripeWebhook } from "./lib/stripeWebhook";
+import { captureError } from "./lib/instrument";
 
 const app: Express = express();
 
@@ -179,6 +180,8 @@ app.use(
         _next: express.NextFunction,
     ) => {
         req.log?.error({ err }, "Unhandled request error");
+        // Report to Sentry (no-op unless SENTRY_DSN is set).
+        captureError(err);
         if (res.headersSent) return;
         res.status(500).json({ error: "Internal server error" });
     },

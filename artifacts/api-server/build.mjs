@@ -68,6 +68,10 @@ async function buildAll() {
       "googleapis",
       "firebase-admin",
       "@parcel/watcher",
+      // Externalized (not bundled): @sentry/node pulls in the OpenTelemetry tree
+      // (also external below), which does not bundle cleanly. Kept external so it
+      // resolves at runtime from node_modules with its own dependency subtree.
+      "@sentry/node",
       "@sentry/profiling-node",
       "@tree-sitter/*",
       "aws-sdk",

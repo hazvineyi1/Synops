@@ -178,6 +178,9 @@ importers:
       '@mozilla/readability':
         specifier: ^0.6.0
         version: 0.6.0
+      '@sentry/node':
+        specifier: ^8.0.0
+        version: 8.55.2
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
@@ -957,6 +960,9 @@ importers:
       '@replit/connectors-sdk':
         specifier: ^0.4.1
         version: 0.4.1
+      '@sentry/node':
+        specifier: ^8.0.0
+        version: 8.55.2
       '@swc/helpers':
         specifier: ^0.5.23
         version: 0.5.23
