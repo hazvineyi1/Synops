@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
+import { Logo } from "./Logo";
 
 export function Footer() {
   return (
@@ -7,18 +8,12 @@ export function Footer() {
       <div className="max-w-[1200px] mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-20">
           <div className="col-span-1 md:col-span-2 pr-8">
-            <Link href="/" className="flex items-center gap-3 mb-6 inline-flex">
-              <div className="w-8 h-8 rounded-[4px] bg-primary flex items-center justify-center">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="white" />
-                </svg>
-              </div>
-              <span className="font-sans text-[22px] tracking-tight text-foreground">
-                <span className="font-bold">Synops</span> <span className="font-normal">Consulting</span>
-              </span>
+            <Link href="/" className="mb-6 inline-flex">
+              <Logo wordmarkClassName="text-foreground" />
             </Link>
             <p className="text-[15px] text-muted-foreground leading-relaxed max-w-sm">
-              Operations, learning, and technology consulting, from strategy to build.
+              An education technology and AI company. We build the platforms that teach, coach, and
+              certify, and consult where deep operational rigor is needed.
             </p>
           </div>
 

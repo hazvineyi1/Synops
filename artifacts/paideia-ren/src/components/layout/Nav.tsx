@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
 import { Menu, X } from "lucide-react";
+import { Logo } from "./Logo";
 
 export function Nav() {
   const [isScrolled, setIsScrolled] = React.useState(false);
@@ -16,11 +17,11 @@ export function Nav() {
   }, []);
 
   const navLinks = [
-    { href: "/about", label: "About" },
-    { href: "/healthcare", label: "Healthcare" },
+    { href: "/products", label: "Products" },
     { href: "/learning", label: "Learning & AI" },
     { href: "/platforms", label: "Platforms" },
-    { href: "/products", label: "Products" },
+    { href: "/healthcare", label: "Healthcare" },
+    { href: "/about", label: "About" },
     { href: "/insights", label: "Insights" },
   ];
 
@@ -32,15 +33,8 @@ export function Nav() {
         }`}
       >
         <div className="max-w-[1200px] mx-auto px-6 h-[88px] flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group z-50">
-            <div className={`w-8 h-8 rounded-[4px] flex items-center justify-center transition-colors ${isScrolled ? 'bg-primary' : 'bg-white'}`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 2L2 12L12 22L22 12L12 2Z" fill={isScrolled ? "white" : "currentColor"} className={isScrolled ? "" : "text-primary"} />
-              </svg>
-            </div>
-            <span className={`font-sans text-[22px] tracking-tight ${isScrolled ? "text-foreground" : "text-white"}`}>
-              <span className="font-bold">Synops</span> <span className="font-normal">Consulting</span>
-            </span>
+          <Link href="/" className="z-50">
+            <Logo wordmarkClassName={isScrolled ? "text-foreground" : "text-white"} />
           </Link>
 
           <nav className="hidden md:flex items-center gap-8">
