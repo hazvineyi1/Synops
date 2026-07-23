@@ -1,3 +1,3 @@
-Chore: add drizzle baseline migration (0000) as the migration history
+Marketing: edtech-led rebrand of synops-consulting.com
 
-Commits the versioned migration baseline generated from the current schema (93 tables, 35 enums, 140 statements) at praxis/lib/db/migrations/0000_polite_lightspeed.sql + meta/. A migrations/.gitattributes forces LF on the SQL so drizzle's file-hash stays stable across Windows/Linux checkouts. The baseline is already marked-applied on the staging DB and on the live prod DB (Railway Synops DB) via the drizzle ledger, so this file is NOT re-run anywhere; from here schema changes flow through drizzle-kit generate -> staging migrate -> prod migrate. No runtime/app change. Files: praxis/lib/db/migrations/.
+Home now leads with EdTech + AI and the platforms; healthcare is the supporting practice. New monogram-S logo + favicon and a refined teal/orange palette via central tokens, so every page inherits it. Contact and inquiry submissions now email info@synops-consulting.com (Resend, reply-to the visitor). Copy is em-dash free. Files: paideia-ren (Home, Nav, Footer, Logo, index.css, index.html, favicon) and paideia-api (pilot-requests, email).
