@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,7 +13,6 @@ import Home from "@/pages/Home";
 import About from "@/pages/About";
 import Healthcare from "@/pages/Healthcare";
 import Learning from "@/pages/Learning";
-import Platforms from "@/pages/Platforms";
 import Products from "@/pages/Products";
 import Insights from "@/pages/Insights";
 import Article from "@/pages/Article";
@@ -54,7 +53,8 @@ function Router() {
           <Route path="/about" component={About} />
           <Route path="/healthcare" component={Healthcare} />
           <Route path="/learning" component={Learning} />
-          <Route path="/platforms" component={Platforms} />
+          {/* Platforms merged into Products; keep the path as a redirect so old links resolve. */}
+          <Route path="/platforms"><Redirect to="/products" /></Route>
           <Route path="/products" component={Products} />
           <Route path="/insights" component={Insights} />
           <Route path="/insights/:slug" component={Article} />

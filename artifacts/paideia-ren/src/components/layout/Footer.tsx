@@ -19,9 +19,8 @@ export function Footer() {
 
           <div className="flex flex-col gap-4">
             <h3 className="text-[13px] font-bold uppercase tracking-wider text-foreground mb-2">Practices</h3>
-            <Link href="/healthcare" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Healthcare & Operations</Link>
             <Link href="/learning" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Learning, EdTech & AI</Link>
-            <Link href="/platforms" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Platforms & Build</Link>
+            <Link href="/healthcare" className="text-[15px] text-muted-foreground hover:text-accent transition-colors">Healthcare & Operations</Link>
           </div>
 
           {/* Products: private beta. These link to the /products showcase (sampler +

@@ -189,91 +189,20 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How we work */}
-      <section className="py-24 lg:py-32 px-6 bg-background border-t border-border">
-        <div className="max-w-[1200px] mx-auto">
-          <h2 className="text-4xl lg:text-[48px] font-bold text-primary tracking-tight mb-16">
-            How we work
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {[
-              { num: "01", title: "Assess", copy: "We analyze current state constraints, define measurable outcomes, and identify risks before committing resources." },
-              { num: "02", title: "Design", copy: "We structure the intervention, whether an organizational workflow, a curriculum, or a platform architecture." },
-              { num: "03", title: "Build", copy: "We execute the plan directly. We are practitioners, not just advisors. We build the courses and manage the implementations." },
-              { num: "04", title: "Sustain", copy: "We hand off robust documentation, conduct training, and ensure the organization can maintain the new standard." }
-            ].map((step, i) => (
-              <div key={i} className="flex flex-col">
-                <span className="text-accent font-bold text-xl mb-4">{step.num}</span>
-                <div className="h-px bg-border w-full mb-6 relative">
-                  <div className="absolute top-0 left-0 h-full w-12 bg-primary"></div>
-                </div>
-                <h4 className="text-2xl font-bold text-foreground mb-4">{step.title}</h4>
-                <p className="text-[16px] text-muted-foreground leading-relaxed">{step.copy}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Principals */}
-      <section className="py-24 lg:py-32 px-6 bg-white border-t border-border">
-        <div className="max-w-[1200px] mx-auto">
-          <div className="max-w-3xl mb-16">
-            <h2 className="text-4xl lg:text-[48px] font-bold text-primary tracking-tight mb-6">
-              Led by the people doing the work
-            </h2>
-            <p className="text-[20px] text-muted-foreground leading-relaxed">
-              Synops is a complementary partnership. You work directly with the principals, not a rotating bench of juniors.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-            {[
-              {
-                initials: "BM",
-                name: "Bertha D. Musoni",
-                role: "Founder & Principal Consultant",
-                creds: "MPH · MBA · PMP · DBA(c)",
-                bio: "20+ years in managed care, Medicaid operations, and provider network management, with oversight of provider relationships up to $1B in annual spend.",
-              },
-              {
-                initials: "BM",
-                name: "Belinda H. Musoni",
-                role: "Principal, Learning & AI",
-                creds: "M.Ed · PhD(c) ML · Quality Matters",
-                bio: "A learning scientist and instructional-design leader who has shipped 40+ courses to WCAG 2.1 AA, with deep work in AI evaluation and adaptive systems.",
-              },
-            ].map((p) => (
-              <div key={p.name} className="flex gap-6 border border-border p-8 bg-background">
-                <div className="shrink-0 w-16 h-16 rounded-[6px] bg-primary flex items-center justify-center">
-                  <span className="text-white font-bold text-[20px] tracking-tight">{p.initials}</span>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-foreground tracking-tight">{p.name}</h3>
-                  <p className="text-primary font-semibold text-[14px] uppercase tracking-wide mb-1">{p.role}</p>
-                  <p className="text-[12px] font-semibold text-muted-foreground tracking-widest uppercase mb-4">{p.creds}</p>
-                  <p className="text-[15px] text-muted-foreground leading-relaxed">{p.bio}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          <Link href="/about" className="text-primary font-bold text-[16px] inline-flex items-center gap-2 hover:text-accent transition-colors group">
-            Read more about the firm <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-          </Link>
-        </div>
-      </section>
-
       {/* Founder conviction */}
-      <section className="py-24 lg:py-32 px-6 bg-background border-t border-border">
+      <section className="py-24 lg:py-32 px-6 bg-white border-t border-border">
         <div className="max-w-[860px] mx-auto text-center">
           <Quote className="text-accent mx-auto mb-8" size={40} />
           <blockquote className="text-[26px] lg:text-[32px] font-medium text-foreground leading-[1.4] tracking-tight mb-8">
             "We don't hand over a slide deck and wish you luck. We build the workflow, ship the course, stand up the platform, and stay until your team can run it without us."
           </blockquote>
-          <div className="text-[15px]">
+          <div className="text-[15px] mb-8">
             <span className="font-bold text-foreground">Bertha D. Musoni</span>
             <span className="text-muted-foreground"> · Founder & Principal Consultant</span>
           </div>
+          <Link href="/about" className="text-primary font-bold text-[16px] inline-flex items-center gap-2 hover:text-accent transition-colors group">
+            Meet the team <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
       </section>
 
@@ -394,54 +323,16 @@ export default function Home() {
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="py-24 lg:py-32 px-6 bg-white border-b border-border">
-        <div className="max-w-[800px] mx-auto">
-          <h2 className="text-3xl lg:text-[40px] font-bold text-primary tracking-tight mb-12 text-center">
-            Common questions
-          </h2>
-          <div className="space-y-8">
-            <div className="border border-border p-8 rounded-none">
-              <h4 className="text-xl font-bold text-foreground mb-4">Do you only work with clients in Virginia?</h4>
-              <p className="text-[16px] text-muted-foreground leading-relaxed">
-                No. We serve clients nationwide across all U.S. time zones. While we have a physical presence in Virginia, our delivery model is fully remote.
-              </p>
-            </div>
-            <div className="border border-border p-8 rounded-none">
-              <h4 className="text-xl font-bold text-foreground mb-4">What is your typical engagement model?</h4>
-              <p className="text-[16px] text-muted-foreground leading-relaxed">
-                We offer both strategic advisory (assessments, audits, planning) and hands-on execution (building courses, managing operations transitions, developing platforms). We structure engagements as distinct projects with clear deliverables and timelines.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* CTA Strip */}
-      <section className="py-24 px-6 bg-background">
+      <section className="py-24 px-6 bg-background border-t border-border">
         <div className="max-w-[1200px] mx-auto text-center">
           <h2 className="text-4xl font-bold text-primary mb-8 tracking-tight">Ready to begin?</h2>
-          <Link 
-            href="/contact" 
+          <Link
+            href="/contact"
             className="inline-block bg-accent hover:bg-accent/90 text-white px-10 py-5 font-bold text-[18px] transition-colors rounded-[6px]"
           >
             Book a consultation
           </Link>
-          <div className="mt-12 text-[14px] text-muted-foreground font-semibold tracking-widest uppercase flex flex-wrap justify-center gap-x-6 gap-y-3">
-            <span>MPH</span>
-            <span>·</span>
-            <span>MBA</span>
-            <span>·</span>
-            <span>PMP</span>
-            <span>·</span>
-            <span>DBA(c)</span>
-            <span>·</span>
-            <span>M.Ed</span>
-            <span>·</span>
-            <span>PhD(c) Machine Learning</span>
-            <span>·</span>
-            <span>Quality Matters</span>
-          </div>
         </div>
       </section>
     </div>

@@ -19,10 +19,8 @@ export function Nav() {
   const navLinks = [
     { href: "/products", label: "Products" },
     { href: "/learning", label: "Learning & AI" },
-    { href: "/platforms", label: "Platforms" },
     { href: "/healthcare", label: "Healthcare" },
     { href: "/about", label: "About" },
-    { href: "/insights", label: "Insights" },
   ];
 
   return (
