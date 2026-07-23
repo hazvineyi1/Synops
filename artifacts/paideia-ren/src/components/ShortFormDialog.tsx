@@ -31,7 +31,9 @@ interface Props {
   toastTitle: string;
   toastDescription: string;
   testIdPrefix?: string;
-  endpoint?: string;
+  // Required: the POST target for the submission. Making this mandatory removes the
+  // possibility of a form that silently accepts input and never sends it anywhere.
+  endpoint: string;
   source?: string;
 }
 
@@ -66,44 +68,38 @@ export function ShortFormDialog({
   const [submitting, setSubmitting] = React.useState(false);
 
   async function onSubmit(values: Values) {
-    if (endpoint) {
-      setSubmitting(true);
-      try {
-        const utm = getUtm();
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            source: source ?? testIdPrefix,
-            contactName: values.name,
-            contactEmail: values.email,
-            organization: values.organization || null,
-            message: values.message || null,
-            sourcePath: typeof window !== "undefined" ? window.location.pathname + window.location.search : null,
-            sourceReferrer: typeof document !== "undefined" ? document.referrer || null : null,
-            sourceUtm: Object.keys(utm).length > 0 ? utm : null,
-            anonymousId: getAnonymousId(),
-          }),
-        });
-        if (!res.ok) throw new Error(`Request failed (${res.status})`);
-        track("pilot_form_submitted", { source: source ?? testIdPrefix });
-        toast({ title: toastTitle, description: toastDescription });
-        form.reset();
-        setOpen(false);
-      } catch (err) {
-        toast({
-          title: "Could not send",
-          description: (err as Error).message + ". Please try again or email info@synops-consulting.com.",
-          variant: "destructive",
-        });
-      } finally {
-        setSubmitting(false);
-      }
-      return;
+    setSubmitting(true);
+    try {
+      const utm = getUtm();
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: source ?? testIdPrefix,
+          contactName: values.name,
+          contactEmail: values.email,
+          organization: values.organization || null,
+          message: values.message || null,
+          sourcePath: typeof window !== "undefined" ? window.location.pathname + window.location.search : null,
+          sourceReferrer: typeof document !== "undefined" ? document.referrer || null : null,
+          sourceUtm: Object.keys(utm).length > 0 ? utm : null,
+          anonymousId: getAnonymousId(),
+        }),
+      });
+      if (!res.ok) throw new Error(`Request failed (${res.status})`);
+      track("pilot_form_submitted", { source: source ?? testIdPrefix });
+      toast({ title: toastTitle, description: toastDescription });
+      form.reset();
+      setOpen(false);
+    } catch (err) {
+      toast({
+        title: "Could not send",
+        description: (err as Error).message + ". Please try again or email info@synops-consulting.com.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
     }
-    toast({ title: toastTitle, description: toastDescription });
-    form.reset();
-    setOpen(false);
   }
 
   return (
