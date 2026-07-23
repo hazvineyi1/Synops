@@ -28,6 +28,15 @@ export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: sslFor(process.env.DATABASE_URL),
 });
+
+// An idle pooled client can emit 'error' when a hosted provider drops the socket
+// (Railway/Supabase close idle connections aggressively). Without a listener,
+// node's default handling of an unhandled 'error' event would crash the process.
+// Log it and let the pool re-establish connections on demand.
+pool.on("error", (err) => {
+  console.error("[db] idle client error:", err);
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

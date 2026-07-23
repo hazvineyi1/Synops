@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { loadTeacher } from "./middlewares/auth.js";
+import { globalRateLimit } from "./middlewares/rateLimit.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { syncTeacherFromCustomer } from "./lib/stripeSync.js";
 import { captureError } from "./instrument.js";
@@ -21,6 +22,8 @@ const app: Express = express();
 // caller rather than the shared proxy address; without this, every request looks
 // like it comes from one IP and per-IP rate limiting throttles all users as one.
 app.set("trust proxy", 1);
+// Do not advertise the framework.
+app.disable("x-powered-by");
 
 app.use(
   pinoHttp({
@@ -41,6 +44,36 @@ app.use(
     },
   }),
 );
+
+// Baseline security response headers on every response. Dependency-free and
+// conservative (no CSP, since this server also serves the SPA + third-party
+// assets and a wrong CSP silently breaks the app).
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-DNS-Prefetch-Control", "off");
+  res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  if (process.env["NODE_ENV"] === "production") {
+    res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
+  }
+  next();
+});
+
+// Broad denial-of-service backstop across the whole API. Health probes are
+// exempt so a monitor is never throttled; per-route limiters add tighter caps.
+app.use(
+  globalRateLimit({
+    windowMs: 60_000,
+    max: 1000,
+    skip: (req) =>
+      req.path === "/api/healthz" ||
+      req.path === "/api/readyz" ||
+      req.path === "/api/version",
+  }),
+);
+
 app.use(
   cors({
     origin: process.env["NODE_ENV"] === "production"
