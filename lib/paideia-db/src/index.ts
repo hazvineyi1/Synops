@@ -25,6 +25,15 @@ function sslFor(connectionString: string): false | { rejectUnauthorized: false }
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: sslFor(process.env.DATABASE_URL),
+  // keepAlive prevents a hosted proxy from silently dropping an idle socket
+  // (which surfaces as an intermittent "Connection terminated unexpectedly").
+  keepAlive: true,
+  // Recycle idle clients before the proxy's own idle cutoff.
+  idleTimeoutMillis: 30_000,
+  // Fail fast on a hung connect instead of hanging the request.
+  connectionTimeoutMillis: 10_000,
+  // Bound the pool so a burst can't exhaust the database's connection limit.
+  max: 10,
 });
 
 // An idle pooled client can emit 'error' when a hosted provider drops the socket
