@@ -124,6 +124,26 @@ jobs:
           pnpm --filter @workspace/kanon-db run push-force
           pnpm --filter @workspace/kanon-api run test
 
+      # SLO gate: boot a real service and load its DB-backed readiness endpoint
+      # under concurrency, asserting the objectives (scripts/loadtest.mjs exits
+      # non-zero on a breach). This turns SLA validation into a continuous check
+      # instead of a manual pre-launch step, so a pool/query/rate-limit
+      # regression that tanks latency or leaks 5xx fails CI. The p99 threshold is
+      # lenient because shared CI runners are slower than production; the hard
+      # guarantee enforced here is zero errors and zero 5xx under load.
+      - name: SLO load gate (readiness under concurrency)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kanon_test
+        run: |
+          pnpm --filter @workspace/kanon-api run build
+          PORT=5099 NODE_ENV=production node artifacts/kanon-api/dist/index.mjs &
+          SRV=$!
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:5099/api/readyz >/dev/null 2>&1 && break; sleep 1; done
+          node scripts/loadtest.mjs http://127.0.0.1:5099/api/readyz -r 1000 -c 50 --max-p99 1500 --max-error-rate 1
+          RESULT=$?
+          kill $SRV 2>/dev/null || true
+          exit $RESULT
+
   # Praxis LMS is a SELF-CONTAINED pnpm workspace under praxis/ with its own lockfile, deployed as
   # its own Railway service (Dockerfile.praxis). The Coach job above never builds it, so a Praxis-
   # breaking change could pass CI and only fail in the Railway image build. This job reproduces
