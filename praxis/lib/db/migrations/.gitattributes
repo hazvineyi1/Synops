@@ -1,0 +1,2 @@
+*.sql text eol=lf
+meta/*.json text eol=lf
