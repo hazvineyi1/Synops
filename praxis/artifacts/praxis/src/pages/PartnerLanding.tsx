@@ -9,7 +9,7 @@ interface Landing { slug: string; name: string; brand: Brand | null; orgs: { nam
 const ENZA = {
   tagline: 'Connect. Create. Elevate.',
   heroLead: 'We empower township and rural entrepreneurs through business coaching, practical training and incubation - helping new ventures launch, existing SMMEs grow, and entrepreneurial skills flourish.',
-  accreditation: 'A QCTO-accredited training provider',
+  accreditation: 'Practical, skills-based business training and coaching',
   programmes: [
     { name: 'BizAscend Starter', desc: 'From idea to first sales - the fundamentals to start and sustain a business.' },
     { name: 'BizAscend Builder', desc: 'Systems that support growth - operations, finance and repeatable selling.' },
@@ -78,11 +78,10 @@ export function PartnerLanding({ params }: { params: { slug: string } }) {
         <div className="max-w-6xl mx-auto px-5 py-20 sm:py-28 relative">
           <div className="text-xs font-semibold uppercase tracking-[0.3em] mb-4" style={{ color: accent }}>{isEnza ? c.tagline : 'Learn. Grow. Succeed.'}</div>
           <h1 className="text-4xl sm:text-6xl font-black text-white leading-[1.05] max-w-3xl">Growth comes from <span style={{ color: accent }}>skilling your people</span>.</h1>
-          <p className="mt-6 text-lg text-slate-200 max-w-2xl leading-relaxed">{isEnza ? c.heroLead : `${name} delivers practical, accredited training and coaching so people and businesses can grow with confidence.`}</p>
+          <p className="mt-6 text-lg text-slate-200 max-w-2xl leading-relaxed">{isEnza ? c.heroLead : `${name} delivers practical, skills-based training and coaching so people and businesses can grow with confidence.`}</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Btn href={`/sign-in?p=${slug}`}>Enter the platform</Btn>
           </div>
-          {isEnza && <div className="mt-6 text-sm text-slate-300">{c.accreditation}</div>}
         </div>
       </section>
 
