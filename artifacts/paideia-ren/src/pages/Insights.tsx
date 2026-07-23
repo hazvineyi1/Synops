@@ -4,23 +4,35 @@ import { ArrowRight } from "lucide-react";
 import { CTASection } from "@/components/layout/CTASection";
 import { articles } from "@/data/insights";
 
+// Lead with EdTech + AI: order the feed so the learning/AI and platform pieces
+// come first, with the healthcare/operations perspective as the supporting one.
+const CATEGORY_ORDER: Record<string, number> = {
+  "Learning, EdTech & AI": 0,
+  "Platforms & SaaS": 1,
+  "Healthcare & Operations": 2,
+};
+const sortedArticles = [...articles].sort(
+  (a, b) => (CATEGORY_ORDER[a.category] ?? 9) - (CATEGORY_ORDER[b.category] ?? 9),
+);
+
 export default function Insights() {
   return (
     <div className="min-h-screen pt-[88px]">
       <section className="bg-background pt-24 pb-20 px-6 border-b border-border">
         <div className="max-w-[1200px] mx-auto">
+          <span className="block text-[13px] font-bold uppercase tracking-widest text-accent mb-5">Education Technology &amp; AI</span>
           <h1 className="text-5xl md:text-[64px] font-bold text-primary leading-[1.1] tracking-tight mb-6">
             Insights
           </h1>
           <p className="text-[22px] text-muted-foreground leading-relaxed max-w-3xl">
-            Perspectives on healthcare operations, learning science, and technical implementation from our principals.
+            Perspectives on education technology and AI, learning science, and the operational rigor that makes our platforms hold up in the real world.
           </p>
         </div>
       </section>
 
       <section className="py-24 px-6 bg-white">
         <div className="max-w-[1200px] mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-          {articles.map((post) => (
+          {sortedArticles.map((post) => (
             <Link
               key={post.slug}
               href={`/insights/${post.slug}`}
