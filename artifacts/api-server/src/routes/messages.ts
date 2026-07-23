@@ -77,8 +77,12 @@ router.post("/messages", requireAuth, async (req, res) => {
     return;
   }
 
-  // Save user message
-  await db.insert(coachMessagesTable).values({ userId, role: "user", content: text });
+  // Save the user message, capturing its id so we can undo it if reply
+  // generation fails (below) rather than leaving a question with no answer.
+  const [userMsg] = await db
+    .insert(coachMessagesTable)
+    .values({ userId, role: "user", content: text })
+    .returning();
 
   // Get profile for personality
   const profiles = await db.select().from(profilesTable).where(eq(profilesTable.userId, userId)).limit(1);
@@ -121,12 +125,24 @@ Rules:
   const systemPrompt =
     buildSystemPrompt(personality, profileContext) + teachingLoop + languageInstruction(readLangCookie(req));
 
-  const response = await createMessage({
-    model: MODEL,
-    max_tokens: 1500,
-    system: systemPrompt,
-    messages: chatMessages,
-  }, { label: "chat", userId });
+  let response;
+  try {
+    response = await createMessage({
+      model: MODEL,
+      max_tokens: 1500,
+      system: systemPrompt,
+      messages: chatMessages,
+    }, { label: "chat", userId });
+  } catch (err) {
+    // Reply generation failed. Remove the just-saved user message so the thread
+    // never shows a question with no answer, then surface the error so the
+    // client can let the learner retry.
+    await db
+      .delete(coachMessagesTable)
+      .where(eq(coachMessagesTable.id, userMsg.id))
+      .catch(() => {});
+    throw err;
+  }
 
   const replyContent = response.content[0]?.type === "text" ? response.content[0].text : "I'm here. What's on your mind?";
 
