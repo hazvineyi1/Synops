@@ -1,4 +1,5 @@
 import type { AccreditationReport, StandardRow } from "./accreditationEngine";
+import { drawLetterheadHeader, drawLetterheadFooters, LETTERHEAD } from "./letterhead";
 
 /**
  * Renders an AccreditationReport to downloadable files.
@@ -19,6 +20,7 @@ export async function buildWorkbook(report: AccreditationReport): Promise<Buffer
 
   const s = report.summary;
   const summaryAoa: (string | number)[][] = [
+    [LETTERHEAD.providerName],
     ["Accreditation Readiness Report"],
     ["Organisation", report.org.name],
     ["Generated", new Date(report.generatedAt).toLocaleString()],
@@ -96,9 +98,8 @@ export async function buildPdf(report: AccreditationReport): Promise<Buffer> {
     if (doc.y + h > bottom) doc.addPage();
   };
 
-  // Title
-  doc.fillColor(teal).fontSize(11).font("Helvetica-Bold").text("PRAXIS", { characterSpacing: 1 });
-  doc.moveDown(0.3);
+  // Standard Synops Consulting Group letterhead (single source of truth), then the title.
+  drawLetterheadHeader(doc as never, { name: teal, sub: soft, line });
   doc.fillColor(ink).fontSize(24).font("Helvetica-Bold").text("Accreditation Readiness Report");
   doc.moveDown(0.2);
   doc.fillColor(soft).fontSize(12).font("Helvetica").text(report.org.name);
@@ -179,15 +180,8 @@ export async function buildPdf(report: AccreditationReport): Promise<Buffer> {
   if (report.gaps.unmappedCourses.length === 0) doc.fillColor("#6b7a76").text("None — every published course maps to at least one standard.");
   else report.gaps.unmappedCourses.forEach((c) => { ensure(16); doc.fillColor(ink).text(`• ${c.title}`); });
 
-  // Page numbers
-  const range = doc.bufferedPageRange();
-  for (let i = 0; i < range.count; i++) {
-    doc.switchToPage(range.start + i);
-    doc.fillColor("#8a9995").fontSize(8).font("Helvetica").text(
-      `Praxis Accreditation Readiness Report — ${report.org.name} — page ${i + 1} of ${range.count}`,
-      left, doc.page.height - 34, { width, align: "center" },
-    );
-  }
+  // Standard letterhead footer on every page (provider name + doc title + page X of Y).
+  drawLetterheadFooters(doc as never, `Accreditation Readiness Report — ${report.org.name}`);
 
   doc.end();
   return done;
