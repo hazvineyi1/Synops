@@ -23,6 +23,11 @@ router.get("/version", (_req, res) => {
     service: "paideia-api",
     commit: process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT ?? "unknown",
     deploymentId: process.env.RAILWAY_DEPLOYMENT_ID ?? null,
+    // Which region + replica is serving this request. Prerequisite for
+    // multi-region operations: when traffic is split or failed over across
+    // regions, the response and its log line must say which instance answered.
+    region: process.env.RAILWAY_REPLICA_REGION ?? process.env.REGION ?? null,
+    instanceId: process.env.RAILWAY_REPLICA_ID ?? process.env.HOSTNAME ?? null,
     env: process.env.NODE_ENV ?? "development",
     node: process.version,
     startedAt: STARTED_AT.toISOString(),
