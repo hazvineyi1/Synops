@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { coursesTable, modulesTable, beatsTable, assignmentsTable, interactiveActivitiesTable, coursePartnerAssignmentsTable } from "@workspace/db";
-import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import { eq, desc, and, inArray, sql, count, ilike } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { canParticipateInCourse, canStaffActOnCourse, canViewCourseCatalog } from "../lib/scope";
 
@@ -32,11 +32,35 @@ function toCourseResponse(c: typeof coursesTable.$inferSelect) {
 // GET /courses
 router.get("/courses", requireAuth, async (req, res) => {
   const user = req.dbUser!;
+  // Pagination + search + status filter so the catalogue scales. Default limit is
+  // generous so existing (unpaged) callers keep working; the true count is in the
+  // X-Total-Count header. Body stays a plain array.
+  const rawLimit = Number(req.query.limit ?? 500);
+  const limit = Math.min(Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 500), 500);
+  const rawOffset = Number(req.query.offset ?? 0);
+  const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+  const search = String(req.query.search ?? "").trim();
+  const statusFilter = String(req.query.status ?? "").trim();
+  const isStatus = statusFilter === "draft" || statusFilter === "published" || statusFilter === "archived";
+
   // Hub roles (super_admin, instructional_designer) author/oversee across every org, so
   // they see the whole catalogue; everyone else is scoped to their partner/org tenant.
   const seesAll = isHub(user.role);
   if (seesAll) {
-    const courses = await db.select().from(coursesTable).orderBy(desc(coursesTable.createdAt));
+    const conds = [
+      search ? ilike(coursesTable.title, `%${search}%`) : undefined,
+      isStatus ? eq(coursesTable.status, statusFilter as "draft" | "published" | "archived") : undefined,
+    ].filter((c): c is NonNullable<typeof c> => !!c);
+    const where = conds.length ? and(...conds) : undefined;
+    const [{ value: total }] = await db.select({ value: count() }).from(coursesTable).where(where);
+    res.setHeader("X-Total-Count", String(total));
+    const courses = await db
+      .select()
+      .from(coursesTable)
+      .where(where)
+      .orderBy(desc(coursesTable.createdAt))
+      .limit(limit)
+      .offset(offset);
     res.json(courses.map(toCourseResponse));
     return;
   }
@@ -59,10 +83,16 @@ router.get("/courses", requireAuth, async (req, res) => {
       // Assignment table not created yet (setup-platform not run) -> just the owned list.
     }
   }
-  const all = [...owned, ...assigned].sort(
+  let all = [...owned, ...assigned].sort(
     (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
   );
-  res.json(all.map(toCourseResponse));
+  if (search) {
+    const q = search.toLowerCase();
+    all = all.filter((c) => c.title.toLowerCase().includes(q));
+  }
+  if (isStatus) all = all.filter((c) => c.status === statusFilter);
+  res.setHeader("X-Total-Count", String(all.length));
+  res.json(all.slice(offset, offset + limit).map(toCourseResponse));
 });
 
 // POST /courses -- author tiers only (was requireAuth-only, which let any signed-in user create).

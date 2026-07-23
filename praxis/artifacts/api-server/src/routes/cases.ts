@@ -178,7 +178,16 @@ router.get("/cases", requireAuth, async (req, res) => {
     if (!canAuthorCases(u.role)) rows = rows.filter((c) => c.status === "published");
   }
   if (status) rows = rows.filter((c) => c.status === status);
-  res.json(rows.map(caseResponse));
+  // Search + pagination so the case-study list scales. X-Total-Count carries the
+  // filtered total; body stays a plain array (existing consumers unaffected).
+  const search = String(req.query.search ?? "").trim().toLowerCase();
+  if (search) rows = rows.filter((c) => (c.title ?? "").toLowerCase().includes(search));
+  const rawLimit = Number(req.query.limit ?? 500);
+  const limit = Math.min(Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 500), 500);
+  const rawOffset = Number(req.query.offset ?? 0);
+  const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+  res.setHeader("X-Total-Count", String(rows.length));
+  res.json(rows.slice(offset, offset + limit).map(caseResponse));
 });
 
 // GET /cases/:id — a single case (+ rubric).
