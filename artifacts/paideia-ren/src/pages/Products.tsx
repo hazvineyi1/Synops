@@ -178,57 +178,54 @@ function Sampler({
 }) {
   const [active, setActive] = useState(0);
   const current = samples[active]!;
-  const chipOn = accent === "accent" ? "bg-accent text-white" : "bg-primary text-white";
+  const chipOn = accent === "accent" ? "bg-accent text-white border-accent" : "bg-primary text-white border-primary";
+
+  // Cap to 3 rows so the sample stays a tidy, fixed-height panel that balances
+  // the left column instead of towering over it.
+  const rows = current.output.slice(0, 3);
 
   return (
-    <div className="bg-white border border-border rounded-[10px] overflow-hidden shadow-sm">
-      {/* Fake app chrome that signals "this is the product" without being a link */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-border bg-muted/40">
-        <span className="w-2.5 h-2.5 rounded-full bg-border" />
-        <span className="w-2.5 h-2.5 rounded-full bg-border" />
-        <span className="w-2.5 h-2.5 rounded-full bg-border" />
-        <span className="ml-3 text-[12px] font-medium text-muted-foreground">Live sample output</span>
+    <div className="bg-muted/40 border-t lg:border-t-0 lg:border-l border-border p-6 flex flex-col">
+      <div className="flex items-center gap-1.5 mb-3.5">
+        <span className="w-2 h-2 rounded-full bg-border" />
+        <span className="w-2 h-2 rounded-full bg-border" />
+        <span className="w-2 h-2 rounded-full bg-border" />
+        <span className="ml-2 text-[11.5px] font-medium text-muted-foreground">Live sample output</span>
       </div>
 
-      <div className="p-6">
-        <div className="flex flex-wrap gap-2 mb-5">
-          {samples.map((s, i) => (
-            <button
-              key={s.label}
-              type="button"
-              onClick={() => setActive(i)}
-              className={`text-[13px] font-bold px-3.5 py-1.5 rounded-full transition-colors ${
-                i === active ? chipOn : "bg-muted text-muted-foreground hover:bg-muted/70"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-5">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">You ask</div>
-          <div className="bg-muted/50 border border-border rounded-[6px] px-4 py-3 text-[15px] text-foreground italic">
-            "{current.prompt}"
-          </div>
-        </div>
-
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">It produces</div>
-          <div className="space-y-3">
-            {current.output.map((row, i) => (
-              <div key={i} className="border-l-2 border-border pl-4">
-                <div className="text-[13px] font-bold text-primary mb-0.5">{row.h}</div>
-                <p className="text-[15px] text-muted-foreground leading-relaxed">{row.p}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <p className="mt-6 pt-4 border-t border-border text-[13px] text-muted-foreground">
-          Illustrative. The live product runs this against your own curriculum and learners.
-        </p>
+      <div className="flex flex-wrap gap-1.5 mb-3.5">
+        {samples.map((s, i) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => setActive(i)}
+            className={`text-[12px] font-bold px-2.5 py-1.5 rounded-md border transition-colors ${
+              i === active ? chipOn : "bg-white text-muted-foreground border-border hover:bg-muted/70"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
+
+      <div className="text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">You ask</div>
+      <div className="bg-white border border-border rounded-[8px] px-3.5 py-2.5 text-[14px] text-foreground italic mb-4">
+        "{current.prompt}"
+      </div>
+
+      <div className="text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">It produces</div>
+      <div className="space-y-2.5 flex-1">
+        {rows.map((row, i) => (
+          <div key={i} className="border-l-2 border-border pl-3">
+            <div className="text-[12.5px] font-bold text-primary mb-0.5">{row.h}</div>
+            <p className="text-[13.5px] text-muted-foreground leading-snug">{row.p}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-3.5 pt-3 border-t border-border text-[12px] text-muted-foreground">
+        Illustrative. The live product runs this against your own curriculum and learners.
+      </p>
     </div>
   );
 }
@@ -236,70 +233,25 @@ function Sampler({
 /* ------------------------------------------------------ Product explorer */
 
 /**
- * Compact product explorer.
+ * Product explorer: a compact TAB SWITCHER (one product at a time).
  *
- * Replaces three tall stacked sections (which took three screens of scrolling
- * and read as clunky) with a single switcher: pick a product, see its pitch and
- * sampler in place. Deep-linkable via #teacher / #coach / #builder, so a
- * "See it in action" link from elsewhere on the site lands on the RIGHT product
- * instead of dumping the visitor at the top of the page on Synops Teacher.
+ * Replaces the old expand/collapse accordion, which stacked four tall panels and
+ * read as lopsided (short pitch column vs a towering sample). Now: squared tabs
+ * pick a product, and a single balanced two-column card shows its pitch on the
+ * left and a compact, fixed sample on the right. Deep-linkable via
+ * #teacher / #coach / #builder / #praxis so a "See it in action" link lands on
+ * the right product.
  */
-/** The expandable detail body for one product (text column + sampler). */
-function ProductDetail({ p }: { p: Product }) {
-  return (
-    <div className="px-6 lg:px-8 py-9 border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-10 xl:gap-14 items-start">
-      <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-accent mb-3">{p.tagline}</p>
-        <p className="text-[18px] text-foreground leading-relaxed mb-7 max-w-md">{p.lead}</p>
-
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 mb-8">
-          {p.bullets.map((t) => (
-            <li key={t} className="flex gap-2.5 text-[14.5px] text-foreground font-medium leading-snug">
-              <span className="text-accent font-bold mt-px shrink-0">&rarr;</span>
-              <span>{t}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-block text-[12.5px] font-semibold text-muted-foreground bg-muted/60 border border-border rounded-full px-3.5 py-1.5">
-            {p.scaleTitle}
-          </span>
-          {/* Live products link straight to the app; the app gates access itself. */}
-          {p.href && (
-            <a
-              href={p.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block bg-accent text-white px-6 py-2.5 text-[14px] font-bold rounded-[6px] hover:bg-accent/90 transition-colors"
-            >
-              {p.cta ?? "Open"} &rarr;
-            </a>
-          )}
-        </div>
-      </div>
-
-      <Sampler samples={p.samples} accent={p.accent} />
-    </div>
-  );
-}
-
 function ProductExplorer() {
-  // Accordion: any number of products can be open at once, and all can be collapsed.
-  // Starts with the first product open so the page is not bare; every panel toggles.
-  const [open, setOpen] = useState<string[]>([PRODUCTS[0]!.slug]);
-
-  const toggle = (slug: string) =>
-    setOpen((prev) => (prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug]));
+  const [active, setActive] = useState<string>(PRODUCTS[0]!.slug);
 
   useEffect(() => {
     const applyHash = () => {
       const slug = window.location.hash.replace("#", "").toLowerCase();
       if (!PRODUCTS.some((p) => p.slug === slug)) return;
-      // Open the linked product (leave others as they are) and land on it.
-      setOpen((prev) => (prev.includes(slug) ? prev : [...prev, slug]));
+      setActive(slug);
       window.requestAnimationFrame(() => {
-        document.getElementById(`product-${slug}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        document.getElementById("explore")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     };
     applyHash();
@@ -307,89 +259,82 @@ function ProductExplorer() {
     return () => window.removeEventListener("hashchange", applyHash);
   }, []);
 
+  const p = PRODUCTS.find((x) => x.slug === active) ?? PRODUCTS[0]!;
+
   return (
     <section id="explore" className="py-16 px-6 bg-white border-b border-border scroll-mt-20">
-      <div className="max-w-[1200px] mx-auto space-y-4">
-        <div className="flex items-center justify-end gap-4 mb-2">
-          <button
-            type="button"
-            onClick={() => setOpen(PRODUCTS.map((p) => p.slug))}
-            className="text-[13px] font-bold text-muted-foreground hover:text-accent transition-colors"
-          >
-            Expand all
-          </button>
-          <span className="text-border">|</span>
-          <button
-            type="button"
-            onClick={() => setOpen([])}
-            className="text-[13px] font-bold text-muted-foreground hover:text-accent transition-colors"
-          >
-            Collapse all
-          </button>
-        </div>
-
-        {PRODUCTS.map((x) => {
-          const isOpen = open.includes(x.slug);
-          return (
-            <div
-              key={x.slug}
-              id={`product-${x.slug}`}
-              className="border border-border rounded-[10px] overflow-hidden bg-white scroll-mt-24"
-            >
+      <div className="max-w-[1120px] mx-auto">
+        {/* Squared tabs */}
+        <div className="flex flex-wrap justify-center gap-2.5 mb-8">
+          {PRODUCTS.map((x) => {
+            const on = x.slug === active;
+            return (
               <button
+                key={x.slug}
                 type="button"
-                aria-expanded={isOpen}
                 onClick={() => {
-                  toggle(x.slug);
+                  setActive(x.slug);
                   window.history.replaceState(null, "", `#${x.slug}`);
                 }}
-                className={`w-full text-left px-6 py-5 flex items-center gap-4 transition-colors ${
-                  isOpen ? "bg-primary text-white" : "bg-white hover:bg-muted/50"
+                className={`flex items-center gap-2.5 border rounded-lg px-4 py-2.5 font-bold text-[14.5px] transition-colors ${
+                  on ? "bg-primary text-white border-primary" : "bg-white text-muted-foreground border-border hover:bg-muted/40"
                 }`}
               >
-                <div
-                  className={`w-9 h-9 shrink-0 rounded-[5px] flex items-center justify-center font-bold text-[14px] ${
-                    isOpen ? "bg-white text-primary" : "bg-primary text-white"
+                <span
+                  className={`w-6 h-6 rounded-[6px] flex items-center justify-center font-extrabold text-[13px] ${
+                    on ? "bg-white text-primary" : "bg-primary text-white"
                   }`}
                 >
                   {x.letter}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`font-bold text-[18px] ${isOpen ? "text-white" : "text-primary"}`}>{x.name}</span>
-                    {x.tag && (
-                      <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                          isOpen ? "bg-white/20 text-white" : "bg-accent/10 text-accent"
-                        }`}
-                      >
-                        {x.tag}
-                      </span>
-                    )}
-                  </div>
-                  <div className={`text-[13.5px] leading-snug ${isOpen ? "text-white/70" : "text-muted-foreground"}`}>
-                    {x.short}
-                  </div>
-                </div>
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className={`w-5 h-5 shrink-0 transition-transform duration-200 ${
-                    isOpen ? "rotate-180 text-white/80" : "text-muted-foreground"
-                  }`}
-                >
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+                </span>
+                {x.name}
               </button>
+            );
+          })}
+        </div>
 
-              {isOpen && <ProductDetail p={x} />}
+        {/* Balanced two-column panel */}
+        <div className="border border-border rounded-2xl overflow-hidden bg-white shadow-[0_24px_50px_-34px_rgba(19,60,67,0.35)]">
+          <div className="grid grid-cols-1 lg:grid-cols-[0.92fr_1.08fr] items-stretch">
+            <div className="p-8 lg:p-9 flex flex-col">
+              <p className="text-[12px] font-bold uppercase tracking-wider text-accent mb-3">{p.tagline}</p>
+              <div className="flex items-center gap-2 mb-2.5">
+                <h3 className="text-[26px] font-bold text-foreground tracking-tight">{p.name}</h3>
+                {p.tag && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-accent/10 text-accent">
+                    {p.tag}
+                  </span>
+                )}
+              </div>
+              <p className="text-[16.5px] text-muted-foreground leading-relaxed mb-6 max-w-md">{p.lead}</p>
+
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 mb-7">
+                {p.bullets.map((t) => (
+                  <li key={t} className="flex gap-2 text-[14px] text-foreground font-semibold leading-snug">
+                    <span className="text-accent font-extrabold mt-px shrink-0">&rarr;</span>
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="flex flex-wrap items-center gap-3 mt-auto">
+                <span className="inline-block text-[12.5px] font-semibold text-muted-foreground bg-muted/60 border border-border rounded-md px-3.5 py-1.5">
+                  {p.scaleTitle}
+                </span>
+                {/* Live products (Praxis) link straight to the app; the rest route to the interest form. */}
+                <a
+                  href={p.href ?? "#register-interest"}
+                  {...(p.href ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  className="inline-block bg-accent text-white px-6 py-2.5 text-[14px] font-bold rounded-[6px] hover:bg-accent/90 transition-colors"
+                >
+                  {p.href ? p.cta ?? "Open" : "Request access"} &rarr;
+                </a>
+              </div>
             </div>
-          );
-        })}
+
+            <Sampler samples={p.samples} accent={p.accent} />
+          </div>
+        </div>
       </div>
     </section>
   );
