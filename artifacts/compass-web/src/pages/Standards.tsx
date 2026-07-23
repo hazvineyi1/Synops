@@ -271,7 +271,10 @@ function ManageCompetenciesDialog({
   const { toast } = useToast();
   const frameworkId = framework?.id ?? 0;
   const { data: competencies, isLoading } = useListCompetencies(frameworkId, {
-    query: { enabled: !!framework },
+    query: {
+      enabled: !!framework,
+      queryKey: getListCompetenciesQueryKey(frameworkId),
+    },
   });
   const createCompetency = useCreateCompetency();
   const [code, setCode] = useState("");

@@ -18,8 +18,8 @@ import {
   standardsFrameworksTable,
 } from "@workspace/compass-db";
 import {
-  evaluateCourse,
-  type EngineCourse,
+  evaluateCurriculum,
+  type CurriculumEvaluationInput,
   type QaReport,
 } from "@workspace/compass-curriculum-engine";
 
@@ -42,7 +42,7 @@ export interface ObjectiveLevelChange {
 }
 
 export interface ProjectEvaluation {
-  course: EngineCourse;
+  course: CurriculumEvaluationInput;
   report: QaReport;
   /**
    * Objectives whose engine-detected Bloom level differs from what is stored,
@@ -97,7 +97,7 @@ export async function evaluateProject(projectId: number): Promise<ProjectEvaluat
     objStandard.set(link.objectiveId, { id: link.competencyId, label });
   }
 
-  const engineCourse: EngineCourse = {
+  const engineCourse: CurriculumEvaluationInput = {
     title: course?.title || project?.title || "",
     termWeeks: course?.termWeeks ?? null,
     objectives: objectives.map((o) => {
@@ -105,19 +105,18 @@ export async function evaluateProject(projectId: number): Promise<ProjectEvaluat
       return {
         id: String(o.id),
         text: o.text,
-        standardId: std ? String(std.id) : null,
-        standardLabel: std?.label ?? null,
+        standardAlignmentIds: std ? [String(std.id)] : [],
+        standardAlignmentLabel: std?.label ?? undefined,
       };
     }),
     assessments: assessments.map((a) => ({
       id: String(a.id),
       title: a.title,
-      type: a.assessmentType,
       objectiveIds: parseIds(a.alignedObjectiveIds).map(String),
     })),
   };
 
-  const report = evaluateCourse(engineCourse);
+  const report = evaluateCurriculum(engineCourse);
 
   const detectedByObjective = new Map(
     report.objectiveAnalyses.map((a) => [
