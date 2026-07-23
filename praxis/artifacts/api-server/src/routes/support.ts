@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
+import { answerSupport, type SupportTurn } from "../lib/supportChatbot";
 
 const router = Router();
 
@@ -344,6 +345,23 @@ router.get("/support/overview", requireAuth, requireStaff, async (req, res) => {
     .where(scope.length ? and(...scope) : undefined);
 
   res.json(row);
+});
+
+// POST /support/chat — learner-facing support chatbot. Stateless: the client sends the running
+// conversation and gets the next reply. Helps with using the platform, never does coursework.
+router.post("/support/chat", requireAuth, async (req, res) => {
+  const raw = Array.isArray(req.body?.messages) ? req.body.messages : [];
+  const messages: SupportTurn[] = raw
+    .filter((m: unknown): m is { role: string; content: unknown } => !!m && typeof m === "object")
+    .map((m: { role: string; content: unknown }) => ({
+      role: m.role === "assistant" ? ("assistant" as const) : ("user" as const),
+      content: String(m.content ?? ""),
+    }))
+    .filter((m: SupportTurn) => m.content.trim());
+  if (!messages.length) { res.status(400).json({ error: "messages required" }); return; }
+  const u = req.dbUser!;
+  const reply = await answerSupport(messages, { firstName: u.firstName, role: u.role });
+  res.json({ reply });
 });
 
 export default router;

@@ -17,11 +17,13 @@ import {
   platformFilingsTable,
   partnerDocumentsTable,
   coursesTable,
+  opsAnomaliesTable,
 } from "@workspace/db";
 import { eq, and, isNull, desc, sql, or, ilike, gte, count, type SQL } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { logAudit as audit } from "../lib/audit";
 import { healthSnapshot } from "../lib/healthMetrics";
+import { runOpsScan } from "../lib/opsAgent";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
@@ -376,6 +378,27 @@ router.post("/platform/users/:id/revoke-sessions", requireAuth, requireSuperAdmi
 /** GET /platform/health - detailed health snapshot for the admin status dashboard. */
 router.get("/platform/health", requireAuth, requireSuperAdmin, async (_req, res) => {
   res.json(await healthSnapshot());
+});
+
+// GET /platform/ops/anomalies — the ops-agent feed (active by default; ?status=resolved for history).
+router.get("/platform/ops/anomalies", requireAuth, requireSuperAdmin, async (req, res) => {
+  const status = req.query.status === "resolved" ? "resolved" : "active";
+  try {
+    const rows = await db
+      .select()
+      .from(opsAnomaliesTable)
+      .where(eq(opsAnomaliesTable.status, status))
+      .orderBy(desc(opsAnomaliesTable.lastSeenAt))
+      .limit(100);
+    res.json(rows);
+  } catch {
+    res.json([]);
+  }
+});
+
+// POST /platform/ops/scan — run a scan on demand (the agent also runs every minute on its own).
+router.post("/platform/ops/scan", requireAuth, requireSuperAdmin, async (_req, res) => {
+  res.json({ firing: await runOpsScan() });
 });
 
 router.get("/platform/login-activity", requireAuth, requireSuperAdmin, async (req, res) => {

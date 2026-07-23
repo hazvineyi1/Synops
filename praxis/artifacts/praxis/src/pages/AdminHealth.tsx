@@ -15,6 +15,16 @@ interface Health {
   window: { requests: number; errors: number; errorRatePct: number };
 }
 
+interface Anomaly {
+  id: string;
+  kind: string;
+  severity: "warning" | "critical";
+  title: string;
+  detail: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
 const TONE: Record<string, string> = {
   operational: "text-green-600",
   degraded: "text-amber-600",
@@ -30,9 +40,11 @@ function uptime(s: number): string {
 export default function AdminHealth() {
   const { user } = useSession();
   const [h, setH] = useState<Health | null>(null);
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
 
   const load = useCallback(async () => {
     try { setH(await apiFetch<Health>("/platform/health")); } catch { /* transient */ }
+    try { setAnomalies(await apiFetch<Anomaly[]>("/platform/ops/anomalies")); } catch { /* transient */ }
   }, []);
 
   useEffect(() => {
@@ -78,6 +90,34 @@ export default function AdminHealth() {
               <div><p className="text-muted-foreground">5xx (total)</p><p className="font-semibold">{h.serverErrorsTotal.toLocaleString()}</p></div>
               <div><p className="text-muted-foreground">Requests (1m)</p><p className="font-semibold">{h.window.requests.toLocaleString()}</p></div>
               <div><p className="text-muted-foreground">Errors (1m)</p><p className="font-semibold">{h.window.errors.toLocaleString()}</p></div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <AlertTriangle className="h-4 w-4" /> Ops agent
+                <span className="text-xs font-normal text-muted-foreground">flags anomalies automatically, every minute</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {anomalies.length === 0 ? (
+                <p className="text-sm text-green-600">No anomalies. All signals nominal.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {anomalies.map((a) => (
+                    <li key={a.id} className="flex items-start gap-2 rounded-md border border-border p-3">
+                      <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${a.severity === "critical" ? "bg-red-500" : "bg-amber-500"}`} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{a.title}
+                          <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${a.severity === "critical" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>{a.severity}</span>
+                        </p>
+                        <p className="text-sm text-muted-foreground">{a.detail}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </CardContent>
           </Card>
         </>

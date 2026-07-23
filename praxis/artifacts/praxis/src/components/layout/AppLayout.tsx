@@ -7,6 +7,7 @@ import { useSession } from '@/context/SessionContext';
 import { useBrandTheme } from '@/context/ThemeProvider';
 import { DevRoleSwitcher } from '@/components/DevRoleSwitcher';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import SupportChat from '@/components/SupportChat';
 import {
   LayoutDashboard,
   BookOpen,
@@ -643,6 +644,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <div className="h-[env(safe-area-inset-bottom,0px)]" />
       </nav>
+
+      <SupportChat />
 
       {import.meta.env.DEV && <DevRoleSwitcher />}
     </div>

@@ -82,6 +82,22 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`CREATE UNIQUE INDEX IF NOT EXISTS content_translations_key_uidx ON content_translations (source_hash, lang)`,
       sql`CREATE INDEX IF NOT EXISTS content_translations_status_idx ON content_translations (status, lang)`,
     ]],
+    // Ops-agent anomaly feed: always-on monitoring flags problems here (one active row per kind).
+    ["ops_anomalies", [
+      sql`CREATE TABLE IF NOT EXISTS ops_anomalies (
+        id text PRIMARY KEY,
+        kind text NOT NULL,
+        severity text NOT NULL DEFAULT 'warning',
+        status text NOT NULL DEFAULT 'active',
+        title text NOT NULL,
+        detail text NOT NULL DEFAULT '',
+        metadata jsonb,
+        first_seen_at timestamptz NOT NULL DEFAULT now(),
+        last_seen_at timestamptz NOT NULL DEFAULT now(),
+        resolved_at timestamptz
+      )`,
+      sql`CREATE INDEX IF NOT EXISTS ops_anomalies_status_idx ON ops_anomalies (status, last_seen_at)`,
+    ]],
     // Seat-licensing: mark where a seat entitlement came from (B2B pool vs. future B2C purchase).
     ["billing_subscriptions", [
       sql`ALTER TABLE billing_subscriptions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'b2b_pool'`,
