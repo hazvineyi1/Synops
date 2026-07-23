@@ -39,6 +39,8 @@ import { CoachHub } from '@/pages/CoachHub';
 import { OrgMembers } from '@/pages/OrgMembers';
 import { SignInPage } from '@/pages/SignIn';
 import { RequestAccess } from '@/pages/RequestAccess';
+import { Privacy } from '@/pages/Privacy';
+import { Terms } from '@/pages/Terms';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
 import { JoinCohort } from '@/pages/JoinCohort';
@@ -205,6 +207,8 @@ function Routes() {
         <PublicRoute path="/dev-login" component={DevLogin} />
 
         {/* Public */}
+        <PublicRoute path="/privacy" component={Privacy} />
+        <PublicRoute path="/terms" component={Terms} />
         <PublicRoute path="/join/:code" component={JoinCohort} />
         <PublicRoute path="/p/:slug" component={PartnerLanding} />
         {/* Clean vanity path for the Enza landing page. */}

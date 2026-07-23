@@ -2,7 +2,8 @@ import { usePageMeta } from "@/lib/seo";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Building2, Download, FileText } from "lucide-react";
+import { Link } from "wouter";
+import { Building2, FileText } from "lucide-react";
 
 export default function Government() {
   usePageMeta(
@@ -98,13 +99,13 @@ export default function Government() {
       <div className="bg-muted p-8 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-6 border border-border">
         <div>
           <h3 className="font-bold text-lg mb-1">Capability Statement</h3>
-          <p className="text-muted-foreground text-sm">Download our complete corporate overview, core competencies, and past performance details for your procurement files.</p>
+          <p className="text-muted-foreground text-sm">Request our complete corporate overview, core competencies, and past performance details for your procurement files.</p>
         </div>
         <Button className="shrink-0 group" asChild>
-          <a href="#">
-            <Download className="mr-2 w-4 h-4 group-hover:-translate-y-1 transition-transform" />
-            Download PDF
-          </a>
+          <Link href="/contact">
+            <FileText className="mr-2 w-4 h-4" />
+            Request capability statement
+          </Link>
         </Button>
       </div>
     </div>
