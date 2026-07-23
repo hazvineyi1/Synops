@@ -4,6 +4,7 @@ import { partnerDocumentsTable, partnersTable } from "@workspace/db";
 import { eq, inArray, sql } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { logAudit } from "../lib/audit";
+import { auditDocumentContent } from "../lib/templateAudit";
 import templatesData from "../data/documentTemplates.json";
 import filesData from "../data/documentFiles.json";
 
@@ -69,6 +70,17 @@ router.get("/document-templates/:key/download", requireAuth, (req, res) => {
 router.post("/platform/document-templates/:key/send", requireAuth, requireRole("super_admin"), async (req, res) => {
   const t = byKey(req.params.key);
   if (!t) { res.status(404).json({ error: "Not found" }); return; }
+  // Audit gate: never send a template that leaks internal infrastructure or
+  // codenames to a client. A failing audit blocks the send with the findings so
+  // a human fixes the content first.
+  const findings = auditDocumentContent(t.contentHtml);
+  if (findings.length) {
+    res.status(422).json({
+      error: "Template failed the client-safety audit and was not sent.",
+      findings,
+    });
+    return;
+  }
   const partnerIds = Array.isArray(req.body?.partnerIds)
     ? [...new Set((req.body.partnerIds as unknown[]).filter((p): p is string => typeof p === "string" && p.length > 0))]
     : [];
