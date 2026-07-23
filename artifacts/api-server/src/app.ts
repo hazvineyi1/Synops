@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { randomUUID } from "node:crypto";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import path from "path";
@@ -31,6 +32,14 @@ app.disable("x-powered-by");
 app.use(
   pinoHttp({
     logger,
+    // Honour an inbound X-Request-Id (or mint one) and echo it on the response
+    // so a client-observed error maps to a server log line during triage.
+    genReqId: (req, res) => {
+      const hdr = req.headers["x-request-id"];
+      const id = (Array.isArray(hdr) ? hdr[0] : hdr) || randomUUID();
+      res.setHeader("x-request-id", id);
+      return id;
+    },
     serializers: {
       req(req) {
         return {
