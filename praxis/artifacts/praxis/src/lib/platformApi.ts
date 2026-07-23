@@ -49,6 +49,7 @@ export interface PromptTemplateRow {
   category: string;
   description: string;
   promptText: string;
+  status: "draft" | "approved" | "retired";
   createdAt: string;
   updatedAt: string;
 }
@@ -220,6 +221,8 @@ export const platformApi = {
   createPromptTemplate: (orgId: string, body: { title: string; category?: string; description?: string; promptText: string }) =>
     req<PromptTemplateRow>(`/orgs/${orgId}/prompt-templates`, { method: "POST", body: JSON.stringify(body) }),
   deletePromptTemplate: (id: string) => req<void>(`/prompt-templates/${id}`, { method: "DELETE" }),
+  reviewPromptTemplate: (id: string, decision: "approve" | "retire") =>
+    req<PromptTemplateRow>(`/prompt-templates/${id}/review`, { method: "POST", body: JSON.stringify({ decision }) }),
 
   listApiKeys: () => req<ApiKey[]>("/platform/api-keys"),
   createApiKey: (name: string, partnerId?: string | null) =>

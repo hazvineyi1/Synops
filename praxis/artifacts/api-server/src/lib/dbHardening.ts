@@ -82,6 +82,13 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`CREATE UNIQUE INDEX IF NOT EXISTS content_translations_key_uidx ON content_translations (source_hash, lang)`,
       sql`CREATE INDEX IF NOT EXISTS content_translations_status_idx ON content_translations (status, lang)`,
     ]],
+    // Prompt-template review gate: a template only shapes live AI tutoring once approved.
+    ["org_prompt_templates", [
+      sql`ALTER TABLE org_prompt_templates ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'draft'`,
+      sql`ALTER TABLE org_prompt_templates ADD COLUMN IF NOT EXISTS reviewed_by text`,
+      sql`ALTER TABLE org_prompt_templates ADD COLUMN IF NOT EXISTS reviewed_at timestamptz`,
+      sql`CREATE INDEX IF NOT EXISTS org_prompt_templates_org_status_idx ON org_prompt_templates (organisation_id, status)`,
+    ]],
     // Per-item grade type (points | pass_fail | completion) for the configurable gradebook.
     ["gradebook_items", [
       sql`ALTER TABLE gradebook_items ADD COLUMN IF NOT EXISTS grade_type text NOT NULL DEFAULT 'points'`,

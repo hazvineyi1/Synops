@@ -22,6 +22,7 @@ import {
   type CaseContext,
 } from "../lib/caseEngine";
 import { ensureQuestion } from "../lib/socraticEngine";
+import { approvedOrgPromptOverlay } from "../lib/orgPromptOverlay";
 
 /**
  * Public, UNAUTHENTICATED case runner via a signed embed token. A learner outside Praxis
@@ -95,7 +96,9 @@ router.post("/case-embed/:token/start", async (req, res) => {
   const learnerName = typeof req.body?.learnerName === "string" && req.body.learnerName.trim() ? req.body.learnerName.trim().slice(0, 80) : null;
   const lang = validLang(req.body?.language) ? req.body.language : caseRow.language;
 
-  const opening = await generateCaseOpening(ctx(caseRow, learnerName, 0, lang));
+  const octx = ctx(caseRow, learnerName, 0, lang);
+  octx.orgPromptOverlay = await approvedOrgPromptOverlay(caseRow.organisationId);
+  const opening = await generateCaseOpening(octx);
   const facts = lang !== caseRow.language
     ? await translateCaseFacts(caseRow.learningObjective, caseRow.contextBlock, lang)
     : { objective: caseRow.learningObjective, context: caseRow.contextBlock };
@@ -138,7 +141,9 @@ router.post("/case-embed/:token/chat", async (req, res) => {
   res.flushHeaders();
 
   try {
-    const system = buildCaseSystemPrompt(ctx(caseRow, s.learnerName, s.promptCount, lang), false);
+    const octx = ctx(caseRow, s.learnerName, s.promptCount, lang);
+    octx.orgPromptOverlay = await approvedOrgPromptOverlay(caseRow.organisationId);
+    const system = buildCaseSystemPrompt(octx, false);
     const chat = history.map((m) => ({ role: m.role === "tutor" ? ("assistant" as const) : ("user" as const), content: m.content }));
 
     let full = "";

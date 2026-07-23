@@ -583,8 +583,20 @@ function PromptTemplatesTab() {
     mutationFn: (id: string) => platformApi.deletePromptTemplate(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["platform", "prompt-templates", orgId] }),
   });
+  const review = useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: "approve" | "retire" }) => platformApi.reviewPromptTemplate(id, decision),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["platform", "prompt-templates", orgId] }),
+  });
 
   const selCls = "w-full h-10 rounded-md border border-input bg-background px-3 text-sm";
+  const statusBadge = (s: string) => {
+    const map: Record<string, string> = {
+      approved: "bg-green-100 text-green-700",
+      draft: "bg-amber-100 text-amber-700",
+      retired: "bg-muted text-muted-foreground",
+    };
+    return <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${map[s] ?? map.draft}`}>{s === "draft" ? "pending review" : s}</span>;
+  };
 
   return (
     <div className="space-y-4">
@@ -609,6 +621,10 @@ function PromptTemplatesTab() {
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <Button size="sm" onClick={() => create.mutate()} disabled={!title || !promptText || create.isPending}>Add template</Button>
+            <p className="text-xs text-muted-foreground">
+              Only approved templates shape this organisation's live AI tutoring voice. A new or edited
+              template stays in review until you approve it here.
+            </p>
           </Card>
 
           <Card className="divide-y divide-border">
@@ -618,13 +634,21 @@ function PromptTemplatesTab() {
               (templates ?? []).map((t) => (
                 <div key={t.id} className="p-4 flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="font-medium">
-                      {t.title} <span className="text-xs text-muted-foreground font-normal">· {t.category}</span>
+                    <p className="font-medium flex items-center gap-2">
+                      {t.title} <span className="text-xs text-muted-foreground font-normal">· {t.category}</span> {statusBadge(t.status)}
                     </p>
                     <p className="text-sm text-muted-foreground line-clamp-2 mt-1 whitespace-pre-wrap">{t.promptText}</p>
                     {t.createdByName && <p className="text-xs text-muted-foreground/70 mt-1">by {t.createdByName}</p>}
                   </div>
-                  <Button size="sm" variant="ghost" onClick={() => del.mutate(t.id)} className="text-red-600 shrink-0">Delete</Button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {t.status !== "approved" && (
+                      <Button size="sm" variant="outline" onClick={() => review.mutate({ id: t.id, decision: "approve" })} disabled={review.isPending}>Approve</Button>
+                    )}
+                    {t.status === "approved" && (
+                      <Button size="sm" variant="outline" onClick={() => review.mutate({ id: t.id, decision: "retire" })} disabled={review.isPending}>Retire</Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={() => del.mutate(t.id)} className="text-red-600">Delete</Button>
+                  </div>
                 </div>
               ))
             )}

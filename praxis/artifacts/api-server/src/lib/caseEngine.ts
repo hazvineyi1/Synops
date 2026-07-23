@@ -50,6 +50,8 @@ export interface CaseContext {
   aiPersona?: string | null;
   /** Dialogue language code: en | zu | xh | af | sn. */
   language?: string | null;
+  /** Approved per-org tutoring-voice overlay (house style). Null = platform default voice. */
+  orgPromptOverlay?: string | null;
   promptLimit?: number | null;
   // Learner personalisation — present for authenticated sessions, absent for embed.
   learnerName?: string | null;
@@ -102,6 +104,11 @@ export function buildCaseSystemPrompt(c: CaseContext, isOpening: boolean): strin
   extra.push(
     `EXPERT PERSONA - for this case you ARE ${persona}. Ask from that professional's expertise, judgement and vocabulary. This shapes WHAT you probe and HOW you frame it, but you still obey every Socratic rule above: questions only, never lecture, never give the answer.`
   );
+
+  // Approved per-org tutoring voice (house style). Reviewed before it ever reaches a learner.
+  if (c.orgPromptOverlay?.trim()) {
+    extra.push(c.orgPromptOverlay.trim());
+  }
 
   if (c.focusAreas?.length) {
     extra.push("FOCUS AREAS (steer the learner's reasoning toward these, one at a time): " + c.focusAreas.join("; ") + ".");

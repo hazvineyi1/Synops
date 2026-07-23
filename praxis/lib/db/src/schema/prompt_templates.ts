@@ -15,6 +15,12 @@ export const promptTemplatesTable = pgTable("org_prompt_templates", {
   category: text("category").notNull().default("Our templates"),
   description: text("description").notNull().default(""),
   promptText: text("prompt_text").notNull(),
+  // Review gate: a template only shapes live AI tutoring once a super admin approves it.
+  // draft -> (approved | retired). An org author's edit sends an approved template back to
+  // draft so changed wording can never reach learners un-reviewed.
+  status: text("status").notNull().default("draft"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

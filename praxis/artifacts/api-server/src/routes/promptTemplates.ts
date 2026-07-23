@@ -28,6 +28,17 @@ router.get("/orgs/:orgId/prompt-templates", requireAuth, async (req, res) => {
   res.json(rows);
 });
 
+// GET /platform/prompt-templates/pending — the cross-org review queue (super admin).
+router.get("/platform/prompt-templates/pending", requireAuth, async (req, res) => {
+  if (!isSuperAdmin(req.dbUser!.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const rows = await db
+    .select()
+    .from(promptTemplatesTable)
+    .where(eq(promptTemplatesTable.status, "draft"))
+    .orderBy(desc(promptTemplatesTable.updatedAt));
+  res.json(rows);
+});
+
 // POST /orgs/:orgId/prompt-templates
 router.post("/orgs/:orgId/prompt-templates", requireAuth, async (req, res) => {
   if (!canManageOrgTemplates(req.dbUser!, req.params.orgId)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -61,7 +72,35 @@ router.patch("/prompt-templates/:id", requireAuth, async (req, res) => {
   if (category !== undefined) updates.category = category;
   if (description !== undefined) updates.description = description;
   if (promptText !== undefined) updates.promptText = promptText;
+  // Any change to the wording that shapes tutoring sends an approved template back to draft, so
+  // edited text can never keep shaping live sessions without a fresh review.
+  const contentChanged = title !== undefined || promptText !== undefined;
+  if (contentChanged && existing.status === "approved") {
+    updates.status = "draft";
+    updates.reviewedBy = null;
+    updates.reviewedAt = null;
+  }
   const [row] = await db.update(promptTemplatesTable).set(updates).where(eq(promptTemplatesTable.id, req.params.id)).returning();
+  res.json(row);
+});
+
+// POST /prompt-templates/:id/review { decision: approve|retire } — super-admin review gate.
+router.post("/prompt-templates/:id/review", requireAuth, async (req, res) => {
+  if (!isSuperAdmin(req.dbUser!.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const decision = req.body?.decision;
+  if (decision !== "approve" && decision !== "retire") {
+    res.status(400).json({ error: "decision must be 'approve' or 'retire'" });
+    return;
+  }
+  const existing = await db.query.promptTemplatesTable.findFirst({ where: eq(promptTemplatesTable.id, req.params.id) });
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  const status = decision === "approve" ? "approved" : "retired";
+  const [row] = await db
+    .update(promptTemplatesTable)
+    .set({ status, reviewedBy: req.dbUser!.id, reviewedAt: new Date(), updatedAt: new Date() })
+    .where(eq(promptTemplatesTable.id, req.params.id))
+    .returning();
+  await logAudit(req, `prompt_template.${decision}`, "prompt_template", row.id, { organisationId: existing.organisationId, title: existing.title });
   res.json(row);
 });
 

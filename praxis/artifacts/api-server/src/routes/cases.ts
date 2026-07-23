@@ -39,6 +39,7 @@ import {
   type CaseContext,
 } from "../lib/caseEngine";
 import { ensureQuestion } from "../lib/socraticEngine";
+import { approvedOrgPromptOverlay } from "../lib/orgPromptOverlay";
 import { onGradeEvent } from "../lib/gradebookAlerts";
 
 const router = Router();
@@ -498,6 +499,7 @@ router.post("/cases/:id/sessions", requireAuth, async (req, res) => {
 
   const ctx = ctxFromCase(c, req.dbUser as unknown as U, 0, lang);
   ctx.learnerName = enteredName;
+  ctx.orgPromptOverlay = await approvedOrgPromptOverlay(c.organisationId);
   const opening = await generateCaseOpening(ctx);
 
   // Translate the fact pattern into the session language when it differs from the default.
@@ -633,6 +635,7 @@ router.post("/case-sessions/:id/message", requireAuth, async (req, res) => {
   try {
     const ctx = ctxFromCase(c, req.dbUser as unknown as U, s.promptCount, lang);
     if (s.learnerName) ctx.learnerName = s.learnerName;
+    ctx.orgPromptOverlay = await approvedOrgPromptOverlay(c.organisationId);
     const system = buildCaseSystemPrompt(ctx, false);
     const chat = history.map((m) => ({ role: m.role === "tutor" ? ("assistant" as const) : ("user" as const), content: m.content }));
 
