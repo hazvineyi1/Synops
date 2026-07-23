@@ -101,6 +101,62 @@ config, a bad build is caught quickly.
 - **Graceful shutdown**: every service handles SIGTERM/SIGINT, draining in-flight
   requests (10s grace) so Railway redeploys don't sever live connections.
 
+## Capacity planning specifics
+
+- **Connection budget**: each app instance opens at most `max: 10` pooled DB
+  connections (`keepAlive`, 30s idle recycle, 10s connect timeout). Managed
+  Postgres plans typically allow ~100 connections, so keep
+  `instances × 10 + headroom (migrations, backups, psql) ≤ max_connections`.
+  Past ~7–8 instances per database, put a pooler (PgBouncer, transaction mode)
+  in front rather than raising per-instance `max`.
+- **Query performance**: hot lookups are indexed at the schema level (foreign
+  keys and the columns filtered on in list/rollup endpoints). When adding a new
+  frequently-filtered column, add an index in the same schema change and confirm
+  with `EXPLAIN` against a production-sized copy. Watch Postgres slow-query logs
+  and `pg_stat_statements` for regressions.
+- **AI cost**: the coach enforces a per-user daily model-call cap (in-memory,
+  per instance). For exact multi-instance cost control, move the counter to a
+  shared store. Model responses are capped in `max_tokens`.
+- **Right-size first, scale second**: the app tier is cheap to scale
+  horizontally; the database is the constraint. Add app instances for request
+  concurrency, but watch pool saturation and Postgres CPU before assuming the
+  app tier is the bottleneck.
+
+## Logging and retention
+
+- **Format**: structured JSON (pino) to stdout; the platform (Railway) collects
+  and retains them per its plan. Set `LOG_LEVEL` (`trace|debug|info|warn|error`,
+  default `info`) per service.
+- **What is logged**: request id, method, path (query string stripped), status,
+  and error objects on failures. Secrets and full request bodies are not logged.
+- **Retention**: platform log retention is a Railway setting, not a code
+  concern. For long-term audit or compliance retention, ship stdout to an
+  external sink (e.g. a log drain to a provider with the required retention) —
+  the JSON format is drain-ready as-is.
+- **Correlation**: every response carries `x-request-id`; quote it to a user and
+  grep the logs, or search Sentry by the same id.
+
+## Disaster recovery
+
+- **Backup cadence (RPO)**: automated `pg_dump` runs nightly (02:00 UTC), so the
+  worst-case data loss with backups alone is ~24h. Tighten by running the backup
+  workflow more often (`workflow_dispatch` or a denser cron) or by moving to a
+  provider with point-in-time recovery once the data warrants it.
+- **Restore drill (target RTO — practise this before you need it)**:
+  1. Provision a fresh empty Postgres (staging).
+  2. Download the latest `.dump` artifact from the DB Backup workflow run.
+  3. `pg_restore --clean --no-owner -d "$STAGING_URL" <file>.dump`.
+  4. Point a staging app instance at it (`DATABASE_URL`) and verify `/api/readyz`
+     plus a couple of real reads before trusting the restore.
+  5. To recover production, repeat against the production database (or cut the
+     service over to the verified staging database).
+- **Config recovery**: all runtime config is environment variables (documented
+  in the `.env*.example` files) held in Railway, not in the database, so a DB
+  restore does not lose service configuration.
+- **Rollback vs restore**: a bad *deploy* is a rollback (Railway → redeploy the
+  last good build, confirm with `/api/version`); a bad *data* event is a restore
+  (above). They are independent.
+
 ## Third-party integrations (all degrade gracefully when unset)
 
 | Integration | Used by | Behaviour when unconfigured |
