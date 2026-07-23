@@ -8,11 +8,15 @@ export default function Healthcare() {
       <section className="bg-primary-hero pt-24 pb-24 px-6 border-b border-primary/20">
         <div className="max-w-[1200px] mx-auto">
           <div className="max-w-3xl">
+            <span className="block text-[13px] font-bold uppercase tracking-widest text-accent mb-5">The Operational Backbone</span>
             <h1 className="text-white text-5xl md:text-[64px] font-bold leading-[1.1] tracking-tight mb-6">
               Healthcare & Operations
             </h1>
-            <p className="text-[22px] text-white/80 leading-relaxed mb-8">
-              Led by Bertha D. Musoni, we bring over 20 years of managed care leadership to solving complex operational challenges in Medicaid programs and provider networks.
+            <p className="text-[22px] text-white/80 leading-relaxed mb-6">
+              The compliance, managed-care, and change-management rigor that grounds how Synops builds and runs its learning platforms, and that holds up in tightly regulated settings.
+            </p>
+            <p className="text-[17px] text-white/70 leading-relaxed mb-8">
+              Led by Bertha D. Musoni, with 20+ years in managed care, Medicaid operations, and provider-network management. That same discipline is also available as a standalone advisory engagement.
             </p>
             <Link 
               href="/contact?area=healthcare" 
