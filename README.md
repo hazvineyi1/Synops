@@ -109,3 +109,7 @@ Web app (`artifacts/the-coach`, Vite — must be prefixed `VITE_`):
   webhooks tables.
 - The Anthropic key is server-side only and must never reach the client bundle.
 - Public developer API and webhooks are documented in-app at `/developers`.
+- POPIA compliance (learner consent capture, data export/erasure, maintenance
+  mode, and the EU region-migration tooling) is documented in
+  [`docs/POPIA.md`](docs/POPIA.md). Set `MAINTENANCE_MODE=1` on the Praxis and
+  Coach APIs to freeze writes (503) during the EU cutover window.
