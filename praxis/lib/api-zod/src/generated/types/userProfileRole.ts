@@ -13,6 +13,8 @@ export const UserProfileRole = {
   super_admin: 'super_admin',
   partner_admin: 'partner_admin',
   org_admin: 'org_admin',
+  instructional_designer: 'instructional_designer',
   coach: 'coach',
+  funder: 'funder',
   learner: 'learner',
 } as const;

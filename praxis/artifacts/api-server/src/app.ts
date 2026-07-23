@@ -73,6 +73,14 @@ const authLimiter = rateLimit({
 });
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, limit: 1000, standardHeaders: "draft-7", legacyHeaders: false,
+  // Exempt the health/identity probes: /api/readyz is this service's Railway
+  // healthcheck, so it must never be rate-limited — a traffic spike would
+  // otherwise 429 the probe and get an otherwise-healthy instance restarted at
+  // the worst possible moment. (req.originalUrl is the full path across the /api mount.)
+  skip: (req) => {
+    const p = req.originalUrl.split("?")[0];
+    return p === "/api/healthz" || p === "/api/readyz" || p === "/api/version";
+  },
   message: { error: "Rate limit exceeded. Slow down and retry shortly." },
 });
 

@@ -15,7 +15,11 @@ export async function initObservability(): Promise<void> {
     return;
   }
   try {
-    const mod: any = await import("@sentry/node");
+    // Indirect specifier so the type checker and bundler treat this as a
+    // runtime-optional dependency (@sentry/node is not a declared dependency;
+    // it only resolves when the operator installs it alongside SENTRY_DSN).
+    const sentryPkg = "@sentry/node";
+    const mod: any = await import(/* @vite-ignore */ sentryPkg);
     mod.init({
       dsn,
       environment: process.env.NODE_ENV ?? "production",

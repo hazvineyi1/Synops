@@ -156,7 +156,9 @@ export function UpgradePanel() {
     }
   }
 
-  const isActive = billing?.subscriptionStatus === "active" || billing?.tier === "pro";
+  // /billing/status returns the subscription state as `status` (see the
+  // Entitlement shape), not `subscriptionStatus`; `isPro` also covers trial.
+  const isActive = billing?.status === "active" || billing?.tier === "pro" || billing?.isPro === true;
   const expiresAt = billing?.subscriptionExpiresAt ? new Date(billing.subscriptionExpiresAt) : null;
   const manualMethods = methods.filter((m) => m.rail === "manual");
   const liveMethods = methods.filter((m) => m.rail !== "manual");

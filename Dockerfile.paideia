@@ -38,6 +38,13 @@ RUN cp -r artifacts/paideia-study/dist/public artifacts/paideia-ren/dist/public/
 # Build the API (esbuild bundle -> artifacts/paideia-api/dist/index.mjs).
 RUN pnpm --filter @workspace/paideia-api run build
 
+# Pin the runtime environment and drop to the image's built-in non-root user.
+# NODE_ENV is set AFTER install/build so devDependencies remain available during
+# the build; the running service then sees production (enables secure cookies +
+# same-origin static SPA serving + tighter CORS).
+ENV NODE_ENV=production
+USER node
+
 # Railway provides PORT at runtime; the server reads process.env.PORT.
 EXPOSE 8080
 

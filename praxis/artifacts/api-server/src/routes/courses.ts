@@ -120,7 +120,7 @@ router.get("/courses/:courseId/partners", requireAuth, requireRole("super_admin"
 router.put("/courses/:courseId/partners", requireAuth, requireRole("super_admin"), async (req, res) => {
   const courseId = req.params.courseId;
   const partnerIds = Array.isArray(req.body?.partnerIds)
-    ? [...new Set(req.body.partnerIds.filter((p: unknown): p is string => typeof p === "string" && p.length > 0))]
+    ? [...new Set((req.body.partnerIds as unknown[]).filter((p): p is string => typeof p === "string" && p.length > 0))]
     : [];
   await db.delete(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.courseId, courseId));
   if (partnerIds.length) {
@@ -150,7 +150,7 @@ router.get("/partners/:partnerId/courses", requireAuth, requireRole("super_admin
 router.put("/partners/:partnerId/courses", requireAuth, requireRole("super_admin"), async (req, res) => {
   const partnerId = req.params.partnerId;
   const courseIds = Array.isArray(req.body?.courseIds)
-    ? [...new Set(req.body.courseIds.filter((c: unknown): c is string => typeof c === "string" && c.length > 0))]
+    ? [...new Set((req.body.courseIds as unknown[]).filter((c): c is string => typeof c === "string" && c.length > 0))]
     : [];
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS course_partner_assignments (

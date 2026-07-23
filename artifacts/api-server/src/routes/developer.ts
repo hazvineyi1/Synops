@@ -5,6 +5,7 @@ import { db } from "@workspace/db";
 import { apiKeysTable, webhooksTable } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { generateApiKey } from "../lib/apiAuth";
+import { isSafeWebhookTarget } from "../lib/ssrf";
 
 const router = Router();
 
@@ -77,6 +78,15 @@ router.post("/developer/webhooks", requireAuth, async (req, res) => {
   const url = typeof req.body?.url === "string" ? req.body.url.trim() : "";
   if (!/^https?:\/\/.+/i.test(url)) {
     res.status(400).json({ error: "A valid http(s) URL is required." });
+    return;
+  }
+  // SSRF guard: reject webhook targets that point at loopback, private, or
+  // link-local/metadata addresses so a registered webhook cannot be used to
+  // reach internal infrastructure.
+  if (!(await isSafeWebhookTarget(url))) {
+    res.status(400).json({
+      error: "Webhook URL must be a public address (private, loopback, and metadata hosts are not allowed).",
+    });
     return;
   }
   const events =

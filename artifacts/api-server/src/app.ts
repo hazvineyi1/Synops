@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { randomUUID } from "node:crypto";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import path from "path";
@@ -7,6 +8,7 @@ import { existsSync } from "fs";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
+import healthRouter from "./routes/health";
 import { logger } from "./lib/logger";
 import { getAllowedOrigins, isProduction } from "./lib/config";
 import { securityHeaders } from "./middlewares/securityHeaders";
@@ -30,6 +32,14 @@ app.disable("x-powered-by");
 app.use(
   pinoHttp({
     logger,
+    // Honour an inbound X-Request-Id (or mint one) and echo it on the response
+    // so a client-observed error maps to a server log line during triage.
+    genReqId: (req, res) => {
+      const hdr = req.headers["x-request-id"];
+      const id = (Array.isArray(hdr) ? hdr[0] : hdr) || randomUUID();
+      res.setHeader("x-request-id", id);
+      return id;
+    },
     serializers: {
       req(req) {
         return {
@@ -49,6 +59,12 @@ app.use(
 
 // Baseline security headers on every response.
 app.use(securityHeaders());
+
+// Liveness/health checks are mounted ahead of rate limiting, CORS, and the
+// Clerk auth middleware so they never depend on an external provider or a
+// per-request key parse. Railway's deploy healthcheck hits /api/healthz; a
+// Clerk hiccup or a burst of traffic must not fail an otherwise-healthy deploy.
+app.use("/api", healthRouter);
 
 // Clerk proxy must come before body parsers.
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());

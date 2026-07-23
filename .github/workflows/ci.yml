@@ -58,6 +58,92 @@ jobs:
           PORT=8080 BASE_PATH=/builder/ pnpm --filter @workspace/compass-web   run build
           pnpm --filter @workspace/paideia-api run build
 
+  # DB-backed integration suites for the main workspace. compass-api and kanon-api carry the
+  # tenant-isolation, billing-authz, impersonation-safety, and evidence-packet tests — the logic
+  # that keeps one tenant's data unreachable from another and gates every paid feature. They need a
+  # real Postgres (the db package refuses to import without DATABASE_URL), so this job stands up a
+  # throwaway server, pushes each schema into its own database, and runs the suites. A regression
+  # here is a security or billing hole, so it must fail CI before it reaches Railway.
+  test:
+    name: integration tests (compass + kanon + engine)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SESSION_SECRET: ci-only-secret-32-chars-minimum-length
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Create databases
+        run: |
+          psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE compass_test;"
+          psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE kanon_test;"
+
+      - name: Curriculum engine unit tests (no DB)
+        run: pnpm --filter @workspace/compass-curriculum-engine run test
+
+      - name: Compass API integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/compass_test
+        run: |
+          pnpm --filter @workspace/compass-db run push-force
+          pnpm --filter @workspace/compass-api run test
+
+      - name: Kanon API integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kanon_test
+        run: |
+          pnpm --filter @workspace/kanon-db run push-force
+          pnpm --filter @workspace/kanon-api run test
+
+      # SLO gate: boot a real service and load its DB-backed readiness endpoint
+      # under concurrency, asserting the objectives (scripts/loadtest.mjs exits
+      # non-zero on a breach). This turns SLA validation into a continuous check
+      # instead of a manual pre-launch step, so a pool/query/rate-limit
+      # regression that tanks latency or leaks 5xx fails CI. The p99 threshold is
+      # lenient because shared CI runners are slower than production; the hard
+      # guarantee enforced here is zero errors and zero 5xx under load.
+      - name: SLO load gate (readiness under concurrency)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kanon_test
+        run: |
+          pnpm --filter @workspace/kanon-api run build
+          PORT=5099 NODE_ENV=production node artifacts/kanon-api/dist/index.mjs &
+          SRV=$!
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:5099/api/readyz >/dev/null 2>&1 && break; sleep 1; done
+          node scripts/loadtest.mjs http://127.0.0.1:5099/api/readyz -r 1000 -c 50 --max-p99 1500 --max-error-rate 1
+          RESULT=$?
+          kill $SRV 2>/dev/null || true
+          exit $RESULT
+
   # Praxis LMS is a SELF-CONTAINED pnpm workspace under praxis/ with its own lockfile, deployed as
   # its own Railway service (Dockerfile.praxis). The Coach job above never builds it, so a Praxis-
   # breaking change could pass CI and only fail in the Railway image build. This job reproduces
@@ -86,11 +172,24 @@ jobs:
         working-directory: praxis
         run: pnpm install --no-frozen-lockfile
 
+      # Typecheck the whole praxis workspace (libs + api-server + SPA). The image
+      # builds with esbuild/vite, which skip type checking, so without this a
+      # type-level break only surfaces in the Railway image build.
+      - name: Typecheck (praxis workspace)
+        working-directory: praxis
+        run: pnpm run typecheck
+
       # Unit tests over the permission matrix (roles.ts) and gradebook math (gradebookEngine.ts) —
       # the logic that gates every scoped route and feeds credentials. A regression here re-opens a
       # security hole or corrupts a grade, so it fails CI before it can reach Railway.
+      # The pure unit tests never connect to a database, but gradebookEngine.ts
+      # imports @workspace/db, and lib/db throws at import time when DATABASE_URL
+      # is unset. Provide a dummy URL so the import guard passes and the file can
+      # be collected; no real database is needed or contacted.
       - name: Test Praxis API (permissions + gradebook)
         working-directory: praxis
+        env:
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
         run: pnpm --filter @workspace/api-server run test
 
       - name: Build Praxis (SPA + API)

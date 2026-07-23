@@ -7,6 +7,6 @@
     "outDir": "dist",
     "rootDir": "src"
   },
-  "references": [{ "path": "../curriculum-engine" }],
+  "references": [{ "path": "../compass-curriculum-engine" }],
   "include": ["src"]
 }

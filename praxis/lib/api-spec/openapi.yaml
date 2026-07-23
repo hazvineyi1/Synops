@@ -1229,7 +1229,7 @@ components:
           type: ["string", "null"]
         role:
           type: string
-          enum: [super_admin, partner_admin, org_admin, coach, learner]
+          enum: [super_admin, partner_admin, org_admin, instructional_designer, coach, funder, learner]
         partnerId:
           type: ["string", "null"]
         organisationId:

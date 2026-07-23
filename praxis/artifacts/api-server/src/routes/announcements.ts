@@ -91,7 +91,7 @@ router.patch("/announcements/:announcementId", requireAuth, async (req, res) => 
   // and gate to that course's staff.
   const existing = await db.query.announcementsTable.findFirst({ where: eq(announcementsTable.id, req.params.announcementId) });
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!(await canStaffActOnCourse(req.dbUser!, existing.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!existing.courseId || !(await canStaffActOnCourse(req.dbUser!, existing.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const { title, body, pinned } = req.body;
   const [updated] = await db.update(announcementsTable)
     .set({ title, body, pinned, updatedAt: new Date() })
@@ -104,7 +104,7 @@ router.patch("/announcements/:announcementId", requireAuth, async (req, res) => 
 router.delete("/announcements/:announcementId", requireAuth, async (req, res) => {
   const existing = await db.query.announcementsTable.findFirst({ where: eq(announcementsTable.id, req.params.announcementId) });
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!(await canStaffActOnCourse(req.dbUser!, existing.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!existing.courseId || !(await canStaffActOnCourse(req.dbUser!, existing.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(announcementsTable).where(eq(announcementsTable.id, req.params.announcementId));
   res.status(204).send();
 });

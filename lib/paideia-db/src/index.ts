@@ -10,7 +10,40 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// TLS is opt-in so we never change a working connection: enable it only when the
+// connection string asks for it (sslmode=require) or PGSSL=true is set. Managed
+// providers often present a chain node-postgres won't verify by default, hence
+// rejectUnauthorized:false. Railway's internal networking connects without TLS,
+// so defaulting off keeps existing deployments working.
+function sslFor(connectionString: string): false | { rejectUnauthorized: false } {
+  if (process.env.PGSSL === "true" || /sslmode=require/.test(connectionString)) {
+    return { rejectUnauthorized: false };
+  }
+  return false;
+}
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: sslFor(process.env.DATABASE_URL),
+  // keepAlive prevents a hosted proxy from silently dropping an idle socket
+  // (which surfaces as an intermittent "Connection terminated unexpectedly").
+  keepAlive: true,
+  // Recycle idle clients before the proxy's own idle cutoff.
+  idleTimeoutMillis: 30_000,
+  // Fail fast on a hung connect instead of hanging the request.
+  connectionTimeoutMillis: 10_000,
+  // Bound the pool so a burst can't exhaust the database's connection limit.
+  max: 10,
+});
+
+// An idle pooled client can emit 'error' when a hosted provider drops the socket
+// (Railway/Supabase close idle connections aggressively). Without a listener,
+// node's default handling of an unhandled 'error' event would crash the process.
+// Log it and let the pool re-establish connections on demand.
+pool.on("error", (err) => {
+  console.error("[db] idle client error:", err);
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

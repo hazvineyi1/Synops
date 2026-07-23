@@ -112,9 +112,9 @@ export function Home() {
             <span>&copy; {new Date().getFullYear()}</span>
           </div>
           <div className="flex gap-6">
-            <a href="#" className="hover:text-foreground">Privacy</a>
-            <a href="#" className="hover:text-foreground">Terms</a>
-            <a href="#" className="hover:text-foreground">Contact</a>
+            <Link href="/privacy" className="hover:text-foreground">Privacy</Link>
+            <Link href="/terms" className="hover:text-foreground">Terms</Link>
+            <a href="mailto:info@synops-consulting.com" className="hover:text-foreground">Contact</a>
           </div>
         </div>
       </footer>

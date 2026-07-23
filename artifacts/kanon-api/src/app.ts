@@ -1,6 +1,8 @@
 import express, { type Express, type RequestHandler } from "express";
+import { randomUUID } from "node:crypto";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import rateLimit from "express-rate-limit";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "@workspace/kanon-db";
@@ -9,14 +11,41 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "./lib/logger";
 import { handleStripeWebhook } from "./lib/stripeWebhook";
+import { captureError } from "./lib/instrument";
 
 const app: Express = express();
 
 app.set("trust proxy", 1);
+// Do not advertise the framework.
+app.disable("x-powered-by");
+
+// Baseline security response headers on every response. Dependency-free and
+// conservative (no CSP, since this server also serves the SPA + Clerk/Stripe
+// assets and a wrong CSP silently breaks the app).
+app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("X-DNS-Prefetch-Control", "off");
+    res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    if (process.env.NODE_ENV === "production") {
+        res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
+    }
+    next();
+});
 
 app.use(
     pinoHttp({
           logger,
+          // Honour an inbound X-Request-Id (or mint one) and echo it on the
+          // response so a client-observed error maps to a server log line.
+          genReqId: (req, res) => {
+                  const hdr = req.headers["x-request-id"];
+                  const id = (Array.isArray(hdr) ? hdr[0] : hdr) || randomUUID();
+                  res.setHeader("x-request-id", id);
+                  return id;
+          },
           serializers: {
                   req(req) {
                             return {
@@ -33,9 +62,45 @@ app.use(
           },
     }),
   );
-app.use(cors());
+// CORS: the SPA is served same-origin, so cross-origin access is only needed for
+// explicitly allow-listed origins (ALLOWED_ORIGINS / APP_URL). In production,
+// deny cross-origin by default (same-origin requests need no CORS header); in
+// development, reflect the request origin so local tooling works. Mutating
+// requests are additionally protected by sameOriginGuard below.
+const corsAllowlist = (process.env.ALLOWED_ORIGINS ?? process.env.APP_URL ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+app.use(
+    cors({
+        origin:
+            process.env.NODE_ENV === "production"
+                ? corsAllowlist.length > 0
+                    ? corsAllowlist
+                    : false
+                : true,
+    }),
+);
 
 app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
+
+// Broad denial-of-service backstop across the whole API. Individual auth/signup
+// routes keep their own tighter limits; this only catches gross floods. Health
+// probes are exempt so a monitor can never be throttled. Registered after the
+// Stripe webhook so gateway callbacks are not counted.
+app.use(
+    rateLimit({
+        windowMs: 60_000,
+        max: 1000,
+        standardHeaders: true,
+        legacyHeaders: false,
+        skip: (req) =>
+            req.path === "/api/healthz" ||
+            req.path === "/api/readyz" ||
+            req.path === "/api/version",
+        message: { error: "Too many requests, please try again later." },
+    }),
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -112,5 +177,23 @@ if (process.env.NODE_ENV === "production") {
     });
     logger.info({ clientDir }, "Serving built frontend (production)");
 }
+
+// Central error handler: turn any thrown/rejected route error into a logged,
+// correlated JSON 500 instead of Express's default HTML page. Must be registered
+// last. (Express 5 forwards async handler rejections here automatically.)
+app.use(
+    (
+        err: unknown,
+        req: express.Request,
+        res: express.Response,
+        _next: express.NextFunction,
+    ) => {
+        req.log?.error({ err }, "Unhandled request error");
+        // Report to Sentry (no-op unless SENTRY_DSN is set).
+        captureError(err);
+        if (res.headersSent) return;
+        res.status(500).json({ error: "Internal server error" });
+    },
+);
 
 export default app;

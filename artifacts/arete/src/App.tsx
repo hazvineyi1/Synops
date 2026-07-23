@@ -20,6 +20,7 @@ import { Privacy, Terms } from "./pages/legal";
 import { AppLayout } from "./components/layout/app-layout";
 import { LanguageProvider } from "./lib/i18n";
 import { useIsAdmin } from "@/lib/admin-api";
+import { useGetProfile } from "@workspace/api-client-react";
 
 const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY)
   ?? import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -156,8 +157,15 @@ function HeartbeatTracker() {
 function SignedInHome() {
   // Admins land in the admin panel; learners land in the coach.
   const { data: adminData, isLoading } = useIsAdmin();
-  if (isLoading) return null;
-  return <Redirect to={adminData?.isAdmin ? "/admin" : "/coach"} />;
+  const { data: profile, isLoading: profileLoading } = useGetProfile();
+  if (isLoading || profileLoading) return null;
+  if (adminData?.isAdmin) return <Redirect to="/admin" />;
+  // A brand-new learner who has not finished the first-run assessment starts
+  // there, so the coach opens with a real profile (goal, exam date, baseline,
+  // coach personality) instead of silently defaulting. Once the assessment is
+  // complete the profile flag flips and they land in the coach thereafter.
+  if (!profile?.assessmentComplete) return <Redirect to="/start" />;
+  return <Redirect to="/coach" />;
 }
 
 function HomeRedirect() {

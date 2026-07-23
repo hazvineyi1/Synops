@@ -11,7 +11,6 @@ import {
 } from "@/lib/coachApi";
 import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
-import { Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Check, MessageCircle, Sparkles } from "lucide-react";

@@ -25,7 +25,6 @@ export default function Settings() {
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [billing, setBilling] = useState<any | null>(null);
-  const [billingBusy, setBillingBusy] = useState(false);
   const [referral, setReferral] = useState<any | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -104,45 +103,6 @@ export default function Settings() {
     });
   };
 
-  const handleUpgrade = async (plan: "monthly" | "yearly") => {
-    setBillingBusy(true);
-    try {
-      const res = await fetch("/api/billing/checkout", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
-      });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.url) {
-        window.location.href = data.url;
-        return;
-      }
-      toast({ title: "Could not start checkout", description: data?.error ?? "Please try again.", variant: "destructive" });
-    } catch {
-      toast({ title: "Could not start checkout", description: "Please try again.", variant: "destructive" });
-    } finally {
-      setBillingBusy(false);
-    }
-  };
-
-  const handleManageBilling = async () => {
-    setBillingBusy(true);
-    try {
-      const res = await fetch("/api/billing/portal", { method: "POST", credentials: "include" });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.url) {
-        window.location.href = data.url;
-        return;
-      }
-      toast({ title: "Could not open billing", description: data?.error ?? "Please try again.", variant: "destructive" });
-    } catch {
-      toast({ title: "Could not open billing", description: "Please try again.", variant: "destructive" });
-    } finally {
-      setBillingBusy(false);
-    }
-  };
-
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -176,11 +136,6 @@ export default function Settings() {
       toast({ title: "Could not delete account", description: "Please try again.", variant: "destructive" });
     }
   };
-
-  const trialDaysLeft =
-    billing?.inTrial && billing?.trialEndsAt
-      ? Math.max(0, Math.ceil((new Date(billing.trialEndsAt).getTime() - Date.now()) / 86400000))
-      : null;
 
   if (isLoading) {
     return (

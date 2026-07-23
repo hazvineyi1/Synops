@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
 import { isProduction } from "../lib/config";
+import { captureError } from "../lib/instrument";
 
 /** JSON 404 for unmatched API routes (keeps the SPA fallback for everything else). */
 export function notFoundHandler(req: Request, res: Response): void {
@@ -39,6 +40,9 @@ export function errorHandler(
     { err, method: req.method, url: req.url?.split("?")[0], status },
     "Request failed",
   );
+  // Server-side failures go to Sentry (no-op unless SENTRY_DSN is set); 4xx are
+  // client errors and not worth alerting on.
+  if (status >= 500) captureError(err);
 
   if (res.headersSent) return;
 

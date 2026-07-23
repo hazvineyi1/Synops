@@ -192,7 +192,7 @@ export async function issueCredential(
       status: "valid",
     }).onConflictDoNothing({
       target: [credentialsTable.userId, credentialsTable.moduleId],
-      targetWhere: sql`status = 'valid'`,
+      where: sql`status = 'valid'`,
     });
   } catch {
     // Non-fatal
