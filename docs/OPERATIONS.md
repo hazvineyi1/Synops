@@ -157,6 +157,34 @@ config, a bad build is caught quickly.
   last good build, confirm with `/api/version`); a bad *data* event is a restore
   (above). They are independent.
 
+## Validation (executed)
+
+These were run against a booted service (Coach) with a real Postgres, and are
+reproducible with the committed harness.
+
+- **Load** (`scripts/loadtest.mjs`, zero-dependency, exits non-zero on any error
+  or 5xx — safe to gate a pipeline):
+  - Liveness `/api/healthz`, 5000 requests @ 200 concurrency: ~2000 req/s, p99
+    ~196ms, 0 errors, 0 5xx.
+  - Readiness `/api/readyz` (DB-backed, exercises the 10-connection pool under
+    contention), 2000 requests @ 100 concurrency: ~1450 req/s, p99 ~127ms, 0
+    errors, 0 5xx.
+  - Reproduce: `node scripts/loadtest.mjs https://<host>/api/readyz -r 2000 -c 100`.
+    Run against staging before launch and after any pool/query change; watch that
+    p99 stays flat and 5xx stays 0 as concurrency rises.
+- **Chaos / failure-mode** (DB outage drill): with the service under a live DB,
+  stop Postgres, then restart it. Observed and expected behaviour:
+  - During the outage: `/api/readyz` → `503 {"status":"not-ready","db":"down"}`
+    (load balancer stops routing), `/api/healthz` → `200` (liveness stays up so
+    the orchestrator does not kill an otherwise-healthy pod for a transient DB
+    blip), and the process does **not** crash (the pool `error` listener absorbs
+    the dropped-connection event).
+  - After the DB returns: `/api/readyz` → `200` automatically, with no process
+    restart — the pool re-establishes connections on demand.
+  - Reproduce against a controllable DB: hit `/api/readyz` in a loop, stop the
+    database, confirm 503 + process-alive, restart it, confirm auto-recovery to
+    200. Do this in staging as part of pre-launch resilience sign-off.
+
 ## Third-party integrations (all degrade gracefully when unset)
 
 | Integration | Used by | Behaviour when unconfigured |
