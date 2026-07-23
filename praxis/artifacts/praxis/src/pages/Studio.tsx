@@ -10,6 +10,10 @@ import { PlusCircle, PenTool, Clock, Settings2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiFetch } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
+import {
+  AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader,
+  AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
 
 const CAN_AUTHOR = ['super_admin', 'instructional_designer', 'partner_admin', 'org_admin', 'coach'];
 
@@ -21,8 +25,10 @@ export function Studio() {
   const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const deleteDraft = async (id: string, title: string) => {
-    if (!window.confirm(`Delete draft "${title}"? This cannot be undone.`)) return;
+  // Confirmation is handled by an AlertDialog (native window.confirm is
+  // suppressed by some browsers/embedded contexts, which silently blocked
+  // Studio deletions).
+  const deleteDraft = async (id: string) => {
     setDeletingId(id);
     try {
       await apiFetch(`/studio/scripts/${id}`, { method: 'DELETE' });
@@ -77,11 +83,31 @@ export function Studio() {
                 </div>
                 <div className="flex items-center gap-1.5">
                   {canAuthor && (
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600"
-                      title="Delete draft" disabled={deletingId === draft.id}
-                      onClick={() => deleteDraft(draft.id, draft.title)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                          title="Delete draft" disabled={deletingId === draft.id}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete draft "{draft.title}"?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This cannot be undone. The draft script and its beats will be removed.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-red-600 hover:bg-red-700"
+                            onClick={() => deleteDraft(draft.id)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                   <Button variant="secondary" size="sm" onClick={() => setLocation(`/studio/${draft.id}`)} disabled={draft.status === 'generating'}>
                     <PenTool className="h-4 w-4 mr-2" /> Edit Draft

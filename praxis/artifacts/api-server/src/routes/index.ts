@@ -30,6 +30,7 @@ import learnRouter from "./learn";
 import coachAreaRouter from "./coachArea";
 import consentRouter from "./consent";
 import dataRightsRouter from "./dataRights";
+import cleanupRouter from "./cleanup";
 import progressRouter from "./progress";
 import activitiesRouter from "./activities";
 import moduleReadingsRouter from "./moduleReadings";
@@ -115,6 +116,7 @@ router.use(partnerLandingRouter);
 router.use(documentTemplatesRouter);
 router.use(consentRouter);
 router.use(dataRightsRouter);
+router.use(cleanupRouter);
 // Defense in depth: the dev router is not even mounted unless explicitly enabled (see routes/dev.ts).
 if (devRoutesEnabled) router.use(devRouter);
 

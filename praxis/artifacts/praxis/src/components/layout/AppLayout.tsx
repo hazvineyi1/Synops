@@ -465,6 +465,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             />
           )}
 
+          {user.role === 'super_admin' && (
+            <ShellNavLink
+              item={{ label: t('nav.cleanup', 'Environment cleanup'), href: '/admin/cleanup', icon: Sparkles }}
+              active={isNavActive('/admin/cleanup')}
+            />
+          )}
+
           <div className="px-1"><LanguageSwitcher variant="full" /></div>
 
           <button
