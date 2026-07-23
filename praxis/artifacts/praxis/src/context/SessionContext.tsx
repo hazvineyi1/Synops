@@ -32,6 +32,10 @@ export interface SessionUser {
   privacyPolicyVersion?: string;
   /** True when the user must accept the current privacy policy before continuing. */
   consentRequired?: boolean;
+  /** True when 2FA is on for this account. */
+  mfaEnabled?: boolean;
+  /** True when the user's role requires 2FA but they have not enabled it yet. */
+  mfaSetupRequired?: boolean;
 }
 
 interface SessionState {

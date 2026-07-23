@@ -18,7 +18,7 @@ import {
   partnerDocumentsTable,
   coursesTable,
 } from "@workspace/db";
-import { eq, and, isNull, desc, sql, or, ilike, gte, type SQL } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, or, ilike, gte, count, type SQL } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { logAudit as audit } from "../lib/audit";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
@@ -373,7 +373,26 @@ router.post("/platform/users/:id/revoke-sessions", requireAuth, requireSuperAdmi
 
 /** GET /platform/login-activity — platform-wide, including failures. */
 router.get("/platform/login-activity", requireAuth, requireSuperAdmin, async (req, res) => {
-  const limit = Math.min(Number(req.query.limit ?? 100), 500);
+  const rawLimit = Number(req.query.limit ?? 100);
+  const limit = Math.min(Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 100), 500);
+  const rawOffset = Number(req.query.offset ?? 0);
+  const offset = Math.max(0, Number.isFinite(rawOffset) ? rawOffset : 0);
+  // Optional filters so a large trail is navigable: by outcome (success/failure)
+  // and by a specific user id.
+  const conds: SQL[] = [];
+  const outcome = String(req.query.outcome ?? "").trim();
+  const VALID_OUTCOMES = ["success", "bad_password", "unknown_email", "suspended", "impersonated"] as const;
+  if ((VALID_OUTCOMES as readonly string[]).includes(outcome)) {
+    conds.push(eq(loginEventsTable.outcome, outcome as (typeof VALID_OUTCOMES)[number]));
+  }
+  const userId = String(req.query.userId ?? "").trim();
+  if (userId) conds.push(eq(loginEventsTable.userId, userId));
+  const where = conds.length ? and(...conds) : undefined;
+
+  // Total (respecting filters) so the UI can page without silently truncating.
+  const [{ value: total }] = await db.select({ value: count() }).from(loginEventsTable).where(where);
+  res.setHeader("X-Total-Count", String(total));
+
   const rows = await db
     .select({
       id: loginEventsTable.id,
@@ -386,8 +405,10 @@ router.get("/platform/login-activity", requireAuth, requireSuperAdmin, async (re
       createdAt: loginEventsTable.createdAt,
     })
     .from(loginEventsTable)
+    .where(where)
     .orderBy(desc(loginEventsTable.createdAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
   res.json(rows);
 });
 

@@ -24,6 +24,7 @@ import {
 } from "../lib/auth";
 import { generateSecret, verifyTotp, otpauthUrl, generateBackupCodes, normalizeBackupCode } from "../lib/totp";
 import { PRIVACY_POLICY_VERSION, consentRequired } from "../lib/popia";
+import { mfaSetupRequired } from "../lib/mfaPolicy";
 
 const router = Router();
 
@@ -48,6 +49,9 @@ function publicUser(u: typeof usersTable.$inferSelect, impersonatorId?: string) 
     consentVersion: u.consentVersion ?? null,
     privacyPolicyVersion: PRIVACY_POLICY_VERSION,
     consentRequired: consentRequired(u.consentVersion),
+    // 2FA policy: admin roles must enrol. The SPA gates the console until they do.
+    mfaEnabled: !!u.mfaEnabled,
+    mfaSetupRequired: mfaSetupRequired(u),
   };
 }
 

@@ -7,6 +7,7 @@ import { SessionProvider, useSession } from '@/context/SessionContext';
 import { ThemeApplier } from '@/context/ThemeProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ConsentGate } from '@/components/ConsentGate';
+import { MfaGate } from '@/components/MfaGate';
 import { MaintenanceBanner } from '@/components/MaintenanceBanner';
 
 // Pages
@@ -157,6 +158,8 @@ function ProtectedRoute({
         if (!isSignedIn) return <Redirect to="/sign-in" />;
         // POPIA: block until the current privacy policy is accepted.
         if (user?.consentRequired) return <ConsentGate />;
+        // 2FA policy: admin roles must enrol. Leave /security reachable so they can.
+        if (user?.mfaSetupRequired && path !== "/security") return <MfaGate />;
         return (
           <AppLayout>
             <Component params={params} />
