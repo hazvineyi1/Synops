@@ -248,6 +248,11 @@ router.delete("/organisations/:orgId/members/:userId", requireAuth, async (req, 
 // GET /organisations/:orgId/stats
 router.get("/organisations/:orgId/stats", requireAuth, async (req, res) => {
   const { orgId } = req.params;
+  // Was requireAuth-only: any user (incl. an admin in another tenant) could read
+  // any org's member counts. Scope to the caller's tenant.
+  const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, orgId) });
+  if (!org) { res.status(404).json({ error: "Not found" }); return; }
+  if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
   const [memberCount] = await db
     .select({ count: count() })
     .from(usersTable)

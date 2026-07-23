@@ -152,6 +152,20 @@ jobs:
     name: build praxis (SPA + api)
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: praxis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -179,17 +193,24 @@ jobs:
         working-directory: praxis
         run: pnpm run typecheck
 
-      # Unit tests over the permission matrix (roles.ts) and gradebook math (gradebookEngine.ts) —
-      # the logic that gates every scoped route and feeds credentials. A regression here re-opens a
-      # security hole or corrupts a grade, so it fails CI before it can reach Railway.
-      # The pure unit tests never connect to a database, but gradebookEngine.ts
-      # imports @workspace/db, and lib/db throws at import time when DATABASE_URL
-      # is unset. Provide a dummy URL so the import guard passes and the file can
-      # be collected; no real database is needed or contacted.
-      - name: Test Praxis API (permissions + gradebook)
+      # Push the schema into the throwaway Postgres so the DB-backed tests (the
+      # cross-tenant isolation suite) run for real, not skipped.
+      - name: Push Praxis schema
         working-directory: praxis
         env:
-          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/praxis_test
+        run: pnpm --filter @workspace/db run push-force
+
+      # Unit tests over the permission matrix (roles.ts) and gradebook math (gradebookEngine.ts),
+      # PLUS the DB-backed cross-tenant isolation suite (tenant-isolation.test.ts) which boots the
+      # real app and proves one tenant can never read another's partner/org data. A regression here
+      # re-opens a security hole, corrupts a grade, or leaks a client's data across tenants, so it
+      # fails CI before it can reach Railway.
+      - name: Test Praxis API (permissions + gradebook + tenant isolation)
+        working-directory: praxis
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/praxis_test
+          SESSION_SECRET: ci-only-secret-32-chars-minimum-length
         run: pnpm --filter @workspace/api-server run test
 
       - name: Build Praxis (SPA + API)
