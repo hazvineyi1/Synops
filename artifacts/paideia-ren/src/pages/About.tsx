@@ -12,17 +12,17 @@ export default function About() {
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
             className="text-white text-5xl md:text-[64px] font-bold leading-[1.1] tracking-tight mb-8"
           >
-            About Synops Consulting Group
+            About Synops
           </motion.h1>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.2 }}
             className="text-[20px] text-white/80 leading-relaxed max-w-3xl mx-auto space-y-6"
           >
             <p>
-              A complementary partnership spanning healthcare operations and education technology, serving organizations across the United States.
+              An education technology and AI company, grounded in two decades of operational and healthcare rigor, serving institutions across the United States.
             </p>
             <p>
-              We offer both strategic advisory and hands-on build capability. Our model is fully remote, allowing us to deploy exactly the right expertise to your challenges, regardless of geography. We don't just write reports. We implement workflows, build curricula, and architect the platforms necessary to sustain change.
+              We build the platforms that teach, coach, design curriculum, and deliver it to learners, and we advise where deep operational experience is needed. Fully remote, so we bring exactly the right expertise to your challenge. We don't just write reports. We build the curricula, ship the platforms, and stay until your team can run them.
             </p>
           </motion.div>
         </div>
@@ -72,7 +72,7 @@ export default function About() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-white border border-border p-10 rounded-none">
               <h3 className="text-2xl font-bold text-foreground mb-4">Rigor</h3>
-              <p className="text-[16px] text-muted-foreground leading-relaxed">Evidence-based approaches over trends, whether in clinical operations or educational design.</p>
+              <p className="text-[16px] text-muted-foreground leading-relaxed">Evidence-based approaches over trends, in learning design and in operations.</p>
             </div>
             <div className="bg-white border border-border p-10 rounded-none">
               <h3 className="text-2xl font-bold text-foreground mb-4">Accountability</h3>
@@ -92,7 +92,7 @@ export default function About() {
 
       <CTASection
         heading="Let's build something that lasts"
-        subtext="Bring us your hardest operational or learning challenge. We advise, then we build."
+        subtext="Bring us your hardest learning or operational challenge. We build, and we advise."
         buttonLabel="Book a consultation"
         href="/contact"
       />

@@ -7,10 +7,10 @@ export default function Platforms() {
       <section className="bg-primary-hero pt-24 pb-24 px-6 border-b border-primary/20">
         <div className="max-w-[1200px] mx-auto text-center">
           <h1 className="text-white text-5xl md:text-[64px] font-bold leading-[1.1] tracking-tight mb-6">
-            Beyond Advisory: We Build
+            The Synops platform stack
           </h1>
           <p className="text-[22px] text-white/80 leading-relaxed mb-8 max-w-3xl mx-auto">
-            From adaptive learning platforms to secure operational dashboards, our technical arm translates strategic requirements into working software.
+            AI platforms for teaching, learning, curriculum design and delivery, built in-house and running today with real institutions. The same engineering rigor extends to the operational tools our clients need.
           </p>
           <Link 
             href="/contact?area=platforms" 
@@ -30,7 +30,7 @@ export default function Platforms() {
               Private beta, by invitation
             </div>
             <h2 className="text-4xl font-bold text-primary tracking-tight mb-4">Our Products</h2>
-            <p className="text-[18px] text-muted-foreground">Purpose-built platforms reflecting our rigorous standards.</p>
+            <p className="text-[18px] text-muted-foreground">AI platforms for teaching, learning, curriculum design and delivery.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -87,20 +87,20 @@ export default function Platforms() {
         <div className="max-w-[1200px] mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white border border-border p-8">
-              <h4 className="text-[18px] font-bold text-primary mb-3">Custom Web Apps</h4>
-              <p className="text-[15px] text-muted-foreground leading-relaxed">Tailored SaaS solutions for distinct operational needs.</p>
-            </div>
-            <div className="bg-white border border-border p-8">
               <h4 className="text-[18px] font-bold text-primary mb-3">AI-Powered Learning</h4>
-              <p className="text-[15px] text-muted-foreground leading-relaxed">Intelligent tutoring systems and specialized internal agents.</p>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">Intelligent tutoring, adaptive practice, and AI content evaluation.</p>
             </div>
             <div className="bg-white border border-border p-8">
-              <h4 className="text-[18px] font-bold text-primary mb-3">Operations Dashboards</h4>
-              <p className="text-[15px] text-muted-foreground leading-relaxed">Real-time reporting and analytics for managed care oversight.</p>
+              <h4 className="text-[18px] font-bold text-primary mb-3">Learning Platforms & LMS</h4>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">Course delivery, interactive activities, credentials, and real access control.</p>
             </div>
             <div className="bg-white border border-border p-8">
-              <h4 className="text-[18px] font-bold text-primary mb-3">Secure Data Workflows</h4>
-              <p className="text-[15px] text-muted-foreground leading-relaxed">Engineered with privacy, compliance, and RBAC at the core.</p>
+              <h4 className="text-[18px] font-bold text-primary mb-3">Reporting & Analytics</h4>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">Dashboards for engagement, outcomes, and operational oversight.</p>
+            </div>
+            <div className="bg-white border border-border p-8">
+              <h4 className="text-[18px] font-bold text-primary mb-3">Secure by Design</h4>
+              <p className="text-[15px] text-muted-foreground leading-relaxed">Privacy, compliance, and role-based access at the core.</p>
             </div>
           </div>
           

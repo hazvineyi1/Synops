@@ -25,6 +25,21 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Kill any leftover service worker from an older PWA build of this site.
+      // The current marketing app ships no service worker; a lingering one only
+      // serves stale content and 404s deep links. Unregister and clear caches.
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (rs) {
+          rs.forEach(function (r) { r.unregister(); });
+        }).catch(function () {});
+        if (window.caches && caches.keys) {
+          caches.keys().then(function (ks) {
+            ks.forEach(function (k) { caches.delete(k); });
+          }).catch(function () {});
+        }
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
