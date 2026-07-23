@@ -37,6 +37,7 @@ import { gradebookSettingsTable, gradebookOrgOverridesTable, type LetterBand } f
 import { buildGradebookWorkbook, buildGradebookCsv, type GbExportReport } from "../lib/gradebookExport";
 import { onGradeEvent, scanCourse } from "../lib/gradebookAlerts";
 import { mailerConfigured, sendMail, appUrl, emailShell } from "../lib/mailer";
+import { resolveEmailBrand } from "../lib/emailBrand";
 
 const router = Router();
 

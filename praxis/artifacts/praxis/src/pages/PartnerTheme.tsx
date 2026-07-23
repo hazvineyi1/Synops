@@ -126,7 +126,7 @@ export function PartnerTheme() {
                 <div className="space-y-1.5">
                   <Label>Logo (required)</Label>
                   <button type="button" onClick={() => logoRef.current?.click()} className="w-full h-24 rounded-lg border border-dashed border-border hover:border-primary/40 flex items-center justify-center overflow-hidden bg-muted/30">
-                    {logoParts?.dataUrl || form.logoUrl ? <img src={logoParts?.dataUrl || form.logoUrl} alt="Logo" className="max-h-20 object-contain" /> : <span className="text-xs text-muted-foreground flex items-center gap-1"><Upload className="h-3.5 w-3.5" /> Upload logo</span>}
+                    {logoParts?.dataUrl || form.logoUrl ? <img src={logoParts?.dataUrl || form.logoUrl || undefined} alt="Logo" className="max-h-20 object-contain" /> : <span className="text-xs text-muted-foreground flex items-center gap-1"><Upload className="h-3.5 w-3.5" /> Upload logo</span>}
                   </button>
                 </div>
                 <div className="space-y-1.5">

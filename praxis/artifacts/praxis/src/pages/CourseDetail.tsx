@@ -1124,7 +1124,7 @@ export function CourseDetail() {
 
   // Instructor authoring: persist course-level learning objectives.
   const saveCourse = useMutation({
-    mutationFn: (patch: { objectives: string[] }) =>
+    mutationFn: (patch: Record<string, unknown>) =>
       apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['course', courseId] }),
   });

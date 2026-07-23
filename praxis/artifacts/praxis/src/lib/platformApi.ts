@@ -139,7 +139,14 @@ export interface ApiKey {
   createdAt: string;
 }
 
-export type Role = "super_admin" | "partner_admin" | "org_admin" | "coach" | "learner";
+export type Role =
+  | "super_admin"
+  | "partner_admin"
+  | "org_admin"
+  | "instructional_designer"
+  | "coach"
+  | "funder"
+  | "learner";
 
 /* ── Calls ── */
 
@@ -166,7 +173,7 @@ export const platformApi = {
     ),
 
   resetLink: (id: string) =>
-    req<{ link: string; expiresAt: string; email: string }>(
+    req<{ link: string; expiresAt: string; email: string; emailed: boolean }>(
       `/platform/users/${id}/reset-link`,
       { method: "POST" },
     ),

@@ -65,7 +65,7 @@ async function pptxToText(buf: Buffer): Promise<string> {
   for (const name of slideNames) {
     const xml = await zip.files[name].async("string");
     const runs = xml.match(/<a:t>[\s\S]*?<\/a:t>/g);
-    const text = runs ? runs.map((run) => run.replace(/<[^>]+>/g, "")).join(" ") : stripHtml(xml);
+    const text = runs ? runs.map((run: string) => run.replace(/<[^>]+>/g, "")).join(" ") : stripHtml(xml);
     if (text.trim()) parts.push(text.trim());
   }
   return parts.join("\n\n");
