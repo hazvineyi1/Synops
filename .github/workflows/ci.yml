@@ -182,8 +182,14 @@ jobs:
       # Unit tests over the permission matrix (roles.ts) and gradebook math (gradebookEngine.ts) —
       # the logic that gates every scoped route and feeds credentials. A regression here re-opens a
       # security hole or corrupts a grade, so it fails CI before it can reach Railway.
+      # The pure unit tests never connect to a database, but gradebookEngine.ts
+      # imports @workspace/db, and lib/db throws at import time when DATABASE_URL
+      # is unset. Provide a dummy URL so the import guard passes and the file can
+      # be collected; no real database is needed or contacted.
       - name: Test Praxis API (permissions + gradebook)
         working-directory: praxis
+        env:
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci
         run: pnpm --filter @workspace/api-server run test
 
       - name: Build Praxis (SPA + API)
