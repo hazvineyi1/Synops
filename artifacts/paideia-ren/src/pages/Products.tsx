@@ -332,7 +332,29 @@ function ProductExplorer() {
               </div>
             </div>
 
-            <Sampler samples={p.samples} accent={p.accent} />
+            {p.video ? (
+              <div className="bg-muted/40 border-t lg:border-t-0 lg:border-l border-border p-6 flex flex-col justify-center">
+                <div className="rounded-[10px] overflow-hidden border border-border bg-black shadow-sm">
+                  <video
+                    key={p.video}
+                    className="block w-full h-auto"
+                    src={`${import.meta.env.BASE_URL}${p.video}`}
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    controls
+                    preload="metadata"
+                    aria-label="Walkthrough of the Curriculum Builder platform: the projects dashboard, the standards alignment map, and a QA report with accessibility checks passing."
+                  />
+                </div>
+                {p.videoCaption && (
+                  <p className="mt-3.5 text-[12px] text-muted-foreground leading-snug">{p.videoCaption}</p>
+                )}
+              </div>
+            ) : (
+              <Sampler samples={p.samples} accent={p.accent} />
+            )}
           </div>
         </div>
       </div>
@@ -358,6 +380,10 @@ type Product = {
   cta?: string;
   // Optional category chip shown next to the name (e.g. "LMS").
   tag?: string;
+  // Optional walkthrough video (file in /public); shown in the right panel
+  // instead of the illustrative sampler.
+  video?: string;
+  videoCaption?: string;
 };
 
 const PRODUCTS: Product[] = [
@@ -417,6 +443,8 @@ const PRODUCTS: Product[] = [
     scale: "Scales from one program to an institution.",
     samples: BUILDER_SAMPLES,
     accent: "primary" as const,
+    video: "curriculum-builder-animation.mp4",
+    videoCaption: "A real walkthrough: the projects dashboard, the standards alignment map, and a QA report with accessibility checks passing before handoff.",
   },
   {
     slug: "praxis",
