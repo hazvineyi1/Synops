@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import router from "./routes";
 import { maintenanceMode } from "./middlewares/maintenanceMode";
+import { recordRequest } from "./lib/healthMetrics";
 import { registerPwa } from "./pwa";
 import { logger } from "./lib/logger";
 import { captureError } from "./lib/observability";
@@ -127,6 +128,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authLimiter);
 app.use("/api/dev", authLimiter);
 app.use("/api", apiLimiter);
+
+// Self-monitoring: count requests + 5xx per response for the health dashboard.
+app.use("/api", (_req, res, next) => {
+  res.on("finish", () => recordRequest(res.statusCode));
+  next();
+});
 
 // Read-only freeze during the region cutover: rejects writes with 503 and flags
 // the state to the SPA. No-op unless MAINTENANCE_MODE is set.

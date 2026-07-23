@@ -35,6 +35,7 @@ import {
   Palette,
   Megaphone,
   ArrowLeft,
+  Activity,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
@@ -469,6 +470,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <ShellNavLink
               item={{ label: t('nav.cleanup', 'Environment cleanup'), href: '/admin/cleanup', icon: Sparkles }}
               active={isNavActive('/admin/cleanup')}
+            />
+          )}
+
+          {user.role === 'super_admin' && (
+            <ShellNavLink
+              item={{ label: t('nav.health', 'System health'), href: '/admin/health', icon: Activity }}
+              active={isNavActive('/admin/health')}
             />
           )}
 

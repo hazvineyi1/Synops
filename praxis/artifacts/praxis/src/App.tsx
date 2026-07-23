@@ -46,6 +46,8 @@ import { Privacy } from '@/pages/Privacy';
 import { DataPrivacy } from '@/pages/DataPrivacy';
 import { AdminDataRequests } from '@/pages/AdminDataRequests';
 import EnvironmentCleanup from '@/pages/EnvironmentCleanup';
+import { PublicStatus } from '@/pages/PublicStatus';
+import AdminHealth from '@/pages/AdminHealth';
 import { Terms } from '@/pages/Terms';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
@@ -218,6 +220,7 @@ function Routes() {
         <PublicRoute path="/dev-login" component={DevLogin} />
 
         {/* Public */}
+        <PublicRoute path="/status" component={PublicStatus} />
         <PublicRoute path="/privacy" component={Privacy} />
         <PublicRoute path="/terms" component={Terms} />
         <PublicRoute path="/join/:code" component={JoinCohort} />
@@ -238,6 +241,7 @@ function Routes() {
         <ProtectedRoute path="/privacy/data" component={DataPrivacy} />
         <ProtectedRoute path="/admin/data-requests" component={AdminDataRequests} />
         <ProtectedRoute path="/admin/cleanup" component={EnvironmentCleanup} />
+        <ProtectedRoute path="/admin/health" component={AdminHealth} />
         <ProtectedRoute path="/studio/new" component={StudioNew} />
         <ProtectedRoute path="/studio/:draftId" component={StudioEdit} />
         <ProtectedRoute path="/studio" component={Studio} />

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { maintenanceEnabled } from "../middlewares/maintenanceMode";
+import { healthSnapshot } from "../lib/healthMetrics";
 
 const router = Router();
 
@@ -49,6 +50,18 @@ router.get("/readyz", async (_req, res) => {
   } catch (err) {
     res.status(503).json({ status: "not-ready", db: "down", detail: err instanceof Error ? err.message : String(err) });
   }
+});
+
+// Public status summary for the status page. No auth, no sensitive detail -
+// just overall health, whether the database is reachable, and uptime.
+router.get("/status", async (_req, res) => {
+  const snap = await healthSnapshot();
+  res.json({
+    status: snap.status,
+    db: snap.db,
+    uptimeSeconds: snap.uptimeSeconds,
+    maintenance: maintenanceEnabled(),
+  });
 });
 
 export default router;

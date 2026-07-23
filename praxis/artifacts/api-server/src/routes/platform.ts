@@ -21,6 +21,7 @@ import {
 import { eq, and, isNull, desc, sql, or, ilike, gte, count, type SQL } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { logAudit as audit } from "../lib/audit";
+import { healthSnapshot } from "../lib/healthMetrics";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
@@ -372,6 +373,11 @@ router.post("/platform/users/:id/revoke-sessions", requireAuth, requireSuperAdmi
 /* ───────────────────────── Login activity & audit ───────────────────────── */
 
 /** GET /platform/login-activity — platform-wide, including failures. */
+/** GET /platform/health - detailed health snapshot for the admin status dashboard. */
+router.get("/platform/health", requireAuth, requireSuperAdmin, async (_req, res) => {
+  res.json(await healthSnapshot());
+});
+
 router.get("/platform/login-activity", requireAuth, requireSuperAdmin, async (req, res) => {
   const rawLimit = Number(req.query.limit ?? 100);
   const limit = Math.min(Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 100), 500);
