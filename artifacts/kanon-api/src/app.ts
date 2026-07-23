@@ -52,7 +52,25 @@ app.use(
           },
     }),
   );
-app.use(cors());
+// CORS: the SPA is served same-origin, so cross-origin access is only needed for
+// explicitly allow-listed origins (ALLOWED_ORIGINS / APP_URL). In production,
+// deny cross-origin by default (same-origin requests need no CORS header); in
+// development, reflect the request origin so local tooling works. Mutating
+// requests are additionally protected by sameOriginGuard below.
+const corsAllowlist = (process.env.ALLOWED_ORIGINS ?? process.env.APP_URL ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+app.use(
+    cors({
+        origin:
+            process.env.NODE_ENV === "production"
+                ? corsAllowlist.length > 0
+                    ? corsAllowlist
+                    : false
+                : true,
+    }),
+);
 
 app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), handleStripeWebhook);
 

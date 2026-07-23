@@ -24,6 +24,13 @@ RUN pnpm --filter @workspace/kanon-api run build
 # build time; the SPA is served same-origin so no VITE_* runtime keys are needed.
 RUN PORT=8080 BASE_PATH=/ pnpm --filter @workspace/kanon run build
 
+# Pin the runtime environment and drop to the image's built-in non-root user.
+# NODE_ENV is set AFTER install/build so devDependencies remain available during
+# the build; the running service then sees production (enables secure cookies +
+# same-origin static SPA serving).
+ENV NODE_ENV=production
+USER node
+
 # Railway provides PORT at runtime; the server reads process.env.PORT.
 EXPOSE 8080
 

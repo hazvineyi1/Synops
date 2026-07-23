@@ -31,6 +31,13 @@ RUN PORT=8080 BASE_PATH=/ \
     VITE_CLERK_PROXY_URL=$VITE_CLERK_PROXY_URL \
     pnpm --filter @workspace/arete run build
 
+# Pin the runtime environment and drop to the image's built-in non-root user.
+# NODE_ENV is set AFTER install/build so devDependencies (vite, esbuild, tsc)
+# are available during the build; the running service then sees production
+# (enables secure cookies + same-origin static serving + tighter CORS).
+ENV NODE_ENV=production
+USER node
+
 # Railway provides PORT at runtime; the server reads process.env.PORT.
 EXPOSE 8080
 
