@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@workspace/paideia-db";
 import { HealthCheckResponse } from "@workspace/paideia-api-zod";
 import { logger } from "../lib/logger.js";
+import { maintenanceEnabled } from "../middlewares/maintenanceMode.js";
 
 const router: IRouter = Router();
 
@@ -32,6 +33,8 @@ router.get("/version", (_req, res) => {
     node: process.version,
     startedAt: STARTED_AT.toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
+    // Read-only maintenance window in effect (drives the SPA banner).
+    maintenance: maintenanceEnabled(),
   });
 });
 

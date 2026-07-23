@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { loadTeacher } from "./middlewares/auth.js";
+import { maintenanceMode } from "./middlewares/maintenanceMode.js";
 import { globalRateLimit } from "./middlewares/rateLimit.js";
 import { getStripeSync } from "./lib/stripeClient.js";
 import { syncTeacherFromCustomer } from "./lib/stripeSync.js";
@@ -272,6 +273,10 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(loadTeacher);
+
+// Read-only freeze during the region cutover: rejects writes with 503 and flags
+// the state to the SPA. No-op unless MAINTENANCE_MODE is set.
+app.use("/api", maintenanceMode);
 
 app.use("/api", router);
 

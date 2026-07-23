@@ -5,6 +5,11 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { getStripeSync } from "./lib/stripeClient";
 import { recoverStuckSubmissions } from "./lib/gradingQueue";
+import { ensurePopiaSchema } from "./lib/popiaSchema";
+
+// POPIA: ensure the consent + deletion-request tables/columns exist at boot
+// (paideia has no migration runner; this heals ahead of an explicit push).
+void ensurePopiaSchema();
 
 async function initStripe(): Promise<void> {
   const databaseUrl = process.env["DATABASE_URL"];

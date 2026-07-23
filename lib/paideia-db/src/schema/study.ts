@@ -52,6 +52,11 @@ export const studyUsersTable = pgTable("study_users", {
   ageBand: text("age_band"),
   guardianEmail: text("guardian_email"),
   guardianConsentAt: timestamp("guardian_consent_at"),
+  // POPIA consent: the privacy-policy version this learner last accepted, and
+  // when. Null = never (or pre-tracking) -> the consent gate re-prompts. The
+  // append-only record lives in study_consents.
+  consentVersion: text("consent_version"),
+  consentedAt: timestamp("consented_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -963,3 +968,51 @@ export type StudyAnnouncement = typeof studyAnnouncementsTable.$inferSelect;
 export type StudyPlan = typeof studyPlansTable.$inferSelect;
 export type StudyPaymentMethod = typeof studyPaymentMethodsTable.$inferSelect;
 export type StudyApiKey = typeof studyApiKeysTable.$inferSelect;
+
+// ---- POPIA: consent + data-subject requests -----------------------------
+
+/**
+ * Append-only consent audit for the Coach (Paideia) learner. Records every time
+ * the learner accepted the privacy policy: which version, when, from where. The
+ * learner's current state is denormalised onto study_users (consent_version /
+ * consented_at); this is the durable record.
+ */
+export const studyConsentsTable = pgTable(
+  "study_consents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    app: text("app").notNull().default("coach"),
+    policyVersion: text("policy_version").notNull(),
+    consentedAt: timestamp("consented_at").defaultNow().notNull(),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+  },
+  (t) => ({ userIdx: index("study_consents_user_idx").on(t.userId) }),
+);
+
+export type StudyConsent = typeof studyConsentsTable.$inferSelect;
+
+/**
+ * A learner erasure request (POPIA right to deletion). Never a one-click wipe:
+ * it starts "pending" and an admin approves it, at which point the account is
+ * de-identified. Coach is a direct-to-learner product (no partner orgs), so
+ * every request is actioned here.
+ */
+export const studyDeletionRequestsTable = pgTable(
+  "study_deletion_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id").notNull(),
+    // pending -> (done | rejected)
+    status: text("status").notNull().default("pending"),
+    reason: text("reason"),
+    requestedAt: timestamp("requested_at").defaultNow().notNull(),
+    decidedBy: uuid("decided_by"),
+    decidedAt: timestamp("decided_at"),
+    retentionNote: text("retention_note"),
+  },
+  (t) => ({ statusIdx: index("study_deletion_requests_status_idx").on(t.status) }),
+);
+
+export type StudyDeletionRequest = typeof studyDeletionRequestsTable.$inferSelect;

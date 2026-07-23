@@ -1,31 +1,6 @@
 import { Router, type IRouter } from "express";
-import {
-  db,
-  studyUsersTable,
-  studyLearnerProfilesTable,
-  studyCognitiveProfilesTable,
-  studyLearningStyleProfilesTable,
-  studyMaterialsTable,
-  studyConceptsTable,
-  studyFlashcardsTable,
-  studyPracticeSessionsTable,
-  studyMockExamsTable,
-  studyAssessmentsTable,
-  studyTutorConversationsTable,
-  studyTutorMessagesTable,
-  studyWeeklyBriefsTable,
-  studyKnowledgeNodesTable,
-  studyKnowledgeEdgesTable,
-  studyContentChunksTable,
-  studyAnnotationsTable,
-  studyContentSourcesTable,
-  studyLearningPathsTable,
-  studyLearningPathStepsTable,
-  studyActivityLogTable,
-  studyNotificationsTable,
-  studyPaymentsTable,
-} from "@workspace/paideia-db";
-import { eq, inArray } from "drizzle-orm";
+import { db, studyUsersTable } from "@workspace/paideia-db";
+import { eq } from "drizzle-orm";
 import { requireStudyUser } from "../../middlewares/auth.js";
 import {
   verifyPassword,
@@ -33,6 +8,7 @@ import {
   STUDY_IMPERSONATOR_COOKIE,
 } from "../../lib/studyAuth.js";
 import { logger } from "../../lib/logger.js";
+import { assembleLearnerExport } from "../../lib/learnerExport.js";
 
 // Learner data rights (GDPR): a self-service export of everything we hold on the
 // signed-in learner, and a password-confirmed self-deletion of their account.
@@ -43,101 +19,11 @@ router.use(requireStudyUser);
 // Streamed as a downloadable JSON attachment. The password hash is never included.
 router.get("/export", async (req, res) => {
   const userId = req.studyUser!.id;
-
-  const [accountRow] = await db
-    .select()
-    .from(studyUsersTable)
-    .where(eq(studyUsersTable.id, userId));
-  if (!accountRow) {
+  const payload = await assembleLearnerExport(userId);
+  if (!payload) {
     res.status(404).json({ error: "Account not found" });
     return;
   }
-  // Never export the password hash.
-  const account: Record<string, unknown> = { ...accountRow };
-  delete account["passwordHash"];
-
-  const conversations = await db
-    .select()
-    .from(studyTutorConversationsTable)
-    .where(eq(studyTutorConversationsTable.userId, userId));
-  const conversationIds = conversations.map((c) => c.id);
-  const tutorMessages = conversationIds.length
-    ? await db
-        .select()
-        .from(studyTutorMessagesTable)
-        .where(inArray(studyTutorMessagesTable.conversationId, conversationIds))
-    : [];
-
-  const [
-    learnerProfile,
-    cognitiveProfile,
-    learningStyleProfile,
-    materials,
-    concepts,
-    flashcards,
-    practiceSessions,
-    mockExams,
-    assessments,
-    weeklyBriefs,
-    knowledgeNodes,
-    knowledgeEdges,
-    contentChunks,
-    annotations,
-    contentSources,
-    learningPaths,
-    learningPathSteps,
-    activityLog,
-    notifications,
-    payments,
-  ] = await Promise.all([
-    db.select().from(studyLearnerProfilesTable).where(eq(studyLearnerProfilesTable.userId, userId)),
-    db.select().from(studyCognitiveProfilesTable).where(eq(studyCognitiveProfilesTable.userId, userId)),
-    db.select().from(studyLearningStyleProfilesTable).where(eq(studyLearningStyleProfilesTable.userId, userId)),
-    db.select().from(studyMaterialsTable).where(eq(studyMaterialsTable.userId, userId)),
-    db.select().from(studyConceptsTable).where(eq(studyConceptsTable.userId, userId)),
-    db.select().from(studyFlashcardsTable).where(eq(studyFlashcardsTable.userId, userId)),
-    db.select().from(studyPracticeSessionsTable).where(eq(studyPracticeSessionsTable.userId, userId)),
-    db.select().from(studyMockExamsTable).where(eq(studyMockExamsTable.userId, userId)),
-    db.select().from(studyAssessmentsTable).where(eq(studyAssessmentsTable.userId, userId)),
-    db.select().from(studyWeeklyBriefsTable).where(eq(studyWeeklyBriefsTable.userId, userId)),
-    db.select().from(studyKnowledgeNodesTable).where(eq(studyKnowledgeNodesTable.userId, userId)),
-    db.select().from(studyKnowledgeEdgesTable).where(eq(studyKnowledgeEdgesTable.userId, userId)),
-    db.select().from(studyContentChunksTable).where(eq(studyContentChunksTable.userId, userId)),
-    db.select().from(studyAnnotationsTable).where(eq(studyAnnotationsTable.userId, userId)),
-    db.select().from(studyContentSourcesTable).where(eq(studyContentSourcesTable.userId, userId)),
-    db.select().from(studyLearningPathsTable).where(eq(studyLearningPathsTable.userId, userId)),
-    db.select().from(studyLearningPathStepsTable).where(eq(studyLearningPathStepsTable.userId, userId)),
-    db.select().from(studyActivityLogTable).where(eq(studyActivityLogTable.userId, userId)),
-    db.select().from(studyNotificationsTable).where(eq(studyNotificationsTable.userId, userId)),
-    db.select().from(studyPaymentsTable).where(eq(studyPaymentsTable.userId, userId)),
-  ]);
-
-  const payload = {
-    exportedAt: new Date().toISOString(),
-    account,
-    learnerProfile,
-    cognitiveProfile,
-    learningStyleProfile,
-    materials,
-    concepts,
-    flashcards,
-    practiceSessions,
-    mockExams,
-    assessments,
-    tutor: { conversations, messages: tutorMessages },
-    weeklyBriefs,
-    knowledgeNodes,
-    knowledgeEdges,
-    contentChunks,
-    annotations,
-    contentSources,
-    learningPaths,
-    learningPathSteps,
-    activityLog,
-    notifications,
-    payments,
-  };
-
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader(
     "Content-Disposition",

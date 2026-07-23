@@ -21,6 +21,7 @@ import { requireStudyUser } from "../../middlewares/auth.js";
 import { rateLimit } from "../../middlewares/rateLimit.js";
 import { sendEmail, isEmailConfigured, passwordResetEmail, coachBaseUrl } from "../../lib/email.js";
 import { verifyEntryToken } from "../../lib/learnerEntry.js";
+import { PRIVACY_POLICY_VERSION, consentRequired } from "../../lib/popia.js";
 
 const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -256,6 +257,10 @@ router.get("/me", async (req, res) => {
     impersonating: !!(req.cookies as Record<string, string> | undefined)?.[STUDY_IMPERSONATOR_COOKIE],
     subscriptionCurrentPeriodEnd: u.subscriptionCurrentPeriodEnd?.toISOString() ?? null,
     createdAt: u.createdAt.toISOString(),
+    // POPIA: does this learner need to accept the current privacy policy?
+    consentVersion: u.consentVersion ?? null,
+    privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+    consentRequired: consentRequired(u.consentVersion),
   });
 });
 

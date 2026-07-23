@@ -73,6 +73,7 @@ export default function StudyProfile() {
   const [exporting, setExporting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [deletePassword, setDeletePassword] = useState("");
+  const [deleteRequested, setDeleteRequested] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
@@ -97,24 +98,27 @@ export default function StudyProfile() {
     }
   };
 
+  // POPIA: deletion is never an immediate self-service wipe. We record a request
+  // that an administrator reviews and actions (de-identify), per the data-subject
+  // request procedure.
   const handleDelete = async () => {
     setDeleteError("");
     setDeleting(true);
     try {
-      const res = await fetch("/api/study/account/delete", {
+      const res = await fetch("/api/me/deletion-request", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: deletePassword }),
+        body: JSON.stringify({ reason: deletePassword.trim() || "Requested from profile settings" }),
       });
-      if (!res.ok) {
+      if (!res.ok && res.status !== 409) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error || "Could not delete your account");
+        throw new Error(body.error || "Could not submit your request");
       }
-      // Session is cleared server-side; hard-reload to the sign-in page.
-      window.location.href = "/study/login";
+      setDeleteRequested(true);
     } catch (e) {
-      setDeleteError(e instanceof Error ? e.message : "Could not delete your account");
+      setDeleteError(e instanceof Error ? e.message : "Could not submit your request");
+    } finally {
       setDeleting(false);
     }
   };
@@ -409,7 +413,7 @@ export default function StudyProfile() {
                     Permanently erases your account and all study data. This cannot be undone.
                   </p>
                 </div>
-                {!showDelete && (
+                {!showDelete && !deleteRequested && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -417,23 +421,29 @@ export default function StudyProfile() {
                     onClick={() => setShowDelete(true)}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    Delete account
+                    Request deletion
                   </Button>
                 )}
               </div>
 
-              {showDelete && (
+              {deleteRequested && (
+                <div className="mt-4 rounded-lg border border-border bg-muted/50 p-4 text-sm text-foreground">
+                  Your deletion request has been recorded. An administrator will review and action it
+                  in line with our data-subject request procedure.
+                </div>
+              )}
+
+              {showDelete && !deleteRequested && (
                 <div className="mt-4 rounded-lg border border-red-200 bg-red-50/60 p-4 space-y-3">
                   <p className="text-sm text-red-700">
-                    This is permanent. Enter your password to confirm you want to delete
-                    your account and everything in it.
+                    This records a deletion request. It is not immediate - an administrator reviews it
+                    and then erases your data. You can optionally tell us why.
                   </p>
                   <div>
-                    <Label htmlFor="deletePassword">Password</Label>
+                    <Label htmlFor="deleteReason">Reason (optional)</Label>
                     <Input
-                      id="deletePassword"
-                      type="password"
-                      autoComplete="current-password"
+                      id="deleteReason"
+                      type="text"
                       value={deletePassword}
                       onChange={(e) => setDeletePassword(e.target.value)}
                       className="mt-1.5 max-w-sm"
@@ -444,11 +454,11 @@ export default function StudyProfile() {
                     <Button
                       size="sm"
                       className="gap-1.5 bg-red-600 hover:bg-red-700 text-white"
-                      disabled={deleting || !deletePassword}
+                      disabled={deleting}
                       onClick={handleDelete}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      {deleting ? "Deleting..." : "Permanently delete"}
+                      {deleting ? "Submitting..." : "Request deletion"}
                     </Button>
                     <Button
                       variant="ghost"

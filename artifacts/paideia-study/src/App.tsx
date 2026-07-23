@@ -15,6 +15,8 @@ import StudyForgotPassword from "@/pages/StudyForgotPassword";
 import StudyResetPassword from "@/pages/StudyResetPassword";
 import StudySignup from "@/pages/StudySignup";
 import StudyPrivacy from "@/pages/StudyPrivacy";
+import { StudyConsentGate } from "@/components/StudyConsentGate";
+import { StudyMaintenanceBanner } from "@/components/StudyMaintenanceBanner";
 import StudyTerms from "@/pages/StudyTerms";
 import StudyHelp from "@/pages/StudyHelp";
 import { captureEntrySource, isUsAudience } from "@/lib/entry";
@@ -36,6 +38,8 @@ const StudyTutor = lazy(() => import("@/pages/StudyTutor"));
 const StudyTutorChat = lazy(() => import("@/pages/StudyTutorChat"));
 const StudyTutorGuided = lazy(() => import("@/pages/StudyTutorGuided"));
 const StudyProfile = lazy(() => import("@/pages/StudyProfile"));
+const StudyDataPrivacy = lazy(() => import("@/pages/StudyDataPrivacy"));
+const StudyAdminDataRequests = lazy(() => import("@/pages/StudyAdminDataRequests"));
 const StudyBriefs = lazy(() => import("@/pages/StudyBriefs"));
 const StudyKnowledgeMap = lazy(() => import("@/pages/StudyKnowledgeMap"));
 const StudyMaterialView = lazy(() => import("@/pages/StudyMaterialView"));
@@ -96,6 +100,8 @@ function Protected({ component: Component }: { component: ComponentType<any> }) 
   }
 
   if (!user) return null;
+  // POPIA: block protected content until the current privacy policy is accepted.
+  if ((user as { consentRequired?: boolean }).consentRequired) return <StudyConsentGate />;
   return <Component />;
 }
 
@@ -196,6 +202,8 @@ function Router() {
       <Route path="/tutor/guided/:conversationId" component={() => <Protected component={StudyTutorGuided} />} />
       <Route path="/tutor/:conversationId" component={StudyTutorChat} />
       <Route path="/profile" component={() => <Protected component={StudyProfile} />} />
+      <Route path="/privacy/data" component={() => <Protected component={StudyDataPrivacy} />} />
+      <Route path="/admin/data-requests" component={() => <Protected component={StudyAdminDataRequests} />} />
       <Route path="/briefs" component={() => <Protected component={StudyBriefs} />} />
       <Route path="/knowledge-map" component={() => <Protected component={StudyKnowledgeMap} />} />
       <Route path="/assessment/:id" component={() => <Protected component={StudyAssessment} />} />
@@ -222,6 +230,7 @@ function App() {
         <StudyAuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <HeartbeatTracker />
+            <StudyMaintenanceBanner />
             <ImpersonationBanner />
             <AdminFab />
             <OfflineIndicator />
