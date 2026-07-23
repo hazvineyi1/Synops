@@ -152,6 +152,13 @@ jobs:
         working-directory: praxis
         run: pnpm install --no-frozen-lockfile
 
+      # Typecheck the whole praxis workspace (libs + api-server + SPA). The image
+      # builds with esbuild/vite, which skip type checking, so without this a
+      # type-level break only surfaces in the Railway image build.
+      - name: Typecheck (praxis workspace)
+        working-directory: praxis
+        run: pnpm run typecheck
+
       # Unit tests over the permission matrix (roles.ts) and gradebook math (gradebookEngine.ts) —
       # the logic that gates every scoped route and feeds credentials. A regression here re-opens a
       # security hole or corrupts a grade, so it fails CI before it can reach Railway.
