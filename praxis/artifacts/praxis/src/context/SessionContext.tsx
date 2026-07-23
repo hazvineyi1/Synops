@@ -26,6 +26,12 @@ export interface SessionUser {
   organisationId: string | null;
   /** True when a super_admin is viewing the app AS this user. */
   impersonating: boolean;
+  /** POPIA: the privacy-policy version the user last accepted (null = never). */
+  consentVersion?: string | null;
+  /** The current privacy-policy version the server expects. */
+  privacyPolicyVersion?: string;
+  /** True when the user must accept the current privacy policy before continuing. */
+  consentRequired?: boolean;
 }
 
 interface SessionState {

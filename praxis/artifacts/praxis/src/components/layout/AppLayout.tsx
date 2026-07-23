@@ -453,6 +453,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             active={isNavActive('/security')}
           />
 
+          <ShellNavLink
+            item={{ label: t('nav.privacyData', 'Privacy & my data'), href: '/privacy/data', icon: FileText }}
+            active={isNavActive('/privacy/data')}
+          />
+
+          {user.role === 'super_admin' && (
+            <ShellNavLink
+              item={{ label: t('nav.dataRequests', 'Data requests'), href: '/admin/data-requests', icon: ShieldCheck }}
+              active={isNavActive('/admin/data-requests')}
+            />
+          )}
+
           <div className="px-1"><LanguageSwitcher variant="full" /></div>
 
           <button

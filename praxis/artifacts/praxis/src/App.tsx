@@ -6,6 +6,8 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { SessionProvider, useSession } from '@/context/SessionContext';
 import { ThemeApplier } from '@/context/ThemeProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ConsentGate } from '@/components/ConsentGate';
+import { MaintenanceBanner } from '@/components/MaintenanceBanner';
 
 // Pages
 import NotFound from '@/pages/not-found';
@@ -40,6 +42,8 @@ import { OrgMembers } from '@/pages/OrgMembers';
 import { SignInPage } from '@/pages/SignIn';
 import { RequestAccess } from '@/pages/RequestAccess';
 import { Privacy } from '@/pages/Privacy';
+import { DataPrivacy } from '@/pages/DataPrivacy';
+import { AdminDataRequests } from '@/pages/AdminDataRequests';
 import { Terms } from '@/pages/Terms';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
@@ -144,13 +148,15 @@ function ProtectedRoute({
   component: React.ComponentType<any>;
   path: string;
 }) {
-  const { isSignedIn, loading } = useSession();
+  const { isSignedIn, loading, user } = useSession();
 
   return (
     <Route path={path}>
       {(params) => {
         if (loading) return <SessionGate />;
         if (!isSignedIn) return <Redirect to="/sign-in" />;
+        // POPIA: block until the current privacy policy is accepted.
+        if (user?.consentRequired) return <ConsentGate />;
         return (
           <AppLayout>
             <Component params={params} />
@@ -169,13 +175,14 @@ function FocusRoute({
   component: React.ComponentType<any>;
   path: string;
 }) {
-  const { isSignedIn, loading } = useSession();
+  const { isSignedIn, loading, user } = useSession();
 
   return (
     <Route path={path}>
       {(params) => {
         if (loading) return <SessionGate />;
         if (!isSignedIn) return <Redirect to="/sign-in" />;
+        if (user?.consentRequired) return <ConsentGate />;
         return <Component params={params} />;
       }}
     </Route>
@@ -224,6 +231,8 @@ function Routes() {
 
         {/* App layout routes */}
         <ProtectedRoute path="/dashboard" component={Dashboard} />
+        <ProtectedRoute path="/privacy/data" component={DataPrivacy} />
+        <ProtectedRoute path="/admin/data-requests" component={AdminDataRequests} />
         <ProtectedRoute path="/studio/new" component={StudioNew} />
         <ProtectedRoute path="/studio/:draftId" component={StudioEdit} />
         <ProtectedRoute path="/studio" component={Studio} />
@@ -306,6 +315,7 @@ function App() {
           <WouterRouter base={basePath}>
             <SessionProvider>
               <ThemeApplier />
+              <MaintenanceBanner />
               <Routes />
             </SessionProvider>
           </WouterRouter>

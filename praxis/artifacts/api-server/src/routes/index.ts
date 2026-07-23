@@ -28,6 +28,8 @@ import notificationsRouter from "./notifications";
 import interactiveVideoRouter from "./interactive_video";
 import learnRouter from "./learn";
 import coachAreaRouter from "./coachArea";
+import consentRouter from "./consent";
+import dataRightsRouter from "./dataRights";
 import progressRouter from "./progress";
 import activitiesRouter from "./activities";
 import moduleReadingsRouter from "./moduleReadings";
@@ -111,6 +113,8 @@ router.use(enrolRouter);
 router.use(translateRouter);
 router.use(partnerLandingRouter);
 router.use(documentTemplatesRouter);
+router.use(consentRouter);
+router.use(dataRightsRouter);
 // Defense in depth: the dev router is not even mounted unless explicitly enabled (see routes/dev.ts).
 if (devRoutesEnabled) router.use(devRouter);
 

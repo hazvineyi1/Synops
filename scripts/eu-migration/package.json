@@ -1,0 +1,15 @@
+{
+  "name": "eu-migration-tools",
+  "private": true,
+  "type": "module",
+  "description": "Operator tooling for the US -> EU (Frankfurt) region cutover. Run manually in a maintenance window; see ../../EU-CUTOVER-CHECKLIST.md.",
+  "scripts": {
+    "verify": "tsx verify.ts",
+    "copy-storage": "tsx copy-storage.ts"
+  },
+  "devDependencies": {
+    "pg": "^8.13.1",
+    "tsx": "^4.19.2",
+    "@types/pg": "^8.11.10"
+  }
+}

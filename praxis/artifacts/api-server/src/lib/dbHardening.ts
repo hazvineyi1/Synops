@@ -25,6 +25,42 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled boolean NOT NULL DEFAULT false`,
       sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret text`,
       sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_backup_codes text[] NOT NULL DEFAULT '{}'`,
+      // POPIA consent state (latest accepted policy version + when). Additive; the
+      // consent gate treats existing rows (null) as "needs to accept".
+      sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS consent_version text`,
+      sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS consented_at timestamptz`,
+    ]],
+    // POPIA: append-only consent audit. The current state is denormalised onto
+    // users; this is the durable record of every acceptance.
+    ["consent_events", [
+      sql`CREATE TABLE IF NOT EXISTS consent_events (
+        id text PRIMARY KEY,
+        user_id text NOT NULL,
+        app text NOT NULL DEFAULT 'praxis',
+        policy_version text NOT NULL,
+        consented_at timestamptz NOT NULL DEFAULT now(),
+        ip text,
+        user_agent text
+      )`,
+      sql`CREATE INDEX IF NOT EXISTS consent_events_user_idx ON consent_events (user_id)`,
+    ]],
+    // POPIA: data-subject erasure requests. Approved by a super admin; partner-org
+    // learners are routed to the partner, not deleted here.
+    ["deletion_requests", [
+      sql`CREATE TABLE IF NOT EXISTS deletion_requests (
+        id text PRIMARY KEY,
+        user_id text NOT NULL,
+        app text NOT NULL DEFAULT 'praxis',
+        status text NOT NULL DEFAULT 'pending',
+        reason text,
+        route_to_partner boolean NOT NULL DEFAULT false,
+        partner_id text,
+        requested_at timestamptz NOT NULL DEFAULT now(),
+        decided_by text,
+        decided_at timestamptz,
+        retention_note text
+      )`,
+      sql`CREATE INDEX IF NOT EXISTS deletion_requests_status_idx ON deletion_requests (status)`,
     ]],
     // Per-item grade type (points | pass_fail | completion) for the configurable gradebook.
     ["gradebook_items", [

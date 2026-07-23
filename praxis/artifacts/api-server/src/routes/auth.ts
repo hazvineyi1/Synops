@@ -23,6 +23,7 @@ import {
   SESSION_COOKIE,
 } from "../lib/auth";
 import { generateSecret, verifyTotp, otpauthUrl, generateBackupCodes, normalizeBackupCode } from "../lib/totp";
+import { PRIVACY_POLICY_VERSION, consentRequired } from "../lib/popia";
 
 const router = Router();
 
@@ -42,6 +43,11 @@ function publicUser(u: typeof usersTable.$inferSelect, impersonatorId?: string) 
     coachPersonality: u.coachPersonality,
     // The UI must be able to show an unmissable "you are impersonating" banner.
     impersonating: !!impersonatorId,
+    // POPIA: has this user accepted the current privacy-policy version? The SPA
+    // shows a blocking consent gate when consentRequired is true.
+    consentVersion: u.consentVersion ?? null,
+    privacyPolicyVersion: PRIVACY_POLICY_VERSION,
+    consentRequired: consentRequired(u.consentVersion),
   };
 }
 

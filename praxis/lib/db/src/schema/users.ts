@@ -72,6 +72,11 @@ export const usersTable = pgTable("users", {
   mfaEnabled: boolean("mfa_enabled").notNull().default(false),
   mfaSecret: text("mfa_secret"),
   mfaBackupCodes: text("mfa_backup_codes").array().notNull().default([]),
+  // POPIA consent: the privacy-policy version this user last accepted, and when.
+  // Null = never consented (or consented before we tracked it) -> the consent
+  // gate re-prompts. The append-only record lives in consent_events.
+  consentVersion: text("consent_version"),
+  consentedAt: timestamp("consented_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

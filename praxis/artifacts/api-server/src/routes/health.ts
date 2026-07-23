@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { maintenanceEnabled } from "../middlewares/maintenanceMode";
 
 const router = Router();
 
@@ -30,6 +31,8 @@ router.get("/version", (_req, res) => {
     node: process.version,
     startedAt: STARTED_AT.toISOString(),
     uptimeSeconds: Math.round(process.uptime()),
+    // Read-only maintenance window in effect (drives the SPA banner).
+    maintenance: maintenanceEnabled(),
   });
 });
 

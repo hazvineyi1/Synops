@@ -9,6 +9,7 @@ import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import router from "./routes";
+import { maintenanceMode } from "./middlewares/maintenanceMode";
 import { registerPwa } from "./pwa";
 import { logger } from "./lib/logger";
 import { captureError } from "./lib/observability";
@@ -126,6 +127,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authLimiter);
 app.use("/api/dev", authLimiter);
 app.use("/api", apiLimiter);
+
+// Read-only freeze during the region cutover: rejects writes with 503 and flags
+// the state to the SPA. No-op unless MAINTENANCE_MODE is set.
+app.use("/api", maintenanceMode);
 
 app.use("/api", router);
 
