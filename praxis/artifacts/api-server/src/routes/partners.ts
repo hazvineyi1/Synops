@@ -5,6 +5,7 @@ import { eq, and, count, inArray, sql, desc } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { isSuperAdmin, isFacilitator } from "../lib/roles";
 import { validateBody } from "../lib/validate";
+import { partnerCounts, partnerCount } from "../lib/tenantCounts";
 
 // Map an audit action onto the partner-audit category the UI colour-codes by.
 function auditCategory(action: string): "financial" | "funder" | "account" | "impersonation" | "branding" {
@@ -104,30 +105,14 @@ function toPartnerResponse(p: typeof partnersTable.$inferSelect) {
 // GET /partners
 router.get("/partners", requireAuth, requireRole("super_admin"), async (req, res) => {
   const partners = await db.select().from(partnersTable);
-  // Compute learner/org counts LIVE — the stored partners.orgCount/learnerCount columns are
-  // denormalised and never recomputed when learners are seeded/enrolled, so they read stale 0.
-  // A learner may attach to a partner directly (partner_id) or via their organisation, so resolve
-  // through both. Two grouped queries instead of the stale column.
-  const orgById = new Map<string, number>();
-  const learnerById = new Map<string, number>();
-  try {
-    const orgRows: any = await db.execute(sql`
-      SELECT partner_id AS pid, COUNT(*)::int AS c FROM organisations
-      WHERE partner_id IS NOT NULL GROUP BY partner_id`);
-    for (const r of orgRows.rows ?? []) orgById.set(r.pid, Number(r.c));
-    const learnerRows: any = await db.execute(sql`
-      SELECT COALESCE(u.partner_id, o.partner_id) AS pid, COUNT(*)::int AS c
-      FROM users u LEFT JOIN organisations o ON u.organisation_id = o.id
-      WHERE u.role = 'learner' AND COALESCE(u.partner_id, o.partner_id) IS NOT NULL
-      GROUP BY COALESCE(u.partner_id, o.partner_id)`);
-    for (const r of learnerRows.rows ?? []) learnerById.set(r.pid, Number(r.c));
-  } catch {
-    /* fall back to stored columns below */
-  }
+  // Live counts from the shared helper (single source of truth) - the stored
+  // partners.orgCount/learnerCount columns drift and are not used. The partner
+  // stats endpoint uses the same helper, so the list and detail always agree.
+  const { orgs, learners } = await partnerCounts();
   res.json(partners.map((p) => ({
     ...toPartnerResponse(p),
-    orgCount: orgById.get(p.id) ?? p.orgCount ?? 0,
-    learnerCount: learnerById.get(p.id) ?? p.learnerCount ?? 0,
+    orgCount: orgs.get(p.id) ?? 0,
+    learnerCount: learners.get(p.id) ?? 0,
   })));
 });
 
@@ -199,22 +184,18 @@ router.get("/partners/:partnerId/stats", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  const [orgCountResult] = await db
-    .select({ count: count() })
-    .from(organisationsTable)
-    .where(eq(organisationsTable.partnerId, partnerId));
-  const [learnerCountResult] = await db
-    .select({ count: count() })
-    .from(usersTable)
-    .where(eq(usersTable.partnerId, partnerId));
+  // Same helper as the partner list, so totalLearners/orgCount are identical
+  // across tabs (previously stats counted all users with a direct partner_id,
+  // while the list counted learners via partner OR org - two different numbers).
+  const { orgCount, learnerCount } = await partnerCount(partnerId);
 
   res.json({
     partnerId,
-    totalLearners: Number(learnerCountResult.count),
+    totalLearners: learnerCount,
     activeEnrolments: 0,
     credentialsIssued: 0,
     completionRate: 0,
-    orgCount: Number(orgCountResult.count),
+    orgCount,
   });
 });
 

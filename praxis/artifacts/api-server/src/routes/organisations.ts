@@ -6,6 +6,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { canAdministerOrg, canAccessOrg, canAssignRole, assignableRoles } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 import { validateBody } from "../lib/validate";
+import { orgMemberCounts, orgMemberCount } from "../lib/tenantCounts";
 
 const router = Router();
 
@@ -51,7 +52,10 @@ router.get("/organisations", requireAuth, async (req, res) => {
   } else {
     orgs = [];
   }
-  res.json(orgs.map(toOrgResponse));
+  // Live member counts (single source of truth) so the list matches the detail
+  // stats tab. The stored organisations.member_count column drifts and is not used.
+  const counts = await orgMemberCounts(orgs.map((o) => o.id));
+  res.json(orgs.map((o) => ({ ...toOrgResponse(o), memberCount: counts.get(o.id) ?? 0 })));
 });
 
 // POST /organisations
@@ -253,14 +257,12 @@ router.get("/organisations/:orgId/stats", requireAuth, async (req, res) => {
   const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, orgId) });
   if (!org) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
-  const [memberCount] = await db
-    .select({ count: count() })
-    .from(usersTable)
-    .where(eq(usersTable.organisationId, orgId));
+  // Same helper as the org list, so the count is identical across tabs.
+  const totalMembers = await orgMemberCount(orgId);
 
   res.json({
     orgId,
-    totalMembers: Number(memberCount.count),
+    totalMembers,
     activeEnrolments: 0,
     completions: 0,
     credentialsIssued: 0,
