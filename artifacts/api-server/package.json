@@ -10,14 +10,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@clerk/express": "^2.1.21",
     "@clerk/shared": "^4.13.1",
     "@mozilla/readability": "^0.6.0",
+    "@sentry/node": "^8.0.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/billing": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/identity": "workspace:*",
-    "@anthropic-ai/sdk": "^0.39.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",

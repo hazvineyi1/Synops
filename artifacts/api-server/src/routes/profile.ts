@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../lib/requireAuth";
 import { db } from "@workspace/db";
-import { profilesTable } from "@workspace/db";
+import { profilesTable, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const router = Router();
@@ -48,6 +48,13 @@ router.post("/profile", requireAuth, async (req, res) => {
       },
     })
     .returning();
+  // Mirror completion onto the users row so admin analytics ("Completed
+  // onboarding") reflect reality; the profile table drives the app flow, but
+  // the reporting column lives on users.
+  await db
+    .update(usersTable)
+    .set({ assessmentComplete: body.assessmentComplete ?? false })
+    .where(eq(usersTable.id, userId));
   res.status(201).json(profile);
 });
 
@@ -84,6 +91,13 @@ router.patch("/profile", requireAuth, async (req, res) => {
     .set(updateFields)
     .where(eq(profilesTable.userId, userId))
     .returning();
+  // Keep the users reporting column in sync when completion changes here too.
+  if (body.assessmentComplete !== undefined) {
+    await db
+      .update(usersTable)
+      .set({ assessmentComplete: !!body.assessmentComplete })
+      .where(eq(usersTable.id, userId));
+  }
   res.json(profile);
 });
 

@@ -280,7 +280,7 @@ export async function getCourseColumns(courseId: string, orgId?: string | null):
       category: it.category,
       itemType: it.itemType as "formative" | "summative",
       // completion columns always render as a %; others use their configured grade type.
-      gradeType: it.sourceType === "completion"
+      gradeType: (it.sourceType as string) === "completion"
         ? "completion"
         : (((it as { gradeType?: string }).gradeType as "points" | "pass_fail" | "completion") ?? "points"),
       pointsPossible: Number(it.pointsPossible),

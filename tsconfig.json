@@ -18,6 +18,10 @@
     { "path": "./lib/paideia-api-client" },
     { "path": "./lib/paideia-api-zod" },
     { "path": "./lib/compass-api-client" },
-    { "path": "./lib/compass-curriculum-engine" }
+    { "path": "./lib/compass-curriculum-engine" },
+    { "path": "./lib/compass-db" },
+    { "path": "./lib/compass-api-zod" },
+    { "path": "./lib/compass-evidence-packet" },
+    { "path": "./lib/compass-openai" }
   ]
 }

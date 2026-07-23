@@ -5,6 +5,7 @@ import { apiKeysTable, webhooksTable, usersTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { getEntitlement } from "./billing";
 import { logger } from "./logger";
+import { isSafeWebhookTarget } from "./ssrf";
 
 export const API_KEY_PREFIX = "coach_sk_";
 
@@ -88,6 +89,12 @@ export async function emitWebhook(ownerId: string, event: string, data: unknown)
           .map((s) => s.trim())
           .includes(event);
       if (!subscribed) continue;
+      // Re-check at delivery: a public hostname can resolve into private space
+      // (DNS rebinding), and legacy rows may predate the registration guard.
+      if (!(await isSafeWebhookTarget(hook.url))) {
+        logger.warn({ url: hook.url, event }, "webhook delivery blocked (non-public target)");
+        continue;
+      }
       fetch(hook.url, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Coach-Signature": signWebhook(hook.secret, payload) },

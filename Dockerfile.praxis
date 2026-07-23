@@ -24,6 +24,12 @@ RUN pnpm install --no-frozen-lockfile
 RUN PORT=8080 BASE_PATH=/ pnpm --filter @workspace/praxis run build
 RUN pnpm --filter @workspace/api-server run build
 
+# Pin the runtime environment and drop to the image's built-in non-root user.
+# NODE_ENV is set AFTER install/build so devDependencies remain available during
+# the build; the running service then sees production.
+ENV NODE_ENV=production
+USER node
+
 # Railway provides PORT at runtime; the server reads process.env.PORT.
 EXPOSE 8080
 

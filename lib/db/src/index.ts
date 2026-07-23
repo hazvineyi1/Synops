@@ -27,7 +27,27 @@ function sslFor(connectionString: string): false | { rejectUnauthorized: false }
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: sslFor(process.env.DATABASE_URL),
+  // keepAlive stops a hosted proxy (Railway/Supabase) from silently dropping an
+  // idle TCP socket; without it, a connection that sat unused between requests is
+  // dead by the next checkout and the query throws "Connection terminated
+  // unexpectedly" — an intermittent 500 that looks random.
+  keepAlive: true,
+  // Recycle idle clients before the proxy's own idle cutoff.
+  idleTimeoutMillis: 30_000,
+  // Fail fast on a hung connect instead of hanging the request.
+  connectionTimeoutMillis: 10_000,
+  // Bound the pool so a burst can't exhaust the database's connection limit.
+  max: 10,
 });
+
+// An idle pooled client can emit 'error' when a hosted provider drops the socket
+// (Railway/Supabase close idle connections aggressively). Without a listener,
+// node's default handling of an unhandled 'error' event would crash the process.
+// Log it and let the pool re-establish connections on demand.
+pool.on("error", (err) => {
+  console.error("[db] idle client error:", err);
+});
+
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

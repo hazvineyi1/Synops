@@ -23,6 +23,39 @@ export function rateLimit(opts: { windowMs: number; max: number; key?: (req: Req
   };
 }
 
+// Broad denial-of-service backstop keyed by client IP ALONE (not per-path), so a
+// single abusive IP flooding many endpoints is caught in aggregate. Mount once at
+// the top of the app; per-route limiters keep their own tighter caps underneath.
+// `skip` exempts health probes so a monitor can never be throttled.
+export function globalRateLimit(opts: {
+  windowMs: number;
+  max: number;
+  skip?: (req: Request) => boolean;
+}) {
+  const ipBuckets = new Map<string, Bucket>();
+  setInterval(() => {
+    const now = Date.now();
+    for (const [k, b] of ipBuckets) if (now > b.resetAt) ipBuckets.delete(k);
+  }, opts.windowMs).unref?.();
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (opts.skip?.(req)) { next(); return; }
+    const now = Date.now();
+    const key = req.ip ?? "anon";
+    const b = ipBuckets.get(key);
+    if (!b || now > b.resetAt) {
+      ipBuckets.set(key, { count: 1, resetAt: now + opts.windowMs });
+      next();
+      return;
+    }
+    if (b.count >= opts.max) {
+      res.status(429).json({ error: "Too many requests. Please try again in a few minutes." });
+      return;
+    }
+    b.count += 1;
+    next();
+  };
+}
+
 // Like rateLimit, but only throttles mutating requests (POST/PUT/PATCH/DELETE);
 // reads (GET/HEAD/OPTIONS) always pass through. Use this at the mount point of
 // the expensive AI-generation routers so a runaway loop or abusive client can't

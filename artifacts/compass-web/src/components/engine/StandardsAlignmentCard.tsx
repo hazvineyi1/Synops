@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   useListStandardsFrameworks,
   useListCompetencies,
+  getListCompetenciesQueryKey,
   useListCrosswalkLinks,
   getListCrosswalkLinksQueryKey,
   useCreateCrosswalkLink,
@@ -42,10 +43,16 @@ export function StandardsAlignmentCard({
   const activeFrameworkId = frameworkId ?? frameworks?.[0]?.id ?? null;
 
   const { data: competencies } = useListCompetencies(activeFrameworkId ?? 0, {
-    query: { enabled: !!activeFrameworkId },
+    query: {
+      enabled: !!activeFrameworkId,
+      queryKey: getListCompetenciesQueryKey(activeFrameworkId ?? 0),
+    },
   });
   const { data: links } = useListCrosswalkLinks(projectId, {
-    query: { enabled: !!projectId },
+    query: {
+      enabled: !!projectId,
+      queryKey: getListCrosswalkLinksQueryKey(projectId),
+    },
   });
 
   const invalidate = () =>

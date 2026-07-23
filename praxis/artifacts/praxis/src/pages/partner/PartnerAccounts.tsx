@@ -137,7 +137,7 @@ export function PartnerAccounts() {
     },
     onSuccess: (r) => {
       const selOrg = orgs.find((o) => o.id === org);
-      setInvites((xs) => [{ id: Math.random().toString(36).slice(2), email: r.email, role: r.role, orgName: selOrg?.name ?? '', sentAt: new Date().toISOString().slice(0, 10) }, ...xs]);
+      setInvites((xs) => [{ id: Math.random().toString(36).slice(2), email: r.email, role: r.role as 'coach' | 'org_admin', orgName: selOrg?.name ?? '', sentAt: new Date().toISOString().slice(0, 10) }, ...xs]);
       setInviteLink(r.link);
       qc.invalidateQueries({ queryKey: ['partner-members', partnerId] });
       flashMsg(r.emailed ? 'Invite emailed with a set-password link.' : 'Account created. Copy the set-password link below to share it.');

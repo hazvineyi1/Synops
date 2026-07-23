@@ -70,7 +70,7 @@ router.post("/platform/document-templates/:key/send", requireAuth, requireRole("
   const t = byKey(req.params.key);
   if (!t) { res.status(404).json({ error: "Not found" }); return; }
   const partnerIds = Array.isArray(req.body?.partnerIds)
-    ? [...new Set(req.body.partnerIds.filter((p: unknown): p is string => typeof p === "string" && p.length > 0))]
+    ? [...new Set((req.body.partnerIds as unknown[]).filter((p): p is string => typeof p === "string" && p.length > 0))]
     : [];
   if (!partnerIds.length) { res.status(400).json({ error: "Select at least one partner." }); return; }
   await ensureTemplateKey();

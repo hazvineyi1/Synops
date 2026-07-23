@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import healthRouter from "./health";
 import profileRouter from "./profile";
 import messagesRouter from "./messages";
 import materialRouter from "./material";
@@ -21,7 +20,8 @@ import { aiLimiter, authLimiter } from "../middlewares/rateLimit";
 
 const router: IRouter = Router();
 
-router.use(healthRouter);
+// Note: the liveness route (/api/healthz) is mounted in app.ts ahead of the
+// Clerk auth middleware so the deploy healthcheck never depends on auth.
 router.use(profileRouter);
 
 // Throttle the expensive Anthropic-backed write endpoints. The limiter skips

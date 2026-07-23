@@ -30,7 +30,7 @@ export function GradebookBrowser() {
 
   const top = stack[stack.length - 1];
 
-  const data = useQuery({
+  const data = useQuery<PartnerRow[] | OrgRow[] | CourseRow[]>({
     queryKey: ["gb-browse", top?.kind, top?.partnerId, top?.organisationId],
     enabled: !!top && top.kind !== "none",
     queryFn: () => {

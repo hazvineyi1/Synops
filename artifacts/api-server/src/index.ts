@@ -1,5 +1,8 @@
-// Must be first: stubs browser globals (DOMMatrix, etc.) before any module that
-// imports pdf-parse / pdf.js is loaded, otherwise the process crashes on startup.
+// Must be first: initialise Sentry (no-op without SENTRY_DSN) before anything
+// else loads, so early startup errors are captured too.
+import "./lib/instrument";
+// Then stub browser globals (DOMMatrix, etc.) before any module that imports
+// pdf-parse / pdf.js is loaded, otherwise the process crashes on startup.
 import "./lib/pdfPolyfill";
 
 import app from "./app";

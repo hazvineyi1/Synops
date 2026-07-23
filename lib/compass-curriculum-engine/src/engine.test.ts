@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   detectVerb,
-  evaluateCourse,
-  type EngineCourse,
+  evaluateCurriculum,
+  type CurriculumEvaluationInput,
 } from "./index";
 
 describe("detectVerb", () => {
@@ -39,24 +39,24 @@ describe("detectVerb", () => {
   });
 });
 
-describe("evaluateCourse", () => {
-  const course: EngineCourse = {
+describe("evaluateCurriculum", () => {
+  const course: CurriculumEvaluationInput = {
     title: "Foundations of Data Literacy",
     gradeBand: "Intro",
     termWeeks: 12,
     objectives: [
-      { id: "o1", text: "Interpret measures of center and spread to compare two data sets.", standardId: "s1", standardLabel: "Math HSS.ID.A.2" },
-      { id: "o2", text: "Understand how data visualizations can mislead an audience.", standardId: "s2", standardLabel: "ELA RST.9-10.7" },
-      { id: "o3", text: "Design a data dashboard that answers a real-world question.", standardId: null },
-      { id: "o4", text: "Recognize common sources of bias in data collection.", standardId: "s3", standardLabel: "ELA RI.9-10.1" },
+      { id: "o1", text: "Interpret measures of center and spread to compare two data sets.", standardAlignmentIds: ["s1"], standardAlignmentLabel: "Math HSS.ID.A.2" },
+      { id: "o2", text: "Understand how data visualizations can mislead an audience.", standardAlignmentIds: ["s2"], standardAlignmentLabel: "ELA RST.9-10.7" },
+      { id: "o3", text: "Design a data dashboard that answers a real-world question.", standardAlignmentIds: [] },
+      { id: "o4", text: "Recognize common sources of bias in data collection.", standardAlignmentIds: ["s3"], standardAlignmentLabel: "ELA RI.9-10.1" },
     ],
     assessments: [
-      { id: "a1", title: "Unit 1 data analysis quiz", type: "summative", objectiveIds: ["o1"] },
-      { id: "a2", title: "Misleading-chart critique", type: "formative", objectiveIds: ["o2", "o4"] },
+      { id: "a1", title: "Unit 1 data analysis quiz", objectiveIds: ["o1"] },
+      { id: "a2", title: "Misleading-chart critique", objectiveIds: ["o2", "o4"] },
     ],
   };
 
-  const report = evaluateCourse(course);
+  const report = evaluateCurriculum(course);
 
   it("produces a score strictly between 0 and 100 for an imperfect course", () => {
     expect(report.score).toBeGreaterThan(0);

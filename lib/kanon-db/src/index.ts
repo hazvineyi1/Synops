@@ -24,6 +24,15 @@ const useSsl =
 export const pool = new Pool({
     connectionString,
     ...(useSsl ? { ssl: { rejectUnauthorized: false } } : {}),
+    // keepAlive prevents a hosted proxy from silently dropping an idle socket
+    // (which surfaces as an intermittent "Connection terminated unexpectedly").
+    keepAlive: true,
+    // Recycle idle clients before the proxy's own idle cutoff.
+    idleTimeoutMillis: 30_000,
+    // Fail fast on a hung connect instead of hanging the request.
+    connectionTimeoutMillis: 10_000,
+    // Bound the pool so a burst can't exhaust the database's connection limit.
+    max: 10,
 });
 
 pool.on("error", (err) => {
