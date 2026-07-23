@@ -99,7 +99,7 @@ const COACH_SAMPLES = [
       { h: "Question", p: "Explain how a change in a single DNA base can lead to a non-functioning protein. [6 marks]" },
       { h: "Your answer", p: "The base changes so the protein is different and doesn't work." },
       { h: "Marked", p: "2 out of 6. You have the start and the end, but none of the middle." },
-      { h: "What's missing", p: "The changed base alters a codon, a different amino acid is placed, the primary sequence changes, folding changes, the active site shape changes, and the substrate no longer binds. Examiners award the chain, not the conclusion." },
+      { h: "What's missing", p: "The whole causal chain: codon changes, wrong amino acid, folding changes, active site changes, substrate no longer binds. Examiners award the chain, not the conclusion." },
     ],
   },
 ];
@@ -226,7 +226,7 @@ function Sampler({
         </div>
 
         <p className="mt-6 pt-4 border-t border-border text-[13px] text-muted-foreground">
-          Illustrative output. The live product generates this against your curriculum, your standards and your learners.
+          Illustrative. The live product runs this against your own curriculum and learners.
         </p>
       </div>
     </div>
@@ -247,43 +247,36 @@ function Sampler({
 /** The expandable detail body for one product (text column + sampler). */
 function ProductDetail({ p }: { p: Product }) {
   return (
-    <div className="px-6 lg:px-8 py-8 border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-10 xl:gap-14 items-start">
+    <div className="px-6 lg:px-8 py-9 border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-10 xl:gap-14 items-start">
       <div>
-        <p className="text-[13px] font-bold uppercase tracking-wider text-accent mb-4">{p.tagline}</p>
-        <p className="text-[17px] text-muted-foreground leading-relaxed mb-7">{p.lead}</p>
+        <p className="text-[13px] font-bold uppercase tracking-wider text-accent mb-3">{p.tagline}</p>
+        <p className="text-[18px] text-foreground leading-relaxed mb-7 max-w-md">{p.lead}</p>
 
-        <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-3">{p.bulletsTitle}</h3>
-        <ul className="space-y-2.5 mb-7">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3.5 mb-8">
           {p.bullets.map((t) => (
-            <li key={t} className="flex gap-3 text-[15.5px] text-muted-foreground leading-relaxed">
-              <span className="text-accent font-bold mt-0.5 shrink-0">&rarr;</span>
+            <li key={t} className="flex gap-2.5 text-[14.5px] text-foreground font-medium leading-snug">
+              <span className="text-accent font-bold mt-px shrink-0">&rarr;</span>
               <span>{t}</span>
             </li>
           ))}
         </ul>
 
-        <div className="border-t border-border pt-5">
-          <h3 className="text-[12px] font-bold uppercase tracking-wider text-primary mb-2">{p.scaleTitle}</h3>
-          <p className="text-[15px] text-muted-foreground leading-relaxed">{p.scale}</p>
-        </div>
-
-        {/* Live products link straight to the app; the app gates access itself. */}
-        {p.href && (
-          <div className="border-t border-border mt-5 pt-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-block text-[12.5px] font-semibold text-muted-foreground bg-muted/60 border border-border rounded-full px-3.5 py-1.5">
+            {p.scaleTitle}
+          </span>
+          {/* Live products link straight to the app; the app gates access itself. */}
+          {p.href && (
             <a
               href={p.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block bg-accent text-white px-7 py-3.5 font-bold rounded-[6px] hover:bg-accent/90 transition-colors"
+              className="inline-block bg-accent text-white px-6 py-2.5 text-[14px] font-bold rounded-[6px] hover:bg-accent/90 transition-colors"
             >
               {p.cta ?? "Open"} &rarr;
             </a>
-            <p className="mt-3 text-[13.5px] text-muted-foreground leading-relaxed">
-              Access is by enrolment. Enrolled learners sign in above; if your organisation
-              is not yet set up, register your interest below.
-            </p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <Sampler samples={p.samples} accent={p.accent} />
@@ -429,16 +422,16 @@ const PRODUCTS: Product[] = [
     letter: "T",
     name: "Synops Teacher",
     tagline: "Give every teacher back their evenings",
-    lead: "An AI co-pilot for teachers. It drafts the lesson plans, worksheets, quizzes, mark schemes and parent communications that consume a teacher's unpaid hours, grounded in your curriculum and pitched at your year groups. It does not replace teacher judgement. It removes the blank page, so judgement is spent where it actually matters.",
+    lead: "An AI co-pilot that drafts the lesson plans, worksheets, quizzes and parent notes that eat a teacher's evenings, grounded in your curriculum.",
     bulletsTitle: "Why departments adopt it",
     bullets: [
-      "Cuts planning and admin time materially, recovering the hours teachers say they lose to paperwork.",
-      "Consistent quality across a department, not just from your strongest planners.",
-      "Every output is aligned to your curriculum and standards, not a generic template.",
-      "Built-in differentiation: support and stretch generated with every plan.",
+      "Cuts planning and admin time",
+      "Consistent quality across a department",
+      "Aligned to your curriculum, not a template",
+      "Differentiation built into every plan",
     ],
     scaleTitle: "Scales from one classroom to a trust",
-    scale: "Start with a single department pilot. Expand to whole-school with shared resource libraries, class and assignment management, and admin oversight of usage and quality. Multi-school rollouts run on the same tenancy model our consulting clients already operate: isolated data, per-institution branding, and central control.",
+    scale: "Scales from one classroom to a trust.",
     samples: TEACHER_SAMPLES,
     accent: "accent" as const,
   },
@@ -448,16 +441,16 @@ const PRODUCTS: Product[] = [
     letter: "C",
     name: "Synops Coach",
     tagline: "A tutor that refuses to just give the answer",
-    lead: "An AI study coach for learners. Adaptive study plans, spaced retrieval, exam practice with honest marking, and a guided Socratic tutor that leads a student to the answer instead of handing it over. Most AI tools make it easier for a student to avoid thinking. This one is engineered to make that impossible.",
+    lead: "An AI study coach with adaptive plans, honest exam marking, and a Socratic tutor that leads students to the answer instead of handing it over.",
     bulletsTitle: "Why institutions fund it",
     bullets: [
-      "One-to-one tutoring is the most effective intervention we know, and the least affordable. This is the first thing that scales it.",
-      "Socratic by design: students reach the answer themselves, so the understanding survives the exam.",
-      "Study plans built on spaced retrieval and interleaving, not on how long a student sits at a desk.",
-      "Honest marking against real mark schemes, so students find out now rather than in August.",
+      "Makes 1:1 tutoring finally scale",
+      "Socratic by design, no spoon-feeding",
+      "Study plans built on spaced retrieval",
+      "Honest marking to real mark schemes",
     ],
     scaleTitle: "Scales to a whole cohort",
-    scale: "Deploy to a single intervention group, a year cohort, or an entire student body. Seat-based licensing keeps cost predictable as you grow, and the marginal cost of the next student is a fraction of an hour of human tutoring. Institutional dashboards show who is engaging, who is struggling, and where the cohort is weakest.",
+    scale: "Scales to a whole cohort.",
     samples: COACH_SAMPLES,
     accent: "primary" as const,
   },
@@ -467,16 +460,16 @@ const PRODUCTS: Product[] = [
     letter: "B",
     name: "Curriculum Builder",
     tagline: "Good design and audit-ready evidence, from one workflow",
-    lead: "A curriculum design platform that takes instructional teams from intake through design, quality assurance, and handoff. Backward design by default, with objectives, assessments and activities held in a live alignment map. Most curriculum tools track approvals. This one helps you build the course, and produces the accreditation evidence as a by-product of doing it properly.",
+    lead: "A curriculum design platform that takes teams from intake to handoff, and produces accreditation evidence as a by-product of designing the course properly.",
     bulletsTitle: "Why institutions buy it",
     bullets: [
-      "Accreditation self-studies stop being a six-month scramble. The evidence is already there, mapped to the performance indicator.",
-      "Rules-based QA catches unmeasurable objectives, unassessed outcomes and accessibility failures before handoff, not after a site visit.",
-      "Standards library covering regional and specialist accreditors, plus your own institutional outcomes.",
-      "Replaces specialist accreditation consultants billing by the hour.",
+      "Accreditation evidence as a by-product",
+      "Automated pedagogical + accessibility QA",
+      "Regional + specialist standards library",
+      "Replaces per-hour accreditation consultants",
     ],
     scaleTitle: "Scales from one program to an institution",
-    scale: "Start with a single program build. Expand to department, college and whole-institution curriculum mapping, with a live view of where every program outcome is introduced, practiced and assessed. Multi-tenant by design: isolated data, your branding, and central oversight across every course in development.",
+    scale: "Scales from one program to an institution.",
     samples: BUILDER_SAMPLES,
     accent: "primary" as const,
   },
@@ -487,16 +480,16 @@ const PRODUCTS: Product[] = [
     name: "Synops Praxis",
     tag: "LMS",
     tagline: "The learning platform where it all comes together",
-    lead: "A full learning management system for institutions and workforce training. Enrolled learners take courses, complete interactive activities and hand them in, earn verifiable credentials, and get help from a built-in support desk. Coaches review and grade; administrators run the whole platform. Praxis is where the curriculum you design and the coaching you provide actually reach learners, under one roof with real access control.",
+    lead: "A full LMS where enrolled learners take courses, complete interactive activities, and earn verifiable credentials, with coaches grading and admins running it all.",
     bulletsTitle: "Why organisations run it",
     bullets: [
-      "Enrolment-based access: learners sign in only once their organisation has enrolled and approved them.",
-      "Interactive HTML activities learners complete in-browser and hand in, sandboxed and gradable, with results recorded automatically.",
-      "A built-in helpdesk so learner questions and issues are tracked to resolution, not lost in email.",
-      "A super-admin console for impersonation, master password resets, login activity, audit trails and API keys.",
+      "Enrolment-gated learner access",
+      "Interactive activities, auto-graded",
+      "Built-in support desk",
+      "Super-admin console + audit trails",
     ],
     scaleTitle: "Scales from one cohort to a workforce",
-    scale: "Multi-tenant by design: each organisation gets isolated data, its own branding, and role-based access from learner to coach to org and partner admin. Roll out to a single training cohort or an entire workforce, with the platform console giving central oversight of every account, session and credential.",
+    scale: "Scales from one cohort to a workforce.",
     samples: PRAXIS_SAMPLES,
     accent: "accent" as const,
     // Praxis is live and enrolment-gated, so it links straight to sign-in rather than
@@ -568,12 +561,9 @@ export default function Products() {
           <h1 className="text-5xl lg:text-[64px] font-bold leading-[1.1] tracking-tight mb-8">
             We don't just advise. We ship.
           </h1>
-          <p className="text-[21px] text-white/80 leading-relaxed max-w-3xl mb-10">
-            Four platforms built from the same conviction: that good pedagogy should scale without being
-            diluted. One for the people who teach, one for the people who learn, one for the teams who
-            design the curriculum itself, and one that delivers it all to enrolled learners. All are
-            running today with real institutions. We onboard deliberately, so every partner gets the
-            attention that makes a rollout succeed.
+          <p className="text-[21px] text-white/80 leading-relaxed max-w-2xl mb-10">
+            Four platforms so good pedagogy can scale without being diluted, running today with real
+            institutions. Open one below to see it in action.
           </p>
           <a
             href="#register-interest"
@@ -595,9 +585,8 @@ export default function Products() {
               Request access
             </h2>
             <p className="text-[19px] text-muted-foreground leading-relaxed">
-              Our platforms are onboarded by invitation, and access to Synops Praxis is by enrolment. Tell us
-              who you are and what you are trying to solve, and our team will contact you to arrange a
-              walkthrough and discuss a pilot.
+              Onboarded by invitation. Tell us who you are and what you want to solve, and we will arrange a
+              walkthrough and a pilot.
             </p>
           </div>
 
