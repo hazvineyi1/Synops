@@ -34,6 +34,7 @@ import {
   generateRubricDraft,
   translateCaseFacts,
   translateTexts,
+  maxTokensForLang,
   CASE_MODEL,
   type CaseContext,
 } from "../lib/caseEngine";
@@ -636,7 +637,7 @@ router.post("/case-sessions/:id/message", requireAuth, async (req, res) => {
     const chat = history.map((m) => ({ role: m.role === "tutor" ? ("assistant" as const) : ("user" as const), content: m.content }));
 
     let full = "";
-    const stream = anthropic.messages.stream({ model: CASE_MODEL, max_tokens: 1024, system, messages: chat });
+    const stream = anthropic.messages.stream({ model: CASE_MODEL, max_tokens: maxTokensForLang(1024, lang), system, messages: chat });
     for await (const event of stream) {
       if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
         full += event.delta.text;

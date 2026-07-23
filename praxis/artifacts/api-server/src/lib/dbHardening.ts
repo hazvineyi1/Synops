@@ -62,6 +62,26 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       )`,
       sql`CREATE INDEX IF NOT EXISTS deletion_requests_status_idx ON deletion_requests (status)`,
     ]],
+    // Localization: static translation cache + native-speaker review workflow. Each
+    // (source_hash, lang) is translated once and served from cache; status gates whether
+    // a machine draft or an approved translation is shown.
+    ["content_translations", [
+      sql`CREATE TABLE IF NOT EXISTS content_translations (
+        id text PRIMARY KEY,
+        source_hash text NOT NULL,
+        lang text NOT NULL,
+        source_text text NOT NULL,
+        translated_text text NOT NULL,
+        status text NOT NULL DEFAULT 'machine',
+        content_type text NOT NULL DEFAULT 'general',
+        reviewed_by text,
+        reviewed_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      sql`CREATE UNIQUE INDEX IF NOT EXISTS content_translations_key_uidx ON content_translations (source_hash, lang)`,
+      sql`CREATE INDEX IF NOT EXISTS content_translations_status_idx ON content_translations (status, lang)`,
+    ]],
     // Per-item grade type (points | pass_fail | completion) for the configurable gradebook.
     ["gradebook_items", [
       sql`ALTER TABLE gradebook_items ADD COLUMN IF NOT EXISTS grade_type text NOT NULL DEFAULT 'points'`,

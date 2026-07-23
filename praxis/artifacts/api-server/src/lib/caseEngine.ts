@@ -1,5 +1,6 @@
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { buildSocraticSystemPrompt, ensureQuestion, type SocraticContext } from "./socraticEngine";
+import { glossaryPromptBlock } from "./localizationGlossary";
 import type { RubricCriterion, CaseMessage, CaseRubricScore } from "@workspace/db";
 
 /**
@@ -22,6 +23,19 @@ export const LANG_NAMES: Record<string, string> = {
 };
 export function languageName(code?: string | null): string {
   return LANG_NAMES[code ?? "en"] ?? "English";
+}
+
+/**
+ * Token-budget multiplier per language. isiZulu and isiXhosa are agglutinative: a
+ * sentence that fits in N tokens of English can take far more tokens once every
+ * concord, tense and object marker is spelled out, so a fixed max_tokens truncates
+ * the reply mid-sentence. Afrikaans runs a little longer than English too. Scaling
+ * the budget by language is what stops the non-English case turns cutting off.
+ */
+const LANG_TOKEN_MULTIPLIER: Record<string, number> = { zu: 1.8, xh: 1.8, af: 1.25 };
+export function maxTokensForLang(base: number, langCode?: string | null): number {
+  const m = LANG_TOKEN_MULTIPLIER[langCode ?? "en"] ?? 1;
+  return Math.round(base * m);
 }
 
 export interface CaseContext {
@@ -76,7 +90,8 @@ export function buildCaseSystemPrompt(c: CaseContext, isOpening: boolean): strin
   if (lang !== "en") {
     const name = languageName(lang);
     extra.push(
-      `LANGUAGE - ABSOLUTE OVERRIDE: Conduct this ENTIRE session in ${name}. Every question you write MUST be in natural, fluent ${name}, ignoring any earlier instruction to use English. If the learner replies in another language, still ask your next question in ${name} unless they explicitly ask you to switch. All other Socratic rules still apply.`
+      `LANGUAGE - ABSOLUTE OVERRIDE: Conduct this ENTIRE session in ${name}. Every question you write MUST be in natural, fluent ${name}, ignoring any earlier instruction to use English. If the learner replies in another language, still ask your next question in ${name} unless they explicitly ask you to switch. All other Socratic rules still apply.` +
+        glossaryPromptBlock(lang)
     );
   }
 
@@ -121,7 +136,7 @@ export async function generateCaseOpening(c: CaseContext): Promise<string> {
   try {
     const msg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 400,
+      max_tokens: maxTokensForLang(400, c.language),
       system,
       messages: [{ role: "user", content: "I'm ready to begin this case. Ask me the first question." }],
     });
@@ -160,7 +175,7 @@ export async function generateCaseAnalysis(
   rubric?: { criteria: RubricCriterion[] } | null
 ): Promise<CaseAnalysis> {
   const langLine = c.language && c.language !== "en"
-    ? `\nWrite engagementNarrative, conceptsAddressed, reasoningStrengths, developmentAreas and every rubric note in ${languageName(c.language)} (the language of the dialogue). Keep the JSON keys exactly as given in English.`
+    ? `\nWrite engagementNarrative, conceptsAddressed, reasoningStrengths, developmentAreas and every rubric note in ${languageName(c.language)} (the language of the dialogue). Keep the JSON keys exactly as given in English.${glossaryPromptBlock(c.language)}`
     : "";
   const rubricBlock =
     rubric?.criteria?.length
@@ -189,7 +204,7 @@ Return a SINGLE strict JSON object, no prose around it:
   try {
     const msg = await anthropic.messages.create({
       model: ANALYSIS_MODEL,
-      max_tokens: 1200,
+      max_tokens: maxTokensForLang(1200, c.language),
       system,
       messages: [
         {
@@ -301,11 +316,11 @@ export async function translateCaseFacts(
   langCode: string
 ): Promise<{ objective: string | null; context: string }> {
   const name = languageName(langCode);
-  const system = `You are a professional translator. Translate the given case-study text into natural, fluent ${name}. Keep people's names, numbers and currency amounts (e.g. R80,000) exactly as they are. Do not add any commentary or notes. Return a SINGLE strict JSON object and nothing else: {"objective": string|null, "context": string}.`;
+  const system = `You are a professional translator. Translate the given case-study text into natural, fluent ${name}. Keep people's names, numbers and currency amounts (e.g. R80,000) exactly as they are. Do not add any commentary or notes. Return a SINGLE strict JSON object and nothing else: {"objective": string|null, "context": string}.${glossaryPromptBlock(langCode)}`;
   try {
     const msg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 1600,
+      max_tokens: maxTokensForLang(1600, langCode),
       system,
       messages: [{ role: "user", content: JSON.stringify({ objective: objective ?? null, context }) + "\n\nReturn only the JSON." }],
     });
@@ -329,11 +344,11 @@ export async function translateCaseFacts(
 export async function translateTexts(texts: string[], langCode: string): Promise<string[]> {
   if (!texts.length) return [];
   const name = languageName(langCode);
-  const system = `You are a professional translator. Translate EACH string in the given JSON array into natural, fluent ${name}. Keep people's names, numbers and currency amounts (e.g. R80,000) exactly as they are. These are a Socratic coach's questions — keep the questioning tone. Preserve the array order and length EXACTLY (one translation per input, same index). Return ONLY a strict JSON array of the translated strings and nothing else.`;
+  const system = `You are a professional translator. Translate EACH string in the given JSON array into natural, fluent ${name}. Keep people's names, numbers and currency amounts (e.g. R80,000) exactly as they are. These are a Socratic coach's questions — keep the questioning tone. Preserve the array order and length EXACTLY (one translation per input, same index). Return ONLY a strict JSON array of the translated strings and nothing else.${glossaryPromptBlock(langCode)}`;
   try {
     const msg = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 3000,
+      max_tokens: maxTokensForLang(3000, langCode),
       system,
       messages: [{ role: "user", content: JSON.stringify(texts) + "\n\nReturn only the JSON array." }],
     });

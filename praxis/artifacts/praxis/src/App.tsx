@@ -48,6 +48,7 @@ import { AdminDataRequests } from '@/pages/AdminDataRequests';
 import EnvironmentCleanup from '@/pages/EnvironmentCleanup';
 import { PublicStatus } from '@/pages/PublicStatus';
 import AdminHealth from '@/pages/AdminHealth';
+import TranslationReview from '@/pages/TranslationReview';
 import { Terms } from '@/pages/Terms';
 import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
@@ -242,6 +243,7 @@ function Routes() {
         <ProtectedRoute path="/admin/data-requests" component={AdminDataRequests} />
         <ProtectedRoute path="/admin/cleanup" component={EnvironmentCleanup} />
         <ProtectedRoute path="/admin/health" component={AdminHealth} />
+        <ProtectedRoute path="/admin/translations" component={TranslationReview} />
         <ProtectedRoute path="/studio/new" component={StudioNew} />
         <ProtectedRoute path="/studio/:draftId" component={StudioEdit} />
         <ProtectedRoute path="/studio" component={Studio} />

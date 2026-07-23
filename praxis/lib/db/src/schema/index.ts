@@ -47,3 +47,4 @@ export * from "./funded_seat_assignments";
 export * from "./delegated_admins";
 export * from "./org_classes";
 export * from "./consent";
+export * from "./translations";
