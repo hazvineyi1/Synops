@@ -18,6 +18,8 @@ interface Sub { id: string; orgId: string | null; orgName: string | null; planNa
 interface Invoice { id: string; orgId: string | null; orgName: string | null; number: string; period: string | null; net: number; status: string; issued: string | null; due: string | null }
 interface Agreement { id: string; funderName: string; orgName: string | null; seatsFunded: number; value: number; status: string }
 interface OrgLite { id: string; name: string; partnerId: string | null }
+interface SeatOrgUsage { orgId: string; orgName: string; licensedSeats: number; consumedSeats: number; fundedSeats: number; billableSeats: number; pricePerSeat: number; projectedNet: number; overage: number }
+interface SeatSummary { poolLicensed: number; totalLicensed: number; totalConsumed: number; totalFunded: number; totalBillable: number; projectedNet: number; orgs: SeatOrgUsage[] }
 
 const PLANS = [{ name: 'Essential', price: 180 }, { name: 'Growth', price: 240 }, { name: 'Scale', price: 320 }];
 const statusPill = (s: string) =>
@@ -55,6 +57,7 @@ export function PartnerFinance() {
     enabled: !!partnerId,
   });
   const { data: funding } = useQuery({ queryKey: ['partner-funding', partnerId], queryFn: () => apiFetch<Agreement[]>(`/partners/${partnerId}/funding`), enabled: !!partnerId });
+  const { data: seatUsage } = useQuery({ queryKey: ['partner-seat-usage', partnerId], queryFn: () => apiFetch<SeatSummary>(`/partners/${partnerId}/seat-usage`), enabled: !!partnerId });
   const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
   const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
 
@@ -74,6 +77,10 @@ export function PartnerFinance() {
   const invPatch = useMutation({ mutationFn: ({ id, patch }: { id: string; patch: Partial<Invoice> }) => apiFetch(`/partners/${partnerId}/invoices/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }), onSuccess: invalidate });
   const invDelete = useMutation({ mutationFn: (id: string) => apiFetch(`/partners/${partnerId}/invoices/${id}`, { method: 'DELETE' }), onSuccess: () => { invalidate(); flashMsg('Invoice removed.'); } });
   const invCreate = useMutation({ mutationFn: (body: Record<string, unknown>) => apiFetch(`/partners/${partnerId}/invoices`, { method: 'POST', body: JSON.stringify(body) }), onSuccess: () => { invalidate(); setAddInv(false); flashMsg('Invoice created.'); } });
+  const invGenerate = useMutation({
+    mutationFn: (period: string) => apiFetch<{ created: number }>(`/partners/${partnerId}/invoices/generate`, { method: 'POST', body: JSON.stringify({ period }) }),
+    onSuccess: (r) => { invalidate(); qc.invalidateQueries({ queryKey: ['partner-seat-usage', partnerId] }); flashMsg(r.created ? `${r.created} draft invoice(s) generated.` : 'No billable seats this period.'); },
+  });
 
   const setLocalSub = (id: string, patch: Partial<Sub>) => setSubs((xs) => xs.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   const commitSub = (id: string, key: keyof Sub) => { const cur = subs.find((s) => s.id === id); if (cur) subPatch.mutate({ id, patch: { [key]: cur[key] } as Partial<Sub> }); };
@@ -94,6 +101,7 @@ export function PartnerFinance() {
   const [subForm, setSubForm] = useState({ orgName: '', planName: 'Essential', pricePerSeat: 180, seats: 0 });
   const [addInv, setAddInv] = useState(false);
   const [invForm, setInvForm] = useState({ orgName: '', number: '', period: '', net: 0 });
+  const [genPeriod, setGenPeriod] = useState('');
 
   return (
     <div className="space-y-6">
@@ -115,6 +123,7 @@ export function PartnerFinance() {
       <Tabs defaultValue="subs">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="subs">Subscriptions</TabsTrigger>
+          <TabsTrigger value="seats">Seat licensing</TabsTrigger>
           <TabsTrigger value="invoices">Invoicing &amp; Payments</TabsTrigger>
           <TabsTrigger value="disb">Funder Disbursement</TabsTrigger>
           <TabsTrigger value="vat">Tax / VAT</TabsTrigger>
@@ -156,6 +165,50 @@ export function PartnerFinance() {
               </tbody>
             </table>
           </Card>
+        </TabsContent>
+
+        {/* Seat licensing — pooled-seat reconciliation from real usage, and per-org invoice generation */}
+        <TabsContent value="seats" className="mt-4 space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <StatCard icon={Wallet} label="Licensed (pool + orgs)" value={String(seatUsage?.totalLicensed ?? 0)} tint="bg-muted text-muted-foreground" />
+            <StatCard icon={Receipt} label="Consumed (active learners)" value={String(seatUsage?.totalConsumed ?? 0)} tint="bg-emerald-500/10 text-emerald-600" />
+            <StatCard icon={Landmark} label="Funder-funded" value={String(seatUsage?.totalFunded ?? 0)} tint="bg-violet-500/10 text-violet-600" />
+            <StatCard icon={Receipt} label="Net billable" value={String(seatUsage?.totalBillable ?? 0)} tint="bg-indigo-500/10 text-indigo-600" />
+            <StatCard icon={Wallet} label="Projected (excl. VAT)" value={ZAR(seatUsage?.projectedNet ?? 0)} tint="bg-emerald-500/10 text-emerald-600" />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Consumed seats are counted from real active learners, not a typed-in number. Billable = consumed minus funder-funded
+            seats (a learner on a SETA/CSI grant is paid by the funder). Generating invoices creates one draft per org from its net
+            billable seats; you review and issue them. Nothing is charged automatically.
+          </p>
+          <Card className="overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                <tr><th className="text-left p-3">Organisation</th><th className="text-right p-3">Licensed</th><th className="text-right p-3">Consumed</th><th className="text-right p-3">Funded</th><th className="text-right p-3">Billable</th><th className="text-right p-3">R / seat</th><th className="text-right p-3">Net (excl. VAT)</th></tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(seatUsage?.orgs ?? []).length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No organisations with seat usage yet.</td></tr>}
+                {(seatUsage?.orgs ?? []).map((o) => (
+                  <tr key={o.orgId}>
+                    <td className="p-3 font-medium">{orgLabel(o.orgName)}{o.overage > 0 && <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs text-red-700">{o.overage} over licence</span>}</td>
+                    <td className="p-3 text-right tabular-nums">{o.licensedSeats}</td>
+                    <td className="p-3 text-right tabular-nums">{o.consumedSeats}</td>
+                    <td className="p-3 text-right tabular-nums">{o.fundedSeats}</td>
+                    <td className="p-3 text-right tabular-nums font-medium">{o.billableSeats}</td>
+                    <td className="p-3 text-right tabular-nums">{ZAR(o.pricePerSeat)}</td>
+                    <td className="p-3 text-right tabular-nums font-medium">{ZAR(o.projectedNet)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+          <div className="flex flex-wrap items-center gap-2">
+            <input value={genPeriod} onChange={(e) => setGenPeriod(e.target.value)} placeholder="Period e.g. 2026-07"
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm" />
+            <Button size="sm" className="gap-1.5" disabled={invGenerate.isPending || !(seatUsage?.totalBillable)} onClick={() => invGenerate.mutate(genPeriod || undefined as unknown as string)}>
+              <Receipt className="h-4 w-4" /> Generate draft invoices
+            </Button>
+          </div>
         </TabsContent>
 
         {/* Invoices */}

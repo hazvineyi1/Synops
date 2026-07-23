@@ -82,6 +82,10 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`CREATE UNIQUE INDEX IF NOT EXISTS content_translations_key_uidx ON content_translations (source_hash, lang)`,
       sql`CREATE INDEX IF NOT EXISTS content_translations_status_idx ON content_translations (status, lang)`,
     ]],
+    // Seat-licensing: mark where a seat entitlement came from (B2B pool vs. future B2C purchase).
+    ["billing_subscriptions", [
+      sql`ALTER TABLE billing_subscriptions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'b2b_pool'`,
+    ]],
     // Prompt-template review gate: a template only shapes live AI tutoring once approved.
     ["org_prompt_templates", [
       sql`ALTER TABLE org_prompt_templates ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'draft'`,

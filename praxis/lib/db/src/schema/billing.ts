@@ -15,6 +15,9 @@ export const billingSubscriptionsTable = pgTable("billing_subscriptions", {
   pricePerSeat: integer("price_per_seat").notNull().default(0),
   seats: integer("seats").notNull().default(0),
   activeSeats: integer("active_seats").notNull().default(0),
+  // Where this seat entitlement came from. B2B pooled licence today; a future B2C storefront
+  // purchase is the same row with source='b2c_purchase' and seats=1 - no schema change needed.
+  source: text("source").notNull().default("b2b_pool"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

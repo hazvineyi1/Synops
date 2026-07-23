@@ -5,6 +5,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { isSuperAdmin, isFacilitator } from "../lib/roles";
 import { logAudit } from "../lib/audit";
+import { partnerSeatSummary, nextInvoiceNumber } from "../lib/seatLicensing";
 
 /**
  * Partner Financial Hub backend: real subscriptions + invoices per partner. Super admin manages any
@@ -31,8 +32,10 @@ async function ensureTables() {
       price_per_seat integer NOT NULL DEFAULT 0,
       seats integer NOT NULL DEFAULT 0,
       active_seats integer NOT NULL DEFAULT 0,
+      source text NOT NULL DEFAULT 'b2b_pool',
       created_at timestamptz NOT NULL DEFAULT now()
     )`);
+  await db.execute(sql`ALTER TABLE billing_subscriptions ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'b2b_pool'`);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS billing_invoices (
       id text PRIMARY KEY,
@@ -153,6 +156,57 @@ router.delete("/partners/:partnerId/invoices/:id", requireAuth, async (req, res)
   if (!canManage(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
   await db.delete(billingInvoicesTable).where(and(eq(billingInvoicesTable.id, id), eq(billingInvoicesTable.partnerId, partnerId)));
   res.status(204).send();
+});
+
+// GET /partners/:partnerId/seat-usage — pooled-seat reconciliation: licensed vs. consumed vs.
+// funder-funded vs. net billable, per org, computed from real learners (not the hand-entered number).
+router.get("/partners/:partnerId/seat-usage", requireAuth, async (req, res) => {
+  const { partnerId } = req.params;
+  if (!canManage(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    res.json(await partnerSeatSummary(partnerId));
+  } catch {
+    res.json({ partnerId, poolLicensed: 0, totalLicensed: 0, totalConsumed: 0, totalFunded: 0, totalBillable: 0, projectedNet: 0, orgs: [] });
+  }
+});
+
+// POST /partners/:partnerId/invoices/generate { period, dueDate? } — draft one invoice per org from
+// its net billable seats x price. Drafts only (a human reviews and issues); orgs with nothing to
+// bill are skipped. Never charges anything - there is no payment gateway by design.
+router.post("/partners/:partnerId/invoices/generate", requireAuth, async (req, res) => {
+  const { partnerId } = req.params;
+  if (!canManage(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const b = req.body ?? {};
+  const period = b.period ? String(b.period) : null;
+  const issued = b.issued ? String(b.issued) : null;
+  const due = b.due ? String(b.due) : null;
+  await ensureTables();
+
+  const summary = await partnerSeatSummary(partnerId);
+  const billableOrgs = summary.orgs.filter((o) => o.billableSeats > 0 && o.projectedNet > 0);
+  if (!billableOrgs.length) { res.json({ created: 0, invoices: [], note: "No billable seats this period." }); return; }
+
+  const year = new Date(Date.now()).getUTCFullYear();
+  const created: unknown[] = [];
+  for (const o of billableOrgs) {
+    const number = await nextInvoiceNumber(partnerId, year);
+    const [row] = await db.insert(billingInvoicesTable).values({
+      partnerId,
+      orgId: o.orgId,
+      orgName: o.orgName,
+      number,
+      period,
+      net: o.projectedNet,
+      status: "draft", // review before issuing
+      issued,
+      due,
+    }).returning();
+    created.push(row);
+    await logAudit(req, "billing.invoice_generated", "invoice", row.id, {
+      orgId: o.orgId, billableSeats: o.billableSeats, pricePerSeat: o.pricePerSeat, net: o.projectedNet, period,
+    });
+  }
+  res.status(201).json({ created: created.length, invoices: created });
 });
 
 export default router;
