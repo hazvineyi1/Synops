@@ -1,9 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useGetSession, useGetModule } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Send, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion, Lightbulb, ChevronRight, PencilLine, Check } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion, Lightbulb, ChevronRight, PencilLine, Check, TrendingUp, X } from 'lucide-react';
+
+// Adaptive-difficulty levels. The coach calibrates how demanding its questions are as the learner's
+// reasoning strengthens; we surface that as a visible level so the learner always knows where they
+// are and why it moved. Derived on the client from the mastery tier (the same signal that drives the
+// coach's escalation) - a precise per-question difficulty value would be a small backend addition
+// (emit `difficulty` on the done-event), flagged in the deliverables as backend work.
+const LEVELS = [
+  { name: 'Foundation', short: 'L1', tip: 'Starting out - grounding the core idea.' },
+  { name: 'Building', short: 'L2', tip: 'Building on the basics with more depth.' },
+  { name: 'Applying', short: 'L3', tip: 'Applying the idea to real situations.' },
+  { name: 'Advanced', short: 'L4', tip: 'Advanced - reasoning through harder cases.' },
+];
+// The level tier (0-3) for a mastery percentage. Same 20/50/80 breakpoints the meter already uses,
+// so the level and the bar always agree.
+const tierFromPct = (pct: number): number => (pct >= 80 ? 3 : pct >= 50 ? 2 : pct >= 20 ? 1 : 0);
 import { Link, useLocation } from 'wouter';
 import { BeatType } from '@workspace/api-client-react';
 import { cn } from '@/lib/utils';
@@ -145,7 +160,19 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // Live mastery from the last graded turn (so the bar moves immediately) + a brief "+N%" gain badge.
   const [liveMastery, setLiveMastery] = useState<number | null>(null);
   const [masteryGain, setMasteryGain] = useState<number | null>(null);
+  // Adaptive-difficulty level: a transient "level up" celebration when the learner crosses into a
+  // harder tier, plus the last-crossed level so the badge can explain the change.
+  const [levelUp, setLevelUp] = useState<number | null>(null);
+  const prevLevelRef = useRef(0);
+  // Response-quality feedback (item 4): the grade of the just-submitted answer drives a brief,
+  // always-encouraging animation (green check for strong, amber lightbulb for keep-going).
+  const [feedback, setFeedback] = useState<null | { grade: number; id: number }>(null);
+  // Milestone celebration (item 3): fires once when mastery first crosses 50% (80% has its own banner).
+  const [milestone, setMilestone] = useState<number | null>(null);
+  const reachedMilestones = useRef<Set<number>>(new Set());
+  const prefersReducedMotion = useReducedMotion();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Local state for turns to optimistically append user message and streaming tutor message
   const [localTurns, setLocalTurns] = useState<any[]>([]);
@@ -196,6 +223,8 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   const masteryNumClass = ['text-base text-foreground', 'text-lg text-amber-600', 'text-2xl text-primary', 'text-3xl text-green-600'][masteryTier];
   const masteryTextColor = mp >= 80 ? 'text-green-600' : mp >= 50 ? 'text-primary' : mp >= 20 ? 'text-amber-600' : 'text-muted-foreground';
   const masteryCaption = mp >= 80 ? 'Mastered' : mp >= 50 ? 'Almost there' : mp >= 20 ? 'Building' : 'Getting started';
+  const level = tierFromPct(mp); // 0-3
+  const levelInfo = LEVELS[level];
 
   const currentBeat = moduleData?.beats?.find(b => b.id === session.currentBeatId);
 
@@ -272,6 +301,10 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           const newPct = Math.round(meta.masteryScore * 100);
           setLiveMastery(meta.masteryScore);
           if (newPct > prevPct) { setMasteryGain(newPct - prevPct); setTimeout(() => setMasteryGain(null), 2800); }
+          // Level up: the learner has crossed into a harder difficulty tier. Celebrate it briefly.
+          const prevTier = tierFromPct(prevPct);
+          const newTier = tierFromPct(newPct);
+          if (newTier > prevTier) { setLevelUp(newTier); setTimeout(() => setLevelUp(null), 3200); }
         }
         // When complete, refetch the session to get the real turns and updated mastery/beat
         refetchSession().then(() => {
@@ -326,7 +359,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             <h1 className="font-serif font-bold text-lg">{moduleData?.title || 'Loading Module...'}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-3 transition-all duration-500" style={{ width: meterWidth, maxWidth: '62vw' }}>
+        <div className="flex items-center gap-2 sm:gap-3">
+        <LevelBadge level={level} info={levelInfo} levelUp={levelUp} reducedMotion={!!prefersReducedMotion} />
+        <div className="flex items-center gap-3 transition-all duration-500" style={{ width: meterWidth, maxWidth: '52vw' }}>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mastery</span>
@@ -352,6 +387,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
               </motion.span>
             )}
           </div>
+        </div>
         </div>
       </header>
 
@@ -646,6 +682,56 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           The tutor will not provide answers, only questions to guide your reasoning.
         </p>
       </footer>
+    </div>
+  );
+}
+
+// Difficulty-level colours (never red). Foundation -> Advanced climbs slate -> amber -> blue -> green,
+// mirroring the mastery meter so the two always read as one system.
+const LEVEL_TONE = [
+  'text-slate-600 bg-slate-500/10 border-slate-300 dark:text-slate-300 dark:border-slate-700',
+  'text-amber-700 bg-amber-500/10 border-amber-300 dark:text-amber-300 dark:border-amber-800',
+  'text-blue-700 bg-blue-500/10 border-blue-300 dark:text-blue-300 dark:border-blue-800',
+  'text-green-700 bg-green-500/10 border-green-300 dark:text-green-300 dark:border-green-800',
+];
+
+/**
+ * Adaptive-difficulty Level badge, shown beside the Mastery meter. Always tells the learner which
+ * level of question they're being asked and why; when they cross into a harder tier a brief, upbeat
+ * "Level up" chip animates out (honoured only when reduced-motion is off). Purely visual - it reads
+ * the mastery-derived level, it does not change the tutoring.
+ */
+function LevelBadge({ level, info, levelUp, reducedMotion }: { level: number; info: { name: string; short: string; tip: string }; levelUp: number | null; reducedMotion: boolean }) {
+  const celebrating = levelUp === level && !reducedMotion;
+  return (
+    <div className="relative shrink-0">
+      <motion.div
+        animate={celebrating ? { scale: [1, 1.14, 1] } : { scale: 1 }}
+        transition={{ duration: 0.6 }}
+        title={`Level ${level + 1} of 4 - ${info.name}. ${info.tip}`}
+        aria-label={`Current level: ${info.name}, level ${level + 1} of 4`}
+        className={cn(
+          'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors',
+          LEVEL_TONE[level],
+          celebrating && 'shadow-[0_0_16px_2px] shadow-current/30',
+        )}
+      >
+        <TrendingUp className="h-3.5 w-3.5" />
+        <span className="tabular-nums">{info.short}</span>
+        <span className="hidden md:inline">{info.name}</span>
+      </motion.div>
+      <AnimatePresence>
+        {levelUp === level && (
+          <motion.div
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.85 }}
+            animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: -4, scale: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute left-1/2 top-full z-20 mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-lg border border-green-300 bg-green-50 px-2.5 py-1 text-[11px] font-semibold text-green-700 shadow-md dark:border-green-800 dark:bg-green-950/60 dark:text-green-300"
+          >
+            Level up - you're reasoning well
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
