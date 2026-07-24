@@ -582,9 +582,25 @@ export function evaluateOffTrack(
   computed: LearnerComputed,
 ): OffTrackResult {
   const reasons: string[] = [];
-  const overallFrac = computed.overallPercent === null ? null : computed.overallPercent / 100;
 
-  if (overallFrac !== null && overallFrac < PASS) reasons.push("mastery_low");
+  // Judge risk on what the learner has ACTUALLY engaged with. In a self-paced course, modules they
+  // have not reached yet are counted as zeros (an unopened module has completion 0, and the overall
+  // grade auto-fills from completion), which would wrongly label an early-but-progressing learner
+  // "low mastery" / "behind". So mastery is judged on REAL graded work they have attempted (never an
+  // auto-filled placeholder derived from completion), and completion on modules they have started.
+  const realGradedFracs = columns
+    .filter((c) => c.includeInGrade && c.itemType === "summative")
+    .map((c) => computed.cells[c.key])
+    .filter((cell) => !!cell && cell.fraction !== null && cell.auto !== true)
+    .map((cell) => cell!.fraction as number);
+  const attemptedGradeAvg = realGradedFracs.length
+    ? realGradedFracs.reduce((a, b) => a + b, 0) / realGradedFracs.length
+    : null;
+  const gradesStrong = attemptedGradeAvg !== null && attemptedGradeAvg >= PASS;
+
+  // Low mastery only when real attempted graded work is below pass - not merely because later
+  // modules are unreached (which auto-fills the overall toward zero for an early learner).
+  if (attemptedGradeAvg !== null && attemptedGradeAvg < PASS) reasons.push("mastery_low");
   if (computed.trend.dir === "down") reasons.push("trend_down");
 
   const now = Date.now();
@@ -595,25 +611,20 @@ export function evaluateOffTrack(
   });
   if (missingOverdue) reasons.push("missing_summative");
 
-  // Behind on the actual content: engagement matters, not just grades. A learner who has STARTED
-  // the course but worked through less than half of the module content is falling behind even if
-  // they have no low grades yet - so the coach reflects that instead of a misleading "on track".
+  // Behind on content: judge only modules the learner has STARTED. Leaving STARTED modules
+  // half-finished is falling behind; a not-yet-opened module is "not started", not "behind".
   const completionCols = columns.filter((c) => c.sourceType === "completion");
-  if (completionCols.length > 0) {
-    const fracs = completionCols.map((c) => computed.cells[c.key]?.fraction ?? 0);
-    const started = fracs.some((f) => f > 0.05);
-    const avgCompletion = fracs.reduce((a, b) => a + b, 0) / fracs.length;
-    // Don't override strong graded performance: a learner who is passing their graded work is
-    // NOT "off track" merely for viewing less of the content (they may be testing out). This is
-    // what wrongly flipped a 100% learner to off-track. Only treat low completion as an off-track
-    // signal when grades aren't already demonstrating mastery.
-    const gradesStrong = overallFrac !== null && overallFrac >= PASS;
-    if (started && avgCompletion < 0.5 && !gradesStrong) reasons.push("low_completion");
+  const engagedCompletion = completionCols
+    .map((c) => computed.cells[c.key]?.fraction ?? 0)
+    .filter((f) => f > 0.05);
+  if (engagedCompletion.length > 0) {
+    const avgEngaged = engagedCompletion.reduce((a, b) => a + b, 0) / engagedCompletion.length;
+    if (avgEngaged < 0.5 && !gradesStrong) reasons.push("low_completion");
   }
 
   let status: OffTrackResult["status"] = "on_track";
   if (reasons.length > 0) status = "off_track";
-  else if (overallFrac !== null && overallFrac < AT_RISK) status = "at_risk";
+  else if (attemptedGradeAvg !== null && attemptedGradeAvg < AT_RISK) status = "at_risk";
 
   return { status, reasons, masteryPct: computed.overallPercent };
 }

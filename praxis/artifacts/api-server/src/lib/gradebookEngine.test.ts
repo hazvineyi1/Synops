@@ -108,6 +108,43 @@ describe("evaluateOffTrack", () => {
     expect(e.reasons).toContain("trend_down");
     expect(e.status).toBe("off_track");
   });
+
+  it("does not flag an early learner who mastered one module and has not reached the rest", () => {
+    const cols = [
+      col({ key: "s1", sourceId: "a1" }), // graded deliverable (auto-fills from completion)
+      completionCol({ key: "m1", sourceId: "mod1" }),
+      completionCol({ key: "m2", sourceId: "mod2" }),
+      completionCol({ key: "m3", sourceId: "mod3" }),
+      completionCol({ key: "m4", sourceId: "mod4" }),
+      completionCol({ key: "m5", sourceId: "mod5" }),
+      completionCol({ key: "m6", sourceId: "mod6" }),
+    ];
+    // Module 1 fully complete; the other five not started yet (recorded as completion 0, as the
+    // engine does). Overall auto-fills to ~1/6, but there is no REAL graded work below pass.
+    const c = computeLearner(
+      cols,
+      new Map([["m1", 1], ["m2", 0], ["m3", 0], ["m4", 0], ["m5", 0], ["m6", 0]]),
+      undefined,
+      false,
+    );
+    const e = evaluateOffTrack(cols, c);
+    expect(e.reasons).not.toContain("mastery_low");
+    expect(e.reasons).not.toContain("low_completion");
+    expect(e.status).toBe("on_track");
+  });
+
+  it("still flags a learner leaving STARTED modules unfinished (genuinely behind)", () => {
+    const cols = [
+      col({ key: "s1", sourceId: "a1" }),
+      completionCol({ key: "m1", sourceId: "mod1" }),
+      completionCol({ key: "m2", sourceId: "mod2" }),
+    ];
+    // Both modules opened but barely progressed - low completion on started content.
+    const c = computeLearner(cols, new Map([["m1", 0.2], ["m2", 0.2]]), undefined, false);
+    const e = evaluateOffTrack(cols, c);
+    expect(e.reasons).toContain("low_completion");
+    expect(e.status).toBe("off_track");
+  });
 });
 
 describe("auto-score from completion", () => {

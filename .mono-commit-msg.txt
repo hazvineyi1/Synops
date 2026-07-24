@@ -1,1 +1,1 @@
-Praxis: branding live preview opens real branded sign-in (slug in theme payload)
+Praxis: off-track judged on attempted work so early learners are not falsely flagged
