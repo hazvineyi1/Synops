@@ -305,6 +305,13 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           const prevTier = tierFromPct(prevPct);
           const newTier = tierFromPct(newPct);
           if (newTier > prevTier) { setLevelUp(newTier); setTimeout(() => setLevelUp(null), 3200); }
+          // Milestone: a one-time celebration the first time mastery crosses the 50% mark (80% has
+          // its own Mastery Achieved banner). Fires once per session via the reached-set guard.
+          if (prevPct < 50 && newPct >= 50 && !reachedMilestones.current.has(50)) {
+            reachedMilestones.current.add(50);
+            setMilestone(50);
+            setTimeout(() => setMilestone((x) => (x === 50 ? null : x)), 3800);
+          }
         }
         // Distinct, always-encouraging feedback keyed to the grade of the answer just submitted:
         // a green check for strong reasoning, a warm amber lightbulb for keep-going. Never punitive.
@@ -374,7 +381,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
               <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mastery</span>
               <span className={cn("text-[10px] sm:text-xs font-medium transition-colors", masteryTextColor)}>{masteryCaption}</span>
             </div>
-            <div className={cn("w-full overflow-hidden rounded-full bg-muted transition-all duration-500", masteryBarHeight)}>
+            <div className={cn("w-full overflow-hidden rounded-full bg-muted transition-all duration-500", masteryBarHeight, milestone === 50 && !prefersReducedMotion && "animate-pulse ring-2 ring-primary/40")}>
               <div
                 className={cn("h-full rounded-full transition-all duration-700 ease-out", masteryBarColor, mp >= 80 && "shadow-[0_0_14px_2px] shadow-green-500/50")}
                 style={{ width: `${mp}%` }}
@@ -511,8 +518,10 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                     className={cn(
                       "max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed whitespace-pre-wrap",
                       turn.role === 'learner'
-                        ? "bg-primary text-primary-foreground rounded-tr-sm"
-                        : "bg-card border border-border shadow-sm rounded-tl-sm text-foreground"
+                        // The learner's own words - solid primary, clearly "yours".
+                        ? "bg-primary text-primary-foreground rounded-tr-sm shadow-sm"
+                        // The coach's question - a calm blue-accented card (neutral/blue, never red).
+                        : "bg-card border border-border border-l-[3px] border-l-blue-400/70 dark:border-l-blue-500/60 shadow-sm rounded-tl-sm text-foreground"
                     )}
                   >
                     {turn.role === 'tutor' ? sanitizePlain(turn.content) : turn.content}
@@ -529,7 +538,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
               animate={{ opacity: 1, y: 0 }}
               className="flex w-full justify-start"
              >
-              <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed whitespace-pre-wrap bg-card border border-border shadow-sm rounded-tl-sm text-foreground relative">
+              <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed whitespace-pre-wrap bg-card border border-border border-l-[3px] border-l-blue-400/70 dark:border-l-blue-500/60 shadow-sm rounded-tl-sm text-foreground relative">
                 {streamingText ? sanitizePlain(streamingText) : (
                   <span className="inline-flex gap-1 items-center">
                     <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />
@@ -600,6 +609,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
       {/* Response-quality feedback: a brief, encouraging cue after each answer (never punitive). */}
       <ResponseFeedback feedback={feedback} reducedMotion={!!prefersReducedMotion} />
+
+      {/* Milestone celebration: a one-time toast + sparkle when mastery first crosses 50%. */}
+      <MilestoneToast milestone={milestone} reducedMotion={!!prefersReducedMotion} />
 
       {/* Input Area — selectable answer choices for most questions, with a "type my own" escape;
           free-text box when the coach asks for the learner's own words (or they choose to write). */}
@@ -692,6 +704,36 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           The tutor will not provide answers, only questions to guide your reasoning.
         </p>
       </footer>
+    </div>
+  );
+}
+
+/**
+ * Milestone celebration: a warm, centred toast with a small sparkle burst the first time the learner
+ * crosses the 50% mark (the 80% mark has its own Mastery Achieved banner). Encouraging, brief, and
+ * motion-respecting - reduced-motion shows a still toast with no burst.
+ */
+function MilestoneToast({ milestone, reducedMotion }: { milestone: number | null; reducedMotion: boolean }) {
+  return (
+    <div className="pointer-events-none fixed inset-x-0 top-24 z-40 flex justify-center px-4">
+      <AnimatePresence>
+        {milestone === 50 && (
+          <motion.div
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: -12, scale: 0.9 }}
+            animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 20 }}
+            className="relative flex items-center gap-2.5 rounded-2xl border border-primary/30 bg-card px-5 py-3 shadow-xl"
+          >
+            {!reducedMotion && <Confetti />}
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary"><Sparkles className="h-4 w-4" /></span>
+            <div>
+              <p className="text-sm font-bold text-foreground">Halfway to mastery</p>
+              <p className="text-xs text-muted-foreground">You're at 50% - your reasoning is really coming together.</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
