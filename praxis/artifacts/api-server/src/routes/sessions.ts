@@ -296,16 +296,24 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       fullResponse = cleaned;
     }
 
-    // Grade + SM-2 + credential issuance (shared with the WhatsApp channel).
-    const result = await applyCheckpoint({
-      userId: req.userId!,
-      session,
-      socraticCtx,
-      learnerResponse: response,
-      historyOrdered,
-      tutorReply: fullResponse,
-      isSelection,
-    });
+    // Grade the answer AND generate the next question's answer-choices CONCURRENTLY. They are
+    // independent (grading reads the learner's reply + history; options read the new tutor question),
+    // so running them together instead of back-to-back fires the `done` event ~one AI round-trip
+    // sooner - the main source of the dead gap before the buttons appeared. On the mastery turn the
+    // session is over, so we discard the options we speculatively generated.
+    const [result, generatedOpts] = await Promise.all([
+      // Grade + SM-2 + credential issuance (shared with the WhatsApp channel).
+      applyCheckpoint({
+        userId: req.userId!,
+        session,
+        socraticCtx,
+        learnerResponse: response,
+        historyOrdered,
+        tutorReply: fullResponse,
+        isSelection,
+      }),
+      generateAnswerOptions(fullResponse, socraticCtx).catch(() => ({ mode: "free" as string, options: [] as string[] })),
+    ]);
 
     const masteryDelta = result.newMastery - Number(session.masteryScore);
 
@@ -319,12 +327,9 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       recentTutor.length === 2 && recentTutor.every((t) => Number(t.masteryDelta ?? 0) <= 0);
     const scaffold = result.grade <= 1 && priorTwoStruggled;
 
-    // Selectable answer choices for the NEW question, so the learner can pick instead of typing.
-    // Skipped once mastered (the session is over).
-    let answerOpts = { mode: "free" as string, options: [] as string[] };
-    if (!result.mastered) {
-      try { answerOpts = await generateAnswerOptions(fullResponse, socraticCtx); } catch { /* leave as free */ }
-    }
+    // Selectable answer choices for the NEW question. Once mastered the session is over, so we drop
+    // the speculatively-generated options.
+    const answerOpts = result.mastered ? { mode: "free" as string, options: [] as string[] } : generatedOpts;
 
     // Save tutor turn
     await db.insert(dialogueTurnsTable).values({

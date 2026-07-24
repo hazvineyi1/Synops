@@ -400,27 +400,35 @@ Rules:
 - Use "free" ONLY when the question is a genuinely personal reflection or example unique to this learner (for example "tell me about a time you..."), or when you honestly cannot write at least 4 distinct plausible choices. Then return an empty options array. Do NOT choose free just because the question is open ended.
 - Options are SHORT, a handful of words each. Plain text only: no letter or number prefixes, no markdown, no asterisks, no em or en dashes. Workplace-authentic South African English.`;
   const fallback: AnswerOptions = { mode: "free", options: [] };
-  try {
-    const msg = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 400,
-      system,
-      messages: [{ role: "user", content: `Coaching question:\n"${question}"\n\nReturn only the JSON.` }],
-    });
-    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) return fallback;
-    const parsed = JSON.parse(match[0]) as { mode?: unknown; options?: unknown };
-    const mode = parsed.mode === "single" || parsed.mode === "multi" ? parsed.mode : "free";
-    if (mode === "free") return { mode: "free", options: [] };
-    const options = Array.isArray(parsed.options)
-      ? (parsed.options as unknown[]).map((o) => sanitizePlain(String(o))).filter(Boolean).slice(0, 5)
-      : [];
-    if (options.length < 2) return fallback; // not enough to choose from, fall back to typing
-    return { mode, options };
-  } catch {
-    return fallback;
-  }
+  // One generation attempt. Returns the options, a genuine free-form verdict, or null when the call
+  // or parse failed in a RETRYABLE way (network error, no JSON, or too few options) so the caller
+  // can try once more before giving up. This is what stops buttons silently vanishing on a single
+  // flaky parse: we only fall back to free-form when the model truly says free, or after a retry.
+  const attempt = async (): Promise<AnswerOptions | null> => {
+    try {
+      const msg = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 400,
+        system,
+        messages: [{ role: "user", content: `Coaching question:\n"${question}"\n\nReturn only the JSON.` }],
+      });
+      const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) return null; // no JSON -> retryable
+      const parsed = JSON.parse(match[0]) as { mode?: unknown; options?: unknown };
+      const mode = parsed.mode === "single" || parsed.mode === "multi" ? parsed.mode : "free";
+      if (mode === "free") return { mode: "free", options: [] }; // genuinely free -> not retryable
+      const options = Array.isArray(parsed.options)
+        ? (parsed.options as unknown[]).map((o) => sanitizePlain(String(o))).filter(Boolean).slice(0, 5)
+        : [];
+      if (options.length < 2) return null; // too few to choose from -> retryable
+      return { mode, options };
+    } catch {
+      return null; // network/parse error -> retryable
+    }
+  };
+  // Retry once before falling back, so a single flaky response doesn't drop the answer buttons.
+  return (await attempt()) ?? (await attempt()) ?? fallback;
 }
 
 export { MODEL as SOCRATIC_MODEL };

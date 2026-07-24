@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const create = vi.fn();
 vi.mock("@workspace/integrations-anthropic-ai", () => ({ anthropic: { messages: { create: (...args: unknown[]) => create(...args) } } }));
 
-import { gradeCheckpoint } from "./socraticEngine";
+import { gradeCheckpoint, generateAnswerOptions } from "./socraticEngine";
 
 const ctx = { beatTitle: "Cash flow", moduleTitle: "Finance", narration: "", scenario: "" } as never;
 const history = [{ role: "tutor", content: "Why does cash flow matter?" }];
@@ -45,5 +45,34 @@ describe("gradeCheckpoint fairness (fix B)", () => {
     const r = await gradeCheckpoint(ctx, "idk", history, false);
     expect(r.grade).toBe(0);
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe("generateAnswerOptions robustness (fix A)", () => {
+  beforeEach(() => create.mockReset());
+  const opts = (mode: string, options: string[]) => ({ content: [{ type: "text", text: JSON.stringify({ mode, options }) }] });
+
+  it("retries once when the first response has no parseable JSON, instead of dropping the buttons", async () => {
+    create
+      .mockResolvedValueOnce({ content: [{ type: "text", text: "sorry, prose not json" }] })
+      .mockResolvedValueOnce(opts("single", ["It improves cash flow", "It raises costs", "It has no effect"]));
+    const r = await generateAnswerOptions("Why keep an eye on cash flow?", ctx);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(r.mode).toBe("single");
+    expect(r.options.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("returns free-form only when the model genuinely says free (no wasteful retry)", async () => {
+    create.mockResolvedValue(opts("free", []));
+    const r = await generateAnswerOptions("Tell me about a time you managed a tight budget", ctx);
+    expect(r.mode).toBe("free");
+    expect(create).toHaveBeenCalledTimes(1); // a genuine free verdict is not retried
+  });
+
+  it("falls back to free-form only after both attempts fail", async () => {
+    create.mockResolvedValue({ content: [{ type: "text", text: "still not json" }] });
+    const r = await generateAnswerOptions("A question", ctx);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(r.mode).toBe("free");
   });
 });
