@@ -148,9 +148,12 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // the backend flags `scaffold` on the done event. We surface a gentle, opt-in offer
   // of a worked example rather than another question (the worked-example effect).
   const [showScaffold, setShowScaffold] = useState(false);
-  // Guidance + context panels — both available at all times via the sticky bar, each minimisable.
-  const [showHow, setShowHow] = useState(true);
-  const [showFacts, setShowFacts] = useState(true);
+  // Guidance panel (top) stays inline + minimisable. The Fact pattern moved out of the header into
+  // a persistent right rail on desktop (collapsible) and a bottom-sheet drawer on mobile, so it is
+  // referenceable throughout without crowding the header.
+  const [showHow, setShowHow] = useState(false);
+  const [factsRailOpen, setFactsRailOpen] = useState(true);
+  const [factsDrawerOpen, setFactsDrawerOpen] = useState(false);
   // Selectable answer options: what the learner has picked, and whether they chose to type instead.
   const [selected, setSelected] = useState<string[]>([]);
   const [typeOwn, setTypeOwn] = useState(false);
@@ -405,8 +408,12 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
         </div>
       </header>
 
-      {/* Guidance + context bar — sticky under the header so instructions and the fact pattern
-          are reachable at all times. Each panel can be minimised or expanded during the session. */}
+      {/* Body: chat column (left) + persistent Fact pattern rail (right, desktop). */}
+      <div className="flex flex-1 min-h-0">
+      <section className="flex flex-1 flex-col min-h-0 min-w-0">
+
+      {/* Guidance bar — sticky under the header. "How this works" lives here (minimisable); the Fact
+          pattern now has its own rail/drawer, so the header no longer crowds. */}
       {!isMastered && (
         <div className="shrink-0 sticky top-14 z-10 border-b border-border bg-muted">
           <div className="mx-auto max-w-3xl px-4 py-2 flex flex-wrap items-center gap-2">
@@ -422,13 +429,12 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                 <Info className="h-3.5 w-3.5" /> How this works
                 {showHow ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
+              {/* Mobile-only Fact pattern trigger (desktop uses the persistent rail). */}
               <button
-                onClick={() => setShowFacts(v => !v)}
-                aria-expanded={showFacts}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/40"
+                onClick={() => setFactsDrawerOpen(true)}
+                className="lg:hidden inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/40"
               >
                 <FileText className="h-3.5 w-3.5" /> Fact pattern
-                {showFacts ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
               </button>
             </div>
           </div>
@@ -462,30 +468,11 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             </div>
           )}
 
-          {/* Fact pattern — the situation/context, available throughout */}
-          {showFacts && (
-            <div className="border-t border-border bg-amber-50 dark:bg-amber-950/30">
-              <div className="mx-auto max-w-3xl px-4 py-3 text-sm">
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">Fact pattern: the context for this session</p>
-                {factPattern.focus && (
-                  <p className="mb-2 text-foreground"><span className="font-medium">You're catching up on:</span> {factPattern.focus}</p>
-                )}
-                {factPattern.description && <p className="mb-2 text-muted-foreground">{factPattern.description}</p>}
-                {factPattern.scenario && <p className="whitespace-pre-wrap text-foreground">{factPattern.scenario}</p>}
-                {factPattern.bullets.length > 0 && (
-                  <ul className="mt-2 list-disc space-y-0.5 pl-5 text-muted-foreground">
-                    {factPattern.bullets.map((b, i) => <li key={i}>{b}</li>)}
-                  </ul>
-                )}
-                {!hasFacts && <p className="text-muted-foreground">Your coach will set the scene as you begin.</p>}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
       {/* Main Dialogue Area */}
-      <main className="flex-1 overflow-y-auto px-4 py-8 flex justify-center">
+      <main ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-8 flex justify-center">
         <div className="w-full max-w-3xl space-y-6">
           <AnimatePresence initial={false}>
             {localTurns.map((turn, idx) => {
@@ -704,7 +691,119 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           The tutor will not provide answers, only questions to guide your reasoning.
         </p>
       </footer>
+      </section>
+
+      {/* Desktop: persistent, collapsible Fact pattern rail on the right. */}
+      <FactPatternRail
+        open={factsRailOpen}
+        onToggle={() => setFactsRailOpen(v => !v)}
+        factPattern={factPattern}
+        hasFacts={hasFacts}
+      />
+      </div>
+
+      {/* Mobile: Fact pattern bottom-sheet drawer. */}
+      <FactPatternDrawer
+        open={factsDrawerOpen}
+        onClose={() => setFactsDrawerOpen(false)}
+        factPattern={factPattern}
+        hasFacts={hasFacts}
+        reducedMotion={!!prefersReducedMotion}
+      />
     </div>
+  );
+}
+
+interface FactPattern { focus: string | null; description: string; scenario: string; bullets: string[] }
+
+// The Fact pattern body, shared by the desktop rail and the mobile drawer so both stay in sync.
+function FactPatternContent({ factPattern, hasFacts }: { factPattern: FactPattern; hasFacts: boolean }) {
+  return (
+    <div className="text-sm">
+      {factPattern.focus && (
+        <p className="mb-3 rounded-lg bg-amber-100/70 px-3 py-2 text-foreground dark:bg-amber-900/30"><span className="font-semibold">You're catching up on:</span> {factPattern.focus}</p>
+      )}
+      {factPattern.description && <p className="mb-3 text-muted-foreground">{factPattern.description}</p>}
+      {factPattern.scenario && <p className="mb-3 whitespace-pre-wrap text-foreground">{factPattern.scenario}</p>}
+      {factPattern.bullets.length > 0 && (
+        <ul className="list-disc space-y-1 pl-5 text-muted-foreground">
+          {factPattern.bullets.map((b, i) => <li key={i}>{b}</li>)}
+        </ul>
+      )}
+      {!hasFacts && <p className="text-muted-foreground">Your coach will set the scene as you begin.</p>}
+    </div>
+  );
+}
+
+/**
+ * Desktop Fact pattern rail: a persistent right-hand column, referenceable throughout the session
+ * without interrupting the chat. Collapses to a slim vertical tab that re-expands on click, so it
+ * never crowds the conversation. Sticky under the header with its own scroll.
+ */
+function FactPatternRail({ open, onToggle, factPattern, hasFacts }: { open: boolean; onToggle: () => void; factPattern: FactPattern; hasFacts: boolean }) {
+  if (!open) {
+    return (
+      <aside className="hidden lg:flex shrink-0 border-l border-border bg-card">
+        <button
+          onClick={onToggle}
+          aria-label="Show fact pattern"
+          className="flex h-full w-11 flex-col items-center gap-2 py-4 text-xs font-semibold text-muted-foreground transition hover:text-foreground hover:bg-muted/50"
+        >
+          <FileText className="h-4 w-4" />
+          <span className="[writing-mode:vertical-rl] rotate-180 tracking-wide">Fact pattern</span>
+        </button>
+      </aside>
+    );
+  }
+  return (
+    <aside className="hidden lg:flex w-80 shrink-0 flex-col border-l border-border bg-card">
+      <div className="sticky top-14 flex max-h-[calc(100vh-3.5rem)] flex-col">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <h2 className="text-xs font-bold uppercase tracking-wide text-foreground">Fact pattern</h2>
+          </div>
+          <button onClick={onToggle} aria-label="Collapse fact pattern" className="text-muted-foreground transition hover:text-foreground">
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <p className="px-4 pt-3 text-[11px] text-muted-foreground">The context for this session - here whenever you need it.</p>
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          <FactPatternContent factPattern={factPattern} hasFacts={hasFacts} />
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+/** Mobile Fact pattern drawer: a bottom sheet that slides up over the chat, dismissable. */
+function FactPatternDrawer({ open, onClose, factPattern, hasFacts, reducedMotion }: { open: boolean; onClose: () => void; factPattern: FactPattern; hasFacts: boolean; reducedMotion: boolean }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div className="fixed inset-0 z-50 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+          <motion.div
+            initial={reducedMotion ? { opacity: 0 } : { y: '100%' }}
+            animate={reducedMotion ? { opacity: 1 } : { y: 0 }}
+            exit={reducedMotion ? { opacity: 0 } : { y: '100%' }}
+            transition={{ type: 'spring', stiffness: 360, damping: 34 }}
+            className="absolute inset-x-0 bottom-0 max-h-[75vh] rounded-t-2xl border-t border-border bg-card shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <h2 className="text-sm font-bold text-foreground">Fact pattern</h2>
+              </div>
+              <button onClick={onClose} aria-label="Close fact pattern" className="text-muted-foreground transition hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="overflow-y-auto px-4 py-4" style={{ maxHeight: 'calc(75vh - 3.5rem)' }}>
+              <FactPatternContent factPattern={factPattern} hasFacts={hasFacts} />
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
