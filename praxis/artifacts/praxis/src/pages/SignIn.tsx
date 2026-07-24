@@ -80,13 +80,13 @@ export function SignInPage() {
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 mb-8">
           {brandLogo ? (
-            <img src={brandLogo} alt={brandName} className="h-10 max-w-[190px] object-contain bg-white rounded p-1" />
+            <img src={brandLogo} alt={brandName} className="h-20 sm:h-24 max-w-[300px] object-contain bg-white rounded-xl p-3 shadow-lg" />
           ) : (
             <>
-              <div className="h-9 w-9 rounded-lg flex items-center justify-center font-bold" style={{ backgroundColor: accent, color: accentText }}>
+              <div className="h-12 w-12 rounded-lg flex items-center justify-center font-bold text-xl" style={{ backgroundColor: accent, color: accentText }}>
                 {brandName.charAt(0).toUpperCase()}
               </div>
-              <span className="text-lg font-semibold text-white tracking-tight">{brandName}</span>
+              <span className="text-xl font-semibold text-white tracking-tight">{brandName}</span>
             </>
           )}
         </div>
