@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sm2Update, MAX_MASTERY_STEP } from "./sm2";
+import { sm2Update, masteryStep, MAX_MASTERY_STEP } from "./sm2";
 
 /**
  * The critical non-punitive invariant: a weak or incorrect answer must NEVER decrease the mastery
@@ -74,6 +74,32 @@ describe("sm2Update - non-punitive mastery", () => {
     for (let i = 0; i < 5; i++) m = sm2Update(m, EF, INTERVAL, REPS, 3).mastery;
     expect(m).toBeGreaterThanOrEqual(0.8);
   });
+});
+
+describe("masteryStep (shared session + concept mastery step)", () => {
+  it("starts from the given score (session-local), not from any global state", () => {
+    // Five clear-mastery answers from 0 reach exactly the 0.8 bar - no float drift below it.
+    let m = 0;
+    const seq: number[] = [];
+    for (let i = 0; i < 5; i++) { m = masteryStep(m, 3); seq.push(m); }
+    expect(seq).toEqual([0.16, 0.32, 0.48, 0.64, 0.8]);
+    expect(m).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("never decreases and never exceeds MAX_MASTERY_STEP per call", () => {
+    for (let mm = 0; mm <= 1.0001; mm += 0.05) {
+      const prev = Math.min(1, Math.round(mm * 100) / 100);
+      for (const g of [0, 1, 2, 3]) {
+        const out = masteryStep(prev, g);
+        expect(out).toBeGreaterThanOrEqual(prev);
+        expect(out - prev).toBeLessThanOrEqual(MAX_MASTERY_STEP + 1e-9);
+      }
+    }
+  });
+
+  it("awards nothing for a disengaged (grade 0) answer", () => {
+    expect(masteryStep(0.5, 0)).toBe(0.5);
+  });
 
   it("still resets the spaced-repetition schedule on a failed grade (tutoring cadence unchanged)", () => {
     const out = sm2Update(0.6, EF, 10, 5, 0); // grade < 1 resets reps/interval
@@ -81,3 +107,5 @@ describe("sm2Update - non-punitive mastery", () => {
     expect(out.interval).toBe(1);
   });
 });
+// (masteryStep drives both the persistent SM-2 score and the per-session meter, so its behaviour is
+// pinned here directly in addition to the sm2Update tests above.)

@@ -188,4 +188,33 @@ describe("session pacing lifecycle", () => {
     const res = await fetch(`${base}/sessions/${id}/plan`, { method: "PATCH", headers: H, body: JSON.stringify({ plannedInteractions: 5 }) });
     expect(res.status).toBe(400);
   });
+
+  it("does NOT certify early: it runs the full chosen count, then certifies at the end on strong answers", async () => {
+    if (!hasDb) return;
+    const id = await newSession(5); // 5 measured grade-3 answers reach the 0.8 bar exactly at the end
+    const answers = [
+      "A website lives on a server, a computer that stays on and is reachable over the internet.",
+      "The browser sends a request to that server, which responds with the page's files.",
+      "The server finds the right HTML, CSS and images and sends them back to render.",
+      "DNS turns the typed address into the server's IP so the request reaches the right machine.",
+      "Then the browser assembles the HTML into the page the customer finally sees.",
+    ];
+    const metas: Record<string, unknown>[] = [];
+    for (const a of answers) metas.push(await respond(id, a));
+
+    // Crucially, the session never ended before the final answer - no mastery after one question.
+    expect(metas.slice(0, 4).every((m) => m.ended === false)).toBe(true);
+    // The mastery meter climbed in measured steps, staying under the bar until near the end.
+    expect(Number(metas[0].masteryScore)).toBeLessThan(0.4);
+    // The final answer completes the plan AND certifies (session mastery reached the bar).
+    const last = metas[4];
+    expect(last.ended).toBe(true);
+    expect(last.endedReason).toBe("mastered");
+    expect(last.mastered).toBe(true);
+
+    const sres = await fetch(`${base}/sessions/${id}`, { headers: H });
+    const s = await sres.json();
+    expect(s.status).toBe("mastered");
+    expect(s.analysis).toBeTruthy();
+  });
 });

@@ -55,23 +55,27 @@ afterAll(async () => {
 });
 
 /**
- * Set up one scenario: a published module, a concept-mastery row seeded near the bar (0.7 -> a single
- * grade-3 turn lands 0.85), and a session with the given turnCount + createdAt. Returns the session row.
+ * Set up one scenario: a published module and a session seeded with a SESSION-LOCAL mastery, turnCount
+ * and createdAt. A high conceptMastery is ALSO seeded to prove certification never rides on carried-over
+ * per-concept score - only the session's own mastery counts. Returns the session row.
  */
-async function scenario(key: string, turnCount: number, ageMs: number) {
+async function scenario(key: string, opts: { sessionMastery: string; turnCount: number; ageMs: number; plannedInteractions?: number | null }) {
   const { db, modulesTable, conceptMasteryTable, sessionsTable } = dbMod;
   const moduleId = `m-${key}-${SUFFIX}`;
   await db.insert(modulesTable).values({ id: moduleId, courseId, title: `Module ${key}`, order: 1, status: "published" });
-  await db.insert(conceptMasteryTable).values({ userId, moduleId, moduleTitle: `Module ${key}`, courseId, mastery: "0.7000" });
+  // Deliberately HIGH carried-over per-concept score. It must not leak into session certification.
+  await db.insert(conceptMasteryTable).values({ userId, moduleId, moduleTitle: `Module ${key}`, courseId, mastery: "0.9500" });
   await db.insert(sessionsTable).values({
-    id: `s-${key}-${SUFFIX}`, moduleId, userId, status: "active", turnCount,
-    createdAt: new Date(Date.now() - ageMs),
+    id: `s-${key}-${SUFFIX}`, moduleId, userId, status: "active",
+    masteryScore: opts.sessionMastery, turnCount: opts.turnCount,
+    plannedInteractions: opts.plannedInteractions ?? null,
+    createdAt: new Date(Date.now() - opts.ageMs),
   });
   const [session] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, `s-${key}-${SUFFIX}`));
   return { session, moduleId };
 }
 
-async function run(session: typeof dbMod.sessionsTable.$inferSelect) {
+async function run(session: typeof dbMod.sessionsTable.$inferSelect, pacing?: { hasLimit: boolean; isFinalInteraction: boolean }) {
   return mastery.applyCheckpoint({
     userId,
     session,
@@ -79,79 +83,107 @@ async function run(session: typeof dbMod.sessionsTable.$inferSelect) {
     learnerResponse: "Here is my reasoning in full.",
     historyOrdered: [],
     tutorReply: "Understood.",
+    pacing,
   });
 }
 
-describe("mastery pacing floor", () => {
+describe("mastery certification pacing", () => {
   it("has a database (else skipped)", () => {
     if (!hasDb) console.warn("masteryPacing: no DATABASE_URL, skipping");
     expect(true).toBe(true);
   });
 
-  it("does NOT certify below the floor, but the mastery score still climbs", async () => {
+  it("session mastery is SESSION-LOCAL: a fresh session's first answer moves it a measured step, never near-full from carried-over score", async () => {
     if (!hasDb) return;
-    const { db, sessionsTable, conceptMasteryTable, credentialsTable } = dbMod;
-    // turnCount 0 -> 1 exchange (< MIN), createdAt now -> ~0ms elapsed (< MIN). Both fail.
-    const { session, moduleId } = await scenario("below", 0, 0);
+    // Session starts at 0, conceptMastery seeded at 0.95. One strong answer must land ~0.16, not ~0.95.
+    const { session } = await scenario("local", { sessionMastery: "0", turnCount: 1, ageMs: 0 });
     const res = await run(session);
-
-    expect(res.newMastery).toBeGreaterThanOrEqual(0.8); // score reached the bar
-    expect(res.mastered).toBe(false); // ...but pacing floor holds certification
-
-    const [s] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, session.id));
-    expect(s.status).toBe("active");
-    expect(s.completedAt).toBeNull();
-
-    // Mastery score is still persisted (climbs) even though not certified.
-    const [cm] = await db.select().from(conceptMasteryTable).where(and(eq(conceptMasteryTable.userId, userId), eq(conceptMasteryTable.moduleId, moduleId)));
-    expect(Number(cm.mastery)).toBeGreaterThanOrEqual(0.8);
-
-    // No credential issued.
-    const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId)));
-    expect(creds).toHaveLength(0);
-  });
-
-  it("does NOT certify when exchanges are met but elapsed time is not", async () => {
-    if (!hasDb) return;
-    const { db, sessionsTable, credentialsTable } = dbMod;
-    // Enough exchanges (turnCount 10 -> 6), but session is brand new (elapsed < MIN).
-    const { session, moduleId } = await scenario("time", 10, 0);
-    const res = await run(session);
+    expect(res.newMastery).toBeLessThanOrEqual(mastery.MASTERY_THRESHOLD - 0.4); // nowhere near the bar
+    expect(res.newMastery).toBeGreaterThan(0); // but it did climb
     expect(res.mastered).toBe(false);
-    const [s] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, session.id));
-    expect(s.status).toBe("active");
-    const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId)));
-    expect(creds).toHaveLength(0);
   });
 
-  it("does NOT certify when time is met but exchanges are not", async () => {
-    if (!hasDb) return;
-    const { db, credentialsTable } = dbMod;
-    // Old enough session, but only 1 exchange (turnCount 0 -> 1 < MIN).
-    const { session, moduleId } = await scenario("fewturns", 0, mastery.MIN_MASTERY_SESSION_MS + 60_000);
-    const res = await run(session);
-    expect(res.mastered).toBe(false);
-    const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId)));
-    expect(creds).toHaveLength(0);
+  describe("no-limit (legacy / WhatsApp) sessions use the pacing floor", () => {
+    it("does NOT certify below the floor, though the session score still climbs", async () => {
+      if (!hasDb) return;
+      const { db, sessionsTable, credentialsTable } = dbMod;
+      // Session score already near the bar, but turnCount 0 -> 1 exchange (< MIN) and fresh (< MIN time).
+      const { session, moduleId } = await scenario("below", { sessionMastery: "0.7000", turnCount: 0, ageMs: 0 });
+      const res = await run(session);
+      expect(res.newMastery).toBeGreaterThanOrEqual(0.8); // the score crosses the bar this turn
+      expect(res.mastered).toBe(false); // ...but pacing holds certification
+      const [s] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, session.id));
+      expect(s.status).toBe("active");
+      expect(s.completedAt).toBeNull();
+      const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId)));
+      expect(creds).toHaveLength(0);
+    });
+
+    it("does NOT certify when exchanges are met but elapsed time is not", async () => {
+      if (!hasDb) return;
+      const { db, credentialsTable } = dbMod;
+      const { session, moduleId } = await scenario("time", { sessionMastery: "0.7000", turnCount: 10, ageMs: 0 });
+      const res = await run(session);
+      expect(res.mastered).toBe(false);
+      const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId)));
+      expect(creds).toHaveLength(0);
+    });
+
+    it("certifies once BOTH floor conditions are met", async () => {
+      if (!hasDb) return;
+      const { db, sessionsTable, credentialsTable } = dbMod;
+      const { session, moduleId } = await scenario("above", { sessionMastery: "0.7000", turnCount: 10, ageMs: mastery.MIN_MASTERY_SESSION_MS + 60_000 });
+      const res = await run(session);
+      expect(res.mastered).toBe(true);
+      const [s] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, session.id));
+      expect(s.status).toBe("mastered");
+      expect(s.completedAt).not.toBeNull();
+      const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId), eq(credentialsTable.status, "valid")));
+      expect(creds).toHaveLength(1);
+    });
   });
 
-  it("certifies and issues a credential once BOTH floor conditions are met", async () => {
-    if (!hasDb) return;
-    const { db, sessionsTable, credentialsTable } = dbMod;
-    // turnCount 10 -> 6 exchanges (>= MIN), session old enough (elapsed >= MIN).
-    const { session, moduleId } = await scenario("above", 10, mastery.MIN_MASTERY_SESSION_MS + 60_000);
-    const res = await run(session);
+  describe("limited (learner-chosen count) sessions certify only at the end", () => {
+    it("does NOT certify mid-session even when the session score is over the bar", async () => {
+      if (!hasDb) return;
+      const { db, sessionsTable, credentialsTable } = dbMod;
+      // Score already over the bar, but this is NOT the final interaction of the chosen plan.
+      const { session, moduleId } = await scenario("mid", { sessionMastery: "0.8000", turnCount: 6, ageMs: 60_000, plannedInteractions: 8 });
+      const res = await run(session, { hasLimit: true, isFinalInteraction: false });
+      expect(res.mastered).toBe(false);
+      const [s] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, session.id));
+      expect(s.status).toBe("active");
+      expect(s.completedAt).toBeNull();
+      const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId)));
+      expect(creds).toHaveLength(0);
+    });
 
-    expect(res.mastered).toBe(true);
-    const [s] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, session.id));
-    expect(s.status).toBe("mastered");
-    expect(s.completedAt).not.toBeNull();
+    it("certifies on the final interaction when the session mastery reached the bar", async () => {
+      if (!hasDb) return;
+      const { db, sessionsTable, credentialsTable } = dbMod;
+      const { session, moduleId } = await scenario("final", { sessionMastery: "0.7000", turnCount: 8, ageMs: 60_000, plannedInteractions: 5 });
+      const res = await run(session, { hasLimit: true, isFinalInteraction: true });
+      expect(res.mastered).toBe(true);
+      const [s] = await db.select().from(sessionsTable).where(eq(sessionsTable.id, session.id));
+      expect(s.status).toBe("mastered");
+      const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId), eq(credentialsTable.status, "valid")));
+      expect(creds).toHaveLength(1);
+    });
 
-    const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId), eq(credentialsTable.status, "valid")));
-    expect(creds).toHaveLength(1);
+    it("does NOT certify on the final interaction if the session mastery fell short", async () => {
+      if (!hasDb) return;
+      const { db, credentialsTable } = dbMod;
+      // Only reached ~0.48 across the session; the final answer cannot alone carry it to the bar.
+      const { session, moduleId } = await scenario("short", { sessionMastery: "0.4000", turnCount: 8, ageMs: 60_000, plannedInteractions: 5 });
+      const res = await run(session, { hasLimit: true, isFinalInteraction: true });
+      expect(res.mastered).toBe(false);
+      const creds = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, moduleId)));
+      expect(creds).toHaveLength(0);
+    });
   });
 
   it("exposes the floor constants as clear named values", () => {
+    if (!hasDb) return;
     expect(mastery.MIN_MASTERY_EXCHANGES).toBeGreaterThanOrEqual(1);
     expect(mastery.MIN_MASTERY_SESSION_MS).toBeGreaterThan(0);
   });

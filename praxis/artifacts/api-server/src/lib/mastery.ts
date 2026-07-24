@@ -8,19 +8,18 @@ import {
 } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { gradeCheckpoint, type SocraticContext } from "./socraticEngine";
-import { sm2Update } from "./sm2";
+import { sm2Update, masteryStep } from "./sm2";
 import { maybeCompleteEnrolment } from "./progressMath";
 
 export const MASTERY_THRESHOLD = 0.8;
 
 /**
- * Pacing floor for certification. A high mastery score is necessary but not sufficient: without a
- * floor, a learner who lands two lucky answers can be certified in seconds, which is neither real
- * mastery nor defensible on a compliance record. Certification therefore also requires a minimum
- * number of learner exchanges AND a minimum elapsed session time. Below the floor the mastery meter
- * still climbs (genuine SM-2 progress is recorded), but the session stays "active" and no credential
- * is issued until the learner has actually engaged for long enough. These gate issuance only; they
- * do NOT touch the grader rubric or the SM-2 curve.
+ * Pacing floor for certification on the LEGACY / no-limit path (e.g. WhatsApp), where there is no
+ * learner-chosen interaction count to end on. A high score alone is not enough: certification also
+ * requires a minimum number of learner exchanges AND a minimum elapsed session time, so a rushed
+ * couple of answers can never certify in seconds. Web sessions instead run for the learner's chosen
+ * number of interactions and certify at the END (see the pacing option), so they do not use this
+ * floor. Below either bar the mastery meter still climbs; only issuance is held.
  */
 export const MIN_MASTERY_EXCHANGES = 5;
 export const MIN_MASTERY_SESSION_MS = 3 * 60 * 1000;
@@ -46,6 +45,15 @@ export async function applyCheckpoint(opts: {
   historyOrdered: { role: string; content: string }[];
   tutorReply: string;
   isSelection?: boolean;
+  /**
+   * How this session decides when to certify:
+   *  - hasLimit: the learner chose a fixed number of interactions. The session runs the whole way and
+   *    certifies ONLY on the final interaction, and only if the session mastery reached the bar. It
+   *    never certifies (or ends) early, however strong the answers.
+   *  - isFinalInteraction: this answer is the learner's last one for a limited session.
+   * When hasLimit is false (legacy / WhatsApp), the pacing floor above governs certification instead.
+   */
+  pacing?: { hasLimit: boolean; isFinalInteraction: boolean };
 }): Promise<CheckpointResult> {
   const { userId, session, socraticCtx, learnerResponse, historyOrdered } = opts;
 
@@ -113,17 +121,26 @@ export async function applyCheckpoint(opts: {
         },
       });
 
-    const newMastery = sm2.mastery;
+    // The SESSION mastery meter is session-local: it starts at 0 each session and climbs one measured
+    // step per answer, based purely on THIS session's grades. It deliberately does NOT inherit the
+    // persistent per-concept score, so mastery is earned by answering the chosen questions correctly
+    // in this session (not carried in from past work), and can never read near-full after one answer.
+    const newMastery = masteryStep(Number(session.masteryScore), grade.grade);
     const freshTurnCount = Number(session.turnCount) + 2;
     const learnerExchanges = Math.floor(freshTurnCount / 2);
     const elapsedMs = now.getTime() - new Date(session.createdAt).getTime();
-    // Certify once the bar reaches 0.8 on a turn that is at least solid (not a stumble/refusal) AND
-    // the pacing floor is met (enough exchanges AND enough elapsed time). The score condition keeps
-    // the visible meter and the credential in agreement; the pacing condition stops a rushed session
-    // from certifying in seconds. Below the floor the score still rises but the session stays active.
-    const scoreMastered = newMastery >= MASTERY_THRESHOLD && grade.grade >= 2;
+
+    // Certification depends on how the session is paced.
+    //  - A limited (web) session runs to the learner's chosen number of interactions and certifies
+    //    ONLY on the final one, and only if the session mastery has reached the bar by then, i.e. the
+    //    learner answered enough of their chosen questions well. It never certifies early.
+    //  - A no-limit (legacy / WhatsApp) session uses the pacing floor: enough exchanges AND enough
+    //    elapsed time, plus a solid final answer.
+    const reachedBar = newMastery >= MASTERY_THRESHOLD;
     const pacingSatisfied = learnerExchanges >= MIN_MASTERY_EXCHANGES && elapsedMs >= MIN_MASTERY_SESSION_MS;
-    const nowMastered = scoreMastered && pacingSatisfied;
+    const nowMastered = opts.pacing?.hasLimit
+      ? !!opts.pacing.isFinalInteraction && reachedBar
+      : reachedBar && grade.grade >= 2 && pacingSatisfied;
     const alreadyMastered = session.status === "mastered";
 
     await tx

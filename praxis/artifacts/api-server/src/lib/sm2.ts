@@ -15,6 +15,27 @@
  */
 export const MAX_MASTERY_STEP = 0.16;
 
+/**
+ * One measured, non-punitive mastery step from a grade. Shared by SM-2 (the persistent per-concept
+ * score used for scheduling) AND by the per-SESSION mastery meter, so both move the same measured way.
+ *
+ * NON-PUNITIVE: a weak or incorrect answer never DECREASES the score - it can award progress (a strong
+ * answer) or award nothing (a weak one), never a negative delta. MEASURED: the step is capped at
+ * MAX_MASTERY_STEP so the meter climbs in intervals the learner can feel rather than leaping the bar on
+ * one answer. Grade 2 (solid, incl. a correct multiple-choice pick) tops out at 0.85 so mastery CAN
+ * cross the 0.8 bar over a few good turns; grade 3 reaches full mastery.
+ */
+export function masteryStep(prevMastery: number, grade: number): number {
+  const TARGET = [0, 0.5, 0.85, 1.0];
+  const target = TARGET[Math.max(0, Math.min(3, Math.round(grade)))] ?? 0;
+  const gained = target > prevMastery ? Math.min((target - prevMastery) * 0.5, MAX_MASTERY_STEP) : 0;
+  // max(prev, ...) is belt-and-braces: the score is guaranteed never to fall below where it was.
+  const next = Math.min(1, Math.max(prevMastery, prevMastery + gained));
+  // Round to the mastery column's 4-decimal precision. This also stops float drift from repeated
+  // additions (five 0.16 steps sum to 0.79999... which would wrongly read as below the 0.8 bar).
+  return Math.round(next * 10000) / 10000;
+}
+
 export function sm2Update(
   mastery: number,
   ef: number,
@@ -39,30 +60,14 @@ export function sm2Update(
   // Ease-factor adjustment (SM-2), clamped to a 0-3 grade range.
   newEf = Math.max(1.3, ef + (0.1 - (3 - grade) * (0.08 + (3 - grade) * 0.02)));
 
-  // Mastery moves toward a target set by the grade. NON-PUNITIVE INVARIANT: a weak or incorrect
-  // answer never DECREASES the mastery percentage - it can only award progress (a strong answer) or
-  // award nothing (a weak one), never a negative delta. So we move toward the target only when that
-  // target is above where the learner already is, and otherwise hold steady. This keeps every point
-  // of progress earned-and-kept: a single stumble can never wipe out ground the learner has won, and
-  // the meter the learner watches only ever holds or climbs. (The spaced-repetition scheduling above
-  // still reacts to a weak answer - reps/interval reset so the concept comes back sooner - so the
-  // tutoring cadence is unchanged; only the visible mastery score is protected from decreasing.)
-  // Grade 2 (solid, including a correct multiple-choice pick) tops out at 0.85 so mastery CAN cross
-  // the 0.8 bar with a few good turns rather than walling just below it; grade 3 reaches full mastery.
-  const TARGET = [0, 0.5, 0.85, 1.0];
-  const target = TARGET[Math.max(0, Math.min(3, Math.round(grade)))] ?? 0;
-  // Only climb toward a higher target; a lower target contributes 0 (never a subtraction). The step
-  // is capped at MAX_MASTERY_STEP so the meter climbs in measured intervals the learner can feel,
-  // rather than leaping most of the way on one strong answer.
-  const gained = target > mastery ? Math.min((target - mastery) * 0.5, MAX_MASTERY_STEP) : 0;
-  const newMastery = mastery + gained;
-
+  // The persistent per-concept mastery moves one measured, non-punitive step (see masteryStep). The
+  // spaced-repetition scheduling above still reacts to a weak answer (reps/interval reset), so the
+  // tutoring cadence is unchanged; only the visible mastery score is protected from decreasing.
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + newInterval);
 
   return {
-    // max(mastery, ...) is belt-and-braces: the score is guaranteed to never fall below where it was.
-    mastery: Math.min(1, Math.max(mastery, newMastery)),
+    mastery: masteryStep(mastery, grade),
     ef: Math.round(newEf * 100) / 100,
     interval: newInterval,
     reps: newReps,

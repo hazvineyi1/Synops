@@ -376,6 +376,9 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
         historyOrdered,
         tutorReply: fullResponse,
         isSelection,
+        // A limited (web) session runs the full chosen count and certifies only on the final answer;
+        // reachedLimit marks that final answer. No-limit sessions fall back to the pacing floor.
+        pacing: { hasLimit: session.plannedInteractions != null, isFinalInteraction: reachedLimit },
       }),
       generateAnswerOptions(fullResponse, socraticCtx).catch(() => ({ mode: "free" as string, options: [] as string[] })),
     ]);

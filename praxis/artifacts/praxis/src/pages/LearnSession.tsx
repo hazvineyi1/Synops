@@ -311,7 +311,6 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // before the full session refetch lands.
   const effMastery = liveMastery != null ? liveMastery : (session.masteryScore || 0);
   const masteryPercentage = Math.round(effMastery * 100);
-  const isMastered = effMastery >= 0.8;
 
   // The mastery meter grows and intensifies as the discussion progresses, so the learner can feel
   // the needle move: width, bar height, number size and colour all scale with the score.
@@ -335,13 +334,17 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // the session ended (if it has), and the cached analysis. Read from the session, with the live
   // done-event values taking precedence so the UI updates the instant the final turn lands.
   const sessionAny = session as unknown as {
-    plannedInteractions?: number | null; endedReason?: 'mastered' | 'reached_limit' | null;
+    status?: string; plannedInteractions?: number | null; endedReason?: 'mastered' | 'reached_limit' | null;
     analysis?: SessionAnalysis | null; completedAt?: string | null;
   };
   const plannedInteractions = sessionAny.plannedInteractions ?? null;
   const learnerAnswers = localTurns.filter((t) => t?.role === 'learner').length;
-  const endedReason: 'mastered' | 'reached_limit' | null = liveEnded?.reason ?? sessionAny.endedReason ?? (isMastered ? 'mastered' : null);
-  const sessionEnded = isMastered || !!endedReason || !!sessionAny.completedAt || !!liveEnded;
+  // The session ends and mastery is CERTIFIED only when the BACKEND says so, never merely because the
+  // meter crossed 0.8. A limited session runs its full chosen count; certification is decided at the
+  // end. So a high meter mid-session no longer ends the session or shows "Mastery Achieved".
+  const endedReason: 'mastered' | 'reached_limit' | null = liveEnded?.reason ?? sessionAny.endedReason ?? null;
+  const sessionEnded = !!endedReason || sessionAny.status === 'mastered' || !!sessionAny.completedAt || !!liveEnded;
+  const certified = endedReason === 'mastered' || sessionAny.status === 'mastered';
   const analysis: SessionAnalysis | null = liveEnded?.analysis ?? sessionAny.analysis ?? null;
   // The setup gate runs when the learner has not chosen a limit and has not answered anything yet.
   const needsSetup = plannedInteractions == null && learnerAnswers === 0 && !sessionEnded;
@@ -722,7 +725,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
           {/* Scaffolding offer — appears after a run of struggle. Warm, not punitive:
               it normalises the difficulty and offers a worked example, opt-in. */}
-          {showScaffold && !isStreaming && !isMastered && (
+          {showScaffold && !isStreaming && !sessionEnded && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
@@ -755,31 +758,17 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             </motion.div>
           )}
 
-          {/* Mastery Achieved Banner (only when the learner actually crossed the bar). */}
-          {isMastered && (
-            <div className="relative overflow-hidden mt-8 mb-4 p-8 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 flex flex-col items-center text-center animate-in zoom-in-95 duration-500 motion-reduce:animate-none">
-              <Confetti />
-              <div className="h-16 w-16 bg-primary rounded-full flex items-center justify-center mb-4 text-primary-foreground shadow-lg">
-                <Sparkles className="h-8 w-8" />
-              </div>
-              <h3 className="text-2xl font-serif font-bold text-foreground mb-2">Mastery Achieved</h3>
-              <p className="text-muted-foreground max-w-md mb-6">
-                You've demonstrated sufficient reasoning capability for this module. Your PraxisMark is ready.
-              </p>
-              <Button size="lg" onClick={() => setLocation('/credentials')}>
-                View PraxisMark Credential
-              </Button>
-            </div>
-          )}
-
-          {/* End-of-session analysis + recommendation. Shows for BOTH endings: mastery reached, and
-              the learner's chosen interaction limit used up. Always closes with one clear next step. */}
+          {/* End-of-session state. Shows for BOTH endings: mastery certified by the backend, and the
+              learner's chosen interaction limit used up. It is the single end panel (celebration for a
+              certified session, plus the analysis and one clear next step). Never shown mid-session -
+              a high meter alone does not end the session. */}
           {sessionEnded && (
             <EndAnalysisPanel
               endedReason={endedReason}
+              certified={certified}
               analysis={analysis}
               masteryPct={mp}
-              onReviewCredential={isMastered ? () => setLocation('/credentials') : undefined}
+              onReviewCredential={certified ? () => setLocation('/credentials') : undefined}
               onBack={() => setLocation('/dashboard')}
               reducedMotion={!!prefersReducedMotion}
             />
@@ -1035,29 +1024,33 @@ const VERDICT_META: Record<SessionAnalysis['verdict'], { label: string; classNam
 };
 // End-of-session analysis + recommendation, shown for both endings (mastery reached, or the chosen
 // interaction limit used up). Honest, encouraging, and always closing with one concrete next step.
-function EndAnalysisPanel({ endedReason, analysis, masteryPct, onReviewCredential, onBack, reducedMotion }: {
+function EndAnalysisPanel({ endedReason, certified, analysis, masteryPct, onReviewCredential, onBack, reducedMotion }: {
   endedReason: 'mastered' | 'reached_limit' | null;
+  certified: boolean;
   analysis: SessionAnalysis | null;
   masteryPct: number;
   onReviewCredential?: () => void;
   onBack: () => void;
   reducedMotion: boolean;
 }) {
-  const verdict = analysis?.verdict ?? (endedReason === 'mastered' ? 'certified' : masteryPct >= 60 ? 'nearly' : 'keep_going');
+  const verdict = analysis?.verdict ?? (certified ? 'certified' : masteryPct >= 60 ? 'nearly' : 'keep_going');
   const vm = VERDICT_META[verdict];
   const VIcon = vm.icon;
-  const heading = endedReason === 'mastered' ? 'Session complete - mastery reached' : 'Session complete';
+  const heading = certified ? 'Mastery achieved' : 'Session complete';
   return (
     <motion.div
       initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
       animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="mt-8 mb-4 rounded-2xl border border-border bg-card p-6 sm:p-7"
+      className={cn('relative overflow-hidden mt-8 mb-4 rounded-2xl border p-6 sm:p-7', certified ? 'border-primary/30 bg-gradient-to-br from-primary/10 to-transparent' : 'border-border bg-card')}
     >
+      {certified && <Confetti />}
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h3 className="text-xl font-serif font-bold text-foreground">{heading}</h3>
-          <p className="text-sm text-muted-foreground mt-0.5">Here is how it went, and what to do next.</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {certified ? 'You demonstrated real mastery across this session. Your PraxisMark is ready.' : 'Here is how it went, and what to do next.'}
+          </p>
         </div>
         <span className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 shrink-0', vm.className)}>
           <VIcon className="h-3.5 w-3.5" /> {vm.label}
