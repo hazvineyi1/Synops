@@ -306,6 +306,13 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           const newTier = tierFromPct(newPct);
           if (newTier > prevTier) { setLevelUp(newTier); setTimeout(() => setLevelUp(null), 3200); }
         }
+        // Distinct, always-encouraging feedback keyed to the grade of the answer just submitted:
+        // a green check for strong reasoning, a warm amber lightbulb for keep-going. Never punitive.
+        if (typeof meta.grade === 'number') {
+          const fid = Date.now();
+          setFeedback({ grade: meta.grade, id: fid });
+          setTimeout(() => setFeedback((f) => (f && f.id === fid ? null : f)), 2400);
+        }
         // When complete, refetch the session to get the real turns and updated mastery/beat
         refetchSession().then(() => {
           setIsStreaming(false);
@@ -591,6 +598,9 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
         </div>
       </main>
 
+      {/* Response-quality feedback: a brief, encouraging cue after each answer (never punitive). */}
+      <ResponseFeedback feedback={feedback} reducedMotion={!!prefersReducedMotion} />
+
       {/* Input Area — selectable answer choices for most questions, with a "type my own" escape;
           free-text box when the coach asks for the learner's own words (or they choose to write). */}
       <footer className="shrink-0 bg-background border-t border-border p-4 pb-safe">
@@ -682,6 +692,53 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           The tutor will not provide answers, only questions to guide your reasoning.
         </p>
       </footer>
+    </div>
+  );
+}
+
+/**
+ * Response-quality feedback toast. Distinct but ALWAYS encouraging: a satisfying green checkmark
+ * that bounces + glows for strong reasoning (grade >= 2), and a warm amber lightbulb with a gentle
+ * pulse and a "keep going" line for a weaker answer (grade <= 1). Never a red X, never a shake or
+ * error pattern - a weak answer is a nudge onward, not a failure. Respects reduced-motion.
+ */
+function ResponseFeedback({ feedback, reducedMotion }: { feedback: { grade: number; id: number } | null; reducedMotion: boolean }) {
+  const strong = (feedback?.grade ?? 0) >= 2;
+  const messages = strong
+    ? ['Nice reasoning', 'Strong thinking', "That's it", 'Well reasoned']
+    : ['Good start - keep going', "You're on the way", 'Keep building on that', 'Nearly there - stay with it'];
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-28 z-30 flex justify-center px-4 sm:bottom-32">
+      <AnimatePresence>
+        {feedback && (
+          <motion.div
+            key={feedback.id}
+            initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.9 }}
+            animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.3 } }}
+            transition={{ type: 'spring', stiffness: 420, damping: 22 }}
+            className={cn(
+              'flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg backdrop-blur',
+              strong
+                ? 'border-green-300 bg-green-50/95 text-green-700 dark:border-green-800 dark:bg-green-950/80 dark:text-green-300'
+                : 'border-amber-300 bg-amber-50/95 text-amber-800 dark:border-amber-800 dark:bg-amber-950/80 dark:text-amber-200',
+            )}
+          >
+            <motion.span
+              initial={reducedMotion ? {} : { scale: 0 }}
+              animate={reducedMotion ? {} : (strong ? { scale: [0, 1.35, 1] } : { scale: [1, 1.15, 1] })}
+              transition={{ duration: strong ? 0.5 : 1.1, repeat: strong ? 0 : 1, ease: 'easeOut' }}
+              className={cn(
+                'flex h-6 w-6 items-center justify-center rounded-full',
+                strong ? 'bg-green-500 text-white shadow-[0_0_12px_2px] shadow-green-500/50' : 'bg-amber-400/90 text-amber-950',
+              )}
+            >
+              {strong ? <Check className="h-4 w-4" /> : <Lightbulb className="h-3.5 w-3.5" />}
+            </motion.span>
+            {messages[feedback.id % messages.length]}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
