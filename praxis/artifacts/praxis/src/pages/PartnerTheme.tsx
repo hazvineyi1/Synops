@@ -86,7 +86,7 @@ export function PartnerTheme() {
     mutationFn: () => apiFetch<{ displayName: string; primaryColor: string; secondaryColor: string; accentColor: string; fontFamily: string; credentialTitle: string; tagline: string }>(
       '/brand/ai-generate',
       { method: 'POST', body: JSON.stringify({
-        logoBase64: logoParts!.base64, logoMediaType: logoParts!.mediaType,
+        logoBase64: logoParts?.base64, logoMediaType: logoParts?.mediaType,
         cardBase64: cardParts?.base64, cardMediaType: cardParts?.mediaType,
         website: aiWebsite.trim() || undefined, businessName: (aiName.trim() || form.displayName || undefined),
       }) }),
@@ -142,7 +142,7 @@ export function PartnerTheme() {
                 <div className="space-y-1.5"><Label>Website</Label><Input value={aiWebsite} onChange={(e) => setAiWebsite(e.target.value)} placeholder="https://theirsite.com" /></div>
               </div>
 
-              <Button onClick={() => gen.mutate()} disabled={!logoParts || gen.isPending} className="w-full gap-1.5">
+              <Button onClick={() => gen.mutate()} disabled={(!logoParts && !form.logoUrl) || gen.isPending} className="w-full gap-1.5">
                 {gen.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : <><Wand2 className="h-4 w-4" /> Generate brand with AI</>}
               </Button>
               <p className="text-xs text-muted-foreground">The logo is stored with the brand. Needs AI to be configured on the server; if not, set the colours manually below.</p>

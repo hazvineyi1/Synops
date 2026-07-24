@@ -12,6 +12,23 @@ const HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const cleanHex = (v: unknown, fallback: string) => (typeof v === "string" && HEX.test(v.trim()) ? v.trim() : fallback);
 const IMG_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
+/** Fetch an image URL server-side and return it as base64 + media type (for the AI vision call), so
+ * the brand kit can read a logo the tenant has already saved without forcing a re-upload. Restricted
+ * to https image responses under a size cap; returns null on any problem (caller then 400s). */
+async function fetchImageAsBase64(url: string): Promise<{ base64: string; mediaType: string } | null> {
+  try {
+    const r = await fetch(url, { redirect: "follow" });
+    if (!r.ok) return null;
+    const mediaType = (r.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!IMG_TYPES.includes(mediaType)) return null;
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length === 0 || buf.length > 5_000_000) return null;
+    return { base64: buf.toString("base64"), mediaType };
+  } catch {
+    return null;
+  }
+}
+
 type TenantType = "platform" | "partner" | "organisation";
 
 function toThemeResponse(t: typeof brandThemesTable.$inferSelect) {
@@ -131,9 +148,22 @@ router.put("/brand/partner/:partnerId", requireAuth, requireRole("super_admin"),
  * client previews and then applies via PUT /brand/theme. Top-tier only.
  */
 router.post("/brand/ai-generate", requireAuth, requireRole("super_admin", "partner_admin"), async (req, res) => {
-  const { logoBase64, logoMediaType, cardBase64, cardMediaType, website, businessName } = req.body ?? {};
+  const { cardBase64, cardMediaType, website, businessName } = req.body ?? {};
+  let logoBase64 = req.body?.logoBase64;
+  let logoMediaType = req.body?.logoMediaType;
+  // If the admin did not re-upload a logo, fall back to the tenant's already-saved brand logo
+  // (fetched server-side, no CORS), so "Generate" works from the logo they can already see.
+  if (!logoBase64) {
+    const user = req.dbUser!;
+    const tenantId = user.partnerId ?? "platform";
+    const theme = await db.query.brandThemesTable.findFirst({ where: eq(brandThemesTable.tenantId, tenantId) });
+    if (theme?.logoUrl && /^https:\/\//i.test(theme.logoUrl)) {
+      const fetched = await fetchImageAsBase64(theme.logoUrl);
+      if (fetched) { logoBase64 = fetched.base64; logoMediaType = fetched.mediaType; }
+    }
+  }
   if (!logoBase64 || !IMG_TYPES.includes(String(logoMediaType))) {
-    res.status(400).json({ error: "A logo image (logoBase64 + logoMediaType png/jpeg/webp) is required." });
+    res.status(400).json({ error: "A logo image is required. Upload a logo (or save one on the brand) first." });
     return;
   }
 
