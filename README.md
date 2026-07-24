@@ -80,6 +80,28 @@ API server (`artifacts/api-server`):
 | `ENABLE_TEST_LOGIN` / `TEST_LOGIN_EMAIL` | no | Dev-only test login. |
 | `LOG_LEVEL` / `NODE_ENV` | no | Logging level / environment. |
 
+### Multi-factor authentication (MFA)
+
+MFA supports several factor types and any one verified factor satisfies the sign-in
+challenge. TOTP authenticator apps, passkeys, and backup codes work with no extra
+configuration. The remaining channels are optional and degrade gracefully - if a
+channel is not configured, that option is simply hidden in the UI:
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `RESEND_API_KEY` + `EMAIL_FROM` | no | Enables email one-time codes and the recovery-email channel (uses the existing Resend email lib). Without them, the email code and recovery options are hidden. |
+| `TWILIO_ACCOUNT_SID` | no | Twilio account SID. All three Twilio vars are needed to enable SMS codes. |
+| `TWILIO_AUTH_TOKEN` | no | Twilio auth token. |
+| `TWILIO_FROM` | no | Twilio sender number, e.g. `+15550001111`. SMS has a per-message cost, so the SMS option stays hidden/disabled until all three are set - a human enables it deliberately. |
+| `WEBAUTHN_RP_ID` | no | Passkey Relying Party ID (the registrable domain, e.g. `praxis.example.com`). Defaults to the request hostname; set it when serving behind a proxy or on a custom domain. |
+| `WEBAUTHN_ORIGIN` | no | Full passkey origin, e.g. `https://praxis.example.com`. Defaults to scheme+host of the request. Must exactly match the site the user registers/authenticates on. |
+
+Coach (`artifacts/paideia-api`) has the same MFA system with authenticator apps,
+passkeys, email codes, recovery email and backup codes. It reads `RESEND_API_KEY` +
+`EMAIL_FROM` for email/recovery codes and `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` for
+passkeys, exactly as above. (Coach does not use SMS, so no Twilio vars are needed
+there.) MFA is required for admin teachers - they cannot remove their last method.
+
 Web app (`artifacts/the-coach`, Vite — must be prefixed `VITE_`):
 
 | Variable | Required | Purpose |

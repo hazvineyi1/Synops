@@ -11,6 +11,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Teacher, ClassProfile } from "@/lib/types";
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2 } from "lucide-react";
+import MfaSettings from "@/components/MfaSettings";
 
 export default function Settings() {
   const { teacher, setTeacher } = useAuth();
@@ -107,6 +108,7 @@ export default function Settings() {
         <Button type="submit" disabled={busy}>Save changes</Button>
       </form>
       <ClassProfilesSection />
+      <MfaSettings />
     </AppShell>
   );
 }

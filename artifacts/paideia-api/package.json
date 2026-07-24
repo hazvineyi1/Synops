@@ -12,10 +12,11 @@
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",
     "@sentry/node": "^8.0.0",
+    "@simplewebauthn/server": "^13.3.2",
+    "@workspace/compass-api": "workspace:*",
     "@workspace/paideia-api-zod": "workspace:*",
     "@workspace/paideia-db": "workspace:*",
     "cookie-parser": "^1.4.7",
-    "pdfkit": "^0.19.1",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
@@ -23,12 +24,12 @@
     "multer": "^2.1.1",
     "openai": "^4.79.0",
     "pdf-parse": "^1.1.1",
+    "pdfkit": "^0.19.1",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0",
     "stripe": "20.0.0",
     "stripe-replit-sync": "1.0.0",
-    "zod": "catalog:",
-    "@workspace/compass-api": "workspace:*"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",

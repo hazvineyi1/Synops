@@ -6,10 +6,13 @@ import { logger } from "./lib/logger";
 import { getStripeSync } from "./lib/stripeClient";
 import { recoverStuckSubmissions } from "./lib/gradingQueue";
 import { ensurePopiaSchema } from "./lib/popiaSchema";
+import { ensureMfaSchema } from "./lib/mfaSchema";
 
 // POPIA: ensure the consent + deletion-request tables/columns exist at boot
 // (paideia has no migration runner; this heals ahead of an explicit push).
 void ensurePopiaSchema();
+// MFA: ensure the multi-factor tables exist at boot, same reasoning.
+void ensureMfaSchema();
 
 async function initStripe(): Promise<void> {
   const databaseUrl = process.env["DATABASE_URL"];
