@@ -338,7 +338,7 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       selectMode: answerOpts.mode,
     });
 
-    res.write(`data: ${JSON.stringify({ done: true, masteryScore: result.newMastery, grade: result.grade, mastered: result.mastered, scaffold, options: answerOpts.options, selectMode: answerOpts.mode })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true, masteryScore: result.newMastery, grade: result.grade, reasoning: result.reasoning, mastered: result.mastered, scaffold, options: answerOpts.options, selectMode: answerOpts.mode })}\n\n`);
     res.end();
   } catch (err) {
     req.log.error({ err }, "Session respond error");

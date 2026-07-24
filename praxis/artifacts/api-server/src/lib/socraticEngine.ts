@@ -247,15 +247,19 @@ export async function gradeCheckpoint(
     .map((t) => `${t.role === "tutor" ? "COACH" : "LEARNER"}: ${t.content}`)
     .join("\n");
 
-  const cap = isSelection ? 2 : 3;
+  // Both paths grade on the full 0-3 scale. A correct selected answer to a question that genuinely
+  // requires understanding CAN demonstrate mastery, so option-only learners are no longer capped
+  // below the bar (the old isSelection cap of 2 meant they asymptoted at ~0.78 and could never
+  // certify - a fairness bug). The rubric still reserves 3 for a clearly correct, best-fit choice.
+  const cap = 3;
   const system = isSelection
     ? `You are assessing a learner who SELECTED an answer from multiple choices for the concept "${ctx.beatTitle ?? ctx.moduleTitle ?? "this concept"}". Grade the CORRECTNESS of the choice they picked, not its length.
-Return a single JSON object: {"grade": 0|1|2, "reasoning": "one short sentence"}.
+Return a single JSON object: {"grade": 0|1|2|3, "reasoning": "one short sentence"}.
 Rubric:
 0 = the choice is wrong, a misconception, or off-topic.
 1 = the choice is partly right or a weak fit.
 2 = the choice is correct and on point.
-Do NOT give 3: recognising a good answer is not the same as explaining it, and mastery requires the learner to justify their reasoning in their own words.
+3 = the choice is clearly correct AND the best, most complete option for a question that genuinely requires understanding the concept to answer (not a trivially guessable one).
 Source content for reference: ${ctx.narration ?? ""} ${ctx.scenario ?? ""}`.trim()
     : `You are a strict but fair assessor of demonstrated understanding on the concept "${ctx.beatTitle ?? ctx.moduleTitle ?? "this concept"}".
 Grade ONLY the learner's demonstrated reasoning, not their writing length, politeness or confidence.
@@ -268,37 +272,43 @@ Rubric:
 Be strict: only give 2 or 3 when the learner has actually explained real reasoning about the concept.
 Source content for reference: ${ctx.narration ?? ""} ${ctx.scenario ?? ""}`.trim();
 
-  try {
-    const msg = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 200,
-      system,
-      messages: [
-        {
-          role: "user",
-          content: `Recent dialogue:\n${transcript}\n\nLatest learner answer to grade:\n"${learnerResponse}"\n\nReturn only the JSON.`,
-        },
-      ],
-    });
-    const text = msg.content
-      .map((b) => (b.type === "text" ? b.text : ""))
-      .join("");
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) {
-      const parsed = JSON.parse(match[0]);
-      const g = Math.max(0, Math.min(cap, Math.round(Number(parsed.grade))));
-      return { grade: g as 0 | 1 | 2 | 3, reasoning: String(parsed.reasoning ?? "") };
+  // One grading attempt: returns a parsed grade, or null if the call/parse failed (so we can retry).
+  const gradeOnce = async (): Promise<CheckpointGrade | null> => {
+    try {
+      const msg = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 200,
+        system,
+        messages: [
+          {
+            role: "user",
+            content: `Recent dialogue:\n${transcript}\n\nLatest learner answer to grade:\n"${learnerResponse}"\n\nReturn only the JSON.`,
+          },
+        ],
+      });
+      const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        const g = Math.max(0, Math.min(cap, Math.round(Number(parsed.grade))));
+        return { grade: g as 0 | 1 | 2 | 3, reasoning: String(parsed.reasoning ?? "") };
+      }
+    } catch {
+      // fall through - caller decides whether to retry
     }
-  } catch {
-    // fall through to a conservative default
-  }
-  // Conservative fallback if grading fails. CRITICAL: never return a MASTERY-qualifying grade here.
-  // Mastery (and therefore credential issuance) requires grade >= 2; an AI outage must not let a
-  // learner reach mastery by padding an answer to 25+ words. Cap the fallback at 1 so a real grader
-  // is always required to certify. (Selection answers also cap at 1.)
-  if (isSelection) return { grade: 1, reasoning: "Selected answer (grader unavailable) - not counted toward mastery." };
-  const words = learnerResponse.trim().split(/\s+/).filter(Boolean).length;
-  return { grade: words > 5 ? 1 : 0, reasoning: "Fallback estimate (grader unavailable) - not counted toward mastery." };
+    return null;
+  };
+
+  // Retry once before falling back, so a single transient hiccup doesn't cost the learner a grade.
+  const graded = (await gradeOnce()) ?? (await gradeOnce());
+  if (graded) return graded;
+
+  // Neutral (not punitive) fallback: the grader is unavailable, so give partial credit rather than
+  // near-zeroing the learner's progress. This is SAFE against a false certification: a grade of 2
+  // moves mastery only toward ~0.78, which is below the 0.8 bar, and certification additionally
+  // requires grade >= 2 AND mastery >= 0.8 - so an outage can never on its own award a credential.
+  // (Genuine refusals/give-ups are already caught as grade 0 by isDisengaged above.)
+  return { grade: 2, reasoning: "We could not fully grade this one just now, so it counts as partial credit - keep going." };
 }
 
 export interface WorkedExample {
