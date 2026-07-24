@@ -1179,12 +1179,9 @@ export function CourseDetail() {
           </div>
         </div>
         {role === 'learner' && !enrolment && (
-          <Button
-            onClick={() => { if (window.confirm(`Enrol in "${course.title}"? This adds the course to your learning and may count toward your training record.`)) enrolMutation.mutate(); }}
-            disabled={enrolMutation.isPending}
-          >
-            {enrolMutation.isPending ? 'Enrolling...' : 'Enrol Now'}
-          </Button>
+          <div className="max-w-xs shrink-0 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            Enrolment is managed by your organisation. Ask your admin to assign this course to you.
+          </div>
         )}
         {enrolment && <Badge variant="outline" className="text-green-600 border-green-600">Enrolled</Badge>}
       </div>

@@ -33,6 +33,13 @@ function canAccessOrg(user: U, org: { id: string; partnerId: string | null } | n
   if (!org) return false;
   return isSuperAdmin(user.role) || (!!user.partnerId && user.partnerId === org.partnerId) || (!!user.organisationId && user.organisationId === org.id);
 }
+// Assigning courses, managing class rosters and materialising enrolments are ADMIN actions.
+// canAccessOrg (above) is true for ANY member of the org, including a learner, so the MUTATION
+// endpoints gate on this stricter check - a learner can browse but can never assign or enrol.
+const ORG_ADMIN_ROLES = new Set<string>(["org_admin", "partner_admin", "super_admin"]);
+function canAdminOrg(user: U, org: { id: string; partnerId: string | null } | null | undefined) {
+  return canAccessOrg(user, org) && ORG_ADMIN_ROLES.has(user.role);
+}
 const strArr = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && x.length > 0))] : [];
 
@@ -65,7 +72,7 @@ router.get("/organisations/:orgId/classes", requireAuth, async (req, res) => {
 router.post("/organisations/:orgId/classes", requireAuth, async (req, res) => {
   const { orgId } = req.params;
   const org = await orgFor(orgId);
-  if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!canAdminOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
   if (!req.body?.name || !String(req.body.name).trim()) { res.status(400).json({ error: "A class name is required." }); return; }
   await ensureTables();
   const [row] = await db.insert(orgClassesTable).values({ orgId, partnerId: org!.partnerId, name: String(req.body.name).trim(), createdBy: req.dbUser!.id }).returning();
@@ -121,7 +128,7 @@ router.get("/classes/:classId", requireAuth, async (req, res) => {
 
 router.patch("/classes/:classId", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
-  if (!cls || !canAccessOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
+  if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
   const name = req.body?.name ? String(req.body.name).trim() : "";
   if (!name) { res.status(400).json({ error: "A class name is required." }); return; }
   await db.update(orgClassesTable).set({ name }).where(eq(orgClassesTable.id, cls.id));
@@ -130,7 +137,7 @@ router.patch("/classes/:classId", requireAuth, async (req, res) => {
 
 router.delete("/classes/:classId", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
-  if (!cls || !canAccessOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
+  if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
   await Promise.all([
     db.delete(orgClassLearnersTable).where(eq(orgClassLearnersTable.classId, cls.id)),
     db.delete(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id)),
@@ -144,7 +151,7 @@ router.delete("/classes/:classId", requireAuth, async (req, res) => {
 // PUT /classes/:classId/learners { learnerIds } — replace the roster.
 router.put("/classes/:classId/learners", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
-  if (!cls || !canAccessOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
+  if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
   const learnerIds = strArr(req.body?.learnerIds);
   await db.delete(orgClassLearnersTable).where(eq(orgClassLearnersTable.classId, cls.id));
   if (learnerIds.length) await db.insert(orgClassLearnersTable).values(learnerIds.map((learnerId) => ({ classId: cls.id, learnerId })));
@@ -154,7 +161,7 @@ router.put("/classes/:classId/learners", requireAuth, async (req, res) => {
 // PUT /classes/:classId/courses { courseIds } — replace the assigned courses.
 router.put("/classes/:classId/courses", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
-  if (!cls || !canAccessOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
+  if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
   const courseIds = strArr(req.body?.courseIds);
   await db.delete(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id));
   if (courseIds.length) await db.insert(orgClassCoursesTable).values(courseIds.map((courseId) => ({ classId: cls.id, courseId })));
@@ -164,7 +171,7 @@ router.put("/classes/:classId/courses", requireAuth, async (req, res) => {
 // PUT /classes/:classId/staff { staff: [{staffId, role}] } — replace staff assignments.
 router.put("/classes/:classId/staff", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
-  if (!cls || !canAccessOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
+  if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
   const raw = Array.isArray(req.body?.staff) ? req.body.staff : [];
   const staff = raw
     .filter((s: any) => s && typeof s.staffId === "string" && typeof s.role === "string")
@@ -177,7 +184,7 @@ router.put("/classes/:classId/staff", requireAuth, async (req, res) => {
 // POST /classes/:classId/enrol — materialise real enrolments for every learner x course in the class.
 router.post("/classes/:classId/enrol", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
-  if (!cls || !canAccessOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
+  if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
   const [learners, courses] = await Promise.all([
     db.select({ v: orgClassLearnersTable.learnerId }).from(orgClassLearnersTable).where(eq(orgClassLearnersTable.classId, cls.id)),
     db.select({ v: orgClassCoursesTable.courseId }).from(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id)),

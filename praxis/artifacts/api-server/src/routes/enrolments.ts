@@ -47,8 +47,14 @@ router.get("/courses/:courseId/roster", requireAuth, async (req, res) => {
   }));
 });
 
-// POST /courses/:courseId/enrol — enroll self
+// POST /courses/:courseId/enrol — STAFF ONLY. Self-enrolment is disabled: a learner is added to a
+// course only by an org admin (assign flow) or an admin-issued join link, never by enrolling
+// themselves. Enrolment drives progress, gradebooks and credentials, so it is not self-service.
 router.post("/courses/:courseId/enrol", requireAuth, async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {
+    res.status(403).json({ error: "Enrolment is managed by your organisation. Ask your admin to assign this course to you." });
+    return;
+  }
   const existing = await db.query.enrolmentsTable.findFirst({
     where: and(eq(enrolmentsTable.userId, req.userId!), eq(enrolmentsTable.courseId, req.params.courseId)),
   });
