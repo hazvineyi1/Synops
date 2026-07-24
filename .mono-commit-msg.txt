@@ -1,3 +1,3 @@
-Praxis: super-admin platform shell shows Synops brand, not the partner's
+Praxis: bigger, bolder partner logo on the sign-in page
 
-At the platform level a super admin saw the tenant/partner white-label brand (e.g. 'Enza Global') in the sidebar header. Now, when isSuperPlatform (super_admin and not inside a partner), the header shows the platform-owner brand 'Synops'; inside a partner it still shows that partner's brand. File: praxis/artifacts/praxis/src/components/layout/AppLayout.tsx.
+The tenant logo on the sign-in screen was rendered tiny (h-10 in a cramped box). Enlarged it to h-20 (h-24 on wider screens), max-width 300px, in a rounded-xl white card with padding and a shadow, so a partner's logo (e.g. Enza Global) reads big, clear and bold. Fallback monogram + name also enlarged. File: praxis/artifacts/praxis/src/pages/SignIn.tsx.

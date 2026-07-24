@@ -148,23 +148,35 @@ export function SignInPage() {
   const chooseMethod = (m: string) => { setChosen(m); setShowPicker(false); setOtpSent(null); setCode(""); setError(null); };
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center px-4" style={{ background: `linear-gradient(160deg, ${primary} 0%, #05070d 100%)` }}>
-      <div className="w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-8">
+    <div className="relative min-h-[100dvh] flex items-center justify-center px-4 overflow-hidden" style={{ background: `linear-gradient(160deg, ${primary} 0%, #05070d 100%)` }}>
+      {/* Big, subtle brand watermark behind the form. Feathered with a radial mask so it reads as a
+          watermark (not a pasted rectangle), and aria-hidden + pointer-events-none so it is purely
+          decorative and never intercepts input. */}
+      {brandLogo && (
+        <img
+          src={brandLogo}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(760px,125vw)] max-w-none object-contain opacity-[0.08]"
+          style={{ WebkitMaskImage: 'radial-gradient(ellipse at center, #000 36%, transparent 70%)', maskImage: 'radial-gradient(ellipse at center, #000 36%, transparent 70%)' }}
+        />
+      )}
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center text-center">
           {brandLogo ? (
-            <img src={brandLogo} alt={brandName} className="h-20 sm:h-24 max-w-[300px] object-contain bg-white rounded-xl p-3 shadow-lg" />
+            <img src={brandLogo} alt={brandName} className="h-12 max-w-[220px] object-contain bg-white rounded-lg p-2 shadow-md" />
           ) : (
-            <>
-              <div className="h-12 w-12 rounded-lg flex items-center justify-center font-bold text-xl" style={{ backgroundColor: accent, color: accentText }}>
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-lg flex items-center justify-center font-bold text-xl" style={{ backgroundColor: accent, color: accentText }}>
                 {brandName.charAt(0).toUpperCase()}
               </div>
               <span className="text-xl font-semibold text-white tracking-tight">{brandName}</span>
-            </>
+            </div>
           )}
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-1">Sign in</h1>
-        <p className="text-sm text-white/60 mb-6">
+        <h1 className="text-2xl font-bold text-white mb-1 text-center">Sign in</h1>
+        <p className="text-sm text-white/60 mb-6 text-center">
           Access is by enrolment. If your organisation has enrolled you, use the email they registered.
         </p>
 
