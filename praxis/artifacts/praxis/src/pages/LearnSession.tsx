@@ -73,7 +73,25 @@ function parseWorked(content: string): WorkedExample | null {
   return null;
 }
 
-type DoneMeta = { scaffold?: boolean; grade?: number; reasoning?: string; mastered?: boolean; masteryScore?: number; options?: string[]; selectMode?: string };
+// End-of-session analysis + recommendation (mirrors the backend SessionAnalysis shape).
+interface SessionAnalysis {
+  summary: string;
+  strengths: string[];
+  focusAreas: string[];
+  recommendation: string;
+  verdict: 'certified' | 'nearly' | 'keep_going';
+  masteryPercent: number;
+  interactions: number;
+}
+
+type DoneMeta = {
+  scaffold?: boolean; grade?: number; reasoning?: string; mastered?: boolean; masteryScore?: number;
+  options?: string[]; selectMode?: string;
+  // Session-pacing fields: the adaptive difficulty tier, how many interactions are used, the chosen
+  // limit, and (when the session ends) why it ended plus the analysis.
+  difficulty?: number; interactionsUsed?: number; plannedInteractions?: number | null;
+  ended?: boolean; endedReason?: 'mastered' | 'reached_limit' | null; analysis?: SessionAnalysis | null;
+};
 
 // Generic SSE reader: streams text tokens, captures the final done-event metadata,
 // and hands that metadata to onComplete so the caller can react (e.g. offer support).
@@ -120,6 +138,12 @@ async function streamSSE(
                 selectMode: data.selectMode,
                 mastered: data.mastered,
                 masteryScore: data.masteryScore,
+                difficulty: data.difficulty,
+                interactionsUsed: data.interactionsUsed,
+                plannedInteractions: data.plannedInteractions,
+                ended: data.ended,
+                endedReason: data.endedReason,
+                analysis: data.analysis,
               };
             }
           } catch (e) {
@@ -166,6 +190,14 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // Live mastery from the last graded turn (so the bar moves immediately) + a brief "+N%" gain badge.
   const [liveMastery, setLiveMastery] = useState<number | null>(null);
   const [masteryGain, setMasteryGain] = useState<number | null>(null);
+  // Live session-end state from the done event, so the end panel appears the instant the final turn
+  // lands (before the refetch). endedReason distinguishes mastery from using up the interaction limit.
+  const [liveEnded, setLiveEnded] = useState<{ reason: 'mastered' | 'reached_limit' | null; analysis: SessionAnalysis | null } | null>(null);
+  // Live adaptive-difficulty tier straight from the backend, so the Level badge always matches the
+  // coach's real escalation rather than being re-derived on the client.
+  const [liveDifficulty, setLiveDifficulty] = useState<number | null>(null);
+  // The interaction limit the learner is choosing on the setup gate (before the session starts).
+  const [savingPlan, setSavingPlan] = useState(false);
   // Adaptive-difficulty level: a transient "level up" celebration when the learner crosses into a
   // harder tier, plus the last-crossed level so the badge can explain the change.
   const [levelUp, setLevelUp] = useState<number | null>(null);
@@ -213,6 +245,30 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
   // A fresh question resets the selection and the "type my own" toggle.
   useEffect(() => { setSelected([]); setTypeOwn(false); }, [localTurns.length]);
+
+  // If a session that has already ended is loaded (e.g. the learner reopens it) and its analysis was
+  // never cached, fetch it once so the end panel is never left blank.
+  const analysisFetchedRef = useRef(false);
+  useEffect(() => {
+    const s = session as unknown as { status?: string; endedReason?: string | null; completedAt?: string | null; analysis?: SessionAnalysis | null } | undefined;
+    if (!s) return;
+    const ended = s.status === 'mastered' || !!s.endedReason || !!s.completedAt;
+    const hasAnalysis = !!(liveEnded?.analysis || s.analysis);
+    if (ended && !hasAnalysis && !analysisFetchedRef.current) {
+      analysisFetchedRef.current = true;
+      fetch(`/api/sessions/${sessionId}/analysis`, { credentials: 'include' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d?.analysis) {
+            setLiveEnded((prev) => ({
+              reason: prev?.reason ?? (s.endedReason as 'mastered' | 'reached_limit' | null) ?? (s.status === 'mastered' ? 'mastered' : 'reached_limit'),
+              analysis: d.analysis as SessionAnalysis,
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [session, liveEnded, sessionId]);
 
   // Reliable auto-scroll with scroll-anchoring: follow the latest message ONLY while the learner is
   // already near the bottom, so streaming tokens never yank them up mid-read. Instant scroll during
@@ -270,8 +326,27 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   const masteryNumClass = ['text-base text-foreground', 'text-lg text-amber-600', 'text-2xl text-teal-600', 'text-3xl text-green-600'][masteryTier];
   const masteryTextColor = mp >= 80 ? 'text-green-600' : mp >= 65 ? 'text-teal-600' : mp >= 45 ? 'text-yellow-600' : mp >= 20 ? 'text-amber-600' : 'text-muted-foreground';
   const masteryCaption = mp >= 80 ? 'Mastered' : mp >= 65 ? 'Almost there' : mp >= 45 ? 'Building well' : mp >= 20 ? 'Building' : 'Getting started';
-  const level = tierFromPct(mp); // 0-3
+  // Adaptive difficulty level: prefer the tier the backend emitted (authoritative), else derive from
+  // the meter. Same 20/50/80 breakpoints, so the Level and the bar always agree.
+  const level = liveDifficulty != null ? liveDifficulty : tierFromPct(mp); // 0-3
   const levelInfo = LEVELS[level];
+
+  // Session pacing: the learner-chosen interaction limit, how many of their own answers are in, why
+  // the session ended (if it has), and the cached analysis. Read from the session, with the live
+  // done-event values taking precedence so the UI updates the instant the final turn lands.
+  const sessionAny = session as unknown as {
+    plannedInteractions?: number | null; endedReason?: 'mastered' | 'reached_limit' | null;
+    analysis?: SessionAnalysis | null; completedAt?: string | null;
+  };
+  const plannedInteractions = sessionAny.plannedInteractions ?? null;
+  const learnerAnswers = localTurns.filter((t) => t?.role === 'learner').length;
+  const endedReason: 'mastered' | 'reached_limit' | null = liveEnded?.reason ?? sessionAny.endedReason ?? (isMastered ? 'mastered' : null);
+  const sessionEnded = isMastered || !!endedReason || !!sessionAny.completedAt || !!liveEnded;
+  const analysis: SessionAnalysis | null = liveEnded?.analysis ?? sessionAny.analysis ?? null;
+  // The setup gate runs when the learner has not chosen a limit and has not answered anything yet.
+  const needsSetup = plannedInteractions == null && learnerAnswers === 0 && !sessionEnded;
+  // "Question X of N": the number they are working on now, capped at the plan.
+  const questionNumber = plannedInteractions != null ? Math.min(learnerAnswers + (isStreaming ? 0 : 1), plannedInteractions) : null;
 
   const currentBeat = moduleData?.beats?.find(b => b.id === session.currentBeatId);
 
@@ -299,7 +374,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // Show the answer choices whenever the current question has them and the learner hasn't chosen to
   // type instead. Deliberately does NOT depend on the input's focus or contents, so options never
   // silently vanish just because there is leftover whitespace in the textarea.
-  const showOptions = !isStreaming && !isMastered && activeOptions.length >= 2 && activeMode !== 'free' && !typeOwn;
+  const showOptions = !isStreaming && !sessionEnded && activeOptions.length >= 2 && activeMode !== 'free' && !typeOwn;
 
   function toggleSelect(opt: string) {
     if (activeMode === 'multi') {
@@ -380,9 +455,15 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           const newPct = typeof meta.masteryScore === 'number' ? Math.round(meta.masteryScore * 100) : prevPct;
           setLastScore({ grade: meta.grade, reasoning: meta.reasoning ?? '', gain: Math.max(0, newPct - prevPct), masteryPct: newPct });
         }
+        // Adaptive difficulty tier straight from the backend drives the Level badge.
+        if (typeof meta.difficulty === 'number') setLiveDifficulty(meta.difficulty);
+        // Session ended (mastery reached or interaction limit used up): surface the analysis panel now.
+        if (meta.ended) {
+          setLiveEnded({ reason: meta.endedReason ?? (meta.mastered ? 'mastered' : 'reached_limit'), analysis: meta.analysis ?? null });
+        }
         // Fix A: render the next question's answer choices straight from the done event, so the
-        // buttons appear immediately instead of only after the session refetch below.
-        if (Array.isArray(meta.options) && meta.options.length >= 2 && meta.selectMode && meta.selectMode !== 'free' && !meta.mastered) {
+        // buttons appear immediately instead of only after the session refetch below. Never when ended.
+        if (!meta.ended && Array.isArray(meta.options) && meta.options.length >= 2 && meta.selectMode && meta.selectMode !== 'free' && !meta.mastered) {
           setOptimisticOpts({ options: meta.options, mode: meta.selectMode });
         }
         // When complete, refetch the session to get the real turns and updated mastery/beat
@@ -426,6 +507,40 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
     }
   };
 
+  // Setup gate: the learner chooses how many interactions this session runs for, before they answer.
+  // Persists the choice, then reveals the conversation. The backend clamps the value to a sane range.
+  const choosePlan = async (n: number) => {
+    if (savingPlan) return;
+    setSavingPlan(true);
+    try {
+      await fetch(`/api/sessions/${sessionId}/plan`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ plannedInteractions: n }),
+      });
+      await refetchSession();
+    } catch (e) {
+      console.error('choosePlan error', e);
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  // Setup gate: before the first answer, the learner chooses how many interactions this session runs
+  // for. This is the "choose before you start" step; the coach's opening question waits behind it.
+  if (needsSetup) {
+    return (
+      <SessionSetup
+        moduleTitle={moduleData?.title}
+        saving={savingPlan}
+        onChoose={choosePlan}
+        onBack={() => setLocation('/dashboard')}
+        reducedMotion={!!prefersReducedMotion}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Header Bar */}
@@ -439,6 +554,11 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+        {questionNumber != null && !sessionEnded && (
+          <span className="hidden sm:inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-muted-foreground tabular-nums" title="How many questions you chose for this session">
+            <MessageCircleQuestion className="h-3.5 w-3.5 text-primary" /> Question {questionNumber} of {plannedInteractions}
+          </span>
+        )}
         <LevelBadge level={level} info={levelInfo} levelUp={levelUp} reducedMotion={!!prefersReducedMotion} />
         <div className="flex items-center gap-3 transition-all duration-500" style={{ width: meterWidth, maxWidth: '52vw' }}>
           <div className="flex-1 min-w-0">
@@ -476,7 +596,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
       {/* Guidance bar — sticky under the header. "How this works" lives here (minimisable); the Fact
           pattern now has its own rail/drawer, so the header no longer crowds. */}
-      {!isMastered && (
+      {!sessionEnded && (
         <div className="shrink-0 sticky top-14 z-10 border-b border-border bg-muted">
           <div className="mx-auto max-w-3xl px-4 py-2 flex flex-wrap items-center gap-2">
             {currentBeat?.title && (
@@ -635,7 +755,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             </motion.div>
           )}
 
-          {/* Mastery Achieved Banner */}
+          {/* Mastery Achieved Banner (only when the learner actually crossed the bar). */}
           {isMastered && (
             <div className="relative overflow-hidden mt-8 mb-4 p-8 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 flex flex-col items-center text-center animate-in zoom-in-95 duration-500 motion-reduce:animate-none">
               <Confetti />
@@ -650,6 +770,19 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                 View PraxisMark Credential
               </Button>
             </div>
+          )}
+
+          {/* End-of-session analysis + recommendation. Shows for BOTH endings: mastery reached, and
+              the learner's chosen interaction limit used up. Always closes with one clear next step. */}
+          {sessionEnded && (
+            <EndAnalysisPanel
+              endedReason={endedReason}
+              analysis={analysis}
+              masteryPct={mp}
+              onReviewCredential={isMastered ? () => setLocation('/credentials') : undefined}
+              onBack={() => setLocation('/dashboard')}
+              reducedMotion={!!prefersReducedMotion}
+            />
           )}
 
           <div ref={messagesEndRef} className="h-4" />
@@ -676,7 +809,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
       {/* Mastery scorecard: after each graded turn, show WHY it scored what it did - the 0-3 grade,
           a one-line reason, the mastery gained, and progress to the 80% goal. */}
-      {lastScore && !isMastered && (
+      {lastScore && !sessionEnded && (
         <MasteryScorecard score={lastScore} showRubric={showRubric} onToggleRubric={() => setShowRubric(v => !v)} reducedMotion={!!prefersReducedMotion} />
       )}
 
@@ -686,7 +819,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
         <div className="max-w-3xl mx-auto">
           {/* Thinking placeholder: while the coach is composing the next turn, show a soft skeleton of
               the answer choices so there is no dead gap before they appear. */}
-          {isStreaming && !isMastered && (
+          {isStreaming && !sessionEnded && (
             <div className="mb-3" aria-hidden>
               <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <span className="inline-flex gap-1">
@@ -752,8 +885,8 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={isMastered ? "Session completed." : isStreaming ? "Your coach is replying, keep typing if you like…" : "Type your response..."}
-                  disabled={isMastered}
+                  placeholder={sessionEnded ? "Session complete." : isStreaming ? "Your coach is replying, keep typing if you like…" : "Type your response..."}
+                  disabled={sessionEnded}
                   className={cn(
                     "w-full resize-none rounded-xl border bg-card px-4 py-4 pr-14 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-h-[60px] max-h-[200px]",
                     sendBlocked ? "border-amber-400" : "border-input"
@@ -764,7 +897,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                 <Button
                   size="icon"
                   className="absolute right-2 top-[50%] -translate-y-[50%] h-10 w-10 rounded-lg"
-                  disabled={!inputValue.trim() || isStreaming || isMastered}
+                  disabled={!inputValue.trim() || isStreaming || sessionEnded}
                   onClick={() => handleSend()}
                   title={isStreaming ? "Your coach is still replying" : "Send"}
                 >
@@ -772,7 +905,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                 </Button>
               </motion.div>
               <div className="mt-2 flex items-center justify-between gap-3">
-                {typeOwn && activeOptions.length >= 2 && activeMode !== 'free' && !isMastered ? (
+                {typeOwn && activeOptions.length >= 2 && activeMode !== 'free' && !sessionEnded ? (
                   <button onClick={() => { setTypeOwn(false); setInputValue(''); }} className="text-xs font-medium text-primary hover:underline">
                     Back to answer choices
                   </button>
@@ -814,6 +947,185 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 }
 
 interface FactPattern { focus: string | null; description: string; scenario: string; bullets: string[] }
+
+// Setup gate: the learner picks how many interactions (their own answers) this session runs for,
+// BEFORE the coaching starts. A hard cap, chosen up front, so the session has a clear, agreed shape
+// and ends with an analysis. Presets cover a quick check to a deep dive; the backend clamps anyway.
+const INTERACTION_PRESETS: { n: number; label: string; blurb: string; minutes: string }[] = [
+  { n: 5, label: 'Quick check', blurb: 'A short, focused set of questions.', minutes: 'about 5 min' },
+  { n: 8, label: 'Standard', blurb: 'A balanced session, enough to reach mastery.', minutes: 'about 10 min' },
+  { n: 12, label: 'Deep dive', blurb: 'More questions, more depth and practice.', minutes: 'about 15 min' },
+];
+function SessionSetup({ moduleTitle, saving, onChoose, onBack, reducedMotion }: { moduleTitle?: string | null; saving: boolean; onChoose: (n: number) => void; onBack: () => void; reducedMotion: boolean }) {
+  const [picked, setPicked] = useState<number | null>(null);
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="h-14 border-b border-border bg-card flex items-center gap-3 px-4 shrink-0">
+        <Button variant="ghost" size="icon" onClick={onBack}><ArrowLeft className="h-5 w-5" /></Button>
+        <h1 className="font-serif font-bold text-lg truncate">{moduleTitle || 'Coaching session'}</h1>
+      </header>
+      <main className="flex-1 flex items-center justify-center p-4">
+        <motion.div
+          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
+          animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="w-full max-w-lg"
+        >
+          <div className="text-center mb-6">
+            <div className="mx-auto h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4">
+              <Target className="h-6 w-6" />
+            </div>
+            <h2 className="text-2xl font-serif font-bold tracking-tight mb-2">How long should this session run?</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              You choose how many questions your coach asks. It adapts to your answers as you go, and when you reach the end you'll get a summary and a clear recommendation. You can always start another session later.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {INTERACTION_PRESETS.map((p) => {
+              const on = picked === p.n;
+              return (
+                <button
+                  key={p.n}
+                  onClick={() => setPicked(p.n)}
+                  disabled={saving}
+                  className={cn(
+                    'w-full text-left rounded-2xl border p-4 flex items-center gap-4 transition disabled:opacity-60',
+                    on ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border bg-card hover:border-primary/40 hover:bg-muted/40',
+                  )}
+                >
+                  <span className={cn('h-11 w-11 shrink-0 rounded-xl flex items-center justify-center text-lg font-bold tabular-nums', on ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground')}>
+                    {p.n}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-foreground">{p.label}</span>
+                      <span className="text-xs text-muted-foreground">{p.n} questions</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{p.blurb}</p>
+                  </div>
+                  <span className="hidden sm:inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0"><Clock className="h-3.5 w-3.5" />{p.minutes}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <Button
+            size="lg"
+            className="w-full mt-6"
+            disabled={picked == null || saving}
+            onClick={() => picked != null && onChoose(picked)}
+          >
+            {saving ? 'Starting...' : picked != null ? `Start with ${picked} questions` : 'Choose a length to start'}
+            {!saving && <ChevronRight className="ml-1.5 h-4 w-4" />}
+          </Button>
+          <p className="text-center text-xs text-muted-foreground mt-3">
+            This is your target. If you reach mastery sooner, the session wraps up early.
+          </p>
+        </motion.div>
+      </main>
+    </div>
+  );
+}
+
+const VERDICT_META: Record<SessionAnalysis['verdict'], { label: string; className: string; icon: React.ComponentType<{ className?: string }> }> = {
+  certified: { label: 'Mastered', className: 'text-green-600 bg-green-500/10 ring-green-500/20', icon: Sparkles },
+  nearly: { label: 'Nearly there', className: 'text-teal-600 bg-teal-500/10 ring-teal-500/20', icon: TrendingUp },
+  keep_going: { label: 'Keep building', className: 'text-amber-600 bg-amber-500/10 ring-amber-500/20', icon: Target },
+};
+// End-of-session analysis + recommendation, shown for both endings (mastery reached, or the chosen
+// interaction limit used up). Honest, encouraging, and always closing with one concrete next step.
+function EndAnalysisPanel({ endedReason, analysis, masteryPct, onReviewCredential, onBack, reducedMotion }: {
+  endedReason: 'mastered' | 'reached_limit' | null;
+  analysis: SessionAnalysis | null;
+  masteryPct: number;
+  onReviewCredential?: () => void;
+  onBack: () => void;
+  reducedMotion: boolean;
+}) {
+  const verdict = analysis?.verdict ?? (endedReason === 'mastered' ? 'certified' : masteryPct >= 60 ? 'nearly' : 'keep_going');
+  const vm = VERDICT_META[verdict];
+  const VIcon = vm.icon;
+  const heading = endedReason === 'mastered' ? 'Session complete - mastery reached' : 'Session complete';
+  return (
+    <motion.div
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
+      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mt-8 mb-4 rounded-2xl border border-border bg-card p-6 sm:p-7"
+    >
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-xl font-serif font-bold text-foreground">{heading}</h3>
+          <p className="text-sm text-muted-foreground mt-0.5">Here is how it went, and what to do next.</p>
+        </div>
+        <span className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 shrink-0', vm.className)}>
+          <VIcon className="h-3.5 w-3.5" /> {vm.label}
+        </span>
+      </div>
+
+      {/* Final mastery meter */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-1 text-xs font-medium text-muted-foreground">
+          <span>Final mastery</span>
+          <span className="tabular-nums text-foreground">{masteryPct}% <span className="text-muted-foreground">/ 80% goal</span></span>
+        </div>
+        <div className="w-full h-2.5 rounded-full bg-muted overflow-hidden">
+          <div className={cn('h-full rounded-full', masteryPct >= 80 ? 'bg-green-500' : masteryPct >= 60 ? 'bg-teal-500' : 'bg-amber-500')} style={{ width: `${Math.min(100, masteryPct)}%` }} />
+        </div>
+      </div>
+
+      {analysis ? (
+        <div className="space-y-5">
+          <p className="text-sm text-foreground/90 leading-relaxed">{analysis.summary}</p>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {analysis.strengths.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">What you did well</p>
+                <ul className="space-y-1.5">
+                  {analysis.strengths.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-foreground/90"><Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {analysis.focusAreas.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Where to focus next</p>
+                <ul className="space-y-1.5">
+                  {analysis.focusAreas.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-sm text-foreground/90"><Target className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />{s}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <Lightbulb className="h-4 w-4 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary">Recommendation</span>
+            </div>
+            <p className="text-sm text-foreground/90 leading-relaxed">{analysis.recommendation}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+          <span className="h-2 w-2 rounded-full bg-primary/40 animate-pulse motion-reduce:animate-none" />
+          Preparing your summary and recommendation...
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3 mt-6">
+        {onReviewCredential && (
+          <Button onClick={onReviewCredential}><Sparkles className="mr-1.5 h-4 w-4" /> View PraxisMark Credential</Button>
+        )}
+        <Button variant={onReviewCredential ? 'outline' : 'default'} onClick={onBack}>Back to dashboard</Button>
+      </div>
+    </motion.div>
+  );
+}
 
 // The Fact pattern body, shared by the desktop rail and the mobile drawer so both stay in sync.
 function FactPatternContent({ factPattern, hasFacts }: { factPattern: FactPattern; hasFacts: boolean }) {

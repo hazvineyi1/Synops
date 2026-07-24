@@ -17,15 +17,38 @@ import {
   generateSocraticTurn,
   generateWorkedExample,
   generateAnswerOptions,
+  generateSessionAnalysis,
   SOCRATIC_MODEL,
   type SocraticContext,
+  type SessionAnalysis,
 } from "../lib/socraticEngine";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { applyCheckpoint } from "../lib/mastery";
 
 const router = Router();
 
+// Fallback soft budget when the learner has not chosen an interaction count (older sessions).
 const PROMPT_BUDGET = 8;
+// The learner chooses how many interactions (their own answers) the session runs for, BEFORE they
+// start. Clamped to a sane range: too few can't demonstrate mastery, too many becomes a marathon.
+const INTERACTIONS_MIN = 3;
+const INTERACTIONS_MAX = 20;
+const clampInteractions = (n: number): number => Math.max(INTERACTIONS_MIN, Math.min(INTERACTIONS_MAX, Math.round(n)));
+
+/** The adaptive difficulty tier (0-3) for a mastery score, the same breakpoints the UI meter uses. */
+function difficultyTier(mastery: number): number {
+  const pct = Math.round(Math.max(0, Math.min(1, mastery)) * 100);
+  return pct >= 80 ? 3 : pct >= 50 ? 2 : pct >= 20 ? 1 : 0;
+}
+
+/** Count the learner's own answers so far (the interaction measure the learner chose a limit for). */
+async function countInteractions(sessionId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(dialogueTurnsTable)
+    .where(and(eq(dialogueTurnsTable.sessionId, sessionId), eq(dialogueTurnsTable.role, "learner")));
+  return Number(row?.n ?? 0);
+}
 
 function toSessionResponse(s: typeof sessionsTable.$inferSelect) {
   return {
@@ -36,6 +59,9 @@ function toSessionResponse(s: typeof sessionsTable.$inferSelect) {
     masteryScore: Number(s.masteryScore),
     currentBeatId: s.currentBeatId,
     turnCount: s.turnCount,
+    plannedInteractions: s.plannedInteractions ?? null,
+    endedReason: s.endedReason ?? null,
+    analysis: (s.analysis as SessionAnalysis | null) ?? null,
     createdAt: s.createdAt.toISOString(),
     completedAt: s.completedAt?.toISOString() ?? null,
   };
@@ -57,6 +83,12 @@ router.post("/sessions", requireAuth, async (req, res) => {
   const remedialFocus = typeof req.body?.remedialFocus === "string" && req.body.remedialFocus.trim()
     ? req.body.remedialFocus.trim().slice(0, 300)
     : null;
+  // The learner can set the interaction limit at creation; if omitted, the setup gate sets it via
+  // PATCH before the first answer. Either way it is clamped to a sane range.
+  const plannedInteractions =
+    req.body?.plannedInteractions != null && Number.isFinite(Number(req.body.plannedInteractions))
+      ? clampInteractions(Number(req.body.plannedInteractions))
+      : null;
   if (!moduleId || typeof moduleId !== "string") {
     res.status(400).json({ error: "moduleId required" });
     return;
@@ -101,6 +133,7 @@ router.post("/sessions", requireAuth, async (req, res) => {
       masteryScore: "0",
       currentBeatId: firstBeat?.id ?? null,
       remedialFocus,
+      plannedInteractions,
     })
     .returning();
 
@@ -119,7 +152,7 @@ router.post("/sessions", requireAuth, async (req, res) => {
       learningStyle: learner.learningStyle,
       accommodations: learner.accommodations,
       turnCount: 0,
-      promptBudget: PROMPT_BUDGET,
+      promptBudget: plannedInteractions ?? PROMPT_BUDGET,
       remedialFocus,
     };
     let tutorOpening: string;
@@ -150,6 +183,27 @@ router.post("/sessions", requireAuth, async (req, res) => {
   res.status(201).json(toSessionResponse(session));
 });
 
+// PATCH /sessions/:sessionId/plan
+// The learner chooses how many interactions this session runs for, BEFORE they start answering. This
+// is the setup gate: allowed only while the session is still active and the learner has not yet given
+// an answer, so the chosen limit is a genuine up-front plan, not a mid-session change.
+router.patch("/sessions/:sessionId/plan", requireAuth, async (req, res) => {
+  const session = await db.query.sessionsTable.findFirst({ where: eq(sessionsTable.id, req.params.sessionId) });
+  if (!session || session.userId !== req.userId) { res.status(404).json({ error: "Not found" }); return; }
+  if (session.status !== "active" || session.completedAt) { res.status(400).json({ error: "Session already started or ended" }); return; }
+  const answered = await countInteractions(session.id);
+  if (answered > 0) { res.status(400).json({ error: "Session already underway" }); return; }
+  const n = Number(req.body?.plannedInteractions);
+  if (!Number.isFinite(n)) { res.status(400).json({ error: "plannedInteractions required" }); return; }
+  const planned = clampInteractions(n);
+  const [updated] = await db
+    .update(sessionsTable)
+    .set({ plannedInteractions: planned })
+    .where(eq(sessionsTable.id, session.id))
+    .returning();
+  res.json(toSessionResponse(updated));
+});
+
 // GET /sessions/:sessionId
 router.get("/sessions/:sessionId", requireAuth, async (req, res) => {
   const session = await db.query.sessionsTable.findFirst({
@@ -166,6 +220,8 @@ router.get("/sessions/:sessionId", requireAuth, async (req, res) => {
 
   res.json({
     ...toSessionResponse(session),
+    // How many of the learner's own answers have been given, so the UI can show "Question X of N".
+    interactionsUsed: turns.filter((t) => t.role === "learner").length,
     turns: turns.map(t => ({
       id: t.id,
       role: t.role,
@@ -193,7 +249,9 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
     res.status(404).json({ error: "Not found" });
     return;
   }
-  if (session.status === "mastered") {
+  // A session ends when mastery is reached OR the learner's chosen interaction limit is used up.
+  // Either way completedAt is set; reject further answers so a finished session cannot be extended.
+  if (session.status === "mastered" || session.completedAt) {
     res.status(400).json({ error: "Session already completed" });
     return;
   }
@@ -219,6 +277,13 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
     content: response,
     beatId: beatId ?? null,
   });
+
+  // Interaction budget: the learner picked how many of their own answers this session runs for. This
+  // answer counts; once the tally reaches the planned limit, the session ends after grading (hard cap)
+  // and an end-of-session analysis is produced. Null planned => fall back to the soft default budget.
+  const interactionsUsed = await countInteractions(sessionId);
+  const budget = session.plannedInteractions ?? PROMPT_BUDGET;
+  const reachedLimit = session.plannedInteractions != null && interactionsUsed >= session.plannedInteractions;
 
   // Setup SSE
   res.setHeader("Content-Type", "text/event-stream");
@@ -253,7 +318,7 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       learningStyle: learner.learningStyle,
       accommodations: learner.accommodations,
       turnCount: exchangeCount,
-      promptBudget: PROMPT_BUDGET,
+      promptBudget: budget,
       remedialFocus: session.remedialFocus,
       recentPerformance,
     };
@@ -327,9 +392,13 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       recentTutor.length === 2 && recentTutor.every((t) => Number(t.masteryDelta ?? 0) <= 0);
     const scaffold = result.grade <= 1 && priorTwoStruggled;
 
-    // Selectable answer choices for the NEW question. Once mastered the session is over, so we drop
-    // the speculatively-generated options.
-    const answerOpts = result.mastered ? { mode: "free" as string, options: [] as string[] } : generatedOpts;
+    // The session ends when the learner masters the concept OR uses up their chosen interactions.
+    const ended = result.mastered || reachedLimit;
+    const endedReason: "mastered" | "reached_limit" | null = result.mastered ? "mastered" : reachedLimit ? "reached_limit" : null;
+
+    // Selectable answer choices for the NEW question. Once the session ends there is nothing more to
+    // answer, so we drop the speculatively-generated options.
+    const answerOpts = ended ? { mode: "free" as string, options: [] as string[] } : generatedOpts;
 
     // Save tutor turn
     await db.insert(dialogueTurnsTable).values({
@@ -343,13 +412,87 @@ router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
       selectMode: answerOpts.mode,
     });
 
-    res.write(`data: ${JSON.stringify({ done: true, masteryScore: result.newMastery, grade: result.grade, reasoning: result.reasoning, mastered: result.mastered, scaffold, options: answerOpts.options, selectMode: answerOpts.mode })}\n\n`);
+    // Adaptive difficulty tier (0-3) the coach is now pitching at, derived from live mastery. Emitted
+    // authoritatively from the backend so the visible Level always matches the coach's real escalation.
+    const difficulty = difficultyTier(result.newMastery);
+
+    // On end, produce the analysis + recommendation ONCE and cache it on the session. For a
+    // limit-reached end (no mastery), also stamp completedAt/endedReason here; the mastery path
+    // already set completedAt via applyCheckpoint. Best-effort: a wrap-up hiccup must not fail the turn.
+    let analysis: SessionAnalysis | null = null;
+    if (ended) {
+      try {
+        analysis = await generateSessionAnalysis({
+          ctx: socraticCtx,
+          history: [...historyOrdered.map((t) => ({ role: t.role, content: t.content })), { role: "learner", content: response }, { role: "tutor", content: fullResponse }],
+          finalMastery: result.newMastery,
+          interactions: interactionsUsed,
+          reachedLimit,
+          mastered: result.mastered,
+        });
+      } catch {
+        analysis = null;
+      }
+      await db
+        .update(sessionsTable)
+        .set({
+          endedReason,
+          analysis,
+          completedAt: session.completedAt ?? new Date(),
+        })
+        .where(eq(sessionsTable.id, sessionId));
+    }
+
+    res.write(`data: ${JSON.stringify({ done: true, masteryScore: result.newMastery, grade: result.grade, reasoning: result.reasoning, mastered: result.mastered, scaffold, options: answerOpts.options, selectMode: answerOpts.mode, difficulty, interactionsUsed, plannedInteractions: session.plannedInteractions ?? null, ended, endedReason, analysis })}\n\n`);
     res.end();
   } catch (err) {
     req.log.error({ err }, "Session respond error");
     res.write(`data: ${JSON.stringify({ error: "Generation failed", done: true })}\n\n`);
     res.end();
   }
+});
+
+/**
+ * GET /sessions/:sessionId/analysis
+ * The end-of-session analysis + recommendation. Returns the cached analysis if present; if the
+ * session has ended but the analysis was never stored (e.g. a wrap-up hiccup at end time), it is
+ * generated on demand and cached. While a session is still active, returns 409 with ready:false.
+ */
+router.get("/sessions/:sessionId/analysis", requireAuth, async (req, res) => {
+  const session = await db.query.sessionsTable.findFirst({ where: eq(sessionsTable.id, req.params.sessionId) });
+  if (!session || session.userId !== req.userId) { res.status(404).json({ error: "Not found" }); return; }
+
+  const ended = session.status === "mastered" || !!session.completedAt;
+  if (session.analysis) { res.json({ ready: true, analysis: session.analysis }); return; }
+  if (!ended) { res.status(409).json({ ready: false, error: "Session still in progress" }); return; }
+
+  // Ended but no cached analysis: build it now from the stored dialogue and final mastery, then cache.
+  const turns = await db
+    .select()
+    .from(dialogueTurnsTable)
+    .where(eq(dialogueTurnsTable.sessionId, session.id))
+    .orderBy(asc(dialogueTurnsTable.createdAt));
+  const beat = session.currentBeatId
+    ? await db.query.beatsTable.findFirst({ where: eq(beatsTable.id, session.currentBeatId) })
+    : null;
+  const interactions = turns.filter((t) => t.role === "learner").length;
+  const ctx: SocraticContext = {
+    beatTitle: beat?.title,
+    moduleTitle: null,
+    narration: beat?.narration,
+    scenario: beat?.scenario,
+    turnCount: interactions,
+  };
+  const analysis = await generateSessionAnalysis({
+    ctx,
+    history: turns.map((t) => ({ role: t.role, content: t.reasoning === "worked_example" ? "[worked example]" : t.content })),
+    finalMastery: Number(session.masteryScore),
+    interactions,
+    reachedLimit: session.endedReason === "reached_limit",
+    mastered: session.status === "mastered",
+  });
+  await db.update(sessionsTable).set({ analysis }).where(eq(sessionsTable.id, session.id));
+  res.json({ ready: true, analysis });
 });
 
 /**

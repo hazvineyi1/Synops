@@ -431,4 +431,112 @@ Rules:
   return (await attempt()) ?? (await attempt()) ?? fallback;
 }
 
+export interface SessionAnalysis {
+  /** One-paragraph plain-language summary of how the session went. */
+  summary: string;
+  /** 2-4 concrete things the learner did well. */
+  strengths: string[];
+  /** 2-4 concrete areas to work on next. */
+  focusAreas: string[];
+  /** One clear, actionable recommendation for what to do next. */
+  recommendation: string;
+  /** Short verdict tag the UI can badge: certified | nearly | keep_going. */
+  verdict: "certified" | "nearly" | "keep_going";
+  /** Final mastery as a whole percentage (0-100), for display. */
+  masteryPercent: number;
+  /** How many of the learner's own answers this analysis is based on. */
+  interactions: number;
+}
+
+/**
+ * End-of-session analysis + recommendation. Produced ONCE when a session ends (mastery reached or the
+ * learner's chosen interaction limit used up) and cached on the session. Grounds its judgement in the
+ * real dialogue and the final mastery, and always ends with one concrete next step. Every field is
+ * sanitised to clean plain prose. On any failure it returns a sensible, non-empty fallback so the
+ * learner always sees a useful wrap-up, never a blank panel.
+ */
+export async function generateSessionAnalysis(opts: {
+  ctx: SocraticContext;
+  history: { role: string; content: string }[];
+  finalMastery: number; // 0-1
+  interactions: number;
+  reachedLimit: boolean;
+  mastered: boolean;
+}): Promise<SessionAnalysis> {
+  const { ctx, history, finalMastery, interactions, mastered } = opts;
+  const masteryPercent = Math.round(Math.max(0, Math.min(1, finalMastery)) * 100);
+  const verdict: SessionAnalysis["verdict"] = mastered || masteryPercent >= 80 ? "certified" : masteryPercent >= 60 ? "nearly" : "keep_going";
+  const concept = ctx.beatTitle ?? ctx.moduleTitle ?? "this concept";
+
+  // Deterministic fallback tuned to the outcome, so even with no AI the wrap-up is meaningful.
+  const fallback: SessionAnalysis = {
+    summary:
+      verdict === "certified"
+        ? `You worked through ${concept} and reached mastery. Your reasoning held up across the session.`
+        : verdict === "nearly"
+        ? `You made solid progress on ${concept} and are close to mastery. A little more reasoning practice will get you there.`
+        : `You made a start on ${concept}. The ideas are taking shape, and a bit more focused practice will build your confidence.`,
+    strengths:
+      verdict === "keep_going"
+        ? ["You stayed engaged and kept reasoning through the questions."]
+        : ["You applied the core idea to the questions.", "You built your answers on what came before."],
+    focusAreas:
+      verdict === "certified"
+        ? ["Keep the reasoning sharp by revisiting this in a week."]
+        : ["Explaining the why behind your answer, not just the what.", "Applying the idea to a fresh, unfamiliar situation."],
+    recommendation:
+      verdict === "certified"
+        ? "You have earned this one. Move on to the next module, and let the coach bring this back for a quick review in a few days."
+        : verdict === "nearly"
+        ? "Start a fresh session on this concept and push for the parts you found hardest. You are close."
+        : "Revisit the module content briefly, then start another coaching session on this concept to build from the foundations.",
+    verdict,
+    masteryPercent,
+    interactions,
+  };
+
+  const transcript = history
+    .map((t) => `${t.role === "tutor" ? "COACH" : "LEARNER"}: ${t.content}`)
+    .join("\n")
+    .slice(0, 6000);
+
+  const system = `You are writing a brief, encouraging end-of-session report for an adult learner who just finished a Socratic coaching session on "${concept}". You can see the full dialogue and their final mastery (${masteryPercent}% of the goal).
+Return ONLY a JSON object of this exact shape:
+{"summary": string, "strengths": [string, ...], "focusAreas": [string, ...], "recommendation": string}
+Rules:
+- summary: 2 to 3 plain sentences on how the session actually went, grounded in what they said.
+- strengths: 2 to 4 short, specific things they genuinely did well in THIS dialogue. If they struggled throughout, still name one real effort honestly.
+- focusAreas: 2 to 4 short, specific things to work on next, drawn from where their reasoning was thin. If they mastered it, make these about keeping it sharp and extending it.
+- recommendation: ONE clear, concrete next step (e.g. move on, run another session, revisit the content, book a review). Match it to their result: ${verdict === "certified" ? "they reached mastery" : verdict === "nearly" ? "they are close but not certified" : "they are still building"}.
+- Honest but never harsh. Encouraging, workplace-authentic South African English. PLAIN TEXT ONLY in every field: no markdown, no asterisks, no bullet characters, no em or en dashes.`;
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 700,
+      system,
+      messages: [{ role: "user", content: `Final mastery: ${masteryPercent}%. Interactions: ${interactions}.\n\nDialogue:\n${transcript}\n\nReturn only the JSON.` }],
+    });
+    const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return fallback;
+    const parsed = JSON.parse(match[0]) as { summary?: unknown; strengths?: unknown; focusAreas?: unknown; recommendation?: unknown };
+    const strArray = (v: unknown): string[] =>
+      Array.isArray(v) ? v.map((x) => sanitizePlain(String(x))).filter(Boolean).slice(0, 4) : [];
+    const strengths = strArray(parsed.strengths);
+    const focusAreas = strArray(parsed.focusAreas);
+    return {
+      summary: sanitizePlain(String(parsed.summary ?? "")) || fallback.summary,
+      strengths: strengths.length ? strengths : fallback.strengths,
+      focusAreas: focusAreas.length ? focusAreas : fallback.focusAreas,
+      recommendation: sanitizePlain(String(parsed.recommendation ?? "")) || fallback.recommendation,
+      verdict,
+      masteryPercent,
+      interactions,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
 export { MODEL as SOCRATIC_MODEL };

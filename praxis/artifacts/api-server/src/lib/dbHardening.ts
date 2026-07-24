@@ -157,6 +157,13 @@ export async function ensureIntegrityConstraints(): Promise<void> {
     ["gradebook_items", [
       sql`ALTER TABLE gradebook_items ADD COLUMN IF NOT EXISTS grade_type text NOT NULL DEFAULT 'points'`,
     ]],
+    // Coach sessions: the learner-chosen interaction limit, why the session ended, and the cached
+    // end-of-session analysis. All nullable/additive so existing live sessions are untouched.
+    ["sessions", [
+      sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS planned_interactions integer`,
+      sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended_reason text`,
+      sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS analysis jsonb`,
+    ]],
     // Per-organisation grading overrides (course default + org override).
     ["gradebook_org_overrides", [
       sql`CREATE TABLE IF NOT EXISTS gradebook_org_overrides (

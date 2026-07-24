@@ -18,6 +18,17 @@ export const sessionsTable = pgTable("sessions", {
   turnCount: integer("turn_count").notNull().default(0),
   /** When launched from a catch-up (off-track) plan item: the weak area the coach concentrates on. */
   remedialFocus: text("remedial_focus"),
+  /**
+   * The learner-chosen number of interactions (their own answers) for this session, set before they
+   * start. It is a HARD cap: once the learner has given this many answers the session ends and an
+   * analysis is produced. Null means "not chosen yet" (the setup gate has not run) and the session
+   * falls back to the default soft budget.
+   */
+  plannedInteractions: integer("planned_interactions"),
+  /** Why the session ended: "mastered" (bar reached) or "reached_limit" (planned interactions used). */
+  endedReason: text("ended_reason"),
+  /** End-of-session analysis + recommendation, generated once when the session ends and cached here. */
+  analysis: jsonb("analysis"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
 });
@@ -25,6 +36,8 @@ export const sessionsTable = pgTable("sessions", {
 export const insertSessionSchema = createInsertSchema(sessionsTable).omit({
   id: true,
   turnCount: true,
+  endedReason: true,
+  analysis: true,
   createdAt: true,
   completedAt: true,
 });

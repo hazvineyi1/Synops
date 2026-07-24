@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sm2Update } from "./sm2";
+import { sm2Update, MAX_MASTERY_STEP } from "./sm2";
 
 /**
  * The critical non-punitive invariant: a weak or incorrect answer must NEVER decrease the mastery
@@ -42,15 +42,37 @@ describe("sm2Update - non-punitive mastery", () => {
     }
   });
 
-  it("preserves the thresholds: solid answers approach but do not reach the 0.8 bar; mastery answers can", () => {
-    // Repeated grade-2 (solid) reasoning converges toward ~0.78, staying just under the 0.8 mastery bar.
+  it("lets solid reasoning certify: repeated grade-2 crosses the 0.8 bar and converges toward its 0.85 target", () => {
+    // Fair-grading design: solid, correct reasoning (grade 2, including a correct multiple-choice
+    // pick) tops out at 0.85, so it CAN cross the 0.8 mastery bar over enough turns rather than
+    // walling just below it. Early on it is still under the bar (measured climb, not an instant pass).
     let m = 0;
+    const afterFew = (() => { let x = 0; for (let i = 0; i < 3; i++) x = sm2Update(x, EF, INTERVAL, REPS, 2).mastery; return x; })();
+    expect(afterFew).toBeLessThan(0.8); // a few solid turns have not yet certified
     for (let i = 0; i < 30; i++) m = sm2Update(m, EF, INTERVAL, REPS, 2).mastery;
-    expect(m).toBeLessThan(0.8);
-    expect(m).toBeGreaterThan(0.7);
-    // A clear mastery-level (grade 3) answer can carry it over the bar.
-    const over = sm2Update(m, EF, INTERVAL, REPS, 3).mastery;
-    expect(over).toBeGreaterThanOrEqual(0.8);
+    expect(m).toBeGreaterThanOrEqual(0.8); // sustained solid reasoning eventually certifies
+    expect(m).toBeLessThanOrEqual(0.85);   // but never past its target
+  });
+
+  it("climbs in MEASURED intervals: no single answer moves mastery by more than MAX_MASTERY_STEP", () => {
+    // The visible meter must never leap. For every starting mastery and every grade, one update moves
+    // the score by at most the cap (a tiny float epsilon allowed). This is what makes the meter feel
+    // like earned, steady progress rather than a jackpot on one strong answer.
+    for (let mm = 0; mm <= 1.0001; mm += 0.05) {
+      const mastery = Math.min(1, Math.round(mm * 100) / 100);
+      for (const grade of [0, 1, 2, 3]) {
+        const out = sm2Update(mastery, EF, INTERVAL, REPS, grade);
+        expect(out.mastery - mastery, `grade ${grade} at ${mastery} must step <= ${MAX_MASTERY_STEP}`).toBeLessThanOrEqual(MAX_MASTERY_STEP + 1e-9);
+      }
+    }
+  });
+
+  it("still reaches full mastery bar within about five clear-mastery answers", () => {
+    // Grade-3 (clear mastery) with the measured cap reaches the 0.8 bar in ~5 exchanges, aligning
+    // with the certification pacing floor (MIN_MASTERY_EXCHANGES).
+    let m = 0;
+    for (let i = 0; i < 5; i++) m = sm2Update(m, EF, INTERVAL, REPS, 3).mastery;
+    expect(m).toBeGreaterThanOrEqual(0.8);
   });
 
   it("still resets the spaced-repetition schedule on a failed grade (tutoring cadence unchanged)", () => {
