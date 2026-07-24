@@ -9,8 +9,21 @@ import {
 import { eq, and, sql } from "drizzle-orm";
 import { gradeCheckpoint, type SocraticContext } from "./socraticEngine";
 import { sm2Update } from "./sm2";
+import { maybeCompleteEnrolment } from "./progressMath";
 
 export const MASTERY_THRESHOLD = 0.8;
+
+/**
+ * Pacing floor for certification. A high mastery score is necessary but not sufficient: without a
+ * floor, a learner who lands two lucky answers can be certified in seconds, which is neither real
+ * mastery nor defensible on a compliance record. Certification therefore also requires a minimum
+ * number of learner exchanges AND a minimum elapsed session time. Below the floor the mastery meter
+ * still climbs (genuine SM-2 progress is recorded), but the session stays "active" and no credential
+ * is issued until the learner has actually engaged for long enough. These gate issuance only; they
+ * do NOT touch the grader rubric or the SM-2 curve.
+ */
+export const MIN_MASTERY_EXCHANGES = 5;
+export const MIN_MASTERY_SESSION_MS = 3 * 60 * 1000;
 
 interface CheckpointResult {
   grade: number;
@@ -101,10 +114,16 @@ export async function applyCheckpoint(opts: {
       });
 
     const newMastery = sm2.mastery;
-    // Certify once the bar reaches 0.8 on a turn that is at least solid (not a stumble/refusal), so
-    // the visible meter and the credential agree instead of the bar looking full but not certifying.
-    const nowMastered = newMastery >= MASTERY_THRESHOLD && grade.grade >= 2;
     const freshTurnCount = Number(session.turnCount) + 2;
+    const learnerExchanges = Math.floor(freshTurnCount / 2);
+    const elapsedMs = now.getTime() - new Date(session.createdAt).getTime();
+    // Certify once the bar reaches 0.8 on a turn that is at least solid (not a stumble/refusal) AND
+    // the pacing floor is met (enough exchanges AND enough elapsed time). The score condition keeps
+    // the visible meter and the credential in agreement; the pacing condition stops a rushed session
+    // from certifying in seconds. Below the floor the score still rises but the session stays active.
+    const scoreMastered = newMastery >= MASTERY_THRESHOLD && grade.grade >= 2;
+    const pacingSatisfied = learnerExchanges >= MIN_MASTERY_EXCHANGES && elapsedMs >= MIN_MASTERY_SESSION_MS;
+    const nowMastered = scoreMastered && pacingSatisfied;
     const alreadyMastered = session.status === "mastered";
 
     await tx
@@ -135,7 +154,7 @@ export async function applyCheckpoint(opts: {
       mastered: nowMastered,
       shouldIssueCredential: nowMastered && !alreadyMastered,
       moduleTitle: mod?.title ?? null,
-      exchanges: Math.floor(freshTurnCount / 2),
+      exchanges: learnerExchanges,
     };
   });
 
@@ -150,6 +169,17 @@ export async function applyCheckpoint(opts: {
       masteryScore: result.newMastery.toString(),
       exchanges: result.exchanges,
     });
+    // Mastering the last outstanding module (via the coach, with no beat_progress written) should
+    // still flip the enrolment to completed. courseProgress now counts certified modules, so this
+    // fires exactly when the course reads 100%. Best-effort: a completion hiccup must never surface
+    // as a checkpoint failure to the learner, and it self-heals on the next progress read.
+    if (mod?.courseId) {
+      try {
+        await maybeCompleteEnrolment(userId, mod.courseId);
+      } catch {
+        // Non-fatal
+      }
+    }
   }
 
   return { grade: result.grade, reasoning: result.reasoning, newMastery: result.newMastery, mastered: result.mastered };

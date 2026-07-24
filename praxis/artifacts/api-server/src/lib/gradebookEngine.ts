@@ -14,6 +14,7 @@ import {
   gradebookOrgOverridesTable,
   beatProgressTable,
   beatsTable,
+  credentialsTable,
   type GradebookItem,
   type LetterBand,
 } from "@workspace/db";
@@ -435,7 +436,7 @@ export async function getScoreData(
       if (completionCols.length === 0) return;
       const moduleIds = completionCols.map((c) => c.sourceId!);
       const colByModule = new Map(completionCols.map((c) => [c.sourceId!, c]));
-      const [beats, progress] = await Promise.all([
+      const [beats, progress, credentials] = await Promise.all([
         db.select({ id: beatsTable.id, moduleId: beatsTable.moduleId }).from(beatsTable).where(inArray(beatsTable.moduleId, moduleIds)),
         // Join through beats so only progress on CURRENTLY EXISTING beats counts, attributed to the
         // beat's real module. Reading the denormalized beat_progress.module_id counted orphaned rows
@@ -444,6 +445,12 @@ export async function getScoreData(
           .from(beatProgressTable)
           .innerJoin(beatsTable, eq(beatProgressTable.beatId, beatsTable.id))
           .where(inArray(beatsTable.moduleId, moduleIds)),
+        // A module MASTERED via the Socratic coach writes no beat_progress at all - it writes a valid
+        // credential. Without this, a learner who certified through the coach read 0% completion here
+        // (and tripped the low_completion off-track alert). A valid credential = the module is done.
+        db.select({ userId: credentialsTable.userId, moduleId: credentialsTable.moduleId })
+          .from(credentialsTable)
+          .where(and(inArray(credentialsTable.moduleId, moduleIds), eq(credentialsTable.status, "valid"))),
       ]);
       const totalByModule = new Map<string, number>();
       for (const b of beats) totalByModule.set(b.moduleId, (totalByModule.get(b.moduleId) ?? 0) + 1);
@@ -453,12 +460,23 @@ export async function getScoreData(
         const k = `${p.userId}::${p.moduleId}`;
         viewedByUserModule.set(k, (viewedByUserModule.get(k) ?? 0) + 1);
       }
+      const certifiedUserModule = new Set<string>();
+      for (const c of credentials) {
+        if (!uSet.has(c.userId)) continue;
+        certifiedUserModule.add(`${c.userId}::${c.moduleId}`);
+      }
       for (const uid of userIds) {
         for (const mId of moduleIds) {
+          const col = colByModule.get(mId)!;
+          // Certified (mastered via coach) => fully complete, even when the module has zero beats or
+          // none were opened. Either signal satisfies completion; take the stronger of the two.
+          if (certifiedUserModule.has(`${uid}::${mId}`)) {
+            setFrac(uid, col.key, 1);
+            continue;
+          }
           const total = totalByModule.get(mId) ?? 0;
           if (total === 0) continue;
           const viewed = viewedByUserModule.get(`${uid}::${mId}`) ?? 0;
-          const col = colByModule.get(mId)!;
           setFrac(uid, col.key, Math.max(0, Math.min(1, viewed / total)));
         }
       }

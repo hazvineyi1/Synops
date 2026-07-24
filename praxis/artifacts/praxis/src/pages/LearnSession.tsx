@@ -186,6 +186,21 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   const prefersReducedMotion = useReducedMotion();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const responseRef = useRef<HTMLTextAreaElement>(null);
+
+  // When the mobile Fact-pattern drawer closes, return focus to the response box. Without this the
+  // learner's first keystroke after closing the drawer went nowhere (focus was left on the drawer's
+  // now-unmounted controls), so they had to tap the box before typing. Refocusing on the true->false
+  // transition makes "close, then start typing" work in one motion. Guarded to fire only when the
+  // box is actually usable (not mastered / streaming-disabled).
+  const prevDrawerOpenRef = useRef(false);
+  useEffect(() => {
+    if (prevDrawerOpenRef.current && !factsDrawerOpen) {
+      // Wait a frame so the drawer's exit animation has released pointer capture before we focus.
+      requestAnimationFrame(() => responseRef.current?.focus());
+    }
+    prevDrawerOpenRef.current = factsDrawerOpen;
+  }, [factsDrawerOpen]);
 
   // Local state for turns to optimistically append user message and streaming tutor message
   const [localTurns, setLocalTurns] = useState<any[]>([]);
@@ -733,6 +748,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                 transition={{ duration: 0.4 }}
               >
                 <textarea
+                  ref={responseRef}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -864,7 +880,16 @@ function FactPatternDrawer({ open, onClose, factPattern, hasFacts, reducedMotion
   return (
     <AnimatePresence>
       {open && (
-        <motion.div className="fixed inset-0 z-50 lg:hidden" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div
+          className="fixed inset-0 z-50 lg:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, pointerEvents: 'auto' }}
+          // Stop intercepting pointer/keyboard events the instant the drawer starts closing. While
+          // the overlay animated out it still sat over the whole screen and swallowed the learner's
+          // first tap/keystroke aimed at the response box (pointerEvents is non-animatable, so it
+          // snaps to 'none' at the start of exit rather than fading with the opacity).
+          exit={{ opacity: 0, pointerEvents: 'none' }}
+        >
           <div className="absolute inset-0 bg-black/40" onClick={onClose} />
           <motion.div
             initial={reducedMotion ? { opacity: 0 } : { y: '100%' }}

@@ -1142,22 +1142,13 @@ export function CourseDetail() {
     return !(p?.complete || p?.certified);
   })?.id;
 
-  // Display order for the "Start here" list: what the learner should do NEXT comes first.
-  //   0 = in progress (started, not finished)   -> top
-  //   1 = not started yet (the next one in line) -> middle
-  //   2 = complete or mastered                   -> bottom
-  // Each card keeps its CURRICULUM number (seq) so reordering never renumbers a module --
-  // "Handling Difficult Situations" stays 03 even when it floats to the top as what's next.
-  // Array.sort is stable, and publishedModules is already in curriculum order, so modules
-  // within the same bucket stay in sequence.
-  const orderedModules = publishedModules
-    .map((m, i) => {
-      const p = moduleProgressById.get(m.id);
-      const done = !!(p?.complete || p?.certified);
-      const started = (p?.percent ?? 0) > 0 && !done;
-      return { m, seq: i + 1, bucket: done ? 2 : started ? 0 : 1 };
-    })
-    .sort((a, b) => a.bucket - b.bucket);
+  // Display order for the "Start here" list: ALWAYS the curriculum sequence. A module the learner
+  // just mastered keeps its place in the syllabus - it must not drop below untouched modules, which
+  // is disorienting ("where did the one I just finished go?") and makes the list stop reading like a
+  // course outline. Completion is shown by badge (Complete / Mastered), and `recommendedId` still
+  // highlights the next thing to do with a "Start here" chip - so what's next is obvious without
+  // reordering. Each card keeps its curriculum number (seq).
+  const orderedModules = publishedModules.map((m, i) => ({ m, seq: i + 1 }));
 
   if (courseLoading) return (
     <div className="space-y-4">
