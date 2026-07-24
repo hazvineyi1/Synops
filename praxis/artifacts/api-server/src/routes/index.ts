@@ -1,6 +1,7 @@
 import { Router } from "express";
 import healthRouter from "./health";
 import authRouter from "./auth";
+import mfaRouter from "./mfa";
 import platformRouter from "./platform";
 import usersRouter from "./users";
 import partnersRouter from "./partners";
@@ -63,6 +64,7 @@ const router = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(mfaRouter);
 router.use(platformRouter);
 router.use(usersRouter);
 router.use(partnersRouter);

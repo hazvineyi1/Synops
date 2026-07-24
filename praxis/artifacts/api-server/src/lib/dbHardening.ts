@@ -82,6 +82,50 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`CREATE UNIQUE INDEX IF NOT EXISTS content_translations_key_uidx ON content_translations (source_hash, lang)`,
       sql`CREATE INDEX IF NOT EXISTS content_translations_status_idx ON content_translations (status, lang)`,
     ]],
+    // Multi-factor auth: a user may enrol several factors and any one satisfies the challenge.
+    // The old TOTP-only columns on users are backfilled into mfa_factors below (never dropped).
+    ["mfa_factors", [
+      sql`CREATE TABLE IF NOT EXISTS mfa_factors (
+        id text PRIMARY KEY,
+        user_id text NOT NULL,
+        type text NOT NULL,
+        label text NOT NULL DEFAULT '',
+        secret text,
+        credential jsonb,
+        phone text,
+        email text,
+        verified_at timestamptz,
+        last_used_at timestamptz,
+        preferred boolean NOT NULL DEFAULT false,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      sql`CREATE INDEX IF NOT EXISTS mfa_factors_user_idx ON mfa_factors (user_id)`,
+    ]],
+    ["mfa_backup_codes", [
+      sql`CREATE TABLE IF NOT EXISTS mfa_backup_codes (
+        id text PRIMARY KEY,
+        user_id text NOT NULL,
+        code_hash text NOT NULL,
+        used_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      sql`CREATE INDEX IF NOT EXISTS mfa_backup_codes_user_idx ON mfa_backup_codes (user_id)`,
+    ]],
+    ["mfa_challenges", [
+      sql`CREATE TABLE IF NOT EXISTS mfa_challenges (
+        id text PRIMARY KEY,
+        user_id text NOT NULL,
+        purpose text NOT NULL,
+        code_hash text,
+        challenge text,
+        destination text,
+        expires_at timestamptz NOT NULL,
+        attempts integer NOT NULL DEFAULT 0,
+        consumed_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      sql`CREATE INDEX IF NOT EXISTS mfa_challenges_user_purpose_idx ON mfa_challenges (user_id, purpose)`,
+    ]],
     // Ops-agent anomaly feed: always-on monitoring flags problems here (one active row per kind).
     ["ops_anomalies", [
       sql`CREATE TABLE IF NOT EXISTS ops_anomalies (
@@ -173,5 +217,34 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       // A missing table (not yet created) or an odd column is fine — skip and keep the others.
       logger.warn({ err, table }, "integrity-constraint heal skipped");
     }
+  }
+
+  await backfillMfaFactors();
+}
+
+/**
+ * Migrate existing inline TOTP enrolments (users.mfa_secret / mfa_backup_codes) into the new
+ * mfa_factors / mfa_backup_codes tables, once. Purely additive and idempotent - it only inserts a
+ * row when the user has no totp factor yet, so re-running does nothing and no existing authenticator
+ * user is ever broken. The users.mfa_* columns are left in place as the compatibility mirror.
+ */
+async function backfillMfaFactors(): Promise<void> {
+  try {
+    // One totp factor per enrolled user who does not already have one.
+    await db.execute(sql`
+      INSERT INTO mfa_factors (id, user_id, type, label, secret, verified_at, created_at)
+      SELECT gen_random_uuid()::text, u.id, 'totp', 'Authenticator app', u.mfa_secret, now(), now()
+      FROM users u
+      WHERE u.mfa_enabled = true AND u.mfa_secret IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM mfa_factors f WHERE f.user_id = u.id AND f.type = 'totp')`);
+    // Backup-code hashes from the users array into the backup-codes table, once per user.
+    await db.execute(sql`
+      INSERT INTO mfa_backup_codes (id, user_id, code_hash, created_at)
+      SELECT gen_random_uuid()::text, u.id, ch, now()
+      FROM users u, unnest(u.mfa_backup_codes) AS ch
+      WHERE u.mfa_enabled = true
+        AND NOT EXISTS (SELECT 1 FROM mfa_backup_codes b WHERE b.user_id = u.id)`);
+  } catch (err) {
+    logger.warn({ err }, "mfa backfill skipped");
   }
 }

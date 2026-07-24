@@ -7,6 +7,7 @@ import {
   authSessionsTable,
   passwordResetsTable,
   loginEventsTable,
+  mfaFactorsTable,
 } from "@workspace/db";
 import { eq, and, isNull, gt } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -22,9 +23,16 @@ import {
   clientIp,
   SESSION_COOKIE,
 } from "../lib/auth";
-import { generateSecret, verifyTotp, otpauthUrl, generateBackupCodes, normalizeBackupCode } from "../lib/totp";
+import { verifyTotp, normalizeBackupCode } from "../lib/totp";
 import { PRIVACY_POLICY_VERSION, consentRequired } from "../lib/popia";
 import { mfaSetupRequired } from "../lib/mfaPolicy";
+import {
+  availableMethods, verifyTotpForUser, consumeBackupCode, verifyOtpChallenge, createOtpChallenge,
+  otpSendRateLimited, storeWebauthnChallenge, takeWebauthnChallenge, verifiedFactors, markFactorUsed,
+} from "../lib/mfaService";
+import { sendEmailOtp, sendSmsOtp, smsEnabled, maskEmail, maskPhone } from "../lib/otpChannels";
+import { rpFromRequest, authenticationOptions, verifyAssertion, type StoredCredential } from "../lib/webauthn";
+import { logAudit } from "../lib/audit";
 
 const router = Router();
 
@@ -103,31 +111,51 @@ router.post("/auth/login", async (req, res) => {
     return;
   }
 
-  // Opt-in second factor. DORMANT for everyone who hasn't enrolled: mfaEnabled defaults false, so
-  // this whole block is skipped and login behaves exactly as before. Only an enrolled user is asked
-  // for a code — the client re-POSTs email+password+code on the same endpoint.
+  // Second factor. DORMANT for everyone who hasn't enrolled: mfaEnabled mirrors "has a verified
+  // factor", so this block is skipped and login behaves exactly as before for non-MFA users. Any
+  // ONE verified factor satisfies the challenge — the client picks a method and re-POSTs here.
   if (user.mfaEnabled) {
+    const method = String(req.body?.method ?? "").trim();
     const code = String(req.body?.code ?? req.body?.mfaCode ?? "").trim();
-    if (!code) {
-      // Password was correct; we just need the second factor. No session issued yet.
-      res.status(200).json({ mfaRequired: true });
+    const assertion = req.body?.assertion;
+
+    // No credential supplied yet: tell the (password-authenticated) client which methods it can use.
+    if (!code && !assertion) {
+      const avail = await availableMethods(user.id);
+      res.status(200).json({ mfaRequired: true, methods: avail.methods, hasBackupCodes: avail.hasBackupCodes, preferred: avail.preferred, hints: avail.hints });
       return;
     }
-    const okTotp = user.mfaSecret ? verifyTotp(user.mfaSecret, code) : false;
-    let okBackup = false;
-    if (!okTotp) {
-      const hash = sha256(normalizeBackupCode(code));
-      const remaining = user.mfaBackupCodes ?? [];
-      if (remaining.includes(hash)) {
-        okBackup = true; // one-time: consume it
-        await db.update(usersTable).set({ mfaBackupCodes: remaining.filter((c) => c !== hash) }).where(eq(usersTable.id, user.id));
+
+    let verifiedFactorId: string | null = null;
+    let ok = false;
+    if (assertion) {
+      const result = await verifyPasskeyAssertion(user.id, assertion, req);
+      ok = !!result;
+      verifiedFactorId = result;
+    } else if (method === "backup") {
+      ok = (await consumeBackupCode(user.id, code)) || consumeLegacyBackup(user, code);
+    } else if (method === "email_otp" || method === "sms_otp" || method === "email_recovery") {
+      ok = await verifyOtpChallenge(user.id, method, code);
+      if (ok && method === "email_recovery") {
+        await logAudit(req as never, "mfa.recovery_used", "user", user.id, {}); // recovery is logged
       }
+    } else {
+      // Default path (client sent just a code): try any authenticator, then a backup code.
+      const f = await verifyTotpForUser(user.id, code);
+      ok = !!f;
+      verifiedFactorId = f?.id ?? null;
+      // Legacy fallback: an existing TOTP user whose inline secret has not yet been backfilled into
+      // mfa_factors (brief window right after deploy) can still sign in. Never breaks current users.
+      if (!ok && user.mfaSecret && verifyTotp(user.mfaSecret, code)) ok = true;
+      if (!ok) ok = (await consumeBackupCode(user.id, code)) || consumeLegacyBackup(user, code);
     }
-    if (!okTotp && !okBackup) {
+
+    if (!ok) {
       await logAttempt("bad_password");
       res.status(401).json({ error: "Invalid authentication code.", mfaRequired: true });
       return;
     }
+    if (verifiedFactorId) await markFactorUsed(verifiedFactorId);
   }
 
   const token = newSessionToken();
@@ -150,57 +178,98 @@ router.post("/auth/login", async (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
-// ── Opt-in TOTP two-factor auth ─────────────────────────────────────────────────
-// Enrolment is done while signed in. A user turns 2FA on for their own account; nothing here can
-// enable or read another user's secret. Existing accounts are unaffected until they opt in.
+// ── Login-time second-factor challenge ─────────────────────────────────────────────
+// Factor ENROLMENT + management lives in routes/mfa.ts (authenticated, self-service). This endpoint
+// is the login-time challenge issuer: it needs the password (so nothing is revealed to an
+// unauthenticated caller) and then either sends an OTP or returns WebAuthn options for the chosen
+// method, ready for the client to complete on /auth/login.
 
-/** GET /auth/mfa/status — is 2FA on for me, and how many backup codes are left. */
-router.get("/auth/mfa/status", requireAuth, (req, res) => {
-  const u = req.dbUser!;
-  res.json({ enabled: !!u.mfaEnabled, backupCodesRemaining: (u.mfaBackupCodes ?? []).length });
-});
-
-/** POST /auth/mfa/setup — issue a fresh secret + otpauth URI. NOT active until /enable confirms it. */
-router.post("/auth/mfa/setup", requireAuth, async (req, res) => {
-  const u = req.dbUser!;
-  if (u.mfaEnabled) { res.status(409).json({ error: "Two-factor is already on. Turn it off first to re-enrol." }); return; }
-  const secret = generateSecret();
-  await db.update(usersTable).set({ mfaSecret: secret }).where(eq(usersTable.id, u.id));
-  res.json({ secret, otpauthUrl: otpauthUrl(secret, u.email) });
-});
-
-/** POST /auth/mfa/enable { code } — confirm a live code, activate 2FA, return one-time backup codes. */
-router.post("/auth/mfa/enable", requireAuth, async (req, res) => {
-  const u = req.dbUser!;
-  if (u.mfaEnabled) { res.status(409).json({ error: "Two-factor is already on." }); return; }
-  if (!u.mfaSecret) { res.status(400).json({ error: "Start setup first." }); return; }
-  const code = String(req.body?.code ?? "").trim();
-  if (!verifyTotp(u.mfaSecret, code)) {
-    res.status(400).json({ error: "That code didn't match. Check your authenticator app and try again." });
+/** POST /auth/mfa/challenge { email, password, method } — issue an OTP or passkey challenge at login. */
+router.post("/auth/mfa/challenge", async (req, res) => {
+  const email = String(req.body?.email ?? "").toLowerCase().trim();
+  const password = String(req.body?.password ?? "");
+  const method = String(req.body?.method ?? "").trim();
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email)).limit(1);
+  // Same generic failure as login for a bad password / unknown email: reveal nothing.
+  if (!user || user.status === "suspended" || !verifyPassword(password, user.passwordHash)) {
+    res.status(401).json({ error: "Invalid email or password." });
     return;
   }
-  const backupCodes = generateBackupCodes(10);
-  const hashes = backupCodes.map((c) => sha256(normalizeBackupCode(c)));
-  await db.update(usersTable).set({ mfaEnabled: true, mfaBackupCodes: hashes }).where(eq(usersTable.id, u.id));
-  // Backup codes are shown exactly once, here.
-  res.json({ enabled: true, backupCodes });
-});
+  if (!user.mfaEnabled) { res.json({ mfaRequired: false }); return; }
 
-/** POST /auth/mfa/disable { code } — needs a current authenticator or backup code, so a stolen
- *  session can't silently strip 2FA off the account. */
-router.post("/auth/mfa/disable", requireAuth, async (req, res) => {
-  const u = req.dbUser!;
-  if (!u.mfaEnabled) { res.json({ enabled: false }); return; }
-  const code = String(req.body?.code ?? "").trim();
-  const okTotp = u.mfaSecret ? verifyTotp(u.mfaSecret, code) : false;
-  const okBackup = (u.mfaBackupCodes ?? []).includes(sha256(normalizeBackupCode(code)));
-  if (!okTotp && !okBackup) {
-    res.status(400).json({ error: "Enter a current authenticator or backup code to turn off two-factor." });
+  if (method === "email_otp" || method === "email_recovery") {
+    const factor = (await verifiedFactors(user.id)).find((f) => f.type === method);
+    const to = factor?.email || user.email;
+    if (await otpSendRateLimited(user.id, method)) { res.status(429).json({ error: "Too many codes requested. Please wait a few minutes." }); return; }
+    const code = await createOtpChallenge(user.id, method, to);
+    await sendEmailOtp(to, code, method === "email_recovery" ? "recovery" : "sign in");
+    res.json({ sent: true, sentTo: maskEmail(to) });
     return;
   }
-  await db.update(usersTable).set({ mfaEnabled: false, mfaSecret: null, mfaBackupCodes: [] }).where(eq(usersTable.id, u.id));
-  res.json({ enabled: false });
+  if (method === "sms_otp") {
+    if (!smsEnabled()) { res.status(400).json({ error: "SMS is not available." }); return; }
+    const factor = (await verifiedFactors(user.id)).find((f) => f.type === "sms_otp");
+    if (!factor?.phone) { res.status(400).json({ error: "No phone is enrolled." }); return; }
+    if (await otpSendRateLimited(user.id, "sms_otp")) { res.status(429).json({ error: "Too many codes requested. Please wait a few minutes." }); return; }
+    const code = await createOtpChallenge(user.id, "sms_otp", factor.phone);
+    await sendSmsOtp(factor.phone, code);
+    res.json({ sent: true, sentTo: maskPhone(factor.phone) });
+    return;
+  }
+  if (method === "passkey") {
+    const creds = (await verifiedFactors(user.id)).filter((f) => f.type === "passkey").map((f) => f.credential as unknown as StoredCredential);
+    if (!creds.length) { res.status(400).json({ error: "No passkey is enrolled." }); return; }
+    const { rpID } = rpFromRequest(req.headers.host, req.protocol);
+    const options = await authenticationOptions({ rpID, credentials: creds });
+    await storeWebauthnChallenge(user.id, "webauthn_auth", options.challenge);
+    res.json({ options });
+    return;
+  }
+  res.status(400).json({ error: "Unknown method." });
 });
+
+/**
+ * Legacy backup-code fallback for a pre-migration TOTP user whose codes have not yet been backfilled
+ * into mfa_backup_codes. Consumes one from the inline users.mfa_backup_codes array. Fire-and-forget
+ * update; returns whether the code matched. Purely additive - it never blocks the new path.
+ */
+function consumeLegacyBackup(user: typeof usersTable.$inferSelect, code: string): boolean {
+  const hash = sha256(normalizeBackupCode(code));
+  const remaining = user.mfaBackupCodes ?? [];
+  if (!remaining.includes(hash)) return false;
+  void db.update(usersTable).set({ mfaBackupCodes: remaining.filter((c) => c !== hash) }).where(eq(usersTable.id, user.id));
+  return true;
+}
+
+/**
+ * Verify a passkey assertion at login against the stored webauthn_auth challenge + the matching
+ * credential. Returns the factor id on success (so lastUsedAt can be stamped), else null.
+ */
+async function verifyPasskeyAssertion(userId: string, assertion: unknown, req: { headers: { host?: string }; protocol?: string }): Promise<string | null> {
+  const challenge = await takeWebauthnChallenge(userId, "webauthn_auth");
+  if (!challenge) return null;
+  const assertionId = (assertion as { id?: string })?.id;
+  const factors = (await verifiedFactors(userId)).filter((f) => f.type === "passkey");
+  const factor = factors.find((f) => (f.credential as unknown as StoredCredential)?.credentialID === assertionId);
+  if (!factor) return null;
+  const { rpID, origin } = rpFromRequest(req.headers.host, req.protocol);
+  try {
+    const result = await verifyAssertion({
+      response: assertion as never,
+      expectedChallenge: challenge,
+      rpID,
+      origin,
+      credential: factor.credential as unknown as StoredCredential,
+    });
+    if (!result) return null;
+    // Persist the new signature counter (replay defence) and the last-used stamp.
+    const cred = { ...(factor.credential as unknown as StoredCredential), counter: result.newCounter };
+    await db.update(mfaFactorsTable).set({ credential: cred as unknown as Record<string, unknown>, lastUsedAt: new Date() }).where(eq(mfaFactorsTable.id, factor.id));
+    return factor.id;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * POST /auth/demo-login  { role: "student" | "admin" }
