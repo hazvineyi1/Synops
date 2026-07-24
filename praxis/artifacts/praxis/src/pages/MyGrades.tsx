@@ -77,7 +77,10 @@ export function MyGrades() {
             )}
           >
             <span className="font-medium text-foreground">{c.courseTitle}</span>
-            <span className={cn("rounded-full px-2 py-0.5 font-mono text-[11px]", pillBand(c.band))}>
+            <span className={cn("rounded-full px-2 py-0.5 font-mono text-[11px]",
+              // An on-track learner is not failing: a low overall here just reflects progress
+              // (content not yet reached), so show it neutrally rather than in the red "low" band.
+              c.alertStatus === "on_track" && c.band === "low" ? "bg-muted text-muted-foreground" : pillBand(c.band))}>
               {c.overallPercent == null ? "—" : `${Math.round(c.overallPercent)}%`}
             </span>
             {c.alertStatus === "off_track" && <AlertTriangle className="h-3.5 w-3.5 text-red-600" />}
@@ -200,7 +203,11 @@ function OverviewBar({ me }: { me: MeGradebook }) {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-background p-4">
         <div>
-          <div className={cn("text-3xl font-bold", me.overallPercent == null ? "text-muted-foreground" : me.overallPercent >= 70 ? "text-green-600" : "text-red-600")}>
+          <div className={cn("text-3xl font-bold",
+            me.overallPercent == null ? "text-muted-foreground"
+            : me.overallPercent >= 70 ? "text-green-600"
+            : me.alert.status === "on_track" ? "text-foreground"
+            : "text-red-600")}>
             {me.overallPercent == null ? "—" : `${Math.round(me.overallPercent)}%`}
           </div>
           <div className="text-xs text-muted-foreground">Overall mastery</div>
