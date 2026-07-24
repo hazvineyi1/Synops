@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { brandThemesTable } from "@workspace/db";
+import { brandThemesTable, partnersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { resolvePublicBrandByHost, normaliseHost } from "../lib/brandResolve";
@@ -92,7 +92,17 @@ router.get("/brand/theme", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   const tenantId = user.partnerId ?? "platform";
   const theme = await getOrCreateTheme(tenantId, user.partnerId ? "partner" : "platform");
-  res.json(toThemeResponse(theme));
+  // Include the partner slug so the branding page can open a true live preview of the branded
+  // sign-in (/sign-in?p=<slug>), which resolves the brand regardless of host or session.
+  let slug: string | null = null;
+  if (user.partnerId) {
+    const partner = await db.query.partnersTable.findFirst({
+      where: eq(partnersTable.id, user.partnerId),
+      columns: { slug: true },
+    });
+    slug = partner?.slug ?? null;
+  }
+  res.json({ ...toThemeResponse(theme), slug });
 });
 
 // PUT /brand/theme — edit the caller's own tenant theme. White-label control is top-tier only.

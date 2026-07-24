@@ -234,7 +234,8 @@ export function PartnerTheme() {
         </div>
 
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-4">Live preview</h3>
+          <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1">Live preview</h3>
+          <p className="text-xs text-muted-foreground mb-4">A sample of how your brand colour, logo and credential appear to learners. Select <span className="font-medium text-foreground">Continue Learning</span> to open your live branded sign-in in a new tab.</p>
           <div className="rounded-2xl border border-border p-8 bg-muted/30 shadow-inner flex flex-col items-center justify-center min-h-[500px]">
             <div className="w-full max-w-sm bg-card rounded-xl shadow-lg border border-border overflow-hidden mb-8">
               <div className="h-14 border-b border-border flex items-center px-4 gap-2" style={{ backgroundColor: form.primaryColor || '#0f172a', color: '#fff' }}>
@@ -243,7 +244,14 @@ export function PartnerTheme() {
               <div className="p-6 space-y-4">
                 <div className="h-4 w-1/3 bg-muted rounded" />
                 <div className="h-20 w-full bg-muted/50 rounded" />
-                <Button className="w-full" style={{ backgroundColor: form.primaryColor || '#0f172a' }}>Continue Learning</Button>
+                <Button
+                  className="w-full"
+                  style={{ backgroundColor: form.primaryColor || '#0f172a' }}
+                  onClick={() => window.open(theme?.slug ? `/sign-in?p=${encodeURIComponent(theme.slug)}` : '/sign-in', '_blank', 'noopener,noreferrer')}
+                  title="Open your live branded sign-in in a new tab"
+                >
+                  Continue Learning
+                </Button>
               </div>
             </div>
             <div className="w-full max-w-sm bg-card rounded-xl shadow-lg border border-border p-6 relative overflow-hidden">

@@ -21,6 +21,8 @@ export interface BrandTheme {
   credentialTitle: string | null;
   emailSenderName: string | null;
   customDomain: string | null;
+  /** Partner tenant slug, when the theme belongs to a partner. Powers the live sign-in preview. */
+  slug?: string | null;
 }
 
 /** Shared brand-theme query (react-query dedupes across consumers). */

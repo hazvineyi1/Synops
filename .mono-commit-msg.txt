@@ -1,1 +1,1 @@
-Praxis: exempt demo accounts from 2FA gate + mastery can cross 80% with colour progression
+Praxis: branding live preview opens real branded sign-in (slug in theme payload)
