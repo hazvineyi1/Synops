@@ -189,9 +189,25 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // A fresh question resets the selection and the "type my own" toggle.
   useEffect(() => { setSelected([]); setTypeOwn(false); }, [localTurns.length]);
 
+  // Reliable auto-scroll with scroll-anchoring: follow the latest message ONLY while the learner is
+  // already near the bottom, so streaming tokens never yank them up mid-read. Instant scroll during
+  // streaming avoids smooth-scroll stutter; a new turn settles smoothly (unless reduced-motion).
+  const [stickToBottom, setStickToBottom] = useState(true);
+  const onScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    setStickToBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 120);
+  };
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [localTurns, streamingText]);
+    const el = scrollContainerRef.current;
+    if (!el || !stickToBottom) return;
+    el.scrollTop = el.scrollHeight;
+  }, [streamingText, stickToBottom]);
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el || !stickToBottom) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+  }, [localTurns.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Error (e.g. the session 403s or is gone): show a clear state + a way out, never an endless pulse.
   if (sessionError || (!sessionLoading && !session)) return (
@@ -472,7 +488,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
       )}
 
       {/* Main Dialogue Area */}
-      <main ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-8 flex justify-center">
+      <main ref={scrollContainerRef} onScroll={onScroll} className="relative flex-1 overflow-y-auto px-4 py-8 flex justify-center">
         <div className="w-full max-w-3xl space-y-6">
           <AnimatePresence initial={false}>
             {localTurns.map((turn, idx) => {
@@ -481,7 +497,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
                 return (
                   <motion.div
                     key={turn.id || idx}
-                    initial={{ opacity: 0, y: 12 }}
+                    initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, ease: 'easeOut' }}
                     className="w-full"
@@ -493,7 +509,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
               return (
                 <motion.div
                   key={turn.id || idx}
-                  initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                  initial={prefersReducedMotion ? false : { opacity: 0, y: 12, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.3, ease: 'easeOut' }}
                   className={cn(
@@ -521,19 +537,19 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           {/* Streaming active message */}
           {isStreaming && (
              <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={prefersReducedMotion ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex w-full justify-start"
              >
               <div className="max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-4 text-[15px] leading-relaxed whitespace-pre-wrap bg-card border border-border border-l-[3px] border-l-blue-400/70 dark:border-l-blue-500/60 shadow-sm rounded-tl-sm text-foreground relative">
                 {streamingText ? sanitizePlain(streamingText) : (
                   <span className="inline-flex gap-1 items-center">
-                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.3s]" />
-                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce [animation-delay:-0.15s]" />
-                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce" />
+                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce motion-reduce:animate-none [animation-delay:-0.3s]" />
+                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce motion-reduce:animate-none [animation-delay:-0.15s]" />
+                    <span className="h-2 w-2 rounded-full bg-primary/40 animate-bounce motion-reduce:animate-none" />
                   </span>
                 )}
-                {streamingText && <span className="inline-block w-1.5 h-4 bg-primary ml-1 animate-pulse align-middle" />}
+                {streamingText && <span className="inline-block w-1.5 h-4 bg-primary ml-1 animate-pulse motion-reduce:animate-none align-middle" />}
               </div>
             </motion.div>
           )}
@@ -575,7 +591,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
           {/* Mastery Achieved Banner */}
           {isMastered && (
-            <div className="relative overflow-hidden mt-8 mb-4 p-8 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 flex flex-col items-center text-center animate-in zoom-in-95 duration-500">
+            <div className="relative overflow-hidden mt-8 mb-4 p-8 rounded-2xl bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 flex flex-col items-center text-center animate-in zoom-in-95 duration-500 motion-reduce:animate-none">
               <Confetti />
               <div className="h-16 w-16 bg-primary rounded-full flex items-center justify-center mb-4 text-primary-foreground shadow-lg">
                 <Sparkles className="h-8 w-8" />
@@ -600,9 +616,21 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
       {/* Milestone celebration: a one-time toast + sparkle when mastery first crosses 50%. */}
       <MilestoneToast milestone={milestone} reducedMotion={!!prefersReducedMotion} />
 
+      {/* Jump-to-latest: appears when the learner has scrolled up to read earlier turns. */}
+      {!stickToBottom && (
+        <div className="pointer-events-none relative h-0">
+          <button
+            onClick={() => { const el = scrollContainerRef.current; if (el) el.scrollTo({ top: el.scrollHeight, behavior: prefersReducedMotion ? 'auto' : 'smooth' }); setStickToBottom(true); }}
+            className="pointer-events-auto absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-lg transition hover:border-primary/40"
+          >
+            Jump to latest <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Input Area — selectable answer choices for most questions, with a "type my own" escape;
           free-text box when the coach asks for the learner's own words (or they choose to write). */}
-      <footer className="shrink-0 bg-background border-t border-border p-4 pb-safe">
+      <footer className="shrink-0 bg-background border-t border-border p-4 pb-safe shadow-[0_-2px_16px_rgba(0,0,0,0.04)]">
         <div className="max-w-3xl mx-auto">
           {showOptions ? (
             <div>
@@ -646,7 +674,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             <div>
               <motion.div
                 className="relative"
-                animate={sendBlocked ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
+                animate={sendBlocked && !prefersReducedMotion ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
                 transition={{ duration: 0.4 }}
               >
                 <textarea
