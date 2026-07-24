@@ -41,9 +41,9 @@ export async function applyCheckpoint(opts: {
   const grade = await gradeCheckpoint(socraticCtx, learnerResponse, historyOrdered, opts.isSelection ?? false);
   const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, session.moduleId) });
 
-  // Everything that mutates state runs in one transaction so a partial
-  // failure never leaves mastery, evidence, and credentials inconsistent.
-  return await db.transaction(async (tx) => {
+  // Mastery, session status, and evidence mutate in one transaction so a partial failure never
+  // leaves them inconsistent. The credential is issued separately, after commit (see below).
+  const result = await db.transaction(async (tx) => {
     // Lock the existing concept row (if any) so concurrent checkpoints
     // (e.g. web + WhatsApp) serialize instead of clobbering each other.
     const existing = await tx.query.conceptMasteryTable.findFirst({
@@ -125,18 +125,34 @@ export async function applyCheckpoint(opts: {
       score: (grade.grade / 3).toFixed(4),
     });
 
-    if (nowMastered && !alreadyMastered) {
-      await issueCredential(tx, {
-        userId,
-        moduleId: session.moduleId,
-        moduleTitle: mod?.title,
-        masteryScore: newMastery.toString(),
-        exchanges: Math.floor(freshTurnCount / 2),
-      });
-    }
-
-    return { grade: grade.grade, reasoning: grade.reasoning, newMastery, mastered: nowMastered };
+    // NOTE: the credential is issued AFTER this transaction commits (below), never inside it. A
+    // credential hiccup must never roll back the learner's hard-won mastery, and issuing inside the
+    // tx risked exactly that (a failed insert poisons the whole transaction).
+    return {
+      grade: grade.grade,
+      reasoning: grade.reasoning,
+      newMastery,
+      mastered: nowMastered,
+      shouldIssueCredential: nowMastered && !alreadyMastered,
+      moduleTitle: mod?.title ?? null,
+      exchanges: Math.floor(freshTurnCount / 2),
+    };
   });
+
+  // Issue the credential on its own connection, after the checkpoint has committed. issueCredential
+  // is idempotent (findFirst guard + conflict-safe insert), so if it ever fails it simply retries on
+  // the next mastered turn - the mastery + session state are already safely saved either way.
+  if (result.shouldIssueCredential) {
+    await issueCredential(db, {
+      userId,
+      moduleId: session.moduleId,
+      moduleTitle: result.moduleTitle,
+      masteryScore: result.newMastery.toString(),
+      exchanges: result.exchanges,
+    });
+  }
+
+  return { grade: result.grade, reasoning: result.reasoning, newMastery: result.newMastery, mastered: result.mastered };
 }
 
 type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -176,10 +192,13 @@ export async function issueCredential(
     const decayDate = new Date();
     decayDate.setMonth(decayDate.getMonth() + 12); // 12-month validity
 
-    // onConflictDoNothing on the partial unique index (user_id, module_id) WHERE status='valid'
-    // makes issuance race-safe: two concurrent checkpoints (web + WhatsApp for the same learner)
-    // can both pass the findFirst check above, but only one row can exist — the second is a no-op
-    // instead of a duplicate credential.
+    // Arbiter-less ON CONFLICT DO NOTHING: it catches a race (two concurrent mastered checkpoints for
+    // the same learner) via the partial unique index (user_id, module_id) WHERE status='valid' when
+    // that index is present, and - crucially - NEVER raises 42P10 if the index is somehow absent. The
+    // earlier form named the partial index as the conflict arbiter, which errored (and, when this ran
+    // inside the checkpoint transaction, rolled the whole checkpoint back) on any environment where
+    // that index had not been created yet. The findFirst guard above already prevents the common
+    // duplicate; this is the race backstop.
     await exec.insert(credentialsTable).values({
       userId,
       moduleId,
@@ -190,10 +209,7 @@ export async function issueCredential(
       evidenceSummary: `Achieved mastery through ${exchanges} Socratic exchanges`,
       decayDate,
       status: "valid",
-    }).onConflictDoNothing({
-      target: [credentialsTable.userId, credentialsTable.moduleId],
-      where: sql`status = 'valid'`,
-    });
+    }).onConflictDoNothing();
   } catch {
     // Non-fatal
   }
