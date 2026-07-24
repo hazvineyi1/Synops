@@ -73,7 +73,7 @@ function parseWorked(content: string): WorkedExample | null {
   return null;
 }
 
-type DoneMeta = { scaffold?: boolean; grade?: number; mastered?: boolean; masteryScore?: number };
+type DoneMeta = { scaffold?: boolean; grade?: number; reasoning?: string; mastered?: boolean; masteryScore?: number; options?: string[]; selectMode?: string };
 
 // Generic SSE reader: streams text tokens, captures the final done-event metadata,
 // and hands that metadata to onComplete so the caller can react (e.g. offer support).
@@ -115,6 +115,9 @@ async function streamSSE(
               meta = {
                 scaffold: data.scaffold,
                 grade: data.grade,
+                reasoning: data.reasoning,
+                options: data.options,
+                selectMode: data.selectMode,
                 mastered: data.mastered,
                 masteryScore: data.masteryScore,
               };
@@ -173,6 +176,13 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   // Milestone celebration (item 3): fires once when mastery first crosses 50% (80% has its own banner).
   const [milestone, setMilestone] = useState<number | null>(null);
   const reachedMilestones = useRef<Set<number>>(new Set());
+  // Fix A: render answer choices straight from the done SSE event, so they appear the instant the
+  // turn finishes instead of waiting for the session refetch. Cleared when the learner sends again.
+  const [optimisticOpts, setOptimisticOpts] = useState<{ options: string[]; mode: string } | null>(null);
+  // Fix B: the last graded turn's scorecard - grade, one-line reason, and the mastery gained - so the
+  // learner can see WHY each turn scored what it did. Persists until the next answer is sent.
+  const [lastScore, setLastScore] = useState<null | { grade: number; reasoning: string; gain: number; masteryPct: number }>(null);
+  const [showRubric, setShowRubric] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -260,11 +270,18 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
   // The current (latest) coach question and its selectable answer choices, if any.
   const lastTurn = localTurns[localTurns.length - 1];
-  const activeOptions: string[] = (lastTurn && lastTurn.role === 'tutor' && Array.isArray(lastTurn.options)) ? lastTurn.options : [];
-  const activeMode: string = (lastTurn && lastTurn.role === 'tutor' && lastTurn.selectMode) ? lastTurn.selectMode : 'free';
+  // Prefer the options streamed on the done event (they arrive the instant the turn ends); fall back
+  // to whatever the refetched turn carries. This is what makes the buttons appear with no dead gap.
+  const activeOptions: string[] = optimisticOpts?.options
+    ?? ((lastTurn && lastTurn.role === 'tutor' && Array.isArray(lastTurn.options)) ? lastTurn.options : []);
+  const activeMode: string = optimisticOpts?.mode
+    ?? ((lastTurn && lastTurn.role === 'tutor' && lastTurn.selectMode) ? lastTurn.selectMode : 'free');
   // Only show options when the learner has NOT started typing, so switching modes never hides (and
   // loses) text they were partway through writing.
-  const showOptions = !isStreaming && !isMastered && activeOptions.length >= 2 && activeMode !== 'free' && !typeOwn && !inputValue.trim();
+  // Show the answer choices whenever the current question has them and the learner hasn't chosen to
+  // type instead. Deliberately does NOT depend on the input's focus or contents, so options never
+  // silently vanish just because there is leftover whitespace in the textarea.
+  const showOptions = !isStreaming && !isMastered && activeOptions.length >= 2 && activeMode !== 'free' && !typeOwn;
 
   function toggleSelect(opt: string) {
     if (activeMode === 'multi') {
@@ -296,6 +313,8 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
     setIsStreaming(true);
     setStreamingText('');
     setShowScaffold(false);
+    setOptimisticOpts(null); // clear the previous question's choices while the next turn loads
+    setLastScore(null);
 
     // Optimistically add user message
     const tempUserTurn = {
@@ -338,6 +357,15 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
           const fid = Date.now();
           setFeedback({ grade: meta.grade, id: fid });
           setTimeout(() => setFeedback((f) => (f && f.id === fid ? null : f)), 2400);
+          // Fix B: the per-turn scorecard - grade, reason, mastery gained - shown until the next answer.
+          const prevPct = Math.round((session.masteryScore || 0) * 100);
+          const newPct = typeof meta.masteryScore === 'number' ? Math.round(meta.masteryScore * 100) : prevPct;
+          setLastScore({ grade: meta.grade, reasoning: meta.reasoning ?? '', gain: Math.max(0, newPct - prevPct), masteryPct: newPct });
+        }
+        // Fix A: render the next question's answer choices straight from the done event, so the
+        // buttons appear immediately instead of only after the session refetch below.
+        if (Array.isArray(meta.options) && meta.options.length >= 2 && meta.selectMode && meta.selectMode !== 'free' && !meta.mastered) {
+          setOptimisticOpts({ options: meta.options, mode: meta.selectMode });
         }
         // When complete, refetch the session to get the real turns and updated mastery/beat
         refetchSession().then(() => {
@@ -628,10 +656,34 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
         </div>
       )}
 
+      {/* Mastery scorecard: after each graded turn, show WHY it scored what it did - the 0-3 grade,
+          a one-line reason, the mastery gained, and progress to the 80% goal. */}
+      {lastScore && !isMastered && (
+        <MasteryScorecard score={lastScore} showRubric={showRubric} onToggleRubric={() => setShowRubric(v => !v)} reducedMotion={!!prefersReducedMotion} />
+      )}
+
       {/* Input Area — selectable answer choices for most questions, with a "type my own" escape;
           free-text box when the coach asks for the learner's own words (or they choose to write). */}
       <footer className="shrink-0 bg-background border-t border-border p-4 pb-safe shadow-[0_-2px_16px_rgba(0,0,0,0.04)]">
         <div className="max-w-3xl mx-auto">
+          {/* Thinking placeholder: while the coach is composing the next turn, show a soft skeleton of
+              the answer choices so there is no dead gap before they appear. */}
+          {isStreaming && !isMastered && (
+            <div className="mb-3" aria-hidden>
+              <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <span className="inline-flex gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce motion-reduce:animate-none [animation-delay:-0.3s]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce motion-reduce:animate-none [animation-delay:-0.15s]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary/40 animate-bounce motion-reduce:animate-none" />
+                </span>
+                Preparing your next question and answer choices
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="h-12 rounded-xl border-2 border-dashed border-border bg-muted/40 animate-pulse motion-reduce:animate-none" />
+                <div className="h-12 rounded-xl border-2 border-dashed border-border bg-muted/40 animate-pulse motion-reduce:animate-none" />
+              </div>
+            </div>
+          )}
           {showOptions ? (
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
@@ -862,6 +914,58 @@ function MilestoneToast({ milestone, reducedMotion }: { milestone: number | null
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+// Grade presentation (never red). 0 is framed as "keep exploring", not a failure.
+const GRADE_META = [
+  { label: 'Keep exploring', tone: 'text-slate-600 bg-slate-500/10 border-slate-300 dark:text-slate-300 dark:border-slate-700' },
+  { label: 'Getting there', tone: 'text-amber-700 bg-amber-500/10 border-amber-300 dark:text-amber-300 dark:border-amber-800' },
+  { label: 'Solid reasoning', tone: 'text-green-700 bg-green-500/10 border-green-300 dark:text-green-300 dark:border-green-800' },
+  { label: 'Mastery-level', tone: 'text-green-700 bg-green-600/15 border-green-400 dark:text-green-300 dark:border-green-700' },
+];
+
+/**
+ * Mastery scorecard (fix B): after each graded turn, make the previously-hidden rubric visible - the
+ * 0-3 grade, a one-line reason, the mastery gained, and progress toward the 80% goal - with an
+ * expandable "How mastery works" note. Surfacing the criteria is what turns an opaque meter into a
+ * fair, understandable one.
+ */
+function MasteryScorecard({ score, showRubric, onToggleRubric, reducedMotion }: { score: { grade: number; reasoning: string; gain: number; masteryPct: number }; showRubric: boolean; onToggleRubric: () => void; reducedMotion: boolean }) {
+  const g = Math.max(0, Math.min(3, score.grade));
+  const meta = GRADE_META[g];
+  return (
+    <motion.div
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }}
+      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+      className="shrink-0 border-t border-border bg-muted/40"
+    >
+      <div className="mx-auto max-w-3xl px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+          <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold', meta.tone)}>
+            Grade {g}/3 · {meta.label}
+          </span>
+          {score.reasoning && <span className="min-w-0 flex-1 truncate text-muted-foreground" title={score.reasoning}>{score.reasoning}</span>}
+          {score.gain > 0 && <span className="rounded-full bg-green-500/15 px-1.5 py-0.5 text-xs font-bold text-green-600">+{score.gain}% mastery</span>}
+          <span className="ml-auto text-xs font-medium text-foreground tabular-nums">{score.masteryPct}% <span className="text-muted-foreground">/ 80% goal</span></span>
+          <button onClick={onToggleRubric} className="text-xs font-medium text-primary hover:underline" aria-expanded={showRubric}>
+            How mastery works
+          </button>
+        </div>
+        {showRubric && (
+          <div className="mt-2 rounded-lg border border-border bg-background p-3 text-xs text-muted-foreground">
+            <p className="mb-1.5 font-semibold text-foreground">Each answer is scored 0-3 on the reasoning you show (not wording or length):</p>
+            <ul className="space-y-0.5">
+              <li><span className="font-medium text-foreground">0</span> - no reasoning yet; try explaining your thinking.</li>
+              <li><span className="font-medium text-foreground">1</span> - a relevant idea, still taking shape.</li>
+              <li><span className="font-medium text-foreground">2</span> - solid, correct reasoning applied to the situation.</li>
+              <li><span className="font-medium text-foreground">3</span> - clear mastery: correct, applied, and you can say why.</li>
+            </ul>
+            <p className="mt-1.5">Reach <span className="font-medium text-foreground">80% mastery</span> to earn your credential. A weak answer only ever adds 0 - it never lowers your score.</p>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
