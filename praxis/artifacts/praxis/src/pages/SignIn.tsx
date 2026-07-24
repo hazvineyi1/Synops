@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { Link, useLocation, useSearch } from "wouter";
+import { startAuthentication } from "@simplewebauthn/browser";
 import { useSession } from "@/context/SessionContext";
 import { usePublicBrandByHost } from "@/context/ThemeProvider";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API } from "@/lib/api";
+
+const METHOD_LABELS: Record<string, string> = {
+  totp: "Authenticator app",
+  passkey: "Passkey (Face ID / fingerprint / key)",
+  email_otp: "Email code",
+  sms_otp: "Text message",
+  email_recovery: "Recovery email",
+  backup: "Backup code",
+};
+// Methods that need a code delivered before the user can type it.
+const OTP_METHODS = new Set(["email_otp", "sms_otp", "email_recovery"]);
 
 /** Pick a readable text colour (dark or white) for a given hex background. */
 function textOn(hex: string): string {
@@ -29,9 +41,19 @@ export function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [demoBusy, setDemoBusy] = useState<"student" | "admin" | null>(null);
-  // Second-factor step: revealed only when the server says this account has 2FA on.
+  // Second-factor step: revealed only when the server says this account has MFA on.
   const [mfaRequired, setMfaRequired] = useState(false);
   const [code, setCode] = useState("");
+  const [methods, setMethods] = useState<string[]>([]);
+  const [chosen, setChosen] = useState<string>("");
+  const [hints, setHints] = useState<Record<string, string>>({});
+  const [hasBackup, setHasBackup] = useState(false);
+  const [otpSent, setOtpSent] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [mfaBusy, setMfaBusy] = useState(false);
+
+  // All methods the user can choose between (verified factors + backup codes, if any).
+  const pickable = [...methods, ...(hasBackup ? ["backup"] : [])];
 
   // Demo buttons are only offered on the Enza site, where the demo accounts live.
   const showDemo = typeof window !== "undefined" && window.location.hostname === "enza.synops-consulting.com";
@@ -61,19 +83,69 @@ export function SignInPage() {
     setError(null);
     setBusy(true);
     try {
-      const result = await signIn(email, password, mfaRequired ? code : undefined);
-      if (result.mfaRequired) {
-        // Correct password; now ask for the authenticator code and re-submit.
-        setMfaRequired(true);
-        setBusy(false);
+      // First step: email + password. On MFA, capture the enrolled methods and show the challenge.
+      if (!mfaRequired) {
+        const result = await signIn(email, password);
+        if (result.mfaRequired) {
+          const ms = result.methods ?? [];
+          setMethods(ms);
+          setHints(result.hints ?? {});
+          setHasBackup(!!result.hasBackupCodes);
+          setChosen(result.preferred && (ms.includes(result.preferred) || result.preferred === "backup") ? result.preferred : ms[0] ?? (result.hasBackupCodes ? "backup" : ""));
+          setMfaRequired(true);
+          setBusy(false);
+          return;
+        }
+        setLocation("/dashboard");
         return;
       }
+
+      // Second step: submit the chosen factor (code-based methods here; passkey has its own button).
+      const method = chosen === "totp" ? "" : chosen; // totp uses the default code path
+      const result = await signIn(email, password, { method, code: code.trim() });
+      if (result.mfaRequired) { setBusy(false); return; }
       setLocation("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed.");
       setBusy(false);
     }
   };
+
+  /** Send an OTP for the chosen delivery method (email / SMS / recovery) before the user types it. */
+  const sendOtp = async () => {
+    setError(null); setMfaBusy(true);
+    try {
+      const res = await fetch(`${API}/auth/mfa/challenge`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ email, password, method: chosen }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Could not send a code.");
+      setOtpSent(body.sentTo ?? "your device");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send a code.");
+    } finally { setMfaBusy(false); }
+  };
+
+  /** Complete a passkey challenge: fetch options, run the authenticator, submit the assertion. */
+  const usePasskey = async () => {
+    setError(null); setMfaBusy(true);
+    try {
+      const res = await fetch(`${API}/auth/mfa/challenge`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ email, password, method: "passkey" }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Could not start the passkey.");
+      const assertion = await startAuthentication({ optionsJSON: body.options });
+      const result = await signIn(email, password, { method: "passkey", assertion });
+      if (!result.mfaRequired) setLocation("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Passkey sign-in failed.");
+    } finally { setMfaBusy(false); }
+  };
+
+  const chooseMethod = (m: string) => { setChosen(m); setShowPicker(false); setOtpSent(null); setCode(""); setError(null); };
 
   return (
     <div className="min-h-[100dvh] flex items-center justify-center px-4" style={{ background: `linear-gradient(160deg, ${primary} 0%, #05070d 100%)` }}>
@@ -115,13 +187,47 @@ export function SignInPage() {
           </div>
 
           {mfaRequired && (
-            <div>
-              <label htmlFor="mfacode" className="block text-sm font-medium text-white/80 mb-1.5">Authentication code</label>
-              <input id="mfacode" inputMode="numeric" autoComplete="one-time-code" autoFocus required value={code}
-                onChange={(e) => setCode(e.target.value)} placeholder="6-digit code"
-                className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white tracking-widest font-mono placeholder:text-white/40 focus:outline-none focus:ring-2"
-                style={{ ['--tw-ring-color' as any]: accent }} onFocus={(e) => (e.currentTarget.style.borderColor = accent)} onBlur={(e) => (e.currentTarget.style.borderColor = '')} />
-              <p className="mt-1.5 text-xs text-white/50">Enter the code from your authenticator app, or a one-time backup code.</p>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-white/80">
+                {chosen ? `Verify with your ${METHOD_LABELS[chosen]?.toLowerCase() ?? "method"}` : "Choose how to verify"}
+              </p>
+
+              {/* Passkey: single action, no code to type. */}
+              {chosen === "passkey" ? (
+                <button type="button" onClick={usePasskey} disabled={mfaBusy}
+                  className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 font-semibold text-white disabled:opacity-60">
+                  {mfaBusy ? "Waiting for your device..." : "Use passkey"}
+                </button>
+              ) : OTP_METHODS.has(chosen) && !otpSent ? (
+                <button type="button" onClick={sendOtp} disabled={mfaBusy}
+                  className="w-full rounded-lg border border-white/15 bg-white/5 px-4 py-2.5 font-semibold text-white disabled:opacity-60">
+                  {mfaBusy ? "Sending..." : `Send a code${hints[chosen] ? ` to ${hints[chosen]}` : ""}`}
+                </button>
+              ) : (
+                <>
+                  {otpSent && <p className="text-xs text-white/50">Code sent to {otpSent}.</p>}
+                  <input id="mfacode" inputMode="numeric" autoComplete="one-time-code" autoFocus value={code}
+                    onChange={(e) => setCode(e.target.value)} placeholder={chosen === "backup" ? "Backup code" : "6-digit code"}
+                    className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-white tracking-widest font-mono placeholder:text-white/40 focus:outline-none focus:ring-2"
+                    style={{ ['--tw-ring-color' as any]: accent }} onFocus={(e) => (e.currentTarget.style.borderColor = accent)} onBlur={(e) => (e.currentTarget.style.borderColor = '')} />
+                </>
+              )}
+
+              {pickable.length > 1 && (
+                <button type="button" onClick={() => setShowPicker((v) => !v)} className="text-xs text-white/60 hover:text-white/90">
+                  Try another way
+                </button>
+              )}
+              {showPicker && (
+                <div className="rounded-lg border border-white/10 bg-white/5 p-1">
+                  {pickable.map((m) => (
+                    <button key={m} type="button" onClick={() => chooseMethod(m)}
+                      className={`block w-full rounded px-2 py-1.5 text-left text-sm ${m === chosen ? "text-white" : "text-white/70"} hover:bg-white/10`}>
+                      {METHOD_LABELS[m] ?? m}{hints[m] ? ` · ${hints[m]}` : ""}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -129,11 +235,14 @@ export function SignInPage() {
             <div role="alert" className="rounded-lg border border-red-900 bg-red-950/50 px-3 py-2 text-sm text-red-300">{error}</div>
           )}
 
-          <button type="submit" disabled={busy}
-            className="w-full rounded-lg px-4 py-2.5 font-semibold transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ backgroundColor: accent, color: accentText }}>
-            {busy ? (mfaRequired ? "Verifying..." : "Signing in...") : (mfaRequired ? "Verify" : "Sign in")}
-          </button>
+          {/* Hide the submit button on the passkey step (it has its own action). */}
+          {!(mfaRequired && chosen === "passkey") && (
+            <button type="submit" disabled={busy || (mfaRequired && OTP_METHODS.has(chosen) && !otpSent)}
+              className="w-full rounded-lg px-4 py-2.5 font-semibold transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              style={{ backgroundColor: accent, color: accentText }}>
+              {busy ? (mfaRequired ? "Verifying..." : "Signing in...") : (mfaRequired ? "Verify" : "Sign in")}
+            </button>
+          )}
         </form>
 
         {showDemo && (

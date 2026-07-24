@@ -44,8 +44,16 @@ interface SessionState {
   /** True until the first /auth/me resolves. Routes must not redirect while true. */
   loading: boolean;
   refresh: () => Promise<void>;
-  /** Returns { mfaRequired: true } when the password was correct but a 2FA code is needed. */
-  signIn: (email: string, password: string, code?: string) => Promise<{ mfaRequired?: boolean }>;
+  /**
+   * Sign in. When the password is correct but a second factor is needed, returns
+   * { mfaRequired: true } plus the enrolled methods so the UI can offer a picker. Pass the second
+   * factor (method + code, or a passkey assertion) on the follow-up call.
+   */
+  signIn: (
+    email: string,
+    password: string,
+    second?: { method?: string; code?: string; assertion?: unknown },
+  ) => Promise<{ mfaRequired?: boolean; methods?: string[]; hasBackupCodes?: boolean; preferred?: string; hints?: Record<string, string> }>;
   /** One-click demo sign-in (no credentials). role: "student" | "admin". */
   demoSignIn: (role: "student" | "admin") => Promise<void>;
   /** End a server-side impersonation and restore the admin's OWN session (not a sign-out). */
@@ -89,20 +97,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const signIn = useCallback(async (email: string, password: string, code?: string) => {
+  const signIn = useCallback(async (email: string, password: string, second?: { method?: string; code?: string; assertion?: unknown }) => {
     const res = await fetch(`${API}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify(code ? { email, password, code } : { email, password }),
+      body: JSON.stringify({ email, password, ...(second ?? {}) }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error((body as { error?: string }).error ?? "Sign in failed.");
     }
-    // Password was correct but this account has 2FA on: no session yet, prompt for a code.
-    if ((body as { mfaRequired?: boolean }).mfaRequired) {
-      return { mfaRequired: true };
+    // Password was correct but this account has MFA on: no session yet. Return the enrolled methods
+    // so the UI can show a picker (any one verified method satisfies the challenge).
+    const b = body as { mfaRequired?: boolean; methods?: string[]; hasBackupCodes?: boolean; preferred?: string; hints?: Record<string, string> };
+    if (b.mfaRequired) {
+      return { mfaRequired: true, methods: b.methods, hasBackupCodes: b.hasBackupCodes, preferred: b.preferred, hints: b.hints };
     }
     setUser((body as { user: SessionUser }).user);
     setLoading(false);
