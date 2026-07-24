@@ -247,11 +247,14 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   const mp = masteryPercentage;
   const masteryTier = mp >= 80 ? 3 : mp >= 50 ? 2 : mp >= 20 ? 1 : 0;
   const meterWidth = 176 + Math.round((mp / 100) * 184); // 176px -> 360px as it fills
-  const masteryBarColor = mp >= 80 ? 'bg-green-500' : mp >= 50 ? 'bg-primary' : mp >= 20 ? 'bg-amber-500' : 'bg-muted-foreground/60';
+  // Brand-independent colour progression so the bar visibly shifts hue as it climbs. (The tenant
+  // brand primary can render near-black, which made the mid-range look static and colourless.)
+  // Rose -> amber -> yellow -> teal -> green, with a distinct glowing "mastered" state at 80%.
+  const masteryBarColor = mp >= 80 ? 'bg-green-500' : mp >= 65 ? 'bg-teal-500' : mp >= 45 ? 'bg-yellow-500' : mp >= 20 ? 'bg-amber-500' : 'bg-rose-400';
   const masteryBarHeight = ['h-2', 'h-2.5', 'h-3', 'h-4'][masteryTier];
-  const masteryNumClass = ['text-base text-foreground', 'text-lg text-amber-600', 'text-2xl text-primary', 'text-3xl text-green-600'][masteryTier];
-  const masteryTextColor = mp >= 80 ? 'text-green-600' : mp >= 50 ? 'text-primary' : mp >= 20 ? 'text-amber-600' : 'text-muted-foreground';
-  const masteryCaption = mp >= 80 ? 'Mastered' : mp >= 50 ? 'Almost there' : mp >= 20 ? 'Building' : 'Getting started';
+  const masteryNumClass = ['text-base text-foreground', 'text-lg text-amber-600', 'text-2xl text-teal-600', 'text-3xl text-green-600'][masteryTier];
+  const masteryTextColor = mp >= 80 ? 'text-green-600' : mp >= 65 ? 'text-teal-600' : mp >= 45 ? 'text-yellow-600' : mp >= 20 ? 'text-amber-600' : 'text-muted-foreground';
+  const masteryCaption = mp >= 80 ? 'Mastered' : mp >= 65 ? 'Almost there' : mp >= 45 ? 'Building well' : mp >= 20 ? 'Building' : 'Getting started';
   const level = tierFromPct(mp); // 0-3
   const levelInfo = LEVELS[level];
 

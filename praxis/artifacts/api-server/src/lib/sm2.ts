@@ -37,7 +37,9 @@ export function sm2Update(
   // the meter the learner watches only ever holds or climbs. (The spaced-repetition scheduling above
   // still reacts to a weak answer - reps/interval reset so the concept comes back sooner - so the
   // tutoring cadence is unchanged; only the visible mastery score is protected from decreasing.)
-  const TARGET = [0, 0.45, 0.78, 1.0];
+  // Grade 2 (solid, including a correct multiple-choice pick) tops out at 0.85 so mastery CAN cross
+  // the 0.8 bar with a few good turns rather than walling just below it; grade 3 reaches full mastery.
+  const TARGET = [0, 0.5, 0.85, 1.0];
   const target = TARGET[Math.max(0, Math.min(3, Math.round(grade)))] ?? 0;
   // Only climb toward a higher target; a lower target contributes 0 (never a subtraction).
   const gained = target > mastery ? (target - mastery) * 0.5 : 0;

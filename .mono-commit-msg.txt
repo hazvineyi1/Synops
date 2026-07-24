@@ -1,3 +1,1 @@
-Praxis: bigger, bolder partner logo on the sign-in page
-
-The tenant logo on the sign-in screen was rendered tiny (h-10 in a cramped box). Enlarged it to h-20 (h-24 on wider screens), max-width 300px, in a rounded-xl white card with padding and a shadow, so a partner's logo (e.g. Enza Global) reads big, clear and bold. Fallback monogram + name also enlarged. File: praxis/artifacts/praxis/src/pages/SignIn.tsx.
+Praxis: exempt demo accounts from 2FA gate + mastery can cross 80% with colour progression
