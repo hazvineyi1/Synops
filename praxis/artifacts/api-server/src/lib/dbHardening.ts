@@ -192,15 +192,25 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`CREATE UNIQUE INDEX IF NOT EXISTS gradebook_entries_assignment_user_uidx
           ON gradebook_entries (assignment_id, user_id)`,
     ]],
-    ["credentials", [
-      // Keep the most recently issued valid credential per (user, module); demote older valids.
-      sql`UPDATE credentials c SET status = 'superseded'
-          WHERE status = 'valid' AND EXISTS (
+    // Dedupe older valid credentials so the partial unique index below can be built. Two real bugs
+    // lived here and silently broke credential issuance: (1) the column is credential_status, not
+    // `status` (the Drizzle property name), so the query raised "column status does not exist"; and
+    // (2) the demotion value 'superseded' is not in the credential_status enum (valid|expired|revoked),
+    // so it raised "invalid input value for enum". Either error threw on this statement and, when it
+    // shared a step with the CREATE INDEX, skipped the index entirely - so on a fresh production DB
+    // the partial unique index never existed, which is exactly what made issueCredential's old
+    // arbiter-named ON CONFLICT raise 42P10 and roll back the checkpoint. Demote to 'expired' (a real
+    // enum value) and keep the index in its OWN step so it is created even if this dedupe ever fails.
+    ["credentials_dedupe", [
+      sql`UPDATE credentials c SET credential_status = 'expired'
+          WHERE credential_status = 'valid' AND EXISTS (
             SELECT 1 FROM credentials c2
             WHERE c2.user_id = c.user_id AND c2.module_id = c.module_id
-              AND c2.status = 'valid' AND c2.issued_at > c.issued_at)`,
+              AND c2.credential_status = 'valid' AND c2.issued_at > c.issued_at)`,
+    ]],
+    ["credentials_valid_uidx", [
       sql`CREATE UNIQUE INDEX IF NOT EXISTS credentials_user_module_valid_uidx
-          ON credentials (user_id, module_id) WHERE status = 'valid'`,
+          ON credentials (user_id, module_id) WHERE credential_status = 'valid'`,
     ]],
     ["funded_seat_assignments", [
       sql`DELETE FROM funded_seat_assignments a USING funded_seat_assignments b
