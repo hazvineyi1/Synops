@@ -99,8 +99,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const { data: brand, isLoading: brandLoading } = useBrandTheme();
   // While the tenant brand is still resolving, show nothing rather than flashing a default brand
   // name; once resolved use the tenant's name, falling back to a neutral product name.
-  const brandName = brand?.displayName || (brandLoading ? '' : 'Praxis');
-  const brandLogo = brand?.logoUrl || null;
+  const tenantBrandName = brand?.displayName || (brandLoading ? '' : 'Praxis');
+  const tenantBrandLogo = brand?.logoUrl || null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
 
@@ -135,6 +135,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isSuperPlatform = role === 'super_admin' && !inPartnerContext;
   const sidebarBg = isSuperPlatform ? SUPER_BG : SIDEBAR_BG;
   const activePartnerName = role === 'super_admin' && inPartnerContext ? getPartnerHub(user.partnerId).partnerName : null;
+
+  // Platform-owner branding: a super admin at the platform level is Synops (the platform owner),
+  // not the tenant/partner whose white-label brand happens to resolve (which would misleadingly
+  // show e.g. a partner's logo like "Enza Global"). Inside a partner, keep that partner's brand so
+  // it stays clear which tenant you are in.
+  const brandName = isSuperPlatform ? 'Synops' : tenantBrandName;
+  const brandLogo = isSuperPlatform ? null : tenantBrandLogo;
 
   const getNavGroups = (): NavGroup[] => {
     // Learner preview ("View as"): while previewing a learner's experience we must NOT show the
