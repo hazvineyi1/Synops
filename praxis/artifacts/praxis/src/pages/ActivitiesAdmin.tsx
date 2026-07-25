@@ -89,10 +89,11 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
   const [moduleId, setModuleId] = useState<string>("");
 
   // Course / module placement: homing an activity in a module surfaces it in that module's
-  // Complete tab for learners.
+  // Authoring picker: include incomplete/draft courses so activities can be attached to courses that
+  // are still being built (the catalogue filter would otherwise hide them).
   const { data: courseList } = useQuery({
-    queryKey: ["courses"],
-    queryFn: () => apiFetch<{ id: string; title: string }[]>("/courses"),
+    queryKey: ["courses", "authoring"],
+    queryFn: () => apiFetch<{ id: string; title: string }[]>("/courses?includeIncomplete=true"),
   });
   const { data: courseModules } = useQuery({
     queryKey: ["modules", courseId],
@@ -493,7 +494,7 @@ function AddActivityToCourseDialog({ activity, onClose }: { activity: Activity; 
   const { toast } = useToast();
   const [courseId, setCourseId] = useState<string>(activity.courseId ?? "");
   const [moduleId, setModuleId] = useState<string>(activity.moduleId ?? "");
-  const { data: courses } = useQuery({ queryKey: ["courses"], queryFn: () => apiFetch<{ id: string; title: string }[]>("/courses") });
+  const { data: courses } = useQuery({ queryKey: ["courses", "authoring"], queryFn: () => apiFetch<{ id: string; title: string }[]>("/courses?includeIncomplete=true") });
   const { data: modules } = useQuery({ queryKey: ["modules", courseId], queryFn: () => apiFetch<{ id: string; title: string; order: number }[]>(`/courses/${courseId}/modules`), enabled: !!courseId });
   const save = useMutation({
     mutationFn: () => apiFetch(`/activities/${activity.id}`, { method: "PATCH", body: JSON.stringify({ courseId: courseId || null, moduleId: moduleId || null }) }),

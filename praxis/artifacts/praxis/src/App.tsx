@@ -19,6 +19,7 @@ import { Studio } from '@/pages/Studio';
 import { StudioNew } from '@/pages/StudioNew';
 import { StudioEdit } from '@/pages/StudioEdit';
 import { Courses } from '@/pages/Courses';
+import { IncompleteCourses } from '@/pages/IncompleteCourses';
 import { CourseDetail } from '@/pages/CourseDetail';
 import { AssignmentDetail } from '@/pages/AssignmentDetail';
 import { DiscussionThread } from '@/pages/DiscussionThread';
@@ -285,6 +286,7 @@ function Routes() {
         <ProtectedRoute path="/coach-hub" component={CoachHub} />
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />
+        <ProtectedRoute path="/incomplete-courses" component={IncompleteCourses} />
         <ProtectedRoute path="/courses/:courseId" component={CourseDetail} />
         <ProtectedRoute path="/courses" component={Courses} />
         <ProtectedRoute path="/cases/:caseId/edit" component={CaseBuilder} />

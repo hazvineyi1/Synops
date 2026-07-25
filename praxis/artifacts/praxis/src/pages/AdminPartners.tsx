@@ -69,9 +69,12 @@ function CreatePartnerDialog({ onClose, onCreated }: { onClose: () => void; onCr
   // We keep those NOT stripped in the live field so a hyphen can be typed mid-word.
   const finalSlug = slugify(slug);
 
+  // Super-admin assignment/seeding view: include incomplete courses so the whole catalogue (including
+  // courses still being built) is assignable to partners; the catalogue filter still hides them from
+  // learners until complete.
   const { data: courses } = useQuery({
-    queryKey: ['courses'],
-    queryFn: () => apiFetch<CourseLite[]>('/courses'),
+    queryKey: ['courses', 'authoring'],
+    queryFn: () => apiFetch<CourseLite[]>('/courses?includeIncomplete=true'),
   });
 
   const onLogo = async (file?: File | null) => {

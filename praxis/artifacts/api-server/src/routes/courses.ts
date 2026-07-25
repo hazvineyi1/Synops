@@ -1,17 +1,25 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { coursesTable, modulesTable, beatsTable, assignmentsTable, interactiveActivitiesTable, coursePartnerAssignmentsTable } from "@workspace/db";
-import { eq, desc, and, inArray, sql, count, ilike } from "drizzle-orm";
-import { requireAuth, requireRole } from "../middlewares/requireAuth";
+import { eq, ne, desc, and, inArray, sql, count, ilike } from "drizzle-orm";
+import { requireAuth, requireRole, requireHub } from "../middlewares/requireAuth";
 import { canParticipateInCourse, canStaffActOnCourse, canViewCourseCatalog } from "../lib/scope";
+import { loadCourseCompleteness, type CourseCompleteness } from "../lib/courseCompleteness";
 
 // Courses belong to the super admin (tenantId "platform") and are assigned OUT to partners.
 const HUB_ROLES = new Set(["super_admin", "instructional_designer"]);
 const isHub = (role?: string | null) => !!role && HUB_ROLES.has(role);
 
+// Roles that AUTHOR courses (and so may list still-incomplete ones via ?includeIncomplete=true, to
+// build them). Learners and funders can never opt out of the catalogue completeness filter.
+const AUTHOR_ROLES = new Set(["super_admin", "instructional_designer", "partner_admin", "org_admin", "coach"]);
+const canSeeIncomplete = (role?: string | null) => !!role && AUTHOR_ROLES.has(role);
+
 const router = Router();
 
-function toCourseResponse(c: typeof coursesTable.$inferSelect) {
+// Attaches the completeness verdict (complete + the per-module reasons it is not) when known. Callers
+// that have not computed completeness pass nothing and the course reads as not-yet-evaluated.
+function toCourseResponse(c: typeof coursesTable.$inferSelect, completeness?: CourseCompleteness) {
   return {
     id: c.id,
     title: c.title,
@@ -26,10 +34,22 @@ function toCourseResponse(c: typeof coursesTable.$inferSelect) {
     thumbnailUrl: c.thumbnailUrl,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
+    // Course completeness gate: complete == catalogue-eligible. incompleteReasons lists, per blocking
+    // module, exactly what is missing so an author can finish it.
+    complete: completeness?.complete ?? false,
+    incompleteReasons: completeness?.incompleteReasons ?? [],
+    courseIssues: completeness?.courseIssues ?? [],
   };
 }
 
 // GET /courses
+//
+// This is the CATALOGUE list. Course completeness gate: only fully-built, catalogue-eligible courses
+// are returned - for EVERYONE (learners, partners AND hub roles) - so an incomplete course never
+// surfaces in the catalogue. Authors reach incomplete courses through GET /courses/incomplete and open
+// them via GET /courses/:id. Hub authoring tools that must list drafts pass ?includeIncomplete=true to
+// opt out of the filter (honoured only for hub roles); the annotated `complete`/`incompleteReasons`
+// come back either way.
 router.get("/courses", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   // Pagination + search + status filter so the catalogue scales. Default limit is
@@ -42,57 +62,81 @@ router.get("/courses", requireAuth, async (req, res) => {
   const search = String(req.query.search ?? "").trim();
   const statusFilter = String(req.query.status ?? "").trim();
   const isStatus = statusFilter === "draft" || statusFilter === "published" || statusFilter === "archived";
+  const hub = isHub(user.role);
+  // Author-only opt-out so authoring surfaces (course dev suite, activities admin, assignment picker)
+  // can still list drafts to build/assign them. Learners and funders never see incomplete courses.
+  const includeIncomplete = canSeeIncomplete(user.role) && String(req.query.includeIncomplete ?? "") === "true";
 
-  // Hub roles (super_admin, instructional_designer) author/oversee across every org, so
-  // they see the whole catalogue; everyone else is scoped to their partner/org tenant.
-  const seesAll = isHub(user.role);
-  if (seesAll) {
+  // Build the full candidate set for this user (unpaginated), then apply the completeness gate and
+  // paginate in-memory. The catalogue is small and the completeness pass is a fixed handful of batched
+  // queries, so this stays cheap while keeping the page counts and X-Total-Count consistent post-filter.
+  let candidates: (typeof coursesTable.$inferSelect)[];
+  if (hub) {
+    // Hub roles (super_admin, instructional_designer) author/oversee across every org, so they see the
+    // whole catalogue; everyone else is scoped to their partner/org tenant.
     const conds = [
       search ? ilike(coursesTable.title, `%${search}%`) : undefined,
       isStatus ? eq(coursesTable.status, statusFilter as "draft" | "published" | "archived") : undefined,
     ].filter((c): c is NonNullable<typeof c> => !!c);
     const where = conds.length ? and(...conds) : undefined;
-    const [{ value: total }] = await db.select({ value: count() }).from(coursesTable).where(where);
-    res.setHeader("X-Total-Count", String(total));
-    const courses = await db
-      .select()
-      .from(coursesTable)
-      .where(where)
-      .orderBy(desc(coursesTable.createdAt))
-      .limit(limit)
-      .offset(offset);
-    res.json(courses.map(toCourseResponse));
-    return;
-  }
-  // Non-hub users see (a) courses their own tenant owns, plus (b) platform-owned courses
-  // ASSIGNED to their partner from the console. Additive: assignment only grants visibility,
-  // it never removes a course the tenant already owns. Learner course access is still gated
-  // by enrolment elsewhere; this list drives the catalogue an admin/coach can act on.
-  const scope = user.partnerId ?? user.organisationId ?? user.id;
-  const owned = await db.select().from(coursesTable).where(eq(coursesTable.tenantId, scope));
-  let assigned: (typeof coursesTable.$inferSelect)[] = [];
-  if (user.partnerId) {
-    try {
-      const rows = await db
-        .select({ courseId: coursePartnerAssignmentsTable.courseId })
-        .from(coursePartnerAssignmentsTable)
-        .where(eq(coursePartnerAssignmentsTable.partnerId, user.partnerId));
-      const ids = [...new Set(rows.map((r) => r.courseId))].filter((id) => !owned.some((o) => o.id === id));
-      if (ids.length) assigned = await db.select().from(coursesTable).where(inArray(coursesTable.id, ids));
-    } catch {
-      // Assignment table not created yet (setup-platform not run) -> just the owned list.
+    candidates = await db.select().from(coursesTable).where(where).orderBy(desc(coursesTable.createdAt));
+  } else {
+    // Non-hub users see (a) courses their own tenant owns, plus (b) platform-owned courses ASSIGNED to
+    // their partner from the console. Additive: assignment only grants visibility. Learner course access
+    // is still gated by enrolment elsewhere; this list drives the catalogue an admin/coach can act on.
+    const scope = user.partnerId ?? user.organisationId ?? user.id;
+    const owned = await db.select().from(coursesTable).where(eq(coursesTable.tenantId, scope));
+    let assigned: (typeof coursesTable.$inferSelect)[] = [];
+    if (user.partnerId) {
+      try {
+        const rows = await db
+          .select({ courseId: coursePartnerAssignmentsTable.courseId })
+          .from(coursePartnerAssignmentsTable)
+          .where(eq(coursePartnerAssignmentsTable.partnerId, user.partnerId));
+        const ids = [...new Set(rows.map((r) => r.courseId))].filter((id) => !owned.some((o) => o.id === id));
+        if (ids.length) assigned = await db.select().from(coursesTable).where(inArray(coursesTable.id, ids));
+      } catch {
+        // Assignment table not created yet (setup-platform not run) -> just the owned list.
+      }
     }
+    candidates = [...owned, ...assigned].sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    if (search) {
+      const q = search.toLowerCase();
+      candidates = candidates.filter((c) => c.title.toLowerCase().includes(q));
+    }
+    if (isStatus) candidates = candidates.filter((c) => c.status === statusFilter);
   }
-  let all = [...owned, ...assigned].sort(
-    (a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0),
+
+  const completeness = await loadCourseCompleteness(candidates.map((c) => ({ id: c.id, status: c.status })));
+  const visible = includeIncomplete ? candidates : candidates.filter((c) => completeness.get(c.id)?.complete);
+
+  res.setHeader("X-Total-Count", String(visible.length));
+  res.json(visible.slice(offset, offset + limit).map((c) => toCourseResponse(c, completeness.get(c.id))));
+});
+
+// GET /courses/incomplete -- the author-only "Incomplete courses" repository. Every course that is NOT
+// catalogue-eligible (draft, or has a module missing components / not yet published), each with the
+// exact per-module reasons. Guarded to the Hub tier (super_admin + instructional_designer). Archived
+// courses are a deliberate end-state, not work-in-progress, so they are excluded.
+// Registered BEFORE GET /courses/:courseId so the literal path is not captured as an id.
+router.get("/courses/incomplete", requireAuth, requireHub, async (_req, res) => {
+  const courses = await db
+    .select()
+    .from(coursesTable)
+    .where(ne(coursesTable.status, "archived"))
+    .orderBy(desc(coursesTable.createdAt));
+  const completeness = await loadCourseCompleteness(courses.map((c) => ({ id: c.id, status: c.status })));
+  const incomplete = courses.filter((c) => !completeness.get(c.id)?.complete);
+  res.json(
+    incomplete.map((c) => {
+      const comp = completeness.get(c.id);
+      return {
+        ...toCourseResponse(c, comp),
+        moduleCount: comp?.moduleCount ?? c.moduleCount,
+        modules: comp?.modules ?? [],
+      };
+    }),
   );
-  if (search) {
-    const q = search.toLowerCase();
-    all = all.filter((c) => c.title.toLowerCase().includes(q));
-  }
-  if (isStatus) all = all.filter((c) => c.status === statusFilter);
-  res.setHeader("X-Total-Count", String(all.length));
-  res.json(all.slice(offset, offset + limit).map(toCourseResponse));
 });
 
 // POST /courses -- author tiers only (was requireAuth-only, which let any signed-in user create).
@@ -219,8 +263,11 @@ router.get("/courses/:courseId", requireAuth, async (req, res) => {
     .from(modulesTable)
     .where(eq(modulesTable.courseId, course.id))
     .orderBy(modulesTable.order);
+  // Attach the completeness verdict so an author who opens an incomplete course sees what is missing.
+  // Detail stays reachable whether or not the course is catalogue-eligible (this is the edit surface).
+  const completeness = (await loadCourseCompleteness([{ id: course.id, status: course.status }])).get(course.id);
   res.json({
-    ...toCourseResponse(course),
+    ...toCourseResponse(course, completeness),
     modules: modules.map(m => ({
       id: m.id,
       courseId: m.courseId,

@@ -157,7 +157,9 @@ function ReviewFinalize() {
   const { toast } = useToast();
   const [courseId, setCourseId] = useState('');
 
-  const { data: courses } = useQuery({ queryKey: ['courses'], queryFn: () => apiFetch<any[]>('/courses') });
+  // Authoring surface: include incomplete/draft courses so they can be built (the catalogue filter
+  // would otherwise hide the very courses being developed here).
+  const { data: courses } = useQuery({ queryKey: ['courses', 'authoring'], queryFn: () => apiFetch<any[]>('/courses?includeIncomplete=true') });
   const { data: detail, isLoading: detailLoading, isError: detailError } = useQuery({ queryKey: ['course-detail', courseId], queryFn: () => apiFetch<any>(`/courses/${courseId}`), enabled: !!courseId, retry: false });
   const { data: acts } = useQuery({ queryKey: ['course-activities', courseId], queryFn: () => apiFetch<any[]>(`/activities?courseId=${courseId}`), enabled: !!courseId });
   const { data: cases } = useQuery({ queryKey: ['course-cases', courseId], queryFn: () => apiFetch<any[]>(`/courses/${courseId}/cases`), enabled: !!courseId });

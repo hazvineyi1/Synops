@@ -38,6 +38,7 @@ import {
   ArrowLeft,
   Activity,
   Languages,
+  FileWarning,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
@@ -302,6 +303,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.learningHub', 'Learning Hub'), href: '/learning', icon: BookOpen },
             { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: GraduationCap },
+            { label: t('nav.incompleteCourses', 'Incomplete courses'), href: '/incomplete-courses', icon: FileWarning },
             { label: t('nav.studio'), href: '/studio', icon: PenTool },
             { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
             { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
@@ -349,6 +351,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         items: [
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.studio'), href: '/studio', icon: PenTool },
+          { label: t('nav.incompleteCourses', 'Incomplete courses'), href: '/incomplete-courses', icon: FileWarning },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
           { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
