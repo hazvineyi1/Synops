@@ -290,10 +290,15 @@ async function verifyPasskeyAssertion(userId: string, assertion: unknown, req: {
 // Each demo host maps to a fixed tenant and its two demo identities, so demo.synops-consulting.com
 // enters the Synops Demo tenant and enza.synops-consulting.com enters Enza. `adminRole` is the global
 // role the "admin" button lands in (partner_admin -> the partner hub).
+// praxis.synops-consulting.com ALSO enters the Synops Demo tenant: it hosts the /demo landing page,
+// so the investor demo link can live at praxis.synops-consulting.com/demo without a dedicated
+// subdomain. This only affects /auth/demo-login (the one-click buttons); normal credentialed
+// super-admin login on this host is unaffected.
 type DemoTenant = { slug: string; student: string; admin: string; adminRole: "partner_admin" | "org_admin" };
 const DEMO_TENANTS: Record<string, DemoTenant> = {
   "enza.synops-consulting.com": { slug: "enza-global", student: "enza@student1.test", admin: "demo.admin@enzaglobalmedia.co.za", adminRole: "partner_admin" },
   "demo.synops-consulting.com": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
+  "praxis.synops-consulting.com": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
 };
 // Safe-by-default host allowlist: with DEMO_LOGIN_HOSTS unset, the one-click demo only works on the
 // known demo hosts above and is invisible (404) on every other host — so standing up a new tenant on
