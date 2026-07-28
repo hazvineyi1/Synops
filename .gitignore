@@ -61,3 +61,4 @@ MERGE-PRAXIS.bat
 COMMIT-MONO.bat
 .praxis-merge-log.txt
 .mono-commit-log.txt
+.mono-commit-msg.txt

@@ -28,6 +28,7 @@ import { runOpsScan } from "../lib/opsAgent";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
+import { seedSynopsDemo } from "../lib/synopsDemoSeed";
 import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
@@ -1093,6 +1094,23 @@ router.post("/platform/resync-enza-progress", requireAuth, requireSuperAdmin, as
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Resync failed" });
+  }
+});
+
+/**
+ * POST /platform/seed-synops-demo - provisions the public "Synops Demo" tenant used for the demo
+ * link sent to investors and prospects (demo.synops-consulting.com): its own partner, graphite/amber
+ * brand, organisation and cohort, the platform courses (reused from Enza), a demo admin, a coach, and
+ * learners including "Demo Learner". Idempotent - safe to click more than once. Run seed-enza first so
+ * there is a course catalogue to reuse.
+ */
+router.post("/platform/seed-synops-demo", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await seedSynopsDemo();
+    await audit(req, "platform.seed_synops_demo", "partner", result.partnerId ?? "synops-demo", { courses: result.courses, learners: result.learners });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }
 });
 

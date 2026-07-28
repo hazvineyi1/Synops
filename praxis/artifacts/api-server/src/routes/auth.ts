@@ -287,13 +287,18 @@ async function verifyPasskeyAssertion(userId: string, assertion: unknown, req: {
  * Guarded by ENABLE_DEMO_LOGIN: set it to "0" to switch the whole feature off without a
  * code change. Anything else (including unset) leaves it ON, which is what the demo needs.
  */
-const DEMO_STUDENT_EMAIL = "enza@student1.test";
-const DEMO_ADMIN_EMAIL = "demo.admin@enzaglobalmedia.co.za";
-const ENZA_PARTNER_SLUG = "enza-global";
+// Each demo host maps to a fixed tenant and its two demo identities, so demo.synops-consulting.com
+// enters the Synops Demo tenant and enza.synops-consulting.com enters Enza. `adminRole` is the global
+// role the "admin" button lands in (partner_admin -> the partner hub).
+type DemoTenant = { slug: string; student: string; admin: string; adminRole: "partner_admin" | "org_admin" };
+const DEMO_TENANTS: Record<string, DemoTenant> = {
+  "enza.synops-consulting.com": { slug: "enza-global", student: "enza@student1.test", admin: "demo.admin@enzaglobalmedia.co.za", adminRole: "partner_admin" },
+  "demo.synops-consulting.com": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
+};
 // Safe-by-default host allowlist: with DEMO_LOGIN_HOSTS unset, the one-click demo only works on the
-// known demo host and is invisible (404) on every other host — so standing up a new tenant on a new
-// domain can never accidentally expose it. Override with DEMO_LOGIN_HOSTS to add demo hosts.
-const DEFAULT_DEMO_HOSTS = ["enza.synops-consulting.com"];
+// known demo hosts above and is invisible (404) on every other host — so standing up a new tenant on
+// a new domain can never accidentally expose it. Override with DEMO_LOGIN_HOSTS to add demo hosts.
+const DEFAULT_DEMO_HOSTS = Object.keys(DEMO_TENANTS);
 
 router.post("/auth/demo-login", async (req, res) => {
   if (process.env.ENABLE_DEMO_LOGIN === "0") {
@@ -311,6 +316,9 @@ router.post("/auth/demo-login", async (req, res) => {
     res.status(404).json({ error: "Not found." });
     return;
   }
+  // Which demo tenant this host enters. Known hosts map explicitly; any extra host added via
+  // DEMO_LOGIN_HOSTS falls back to the Enza tenant.
+  const tenant = DEMO_TENANTS[host] ?? DEMO_TENANTS["enza.synops-consulting.com"];
   const role = String(req.body?.role ?? "").toLowerCase().trim();
   if (role !== "student" && role !== "admin") {
     res.status(400).json({ error: "Unknown demo role." });
@@ -323,12 +331,12 @@ router.post("/auth/demo-login", async (req, res) => {
   let user: typeof usersTable.$inferSelect | undefined;
 
   if (role === "student") {
-    [user] = await db.select().from(usersTable).where(eq(usersTable.email, DEMO_STUDENT_EMAIL)).limit(1);
+    [user] = await db.select().from(usersTable).where(eq(usersTable.email, tenant.student)).limit(1);
     if (!user) {
-      // Fall back to a real active learner inside the Enza partner, so the demo button works even
-      // if the dedicated demo learner was never seeded. Still narrow: only ever an ACTIVE learner
-      // belonging to the Enza partner, never an arbitrary account from the request.
-      const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_PARTNER_SLUG)).limit(1);
+      // Fall back to a real active learner inside this demo tenant, so the button works even if the
+      // dedicated demo learner was never seeded. Still narrow: only ever an ACTIVE learner belonging
+      // to the demo partner, never an arbitrary account from the request.
+      const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, tenant.slug)).limit(1);
       if (partner) {
         const learners = await db
           .select()
@@ -342,26 +350,26 @@ router.post("/auth/demo-login", async (req, res) => {
         user = live.find((u) => !!u.organisationId) ?? live[0];
       }
       if (!user) {
-        res.status(503).json({ error: "The demo learner is not provisioned yet. Seed the Enza cohort first." });
+        res.status(503).json({ error: "The demo learner is not provisioned yet. Seed the demo tenant first." });
         return;
       }
     }
   } else {
-    // admin: find-or-create a dedicated demo partner_admin on the Enza partner.
-    [user] = await db.select().from(usersTable).where(eq(usersTable.email, DEMO_ADMIN_EMAIL)).limit(1);
+    // admin: find-or-create a dedicated demo admin on this demo tenant's partner.
+    [user] = await db.select().from(usersTable).where(eq(usersTable.email, tenant.admin)).limit(1);
     if (!user) {
-      const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_PARTNER_SLUG)).limit(1);
+      const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, tenant.slug)).limit(1);
       if (!partner) {
-        res.status(503).json({ error: "The Enza partner is not provisioned yet." });
+        res.status(503).json({ error: "The demo partner is not provisioned yet. Seed the demo tenant first." });
         return;
       }
       [user] = await db
         .insert(usersTable)
         .values({
-          email: DEMO_ADMIN_EMAIL,
+          email: tenant.admin,
           firstName: "Demo",
           lastName: "Admin",
-          role: "partner_admin",
+          role: tenant.adminRole,
           status: "active",
           partnerId: partner.id,
           organisationId: null,

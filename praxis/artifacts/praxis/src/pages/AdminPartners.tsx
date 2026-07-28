@@ -461,6 +461,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not seed cohort', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Provision the public Synops Demo tenant (demo.synops-consulting.com): partner + graphite/amber
+  // brand + org + cohort + Demo Learner/Admin, reusing Enza's course catalogue and pre-filling progress.
+  const seedSynopsDemo = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; courses?: number; learners?: number; message?: string }>('/platform/seed-synops-demo', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] });
+      toast({ title: 'Synops Demo ready', description: r.message ?? `${r.courses} courses, ${r.learners} learners.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not seed Synops Demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -518,6 +529,11 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Seed the Enza demo cohort (org, admin, coach, 4 learners)? This writes demo accounts.')) seedCohort.mutate(); }}
                 title="Seed a realistic Enza delivery cohort">
                 {seedCohort.isPending ? 'Seeding…' : 'Seed Enza Cohort'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedSynopsDemo.isPending}
+                onClick={() => { if (window.confirm('Provision the public Synops Demo tenant (demo.synops-consulting.com): partner, brand, cohort, Demo Learner/Admin, reusing Enza courses?')) seedSynopsDemo.mutate(); }}
+                title="Provision the Synops Demo tenant for demo.synops-consulting.com">
+                {seedSynopsDemo.isPending ? 'Provisioning…' : 'Seed Synops Demo'}
               </Button>
               <Button variant="outline" size="sm" disabled={resync.isPending}
                 onClick={() => { if (window.confirm('Resync demo learner progress against the current content?')) resync.mutate(); }}

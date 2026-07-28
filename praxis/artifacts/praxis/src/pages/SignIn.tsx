@@ -55,8 +55,8 @@ export function SignInPage() {
   // All methods the user can choose between (verified factors + backup codes, if any).
   const pickable = [...methods, ...(hasBackup ? ["backup"] : [])];
 
-  // Demo buttons are only offered on the Enza site, where the demo accounts live.
-  const showDemo = typeof window !== "undefined" && window.location.hostname === "enza.synops-consulting.com";
+  // Demo buttons are only offered on the demo-enabled hosts, where the demo accounts live.
+  const showDemo = typeof window !== "undefined" && ["enza.synops-consulting.com", "demo.synops-consulting.com"].includes(window.location.hostname);
 
   const onDemo = async (role: "student" | "admin") => {
     setError(null);

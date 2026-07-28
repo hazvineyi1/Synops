@@ -26,6 +26,8 @@ export function mfaRequiredForRole(role: string): boolean {
 const MFA_EXEMPT_EMAILS = new Set<string>([
   "demo.admin@enzaglobalmedia.co.za",
   "enza@student1.test",
+  "demo.learner@synops-demo.test",
+  "demo.admin@synops-demo.test",
 ]);
 
 export function isMfaExemptEmail(email?: string | null): boolean {

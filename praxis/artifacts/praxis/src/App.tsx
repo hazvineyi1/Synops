@@ -55,6 +55,7 @@ import { ForgotPasswordPage } from '@/pages/ForgotPassword';
 import { ResetPasswordPage } from '@/pages/ResetPassword';
 import { JoinCohort } from '@/pages/JoinCohort';
 import { PartnerLanding } from '@/pages/PartnerLanding';
+import DemoLanding from '@/pages/DemoLanding';
 import { PlatformConsole } from '@/pages/PlatformConsole';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
@@ -131,10 +132,14 @@ function partnerSlugForHost(): string | null {
   return PARTNER_SUBDOMAIN_SLUGS[window.location.hostname] ?? null;
 }
 
+const DEMO_HOST = 'demo.synops-consulting.com';
+
 function HomeRedirect() {
   const { isSignedIn, loading } = useSession();
   if (loading) return <SessionGate />;
   if (isSignedIn) return <Redirect to="/dashboard" />;
+  // The public demo host shows the Synops Demo landing at its root, so the link we send is clean.
+  if (typeof window !== 'undefined' && window.location.hostname === DEMO_HOST) return <DemoLanding />;
   const partnerSlug = partnerSlugForHost();
   if (partnerSlug) return <PartnerLanding params={{ slug: partnerSlug }} />;
   return <Home />;
@@ -213,6 +218,7 @@ function Routes() {
         <Route path="/" component={HomeRedirect} />
 
         {/* Auth */}
+        <PublicRoute path="/demo" component={DemoLanding} />
         <PublicRoute path="/sign-in" component={SignInPage} />
         <PublicRoute path="/forgot-password" component={ForgotPasswordPage} />
         <PublicRoute path="/reset-password" component={ResetPasswordPage} />
