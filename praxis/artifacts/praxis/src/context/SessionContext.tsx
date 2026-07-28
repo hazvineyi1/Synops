@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { API } from "@/lib/api";
 
 /**
@@ -75,6 +75,9 @@ const SessionContext = createContext<SessionState>({
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
+  // Latest user, readable from callbacks with empty deps (e.g. signOut) without going stale.
+  const userRef = useRef<SessionUser | null>(null);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   const refresh = useCallback(async () => {
     try {
@@ -145,6 +148,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Demo personas came in via the demo landing, so send them back there rather than to the
+    // enrolment sign-in (which is a dead end for them). Identify them by their fixed demo domain.
+    const wasDemo = (userRef.current?.email ?? "").toLowerCase().endsWith("@synops-demo.test");
     await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" }).catch(
       () => {},
     );
@@ -153,7 +159,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // every piece of component state belonging to the previous user. Leaking one
     // user's data into the next user's session is exactly the bug worth being
     // heavy-handed about.
-    window.location.href = "/sign-in";
+    window.location.href = wasDemo ? "/demo" : "/sign-in";
   }, []);
 
   return (
