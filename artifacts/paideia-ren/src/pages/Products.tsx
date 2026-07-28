@@ -467,7 +467,7 @@ const PRODUCTS: Product[] = [
     accent: "accent" as const,
     // Praxis is live and enrolment-gated, so it links straight to sign-in rather than
     // sitting behind the interest funnel. The LMS itself gates access.
-    href: "https://synops-production.up.railway.app/sign-in",
+    href: "https://praxis.synops-consulting.com/sign-in",
     cta: "Sign in",
   },
 ];

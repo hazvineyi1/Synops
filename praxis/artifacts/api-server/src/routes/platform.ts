@@ -23,6 +23,7 @@ import { eq, and, isNull, desc, sql, or, ilike, gte, count, type SQL } from "dri
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { logAudit as audit } from "../lib/audit";
 import { healthSnapshot } from "../lib/healthMetrics";
+import { computeEngagementRate } from "../lib/platformHealth";
 import { runOpsScan } from "../lib/opsAgent";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
@@ -669,6 +670,14 @@ router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res)
     db.select({ c: sql<number>`count(*)` }).from(usersTable).where(eq(usersTable.role, "learner"))));
   const activeEnrolments = await safeCount(() => sqlCount(
     db.select({ c: sql<number>`count(*)` }).from(enrolmentsTable).where(eq(enrolmentsTable.status, "active"))));
+  // Distinct learners who hold at least one active enrolment. A learner can be enrolled in several
+  // courses, so activeEnrolments (16) can exceed the learner headcount (7); engagement must be
+  // measured on distinct active learners, not raw enrolments, or the rate blows past 100%.
+  const activeLearners = await safeCount(() => sqlCount(
+    db.select({ c: sql<number>`count(distinct ${enrolmentsTable.userId})` })
+      .from(enrolmentsTable)
+      .innerJoin(usersTable, eq(usersTable.id, enrolmentsTable.userId))
+      .where(and(eq(enrolmentsTable.status, "active"), eq(usersTable.role, "learner")))));
 
   const alerts = [
     { id: "funding", label: "funding agreements expiring", count: expiringFunding, severity: expiringFunding ? "warn" : "ok", detail: "Within 60 days or already expired" },
@@ -677,8 +686,8 @@ router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res)
     { id: "onboarding", label: "partners onboarding", count: onboardingPartners, severity: onboardingPartners ? "info" : "ok", detail: "Not yet marked active" },
     { id: "drafts", label: "courses in draft", count: draftCourses, severity: draftCourses ? "info" : "ok", detail: "Not yet published to partners" },
   ];
-  const engagementRate = learners > 0 ? Math.min(100, Math.round((activeEnrolments / learners) * 100)) : 0;
-  res.json({ alerts, health: { learners, activeEnrolments, engagementRate } });
+  const engagementRate = computeEngagementRate(activeLearners, learners);
+  res.json({ alerts, health: { learners, activeLearners, activeEnrolments, engagementRate } });
 });
 
 /**

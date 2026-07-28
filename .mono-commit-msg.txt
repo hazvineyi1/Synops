@@ -1,1 +1,1 @@
-Praxis: learners cannot self-enrol - enrolment is admin-assigned only
+Marketing: Praxis sign-in link uses praxis.synops-consulting.com (not the raw Railway URL)

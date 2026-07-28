@@ -39,6 +39,7 @@ import {
   Activity,
   Languages,
   FileWarning,
+  Search,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
@@ -103,7 +104,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const tenantBrandName = brand?.displayName || (brandLoading ? '' : 'Praxis');
   const tenantBrandLogo = brand?.logoUrl || null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [location] = useLocation();
+  const [commandQuery, setCommandQuery] = useState('');
+  const [location, navigate] = useLocation();
 
   const handleSignOut = () => {
     void signOut();
@@ -332,6 +334,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
           ],
         },
+        {
+          // Platform operations tools. These used to be dumped into the personal account footer,
+          // which crushed the real nav into a tiny scroll box; they belong in their own labelled
+          // group in the main nav.
+          heading: t('nav.groups.operations', 'Operations'),
+          items: [
+            { label: t('nav.health', 'System health'), href: '/admin/health', icon: Activity },
+            { label: t('nav.cleanup', 'Environment cleanup'), href: '/admin/cleanup', icon: Sparkles },
+            { label: t('nav.translations', 'Translation review'), href: '/admin/translations', icon: Languages },
+            { label: t('nav.dataRequests', 'Data requests'), href: '/admin/data-requests', icon: ShieldCheck },
+          ],
+        },
       ];
     }
 
@@ -376,6 +390,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return !flatNav.some((i) => i.href.length > href.length && (location === i.href || location.startsWith(i.href + '/')));
   };
   const bottomItems = flatNav.slice(0, 4);
+  // Breadcrumb label for the super-admin command bar: the most-specific active nav item.
+  const activeNavLabel = flatNav.find((i) => isNavActive(i.href))?.label ?? '';
 
   const groupHeading = (text: string) => (
     <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.32)' }}>
@@ -471,33 +487,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             active={isNavActive('/privacy/data')}
           />
 
-          {user.role === 'super_admin' && (
-            <ShellNavLink
-              item={{ label: t('nav.dataRequests', 'Data requests'), href: '/admin/data-requests', icon: ShieldCheck }}
-              active={isNavActive('/admin/data-requests')}
-            />
-          )}
-
-          {user.role === 'super_admin' && (
-            <ShellNavLink
-              item={{ label: t('nav.cleanup', 'Environment cleanup'), href: '/admin/cleanup', icon: Sparkles }}
-              active={isNavActive('/admin/cleanup')}
-            />
-          )}
-
-          {user.role === 'super_admin' && (
-            <ShellNavLink
-              item={{ label: t('nav.health', 'System health'), href: '/admin/health', icon: Activity }}
-              active={isNavActive('/admin/health')}
-            />
-          )}
-
-          {user.role === 'super_admin' && (
-            <ShellNavLink
-              item={{ label: t('nav.translations', 'Translation review'), href: '/admin/translations', icon: Languages }}
-              active={isNavActive('/admin/translations')}
-            />
-          )}
+          {/* System health, Environment cleanup, Translation review and Data requests now live in
+              the Operations nav group above (super admin), so the footer stays a compact account
+              area rather than a second, competing menu. */}
 
           <div className="px-1"><LanguageSwitcher variant="full" /></div>
 
@@ -589,6 +581,54 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* ── Main content ─────────────────────────────────────── */}
       <main className="flex-1 flex flex-col min-w-0">
+        {/* Super-admin command bar (desktop): the platform console gets a distinct top bar the
+            partner site does not have - global "jump to", a breadcrumb, system health and
+            notifications - so the shell reads as a command center, and the sidebar is left free
+            for navigation only. */}
+        {isSuperPlatform && (
+          <header className="hidden md:flex h-14 items-center gap-3 px-6 shrink-0" style={{ background: sidebarBg, borderBottom: `1px solid ${HAIRLINE}` }}>
+            <span className="text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.5)' }}>
+              {t('nav.platformConsole', 'Platform Console')}
+            </span>
+            {activeNavLabel && (
+              <>
+                <span style={{ color: 'rgba(255,255,255,0.28)' }}>/</span>
+                <span className="text-sm font-medium whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.92)' }}>{activeNavLabel}</span>
+              </>
+            )}
+            <div className="flex-1 flex justify-center px-4">
+              <div className="relative w-full max-w-sm">
+                <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'rgba(255,255,255,0.4)' }} />
+                <input
+                  value={commandQuery}
+                  onChange={(e) => setCommandQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return;
+                    const query = commandQuery.trim().toLowerCase();
+                    const hit = flatNav.find((i) => i.label.toLowerCase().includes(query));
+                    if (query && hit) { navigate(hit.href); setCommandQuery(''); }
+                  }}
+                  placeholder={t('nav.jumpTo', 'Jump to a section')}
+                  aria-label={t('nav.jumpTo', 'Jump to a section')}
+                  className="w-full rounded-md pl-9 pr-3 py-2 text-sm outline-none placeholder:text-white/40"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: '#fff' }}
+                />
+              </div>
+            </div>
+            <Link href="/admin/health" className="flex items-center gap-1.5 text-xs whitespace-nowrap transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <Activity className="h-4 w-4" /> {t('nav.health', 'System health')}
+            </Link>
+            <Link href="/notifications" className="relative transition-colors hover:text-white" style={{ color: 'rgba(255,255,255,0.7)' }} aria-label={t('nav.notifications')}>
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
+          </header>
+        )}
+
         {/* Mobile top header */}
         <header className="h-14 flex items-center justify-between px-4 md:hidden shrink-0" style={{ background: sidebarBg }}>
           <button

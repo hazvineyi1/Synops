@@ -14,6 +14,7 @@ import { recordRequest } from "./lib/healthMetrics";
 import { registerPwa } from "./pwa";
 import { logger } from "./lib/logger";
 import { captureError } from "./lib/observability";
+import { shouldRedirectToCanonical } from "./lib/canonicalHost";
 
 const app: Express = express();
 
@@ -21,6 +22,21 @@ const app: Express = express();
 // (needed for correct rate-limit keying and audit IPs). Not `true` — that would trust a spoofable
 // chain and express-rate-limit rejects it.
 app.set("trust proxy", 1);
+
+// Canonical host: bounce any hit on the raw *.up.railway.app domain to the branded domain with a
+// permanent redirect, so old bookmarks and stale email links land on praxis.synops-consulting.com
+// instead of exposing the Railway URL in the address bar. Only navigational GET/HEAD requests are
+// redirected; `/api` (which includes Railway's `/api/readyz` health check) and the `/c/` and `/a/`
+// external token embeds are left untouched so nothing server-to-server or embedded breaks. Set
+// CANONICAL_HOST="" to disable. `trust proxy` above makes req.get("host") the real client host.
+const CANONICAL_HOST = process.env.CANONICAL_HOST ?? "praxis.synops-consulting.com";
+app.use((req, res, next) => {
+  if (shouldRedirectToCanonical(req.get("host") ?? "", req.method, req.path, CANONICAL_HOST)) {
+    res.redirect(301, `https://${CANONICAL_HOST}${req.originalUrl}`);
+    return;
+  }
+  next();
+});
 
 // Security headers. CSP, frameguard, COEP and CORP are intentionally left OFF here: the SPA uses
 // inline styles and sandboxed activity iframes, and /c/:token /a/:token are DESIGNED to be embedded

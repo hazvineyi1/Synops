@@ -3,13 +3,13 @@ import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
-import { StatCard, SectionTitle } from '@/components/StatCard';
+import { SectionTitle } from '@/components/StatCard';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
-  LayoutDashboard, Building, Users, Landmark, Wallet, Receipt, Percent, ShieldCheck,
+  LayoutDashboard, Building, Users, Landmark, Wallet, Receipt, Percent, ShieldCheck, BookOpen,
   ChevronRight, ChevronDown, ArrowRight, TrendingUp, HeartPulse, GraduationCap,
   AlertTriangle, CheckCircle2, BellRing,
 } from 'lucide-react';
@@ -45,11 +45,25 @@ export function PlatformOverview() {
   const finByPartner = new Map((fin?.partners ?? []).map((p) => [p.id, p]));
   const { data: alertData } = useQuery({
     queryKey: ['platform-alerts'],
-    queryFn: () => apiFetch<{ alerts: { id: string; label: string; count: number; severity: string; detail: string }[]; health: { learners: number; activeEnrolments: number; engagementRate: number } }>('/platform/alerts'),
+    queryFn: () => apiFetch<{ alerts: { id: string; label: string; count: number; severity: string; detail: string }[]; health: { learners: number; activeLearners: number; activeEnrolments: number; engagementRate: number } }>('/platform/alerts'),
   });
   const alerts = alertData?.alerts ?? [];
   const openAlerts = alerts.filter((a) => a.count > 0);
-  const alertHealth = alertData?.health ?? { learners: 0, activeEnrolments: 0, engagementRate: 0 };
+  const alertHealth = alertData?.health ?? { learners: 0, activeLearners: 0, activeEnrolments: 0, engagementRate: 0 };
+
+  // Live values for the Learning and Operations hub tiles. GET /courses returns the catalog-eligible
+  // (published, complete) courses; /platform/health carries the rolling one-minute error rate.
+  const { data: courses } = useQuery({
+    queryKey: ['courses'],
+    queryFn: () => apiFetch<{ id: string }[]>('/courses'),
+  });
+  const courseCount = courses?.length ?? 0;
+  const { data: health } = useQuery({
+    queryKey: ['platform-health'],
+    queryFn: () => apiFetch<{ window: { errorRatePct: number } }>('/platform/health'),
+    refetchInterval: 60000,
+  });
+  const errorRate = health?.window?.errorRatePct ?? 0;
 
   // Real partners drive getPartnerHub's empty-hub fallback, so opening one never shows demo data.
   useEffect(() => {
@@ -73,23 +87,45 @@ export function PlatformOverview() {
   const enter = (id: string) => { setActivePartner(id); navigate('/partner'); };
 
   const partnerCount = partners?.length ?? 0;
-  const orgCount = orgs?.filter((o) => o.partnerId).length ?? 0;
   const learnerTotal = (partners ?? []).reduce((s, p) => s + (p.learnerCount ?? 0), 0);
+
+  // Hub tiles: the platform home. Each tile is a live stat AND the door into that section, so a
+  // super admin lands on a command deck rather than a wall of links.
+  const hubTiles: { title: string; stat: string; icon: React.ElementType; href: string }[] = [
+    { title: 'Partners', stat: `${partnerCount} active`, icon: Building, href: '/admin/partners' },
+    { title: 'Learning', stat: `${courseCount} course${courseCount === 1 ? '' : 's'}`, icon: BookOpen, href: '/learning' },
+    { title: 'Delivery', stat: `${learnerTotal} learner${learnerTotal === 1 ? '' : 's'}`, icon: Users, href: '/delivery' },
+    { title: 'Finance', stat: `${ZAR(finTotals.mrrGross)} / mo`, icon: Wallet, href: '/platform-finance' },
+    { title: 'Platform', stat: openAlerts.length ? `${openAlerts.length} to review` : 'All clear', icon: ShieldCheck, href: '/platform' },
+    { title: 'Operations', stat: errorRate >= 5 ? `${errorRate}% errors` : 'System healthy', icon: HeartPulse, href: '/admin/health' },
+  ];
 
   const statusChip = (s: string) =>
     s === 'active' ? 'bg-emerald-100 text-emerald-700' : s === 'suspended' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700';
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Partner Hub" icon={LayoutDashboard}
-        subtitle={`${partnerCount} partner${partnerCount === 1 ? '' : 's'} on the platform. Open any partner to work inside their hub.`} />
+      <PageHeader title="Platform overview" icon={LayoutDashboard}
+        subtitle={`${partnerCount} partner${partnerCount === 1 ? '' : 's'} on the platform. Jump into any area, or open a partner below.`} />
 
-      {/* Real platform KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard icon={Building} label="Partners" value={partnerCount} tint="bg-indigo-500/10 text-indigo-600" />
-        <StatCard icon={Building} label="Organisations" value={orgCount} tint="bg-emerald-500/10 text-emerald-600" />
-        <StatCard icon={GraduationCap} label="Learners" value={learnerTotal} tint="bg-violet-500/10 text-violet-600" />
-        <StatCard icon={ShieldCheck} label="System" value={'Healthy'} tint="bg-blue-500/10 text-blue-600" />
+      {/* Hub tiles — the platform home: live stats that double as the door into each area. */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        {hubTiles.map((tile) => (
+          <button
+            key={tile.href}
+            onClick={() => navigate(tile.href)}
+            className="group text-left rounded-xl border border-border bg-card p-4 transition-all hover:border-violet-400/60 hover:shadow-sm"
+          >
+            <div className="flex items-center justify-between">
+              <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600">
+                <tile.icon className="h-5 w-5" />
+              </span>
+              <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            </div>
+            <div className="mt-3 font-semibold leading-tight">{tile.title}</div>
+            <div className="text-sm text-muted-foreground">{tile.stat}</div>
+          </button>
+        ))}
       </div>
 
       {/* Attention needed — REAL alerts derived from live data */}
@@ -200,7 +236,7 @@ export function PlatformOverview() {
         </div>
         <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
           <HeartPulse className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Learner engagement <span className="font-semibold text-foreground">{alertHealth.engagementRate}%</span> <span className="text-muted-foreground">({alertHealth.activeEnrolments} of {alertHealth.learners} learners active)</span></span>
+          <span className="text-xs text-muted-foreground">Learner engagement <span className="font-semibold text-foreground">{alertHealth.engagementRate}%</span> <span className="text-muted-foreground">({alertHealth.activeLearners} of {alertHealth.learners} learners active across {alertHealth.activeEnrolments} enrolments)</span></span>
         </div>
       </Card>
     </div>
