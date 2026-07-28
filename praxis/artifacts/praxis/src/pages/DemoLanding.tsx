@@ -8,10 +8,12 @@ import { useSession } from '@/context/SessionContext';
  * that call /auth/demo-login (host-locked, credential-less) and drop the visitor straight into the
  * live product as a learner or as a partner admin. No sign-up, no forms.
  */
-const INK = '#1B1A17';
-const GRAPHITE = '#111827';
-const AMBER = '#B45309';
-const GREIGE = '#F0EDE8';
+// Deep teal + warm amber on a warm off-white. The teal matches the Synops investor deck/memo
+// (TEAL #133C43), so the demo reads as one brand alongside the pitch materials.
+const INK = '#17211F';      // near-black, teal-tinted — headlines and body
+const TEAL = '#133C43';     // primary — logo, primary button
+const AMBER = '#C2601C';    // warm burnt-amber accent
+const GREIGE = '#F3F1EC';   // warm off-white page surface
 
 export default function DemoLanding() {
   const { demoSignIn } = useSession();
@@ -37,7 +39,7 @@ export default function DemoLanding() {
         {/* Brand row */}
         <div className="flex items-center justify-between mb-12 md:mb-16">
           <div className="flex items-center gap-2.5">
-            <span className="h-8 w-8 rounded-lg flex items-center justify-center font-semibold text-white" style={{ background: GRAPHITE }}>S</span>
+            <span className="h-8 w-8 rounded-lg flex items-center justify-center font-semibold text-white" style={{ background: TEAL }}>S</span>
             <span className="text-[15px] font-medium">Synops <span style={{ color: '#8f8b83' }}>Demo</span></span>
           </div>
           <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full" style={{ background: '#FBEEDC', color: AMBER, border: '1px solid #ecdcc2' }}>
@@ -60,7 +62,7 @@ export default function DemoLanding() {
               onClick={() => enter('student')}
               disabled={busy !== null}
               className="inline-flex items-center gap-2 rounded-[10px] px-5 py-3 text-sm font-medium text-white transition-opacity disabled:opacity-60"
-              style={{ background: GRAPHITE }}
+              style={{ background: TEAL }}
             >
               <GraduationCap className="h-4 w-4" />
               {busy === 'student' ? 'Starting…' : 'Enter as a learner'}
@@ -82,7 +84,7 @@ export default function DemoLanding() {
         <div className="mt-9 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-xl bg-white p-4" style={{ border: '1px solid #e6e2da' }}>
             <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide mb-2" style={{ color: '#8f8b83' }}>
-              <GraduationCap className="h-3.5 w-3.5" style={{ color: GRAPHITE }} /> As a learner
+              <GraduationCap className="h-3.5 w-3.5" style={{ color: TEAL }} /> As a learner
             </div>
             <p className="text-[13px] leading-relaxed" style={{ color: '#3a382f' }}>
               Work through the AI tutor, complete a real case, build mastery, and earn a credential.

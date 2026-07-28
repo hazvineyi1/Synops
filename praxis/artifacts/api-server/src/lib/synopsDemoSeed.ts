@@ -29,12 +29,13 @@ export const DEMO_LEARNER_EMAIL = "demo.learner@synops-demo.test";
 export const DEMO_ADMIN_EMAIL = "demo.admin@synops-demo.test";
 export const DEMO_PARTNER_SLUG = DEMO_SLUG;
 
-// Graphite + amber on greige - the chosen demo brand, deliberately distinct from Enza's lime.
+// Deep teal + warm amber on sand - matches the Synops investor deck (TEAL #133C43), so the demo
+// reads as one brand across the pitch. Deliberately distinct from Enza's lime.
 const BRAND = {
   displayName: "Synops Demo",
-  primaryColor: "#111827",   // graphite (headers/buttons; carries white text)
-  secondaryColor: "#F0EDE8", // warm greige surface
-  accentColor: "#B45309",    // amber accent
+  primaryColor: "#133C43",   // deep teal (headers/buttons; carries white text)
+  secondaryColor: "#F3F1EC", // warm off-white surface
+  accentColor: "#C2601C",    // warm burnt-amber accent
   logoUrl: null as string | null,   // no image -> the shell shows a clean "S" monogram
   faviconUrl: null as string | null,
   fontFamily: "Inter, system-ui, sans-serif",
