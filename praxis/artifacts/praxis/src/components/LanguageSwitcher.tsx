@@ -11,8 +11,10 @@ import { Button } from '@/components/ui/button';
 import { useSession } from '@/context/SessionContext';
 import { isK12DemoEmail } from '@/lib/k12Personas';
 
-const SA_LANGUAGES = [
+// Every language the platform supports (default dropdown for staff / non-K-12 users). English first = default.
+const ALL_LANGUAGES = [
   { code: 'en', label: 'English', short: 'EN' },
+  { code: 'es', label: 'Español', short: 'ES' },
   { code: 'zu', label: 'isiZulu', short: 'ZU' },
   { code: 'xh', label: 'isiXhosa', short: 'XH' },
   { code: 'af', label: 'Afrikaans', short: 'AF' },
@@ -31,7 +33,7 @@ interface Props {
 export function LanguageSwitcher({ variant = 'icon' }: Props) {
   const { i18n } = useTranslation();
   const { user } = useSession();
-  const LANGUAGES = isK12DemoEmail(user?.email) ? US_LANGUAGES : SA_LANGUAGES;
+  const LANGUAGES = isK12DemoEmail(user?.email) ? US_LANGUAGES : ALL_LANGUAGES;
   const current = LANGUAGES.find(l => l.code === i18n.language) ?? LANGUAGES[0];
 
   return (

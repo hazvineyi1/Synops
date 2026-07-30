@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import i18n from "@/i18n";
 import { useSession } from "@/context/SessionContext";
 import { personaByEmail, BAND_THEME } from "@/lib/k12Personas";
 
@@ -39,6 +40,15 @@ export function K12Adaptation() {
 
   useEffect(() => {
     ensureCss();
+    // Language: a K-12 persona follows its own language (Spanish for the Spanish-speaking learners);
+    // everyone else (super-admin, Enza, etc.) defaults back to English rather than inheriting a demo's
+    // Spanish. This stops a Sofía/Mateo session from leaving the whole app in Spanish afterwards.
+    if (persona) {
+      const target = persona.defaultLang ?? "en";
+      if (i18n.language !== target) void i18n.changeLanguage(target);
+    } else if (i18n.language === "es") {
+      void i18n.changeLanguage("en");
+    }
     const root = document.documentElement;
     const clearAll = () => {
       root.classList.remove("k12-hc", "k12-calm", ...MOTIONS, ...BANDS);
