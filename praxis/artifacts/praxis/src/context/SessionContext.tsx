@@ -152,9 +152,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    // Demo personas came in via the demo landing, so send them back there rather than to the
-    // enrolment sign-in (which is a dead end for them). Identify them by their fixed demo domain.
-    const wasDemo = (userRef.current?.email ?? "").toLowerCase().endsWith("@synops-demo.test");
+    // Demo personas came in via a demo landing, so send them back to the RIGHT one rather than the
+    // enrolment sign-in (a dead end for them). K-12 demo learners (…​.k12@synops-demo.test) return to
+    // /k12; the other synops-demo personas return to /demo; real users go to /sign-in.
+    const email = (userRef.current?.email ?? "").toLowerCase();
+    const dest = email.includes(".k12@synops-demo.test") ? "/k12"
+      : email.endsWith("@synops-demo.test") ? "/demo"
+      : "/sign-in";
     await fetch(`${API}/auth/logout`, { method: "POST", credentials: "include" }).catch(
       () => {},
     );
@@ -163,7 +167,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     // every piece of component state belonging to the previous user. Leaking one
     // user's data into the next user's session is exactly the bug worth being
     // heavy-handed about.
-    window.location.href = wasDemo ? "/demo" : "/sign-in";
+    window.location.href = dest;
   }, []);
 
   return (
