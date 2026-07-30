@@ -133,6 +133,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const role = user.role;
+  // Young K-12 learners (K-5) get a jargon-free shell: hide the adult footer links (Notifications,
+  // Security, Privacy & my data) that a child would not understand.
+  const k12FooterPersona = personaByEmail(user?.email);
+  const youngKid = !!k12FooterPersona && (k12FooterPersona.band === 'early' || k12FooterPersona.band === 'elementary');
 
   // Shell colour + context ribbon. A super admin at the platform level is violet; inside a partner
   // (or a partner admin) it is navy, so the colour itself tells you which context you are in.
@@ -483,25 +487,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <ShellNavLink
-            item={{ label: t('nav.notifications'), href: '/notifications', icon: Bell }}
-            active={isNavActive('/notifications')}
-          />
-          {unreadCount > 0 && (
-            <span className="ml-3 inline-block bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-              {unreadCount > 9 ? '9+' : unreadCount} new
-            </span>
+          {!youngKid && (
+            <>
+              <ShellNavLink
+                item={{ label: t('nav.notifications'), href: '/notifications', icon: Bell }}
+                active={isNavActive('/notifications')}
+              />
+              {unreadCount > 0 && (
+                <span className="ml-3 inline-block bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  {unreadCount > 9 ? '9+' : unreadCount} new
+                </span>
+              )}
+
+              <ShellNavLink
+                item={{ label: t('nav.security', 'Security'), href: '/security', icon: ShieldCheck }}
+                active={isNavActive('/security')}
+              />
+
+              <ShellNavLink
+                item={{ label: t('nav.privacyData', 'Privacy & my data'), href: '/privacy/data', icon: FileText }}
+                active={isNavActive('/privacy/data')}
+              />
+            </>
           )}
-
-          <ShellNavLink
-            item={{ label: t('nav.security', 'Security'), href: '/security', icon: ShieldCheck }}
-            active={isNavActive('/security')}
-          />
-
-          <ShellNavLink
-            item={{ label: t('nav.privacyData', 'Privacy & my data'), href: '/privacy/data', icon: FileText }}
-            active={isNavActive('/privacy/data')}
-          />
 
           {/* System health, Environment cleanup, Translation review and Data requests now live in
               the Operations nav group above (super admin), so the footer stays a compact account
