@@ -56,6 +56,7 @@ import { ResetPasswordPage } from '@/pages/ResetPassword';
 import { JoinCohort } from '@/pages/JoinCohort';
 import { PartnerLanding } from '@/pages/PartnerLanding';
 import DemoLanding from '@/pages/DemoLanding';
+import K12Landing from '@/pages/K12Landing';
 import { PlatformConsole } from '@/pages/PlatformConsole';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
@@ -219,6 +220,7 @@ function Routes() {
 
         {/* Auth */}
         <PublicRoute path="/demo" component={DemoLanding} />
+        <PublicRoute path="/k12" component={K12Landing} />
         <PublicRoute path="/sign-in" component={SignInPage} />
         <PublicRoute path="/forgot-password" component={ForgotPasswordPage} />
         <PublicRoute path="/reset-password" component={ResetPasswordPage} />

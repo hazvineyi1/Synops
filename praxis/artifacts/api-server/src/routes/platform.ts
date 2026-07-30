@@ -29,6 +29,7 @@ import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
 import { seedSynopsDemo } from "../lib/synopsDemoSeed";
+import { seedK12 } from "../lib/k12Seed";
 import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
@@ -1108,6 +1109,23 @@ router.post("/platform/seed-synops-demo", requireAuth, requireSuperAdmin, async 
   try {
     const result = await seedSynopsDemo();
     await audit(req, "platform.seed_synops_demo", "partner", result.partnerId ?? "synops-demo", { courses: result.courses, learners: result.learners });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * POST /platform/seed-k12 - provisions the public "Synops Academy (Grade 6)" K-12 demo tenant used
+ * for the K-12 investor/prospect link (praxis.synops-consulting.com/k12): its own partner + brand,
+ * 5 Grade-6 courses across Math/ELA/Science/Social Studies/History aligned to Common Core / NGSS / C3,
+ * and two learners - Maya (two subjects complete + badges) and Leo (accommodations profile). Fully
+ * self-contained (authors its own courses); idempotent - safe to click more than once. Super admin only.
+ */
+router.post("/platform/seed-k12", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await seedK12();
+    await audit(req, "platform.seed_k12", "partner", result.partnerId ?? "synops-k12", { courses: result.courses, learners: result.learners, standards: result.standards });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });

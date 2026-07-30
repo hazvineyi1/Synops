@@ -287,23 +287,26 @@ async function verifyPasskeyAssertion(userId: string, assertion: unknown, req: {
  * Guarded by ENABLE_DEMO_LOGIN: set it to "0" to switch the whole feature off without a
  * code change. Anything else (including unset) leaves it ON, which is what the demo needs.
  */
-// Each demo host maps to a fixed tenant and its two demo identities, so demo.synops-consulting.com
-// enters the Synops Demo tenant and enza.synops-consulting.com enters Enza. `adminRole` is the global
-// role the "admin" button lands in (partner_admin -> the partner hub).
-// praxis.synops-consulting.com ALSO enters the Synops Demo tenant: it hosts the /demo landing page,
-// so the investor demo link can live at praxis.synops-consulting.com/demo without a dedicated
-// subdomain. This only affects /auth/demo-login (the one-click buttons); normal credentialed
-// super-admin login on this host is unaffected.
-type DemoTenant = { slug: string; student: string; admin: string; adminRole: "partner_admin" | "org_admin" };
+// Registry of demo tenants, keyed by a stable slug. Each has fixed demo identities. `student` is the
+// primary learner; `studentAlt` is an optional second learner persona (e.g. the K-12 accommodations
+// learner). `adminRole` is the global role the "admin" button lands in (partner_admin -> partner hub).
+// Every tenant here is safe to expose on the allow-listed demo hosts below.
+type DemoTenant = { slug: string; student: string; studentAlt?: string; admin: string; adminRole: "partner_admin" | "org_admin" };
 const DEMO_TENANTS: Record<string, DemoTenant> = {
-  "enza.synops-consulting.com": { slug: "enza-global", student: "enza@student1.test", admin: "demo.admin@enzaglobalmedia.co.za", adminRole: "partner_admin" },
-  "demo.synops-consulting.com": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
-  "praxis.synops-consulting.com": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
+  "enza-global": { slug: "enza-global", student: "enza@student1.test", admin: "demo.admin@enzaglobalmedia.co.za", adminRole: "partner_admin" },
+  "synops-demo": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
+  "synops-k12": { slug: "synops-k12", student: "maya.k12@synops-demo.test", studentAlt: "leo.k12@synops-demo.test", admin: "teacher.k12@synops-demo.test", adminRole: "partner_admin" },
+};
+// Which tenant a demo host defaults to when the request doesn't name one. Multiple demos can share a
+// host (e.g. praxis.../demo and praxis.../k12) by passing `tenant` in the body; this is the fallback.
+const HOST_DEFAULT_TENANT: Record<string, string> = {
+  "enza.synops-consulting.com": "enza-global",
+  "demo.synops-consulting.com": "synops-demo",
+  "praxis.synops-consulting.com": "synops-demo",
 };
 // Safe-by-default host allowlist: with DEMO_LOGIN_HOSTS unset, the one-click demo only works on the
-// known demo hosts above and is invisible (404) on every other host — so standing up a new tenant on
-// a new domain can never accidentally expose it. Override with DEMO_LOGIN_HOSTS to add demo hosts.
-const DEFAULT_DEMO_HOSTS = Object.keys(DEMO_TENANTS);
+// known demo hosts above and is invisible (404) on every other host. Override with DEMO_LOGIN_HOSTS.
+const DEFAULT_DEMO_HOSTS = Object.keys(HOST_DEFAULT_TENANT);
 
 router.post("/auth/demo-login", async (req, res) => {
   if (process.env.ENABLE_DEMO_LOGIN === "0") {
@@ -321,11 +324,13 @@ router.post("/auth/demo-login", async (req, res) => {
     res.status(404).json({ error: "Not found." });
     return;
   }
-  // Which demo tenant this host enters. Known hosts map explicitly; any extra host added via
-  // DEMO_LOGIN_HOSTS falls back to the Enza tenant.
-  const tenant = DEMO_TENANTS[host] ?? DEMO_TENANTS["enza.synops-consulting.com"];
+  // Which demo tenant to enter: the request may name one (must be allow-listed in DEMO_TENANTS),
+  // otherwise the host's default. This lets several demos share one host at different paths.
+  const requested = String(req.body?.tenant ?? "").trim();
+  const tenantKey = (requested && DEMO_TENANTS[requested]) ? requested : (HOST_DEFAULT_TENANT[host] ?? "synops-demo");
+  const tenant = DEMO_TENANTS[tenantKey] ?? DEMO_TENANTS["synops-demo"];
   const role = String(req.body?.role ?? "").toLowerCase().trim();
-  if (role !== "student" && role !== "admin") {
+  if (role !== "student" && role !== "student_alt" && role !== "admin") {
     res.status(400).json({ error: "Unknown demo role." });
     return;
   }
@@ -335,8 +340,10 @@ router.post("/auth/demo-login", async (req, res) => {
 
   let user: typeof usersTable.$inferSelect | undefined;
 
-  if (role === "student") {
-    [user] = await db.select().from(usersTable).where(eq(usersTable.email, tenant.student)).limit(1);
+  if (role === "student" || role === "student_alt") {
+    // student_alt selects the second learner persona (e.g. the accommodations learner) when defined.
+    const targetEmail = role === "student_alt" ? (tenant.studentAlt ?? tenant.student) : tenant.student;
+    [user] = await db.select().from(usersTable).where(eq(usersTable.email, targetEmail)).limit(1);
     if (!user) {
       // Fall back to a real active learner inside this demo tenant, so the button works even if the
       // dedicated demo learner was never seeded. Still narrow: only ever an ACTIVE learner belonging

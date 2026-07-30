@@ -54,8 +54,12 @@ interface SessionState {
     password: string,
     second?: { method?: string; code?: string; assertion?: unknown },
   ) => Promise<{ mfaRequired?: boolean; methods?: string[]; hasBackupCodes?: boolean; preferred?: string; hints?: Record<string, string> }>;
-  /** One-click demo sign-in (no credentials). role: "student" | "admin". */
-  demoSignIn: (role: "student" | "admin") => Promise<void>;
+  /**
+   * One-click demo sign-in (no credentials). role: "student" | "student_alt" | "admin"
+   * ("student_alt" = a second learner persona, e.g. the K-12 accommodations learner). `tenant`
+   * optionally names which demo tenant to enter (e.g. "synops-k12"), so several demos can share a host.
+   */
+  demoSignIn: (role: "student" | "student_alt" | "admin", tenant?: string) => Promise<void>;
   /** End a server-side impersonation and restore the admin's OWN session (not a sign-out). */
   stopImpersonating: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -122,12 +126,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return {};
   }, []);
 
-  const demoSignIn = useCallback(async (role: "student" | "admin") => {
+  const demoSignIn = useCallback(async (role: "student" | "student_alt" | "admin", tenant?: string) => {
     const res = await fetch(`${API}/auth/demo-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ role }),
+      body: JSON.stringify(tenant ? { role, tenant } : { role }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {

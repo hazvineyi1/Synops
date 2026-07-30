@@ -472,6 +472,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not seed Synops Demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Provision the public K-12 demo tenant (praxis.synops-consulting.com/k12): Grade-6 courses across
+  // Math/ELA/Science/Social Studies/History (CCSS/NGSS/C3) + Maya (standard) and Leo (accommodations).
+  const seedK12 = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; courses?: number; learners?: number; standards?: number; message?: string }>('/platform/seed-k12', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] });
+      toast({ title: 'Synops K-12 ready', description: r.message ?? `${r.courses} courses, ${r.standards} standards, ${r.learners} learners.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not seed Synops K-12', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -534,6 +545,11 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Provision the public Synops Demo tenant (demo.synops-consulting.com): partner, brand, cohort, Demo Learner/Admin, reusing Enza courses?')) seedSynopsDemo.mutate(); }}
                 title="Provision the Synops Demo tenant for demo.synops-consulting.com">
                 {seedSynopsDemo.isPending ? 'Provisioning…' : 'Seed Synops Demo'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedK12.isPending}
+                onClick={() => { if (window.confirm('Provision the public K-12 demo (praxis.synops-consulting.com/k12): Grade-6 Math/ELA/Science/Social Studies/History aligned to Common Core, NGSS and C3, plus Maya (standard) and Leo (accommodations)?')) seedK12.mutate(); }}
+                title="Provision the Synops K-12 demo tenant for praxis.synops-consulting.com/k12">
+                {seedK12.isPending ? 'Provisioning…' : 'Seed K-12 Demo'}
               </Button>
               <Button variant="outline" size="sm" disabled={resync.isPending}
                 onClick={() => { if (window.confirm('Resync demo learner progress against the current content?')) resync.mutate(); }}

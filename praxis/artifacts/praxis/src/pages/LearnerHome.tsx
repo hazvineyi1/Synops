@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { courseAccent } from "@/lib/courseColor";
 import { StatCard, SectionTitle } from "@/components/StatCard";
+import { AccommodationsPanel } from "@/components/AccommodationsPanel";
 
 /**
  * Learner hub.
@@ -238,6 +239,9 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
             : "Ready when you are. Explore your courses to get started."}
         </p>
       </div>
+
+      {/* Visible learning-supports panel. Self-guards: renders only for learners with accommodations. */}
+      <AccommodationsPanel />
 
       {/* Attention strip. A flagged learner sees their off-track status + a route to the plan
           and their AI Coach, front and centre. A learner who is on track sees a positive green
