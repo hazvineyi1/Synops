@@ -441,7 +441,9 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
   const description = `${c.emoji} ${c.intro}\n\nCourse goal: ${c.outcome}`;
   const [course] = await db.insert(coursesTable).values({
     title: c.title, description, tenantId: "platform", status: "published",
-    competencyTags: [...c.tags, c.subject], objectives: outcomes, nqfLevel: 6, // grade band
+    // "Grade 6" tag drives the US grade-level label in the UI (see courseLevelLabel); nqfLevel stays
+    // 6 only as an internal sort key. This is what makes the tenant read as American K-12, not NQF.
+    competencyTags: [...c.tags, c.subject, "Grade 6"], objectives: outcomes, nqfLevel: 6,
   }).returning();
 
   const moduleIds: string[] = [];
@@ -545,6 +547,11 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     const existing = firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
     const courseId = existing ? existing.id : (await createK12Course(c, org.id, facultyId)).courseId;
     courseIds.push(courseId);
+    // Idempotently ensure the "Grade 6" tag on courses seeded before this label existed, so a re-run
+    // upgrades them to the US grade-level display without recreating content.
+    if (existing && !(existing.competencyTags ?? []).some((t) => /^\s*grade\s+\d+/i.test(t))) {
+      await db.update(coursesTable).set({ competencyTags: [...(existing.competencyTags ?? []), "Grade 6"] }).where(eq(coursesTable.id, courseId));
+    }
     standardsCount += c.modules.reduce((n, m) => n + m.standards.length, 0);
     const hasAssign = await db.select().from(coursePartnerAssignmentsTable)
       .where(and(eq(coursePartnerAssignmentsTable.courseId, courseId), eq(coursePartnerAssignmentsTable.partnerId, partner.id)));

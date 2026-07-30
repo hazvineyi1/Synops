@@ -3,6 +3,7 @@ import { useParams, useSearch, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, API } from '@/lib/api';
 import { BLOOM_LEVELS, bloomColor, generateObjectives, type BloomLevel } from '@/lib/courseDevEngine';
+import { courseLevelLabel } from '@/lib/courseLevel';
 import { useGetMe } from '@workspace/api-client-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1174,7 +1175,7 @@ export function CourseDetail() {
           <h1 className="text-2xl font-bold text-foreground">{course.title}</h1>
           <p className="text-muted-foreground mt-1 text-sm max-w-2xl">{course.description}</p>
           <div className="flex flex-wrap gap-2 mt-3">
-            {course.nqfLevel && <Badge variant="outline">NQF Level {course.nqfLevel}</Badge>}
+            {courseLevelLabel(course) && <Badge variant="outline">{courseLevelLabel(course)}</Badge>}
             {course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
           </div>
         </div>

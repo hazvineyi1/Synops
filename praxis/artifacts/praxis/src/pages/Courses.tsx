@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { courseAccent } from "@/lib/courseColor";
+import { courseLevelLabel } from "@/lib/courseLevel";
 import { PageHeader } from "@/components/PageHeader";
 
 const CAN_AUTHOR = ["super_admin", "instructional_designer", "partner_admin", "org_admin", "coach"];
@@ -185,8 +186,8 @@ export function Courses() {
                         {c.title}
                       </h3>
                       <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                        {m?.nqfLevel && (
-                          <span className="text-xs text-muted-foreground">NQF Level {m.nqfLevel}</span>
+                        {m && courseLevelLabel(m as any) && (
+                          <span className="text-xs text-muted-foreground">{courseLevelLabel(m as any)}</span>
                         )}
                         {c.certified && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-700 text-[11px] font-semibold px-2 py-0.5">
@@ -254,7 +255,7 @@ export function Courses() {
                     <div className={cn("h-11 w-11 shrink-0 rounded-xl flex items-center justify-center", a.soft, a.text)}>
                       <BookOpen className="h-5 w-5" />
                     </div>
-                    {course.nqfLevel && <Badge variant="outline">NQF {course.nqfLevel}</Badge>}
+                    {courseLevelLabel(course as any) && <Badge variant="outline">{courseLevelLabel(course as any)}</Badge>}
                   </div>
                   <h3 className="font-semibold text-lg leading-snug line-clamp-2 mb-1.5">{course.title}</h3>
                   <p className="text-sm text-muted-foreground line-clamp-3 flex-1">
