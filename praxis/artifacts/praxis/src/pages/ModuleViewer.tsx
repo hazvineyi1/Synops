@@ -2552,9 +2552,16 @@ function ModuleHubView({
 
   let continueLabel: string;
   let continueAction: () => void;
+  // K-12: the "Next" button jumps straight into a single-item section (no chooser), and uses kid labels.
+  const k12OpenSection = (id: HubTab): boolean => {
+    if (!isK12) return false;
+    if (id === 'complete' && (moduleActivities?.length ?? 0) === 1 && interactiveBeats.length === 0 && quizBeats.length === 0) { navigate(`/activities/${moduleActivities![0].id}/play`); return true; }
+    if (id === 'cases' && (moduleCases?.length ?? 0) === 1) { startCase.mutate(moduleCases![0].id); return true; }
+    return false;
+  };
   if (nextFlow) {
-    continueLabel = `${tab === 'overview' || tab === 'structure' ? 'Start' : 'Next'}: ${nextFlow.label}`;
-    continueAction = () => setTab(nextFlow.id);
+    continueLabel = `${tab === 'overview' || tab === 'structure' ? 'Start' : 'Next'}: ${isK12 ? (K12_LABELS[nextFlow.id] ?? nextFlow.label) : nextFlow.label}`;
+    continueAction = () => { if (!k12OpenSection(nextFlow.id)) setTab(nextFlow.id); };
   } else if (nextMod) {
     continueLabel = 'Next module';
     continueAction = () => navigate(`/courses/${courseId}/modules/${nextMod.id}`);
@@ -2648,7 +2655,19 @@ function ModuleHubView({
               return (
                 <li key={t.id} className="shrink-0 lg:shrink">
                   <button
-                    onClick={() => setTab(t.id)}
+                    onClick={() => {
+                      // K-12: one click to the content. If a section has a single launch-able item,
+                      // open it directly instead of showing a chooser card.
+                      if (isK12) {
+                        if (t.id === 'complete' && (moduleActivities?.length ?? 0) === 1 && interactiveBeats.length === 0 && quizBeats.length === 0) {
+                          navigate(`/activities/${moduleActivities![0].id}/play`); return;
+                        }
+                        if (t.id === 'cases' && (moduleCases?.length ?? 0) === 1) {
+                          startCase.mutate(moduleCases![0].id); return;
+                        }
+                      }
+                      setTab(t.id);
+                    }}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
                       'w-full flex items-center gap-2.5 rounded-md border-2 px-3 py-2.5 text-sm font-medium transition-colors text-left',
