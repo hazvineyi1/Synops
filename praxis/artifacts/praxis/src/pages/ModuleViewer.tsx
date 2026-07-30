@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useReadAloud } from '@/lib/speech';
 import { useSession } from '@/context/SessionContext';
-import { isK12DemoEmail, personaByEmail } from '@/lib/k12Personas';
+import { isK12DemoEmail, personaByEmail, type K12Persona } from '@/lib/k12Personas';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -927,6 +927,9 @@ export function ModuleViewer() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const { user: viewer } = useSession();
+  const youngPersona = personaByEmail(viewer?.email);
+  const isYoungBand = !!youngPersona && (youngPersona.band === 'early' || youngPersona.band === 'elementary');
 
   const { data: mod, isLoading } = useQuery({
     queryKey: ['module-detail', moduleId],
@@ -1022,6 +1025,18 @@ export function ModuleViewer() {
 
   // ── Hub mode: no ?mode= param → show the activity picker ─────────────────
   if (!modeParam) {
+    // Youngest learners (K-5) get a purpose-built, linear, jargon-free lesson instead of the
+    // adult rail+panel hub.
+    if (isYoungBand && youngPersona && courseId && moduleId) {
+      return (
+        <YoungLessonView
+          courseId={courseId}
+          moduleId={moduleId}
+          navigate={navigate}
+          persona={youngPersona}
+        />
+      );
+    }
     return (
       <ModuleHubView
         mod={mod}
@@ -2264,6 +2279,140 @@ function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBea
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
       </div>
       <p className="text-xs text-muted-foreground">Direct file upload uses Supabase Storage; until that is configured, paste a hosted video URL. Learners see the video in this section once saved.</p>
+    </div>
+  );
+}
+
+/**
+ * Purpose-built lesson experience for the youngest learners (K-5 / early + elementary bands).
+ * NOT the adult rail+panel hub: a big, colorful, LINEAR flow — Read → Practice → Talk to your tutor,
+ * with huge step buttons, giant arrows to what's next, a prominent Listen, kid language, and all the
+ * jargon (standards codes, meta headers, objectives) stripped. Roomy, one idea at a time, one click.
+ */
+function YoungLessonView({ courseId, moduleId, navigate, persona }: {
+  courseId: string; moduleId: string; navigate: (to: string) => void; persona: K12Persona;
+}) {
+  const accent = persona.accent;
+  const es = persona.defaultLang === 'es';
+  const T = (en: string, spa: string) => (es ? spa : en);
+
+  const { data: mod } = useQuery({ queryKey: ['module-detail', moduleId], queryFn: () => apiFetch<{ title: string }>(`/modules/${moduleId}`), enabled: !!moduleId });
+  const { data: readings } = useQuery({ queryKey: ['module-readings', moduleId], queryFn: () => apiFetch<ModuleReadingRow[]>(`/modules/${moduleId}/readings`), enabled: !!moduleId });
+  const readingId = readings?.[0]?.id ?? null;
+  const { data: reader } = useQuery({ queryKey: ['reading', readingId], queryFn: () => apiFetch<ModuleReadingRow & { content: string }>(`/readings/${readingId}`), enabled: !!readingId });
+  const { data: activities } = useQuery({ queryKey: ['module-activities', moduleId], queryFn: () => activitiesApi.list({ moduleId }), enabled: !!moduleId });
+  const { data: cases } = useQuery({ queryKey: ['module-cases', moduleId], queryFn: () => apiFetch<{ id: string }[]>(`/modules/${moduleId}/cases`), enabled: !!moduleId });
+  const { data: courseModules } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<{ id: string; order: number }[]>(`/courses/${courseId}/modules`), enabled: !!courseId });
+  const startCase = useMutation({ mutationFn: (cid: string) => apiFetch<{ id: string }>(`/cases/${cid}/sessions`, { method: 'POST', body: JSON.stringify({}) }), onSuccess: (s) => navigate(`/case-run/${s.id}`) });
+
+  const steps = [
+    { id: 'read', label: T('Read', 'Leer'), icon: BookOpen, has: (readings?.length ?? 0) > 0 },
+    { id: 'practice', label: T('Practice', 'Practicar'), icon: Zap, has: (activities?.length ?? 0) > 0 },
+    { id: 'tutor', label: T('Talk to your tutor', 'Habla con tu tutor'), icon: MessageSquare, has: (cases?.length ?? 0) > 0 },
+  ].filter((s) => s.has);
+  const [stepIdx, setStepIdx] = useState(0);
+  const step = steps[Math.min(stepIdx, Math.max(0, steps.length - 1))];
+
+  // Strip anything a young child shouldn't see (standards codes, meta "by the end" lines).
+  const stripYoung = (md: string) => md.split('\n').filter((l) => !/aligned to/i.test(l) && !/^\s*\*\*by the end you can/i.test(l)).join('\n');
+  const [lang, setLang] = useState(es ? 'es' : 'en');
+  const [tBusy, setTBusy] = useState(false);
+  const [tText, setTText] = useState<string | null>(null);
+  useEffect(() => { setTText(null); setLang(es ? 'es' : 'en'); }, [readingId, es]);
+  const pickLang = async (code: string) => {
+    setLang(code);
+    if (code === 'en' || !reader?.content) { setTText(null); return; }
+    setTBusy(true);
+    const [c] = await translateContent([stripYoung(reader.content)], code);
+    setTText(c); setTBusy(false);
+  };
+  useEffect(() => { if (es && reader?.content && lang === 'es' && !tText && !tBusy) { void pickLang('es'); } }, [es, reader?.content]); // eslint-disable-line
+
+  const orderedMods = (courseModules ?? []).slice().sort((a, b) => a.order - b.order);
+  const curIdx = orderedMods.findIndex((m) => m.id === moduleId);
+  const nextMod = curIdx >= 0 ? orderedMods[curIdx + 1] : undefined;
+
+  const launch = () => {
+    if (step?.id === 'practice' && activities?.[0]) navigate(`/activities/${activities[0].id}/play`);
+    else if (step?.id === 'tutor' && cases?.[0]) startCase.mutate(cases[0].id);
+  };
+
+  const bigBtn = "inline-flex items-center gap-2 rounded-full px-7 py-4 text-lg font-bold text-white shadow-md active:scale-95 transition-transform";
+
+  return (
+    <div style={{ background: `${accent}10`, minHeight: '100dvh' }}>
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-5">
+          <button onClick={() => navigate(`/courses/${courseId}`)} className="h-11 w-11 rounded-full bg-white shadow-sm flex items-center justify-center" style={{ color: accent }} aria-label={T('Back', 'Atrás')}>
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+          <h1 className="text-2xl font-bold" style={{ color: '#20242E' }}>{mod?.title ?? '…'}</h1>
+        </div>
+
+        {/* Big colorful step tracker with arrows */}
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          {steps.map((s, i) => {
+            const Icon = s.icon; const active = i === stepIdx; const done = i < stepIdx;
+            return (
+              <div key={s.id} className="flex items-center gap-2">
+                <button onClick={() => setStepIdx(i)}
+                  className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold shadow-sm transition-transform active:scale-95"
+                  style={active ? { background: accent, color: '#fff' } : { background: '#fff', color: done ? accent : '#6b7280', border: `2px solid ${done ? accent : '#eee'}` }}>
+                  <Icon className="h-5 w-5" /> {s.label} {done && '✓'}
+                </button>
+                {i < steps.length - 1 && <ChevronRight className="h-7 w-7" style={{ color: `${accent}99` }} />}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Active step */}
+        {step?.id === 'read' && (
+          <div className="rounded-3xl bg-white p-6 sm:p-8 shadow-sm">
+            <div className="flex items-center gap-3 flex-wrap mb-4">
+              <div><ReadAloudBar text={tText ?? reader?.content ?? ''} /></div>
+              {es && <LangChips value={lang} busy={tBusy} onPick={pickLang} />}
+            </div>
+            <div className="border-t pt-5" style={{ borderColor: `${accent}22` }}>
+              <MarkdownView text={tText ?? stripYoung(reader?.content ?? T('Loading…', 'Cargando…'))} />
+            </div>
+          </div>
+        )}
+        {step?.id === 'practice' && (
+          <div className="rounded-3xl bg-white p-8 shadow-sm text-center">
+            <div className="text-6xl mb-3">🎮</div>
+            <h2 className="text-2xl font-bold mb-2">{T('Time to practice!', '¡A practicar!')}</h2>
+            <p className="text-muted-foreground mb-5">{T('A few quick questions. You can try as many times as you like.', 'Unas preguntas rápidas. Puedes intentarlo las veces que quieras.')}</p>
+            <button onClick={launch} className={bigBtn} style={{ background: accent }}>{T('Start', 'Empezar')} <ChevronRight className="h-6 w-6" /></button>
+          </div>
+        )}
+        {step?.id === 'tutor' && (
+          <div className="rounded-3xl bg-white p-8 shadow-sm text-center">
+            <div className="text-6xl mb-3">🤖</div>
+            <h2 className="text-2xl font-bold mb-2">{T('Talk to your tutor', 'Habla con tu tutor')}</h2>
+            <p className="text-muted-foreground mb-5">{T('Your friendly tutor will help you, one step at a time.', 'Tu tutor amable te ayudará, paso a paso.')}</p>
+            <button onClick={launch} className={bigBtn} style={{ background: accent }}>{T("Let's talk", 'Vamos a hablar')} <ChevronRight className="h-6 w-6" /></button>
+          </div>
+        )}
+
+        {/* GIANT next arrow */}
+        <div className="mt-7 flex flex-col items-center gap-2">
+          {stepIdx < steps.length - 1 ? (
+            <button onClick={() => setStepIdx(stepIdx + 1)} className={bigBtn} style={{ background: accent }}>
+              {T('Next', 'Siguiente')}: {steps[stepIdx + 1].label} <ChevronRight className="h-7 w-7" />
+            </button>
+          ) : nextMod ? (
+            <button onClick={() => navigate(`/courses/${courseId}/modules/${nextMod.id}`)} className={bigBtn} style={{ background: accent }}>
+              {T('Next lesson', 'Siguiente lección')} <ChevronRight className="h-7 w-7" />
+            </button>
+          ) : (
+            <button onClick={() => navigate(`/courses/${courseId}`)} className={bigBtn} style={{ background: accent }}>
+              🎉 {T('All done!', '¡Todo listo!')}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

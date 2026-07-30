@@ -8,11 +8,21 @@ import { casesApi, streamCaseTurn, LANGUAGES, type CaseMessage, type CaseSession
 import { TutorAvatar, tutorGender } from "@/components/TutorAvatar";
 import { useSpeech } from "@/lib/speech";
 import { ArrowLeft, Send, Sparkles, CheckCircle2, TrendingUp, BookOpen, Settings2, Loader2 } from "lucide-react";
+import { useSession } from "@/context/SessionContext";
+import { personaByEmail } from "@/lib/k12Personas";
 
 export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const sessionId = params?.sessionId ?? "";
   const { toast } = useToast();
   const [, navigate] = useLocation();
+
+  // Youngest learners (K-5) get a colorful, playful, kid-worded coach instead of the plain
+  // professional case UI — bigger avatar and bubbles, bright accent, friendly labels.
+  const { user } = useSession();
+  const persona = personaByEmail(user?.email);
+  const young = !!persona && (persona.band === "early" || persona.band === "elementary");
+  const kidAccent = persona?.accent ?? "#4F46E5";
+  const T = (adult: string, kid: string) => (young ? kid : adult);
 
   const qc = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ["case-session", sessionId], queryFn: () => casesApi.getSession(sessionId), enabled: !!sessionId, retry: false });
@@ -136,11 +146,11 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const facts = (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> The situation</p>
-        <button onClick={() => setFactsOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">Minimise</button>
+        <p className="text-sm font-semibold flex items-center gap-1.5"><BookOpen className="h-4 w-4" /> {T("The situation", "What's happening")}</p>
+        <button onClick={() => setFactsOpen(false)} className="text-xs text-muted-foreground hover:text-foreground">{T("Minimise", "Hide")}</button>
       </div>
       {factsObj && (
-        <p className="text-xs rounded-md px-2.5 py-1.5" style={{ background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>Goal: {factsObj}</p>
+        <p className="text-xs rounded-md px-2.5 py-1.5" style={young ? { background: `${kidAccent}18`, color: kidAccent } : { background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>{T("Goal", "We are learning")}: {factsObj}</p>
       )}
       <p className={`text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 transition-opacity ${switching ? "opacity-40" : ""}`}>{factsCtx || "No background was provided for this case."}</p>
       {switching
@@ -150,15 +160,15 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   );
 
   return (
-    <div className="h-screen flex flex-col" style={{ background: "hsl(43 30% 97%)" }}>
-      <header className="flex items-center justify-between gap-2 px-3 sm:px-4 h-16 border-b bg-white/85 backdrop-blur shrink-0">
-        <Link href="/cases"><Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" /> Exit</Button></Link>
+    <div className="h-screen flex flex-col" style={{ background: young ? `${kidAccent}12` : "hsl(43 30% 97%)" }}>
+      <header className="flex items-center justify-between gap-2 px-3 sm:px-4 h-16 border-b bg-white/85 backdrop-blur shrink-0" style={young ? { borderColor: `${kidAccent}33` } : undefined}>
+        <Link href="/cases"><Button variant="ghost" size="sm" style={young ? { color: kidAccent, fontWeight: 700 } : undefined}><ArrowLeft className="h-4 w-4 mr-1" /> {T("Exit", "Back")}</Button></Link>
 
         <div className="flex items-center gap-2.5 min-w-0">
-          <TutorAvatar avatar={tutorAvatar} size={40} speaking={speaking && animate} ring />
+          <TutorAvatar avatar={tutorAvatar} size={young ? 48 : 40} speaking={speaking && animate} ring />
           <div className="leading-tight min-w-0">
-            <p className="text-sm font-medium truncate">{tutorName}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{speaking ? "speaking…" : "your case coach"}</p>
+            <p className={young ? "text-base font-bold truncate" : "text-sm font-medium truncate"} style={young ? { color: kidAccent } : undefined}>{young ? "Your helper 🤖" : tutorName}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{speaking ? T("speaking…", "talking…") : T("your case coach", "here to help you!")}</p>
           </div>
         </div>
 
@@ -206,12 +216,12 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
               {messages.map((m, i) =>
                 m.role === "learner" ? (
                   <div key={i} className="flex justify-end">
-                    <div className="max-w-[82%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed bg-[hsl(222_47%_20%)] text-white">{m.content}</div>
+                    <div className={young ? "max-w-[82%] rounded-3xl rounded-br-md px-5 py-3 text-base leading-relaxed text-white shadow-sm" : "max-w-[82%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed bg-[hsl(222_47%_20%)] text-white"} style={young ? { background: kidAccent } : undefined}>{m.content}</div>
                   </div>
                 ) : (
                   <div key={i} className="flex justify-start items-end gap-2">
-                    <TutorAvatar avatar={tutorAvatar} size={28} speaking={speaking && animate && i === messages.length - 1} />
-                    <div className="max-w-[82%] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed bg-white border">
+                    <TutorAvatar avatar={tutorAvatar} size={young ? 40 : 28} speaking={speaking && animate && i === messages.length - 1} />
+                    <div className={young ? "max-w-[82%] rounded-3xl rounded-bl-md px-5 py-3 text-base leading-relaxed bg-white shadow-sm" : "max-w-[82%] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed bg-white border"} style={young ? { border: `2px solid ${kidAccent}33` } : undefined}>
                       {m.content || <span className="animate-pulse">●</span>}
                     </div>
                   </div>
@@ -224,24 +234,25 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
             <div className="max-w-2xl mx-auto px-4 py-3">
               {budgetReached && (
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border bg-emerald-500/5 border-emerald-500/30 px-3 py-2">
-                  <p className="text-xs text-emerald-800">You've reached the planned depth. Keep going, or finish for your reasoning analysis.</p>
-                  <Button size="sm" onClick={finish} disabled={analysing}><Sparkles className="h-4 w-4 mr-1.5" />{analysing ? "Analysing…" : "Finish & analyse"}</Button>
+                  <p className="text-xs text-emerald-800">{T("You've reached the planned depth. Keep going, or finish for your reasoning analysis.", "Great job! You can keep chatting, or tap the button when you're all done. 🎉")}</p>
+                  <Button size="sm" onClick={finish} disabled={analysing} style={young ? { background: kidAccent } : undefined}><Sparkles className="h-4 w-4 mr-1.5" />{analysing ? T("Analysing…", "One sec…") : T("Finish & analyse", "I'm done!")}</Button>
                 </div>
               )}
               <div className="flex gap-2 items-end">
                 <textarea
-                  className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm max-h-32"
+                  className={young ? "flex-1 resize-none rounded-2xl border-2 bg-white px-4 py-3 text-base max-h-32" : "flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm max-h-32"}
+                  style={young ? { borderColor: `${kidAccent}55` } : undefined}
                   rows={1}
-                  placeholder="Type your reasoning…"
+                  placeholder={T("Type your reasoning…", "Type your answer here…")}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
                   disabled={streaming}
                 />
-                <Button onClick={() => void send()} disabled={streaming || !input.trim()}><Send className="h-4 w-4" /></Button>
+                <Button onClick={() => void send()} disabled={streaming || !input.trim()} className={young ? "h-12 w-12 rounded-full" : undefined} style={young ? { background: kidAccent } : undefined}><Send className={young ? "h-5 w-5" : "h-4 w-4"} /></Button>
               </div>
               {!budgetReached && messages.length > 2 && (
-                <button onClick={finish} disabled={analysing} className="mt-2 text-xs text-muted-foreground hover:text-foreground">Finish early &amp; get analysis</button>
+                <button onClick={finish} disabled={analysing} className="mt-2 text-xs text-muted-foreground hover:text-foreground">{T("Finish early & get analysis", "All done? Tap here 🎉")}</button>
               )}
             </div>
           </div>

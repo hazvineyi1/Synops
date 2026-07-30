@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, API } from '@/lib/api';
 import { BLOOM_LEVELS, bloomColor, generateObjectives, type BloomLevel } from '@/lib/courseDevEngine';
 import { courseLevelLabel } from '@/lib/courseLevel';
+import { personaByEmail } from '@/lib/k12Personas';
 import { useGetMe } from '@workspace/api-client-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1080,6 +1081,10 @@ export function CourseDetail() {
   const { data: user } = useGetMe();
   const role = user?.role ?? 'learner';
   const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(role);
+  // Youngest learners (K-5) get a stripped, jargon-free course page: just "Start here" — no
+  // objectives lists, structure stat grid, competency tags, or calendar sidebar.
+  const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
+  const isYoungBand = !!youngPersona && (youngPersona.band === 'early' || youngPersona.band === 'elementary');
 
   const setTab = (tab: string) => navigate(`/courses/${courseId}?tab=${tab}`);
 
@@ -1276,18 +1281,19 @@ export function CourseDetail() {
         {/* Learners get the cognitively-optimized single-primary-action view; staff keep
             the informational overview (about + upcoming + quick links). */}
         {activeTab === 'overview' && isLearnerView && (
-          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8">
+          <div className={isYoungBand ? '' : 'lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8'}>
             {/* Main column: the single learning flow */}
             <div className="space-y-10 min-w-0">
-              {/* 1. Course overview */}
-              {course.description && (
+              {/* 1. Course overview — hidden for the youngest (no paragraph of adult prose) */}
+              {course.description && !isYoungBand && (
                 <section>
                   <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course overview</h2>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{course.description}</p>
                 </section>
               )}
 
-              {/* 2. Course learning objectives */}
+              {/* 2-4. Objectives, structure, skills — all hidden for the youngest */}
+              {!isYoungBand && (<>
               <section>
                 <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course learning objectives</h2>
                 {(course.objectives && course.objectives.length > 0) ? (
@@ -1334,14 +1340,15 @@ export function CourseDetail() {
                   <p className="text-sm text-muted-foreground">The skills you'll build will be listed here.</p>
                 )}
               </section>
+              </>)}
 
               {/* 5. Start here -> pick a module */}
               <section>
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className="text-lg font-serif font-semibold tracking-tight">Start here</h2>
-                  <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% complete</span>
+                  <h2 className={isYoungBand ? 'text-2xl font-bold tracking-tight' : 'text-lg font-serif font-semibold tracking-tight'} style={isYoungBand ? { color: youngPersona!.accent } : undefined}>{isYoungBand ? "Let's start! 🚀" : 'Start here'}</h2>
+                  <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% {isYoungBand ? 'done' : 'complete'}</span>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">Pick a module to work on. We suggest starting with the recommended one.</p>
+                <p className="text-sm text-muted-foreground mb-3">{isYoungBand ? 'Tap a lesson to begin. 👇' : 'Pick a module to work on. We suggest starting with the recommended one.'}</p>
                 {orderedModules.length > 0 ? (
                   <div className="space-y-2">
                     {orderedModules.map(({ m, seq }) => {
@@ -1383,7 +1390,8 @@ export function CourseDetail() {
               </section>
             </div>
 
-            {/* Side column: Calendar + Announcements */}
+            {/* Side column: Calendar + Announcements — hidden for the youngest (too much) */}
+            {!isYoungBand && (
             <aside className="mt-10 lg:mt-0 space-y-6 lg:sticky lg:top-20 lg:self-start">
               <div className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -1435,6 +1443,7 @@ export function CourseDetail() {
                 </div>
               )}
             </aside>
+            )}
           </div>
         )}
         {activeTab === 'overview' && (isInstructor || !enrolment) && (
