@@ -85,7 +85,14 @@ export function ActivityPlayer({ html, embedUrl, onSubmit, disabled, className }
       // Authenticate by source: only messages from OUR iframe are trusted.
       if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
       const data = e.data;
-      if (!data || data.__synops !== true) return;
+      if (!data) return;
+      // Accept the injected bridge protocol (__synops) AND a legacy { type:'activity_result' } that
+      // some authored activities post directly. Source is already authenticated above.
+      if (data.type === "activity_result") {
+        if (!disabled) onSubmit?.({ payload: data.payload ?? {}, score: typeof data.score === "number" ? data.score : null });
+        return;
+      }
+      if (data.__synops !== true) return;
 
       if (data.type === "resize" && typeof data.height === "number" && data.height > 0) {
         // Clamp so a malicious/broken activity can't blow the layout to millions of px.

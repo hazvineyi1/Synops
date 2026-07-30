@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActivityPlayer, type ActivityPlayerHandleResult } from "@/components/ActivityPlayer";
 import { activitiesApi } from "@/lib/activitiesApi";
@@ -23,6 +23,11 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
     onSuccess: (s) => { setDone(true); setScore(s.score); },
   });
 
+  // Where "Next/Continue" goes: back to the lesson this activity belongs to (so the learner keeps
+  // moving through the module), or the dashboard if it isn't homed in a module.
+  const a = activity as { courseId?: string | null; moduleId?: string | null } | undefined;
+  const backTo = a?.courseId && a?.moduleId ? `/courses/${a.courseId}/modules/${a.moduleId}` : "/dashboard";
+
   return (
     <div className="min-h-[100dvh] bg-slate-50">
       <header className="sticky top-0 z-10 border-b border-border bg-white/90 backdrop-blur">
@@ -31,6 +36,9 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
           <span className="font-medium truncate">{activity?.title ?? "Activity"}</span>
+          <Button variant="ghost" size="sm" className="ml-auto shrink-0" onClick={() => setLocation(backTo)}>
+            Next <ArrowRight className="h-4 w-4 ml-1" />
+          </Button>
         </div>
       </header>
 
@@ -52,7 +60,7 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
             </p>
             <div className="mt-5 flex justify-center gap-2">
               <Button variant="outline" onClick={() => { setDone(false); }}>Try again</Button>
-              <Button onClick={() => setLocation("/dashboard")}>Back to dashboard</Button>
+              <Button onClick={() => setLocation(backTo)}>Continue <ArrowRight className="h-4 w-4 ml-1" /></Button>
             </div>
           </div>
         ) : (
