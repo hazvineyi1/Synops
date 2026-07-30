@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { eq, and, asc } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
+import { PRIVACY_POLICY_VERSION } from "../lib/popia";
 
 /**
  * Public K-12 demo tenant "Synops Academy (Grade 6)" — the investor/prospect link for the K-12
@@ -420,6 +421,9 @@ async function upsertUser(u: {
     firstName: u.firstName, lastName: u.lastName, role: u.role, status: "active" as const,
     partnerId: u.partnerId, organisationId: u.organisationId,
     learningStyle: u.learningStyle ?? null, accommodations: u.accommodations ?? [],
+    // Pre-consent every synthetic K-12 demo identity so the one-click demo lands straight in the
+    // classroom without the POPIA privacy gate (these are non-production accounts, no real data).
+    consentVersion: PRIVACY_POLICY_VERSION, consentedAt: new Date(),
     updatedAt: new Date(),
   };
   if (existing) {
