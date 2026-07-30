@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
+import { personaByEmail } from '@/lib/k12Personas';
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Sokratify theme: one dark-navy sidebar + warm off-white content across the
@@ -226,6 +227,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (role === 'learner') {
+      // Young K-12 learners (K-5) get a slimmed, jargon-free nav with kid words — no "My grades",
+      // "Jotter" or "My sessions". Everything is reachable, just named for a child.
+      const kidPersona = personaByEmail(user?.email);
+      if (kidPersona && (kidPersona.band === 'early' || kidPersona.band === 'elementary')) {
+        return [{
+          items: [
+            { label: t('nav.k12Lessons', 'My lessons'), href: '/dashboard', icon: LayoutDashboard },
+            { label: t('nav.k12Classes', 'My classes'), href: '/courses', icon: BookOpen },
+            { label: t('nav.k12Badges', 'My badges'), href: '/credentials', icon: Award },
+            { label: t('nav.k12Tutor', 'My tutor'), href: '/coach-hub', icon: GraduationCap },
+            { label: t('nav.k12Help', 'Get help'), href: '/support', icon: LifeBuoy },
+          ],
+        }];
+      }
       // Case studies and Activities are reached by learners inside their modules (assigned
       // as part of the module experience), so they are intentionally NOT top-level nav for
       // learners. Staff still get them as authoring surfaces in their own nav blocks.

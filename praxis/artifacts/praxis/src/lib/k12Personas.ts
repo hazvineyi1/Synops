@@ -29,7 +29,48 @@ export interface K12Persona {
   supports: string;         // what's turned on, in plain words
 }
 
+/**
+ * Per-grade-band design language. K-2 looks nothing like 9-12: playful rounded fonts, big radii,
+ * bright colors and bouncy motion for the youngest; clean, tight, restrained for high school.
+ * Applied app-wide by K12Adaptation (font, --radius, base size, accent, motion + band class).
+ */
+export interface BandTheme {
+  label: string;
+  font: string;
+  radiusPx: number;
+  accent: string;
+  pageBg: string;
+  motion: "playful" | "gentle" | "standard" | "minimal";
+  navStyle: "kid" | "standard"; // kid = big icon+word tiles, no adult jargon
+}
+export const BAND_THEME: Record<GradeBand, BandTheme> = {
+  early: {
+    label: "K-2", font: 'ui-rounded, "SF Pro Rounded", "Baloo 2", "Trebuchet MS", "Comic Sans MS", system-ui, sans-serif',
+    radiusPx: 24, accent: "#F97316", pageBg: "#FFF7ED", motion: "playful", navStyle: "kid",
+  },
+  elementary: {
+    label: "3-5", font: 'ui-rounded, "SF Pro Rounded", "Trebuchet MS", system-ui, sans-serif',
+    radiusPx: 18, accent: "#0D9488", pageBg: "#F0FDFA", motion: "gentle", navStyle: "kid",
+  },
+  middle: {
+    label: "6-8", font: 'Inter, system-ui, sans-serif',
+    radiusPx: 12, accent: "#4F46E5", pageBg: "#FBF7EF", motion: "standard", navStyle: "standard",
+  },
+  high: {
+    label: "9-12", font: 'Inter, system-ui, sans-serif',
+    radiusPx: 8, accent: "#111827", pageBg: "#F8FAFC", motion: "minimal", navStyle: "standard",
+  },
+};
+
 export const K12_PERSONAS: K12Persona[] = [
+  {
+    key: "mateo", email: "mateo.k12@synops-demo.test", first: "Mateo", name: "Mateo Flores",
+    grade: 1, gradeLabel: "Grade 1", band: "early", subject: "Reading", subjectEmoji: "🔤",
+    challenge: "Just starting out", challengeLong: "A first-grader learning letters, sounds, and first words.",
+    learningStyleLabel: "Hands-on learner",
+    accent: "#F97316", avatarBg: "#F97316", rootPx: 23, highContrast: false, calm: false, gamified: true, autismMode: false,
+    supports: "Big friendly buttons, pictures with words, read-aloud on everything, and lots of stars and cheering.",
+  },
   {
     key: "sofia", email: "sofia.k12@synops-demo.test", first: "Sofía", name: "Sofía Ramírez",
     grade: 3, gradeLabel: "Grade 3", band: "early", subject: "Reading", subjectEmoji: "📚",

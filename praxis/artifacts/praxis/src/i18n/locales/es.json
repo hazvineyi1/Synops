@@ -17,7 +17,12 @@
     "notifications": "Notificaciones",
     "signOut": "Cerrar sesión",
     "more": "Más",
-    "members": "Miembros"
+    "members": "Miembros",
+    "k12Lessons": "Mis lecciones",
+    "k12Classes": "Mis clases",
+    "k12Badges": "Mis insignias",
+    "k12Tutor": "Mi tutor",
+    "k12Help": "Ayuda"
   },
   "learnerHome": {
     "goodMorning": "Buenos días",

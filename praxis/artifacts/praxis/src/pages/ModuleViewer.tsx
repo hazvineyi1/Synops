@@ -21,6 +21,8 @@ import {
   Lightbulb, Store, Repeat, ListChecks, Rocket,
 } from 'lucide-react';
 import { useReadAloud } from '@/lib/speech';
+import { useSession } from '@/context/SessionContext';
+import { isK12DemoEmail, personaByEmail } from '@/lib/k12Personas';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1884,13 +1886,17 @@ function ReadAloudBar({ text }: { text: string }) {
  */
 // Languages the content can be translated into on demand (matches the server's LANG_NAMES).
 const LANGS: [string, string][] = [['en', 'English'], ['zu', 'isiZulu'], ['xh', 'isiXhosa'], ['af', 'Afrikaans']];
+// US / K-12 learners translate between English and Spanish only (no South African languages).
+const K12_LANGS: [string, string][] = [['en', 'English'], ['es', 'Español']];
 
 /** A row of language chips. The parent runs the actual translation for the content it owns. */
 function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onPick: (code: string) => void }) {
+  const { user } = useSession();
+  const langs = isK12DemoEmail(user?.email) ? K12_LANGS : LANGS;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Languages className="h-3.5 w-3.5" /> Read in:</span>
-      {LANGS.map(([code, name]) => (
+      {langs.map(([code, name]) => (
         <button key={code} type="button" disabled={busy} onClick={() => onPick(code)}
           className={cn('text-xs rounded-full px-2.5 py-1 border transition-colors disabled:opacity-50',
             value === code ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted')}>
@@ -2268,8 +2274,14 @@ function ModuleHubView({
   initialTab?: string | null;
 }) {
   const VALID_TABS: HubTab[] = ['overview', 'structure', 'video', 'readings', 'complete', 'cases', 'participate', 'assignments', 'workshop'];
+  // K-12 persona context: young learners (K-5) land straight on the reading and see a slimmed, jargon-free
+  // set of sections; empty sections are hidden rather than shown greyed (which reads as "unfinished").
+  const { user: k12User } = useSession();
+  const k12Persona = personaByEmail(k12User?.email);
+  const isK12 = !!k12Persona;
+  const youngK12 = !!k12Persona && (k12Persona.band === 'early' || k12Persona.band === 'elementary');
   const [tab, setTab] = useState<HubTab>(
-    initialTab && VALID_TABS.includes(initialTab as HubTab) ? (initialTab as HubTab) : 'overview',
+    initialTab && VALID_TABS.includes(initialTab as HubTab) ? (initialTab as HubTab) : (youngK12 ? 'readings' : 'overview'),
   );
   // Keep the URL's ?tab in sync with the active tab so a reload / shared link reopens the same
   // section (initialTab is read from ?tab on mount). replaceState avoids history spam and a remount.
@@ -2450,6 +2462,16 @@ function ModuleHubView({
     workshop:    { has: (moduleWorkshops?.length ?? 0) > 0, done: workshopsDone },
   };
 
+  // K-12: hide EMPTY sections (no greyed dead-ends) and use kid-friendly labels for young learners.
+  const YOUNG_LABELS: Partial<Record<HubTab, string>> = {
+    overview: 'Start here', structure: 'Steps', video: 'Watch', readings: 'Read', complete: 'Practice',
+    cases: 'Talk to your tutor', participate: 'Share', assignments: 'Show what you know', workshop: 'Class time',
+  };
+  const railTabs = isK12
+    ? TABS.filter((t) => t.id === 'overview' || t.id === 'structure' || tabState[t.id].has)
+    : TABS;
+  const labelFor = (t: { id: HubTab; label: string }) => (youngK12 ? (YOUNG_LABELS[t.id] ?? t.label) : t.label);
+
   // ── Guided linear progression ──────────────────────────────────────────────
   // Every deliverable that exists, in the order the module should be worked through.
   const DELIVERABLES: { id: HubTab; label: string }[] = [
@@ -2603,7 +2625,7 @@ function ModuleHubView({
         <nav aria-label="Module sections"
           className="lg:w-60 lg:shrink-0 lg:sticky lg:top-[84px] lg:self-start">
           <ol className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
-            {TABS.map((t) => {
+            {railTabs.map((t) => {
               const active = tab === t.id;
               const c = TAB_COLOR[t.id];
               const st = tabState[t.id];
@@ -2628,7 +2650,7 @@ function ModuleHubView({
                     )}
                   >
                     <t.icon className="h-4 w-4 shrink-0" />
-                    <span className="flex-1 min-w-0 truncate">{t.label}</span>
+                    <span className="flex-1 min-w-0 truncate">{labelFor(t)}</span>
                     {done && (
                       <CheckCircle className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-emerald-500')} />
                     )}

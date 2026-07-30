@@ -301,8 +301,9 @@ const DEMO_TENANTS: Record<string, DemoTenant> = {
     slug: "synops-k12", student: "maya.k12@synops-demo.test", studentAlt: "leo.k12@synops-demo.test",
     admin: "teacher.k12@synops-demo.test", adminRole: "partner_admin",
     personas: {
-      sofia: "sofia.k12@synops-demo.test", aiden: "aiden.k12@synops-demo.test", maya: "maya.k12@synops-demo.test",
-      leo: "leo.k12@synops-demo.test", jordan: "jordan.k12@synops-demo.test", emma: "emma.k12@synops-demo.test",
+      mateo: "mateo.k12@synops-demo.test", sofia: "sofia.k12@synops-demo.test", aiden: "aiden.k12@synops-demo.test",
+      maya: "maya.k12@synops-demo.test", leo: "leo.k12@synops-demo.test", jordan: "jordan.k12@synops-demo.test",
+      emma: "emma.k12@synops-demo.test",
     },
   },
 };

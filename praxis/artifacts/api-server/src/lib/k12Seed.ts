@@ -69,6 +69,41 @@ interface K12Course {
 
 // ── COURSES (one per persona; two comprehensive lessons each) ────────────────
 const COURSES: K12Course[] = [
+  // 0) MATEO · Grade 1 · just starting out (K-2 band) ─────────────────────────
+  {
+    title: "Letters & Sounds (Grade 1)", subject: "English Language Arts", emoji: "🔤", grade: 1, gradeLabel: "Grade 1",
+    framework: "Common Core State Standards — Grade 1 Foundational Reading",
+    intro: "Reading starts with sounds! You'll learn the sounds letters make and put them together to read your very first words. Let's go!",
+    outcome: "Match letters to their sounds and blend sounds to read simple words.",
+    tags: ["ela", "reading", "phonics", "grade 1", "common core"],
+    persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.35 },
+    modules: [
+      { title: "The sounds letters make", outcome: "Say the sound each letter makes.", hook: "What sound does the letter S make? Sssss — like a snake!", minutes: 5,
+        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics in decoding words" }],
+        points: ["Every letter has a sound", "S says ssss, M says mmm, T says t", "We use sounds to read words"],
+        reading: "Letters make sounds! The letter **S** says *ssss*, like a snake. The letter **M** says *mmm*, like when food is yummy. The letter **T** says *t*, like a tiny tap.\n\nWhen you know the sounds, you can read! Point to a letter and say its sound out loud. You are becoming a reader! 🌟",
+        quiz: [
+          { q: "What sound does S make?", options: ["ssss (like a snake)", "mmm", "t", "zzz"], answer: 0 },
+          { q: "What sound does M make?", options: ["ssss", "mmm (like yummy)", "t", "b"], answer: 1 },
+          { q: "Letters help us…", options: ["read words", "jump high", "eat lunch", "sleep"], answer: 0 },
+          { q: "The letter T says…", options: ["t (a tiny tap)", "ssss", "mmm", "oo"], answer: 0 },
+        ],
+        caseContext: "Mateo sees the letter B and isn't sure what sound it makes. Cheer him on and help him say the /b/ sound with a fun example (like 'ball' or 'bounce'). Keep it super simple and happy.",
+        caseOpening: "Let's try the letter B together! It says /b/ — like BALL. Can you say /b/?" },
+      { title: "Sounding out words", outcome: "Blend letter sounds to read a short word.", hook: "c-a-t… put them together… CAT! You read it!", minutes: 5,
+        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics in decoding words" }],
+        points: ["Say each sound slowly", "Then push them together fast", "c-a-t makes cat!"],
+        reading: "To read a word, say each sound, then push them together.\n\nTry **cat**: say *c… a… t*. Now say it fast: **cat**! You did it!\n\nTry **sun**: *s… u… n* → **sun**! Sounding out is like magic — small sounds make a whole word. Keep going, superstar! ⭐",
+        quiz: [
+          { q: "c-a-t sounds out to…", options: ["cat", "dog", "car", "cup"], answer: 0 },
+          { q: "s-u-n makes…", options: ["sun", "sit", "sad", "six"], answer: 0 },
+          { q: "To read a word we…", options: ["say each sound then blend", "close our eyes", "skip it", "sing"], answer: 0 },
+          { q: "m-a-p makes…", options: ["map", "mad", "mop", "man"], answer: 0 },
+        ],
+        caseContext: "Mateo is sounding out 'dog' and gets stuck after d-o. Warmly help him add the /g/ and blend d-o-g into 'dog'. Celebrate when he gets it.",
+        caseOpening: "You've got d… o… — one more sound! What does g say? Let's finish it: d-o-g!" },
+    ],
+  },
   // 1) SOFÍA · Grade 3 · Spanish-speaking English learner ─────────────────────
   {
     title: "Reading Lab (Grade 3)", subject: "English Language Arts", emoji: "📚", grade: 3, gradeLabel: "Grade 3",
