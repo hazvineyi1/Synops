@@ -2286,6 +2286,7 @@ function ModuleHubView({
   const { user: k12User } = useSession();
   const k12Persona = personaByEmail(k12User?.email);
   const isK12 = !!k12Persona;
+  const [railOpen, setRailOpen] = useState(true); // desktop: collapse the section rail for a full-width read
   const [tab, setTab] = useState<HubTab>(() => {
     const wanted = initialTab && VALID_TABS.includes(initialTab as HubTab) ? (initialTab as HubTab) : null;
     // K-12 skips the Overview/Structure meta tabs and lands straight on the reading (the first real step).
@@ -2640,8 +2641,13 @@ function ModuleHubView({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
 
         <nav aria-label="Module sections"
-          className="lg:w-60 lg:shrink-0 lg:sticky lg:top-[84px] lg:self-start">
-          <ol className="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
+          className={cn("lg:shrink-0 lg:sticky lg:top-[84px] lg:self-start", railOpen ? "lg:w-60" : "lg:w-auto")}>
+          <button onClick={() => setRailOpen((v) => !v)}
+            className="hidden lg:inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 mb-2 rounded-md hover:bg-muted/40"
+            title={railOpen ? 'Hide the steps and read full-width' : 'Show the steps'}>
+            {railOpen ? <><ChevronLeft className="h-4 w-4" /> Hide</> : <><List className="h-4 w-4" /> Steps</>}
+          </button>
+          <ol className={cn("flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0", !railOpen && "lg:hidden")}>
             {railTabs.map((t) => {
               const active = tab === t.id;
               const c = TAB_COLOR[t.id];

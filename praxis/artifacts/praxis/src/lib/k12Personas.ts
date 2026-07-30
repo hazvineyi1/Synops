@@ -68,7 +68,7 @@ export const K12_PERSONAS: K12Persona[] = [
     grade: 1, gradeLabel: "Grade 1", band: "early", subject: "Reading", subjectEmoji: "🔤",
     challenge: "Just starting out", challengeLong: "A first-grader learning letters, sounds, and first words.",
     learningStyleLabel: "Hands-on learner",
-    accent: "#F97316", avatarBg: "#F97316", rootPx: 23, highContrast: false, calm: false, gamified: true, autismMode: false,
+    accent: "#F97316", avatarBg: "#F97316", rootPx: 17, highContrast: false, calm: false, gamified: true, autismMode: false,
     supports: "Big friendly buttons, pictures with words, read-aloud on everything, and lots of stars and cheering.",
   },
   {
@@ -76,7 +76,7 @@ export const K12_PERSONAS: K12Persona[] = [
     grade: 3, gradeLabel: "Grade 3", band: "early", subject: "Reading", subjectEmoji: "📚",
     challenge: "English learner", challengeLong: "A native Spanish speaker learning to read in English.",
     learningStyleLabel: "Visual learner",
-    accent: "#0D9488", avatarBg: "#0D9488", rootPx: 20, highContrast: false, calm: false, gamified: true, autismMode: false, defaultLang: "es",
+    accent: "#0D9488", avatarBg: "#0D9488", rootPx: 16.5, highContrast: false, calm: false, gamified: true, autismMode: false, defaultLang: "es",
     supports: "Spanish interface + bilingual read-aloud, simpler wording, big friendly text, and one idea at a time.",
   },
   {
@@ -84,7 +84,7 @@ export const K12_PERSONAS: K12Persona[] = [
     grade: 4, gradeLabel: "Grade 4", band: "elementary", subject: "Math", subjectEmoji: "🎯",
     challenge: "Autism", challengeLong: "Autistic; thrives on predictable structure, clear steps, and rewards.",
     learningStyleLabel: "Hands-on learner",
-    accent: "#7C3AED", avatarBg: "#7C3AED", rootPx: 18, highContrast: false, calm: true, gamified: true, autismMode: true,
+    accent: "#7C3AED", avatarBg: "#7C3AED", rootPx: 16.5, highContrast: false, calm: true, gamified: true, autismMode: true,
     supports: "A visual schedule, a star/token board, one predictable step at a time, literal language, and extra thinking time.",
   },
   {
@@ -116,7 +116,7 @@ export const K12_PERSONAS: K12Persona[] = [
     grade: 11, gradeLabel: "Grade 11", band: "high", subject: "Algebra", subjectEmoji: "📐",
     challenge: "Low vision + dyscalculia", challengeLong: "Analytical, aiming for college; needs large, high-contrast, concrete math.",
     learningStyleLabel: "Visual learner",
-    accent: "#111827", avatarBg: "#111827", rootPx: 19, highContrast: true, calm: false, gamified: false, autismMode: false,
+    accent: "#111827", avatarBg: "#111827", rootPx: 17.5, highContrast: true, calm: false, gamified: false, autismMode: false,
     supports: "Large high-contrast text, one step shown at a time, concrete real-world examples, and extra time.",
   },
 ];

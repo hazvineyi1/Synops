@@ -106,6 +106,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const tenantBrandName = brand?.displayName || (brandLoading ? '' : 'Praxis');
   const tenantBrandLogo = brand?.logoUrl || null;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  // Desktop sidebar collapse (persisted). Collapsed = sidebar hidden + a floating button to reopen,
+  // so the content can use the full width.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try { return localStorage.getItem('praxis_sidebar_collapsed') === '1'; } catch { return false; }
+  });
+  const toggleSidebar = (next: boolean) => { setSidebarCollapsed(next); try { localStorage.setItem('praxis_sidebar_collapsed', next ? '1' : '0'); } catch { /* ok */ } };
   const [commandQuery, setCommandQuery] = useState('');
   const [location, navigate] = useLocation();
 
@@ -437,8 +443,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
+      {/* Floating reopen button, shown on desktop only when the sidebar is collapsed. */}
+      {sidebarCollapsed && (
+        <button onClick={() => toggleSidebar(false)}
+          className="fixed top-3 left-3 z-50 hidden md:inline-flex items-center justify-center h-9 w-9 rounded-lg shadow-md text-white"
+          style={{ background: sidebarBg }} aria-label="Open menu" title="Open menu">
+          <Menu className="h-5 w-5" />
+        </button>
+      )}
+
       {/* ── Desktop sidebar ─────────────────────────────────── */}
-      <aside className="w-64 flex-shrink-0 flex-col hidden md:flex" style={{ background: sidebarBg }}>
+      <aside className={cn("w-64 flex-shrink-0 flex-col hidden", sidebarCollapsed ? "" : "md:flex")} style={{ background: sidebarBg }}>
         <div className="h-16 flex items-center px-6" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
           <Link href="/dashboard" className="flex items-center gap-2 font-serif font-bold text-xl tracking-tight" style={{ color: '#fff' }}>
             {brandLogo ? (
@@ -448,6 +463,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             {brandName}
           </Link>
+          <button onClick={() => toggleSidebar(true)}
+            className="ml-auto hidden md:inline-flex items-center justify-center h-8 w-8 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Collapse menu" title="Collapse menu">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
         </div>
 
         {role === 'super_admin' && (
