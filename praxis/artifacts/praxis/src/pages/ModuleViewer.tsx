@@ -1956,6 +1956,11 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
   });
 
   const [readerId, setReaderId] = useState<string | null>(null);
+  // One-click reading: when a module has a single reading, open it immediately instead of showing a
+  // chooser card the learner has to click "Read" on. Multi-reading modules still show the list.
+  useEffect(() => {
+    if (!readerId && readings && readings.length === 1) setReaderId(readings[0].id);
+  }, [readings, readerId]);
   const { data: reader, isLoading: readerLoading } = useQuery({
     queryKey: ['reading', readerId],
     queryFn: () => apiFetch<ModuleReadingRow & { content: string }>(`/readings/${readerId}`),
@@ -2013,12 +2018,14 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
     const nextR = idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null;
     return (
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => setReaderId(null)} className="gap-1.5">
-            <ChevronLeft className="h-4 w-4" /> Back to readings
-          </Button>
-          {idx >= 0 && <span className="text-xs text-muted-foreground">Reading {idx + 1} of {list.length}</span>}
-        </div>
+        {list.length > 1 && (
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="sm" onClick={() => setReaderId(null)} className="gap-1.5">
+              <ChevronLeft className="h-4 w-4" /> Back to readings
+            </Button>
+            {idx >= 0 && <span className="text-xs text-muted-foreground">Reading {idx + 1} of {list.length}</span>}
+          </div>
+        )}
         {readerLoading ? <Skeleton className="h-64" /> : (
           <article className="rounded-2xl border border-border bg-card shadow-sm px-6 sm:px-10 py-8 max-w-3xl mx-auto">
             <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{tReading?.title ?? reader?.title}</h3>
@@ -2279,10 +2286,12 @@ function ModuleHubView({
   const { user: k12User } = useSession();
   const k12Persona = personaByEmail(k12User?.email);
   const isK12 = !!k12Persona;
-  const youngK12 = !!k12Persona && (k12Persona.band === 'early' || k12Persona.band === 'elementary');
-  const [tab, setTab] = useState<HubTab>(
-    initialTab && VALID_TABS.includes(initialTab as HubTab) ? (initialTab as HubTab) : (youngK12 ? 'readings' : 'overview'),
-  );
+  const [tab, setTab] = useState<HubTab>(() => {
+    const wanted = initialTab && VALID_TABS.includes(initialTab as HubTab) ? (initialTab as HubTab) : null;
+    // K-12 skips the Overview/Structure meta tabs and lands straight on the reading (the first real step).
+    if (wanted && !(isK12 && (wanted === 'overview' || wanted === 'structure'))) return wanted;
+    return isK12 ? 'readings' : 'overview';
+  });
   // Keep the URL's ?tab in sync with the active tab so a reload / shared link reopens the same
   // section (initialTab is read from ?tab on mount). replaceState avoids history spam and a remount.
   useEffect(() => {
@@ -2462,15 +2471,16 @@ function ModuleHubView({
     workshop:    { has: (moduleWorkshops?.length ?? 0) > 0, done: workshopsDone },
   };
 
-  // K-12: hide EMPTY sections (no greyed dead-ends) and use kid-friendly labels for young learners.
-  const YOUNG_LABELS: Partial<Record<HubTab, string>> = {
-    overview: 'Start here', structure: 'Steps', video: 'Watch', readings: 'Read', complete: 'Practice',
-    cases: 'Talk to your tutor', participate: 'Share', assignments: 'Show what you know', workshop: 'Class time',
+  // K-12 gets a streamlined, sensible lesson path: drop the Overview/Structure meta tabs, show only the
+  // real steps that have content, in order, each opening in one click, with plain-language labels.
+  const K12_LABELS: Partial<Record<HubTab, string>> = {
+    video: 'Watch', readings: 'Read', complete: 'Practice', cases: 'Talk to your tutor',
+    participate: 'Share', assignments: 'Show what you know', workshop: 'Class time',
   };
   const railTabs = isK12
-    ? TABS.filter((t) => t.id === 'overview' || t.id === 'structure' || tabState[t.id].has)
+    ? TABS.filter((t) => t.id !== 'overview' && t.id !== 'structure' && tabState[t.id].has)
     : TABS;
-  const labelFor = (t: { id: HubTab; label: string }) => (youngK12 ? (YOUNG_LABELS[t.id] ?? t.label) : t.label);
+  const labelFor = (t: { id: HubTab; label: string }) => (isK12 ? (K12_LABELS[t.id] ?? t.label) : t.label);
 
   // ── Guided linear progression ──────────────────────────────────────────────
   // Every deliverable that exists, in the order the module should be worked through.

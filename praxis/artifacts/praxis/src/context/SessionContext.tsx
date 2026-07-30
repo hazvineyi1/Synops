@@ -126,12 +126,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return {};
   }, []);
 
-  const demoSignIn = useCallback(async (role: "student" | "student_alt" | "admin", tenant?: string) => {
+  const demoSignIn = useCallback(async (role: "student" | "student_alt" | "admin", tenant?: string, persona?: string) => {
     const res = await fetch(`${API}/auth/demo-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify(tenant ? { role, tenant } : { role }),
+      // persona selects a specific learner within the tenant (e.g. the K-12 landing's 7 students).
+      body: JSON.stringify({ role, ...(tenant ? { tenant } : {}), ...(persona ? { persona } : {}) }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
