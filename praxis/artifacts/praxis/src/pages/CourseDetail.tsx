@@ -1181,7 +1181,8 @@ export function CourseDetail() {
           <p className="text-muted-foreground mt-1 text-sm max-w-2xl">{course.description}</p>
           <div className="flex flex-wrap gap-2 mt-3">
             {courseLevelLabel(course) && <Badge variant="outline">{courseLevelLabel(course)}</Badge>}
-            {course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+            {/* Standards/skill tags are jargon for the youngest — hidden for K-5. */}
+            {!isYoungBand && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
           </div>
         </div>
         {role === 'learner' && !enrolment && (

@@ -23,6 +23,8 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const young = !!persona && (persona.band === "early" || persona.band === "elementary");
   const kidAccent = persona?.accent ?? "#4F46E5";
   const T = (adult: string, kid: string) => (young ? kid : adult);
+  // K-12 (any band) is US-only: English + Español. Non-K-12 keeps the full platform list.
+  const langOptions = persona ? [{ code: "en", name: "English" }, { code: "es", name: "Español" }] : LANGUAGES;
 
   const qc = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ["case-session", sessionId], queryFn: () => casesApi.getSession(sessionId), enabled: !!sessionId, retry: false });
@@ -178,7 +180,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
           </button>
           <div className="relative inline-flex items-center">
             <select value={lang} onChange={(e) => void changeLanguage(e.target.value)} disabled={switching || streaming} title="Language — switches the whole conversation" className="text-xs rounded-md border border-input bg-background px-1.5 py-1.5 disabled:opacity-60">
-              {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+              {langOptions.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
             </select>
             {switching && <Loader2 className="h-3.5 w-3.5 ml-1 animate-spin text-muted-foreground" />}
           </div>
