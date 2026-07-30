@@ -45,6 +45,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
 import { personaByEmail } from '@/lib/k12Personas';
+import { cn } from '@/lib/utils';
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Sokratify theme: one dark-navy sidebar + warm off-white content across the
