@@ -40,6 +40,7 @@ import {
   Languages,
   FileWarning,
   Search,
+  RotateCcw,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
@@ -492,6 +493,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               area rather than a second, competing menu. */}
 
           <div className="px-1"><LanguageSwitcher variant="full" /></div>
+
+          {/* Demo-only: reset this synthetic learner's progress so the lessons can be run again. */}
+          {user?.email?.toLowerCase().endsWith('@synops-demo.test') && (
+            <button
+              onClick={async () => {
+                if (!window.confirm('Reset this demo learner\'s progress so you can run through the lessons again?')) return;
+                try { await apiFetch('/learn/demo-reset', { method: 'POST', body: JSON.stringify({}) }); } catch { /* ignore */ }
+                window.location.href = '/dashboard';
+              }}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
+              style={{ color: 'rgba(255,255,255,0.5)' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
+              title="Reset progress (demo only)"
+            >
+              <RotateCcw className="h-4 w-4 shrink-0" />
+              Reset demo
+            </button>
+          )}
 
           <button
             onClick={handleSignOut}

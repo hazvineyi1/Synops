@@ -1,5 +1,6 @@
 import React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
 import {
   Flame,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { courseAccent } from "@/lib/courseColor";
 import { StatCard, SectionTitle } from "@/components/StatCard";
 import { AccommodationsPanel } from "@/components/AccommodationsPanel";
+import { K12Gamification } from "@/components/K12Gamification";
 
 /**
  * Learner hub.
@@ -101,6 +103,13 @@ interface MyIntervention {
 
 /* ── helpers ── */
 
+function greetingKey(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "learnerHome.goodMorning";
+  if (h < 18) return "learnerHome.goodAfternoon";
+  return "learnerHome.goodEvening";
+}
+
 function greeting(): string {
   const h = new Date().getHours();
   if (h < 12) return "Good morning";
@@ -137,6 +146,7 @@ function timeAgo(iso: string): string {
 
 export function LearnerHome({ firstName }: { firstName?: string | null }) {
   const [, navigate] = useLocation();
+  const { t } = useTranslation();
 
   const { data: prog, isLoading: progLoading } = useQuery({
     queryKey: ["progress", "me"],
@@ -231,17 +241,20 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
       {/* Greeting */}
       <div>
         <h1 className="text-3xl font-serif font-bold tracking-tight">
-          {greeting()}{firstName ? `, ${firstName}` : ""} <span className="inline-block">👋</span>
+          {t(greetingKey())}{firstName ? `, ${firstName}` : ""} <span className="inline-block">👋</span>
         </h1>
         <p className="text-muted-foreground mt-1">
           {inProgress.length > 0
-            ? "Pick up where you left off, or check what's due."
-            : "Ready when you are. Explore your courses to get started."}
+            ? t("learnerHome.subtitle")
+            : t("learnerHome.subtitleEmpty")}
         </p>
       </div>
 
       {/* Visible learning-supports panel. Self-guards: renders only for learners with accommodations. */}
       <AccommodationsPanel />
+
+      {/* Gamification (XP, quest, badges + autism visual schedule / star board). Self-guards to K-12. */}
+      <K12Gamification />
 
       {/* Attention strip. A flagged learner sees their off-track status + a route to the plan
           and their AI Coach, front and centre. A learner who is on track sees a positive green

@@ -8,6 +8,10 @@ import {
   usersTable,
   sessionsTable,
   coursesTable,
+  beatProgressTable,
+  credentialsTable,
+  interactiveActivitiesTable,
+  activitySubmissionsTable,
   type CoachPlanItem,
   type StudyPlanItem,
 } from "@workspace/db";
@@ -337,6 +341,51 @@ router.patch("/learn/profile", requireAuth, async (req, res) => {
     phone: updated.phone,
     whatsappOptIn: updated.whatsappOptIn,
   });
+});
+
+/**
+ * POST /learn/demo-reset — reset the signed-in learner's OWN progress so a demo can be re-run.
+ * DEMO ONLY: allowed exclusively for synthetic demo accounts (@synops-demo.test); any real learner
+ * gets 403. Body: { moduleId } resets one module, { courseId } resets a whole course, neither resets
+ * everything. Clears beat progress, badges/credentials, activity submissions and mastery, and puts the
+ * enrolment back to active. Non-destructive to content — only this learner's progress rows.
+ */
+router.post("/learn/demo-reset", requireAuth, async (req, res) => {
+  const user = req.dbUser!;
+  if (!user.email.toLowerCase().endsWith("@synops-demo.test")) {
+    res.status(403).json({ error: "Reset is available for demo accounts only." });
+    return;
+  }
+  const moduleId = typeof req.body?.moduleId === "string" ? req.body.moduleId : null;
+  const courseId = typeof req.body?.courseId === "string" ? req.body.courseId : null;
+
+  try {
+    // Resolve the set of module ids in scope (for module- and course-scoped resets).
+    let moduleIds: string[] | null = null;
+    if (moduleId) moduleIds = [moduleId];
+    else if (courseId) moduleIds = (await db.select({ id: modulesTable.id }).from(modulesTable).where(eq(modulesTable.courseId, courseId))).map((m) => m.id);
+
+    if (moduleIds) {
+      if (moduleIds.length) {
+        await db.delete(beatProgressTable).where(and(eq(beatProgressTable.userId, user.id), inArray(beatProgressTable.moduleId, moduleIds)));
+        await db.delete(credentialsTable).where(and(eq(credentialsTable.userId, user.id), inArray(credentialsTable.moduleId, moduleIds)));
+        await db.delete(conceptMasteryTable).where(and(eq(conceptMasteryTable.userId, user.id), inArray(conceptMasteryTable.moduleId, moduleIds)));
+        const actIds = (await db.select({ id: interactiveActivitiesTable.id }).from(interactiveActivitiesTable).where(inArray(interactiveActivitiesTable.moduleId, moduleIds))).map((a) => a.id);
+        if (actIds.length) await db.delete(activitySubmissionsTable).where(and(eq(activitySubmissionsTable.userId, user.id), inArray(activitySubmissionsTable.activityId, actIds)));
+      }
+      if (courseId) await db.update(enrolmentsTable).set({ status: "active", completedAt: null }).where(and(eq(enrolmentsTable.userId, user.id), eq(enrolmentsTable.courseId, courseId)));
+    } else {
+      // Full reset for this learner.
+      await db.delete(beatProgressTable).where(eq(beatProgressTable.userId, user.id));
+      await db.delete(credentialsTable).where(eq(credentialsTable.userId, user.id));
+      await db.delete(conceptMasteryTable).where(eq(conceptMasteryTable.userId, user.id));
+      await db.delete(activitySubmissionsTable).where(eq(activitySubmissionsTable.userId, user.id));
+      await db.update(enrolmentsTable).set({ status: "active", completedAt: null }).where(eq(enrolmentsTable.userId, user.id));
+    }
+    res.json({ ok: true, scope: moduleId ? "module" : courseId ? "course" : "all" });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Reset failed" });
+  }
 });
 
 export default router;

@@ -1,0 +1,47 @@
+{
+  "nav": {
+    "today": "Hoy",
+    "myCourses": "Mis cursos",
+    "credentials": "Insignias",
+    "myCoach": "Mi tutor",
+    "learners": "Estudiantes",
+    "submissions": "Entregas",
+    "workforce": "Personal",
+    "reports": "Informes",
+    "organisations": "Organizaciones",
+    "courseCatalog": "Catálogo de cursos",
+    "studio": "Estudio",
+    "partners": "Socios",
+    "platformSettings": "Configuración",
+    "overview": "Resumen",
+    "notifications": "Notificaciones",
+    "signOut": "Cerrar sesión",
+    "more": "Más",
+    "members": "Miembros"
+  },
+  "learnerHome": {
+    "goodMorning": "Buenos días",
+    "goodAfternoon": "Buenas tardes",
+    "goodEvening": "Buenas noches",
+    "subtitle": "Continúa donde lo dejaste o revisa lo que toca hoy.",
+    "subtitleEmpty": "Cuando quieras. Explora tus cursos para empezar."
+  },
+  "common": {
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "cancel": "Cancelar",
+    "submit": "Enviar",
+    "submitting": "Enviando…",
+    "loading": "Cargando…",
+    "search": "Buscar",
+    "invite": "Invitar",
+    "remove": "Quitar",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "confirm": "Confirmar",
+    "close": "Cerrar",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "done": "Listo"
+  }
+}

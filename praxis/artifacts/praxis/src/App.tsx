@@ -57,6 +57,7 @@ import { JoinCohort } from '@/pages/JoinCohort';
 import { PartnerLanding } from '@/pages/PartnerLanding';
 import DemoLanding from '@/pages/DemoLanding';
 import K12Landing from '@/pages/K12Landing';
+import { K12Adaptation } from '@/components/K12Adaptation';
 import { PlatformConsole } from '@/pages/PlatformConsole';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
@@ -336,6 +337,7 @@ function App() {
           <WouterRouter base={basePath}>
             <SessionProvider>
               <ThemeApplier />
+              <K12Adaptation />
               <MaintenanceBanner />
               <Routes />
             </SessionProvider>

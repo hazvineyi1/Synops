@@ -291,11 +291,20 @@ async function verifyPasskeyAssertion(userId: string, assertion: unknown, req: {
 // primary learner; `studentAlt` is an optional second learner persona (e.g. the K-12 accommodations
 // learner). `adminRole` is the global role the "admin" button lands in (partner_admin -> partner hub).
 // Every tenant here is safe to expose on the allow-listed demo hosts below.
-type DemoTenant = { slug: string; student: string; studentAlt?: string; admin: string; adminRole: "partner_admin" | "org_admin" };
+// `personas` (optional) maps a short key -> a fixed learner email, so a tenant can offer several
+// named learner personas the landing picks by key (e.g. K-12's six students across grades).
+type DemoTenant = { slug: string; student: string; studentAlt?: string; admin: string; adminRole: "partner_admin" | "org_admin"; personas?: Record<string, string> };
 const DEMO_TENANTS: Record<string, DemoTenant> = {
   "enza-global": { slug: "enza-global", student: "enza@student1.test", admin: "demo.admin@enzaglobalmedia.co.za", adminRole: "partner_admin" },
   "synops-demo": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
-  "synops-k12": { slug: "synops-k12", student: "maya.k12@synops-demo.test", studentAlt: "leo.k12@synops-demo.test", admin: "teacher.k12@synops-demo.test", adminRole: "partner_admin" },
+  "synops-k12": {
+    slug: "synops-k12", student: "maya.k12@synops-demo.test", studentAlt: "leo.k12@synops-demo.test",
+    admin: "teacher.k12@synops-demo.test", adminRole: "partner_admin",
+    personas: {
+      sofia: "sofia.k12@synops-demo.test", aiden: "aiden.k12@synops-demo.test", maya: "maya.k12@synops-demo.test",
+      leo: "leo.k12@synops-demo.test", jordan: "jordan.k12@synops-demo.test", emma: "emma.k12@synops-demo.test",
+    },
+  },
 };
 // Which tenant a demo host defaults to when the request doesn't name one. Multiple demos can share a
 // host (e.g. praxis.../demo and praxis.../k12) by passing `tenant` in the body; this is the fallback.
@@ -341,8 +350,11 @@ router.post("/auth/demo-login", async (req, res) => {
   let user: typeof usersTable.$inferSelect | undefined;
 
   if (role === "student" || role === "student_alt") {
-    // student_alt selects the second learner persona (e.g. the accommodations learner) when defined.
-    const targetEmail = role === "student_alt" ? (tenant.studentAlt ?? tenant.student) : tenant.student;
+    // A named persona (body.persona) selects a specific learner from the tenant's persona map; else
+    // student_alt picks the second learner, and plain student picks the primary one.
+    const personaKey = String(req.body?.persona ?? "").trim().toLowerCase();
+    const personaEmail = personaKey && tenant.personas ? tenant.personas[personaKey] : undefined;
+    const targetEmail = personaEmail ?? (role === "student_alt" ? (tenant.studentAlt ?? tenant.student) : tenant.student);
     [user] = await db.select().from(usersTable).where(eq(usersTable.email, targetEmail)).limit(1);
     if (!user) {
       // Fall back to a real active learner inside this demo tenant, so the button works even if the

@@ -19,6 +19,13 @@
     "more": "More",
     "members": "Members"
   },
+  "learnerHome": {
+    "goodMorning": "Good morning",
+    "goodAfternoon": "Good afternoon",
+    "goodEvening": "Good evening",
+    "subtitle": "Pick up where you left off, or check what's due.",
+    "subtitleEmpty": "Ready when you are. Explore your courses to get started."
+  },
   "common": {
     "save": "Save",
     "saving": "Saving…",

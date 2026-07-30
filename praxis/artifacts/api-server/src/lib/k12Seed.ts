@@ -2,44 +2,45 @@ import { db } from "@workspace/db";
 import {
   partnersTable, brandThemesTable, organisationsTable, usersTable,
   coursesTable, modulesTable, beatsTable, moduleReadingsTable,
-  caseScenariosTable, interactiveActivitiesTable,
+  caseScenariosTable, interactiveActivitiesTable, discussionsTable, assignmentsTable,
   coursePartnerAssignmentsTable, enrolmentsTable,
   orgClassesTable, orgClassCoursesTable, orgClassStaffTable,
   beatProgressTable, credentialsTable,
   unitStandardsTable, unitStandardMappingsTable,
 } from "@workspace/db";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, inArray } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
 import { PRIVACY_POLICY_VERSION } from "../lib/popia";
 
 /**
- * Public K-12 demo tenant "Synops Academy (Grade 6)" — the investor/prospect link for the K-12
- * story, served at praxis.synops-consulting.com/k12. It stands on its own partner (slug synops-k12)
- * with real Grade 6 courses across Math, ELA, Science, Social Studies and History, each aligned to
- * US standards (Common Core / NGSS / C3). Two demo learners:
- *   - Maya Chen: a standard 6th grader, on-track, with two subjects already COMPLETE (earned badges).
- *   - Leo Rivera: a learner with accommodations configured, to demonstrate the accessibility layer.
- * Idempotent: reuse-by-title / upsert, safe to re-run.
+ * Public K-12 demo tenant "Synops Academy" — the investor/prospect link at
+ * praxis.synops-consulting.com/k12. It showcases inclusive, adaptive, US-standards learning across
+ * grade levels with SIX learner personas, each with a real challenge + the accommodations that help:
+ *   - Sofía  · Grade 3  · Spanish-speaking English learner   (bilingual, playful, big text)
+ *   - Aiden  · Grade 4  · autistic                            (gamified, predictable, token board)
+ *   - Maya   · Grade 6  · on-track                            (balanced)
+ *   - Leo    · Grade 6  · dyslexia + ADHD                     (read-aloud, easy-reading, chunked)
+ *   - Jordan · Grade 8  · dysgraphia / slow processing        (speech-to-text, extended time)
+ *   - Emma   · Grade 11 · low vision + dyscalculia            (high-contrast, large text, analytical)
+ * Each persona has one grade-appropriate course of two comprehensive, fully-built lessons.
+ * Idempotent: reuse-by-title / upsert, and it reconciles each learner's enrolments to their plan.
  */
 const DEMO_SLUG = "synops-k12";
-const ORG_NAME = "Synops Academy (Grade 6)";
-const CLASS_NAME = "Grade 6 · Homeroom 2026";
+const ORG_NAME = "Synops Academy (K-12)";
+const CLASS_NAME = "Synops Academy · 2026";
 const DEMO_PASSWORD = "SynopsDemo123";
 
 export const K12_PARTNER_SLUG = DEMO_SLUG;
-export const K12_LEARNER_EMAIL = "maya.k12@synops-demo.test";
-export const K12_LEARNER_ALT_EMAIL = "leo.k12@synops-demo.test";
 export const K12_ADMIN_EMAIL = "teacher.k12@synops-demo.test";
 
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
 const daysFromNow = (n: number) => new Date(Date.now() + n * 86_400_000);
 
-// Bright, friendly-but-credible K-12 brand: indigo + sunny amber on warm paper.
 const BRAND = {
   displayName: "Synops Academy",
-  primaryColor: "#3730A3",   // indigo (headers/buttons; carries white text)
-  secondaryColor: "#FBF7EF", // warm paper surface
-  accentColor: "#F59E0B",    // sunny amber accent
+  primaryColor: "#4F46E5",   // indigo
+  secondaryColor: "#FBF7EF", // warm paper
+  accentColor: "#F59E0B",    // sunny amber
   logoUrl: null as string | null,
   faviconUrl: null as string | null,
   fontFamily: "Inter, system-ui, sans-serif",
@@ -47,357 +48,258 @@ const BRAND = {
   emailSenderName: "Synops Academy",
 };
 
-// ── Standard shape: a US standard (Common Core / NGSS / C3) represented in the compliance model. ──
 interface Std { code: string; title: string }
 interface K12Module {
-  title: string;
-  outcome: string;
-  hook: string;            // a fun, concrete scenario a 6th grader recognises
-  points: string[];
-  reading: string;         // the lesson body (markdown)
-  minutes: number;
-  standards: Std[];
-  quiz?: { q: string; options: string[]; answer: number }[]; // module 0 gets an interactive quiz
+  title: string; outcome: string; hook: string;
+  points: string[]; reading: string; minutes: number;
+  standards: Std[]; quiz: { q: string; options: string[]; answer: number }[];
+  caseContext: string; caseOpening: string;
+}
+interface K12Persona {
+  email: string; firstName: string; lastName: string;
+  grade: number; gradeLabel: string;
+  learningStyle: string; accommodations: string[];
+  progressFraction: number;   // how far through their course to pre-fill
 }
 interface K12Course {
-  title: string;
-  subject: string;
-  emoji: string;
-  framework: string;       // human label shown in the reader
-  intro: string;
-  outcome: string;
-  tags: string[];
-  caseObjective: string;
-  caseContext: string;
-  caseOpening: string;
-  modules: K12Module[];
+  title: string; subject: string; emoji: string; grade: number; gradeLabel: string;
+  framework: string; intro: string; outcome: string; tags: string[];
+  modules: K12Module[]; persona: K12Persona;
 }
 
+// ── COURSES (one per persona; two comprehensive lessons each) ────────────────
 const COURSES: K12Course[] = [
-  // ── MATH ──────────────────────────────────────────────────────────────────
+  // 1) SOFÍA · Grade 3 · Spanish-speaking English learner ─────────────────────
   {
-    title: "Math 6: Ratios, Fractions & Expressions",
-    subject: "Mathematics", emoji: "➗",
+    title: "Reading Lab (Grade 3)", subject: "English Language Arts", emoji: "📚", grade: 3, gradeLabel: "Grade 3",
+    framework: "Common Core State Standards — Grade 3 ELA/Literacy",
+    intro: "Every story and every article is trying to tell you something. In this reading lab you'll learn to find the big idea and to figure out tricky new words all by yourself — like a reading detective!",
+    outcome: "Find the main idea of a text and use clues to understand new words.",
+    tags: ["ela", "reading", "grade 3", "common core"],
+    persona: { email: "sofia.k12@synops-demo.test", firstName: "Sofía", lastName: "Ramírez", grade: 3, gradeLabel: "Grade 3", learningStyle: "visual", accommodations: ["simplified_language", "concrete_examples", "scaffolded_questions", "positive_reinforcement", "chunked_content"], progressFraction: 0.4 },
+    modules: [
+      { title: "Finding the main idea", outcome: "Say what a short text is mostly about in one sentence.",
+        hook: "A whole page about pandas — what is it MOSTLY about?", minutes: 8,
+        standards: [{ code: "CCSS.ELA-LITERACY.RI.3.2", title: "Determine the main idea; recount key details" }],
+        points: ["The main idea is what the whole text is MOSTLY about", "Key details are the little facts that tell you more", "Ask: what would I tell a friend this was about?"],
+        reading: "When you read, your brain is always asking one big question: **what is this mostly about?** That answer is the **main idea**.\n\nImagine a page all about pandas. It tells you pandas eat bamboo, pandas live in China, and baby pandas are tiny and pink. Those are **key details** — little facts. But the **main idea** ties them together: *pandas are special animals with their own special needs.*\n\nHere's a detective trick: after you read, cover the page and tell a friend in ONE sentence what it was about. If you say \"it was about pandas and how they live,\" you found the main idea! The details are the clues; the main idea is the case you solved. 🕵️",
+        quiz: [
+          { q: "The main idea is…", options: ["One small fact", "What the text is MOSTLY about", "The title only", "The longest word"], answer: 1 },
+          { q: "A text says lions hunt, lions roar, and lions live in groups. The main idea is…", options: ["Lions are loud", "How lions live", "Lions are orange", "One lion"], answer: 1 },
+          { q: "Key details are…", options: ["The big idea", "Little facts that tell you more", "The page number", "The author"], answer: 1 },
+          { q: "A good way to find the main idea is to…", options: ["Count the words", "Tell a friend in one sentence what it was about", "Look at the last letter", "Skip it"], answer: 1 },
+        ],
+        caseContext: "Sofía read a short text: 'Bees are busy. Bees make honey. Bees help flowers grow. Bees live together in a hive.' She thinks the main idea is 'bees make honey.' Gently help her see the bigger idea that ties ALL the sentences together, using simple words and encouragement.",
+        caseOpening: "You found a great detail — bees DO make honey! But look at ALL the sentences. What are they ALL about together?" },
+      { title: "New words from clues", outcome: "Use the words around a new word to guess what it means.",
+        hook: "You read a word you've never seen. What do you do — give up? No way!", minutes: 8,
+        standards: [{ code: "CCSS.ELA-LITERACY.L.3.4", title: "Determine the meaning of unknown words using context clues" }],
+        points: ["Context clues are the other words around the tricky word", "Read the whole sentence, not just the hard word", "Guess, then check if your guess makes sense"],
+        reading: "What do you do when you hit a word you don't know? You become a **word detective** and look for **context clues** — the other words nearby that give you hints.\n\nRead this: *\"The puppy was so **timid** that it hid behind the couch when guests came.\"* Even if you don't know **timid**, the clues help: it *hid* when people came. So timid must mean *shy or scared.* You solved it without a dictionary!\n\nThe steps are simple: (1) read the WHOLE sentence, not just the hard word; (2) look for clues about what's happening; (3) make your best guess; (4) reread to check it makes sense. Little by little, you'll understand harder and harder books. You've got this. 🌟",
+        quiz: [
+          { q: "Context clues are…", options: ["The other words around a tricky word", "The page number", "Pictures only", "The title"], answer: 0 },
+          { q: "\"The soup was so bland it needed salt.\" Bland probably means…", options: ["Too spicy", "Without much flavor", "Very hot", "Frozen"], answer: 1 },
+          { q: "When you meet a new word, first you should…", options: ["Skip the whole page", "Read the whole sentence for clues", "Close the book", "Guess a random word"], answer: 1 },
+          { q: "After you guess a word's meaning, you should…", options: ["Stop reading", "Reread to check it makes sense", "Erase it", "Ask nobody"], answer: 1 },
+        ],
+        caseContext: "Sofía reads: 'The gigantic elephant could not fit through the tiny door.' She doesn't know 'gigantic' and wants to give up. Coach her to use the clues (an elephant, can't fit a tiny door) to figure out gigantic means very big — with warm encouragement and simple language.",
+        caseOpening: "Let's be word detectives! An elephant that can't fit a tiny door — what does that tell you about how BIG 'gigantic' is?" },
+    ],
+  },
+  // 2) AIDEN · Grade 4 · autistic (gamified, predictable) ─────────────────────
+  {
+    title: "Number Quest (Grade 4)", subject: "Mathematics", emoji: "🎯", grade: 4, gradeLabel: "Grade 4",
+    framework: "Common Core State Standards — Grade 4 Mathematics",
+    intro: "Welcome to Number Quest! Every lesson is a level. You'll earn stars for each step, follow a clear map, and always know exactly what comes next. Ready, steady — let's begin.",
+    outcome: "Understand multiplication as equal groups and use arrays to find totals.",
+    tags: ["math", "multiplication", "grade 4", "common core"],
+    persona: { email: "aiden.k12@synops-demo.test", firstName: "Aiden", lastName: "Walsh", grade: 4, gradeLabel: "Grade 4", learningStyle: "kinesthetic", accommodations: ["predictable_structure", "chunked_content", "explicit_transitions", "positive_reinforcement", "literal_language", "extended_processing"], progressFraction: 0.5 },
+    modules: [
+      { title: "Level 1: Equal groups", outcome: "See multiplication as a number of equal groups.",
+        hook: "4 baskets. 3 apples in each. How many apples — WITHOUT counting one by one?", minutes: 7,
+        standards: [{ code: "CCSS.MATH.CONTENT.4.OA.A.1", title: "Interpret a multiplication equation as a comparison / equal groups" }],
+        points: ["Multiplication is a fast way to add equal groups", "4 × 3 means 4 groups of 3", "The answer is called the product"],
+        reading: "Multiplication is a superpower: it adds up **equal groups** fast.\n\nPicture **4 baskets**, and each basket has **3 apples**. You *could* count 1, 2, 3, 4, 5... but there's a faster way. That's **4 groups of 3**, which we write as **4 × 3**. It equals **12**. The answer has a name: the **product**.\n\nHere is the one rule to remember: the groups must be **equal** — the same size. 4 baskets of 3 apples works. 4 baskets with different amounts does NOT. \n\nStep 1: count the groups. Step 2: count how many in each group. Step 3: multiply. That's the whole quest for this level. You're ready. ⭐",
+        quiz: [
+          { q: "4 × 3 means…", options: ["4 plus 3", "4 groups of 3", "3 minus 4", "43"], answer: 1 },
+          { q: "The answer to a multiplication problem is called the…", options: ["Sum", "Product", "Total groups", "Difference"], answer: 1 },
+          { q: "5 bags with 2 marbles each is…", options: ["5 × 2 = 10", "5 + 2 = 7", "2 − 5", "52"], answer: 0 },
+          { q: "For multiplication, the groups must be…", options: ["Different sizes", "Equal sizes", "Very big", "Empty"], answer: 1 },
+        ],
+        caseContext: "Aiden sees 3 plates with 4 cookies on each. He starts counting cookies one at a time. Coach him — with short, clear, literal steps and lots of encouragement — to see it as 3 groups of 4, i.e. 3 × 4 = 12. Keep each message to one small step.",
+        caseOpening: "Step 1: How many plates are there? Just tell me that number." },
+      { title: "Level 2: Arrays", outcome: "Use a rectangle array of rows and columns to find a total.",
+        hook: "Chairs in 5 rows, 4 in each row. How many chairs?", minutes: 7,
+        standards: [{ code: "CCSS.MATH.CONTENT.3.MD.C.7", title: "Relate area to multiplication using arrays of rows and columns" }],
+        points: ["An array is objects lined up in rows and columns", "Rows × columns = the total", "Arrays make multiplication easy to SEE"],
+        reading: "An **array** is a neat rectangle of things in **rows** and **columns**. It turns multiplication into a picture you can see.\n\nImagine a classroom with **5 rows** of chairs and **4 chairs in each row**. To find the total, multiply **rows × columns = 5 × 4 = 20** chairs. You don't have to count every chair — the array does the work.\n\nArrays are everywhere: eggs in a carton, windows on a building, tiles on a floor. Whenever things line up in even rows and columns, you can multiply. Step 1: count the rows. Step 2: count how many in each row. Step 3: multiply. Level complete! 🏆",
+        quiz: [
+          { q: "An array is…", options: ["A messy pile", "Objects in equal rows and columns", "One single object", "A number line"], answer: 1 },
+          { q: "3 rows of 6 stickers is…", options: ["3 × 6 = 18", "3 + 6 = 9", "6 − 3", "36"], answer: 0 },
+          { q: "To find the total in an array you multiply…", options: ["Rows × columns", "Rows + columns", "Rows − columns", "Just the rows"], answer: 0 },
+          { q: "An egg carton with 2 rows of 6 has…", options: ["8 eggs", "12 eggs", "26 eggs", "4 eggs"], answer: 1 },
+        ],
+        caseContext: "Aiden looks at a 6-by-2 array of muffins (6 rows, 2 columns) and isn't sure how to count them fast. Guide him with clear, predictable one-step prompts to multiply 6 × 2 = 12, praising each correct step.",
+        caseOpening: "First step: count the rows going down. How many rows do you see?" },
+    ],
+  },
+  // 3) MAYA · Grade 6 · on-track ───────────────────────────────────────────────
+  {
+    title: "Math 6: Ratios & Rates", subject: "Mathematics", emoji: "➗", grade: 6, gradeLabel: "Grade 6",
     framework: "Common Core State Standards — Grade 6 Mathematics",
-    intro: "Sixth-grade math is where numbers start to describe the real world: how fast, how much, how many for how many. In three short lessons you'll compare with ratios, divide fractions, and write your first algebraic expressions — using pizza, playlists, and road trips, not just worksheets.",
-    outcome: "Use ratios and rates, divide fractions, and write and read simple algebraic expressions.",
-    tags: ["math", "grade 6", "ratios", "fractions", "expressions", "common core"],
-    caseObjective: "Reason about a real ratio-and-rate problem and defend the answer.",
-    caseContext: "A food truck sells 3 tacos for $5. A student says '9 tacos should be $15, and 12 tacos should be $20.' Walk the learner through whether that reasoning holds, using a ratio table and unit rate, and help them catch where a classmate might slip up.",
-    caseOpening: "Before we calculate anything — what stays the same no matter how many tacos you buy? Talk me through your thinking.",
+    intro: "Sixth-grade math describes the real world: how fast, how much, how many for how many. In two lessons you'll master ratios and rates using playlists, recipes, and road trips.",
+    outcome: "Use ratios and unit rates to solve real-world problems.",
+    tags: ["math", "ratios", "rates", "grade 6", "common core"],
+    persona: { email: "maya.k12@synops-demo.test", firstName: "Maya", lastName: "Chen", grade: 6, gradeLabel: "Grade 6", learningStyle: "reading_writing", accommodations: [], progressFraction: 0.75 },
     modules: [
-      { title: "Ratios and rates", outcome: "Describe a relationship between two quantities using a ratio, and find a unit rate.",
-        hook: "Your favorite playlist plays 3 songs every 12 minutes. How long for 10 songs?",
-        minutes: 8, standards: [
-          { code: "CCSS.MATH.CONTENT.6.RP.A.1", title: "Understand the concept of a ratio and use ratio language" },
-          { code: "CCSS.MATH.CONTENT.6.RP.A.2", title: "Understand unit rate and use rate language" },
-          { code: "CCSS.MATH.CONTENT.6.RP.A.3", title: "Use ratio and rate reasoning to solve real-world problems" },
-        ],
-        points: [
-          "A ratio compares two amounts — 3 songs to 12 minutes, written 3:12 or 3/12",
-          "A unit rate tells you 'per one' — here, 1 song every 4 minutes",
-          "A ratio table lets you scale up safely: 3→12, 6→24, 9→36",
-        ],
-        reading: "A **ratio** compares two quantities. If your playlist plays 3 songs every 12 minutes, the ratio of songs to minutes is 3 to 12. You can write it three ways: 3:12, 3 to 12, or the fraction 3/12.\n\nA **unit rate** answers 'how much for exactly one?' Divide to find it: 12 minutes ÷ 3 songs = 4 minutes per song. Now any question is easy — 10 songs take 10 × 4 = 40 minutes.\n\nA **ratio table** keeps you organized when you scale up or down. Start with 3 songs / 12 min, then double, triple, and so on. The trick that makes ratios trustworthy: whatever you multiply the top by, you multiply the bottom by the same amount.",
+      { title: "Ratios and rates", outcome: "Describe a relationship with a ratio and find a unit rate.",
+        hook: "Your playlist plays 3 songs every 12 minutes. How long for 10 songs?", minutes: 8,
+        standards: [{ code: "CCSS.MATH.CONTENT.6.RP.A.1", title: "Understand the concept of a ratio and use ratio language" }, { code: "CCSS.MATH.CONTENT.6.RP.A.2", title: "Understand unit rate and use rate language" }],
+        points: ["A ratio compares two amounts (3 songs to 12 minutes)", "A unit rate is 'per one' — 1 song every 4 minutes", "Divide to find a unit rate"],
+        reading: "A **ratio** compares two quantities. If a playlist plays 3 songs every 12 minutes, the ratio of songs to minutes is 3 to 12 — written 3:12 or 3/12.\n\nA **unit rate** answers 'how much for exactly one?' Divide: 12 minutes ÷ 3 songs = **4 minutes per song**. Now any question is easy: 10 songs take 10 × 4 = 40 minutes.\n\nRates are everywhere — miles per hour, price per ounce, points per game. The move is always the same: set up the ratio, then divide to get the 'per one' rate. Once you have the unit rate, scaling up or down is just multiplication.",
         quiz: [
-          { q: "A recipe uses 2 cups of flour for every 3 eggs. What is the ratio of flour to eggs?", options: ["3:2", "2:3", "2:5", "6:1"], answer: 1 },
-          { q: "A car goes 150 miles on 5 gallons. What is the unit rate (miles per gallon)?", options: ["30 mpg", "150 mpg", "5 mpg", "75 mpg"], answer: 0 },
-          { q: "If 3 songs take 12 minutes, how long do 9 songs take (same rate)?", options: ["24 min", "27 min", "36 min", "40 min"], answer: 2 },
-          { q: "Which of these is the SAME ratio as 4:6?", options: ["2:3", "6:4", "8:10", "4:12"], answer: 0 },
+          { q: "A recipe uses 2 cups flour for 3 eggs. The ratio of flour to eggs is…", options: ["3:2", "2:3", "2:5", "6:1"], answer: 1 },
+          { q: "150 miles on 5 gallons is a unit rate of…", options: ["30 mpg", "150 mpg", "5 mpg", "75 mpg"], answer: 0 },
+          { q: "3 songs take 12 min. 9 songs take…", options: ["24 min", "27 min", "36 min", "40 min"], answer: 2 },
+          { q: "Which is the SAME ratio as 4:6?", options: ["2:3", "6:4", "8:10", "4:12"], answer: 0 },
         ],
-      },
-      { title: "Dividing fractions", outcome: "Divide a fraction by a fraction and explain what the answer means.",
-        hook: "You have 3/4 of a pizza and each serving is 1/8. How many servings can you make?",
-        minutes: 8, standards: [
-          { code: "CCSS.MATH.CONTENT.6.NS.A.1", title: "Interpret and compute quotients of fractions; solve word problems involving division of fractions by fractions" },
+        caseContext: "A food truck sells 3 tacos for $5. A classmate says 9 tacos should be $15 and 12 tacos $20. Walk Maya through checking this with a unit rate and a ratio table, and where the reasoning could slip.",
+        caseOpening: "Before we calculate — what stays the same no matter how many tacos you buy?" },
+      { title: "Solving rate problems", outcome: "Use a ratio table or unit rate to solve a multi-step problem.",
+        hook: "Which is the better buy: 12 oz for $3, or 20 oz for $4.60?", minutes: 9,
+        standards: [{ code: "CCSS.MATH.CONTENT.6.RP.A.3", title: "Use ratio and rate reasoning to solve real-world problems" }],
+        points: ["A ratio table scales both numbers together", "Compare unit rates to find the better deal", "Watch the units — dollars per ounce vs ounces per dollar"],
+        reading: "Real problems reward organized thinking. A **ratio table** keeps two quantities in step: whatever you multiply the top by, you multiply the bottom by too.\n\nFor 'better buy' problems, find the **unit rate** for each option and compare. Option A: 12 oz for $3 → $3 ÷ 12 = **$0.25 per ounce**. Option B: 20 oz for $4.60 → $4.60 ÷ 20 = **$0.23 per ounce**. Option B is cheaper per ounce, so it's the better buy — even though it costs more total.\n\nThe key habit is watching your **units**. 'Dollars per ounce' and 'ounces per dollar' answer different questions. Decide which one you want, compute it for each choice, then compare.",
+        quiz: [
+          { q: "In a ratio table, if you double the top you must…", options: ["Halve the bottom", "Double the bottom", "Leave the bottom", "Add 2 to the bottom"], answer: 1 },
+          { q: "12 oz for $3 is a unit price of…", options: ["$0.25/oz", "$4/oz", "$0.12/oz", "$3/oz"], answer: 0 },
+          { q: "The better buy is usually the one with the…", options: ["Higher total price", "Lower price per unit", "Bigger package always", "Nicer label"], answer: 1 },
+          { q: "To compare two deals fairly, compare their…", options: ["Colors", "Unit rates", "Brand names", "Total sizes only"], answer: 1 },
         ],
-        points: [
-          "Dividing asks 'how many of THIS fit into THAT?'",
-          "To divide by a fraction, multiply by its reciprocal (flip it)",
-          "3/4 ÷ 1/8 = 3/4 × 8/1 = 24/4 = 6 servings",
-        ],
-        reading: "Dividing by a fraction sounds scary, but the question is friendly: **how many of the small piece fit into the big piece?** You have 3/4 of a pizza and each serving is 1/8. How many 1/8-servings fit into 3/4?\n\nThe rule: **to divide by a fraction, multiply by its reciprocal** (flip the second fraction). So 3/4 ÷ 1/8 becomes 3/4 × 8/1 = 24/4 = **6 servings**. \n\nWhy does flipping work? Dividing by 1/8 is the same as asking how many eighths there are — and there are 8 eighths in every whole, so you multiply by 8. Always check that your answer makes sense: 6 small servings from most of a pizza sounds about right.",
-      },
-      { title: "Writing expressions with variables", outcome: "Write and read algebraic expressions that use a letter to stand for a number.",
-        hook: "Tickets cost $9 each. How do you write the cost for ANY number of tickets?",
-        minutes: 8, standards: [
-          { code: "CCSS.MATH.CONTENT.6.EE.A.2", title: "Write, read, and evaluate expressions in which letters stand for numbers" },
-          { code: "CCSS.MATH.CONTENT.6.EE.B.6", title: "Use variables to represent numbers and write expressions when solving a real-world problem" },
-        ],
-        points: [
-          "A variable is a letter that stands in for a number that can change",
-          "'$9 per ticket for t tickets' is written 9t (9 times t)",
-          "Reading matters: 9 + t, 9t, and t/9 all mean different things",
-        ],
-        reading: "A **variable** is just a letter holding a spot for a number you don't know yet — or a number that can change. If tickets cost $9 each and you buy **t** tickets, the total cost is **9t**, which means 9 × t.\n\nThe power of a variable is that one short expression covers every case: 9t works whether you buy 2 tickets ($18) or 40 tickets ($360). You **evaluate** it by substituting a number for the letter.\n\nReading expressions carefully is a real skill. '9 more than t' is t + 9. '9 times t' is 9t. 't shared among 9' is t/9. Same numbers, very different meanings — the words tell you which operation to use.",
-      },
+        caseContext: "Maya must choose between a 6-pack of juice for $4 and a 10-pack for $6.50. Coach her to compute price per juice for each and justify the better buy.",
+        caseOpening: "What number would let you compare these two packs fairly?" },
     ],
   },
-  // ── ELA ───────────────────────────────────────────────────────────────────
+  // 4) LEO · Grade 6 · dyslexia + ADHD ─────────────────────────────────────────
   {
-    title: "English Language Arts 6: Reading & Writing",
-    subject: "English Language Arts", emoji: "📖",
-    framework: "Common Core State Standards — Grade 6 ELA/Literacy",
-    intro: "Great readers don't just find out what happens — they figure out what a story means and prove it with evidence. In three lessons you'll uncover theme, back up your ideas with quotes, and write an argument that could change someone's mind.",
-    outcome: "Determine theme, cite textual evidence, and write a clear evidence-based argument.",
-    tags: ["ela", "grade 6", "reading", "writing", "theme", "evidence", "common core"],
-    caseObjective: "Identify a theme and defend it with specific evidence from a short text.",
-    caseContext: "A student read a fable where a proud lion is saved by a tiny mouse he once mocked. The student says 'the theme is that mice are nice.' Coach the learner toward a real theme statement (a lesson about life, not a plot summary) and push them to point to specific moments that support it.",
-    caseOpening: "Is 'mice are nice' a lesson about life, or just something that happened in the story? What's the difference?",
+    title: "Science 6: Ecosystems", subject: "Science", emoji: "🌿", grade: 6, gradeLabel: "Grade 6",
+    framework: "Next Generation Science Standards — Middle School Life Science",
+    intro: "Every living thing is connected. In two short lessons you'll map how energy flows through a food web and see why changing one thing changes everything.",
+    outcome: "Model how energy flows through an ecosystem and predict the effect of a change.",
+    tags: ["science", "ecosystems", "food web", "grade 6", "ngss"],
+    persona: { email: "leo.k12@synops-demo.test", firstName: "Leo", lastName: "Rivera", grade: 6, gradeLabel: "Grade 6", learningStyle: "auditory", accommodations: ["simplified_language", "chunked_content", "scaffolded_questions", "extended_processing", "concrete_examples", "positive_reinforcement"], progressFraction: 0.4 },
     modules: [
-      { title: "Finding the theme", outcome: "State the theme of a story as a lesson about life, not a summary of the plot.",
-        hook: "A story ends with a bragging hare losing a race to a slow, steady tortoise. What's the lesson?",
-        minutes: 8, standards: [
-          { code: "CCSS.ELA-LITERACY.RL.6.2", title: "Determine a theme or central idea and how it is conveyed through details" },
-        ],
-        points: [
-          "Theme is the life lesson, not a one-sentence plot summary",
-          "Ask: what does a character learn, or what does the story teach us?",
-          "State it as a general truth: 'Steady effort beats overconfidence.'",
-        ],
-        reading: "Every good story is *about* something bigger than its plot. The **theme** is the lesson about life or human nature that the story reveals. The plot of the tortoise and the hare is 'a slow tortoise beats a fast hare.' The **theme** is 'steady effort beats overconfidence.'\n\nHere's the test: a plot summary tells what *happened*; a theme tells what it *means* for people in general. Theme almost never names the characters. 'The hare was lazy' is plot. 'Underestimating others can cost you' is theme.\n\nTo find a theme, watch what a character learns, how they change, or what the ending rewards and punishes. Then say it as a general truth you could apply to your own life.",
+      { title: "Food webs", outcome: "Trace how energy moves from the sun to plants to animals.",
+        hook: "Grass never chases anything. So where does a hawk's energy really come from?", minutes: 8,
+        standards: [{ code: "NGSS.MS-LS2-3", title: "Develop a model to describe the cycling of matter and flow of energy" }],
+        points: ["Producers (plants) capture the sun's energy", "Energy flows: producers → herbivores → predators", "A food web links many food chains together"],
+        reading: "Every ecosystem runs on energy that starts with the **sun**.\n\n**Producers** — plants and algae — catch sunlight and make food. They are the base of everything. **Consumers** eat to get energy: herbivores (like mice) eat plants; predators (like snakes and hawks) eat other animals.\n\nSo a hawk's energy really came from the sun → grass → mouse → snake → hawk. Energy **flows one way** along the chain. A **food web** is just lots of these chains linked together, because most animals eat more than one thing.\n\nOne big idea: everything is connected. Follow the arrows and you can trace any animal's energy all the way back to the sun.",
         quiz: [
-          { q: "Which of these is a THEME, not a plot summary?", options: ["The tortoise won the race.", "A hare took a nap during a race.", "Overconfidence can lead to failure.", "There was a race between two animals."], answer: 2 },
-          { q: "The best way to find a theme is to ask:", options: ["What color was the setting?", "What lesson does the story teach about life?", "How many characters were there?", "When was it written?"], answer: 1 },
-          { q: "A good theme statement usually…", options: ["Names the main character", "Retells the ending", "States a general truth about life", "Lists the events in order"], answer: 2 },
-          { q: "'Kindness comes back to you' is an example of a…", options: ["Setting", "Theme", "Plot summary", "Character trait"], answer: 1 },
+          { q: "Producers get their energy from…", options: ["Eating animals", "The sun", "The soil only", "Other producers"], answer: 1 },
+          { q: "Energy in a food chain flows…", options: ["In a circle", "One way, from producers to consumers", "From predators to plants", "Randomly"], answer: 1 },
+          { q: "A mouse that eats seeds is a…", options: ["Producer", "Herbivore (consumer)", "Predator only", "The sun"], answer: 1 },
+          { q: "A food web is…", options: ["One single chain", "Many food chains linked together", "A spider's home", "A list of plants"], answer: 1 },
         ],
-      },
-      { title: "Citing textual evidence", outcome: "Support a claim about a text with a specific, well-chosen quotation.",
-        hook: "You say a character is brave. A friend says 'prove it.' What do you point to?",
-        minutes: 8, standards: [
-          { code: "CCSS.ELA-LITERACY.RL.6.1", title: "Cite textual evidence to support analysis of what the text says" },
-          { code: "CCSS.ELA-LITERACY.RI.6.1", title: "Cite textual evidence to support analysis of informational text" },
+        caseContext: "In a meadow web, hawks eat snakes, snakes eat mice, mice eat grass. Leo thinks removing the hawks changes nothing. Coach him — in short, simple steps with concrete examples and extra thinking time — to trace what happens to snakes, then mice, then grass.",
+        caseOpening: "Take your time. If the hawks are gone, which animal is suddenly safer — snakes or mice?" },
+      { title: "Energy flow", outcome: "Explain why there are fewer predators than prey.",
+        hook: "Why are there tons of grasshoppers but only a few hawks?", minutes: 8,
+        standards: [{ code: "NGSS.MS-LS2-1", title: "Analyze data for the effects of resource availability on organisms" }],
+        points: ["Energy is lost as heat at every step", "Only some energy passes to the next level", "So each level up has fewer living things"],
+        reading: "Here's a puzzle: in a field there are thousands of grasshoppers, hundreds of frogs, but only a few hawks. Why?\n\nThe answer is **energy loss**. At every step of a food chain, a lot of energy is used up for living — moving, breathing, staying warm — and lost as heat. Only a small part of the energy gets passed to the next animal.\n\nSo plants have the most energy. Herbivores get less. Predators get even less. That's why the top of a food chain can only support a **few** animals — there simply isn't enough energy left for many. Scientists draw this as an **energy pyramid**: wide at the bottom, narrow at the top.",
+        quiz: [
+          { q: "At each step of a food chain, energy is…", options: ["Created", "Mostly lost as heat", "Doubled", "Frozen"], answer: 1 },
+          { q: "There are fewer predators than prey because…", options: ["Predators are lazy", "Less energy reaches the top", "Prey hide", "Predators sleep"], answer: 1 },
+          { q: "Which level has the MOST energy?", options: ["Top predators", "Producers (plants)", "Herbivores", "They're equal"], answer: 1 },
+          { q: "An energy pyramid is…", options: ["Narrow at bottom", "Wide at bottom, narrow at top", "A perfect square", "Upside down"], answer: 1 },
         ],
-        points: [
-          "A claim is what you believe; evidence is the proof from the text",
-          "Quote the smallest exact words that prove your point",
-          "Then explain HOW the quote supports your claim",
-        ],
-        reading: "When you make a **claim** about a text — 'this character is brave' — you have to back it up with **textual evidence**: the actual words from the story. Opinions without evidence don't convince anyone.\n\nGood evidence is *specific* and *short*. Instead of 'she did brave stuff,' quote the exact moment: 'she stepped in front of her little brother as the dog charged.' Pick the smallest quote that proves your point.\n\nThe final step is the one students skip: **explain the link**. After the quote, say how it proves your claim. 'Stepping in front of danger to protect someone shows courage.' Claim, evidence, explanation — that's the whole move.",
-      },
-      { title: "Writing an argument", outcome: "Write a short argument with a clear claim, reasons, and evidence.",
-        hook: "Should schools start an hour later? Convince someone who disagrees.",
-        minutes: 9, standards: [
-          { code: "CCSS.ELA-LITERACY.W.6.1", title: "Write arguments to support claims with clear reasons and relevant evidence" },
-        ],
-        points: [
-          "Start with a clear claim — the position you're arguing",
-          "Give reasons, and support each with evidence",
-          "Answer the other side, then finish with a strong closing",
-        ],
-        reading: "An **argument** isn't a fight — it's a clear case for what you believe, built so a reasonable person might agree. It starts with a **claim**: your position, stated plainly. 'Schools should start an hour later.'\n\nNext come **reasons**, each backed by **evidence**. Reason: teens need more sleep. Evidence: studies show middle schoolers who start later have better attendance and grades. Two or three solid reasons beat ten weak ones.\n\nStrong writers also handle the **other side**: name an objection ('buses would need new schedules') and answer it. Then close by restating your claim with confidence. Claim, reasons, evidence, counter-argument, conclusion — a shape you can reuse for any argument you'll ever write.",
-      },
+        caseContext: "Leo wonders why a lake can feed millions of tiny algae but only a few big fish. Coach him gently, in small steps, to connect it to energy being lost at each level.",
+        caseOpening: "Let's go slow. Where does the energy in the lake start — with the algae or the fish?" },
     ],
   },
-  // ── SCIENCE ────────────────────────────────────────────────────────────────
+  // 5) JORDAN · Grade 8 · dysgraphia / slow processing ─────────────────────────
   {
-    title: "Science 6: Earth, Life & Matter",
-    subject: "Science", emoji: "🔬",
-    framework: "Next Generation Science Standards — Middle School",
-    intro: "Science is how we explain the world with evidence. In three lessons you'll track why weather happens, map how energy flows through a food web, and zoom in on the tiny particles that make up everything around you.",
-    outcome: "Explain weather and climate patterns, model energy flow in ecosystems, and describe matter and its changes.",
-    tags: ["science", "grade 6", "ngss", "weather", "ecosystems", "matter"],
-    caseObjective: "Use a food-web model to predict the effect of a change in an ecosystem.",
-    caseContext: "In a meadow food web, hawks eat snakes, snakes eat mice, and mice eat grass and seeds. A student says 'if all the hawks left, nothing else would change.' Coach the learner to trace the energy and predict what actually happens to snakes, mice, and grass — and why ecosystems are connected.",
-    caseOpening: "If the hawks disappear, what's the very first population that changes — and does it go up or down?",
+    title: "Writing & Argument (Grade 8)", subject: "English Language Arts", emoji: "✍️", grade: 8, gradeLabel: "Grade 8",
+    framework: "Common Core State Standards — Grade 8 ELA/Literacy",
+    intro: "A strong argument can change minds. Over two lessons you'll build a clear claim backed by evidence, then learn to answer the other side — the move that makes writing persuasive.",
+    outcome: "Write an argument with a clear claim, evidence, and a counterargument.",
+    tags: ["ela", "writing", "argument", "grade 8", "common core"],
+    persona: { email: "jordan.k12@synops-demo.test", firstName: "Jordan", lastName: "Bell", grade: 8, gradeLabel: "Grade 8", learningStyle: "auditory", accommodations: ["extended_processing", "scaffolded_questions", "chunked_content", "concrete_examples"], progressFraction: 0.35 },
     modules: [
-      { title: "Weather and climate", outcome: "Explain how the sun, water, and air drive weather, and how weather differs from climate.",
-        hook: "Why does a hot afternoon sometimes end in a thunderstorm?",
-        minutes: 8, standards: [
-          { code: "NGSS.MS-ESS2-5", title: "Collect data to provide evidence for how air masses interacting cause weather" },
-          { code: "NGSS.MS-ESS2-6", title: "Develop a model to describe how unequal heating and rotation cause patterns" },
-        ],
-        points: [
-          "The sun heats the Earth unevenly, and that drives moving air",
-          "Warm air rises and holds water vapor; when it cools, clouds and rain form",
-          "Weather is day-to-day; climate is the pattern over many years",
-        ],
-        reading: "**Weather** is what the atmosphere is doing right now — sunny, rainy, windy. It's powered by the **sun**, which heats Earth's surface unevenly. Warm air rises, cooler air rushes in to replace it, and that moving air is **wind**.\n\nWater is the other key player. Warm air holds **water vapor**. When that air rises and cools, the vapor condenses into tiny droplets — clouds — and if the droplets grow heavy enough, it rains. That hot afternoon thunderstorm? The ground heated the air, it shot upward carrying moisture, and cooled fast at high altitude.\n\n**Climate** is different from weather: it's the *average* pattern over decades. A single snowy day doesn't change a desert's climate. Weather is your mood today; climate is your personality.",
+      { title: "Claim and evidence", outcome: "State a clear claim and support it with specific evidence.",
+        hook: "You say later school start times are better. A skeptic says 'prove it.' What now?", minutes: 9,
+        standards: [{ code: "CCSS.ELA-LITERACY.W.8.1", title: "Write arguments to support claims with clear reasons and relevant evidence" }],
+        points: ["A claim is the position you're arguing", "Evidence is specific proof — facts, data, examples", "Always explain HOW the evidence supports the claim"],
+        reading: "An **argument** is a clear case for what you believe, built so a reasonable person might agree. It starts with a **claim** — your position, stated plainly: *\"Schools should start later.\"*\n\nA claim alone convinces no one. You need **evidence**: specific facts, data, or examples. *\"Studies show teens who start school later have better attendance and higher grades.\"* Good evidence is concrete and relevant — not just \"it's better,\" but *why*, with proof.\n\nThe step writers skip is the **link**: after your evidence, explain how it supports the claim. \"Better attendance and grades show later start times help students succeed.\" Claim → evidence → explanation. Master that chain and you can argue anything.",
         quiz: [
-          { q: "What is the main energy source that drives weather?", options: ["The moon", "The sun", "Ocean tides", "Earth's core"], answer: 1 },
-          { q: "What happens when warm, moist air rises and cools?", options: ["It sinks immediately", "Water vapor condenses into clouds", "It turns into wind only", "Nothing changes"], answer: 1 },
-          { q: "Which describes CLIMATE, not weather?", options: ["It's raining right now", "It's windy this afternoon", "This region is dry most of the year", "A storm is coming tonight"], answer: 2 },
-          { q: "Wind is mostly caused by…", options: ["Uneven heating of Earth's surface", "The moon's gravity", "Trees moving", "Rivers flowing"], answer: 0 },
+          { q: "A claim is…", options: ["A random fact", "The position you're arguing", "A question", "The title"], answer: 1 },
+          { q: "The best evidence is…", options: ["Vague and general", "Specific and relevant", "Only your opinion", "Off-topic"], answer: 1 },
+          { q: "After giving evidence, a strong writer…", options: ["Stops immediately", "Explains how it supports the claim", "Changes the subject", "Repeats the claim only"], answer: 1 },
+          { q: "Which is a claim?", options: ["Schools exist.", "Schools should start later.", "What time is school?", "Buses are yellow."], answer: 1 },
         ],
-      },
-      { title: "Ecosystems and food webs", outcome: "Model how energy flows from producers to consumers in a food web.",
-        hook: "Grass never chases anything, so where does a hawk's energy really come from?",
-        minutes: 8, standards: [
-          { code: "NGSS.MS-LS2-1", title: "Analyze data to provide evidence for the effects of resource availability on organisms" },
-          { code: "NGSS.MS-LS2-3", title: "Develop a model to describe the cycling of matter and flow of energy" },
+        caseContext: "Jordan wants to argue that his town needs a new skate park but only writes 'it would be fun.' Coach him — with extended thinking time and small scaffolded steps — to turn that into a claim plus one specific piece of evidence.",
+        caseOpening: "No rush. 'It would be fun' is a start. WHO would it help, and how? Let's find one specific reason." },
+      { title: "Answering the other side", outcome: "Name an objection and respond to it (counterargument).",
+        hook: "The best way to win an argument? Bring up the OTHER side yourself.", minutes: 9,
+        standards: [{ code: "CCSS.ELA-LITERACY.W.8.1.B", title: "Support claims with logical reasoning, acknowledging counterclaims" }],
+        points: ["A counterargument is the other side's strongest point", "Name it fairly, then respond with reasons", "Handling objections makes you more convincing, not less"],
+        reading: "It sounds backwards, but strong writers **bring up the other side themselves**. This is the **counterargument**.\n\nSay you're arguing for later school start times. A reader might think: *\"But buses would need new schedules.\"* Instead of hoping no one notices, you name it: \"Some worry that later starts would disrupt bus schedules.\" Then you **respond**: \"But many districts have adjusted routes successfully, and the benefit to students' health outweighs the inconvenience.\"\n\nWhy do this? Because it shows you've thought it through, and it takes the wind out of your critic's sails before they even speak. Name the objection fairly, then answer it with reasons. That's the move that turns a good argument into a convincing one.",
+        quiz: [
+          { q: "A counterargument is…", options: ["Your own claim again", "The other side's strongest point", "A spelling rule", "The conclusion"], answer: 1 },
+          { q: "You should present the other side…", options: ["Never", "Fairly, then respond to it", "As a joke", "Only if forced"], answer: 1 },
+          { q: "Addressing objections makes your argument…", options: ["Weaker", "More convincing", "Shorter only", "Off-topic"], answer: 1 },
+          { q: "After naming a counterargument, you should…", options: ["Ignore it", "Respond with reasons", "Agree and quit", "Change topics"], answer: 1 },
         ],
-        points: [
-          "Producers (plants) capture the sun's energy through photosynthesis",
-          "Energy flows: producers → herbivores → predators",
-          "Remove one part and the whole web shifts — everything is connected",
-        ],
-        reading: "Every ecosystem runs on **energy that starts with the sun**. **Producers** — plants and algae — capture sunlight and make food through photosynthesis. They're the foundation of every food web.\n\n**Consumers** get their energy by eating. Herbivores (mice, rabbits) eat producers; predators (snakes, hawks) eat other consumers. So a hawk's energy really came from the sun → grass → mouse → snake → hawk. Energy **flows** one direction along the chain, and a lot is lost as heat at each step, which is why there are always fewer predators than prey.\n\nThe big idea is **connection**. Remove the hawks and the snakes multiply, the mice get hunted harder, and the grass grows back — one change ripples through the whole web.",
-      },
-      { title: "Matter and its interactions", outcome: "Describe matter as made of particles and identify physical vs. chemical changes.",
-        hook: "Ice, water, and steam are all the same stuff — so what actually changed?",
-        minutes: 8, standards: [
-          { code: "NGSS.MS-PS1-1", title: "Develop models to describe the atomic composition of molecules" },
-          { code: "NGSS.MS-PS1-4", title: "Develop a model that predicts changes in particle motion with temperature" },
-        ],
-        points: [
-          "All matter is made of tiny particles (atoms and molecules) in motion",
-          "Adding heat makes particles move faster — solid → liquid → gas",
-          "Physical change = same substance; chemical change = new substance",
-        ],
-        reading: "Everything around you is **matter**, and all matter is made of unimaginably tiny **particles** — atoms and molecules — that are always moving. How fast they move depends on **temperature**.\n\nIn a **solid** like ice, particles are locked in place, just vibrating. Add heat and they move faster and slide past each other — that's a **liquid**. Add more and they break free and fly around — a **gas** (steam). Ice, water, and steam are the *same* water molecules; only the particle motion changed. That's a **physical change**.\n\nA **chemical change** is different: the particles rearrange into a *new* substance. Burning wood makes ash and smoke — you can't get the wood back. Rust, cooking an egg, and a firework are all chemical changes.",
-      },
+        caseContext: "Jordan argues the school day should be shorter, but ignores the obvious objection (less learning time). Coach him to name that objection fairly and craft a reasonable response.",
+        caseOpening: "Someone WILL say 'a shorter day means less learning.' Let's not dodge it — how could you answer that fairly?" },
     ],
   },
-  // ── SOCIAL STUDIES ──────────────────────────────────────────────────────────
+  // 6) EMMA · Grade 11 · low vision + dyscalculia ──────────────────────────────
   {
-    title: "Social Studies 6: Civics, Geography & Economics",
-    subject: "Social Studies", emoji: "🌍",
-    framework: "C3 Framework (NCSS) — Grades 6–8",
-    intro: "Social studies is about how people live together — where they settle, how they govern themselves, and how they choose what to make and buy. In three lessons you'll read the world like a geographer, an economist, and a citizen.",
-    outcome: "Use geographic thinking, explain the purpose of government and citizenship, and reason about economic choices.",
-    tags: ["social studies", "grade 6", "civics", "geography", "economics", "c3"],
-    caseObjective: "Weigh an economic trade-off and justify a decision using opportunity cost.",
-    caseContext: "A student council has $500 and must choose between new library books or new sports equipment — it can't fully fund both. Coach the learner to name the opportunity cost of each choice and make a reasoned recommendation the council could defend to the whole school.",
-    caseOpening: "Whatever the council picks, what exactly are they giving up? That's the real cost.",
+    title: "Algebra I (Grade 11 support)", subject: "Mathematics", emoji: "📐", grade: 11, gradeLabel: "Grade 11",
+    framework: "Common Core State Standards — High School Algebra",
+    intro: "Algebra is the language of patterns and change. In two lessons you'll solve linear equations step by step and read slope as a real rate of change — with every step shown clearly.",
+    outcome: "Solve one-variable linear equations and interpret slope as a rate of change.",
+    tags: ["math", "algebra", "linear equations", "grade 11", "common core"],
+    persona: { email: "emma.k12@synops-demo.test", firstName: "Emma", lastName: "Novak", grade: 11, gradeLabel: "Grade 11", learningStyle: "visual", accommodations: ["concrete_examples", "extended_processing", "scaffolded_questions", "chunked_content"], progressFraction: 0.55 },
     modules: [
-      { title: "Thinking like a geographer", outcome: "Use the five themes of geography to describe a place.",
-        hook: "Why did the world's first cities all grow up next to rivers?",
-        minutes: 8, standards: [
-          { code: "C3.D2.Geo.1.6-8", title: "Construct maps to represent and explain spatial patterns" },
-          { code: "C3.D2.Geo.2.6-8", title: "Explain how physical characteristics of places influence human settlement" },
-        ],
-        points: [
-          "Location (where), Place (what it's like), Region (what's similar)",
-          "Movement (people, goods, ideas) and Human-Environment Interaction",
-          "Geography shapes where and how people live",
-        ],
-        reading: "Geographers read the world with **five themes**. **Location** answers 'where?' — on a map or by landmarks. **Place** describes what makes it special: its landforms, climate, and people. **Region** groups places that share features, like 'the desert Southwest.'\n\n**Movement** tracks how people, goods, and ideas travel between places — trade routes, migration, the internet. **Human-Environment Interaction** looks at how people change their surroundings and adapt to them: building dams, farming, wearing coats in winter.\n\nWhy did ancient cities cluster on rivers? Every theme explains it: rivers gave a good *location*, fertile *place*, easy *movement* of goods by boat, and a way to *interact* with the environment through irrigation. Geography quietly shapes almost everything about how people live.",
+      { title: "Solving linear equations", outcome: "Solve a one-variable equation by keeping it balanced.",
+        hook: "3x + 4 = 19. What is x — and how do you know you're right?", minutes: 10,
+        standards: [{ code: "CCSS.MATH.CONTENT.HSA.REI.B.3", title: "Solve linear equations in one variable" }],
+        points: ["An equation is a balance: do the same to both sides", "Undo operations in reverse order", "Check by substituting your answer back in"],
+        reading: "An **equation** is a balance scale: the two sides are equal, and whatever you do to one side you must do to the other to keep it balanced.\n\nTo solve **3x + 4 = 19**, undo the operations in reverse. First subtract 4 from both sides: 3x = 15. Then divide both sides by 3: **x = 5**.\n\nThe order matters — you undo addition/subtraction before multiplication/division, the reverse of how you'd build the expression. \n\nFinally, **check**: put x = 5 back in. 3(5) + 4 = 15 + 4 = 19. ✓ It balances, so the answer is correct. Checking isn't optional — it's how you *know* you're right, every time.",
         quiz: [
-          { q: "Which theme of geography answers 'where is it?'", options: ["Place", "Location", "Movement", "Region"], answer: 1 },
-          { q: "Building an irrigation canal to water crops is an example of…", options: ["Location", "Region", "Human-Environment Interaction", "Place"], answer: 2 },
-          { q: "Grouping states into 'the Midwest' uses which theme?", options: ["Region", "Movement", "Location", "Place"], answer: 0 },
-          { q: "Why did many early cities form near rivers?", options: ["Rivers looked nice", "Water, fertile soil, and easy transport", "Rivers were cold", "To avoid other people"], answer: 1 },
+          { q: "Solving 2x + 3 = 11, first you…", options: ["Divide by 2", "Subtract 3 from both sides", "Add 3", "Multiply by 2"], answer: 1 },
+          { q: "In x/4 = 5, x equals…", options: ["20", "9", "1.25", "45"], answer: 0 },
+          { q: "To keep an equation true, you must…", options: ["Change only one side", "Do the same to both sides", "Ignore the equals sign", "Add anything"], answer: 1 },
+          { q: "The best way to know your answer is right is to…", options: ["Guess", "Substitute it back and check", "Ask a friend", "Move on"], answer: 1 },
         ],
-      },
-      { title: "Government and citizenship", outcome: "Explain why governments exist and what it means to be a good citizen.",
-        hook: "Who decides the rules at your school — and what if there were none?",
-        minutes: 8, standards: [
-          { code: "C3.D2.Civ.1.6-8", title: "Distinguish the powers and responsibilities of citizens and institutions" },
-          { code: "C3.D2.Civ.2.6-8", title: "Explain the roles of citizens in participating in government" },
-        ],
-        points: [
-          "Governments make rules, provide services, and settle disputes",
-          "Citizens have rights AND responsibilities",
-          "Democracy depends on people participating",
-        ],
-        reading: "A **government** is how a community makes and enforces shared rules. Without one, disputes have no fair way to get settled and shared needs — roads, safety, schools — go unmet. Governments **make laws**, **provide services**, and **resolve conflicts** peacefully.\n\nBeing a **citizen** is a two-way street. You have **rights** — like free speech and fair treatment — but also **responsibilities**: following laws, respecting others' rights, and helping the community. \n\nIn a **democracy**, power ultimately comes from the people, so participation matters: voting, speaking up, serving on a jury, or just staying informed. A democracy is only as strong as the citizens who take part in it.",
-      },
-      { title: "Making economic choices", outcome: "Explain scarcity and opportunity cost and use them to reason about a decision.",
-        hook: "You have $10 and want both a game and a hoodie. What does choosing one really cost?",
-        minutes: 8, standards: [
-          { code: "C3.D2.Eco.1.6-8", title: "Explain how economic decisions affect the well-being of individuals and society" },
-          { code: "C3.D2.Eco.2.6-8", title: "Evaluate alternative approaches using opportunity cost" },
-        ],
-        points: [
-          "Scarcity: unlimited wants, limited resources — so we must choose",
-          "Opportunity cost: what you give up when you pick one thing",
-          "Good decisions weigh the trade-offs",
-        ],
-        reading: "Economics starts with one hard truth: **scarcity**. People have unlimited wants but limited money, time, and resources — so everyone has to **choose**. You can't buy the game *and* the hoodie with $10.\n\nEvery choice has an **opportunity cost**: the value of the next-best thing you gave up. If you buy the game, the opportunity cost is the hoodie you didn't get. It's not just about money — spending Saturday practicing has the opportunity cost of the hangout you skipped.\n\nSmart decision-makers name the trade-off out loud. They ask: what am I really giving up, and is what I'm getting worth more to me? That single question — used by shoppers, businesses, and governments alike — is the heart of economics.",
-      },
-    ],
-  },
-  // ── HISTORY ─────────────────────────────────────────────────────────────────
-  {
-    title: "World History 6: Ancient Civilizations",
-    subject: "History", emoji: "🏛️",
-    framework: "C3 Framework (NCSS) — Grades 6–8, World History",
-    intro: "Long before phones and cities, humans figured out how to farm, build, write, and govern. In three lessons you'll travel from the first farmers to the pyramids of Egypt to the ideas of ancient Greece that still shape your world.",
-    outcome: "Trace how farming changed human life and describe key contributions of ancient Egypt and Greece.",
-    tags: ["history", "grade 6", "ancient civilizations", "egypt", "greece", "c3"],
-    caseObjective: "Explain how one ancient innovation changed the way people lived.",
-    caseContext: "A student says 'farming was just about growing food.' Coach the learner to see the bigger chain reaction the Agricultural Revolution set off — settling down, surplus food, specialized jobs, cities, writing — and to defend which change mattered most.",
-    caseOpening: "Once people could grow more food than they needed, what became possible that never was before?",
-    modules: [
-      { title: "Early humans and the first farms", outcome: "Explain how the shift to farming (the Agricultural Revolution) changed human life.",
-        hook: "For most of history humans chased their food. Then they planted it. What changed?",
-        minutes: 8, standards: [
-          { code: "C3.D2.His.1.6-8", title: "Analyze connections among events and developments in broad historical contexts" },
-          { code: "C3.D2.His.2.6-8", title: "Classify series of historical events by cause and effect" },
-        ],
-        points: [
-          "Early humans were hunter-gatherers who moved to follow food",
-          "Farming let people settle in one place and store surplus food",
-          "Surplus food → more people, new jobs, and the first villages",
-        ],
-        reading: "For hundreds of thousands of years, humans were **hunter-gatherers** — they hunted animals and gathered plants, moving constantly to follow their food. Then, around 10,000 years ago, came one of the biggest changes in human history: people learned to **farm**.\n\nThe **Agricultural Revolution** meant people could stay in one place and grow more food than they needed right away — a **surplus**. Surplus changed everything. With stored food, populations grew. Not everyone had to hunt, so some people could become potters, builders, or leaders — the first **specialized jobs**.\n\nSettled villages grew into towns, and towns into the first cities. Almost everything we call 'civilization' — writing, government, trade — traces back to the day people stopped chasing their food and started planting it.",
+        caseContext: "Emma solves 5x − 2 = 18 and gets x = 4. Coach her to check her work by substituting, discover it doesn't balance, and find x = 4 correctly (5·4−2 = 18 ✓ — actually correct). Use clear, concrete steps.",
+        caseOpening: "Let's verify. Put x = 4 back into 5x − 2. What do you get?" },
+      { title: "Slope as rate of change", outcome: "Read slope as how much y changes per unit of x.",
+        hook: "A phone plan charges $30 plus $10 per gig. What's the 'slope' — and what does it mean?", minutes: 9,
+        standards: [{ code: "CCSS.MATH.CONTENT.HSF.IF.B.6", title: "Calculate and interpret the average rate of change" }],
+        points: ["Slope = rise over run = change in y ÷ change in x", "Slope is a rate: how fast y changes as x grows", "In y = mx + b, m is the slope"],
+        reading: "**Slope** measures how steeply a line rises — and more usefully, it's a **rate of change**: how much *y* changes for each step in *x*.\n\nYou compute it as **rise over run**: the change in y divided by the change in x. On a phone plan that costs $30 plus $10 per gigabyte, every extra gig adds $10, so the **slope is 10** — 10 dollars per gig. The $30 is the starting point (the **y-intercept**).\n\nIn the equation **y = mx + b**, the **m** is the slope and **b** is where the line starts. Reading slope as a rate turns abstract lines into real meaning: dollars per gig, miles per hour, degrees per minute. Same idea, everywhere.",
         quiz: [
-          { q: "Before farming, most humans were…", options: ["City builders", "Hunter-gatherers", "Kings", "Sailors"], answer: 1 },
-          { q: "A 'surplus' of food means…", options: ["Not enough food", "Exactly enough food", "More food than needed right away", "Spoiled food"], answer: 2 },
-          { q: "Why did farming let some people take new jobs like pottery?", options: ["They got bored", "Surplus food meant not everyone had to find food", "Kings ordered it", "They ran out of animals"], answer: 1 },
-          { q: "The Agricultural Revolution led most directly to…", options: ["The first permanent villages and cities", "The invention of cars", "The end of humans", "Colder weather"], answer: 0 },
+          { q: "Slope is…", options: ["Change in y ÷ change in x", "x times y", "The y-intercept", "Always 1"], answer: 0 },
+          { q: "In y = mx + b, the slope is…", options: ["b", "m", "x", "y"], answer: 1 },
+          { q: "A plan is $20 + $5 per month. The slope is…", options: ["20", "5", "25", "0"], answer: 1 },
+          { q: "Slope as a rate of change tells you…", options: ["The starting value", "How fast y changes as x grows", "The color of the line", "Nothing useful"], answer: 1 },
         ],
-      },
-      { title: "Ancient Egypt and Mesopotamia", outcome: "Describe key achievements of early river civilizations.",
-        hook: "How do you build a pyramid — or invent writing — with no machines?",
-        minutes: 8, standards: [
-          { code: "C3.D2.His.3.6-8", title: "Use questions about individuals and groups to analyze why their perspectives differed" },
-        ],
-        points: [
-          "Both grew along rivers (the Nile; the Tigris and Euphrates)",
-          "Mesopotamia gave us early writing (cuneiform) and the wheel",
-          "Egypt built pyramids and used hieroglyphic writing",
-        ],
-        reading: "The first great civilizations grew up along **rivers**, whose yearly floods left rich soil for farming. In **Mesopotamia** (modern Iraq), between the Tigris and Euphrates rivers, people built some of the world's first cities. They invented **cuneiform**, one of the earliest forms of **writing**, pressing marks into clay tablets — which meant ideas and records could finally outlive the person who spoke them. They also gave us the **wheel** and early math.\n\nAlong the **Nile River**, **ancient Egypt** flourished for thousands of years. Egyptians built the massive **pyramids** as tombs for their pharaohs — engineering marvels made without modern machines. They wrote in **hieroglyphics**, made paper from papyrus, and developed advanced medicine and astronomy. Both civilizations show a pattern: rivers made farming possible, farming made cities possible, and cities made writing, building, and government possible.",
-      },
-      { title: "Ancient Greece", outcome: "Explain ideas from ancient Greece that still shape the modern world.",
-        hook: "Why do we still use the word 'democracy' — a word invented 2,500 years ago?",
-        minutes: 8, standards: [
-          { code: "C3.D2.His.14.6-8", title: "Explain multiple causes and effects of events and developments in the past" },
-          { code: "C3.D2.His.16.6-8", title: "Organize applicable evidence into a coherent argument about the past" },
-        ],
-        points: [
-          "Athens developed early democracy — rule by the people",
-          "Greek thinkers advanced philosophy, math, and science",
-          "Greek ideas about government and reason still shape us today",
-        ],
-        reading: "Ancient **Greece** wasn't one country but many independent **city-states**, like **Athens** and **Sparta**. Around 2,500 years ago, Athens developed one of the world's first **democracies** — a word that literally means 'rule by the people.' Citizens gathered to debate and vote on laws directly. It wasn't perfect (many people, including enslaved people and women, couldn't take part), but the idea that ordinary people should have a say was revolutionary and still shapes governments today.\n\nGreek **thinkers** changed how humans understand the world. Philosophers like Socrates asked hard questions about right and wrong; mathematicians like Pythagoras found patterns still taught in your math class; and early scientists looked for natural explanations instead of only myths. When you vote, reason through a problem, or use geometry, you're using ideas that trace back to ancient Greece.",
-      },
+        caseContext: "Emma sees the line y = 15 + 8x for a gym (a $15 join fee plus $8 per visit) and isn't sure what 8 means. Coach her, with a concrete real-world framing, to read 8 as the cost per visit (the rate of change).",
+        caseOpening: "In y = 15 + 8x, the 8 is attached to x — the number of visits. So what does 8 cost you each time?" },
     ],
   },
 ];
 
-// ── Interactive quiz player (self-contained HTML in the sandboxed activity iframe). ──
+// ── Interactive quiz player (sandboxed HTML). ────────────────────────────────
 function quizHtml(title: string, items: { q: string; options: string[]; answer: number }[]): string {
   const data = JSON.stringify(items).replace(/</g, "\\u003c");
   return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-:root{--indigo:#3730A3;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;--no:#b91c1c}
-*{box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;color:var(--ink);margin:0;padding:18px;background:#FBF7EF}
-h2{margin:.2rem 0 1rem;font-size:1.15rem}.q{background:#fff;border:1px solid #ece7db;border-radius:14px;padding:14px 16px;margin:0 0 12px}
-.qt{font-weight:600;margin:0 0 10px}.opt{display:block;width:100%;text-align:left;border:1px solid #e2ddcf;background:#fff;border-radius:10px;padding:10px 12px;margin:6px 0;font:inherit;cursor:pointer;transition:.15s}
-.opt:hover{border-color:var(--indigo)}.opt.sel{border-color:var(--indigo);background:#eef0fb}
-.opt.correct{border-color:var(--ok);background:#e9f7ee}.opt.wrong{border-color:var(--no);background:#fdecec}
-.bar{height:10px;background:#eee;border-radius:6px;overflow:hidden;margin:14px 0 6px}.fill{height:100%;width:0;background:var(--amber);transition:.4s}
-button.go{background:var(--indigo);color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:600;cursor:pointer}
-.score{font-weight:700;font-size:1.05rem;margin:4px 0}.hint{color:#6b7280;font-size:.9rem}
-</style>
-<h2>${title}</h2><div id="app"></div>
-<div class="bar"><div class="fill" id="f"></div></div><p id="s" class="hint">Pick an answer for each question.</p>
-<button class="go" id="submit">Check my answers</button>
-<script>
-const items=${data};const app=document.getElementById('app');const picks=new Array(items.length).fill(-1);let done=false;
-items.forEach((it,qi)=>{const d=document.createElement('div');d.className='q';d.innerHTML='<p class="qt">'+(qi+1)+'. '+it.q+'</p>';
-it.options.forEach((o,oi)=>{const b=document.createElement('button');b.className='opt';b.textContent=o;b.onclick=()=>{if(done)return;picks[qi]=oi;
-[...d.querySelectorAll('.opt')].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');upd();};d.appendChild(b);});app.appendChild(d);});
-function upd(){const ans=picks.filter(p=>p>=0).length;document.getElementById('f').style.width=Math.round(ans/items.length*100)+'%';}
-function report(score){try{parent.postMessage({type:'activity_result',score:score,payload:{picks:picks}},'*');}catch(e){}}
-document.getElementById('submit').onclick=()=>{if(done)return;let right=0;const qs=[...document.querySelectorAll('.q')];
-items.forEach((it,qi)=>{const opts=[...qs[qi].querySelectorAll('.opt')];opts.forEach((b,oi)=>{b.disabled=true;if(oi===it.answer)b.classList.add('correct');if(picks[qi]===oi&&oi!==it.answer)b.classList.add('wrong');});if(picks[qi]===it.answer)right++;});
-const pct=Math.round(right/items.length*100);done=true;document.getElementById('f').style.width='100%';
-document.getElementById('s').innerHTML='<span class="score">You got '+right+' of '+items.length+' right ('+pct+'%). '+(pct>=75?'Great work! 🎉':'Review the lesson and try again.')+'</span>';report(pct);};
-</script>`;
+<style>:root{--indigo:#4F46E5;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;--no:#b91c1c}*{box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;color:var(--ink);margin:0;padding:18px;background:#FBF7EF}h2{margin:.2rem 0 1rem;font-size:1.15rem}.q{background:#fff;border:1px solid #ece7db;border-radius:14px;padding:14px 16px;margin:0 0 12px}.qt{font-weight:600;margin:0 0 10px}.opt{display:block;width:100%;text-align:left;border:1px solid #e2ddcf;background:#fff;border-radius:10px;padding:11px 12px;margin:6px 0;font:inherit;cursor:pointer;transition:.15s}.opt:hover{border-color:var(--indigo)}.opt.sel{border-color:var(--indigo);background:#eef0fb}.opt.correct{border-color:var(--ok);background:#e9f7ee}.opt.wrong{border-color:var(--no);background:#fdecec}.bar{height:10px;background:#eee;border-radius:6px;overflow:hidden;margin:14px 0 6px}.fill{height:100%;width:0;background:var(--amber);transition:.4s}button.go{background:var(--indigo);color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:600;cursor:pointer}.score{font-weight:700;font-size:1.05rem;margin:4px 0}.hint{color:#6b7280;font-size:.9rem}</style>
+<h2>${title}</h2><div id="app"></div><div class="bar"><div class="fill" id="f"></div></div><p id="s" class="hint">Pick an answer for each question.</p><button class="go" id="submit">Check my answers</button>
+<script>const items=${data};const app=document.getElementById('app');const picks=new Array(items.length).fill(-1);let done=false;items.forEach((it,qi)=>{const d=document.createElement('div');d.className='q';d.innerHTML='<p class="qt">'+(qi+1)+'. '+it.q+'</p>';it.options.forEach((o,oi)=>{const b=document.createElement('button');b.className='opt';b.textContent=o;b.onclick=()=>{if(done)return;picks[qi]=oi;[...d.querySelectorAll('.opt')].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');upd();};d.appendChild(b);});app.appendChild(d);});function upd(){const n=picks.filter(p=>p>=0).length;document.getElementById('f').style.width=Math.round(n/items.length*100)+'%';}function report(s){try{parent.postMessage({type:'activity_result',score:s,payload:{picks}},'*');}catch(e){}}document.getElementById('submit').onclick=()=>{if(done)return;let right=0;const qs=[...document.querySelectorAll('.q')];items.forEach((it,qi)=>{const opts=[...qs[qi].querySelectorAll('.opt')];opts.forEach((b,oi)=>{b.disabled=true;if(oi===it.answer)b.classList.add('correct');if(picks[qi]===oi&&oi!==it.answer)b.classList.add('wrong');});if(picks[qi]===it.answer)right++;});const pct=Math.round(right/items.length*100);done=true;document.getElementById('f').style.width='100%';document.getElementById('s').innerHTML='<span class="score">You got '+right+' of '+items.length+' right ('+pct+'%). '+(pct>=75?'Great work! 🎉':'Review the lesson and try again.')+'</span>';report(pct);};</script>`;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -421,8 +323,6 @@ async function upsertUser(u: {
     firstName: u.firstName, lastName: u.lastName, role: u.role, status: "active" as const,
     partnerId: u.partnerId, organisationId: u.organisationId,
     learningStyle: u.learningStyle ?? null, accommodations: u.accommodations ?? [],
-    // Pre-consent every synthetic K-12 demo identity so the one-click demo lands straight in the
-    // classroom without the POPIA privacy gate (these are non-production accounts, no real data).
     consentVersion: PRIVACY_POLICY_VERSION, consentedAt: new Date(),
     updatedAt: new Date(),
   };
@@ -436,27 +336,21 @@ async function upsertUser(u: {
   return created.id;
 }
 
-async function createK12Course(c: K12Course, orgId: string, facultyId: string): Promise<{ courseId: string; moduleIds: string[] }> {
+async function createK12Course(c: K12Course, orgId: string, facultyId: string): Promise<string> {
   const outcomes = c.modules.map((m) => m.outcome);
   const description = `${c.emoji} ${c.intro}\n\nCourse goal: ${c.outcome}`;
   const [course] = await db.insert(coursesTable).values({
     title: c.title, description, tenantId: "platform", status: "published",
-    // "Grade 6" tag drives the US grade-level label in the UI (see courseLevelLabel); nqfLevel stays
-    // 6 only as an internal sort key. This is what makes the tenant read as American K-12, not NQF.
-    competencyTags: [...c.tags, c.subject, "Grade 6"], objectives: outcomes, nqfLevel: 6,
+    competencyTags: [...c.tags, c.subject, c.gradeLabel], objectives: outcomes, nqfLevel: c.grade,
   }).returning();
 
-  const moduleIds: string[] = [];
-  let firstModuleId = "";
   for (let mi = 0; mi < c.modules.length; mi++) {
     const m = c.modules[mi];
     const [mod] = await db.insert(modulesTable).values({
       courseId: course.id, title: m.title, status: "published", lessonType: "slides",
       modality: "async", order: mi, objectives: [m.outcome], estimatedMinutes: m.minutes,
-      description: `${c.subject} · Grade 6. Goal: ${m.outcome}`,
+      description: `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}`,
     }).returning();
-    moduleIds.push(mod.id);
-    if (mi === 0) firstModuleId = mod.id;
 
     await db.insert(beatsTable).values([
       { moduleId: mod.id, type: "title_card", order: 0, title: m.title, narration: `${m.hook}  By the end of this lesson you'll be able to: ${m.outcome}` },
@@ -471,169 +365,133 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
       kind: "note", content: body, chars: body.length, order: 0, published: true, createdBy: facultyId,
     });
 
-    // Standards: create (idempotent by code) and map to this module.
+    // Interactive quiz (every module → satisfies the "interactive" completeness component).
+    await db.insert(interactiveActivitiesTable).values({
+      organisationId: orgId, courseId: course.id, moduleId: mod.id,
+      title: `${m.title}: quick check`,
+      instructions: "Answer each question, then check your work. You can retry as many times as you like.",
+      html: quizHtml(`${m.title}: quick check`, m.quiz), source: "html", kind: "quiz",
+      bloomsLevel: "Understand", difficulty: "foundational",
+      isLibrary: false, tags: c.tags, published: true, createdByUserId: facultyId,
+    });
+
+    // AI tutor case (every module → satisfies the "case study" component; no course-level fallback).
+    await db.insert(caseScenariosTable).values({
+      organisationId: orgId, moduleId: mod.id, createdBy: facultyId, createdByName: "Synops Academy",
+      title: `Tutor: ${m.title}`,
+      learningObjective: m.outcome, contextBlock: m.caseContext, openingQuestion: m.caseOpening,
+      focusAreas: [m.outcome], difficulty: "foundational",
+      status: "published", isLibrary: true, tags: c.tags,
+      guidingInstructions: `You are a warm, patient tutor for a ${c.gradeLabel} student. Coach with questions, never hand over the answer. Match the student's grade: short sentences and everyday examples for younger grades, more analysis for older. Celebrate good thinking and keep it encouraging.`,
+    });
+
+    // Standards.
     for (const s of m.standards) {
       let std = firstOrNull(await db.select().from(unitStandardsTable).where(eq(unitStandardsTable.code, s.code)));
-      if (!std) [std] = await db.insert(unitStandardsTable).values({
-        code: s.code, title: s.title, framework: "other", nqfLevel: 6, description: `${c.framework} · ${c.subject}`,
-      }).returning();
-      const mapped = await db.select().from(unitStandardMappingsTable)
-        .where(and(eq(unitStandardMappingsTable.unitStandardId, std.id), eq(unitStandardMappingsTable.targetId, mod.id)));
-      if (mapped.length === 0) await db.insert(unitStandardMappingsTable).values({ unitStandardId: std.id, targetType: "module", targetId: mod.id });
-      // Also map to the course so the course-level report shows coverage.
-      const mappedCourse = await db.select().from(unitStandardMappingsTable)
-        .where(and(eq(unitStandardMappingsTable.unitStandardId, std.id), eq(unitStandardMappingsTable.targetId, course.id)));
-      if (mappedCourse.length === 0) await db.insert(unitStandardMappingsTable).values({ unitStandardId: std.id, targetType: "course", targetId: course.id });
-    }
-
-    // Module 0 gets an interactive quiz.
-    if (m.quiz && m.quiz.length) {
-      await db.insert(interactiveActivitiesTable).values({
-        organisationId: orgId, courseId: course.id, moduleId: mod.id,
-        title: `${m.title}: quick check`,
-        instructions: "Answer each question, then check your work. You can retry as many times as you like.",
-        html: quizHtml(`${m.title}: quick check`, m.quiz), source: "html", kind: "quiz",
-        bloomsLevel: "Understand", difficulty: "foundational",
-        isLibrary: false, tags: c.tags, published: true, createdByUserId: facultyId,
-      });
+      if (!std) [std] = await db.insert(unitStandardsTable).values({ code: s.code, title: s.title, framework: "other", nqfLevel: c.grade, description: `${c.framework} · ${c.subject}` }).returning();
+      const mMapped = await db.select().from(unitStandardMappingsTable).where(and(eq(unitStandardMappingsTable.unitStandardId, std.id), eq(unitStandardMappingsTable.targetId, mod.id)));
+      if (mMapped.length === 0) await db.insert(unitStandardMappingsTable).values({ unitStandardId: std.id, targetType: "module", targetId: mod.id });
+      const cMapped = await db.select().from(unitStandardMappingsTable).where(and(eq(unitStandardMappingsTable.unitStandardId, std.id), eq(unitStandardMappingsTable.targetId, course.id)));
+      if (cMapped.length === 0) await db.insert(unitStandardMappingsTable).values({ unitStandardId: std.id, targetType: "course", targetId: course.id });
     }
   }
   await db.update(coursesTable).set({ moduleCount: c.modules.length }).where(eq(coursesTable.id, course.id));
 
-  // One AI Socratic tutor case per course (attached to the first module).
-  await db.insert(caseScenariosTable).values({
-    organisationId: orgId, moduleId: firstModuleId, createdBy: facultyId, createdByName: "Synops Academy",
-    title: `Tutor challenge: ${c.subject}`,
-    learningObjective: c.caseObjective,
-    contextBlock: c.caseContext,
-    openingQuestion: c.caseOpening,
-    focusAreas: outcomes.slice(0, 3),
-    difficulty: "foundational",
-    status: "published", isLibrary: true, tags: c.tags,
-    guidingInstructions: `You are a friendly, patient tutor for a 6th grader. Coach with questions, never hand over the answer. Use everyday examples, keep sentences short, and celebrate good thinking. Keep it age-appropriate and encouraging.`,
+  // Course-level assignment + discussion (module_id NULL) → satisfies those components for EVERY module.
+  await db.insert(assignmentsTable).values({
+    courseId: course.id, moduleId: null,
+    title: `Show what you learned: ${c.subject}`,
+    description: `A short, friendly wrap-up task for ${c.title}.`,
+    instructions: `In your own words (or a quick recording), explain the most important thing you learned in this course and give one example.`,
+    submissionType: "file_upload", pointsPossible: "100", published: true, position: 0,
+  });
+  await db.insert(discussionsTable).values({
+    courseId: course.id, authorId: facultyId, moduleId: null,
+    title: `Class discussion: ${c.title}`,
+    body: `Share one thing that surprised you in this course, and reply kindly to a classmate.`,
+    aiFacilitated: true, requireInitialPost: true, graded: false,
   });
 
-  return { courseId: course.id, moduleIds };
+  return course.id;
 }
 
 export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; courses?: number; learners?: number; standards?: number; message: string }> {
   // 1. Partner + brand.
   let partner = firstOrNull(await db.select().from(partnersTable).where(eq(partnersTable.slug, DEMO_SLUG)));
-  if (!partner) {
-    [partner] = await db.insert(partnersTable).values({
-      name: "Synops Academy", slug: DEMO_SLUG, status: "active", contactEmail: "k12@synops-consulting.com",
-    }).returning();
-  }
+  if (!partner) [partner] = await db.insert(partnersTable).values({ name: "Synops Academy", slug: DEMO_SLUG, status: "active", contactEmail: "k12@synops-consulting.com" }).returning();
   await applyBrand(partner.id);
 
-  // 2. Organisation + homeroom class + faculty author.
-  let org = firstOrNull(await db.select().from(organisationsTable)
-    .where(and(eq(organisationsTable.partnerId, partner.id), eq(organisationsTable.name, ORG_NAME))));
-  if (!org) [org] = await db.insert(organisationsTable).values({
-    name: ORG_NAME, partnerId: partner.id, industry: "K-12 Education",
-  }).returning();
-
+  // 2. Org + class + faculty.
+  let org = firstOrNull(await db.select().from(organisationsTable).where(and(eq(organisationsTable.partnerId, partner.id), eq(organisationsTable.name, ORG_NAME))));
+  if (!org) [org] = await db.insert(organisationsTable).values({ name: ORG_NAME, partnerId: partner.id, industry: "K-12 Education" }).returning();
   let cls = firstOrNull(await db.select().from(orgClassesTable).where(eq(orgClassesTable.orgId, org.id)));
-  if (!cls) [cls] = await db.insert(orgClassesTable).values({
-    orgId: org.id, partnerId: partner.id, name: CLASS_NAME,
-  }).returning();
+  if (!cls) [cls] = await db.insert(orgClassesTable).values({ orgId: org.id, partnerId: partner.id, name: CLASS_NAME }).returning();
+  const facultyId = await upsertUser({ email: "faculty.k12@synops-demo.test", firstName: "Ms.", lastName: "Ramírez", role: "instructional_designer", partnerId: partner.id, organisationId: org.id });
 
-  const facultyId = await upsertUser({ email: "faculty.k12@synops-demo.test", firstName: "Ms.", lastName: "Rivera", role: "instructional_designer", partnerId: partner.id, organisationId: org.id });
-
-  // 3. Courses (idempotent by title) + assign to the partner + register on the class.
-  const courseIds: string[] = [];
+  // 3. Courses (idempotent by title) + assign to partner + register on class.
   let standardsCount = 0;
+  const courseByPersona: Record<string, string> = {};
   for (const c of COURSES) {
     const existing = firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
-    const courseId = existing ? existing.id : (await createK12Course(c, org.id, facultyId)).courseId;
-    courseIds.push(courseId);
-    // Idempotently ensure the "Grade 6" tag on courses seeded before this label existed, so a re-run
-    // upgrades them to the US grade-level display without recreating content.
-    if (existing && !(existing.competencyTags ?? []).some((t) => /^\s*grade\s+\d+/i.test(t))) {
-      await db.update(coursesTable).set({ competencyTags: [...(existing.competencyTags ?? []), "Grade 6"] }).where(eq(coursesTable.id, courseId));
-    }
+    const courseId = existing ? existing.id : await createK12Course(c, org.id, facultyId);
+    courseByPersona[c.persona.email] = courseId;
     standardsCount += c.modules.reduce((n, m) => n + m.standards.length, 0);
-    const hasAssign = await db.select().from(coursePartnerAssignmentsTable)
-      .where(and(eq(coursePartnerAssignmentsTable.courseId, courseId), eq(coursePartnerAssignmentsTable.partnerId, partner.id)));
+    // Idempotently ensure the grade tag on pre-existing courses.
+    if (existing && !(existing.competencyTags ?? []).some((t) => /^\s*grade\s+\d+/i.test(t))) {
+      await db.update(coursesTable).set({ competencyTags: [...(existing.competencyTags ?? []), c.gradeLabel] }).where(eq(coursesTable.id, courseId));
+    }
+    const hasAssign = await db.select().from(coursePartnerAssignmentsTable).where(and(eq(coursePartnerAssignmentsTable.courseId, courseId), eq(coursePartnerAssignmentsTable.partnerId, partner.id)));
     if (hasAssign.length === 0) await db.insert(coursePartnerAssignmentsTable).values({ courseId, partnerId: partner.id, assignedBy: facultyId });
     const linked = (await db.select().from(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id))).map((x) => x.courseId);
     if (!linked.includes(courseId)) await db.insert(orgClassCoursesTable).values({ classId: cls.id, courseId });
   }
 
-  // 4. Admin (a teacher) + class staff.
-  const adminId = await upsertUser({ email: K12_ADMIN_EMAIL, firstName: "Ms.", lastName: "Rivera", role: "partner_admin", partnerId: partner.id, organisationId: null });
+  // 4. Teacher (admin) + class staff.
+  const adminId = await upsertUser({ email: K12_ADMIN_EMAIL, firstName: "Ms.", lastName: "Ramírez", role: "partner_admin", partnerId: partner.id, organisationId: null });
   const existingStaff = (await db.select().from(orgClassStaffTable).where(eq(orgClassStaffTable.classId, cls.id))).map((s) => s.staffId);
   if (!existingStaff.includes(adminId)) await db.insert(orgClassStaffTable).values({ classId: cls.id, staffId: adminId, role: "administrator" as const });
 
-  // 5. Two learners: Maya (standard) and Leo (accommodations profile).
-  const mayaId = await upsertUser({ email: K12_LEARNER_EMAIL, firstName: "Maya", lastName: "Chen", role: "learner", partnerId: partner.id, organisationId: org.id, learningStyle: "visual" });
-  const leoId = await upsertUser({
-    email: K12_LEARNER_ALT_EMAIL, firstName: "Leo", lastName: "Rivera", role: "learner", partnerId: partner.id, organisationId: org.id,
-    learningStyle: "auditory",
-    accommodations: ["scaffolded_questions", "simplified_language", "chunked_content", "concrete_examples", "extended_processing", "predictable_structure", "positive_reinforcement"],
-  });
+  // 5. Personas: each enrolled ONLY in their course; reconcile away any stale enrolments.
+  const planEmails = COURSES.map((c) => c.persona.email);
+  for (const c of COURSES) {
+    const p = c.persona;
+    const learnerId = await upsertUser({ email: p.email, firstName: p.firstName, lastName: p.lastName, role: "learner", partnerId: partner.id, organisationId: org.id, learningStyle: p.learningStyle, accommodations: p.accommodations });
+    const myCourseId = courseByPersona[p.email];
 
-  // 6. Enrol both learners in all courses; pre-fill progress. Maya completes Math + ELA (with badges).
-  const beatsByCourse: Record<string, { beatId: string; moduleId: string }[]> = {};
-  const modulesByCourse: Record<string, { id: string; title: string }[]> = {};
-  for (const courseId of courseIds) {
-    const mods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, courseId)).orderBy(asc(modulesTable.order));
-    modulesByCourse[courseId] = mods.map((m) => ({ id: m.id, title: m.title }));
-    const flat: { beatId: string; moduleId: string }[] = [];
+    // Reconcile: remove enrolments/progress for any course NOT in this learner's plan (clean re-seed).
+    const enrolled = await db.select().from(enrolmentsTable).where(eq(enrolmentsTable.userId, learnerId));
+    const staleCourseIds = enrolled.map((e) => e.courseId).filter((id) => id !== myCourseId);
+    if (staleCourseIds.length) {
+      await db.delete(enrolmentsTable).where(and(eq(enrolmentsTable.userId, learnerId), inArray(enrolmentsTable.courseId, staleCourseIds)));
+      await db.delete(beatProgressTable).where(and(eq(beatProgressTable.userId, learnerId), inArray(beatProgressTable.courseId, staleCourseIds)));
+      await db.delete(credentialsTable).where(eq(credentialsTable.userId, learnerId)); // clears badges from old courses
+    }
+
+    // Enrol in their own course.
+    const already = enrolled.some((e) => e.courseId === myCourseId);
+    if (!already) await db.insert(enrolmentsTable).values({ userId: learnerId, courseId: myCourseId, status: "active" as const, enrolledAt: daysAgo(20) });
+
+    // Pre-fill progress up to their fraction.
+    const mods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, myCourseId)).orderBy(asc(modulesTable.order));
+    const beats: { beatId: string; moduleId: string }[] = [];
     for (const m of mods) {
       const bs = await db.select().from(beatsTable).where(eq(beatsTable.moduleId, m.id)).orderBy(asc(beatsTable.createdAt));
-      for (const b of bs) flat.push({ beatId: b.id, moduleId: m.id });
+      for (const b of bs) beats.push({ beatId: b.id, moduleId: m.id });
     }
-    beatsByCourse[courseId] = flat;
-  }
-
-  async function enrolAndProgress(userId: string, plan: { courseId: string; fraction: number; complete: boolean; badges: boolean }[], startDay: number) {
-    const already = (await db.select().from(enrolmentsTable).where(eq(enrolmentsTable.userId, userId))).map((e) => e.courseId);
-    for (let i = 0; i < plan.length; i++) {
-      const p = plan[i];
-      if (!already.includes(p.courseId)) {
-        await db.insert(enrolmentsTable).values({
-          userId, courseId: p.courseId, status: p.complete ? ("completed" as const) : ("active" as const),
-          enrolledAt: daysAgo(startDay - i * 3), completedAt: p.complete ? daysAgo(2) : null,
-        });
-      }
-      const beats = beatsByCourse[p.courseId] ?? [];
-      const viewCount = p.complete ? beats.length : Math.round(beats.length * p.fraction);
-      if (viewCount > 0) {
-        const rows = beats.slice(0, viewCount).map((b, idx) => ({
-          userId, beatId: b.beatId, moduleId: b.moduleId, courseId: p.courseId,
-          secondsSpent: 45 + (idx % 4) * 15, firstViewedAt: daysAgo(startDay - i * 3 - 1), lastViewedAt: daysAgo(Math.max(1, 20 - i * 3)),
-        }));
-        try { await db.insert(beatProgressTable).values(rows).onConflictDoNothing(); } catch { /* cosmetic */ }
-      }
-      // Badges: a valid credential per module of a completed course.
-      if (p.badges) {
-        for (const m of modulesByCourse[p.courseId] ?? []) {
-          const has = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, userId), eq(credentialsTable.moduleId, m.id)));
-          if (has.length === 0) await db.insert(credentialsTable).values({
-            userId, moduleId: m.id, moduleTitle: m.title, partnerId: partner!.id, partnerName: "Synops Academy",
-            status: "valid", masteryScore: "0.9200", evidenceSummary: "Completed all lesson beats and passed the practice check.",
-            decayDate: daysFromNow(365),
-          });
-        }
-      }
+    const viewCount = Math.round(beats.length * p.progressFraction);
+    if (viewCount > 0) {
+      const rows = beats.slice(0, viewCount).map((b, idx) => ({ userId: learnerId, beatId: b.beatId, moduleId: b.moduleId, courseId: myCourseId, secondsSpent: 40 + (idx % 4) * 15, firstViewedAt: daysAgo(14), lastViewedAt: daysAgo(2) }));
+      try { await db.insert(beatProgressTable).values(rows).onConflictDoNothing(); } catch { /* cosmetic */ }
+    }
+    // Maya (on-track) earns a badge for her first module.
+    if (p.email === "maya.k12@synops-demo.test" && mods[0]) {
+      const has = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, learnerId), eq(credentialsTable.moduleId, mods[0].id)));
+      if (has.length === 0) await db.insert(credentialsTable).values({ userId: learnerId, moduleId: mods[0].id, moduleTitle: mods[0].title, partnerId: partner.id, partnerName: "Synops Academy", status: "valid", masteryScore: "0.9100", evidenceSummary: "Completed the lesson and passed the check.", decayDate: daysFromNow(365) });
     }
   }
-
-  // Maya: Math + ELA fully complete with badges; Science/Social/History in progress.
-  await enrolAndProgress(mayaId, [
-    { courseId: courseIds[0], fraction: 1, complete: true, badges: true },   // Math
-    { courseId: courseIds[1], fraction: 1, complete: true, badges: true },   // ELA
-    { courseId: courseIds[2], fraction: 0.66, complete: false, badges: false }, // Science
-    { courseId: courseIds[3], fraction: 0.33, complete: false, badges: false }, // Social Studies
-    { courseId: courseIds[4], fraction: 0.5, complete: false, badges: false },  // History
-  ], 40);
-
-  // Leo: steady early progress across the board (accommodations demo, not a completion demo).
-  await enrolAndProgress(leoId, courseIds.map((courseId, i) => ({ courseId, fraction: [0.5, 0.33, 0.33, 0.2, 0.33][i] ?? 0.33, complete: false, badges: false })), 28);
 
   return {
-    ok: true, partnerId: partner.id, courses: courseIds.length, learners: 2, standards: standardsCount,
-    message: `Synops K-12 ready: ${courseIds.length} courses, ${standardsCount} standards mapped, 2 learners. Maya ${K12_LEARNER_EMAIL} (2 subjects complete + badges), Leo ${K12_LEARNER_ALT_EMAIL} (accommodations). Password ${DEMO_PASSWORD}.`,
+    ok: true, partnerId: partner.id, courses: COURSES.length, learners: planEmails.length, standards: standardsCount,
+    message: `Synops Academy K-12 ready: ${COURSES.length} courses (grades 3-11), ${standardsCount} standards, ${planEmails.length} learner personas. Password ${DEMO_PASSWORD}.`,
   };
 }

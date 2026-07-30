@@ -1,19 +1,16 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Check, Clock, Volume2, Type, Captions, Sparkles } from "lucide-react";
+import { Check, Clock, Volume2, Type, Captions, Mic, Sparkles } from "lucide-react";
 import { useCoachProfile } from "@/lib/coachApi";
+import { useSession } from "@/context/SessionContext";
+import { personaByEmail } from "@/lib/k12Personas";
 
 /**
- * Visible "learning supports" layer for learners with accommodations.
- *
- * Renders ONLY when the signed-in learner has one or more accommodations on their profile, so it
- * never appears for a learner without them (no impact on other tenants). It surfaces the supports
- * that are otherwise applied silently by the AI tutor, and adds two things the learner can actually
- * operate: an "easy-reading text" toggle (larger, more legible type, applied to the whole app) and a
- * read-aloud sample. Extra-time and captions are shown as active badges. This is what makes the
- * accommodations demonstrable rather than invisible.
+ * Visible "learning supports" panel for learners with accommodations — the demo's headline selling
+ * point. It leads with the learner's challenge and why each support helps, then makes the supports
+ * real and operable (easy-reading toggle, read-aloud). Renders only when the learner actually has
+ * accommodations, so it never appears for the on-track learner or for other tenants.
  */
-
 const FRIENDLY: Record<string, string> = {
   scaffolded_questions: "Step-by-step questions",
   simplified_language: "Simpler wording",
@@ -33,17 +30,17 @@ const EASY_CSS =
   "html." + EASY_CLASS + " body{font-family:'Atkinson Hyperlegible','Verdana','Trebuchet MS',system-ui,sans-serif;letter-spacing:.02em;word-spacing:.08em;line-height:1.85}";
 
 function ensureEasyCss() {
-  if (typeof document === "undefined") return;
-  if (document.getElementById("easy-reading-css")) return;
+  if (typeof document === "undefined" || document.getElementById("easy-reading-css")) return;
   const s = document.createElement("style");
-  s.id = "easy-reading-css";
-  s.textContent = EASY_CSS;
+  s.id = "easy-reading-css"; s.textContent = EASY_CSS;
   document.head.appendChild(s);
 }
 
 export function AccommodationsPanel() {
+  const { user } = useSession();
   const { data: profile } = useCoachProfile();
   const accommodations = profile?.accommodations ?? [];
+  const persona = personaByEmail(user?.email);
   const [easy, setEasy] = useState(false);
 
   useEffect(() => {
@@ -66,38 +63,50 @@ export function AccommodationsPanel() {
     try {
       if (!("speechSynthesis" in window)) return;
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance("You've got this. Let's take it one step at a time.");
-      u.rate = 0.95;
+      const es = persona?.defaultLang === "es";
+      const u = new SpeechSynthesisUtterance(es ? "Lo estás haciendo muy bien. Vamos paso a paso." : "You've got this. Let's take it one step at a time.");
+      u.lang = es ? "es-ES" : "en-US"; u.rate = 0.95;
       window.speechSynthesis.speak(u);
     } catch { /* ok */ }
   };
 
   const hasExtraTime = accommodations.includes("extended_processing");
+  const isDysgraphia = persona?.challenge === "Dysgraphia";
+  const accent = persona?.accent ?? "#4F46E5";
 
   return (
-    <Card className="p-4 sm:p-5 border-indigo-200 bg-indigo-50/60 dark:bg-indigo-950/20">
-      <div className="flex items-center gap-2 mb-1">
-        <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center bg-indigo-500/15 text-indigo-600">
+    <Card className="p-4 sm:p-5" style={{ borderColor: `${accent}44`, background: `${accent}0D` }}>
+      <div className="flex items-start gap-2.5 mb-1">
+        <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-white" style={{ background: accent }}>
           <Sparkles className="h-4.5 w-4.5" />
         </div>
         <div className="min-w-0">
-          <p className="font-semibold leading-tight">Your learning supports</p>
-          <p className="text-xs text-muted-foreground">Turned on for you — always active while you learn.</p>
+          <p className="font-semibold leading-tight">
+            {persona ? `${persona.first} learns with ${persona.challenge.toLowerCase()}` : "Your learning supports"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {persona ? `${persona.challengeLong} Here's what's turned on to help — always active.` : "Turned on for you — always active while you learn."}
+          </p>
         </div>
-        <span className="ml-auto text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">Active</span>
+        <span className="ml-auto text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 shrink-0">Active</span>
       </div>
 
-      {/* Active supports as chips */}
+      {/* Supports as chips */}
       <div className="flex flex-wrap gap-2 mt-3">
         {accommodations.map((a) => (
-          <span key={a} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-white dark:bg-white/5 border border-indigo-100 dark:border-white/10 text-indigo-800 dark:text-indigo-200">
-            <Check className="h-3.5 w-3.5 text-indigo-500" />
+          <span key={a} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-white dark:bg-white/5" style={{ border: `1px solid ${accent}33`, color: accent }}>
+            <Check className="h-3.5 w-3.5" style={{ color: accent }} />
             {FRIENDLY[a] ?? a.replace(/_/g, " ")}
           </span>
         ))}
-        <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-white dark:bg-white/5 border border-indigo-100 dark:border-white/10 text-indigo-800 dark:text-indigo-200">
-          <Captions className="h-3.5 w-3.5 text-indigo-500" /> Captions on videos
+        <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-white dark:bg-white/5" style={{ border: `1px solid ${accent}33`, color: accent }}>
+          <Captions className="h-3.5 w-3.5" /> Captions on videos
         </span>
+        {isDysgraphia && (
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-white dark:bg-white/5" style={{ border: `1px solid ${accent}33`, color: accent }}>
+            <Mic className="h-3.5 w-3.5" /> Speak-to-write
+          </span>
+        )}
         {hasExtraTime && (
           <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-200 text-amber-700">
             <Clock className="h-3.5 w-3.5" /> Extra time on activities
@@ -105,28 +114,20 @@ export function AccommodationsPanel() {
         )}
       </div>
 
-      {/* Controls the learner can operate */}
+      {/* Operable controls */}
       <div className="flex flex-wrap items-center gap-2 mt-4">
-        <button
-          onClick={toggleEasy}
-          className={
-            "inline-flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-lg border transition-colors " +
-            (easy
-              ? "bg-indigo-600 text-white border-indigo-600"
-              : "bg-white dark:bg-transparent text-indigo-700 dark:text-indigo-300 border-indigo-200 hover:bg-indigo-50")
-          }
-          aria-pressed={easy}
-        >
+        <button onClick={toggleEasy} aria-pressed={easy}
+          className="inline-flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-lg border transition-colors"
+          style={easy ? { background: accent, color: "#fff", borderColor: accent } : { background: "transparent", color: accent, borderColor: `${accent}55` }}>
           <Type className="h-4 w-4" /> Easy-reading text: {easy ? "On" : "Off"}
         </button>
-        <button
-          onClick={speakSample}
-          className="inline-flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-lg border bg-white dark:bg-transparent text-indigo-700 dark:text-indigo-300 border-indigo-200 hover:bg-indigo-50"
-        >
-          <Volume2 className="h-4 w-4" /> Hear read-aloud
+        <button onClick={speakSample}
+          className="inline-flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-lg border"
+          style={{ background: "transparent", color: accent, borderColor: `${accent}55` }}>
+          <Volume2 className="h-4 w-4" /> {persona?.defaultLang === "es" ? "Escuchar (leer en voz alta)" : "Hear read-aloud"}
         </button>
         <p className="text-xs text-muted-foreground basis-full sm:basis-auto sm:ml-1">
-          Your tutor also adapts automatically — shorter steps, simpler wording, and encouragement.
+          The AI tutor also adapts automatically — shorter steps, simpler wording, and encouragement.
         </p>
       </div>
     </Card>
