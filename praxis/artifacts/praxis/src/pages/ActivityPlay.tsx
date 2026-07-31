@@ -72,14 +72,16 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
           </div>
         ) : done ? (
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-8 text-center">
-            <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto mb-3" />
-            <h2 className="text-xl font-semibold mb-1">Handed in</h2>
+            <div className={young ? 'text-5xl mb-2' : ''}>{young ? '🎉' : <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto mb-3" />}</div>
+            <h2 className="text-2xl font-bold mb-1">{young ? 'Great job!' : 'Handed in'}</h2>
             <p className="text-muted-foreground">
-              Your work has been submitted{score != null ? <> with a score of <strong>{score}</strong></> : null}. Your coach can now review it.
+              {young
+                ? 'You finished! Tap the button to keep going.'
+                : <>Your work has been submitted{score != null ? <> with a score of <strong>{score}</strong></> : null}. Your coach can now review it.</>}
             </p>
             <div className="mt-5 flex justify-center gap-2">
-              <Button variant="outline" onClick={() => { setDone(false); }}>Try again</Button>
-              <Button onClick={() => setLocation(backTo)}>Continue <ArrowRight className="h-4 w-4 ml-1" /></Button>
+              {!young && <Button variant="outline" onClick={() => { setDone(false); }}>Try again</Button>}
+              <Button onClick={() => setLocation(backTo)} className={young ? 'animate-bounce text-lg font-bold rounded-full px-8 py-6' : ''}>Continue <ArrowRight className={young ? 'h-6 w-6 ml-1' : 'h-4 w-4 ml-1'} /></Button>
             </div>
           </div>
         ) : (
