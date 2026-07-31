@@ -23,6 +23,7 @@ import {
 import { useReadAloud } from '@/lib/speech';
 import { useSession } from '@/context/SessionContext';
 import { isK12DemoEmail, personaByEmail, type K12Persona } from '@/lib/k12Personas';
+import { picturesInText } from '@/lib/kidPictures';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2315,6 +2316,8 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
 
   // Strip anything a young child shouldn't see (standards codes, meta "by the end" lines).
   const stripYoung = (md: string) => md.split('\n').filter((l) => !/aligned to/i.test(l) && !/^\s*\*\*by the end you can/i.test(l)).join('\n');
+  // Real photos for any picture-words in the reading (matched on the English source content).
+  const readingPics = picturesInText(reader?.content ?? '');
   const [lang, setLang] = useState(es ? 'es' : 'en');
   const [tBusy, setTBusy] = useState(false);
   const [tText, setTText] = useState<string | null>(null);
@@ -2374,7 +2377,20 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
               <div><ReadAloudBar text={tText ?? reader?.content ?? ''} /></div>
               {es && <LangChips value={lang} busy={tBusy} onPick={pickLang} />}
             </div>
-            <div className="border-t pt-5" style={{ borderColor: `${accent}22` }}>
+            {/* Real photos for the "picture words" in this reading — much clearer than tiny emoji. */}
+            {readingPics.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-4 sm:gap-6 my-6">
+                {readingPics.map((p) => (
+                  <figure key={p.word} className="text-center m-0">
+                    <img src={p.url} alt={p.word} loading="lazy"
+                      className="h-28 w-28 sm:h-36 sm:w-36 rounded-3xl object-cover shadow-md"
+                      style={{ border: `4px solid ${accent}33` }} />
+                    <figcaption className="mt-2 text-xl sm:text-2xl font-extrabold capitalize" style={{ color: accent }}>{p.word}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
+            <div className="border-t pt-5 text-lg leading-relaxed [&_p]:text-lg [&_p]:leading-relaxed [&_li]:text-lg" style={{ borderColor: `${accent}22` }}>
               <MarkdownView text={tText ?? stripYoung(reader?.content ?? T('Loading…', 'Cargando…'))} />
             </div>
           </div>
