@@ -1035,6 +1035,7 @@ export function ModuleViewer() {
           moduleId={moduleId}
           navigate={navigate}
           persona={youngPersona}
+          allBeats={allBeats}
         />
       );
     }
@@ -2290,11 +2291,15 @@ function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBea
  * with huge step buttons, giant arrows to what's next, a prominent Listen, kid language, and all the
  * jargon (standards codes, meta headers, objectives) stripped. Roomy, one idea at a time, one click.
  */
-function YoungLessonView({ courseId, moduleId, navigate, persona }: {
-  courseId: string; moduleId: string; navigate: (to: string) => void; persona: K12Persona;
+function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
+  courseId: string; moduleId: string; navigate: (to: string) => void; persona: K12Persona; allBeats: { id: string }[];
 }) {
   const accent = persona.accent;
   const es = persona.defaultLang === 'es';
+  // Mark this module's steps as viewed so the course progress bar actually advances as the child
+  // works through the lessons (the young view doesn't use the beat-by-beat player that normally does this).
+  const markBeat = useMutation({ mutationFn: (beatId: string) => apiFetch('/progress/beat', { method: 'POST', body: JSON.stringify({ beatId, secondsSpent: 5 }) }) });
+  useEffect(() => { (allBeats ?? []).forEach((b) => { if (b?.id) markBeat.mutate(b.id); }); /* eslint-disable-next-line */ }, [moduleId, allBeats?.length]);
   const T = (en: string, spa: string) => (es ? spa : en);
 
   const { data: mod } = useQuery({ queryKey: ['module-detail', moduleId], queryFn: () => apiFetch<{ title: string }>(`/modules/${moduleId}`), enabled: !!moduleId });

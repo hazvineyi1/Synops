@@ -15,11 +15,16 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 // Source photos (same set as the frontend kidPictures map). Whitelisted — nothing else is fetchable.
+const S = (id: string) => `https://images.unsplash.com/photo-${id}?w=600&h=600&fit=crop&crop=entropy&auto=format&q=80`;
 const KID_SRC: Record<string, string> = {
-  cat: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=600&h=600&fit=crop&crop=entropy&auto=format&q=80",
-  dog: "https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?w=600&h=600&fit=crop&crop=entropy&auto=format&q=80",
-  sun: "https://images.unsplash.com/photo-1563630381190-77c336ea545a?w=600&h=600&fit=crop&crop=entropy&auto=format&q=80",
-  hat: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?w=600&h=600&fit=crop&crop=entropy&auto=format&q=80",
+  cat: S("1514888286974-6c03e2ca1dba"),
+  dog: S("1530281700549-e82e7bf110d6"),
+  sun: S("1563630381190-77c336ea545a"),
+  hat: S("1588850561407-ed78c282e89b"),
+  apple: S("1568702846914-96b305d2aaeb"),
+  ball: S("1498940757830-82f7813bf178"),
+  fish: S("1522069169874-c58ec4b76be5"),
+  tree: S("1502082553048-f009c37129b9"),
 };
 
 const cache = new Map<string, Buffer>();

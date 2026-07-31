@@ -11,6 +11,10 @@ export const KID_PICTURES: Record<string, string> = {
   dog: "/api/kid-cutout/dog.png",
   sun: "/api/kid-cutout/sun.png",
   hat: "/api/kid-cutout/hat.png",
+  apple: "/api/kid-cutout/apple.png",
+  ball: "/api/kid-cutout/ball.png",
+  fish: "/api/kid-cutout/fish.png",
+  tree: "/api/kid-cutout/tree.png",
 };
 
 /**

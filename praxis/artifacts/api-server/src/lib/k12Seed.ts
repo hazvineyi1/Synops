@@ -71,44 +71,65 @@ interface K12Course {
 // removed once via remove.bg, cached; falls back to the original photo if no key is set). Absolute
 // URLs because the quiz renders inside a srcdoc iframe where relative URLs don't resolve.
 const CUTOUT_HOST = "https://praxis.synops-consulting.com";
+const CUT = (w: string) => `${CUTOUT_HOST}/api/kid-cutout/${w}.png`;
 const KID_PICS: Record<string, string> = {
-  cat: `${CUTOUT_HOST}/api/kid-cutout/cat.png`,
-  dog: `${CUTOUT_HOST}/api/kid-cutout/dog.png`,
-  sun: `${CUTOUT_HOST}/api/kid-cutout/sun.png`,
-  hat: `${CUTOUT_HOST}/api/kid-cutout/hat.png`,
+  cat: CUT("cat"), dog: CUT("dog"), sun: CUT("sun"), hat: CUT("hat"),
+  apple: CUT("apple"), ball: CUT("ball"), fish: CUT("fish"), tree: CUT("tree"),
 };
 
 // ── COURSES (one per persona; two comprehensive lessons each) ────────────────
 const COURSES: K12Course[] = [
   // 0) MATEO · Grade 1 · just starting out (K-2 band) ─────────────────────────
   {
-    title: "Letters & First Words (Grade 1)", subject: "English Language Arts", emoji: "🔤", grade: 1, gradeLabel: "Grade 1",
+    title: "Reading Adventure (Grade 1)", subject: "English Language Arts", emoji: "🔤", grade: 1, gradeLabel: "Grade 1",
     framework: "Common Core State Standards — Grade 1 Foundational Reading",
-    intro: "Let's find letters and read our first words — just look and tap! No reading out loud needed.",
-    outcome: "Recognize letters and match simple words to their pictures.",
+    intro: "A four-part reading adventure! Find first letters, then read picture words — look, tap, and earn stars.",
+    outcome: "Recognize beginning letters and read common one-syllable picture words.",
     tags: ["ela", "reading", "letters", "grade 1", "common core"],
-    persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.35 },
+    persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.15 },
     modules: [
-      { title: "Finding letters", outcome: "Find the first letter of a word.", hook: "Every word starts with a letter! Cat starts with C.", minutes: 5,
+      { title: "First letters: A B C D", outcome: "Find the first letter (A, B, C, D).", hook: "Apple starts with A! Ball starts with B!", minutes: 5,
         standards: [{ code: "CCSS.ELA-LITERACY.RF.1.1", title: "Demonstrate understanding of the organization and basic features of print" }],
-        points: ["Every word starts with a letter", "Look at the picture, then find the first letter", "cat → C, dog → D"],
-        reading: "Every word starts with a letter! Look at the picture, then find the letter it starts with.\n\nA **cat** starts with **C**. A **dog** starts with **D**. A **sun** starts with **S**. A **hat** starts with **H**.\n\nLook at the picture and tap the first letter. You're a letter detective! 🔎⭐",
+        points: ["Every word starts with a letter", "Look at the picture, then find the first letter", "apple → A, ball → B, cat → C, dog → D"],
+        reading: "Every word starts with a letter! **Apple** starts with **A**. **Ball** starts with **B**. **Cat** starts with **C**. **Dog** starts with **D**.\n\nLook at the picture, then tap the first letter. You're a letter detective! 🔎⭐",
         quiz: [
-          { q: "Which letter does this word start with?", img: KID_PICS.cat, options: ["C", "O", "S", "A"], answer: 0 },
+          { q: "Which letter does this word start with?", img: KID_PICS.apple, options: ["A", "E", "O", "S"], answer: 0 },
+          { q: "Which letter does this word start with?", img: KID_PICS.ball, options: ["B", "D", "P", "R"], answer: 0 },
+          { q: "Which letter does this word start with?", img: KID_PICS.cat, options: ["C", "O", "S", "G"], answer: 0 },
           { q: "Which letter does this word start with?", img: KID_PICS.dog, options: ["D", "B", "P", "O"], answer: 0 },
-          { q: "Which letter does this word start with?", img: KID_PICS.sun, options: ["S", "C", "Z", "E"], answer: 0 },
-          { q: "Which letter does this word start with?", img: KID_PICS.hat, options: ["H", "N", "M", "K"], answer: 0 },
         ],
         caseContext: "", caseOpening: "" },
-      { title: "Reading picture words", outcome: "Match a word to its picture.", hook: "See the picture, then tap the word that matches!", minutes: 5,
+      { title: "First letters: F H S T", outcome: "Find the first letter (F, H, S, T).", hook: "Fish starts with F! Tree starts with T!", minutes: 5,
+        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.1", title: "Demonstrate understanding of the organization and basic features of print" }],
+        points: ["More first letters", "fish → F, hat → H, sun → S, tree → T", "Look and tap the first letter"],
+        reading: "More first letters! **Fish** starts with **F**. **Hat** starts with **H**. **Sun** starts with **S**. **Tree** starts with **T**.\n\nLook at the picture, then tap the first letter. Keep going, superstar! ⭐",
+        quiz: [
+          { q: "Which letter does this word start with?", img: KID_PICS.fish, options: ["F", "E", "T", "L"], answer: 0 },
+          { q: "Which letter does this word start with?", img: KID_PICS.hat, options: ["H", "N", "M", "K"], answer: 0 },
+          { q: "Which letter does this word start with?", img: KID_PICS.sun, options: ["S", "C", "Z", "E"], answer: 0 },
+          { q: "Which letter does this word start with?", img: KID_PICS.tree, options: ["T", "F", "I", "L"], answer: 0 },
+        ],
+        caseContext: "", caseOpening: "" },
+      { title: "Reading words: cat, dog, sun, hat", outcome: "Match a word to its picture.", hook: "See the picture, then tap the word that matches!", minutes: 5,
         standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics and word analysis skills in decoding words" }],
         points: ["Words name the things we see", "Look at the picture, then find the word", "You can read short words!"],
-        reading: "Words tell us the names of things. When you see a picture, you can find the word that matches it!\n\nA 🐱 is a **cat**. A 🌞 is the **sun**. A 🐶 is a **dog**. Look at the picture, then tap the right word. You're reading! 📖⭐",
+        reading: "Words name the things we see! A **cat**, a **dog**, the **sun**, a **hat**.\n\nLook at the picture, then tap the right word. You're reading! 📖⭐",
         quiz: [
           { q: "Which word matches this picture?", img: KID_PICS.cat, options: ["cat", "dog", "sun", "hat"], answer: 0 },
-          { q: "Which word matches this picture?", img: KID_PICS.sun, options: ["sun", "run", "six", "sit"], answer: 0 },
           { q: "Which word matches this picture?", img: KID_PICS.dog, options: ["dog", "log", "dig", "day"], answer: 0 },
+          { q: "Which word matches this picture?", img: KID_PICS.sun, options: ["sun", "run", "six", "sit"], answer: 0 },
           { q: "Which word matches this picture?", img: KID_PICS.hat, options: ["hat", "ham", "hop", "cat"], answer: 0 },
+        ],
+        caseContext: "", caseOpening: "" },
+      { title: "Reading words: apple, ball, fish, tree", outcome: "Read more picture words.", hook: "Read even more words — you're a reading star!", minutes: 5,
+        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics and word analysis skills in decoding words" }],
+        points: ["More picture words", "Look at the picture, then find the word", "You're a reading star!"],
+        reading: "More words to read! An **apple**, a **ball**, a **fish**, a **tree**.\n\nLook at the picture, then tap the right word. You're a reading star! 🌟",
+        quiz: [
+          { q: "Which word matches this picture?", img: KID_PICS.apple, options: ["apple", "ant", "arm", "ax"], answer: 0 },
+          { q: "Which word matches this picture?", img: KID_PICS.ball, options: ["ball", "bell", "bat", "bus"], answer: 0 },
+          { q: "Which word matches this picture?", img: KID_PICS.fish, options: ["fish", "fox", "fan", "fig"], answer: 0 },
+          { q: "Which word matches this picture?", img: KID_PICS.tree, options: ["tree", "two", "toy", "top"], answer: 0 },
         ],
         caseContext: "", caseOpening: "" },
     ],
