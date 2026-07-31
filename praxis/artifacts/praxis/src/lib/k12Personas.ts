@@ -93,7 +93,7 @@ export const K12_PERSONAS: K12Persona[] = [
     challenge: "On-track", challengeLong: "A confident, on-track student — the baseline experience.",
     learningStyleLabel: "Reading/writing learner",
     accent: "#4F46E5", avatarBg: "#4F46E5", rootPx: 16, highContrast: false, calm: false, gamified: true, autismMode: false,
-    supports: "The standard middle-school experience: balanced pacing, an AI tutor, quizzes, and earned badges.",
+    supports: "The standard middle-school experience: balanced pacing, quizzes with instant feedback, and earned badges.",
   },
   {
     key: "leo", email: "leo.k12@synops-demo.test", first: "Leo", name: "Leo Rivera",
@@ -101,7 +101,7 @@ export const K12_PERSONAS: K12Persona[] = [
     challenge: "Dyslexia + ADHD", challengeLong: "Bright and curious; reading is hard and focus comes in bursts.",
     learningStyleLabel: "Auditory learner",
     accent: "#D97706", avatarBg: "#D97706", rootPx: 16, highContrast: false, calm: false, gamified: true, autismMode: false,
-    supports: "Read-aloud, an easy-reading font toggle, one idea at a time, extra time, and a tutor that keeps steps short.",
+    supports: "Read-aloud, an easy-reading font toggle, one idea at a time, extra time, and short, guided steps.",
   },
   {
     key: "jordan", email: "jordan.k12@synops-demo.test", first: "Jordan", name: "Jordan Bell",
