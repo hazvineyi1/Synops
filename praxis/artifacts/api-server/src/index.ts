@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { initObservability } from "./lib/observability";
 import { ensureIntegrityConstraints } from "./lib/dbHardening";
+import { correctSeededAnnouncements } from "./lib/seedCorrections";
 import { startOpsAgent } from "./lib/opsAgent";
 
 // Fire-and-forget: enables Sentry when SENTRY_DSN is set, otherwise a no-op. Never blocks boot.
@@ -9,6 +10,9 @@ void initObservability();
 // Fire-and-forget: dedupe + add the unique indexes that make credential/funded-seat/gradebook
 // writes race-safe. Never throws; skips any table that isn't present yet.
 void ensureIntegrityConstraints();
+// Fire-and-forget: rewrite the one untrue "interactive video" demo announcement to a truthful
+// message. Idempotent + guarded on the old text; never blocks boot.
+void correctSeededAnnouncements();
 // Always-on ops agent: scan platform signals every minute and maintain the anomaly feed.
 startOpsAgent();
 
