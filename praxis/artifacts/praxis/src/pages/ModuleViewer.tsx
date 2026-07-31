@@ -1845,7 +1845,7 @@ function TranscriptEditor({ beatId, initial, moduleId }: { beatId: string; initi
  * sentence being read rather than highlighting inside the text, because the speech engine
  * needs whitespace-normalised chunks and the reading itself keeps its paragraph breaks.
  */
-function ReadAloudBar({ text }: { text: string }) {
+function ReadAloudBar({ text, rate, pitch }: { text: string; rate?: number; pitch?: number }) {
   const { start, pause, resume, stop, status, index, chunks, supported } = useReadAloud();
 
   if (!supported) {
@@ -1864,7 +1864,7 @@ function ReadAloudBar({ text }: { text: string }) {
       <div className="flex items-center gap-2 flex-wrap">
         <Headphones className="h-4 w-4 text-emerald-600 shrink-0" />
         {status === 'idle' ? (
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => start(text)}>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => start(text, 'en', { rate, pitch })}>
             <Play className="h-3.5 w-3.5" /> Listen
           </Button>
         ) : (
@@ -2316,6 +2316,12 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
 
   // Strip anything a young child shouldn't see (standards codes, meta "by the end" lines).
   const stripYoung = (md: string) => md.split('\n').filter((l) => !/aligned to/i.test(l) && !/^\s*\*\*by the end you can/i.test(l)).join('\n');
+  // Clean text for the read-aloud so it doesn't say "hashtag" / "asterisk" / emoji names and sounds
+  // less robotic — strip markdown symbols and emoji, keep the words.
+  const speechClean = (md: string) => stripYoung(md)
+    .replace(/[#>*_`]/g, ' ')                                   // markdown symbols
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, ' ') // emoji/symbols
+    .replace(/\s+/g, ' ').trim();
   // Real photos for any picture-words in the reading (matched on the English source content).
   const readingPics = picturesInText(reader?.content ?? '');
   // Tap a picture → say the word aloud and give it a playful pop. Makes the reading hands-on.
@@ -2388,14 +2394,18 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
         {step?.id === 'read' && (
           <div className="rounded-3xl bg-white p-6 sm:p-8 shadow-sm">
             <div className="flex items-center gap-3 flex-wrap mb-4">
-              <div><ReadAloudBar text={tText ?? reader?.content ?? ''} /></div>
+              <div><ReadAloudBar text={speechClean(tText ?? reader?.content ?? '')} rate={0.85} pitch={1.15} /></div>
               {es && <LangChips value={lang} busy={tBusy} onPick={pickLang} />}
             </div>
-            {/* Interactive photo "stickers" for the picture-words — tap to hear the word and pop. */}
+            {/* The reading first… */}
+            <div className="text-lg leading-relaxed [&_p]:text-lg [&_p]:leading-relaxed [&_li]:text-lg">
+              <MarkdownView text={tText ?? stripYoung(reader?.content ?? T('Loading…', 'Cargando…'))} />
+            </div>
+            {/* …then the pictures, right next to the sentences that name them. Tap to hear + pop. */}
             {readingPics.length > 0 && (
-              <>
-                <p className="text-center text-sm font-semibold mb-2" style={{ color: `${accent}cc` }}>👆 {T('Tap a picture to hear it!', '¡Toca una foto para escucharla!')}</p>
-                <div className="flex flex-wrap justify-center gap-5 sm:gap-8 my-4">
+              <div className="mt-6 border-t pt-5" style={{ borderColor: `${accent}22` }}>
+                <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>👆 {T('Tap a picture to hear it!', '¡Toca una foto para escucharla!')}</p>
+                <div className="flex flex-wrap justify-center gap-5 sm:gap-8 my-2">
                   {readingPics.map((p, idx) => {
                     const popped = poppedWord === p.word;
                     return (
@@ -2411,11 +2421,8 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
                     );
                   })}
                 </div>
-              </>
+              </div>
             )}
-            <div className="border-t pt-5 text-lg leading-relaxed [&_p]:text-lg [&_p]:leading-relaxed [&_li]:text-lg" style={{ borderColor: `${accent}22` }}>
-              <MarkdownView text={tText ?? stripYoung(reader?.content ?? T('Loading…', 'Cargando…'))} />
-            </div>
           </div>
         )}
         {step?.id === 'practice' && (
@@ -2435,7 +2442,9 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
           </div>
         )}
 
-        {/* GIANT next arrow */}
+        {/* GIANT next arrow — hidden on launch steps (Practice/Tutor) so those have ONE clear action
+            (Start). Forward navigation happens automatically after the child finishes the activity. */}
+        {!(step?.id === 'practice' || step?.id === 'tutor') && (
         <div className="mt-7 flex flex-col items-center gap-2">
           {stepIdx < steps.length - 1 ? (
             <button onClick={() => setStepIdx(stepIdx + 1)} className={bigBtn} style={{ background: accent }}>
@@ -2451,6 +2460,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
             </button>
           )}
         </div>
+        )}
       </div>
     </div>
   );

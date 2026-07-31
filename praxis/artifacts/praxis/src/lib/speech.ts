@@ -76,6 +76,8 @@ export function useReadAloud() {
   const idxRef = useRef(0);
   const stoppedRef = useRef(false);
   const langRef = useRef("en");
+  const rateRef = useRef(1);
+  const pitchRef = useRef(1);
 
   const speakFrom = useCallback(() => {
     if (!supported || stoppedRef.current) return;
@@ -87,18 +89,21 @@ export function useReadAloud() {
     u.lang = BCP47_MAP[langRef.current] ?? "en-ZA";
     const v = pickVoiceFor(null, langRef.current);
     if (v) u.voice = v;
-    u.rate = 1;
+    u.rate = rateRef.current;
+    u.pitch = pitchRef.current;
     const advance = () => { if (stoppedRef.current) return; idxRef.current = i + 1; speakFrom(); };
     u.onend = advance;
     u.onerror = advance;
     window.speechSynthesis.speak(u);
   }, [supported]);
 
-  const start = useCallback((text: string, lang = "en") => {
+  const start = useCallback((text: string, lang = "en", opts?: { rate?: number; pitch?: number }) => {
     if (!supported || !text?.trim()) return;
     window.speechSynthesis.cancel();
     stoppedRef.current = false;
     langRef.current = lang;
+    rateRef.current = opts?.rate ?? 1;
+    pitchRef.current = opts?.pitch ?? 1;
     const list = chunkForSpeech(text);
     chunksRef.current = list;
     setChunks(list);
