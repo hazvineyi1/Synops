@@ -54,6 +54,7 @@ interface K12Module {
   points: string[]; reading: string; minutes: number;
   standards: Std[]; quiz: { q: string; options: string[]; answer: number; img?: string }[];
   caseContext: string; caseOpening: string;
+  game?: "quiz" | "puzzle";   // default "quiz" (2-round game); "puzzle" = spell-the-word tiles
 }
 interface K12Persona {
   email: string; firstName: string; lastName: string;
@@ -81,10 +82,10 @@ const KID_PICS: Record<string, string> = {
 const COURSES: K12Course[] = [
   // 0) MATEO · Grade 1 · just starting out (K-2 band) ─────────────────────────
   {
-    title: "Reading Adventure (Grade 1)", subject: "English Language Arts", emoji: "🔤", grade: 1, gradeLabel: "Grade 1",
+    title: "Grade 1 Reading Adventure", subject: "English Language Arts", emoji: "🔤", grade: 1, gradeLabel: "Grade 1",
     framework: "Common Core State Standards — Grade 1 Foundational Reading",
-    intro: "A four-part reading adventure! Find first letters, then read picture words — look, tap, and earn stars.",
-    outcome: "Recognize beginning letters and read common one-syllable picture words.",
+    intro: "A five-part reading adventure! Find first letters, read picture words, then spell them in a puzzle — look, tap, and earn stars.",
+    outcome: "Recognize beginning letters, read common one-syllable words, and spell them.",
     tags: ["ela", "reading", "letters", "grade 1", "common core"],
     persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.15 },
     modules: [
@@ -130,6 +131,17 @@ const COURSES: K12Course[] = [
           { q: "Which word matches this picture?", img: KID_PICS.ball, options: ["ball", "bell", "bat", "bus"], answer: 0 },
           { q: "Which word matches this picture?", img: KID_PICS.fish, options: ["fish", "fox", "fan", "fig"], answer: 0 },
           { q: "Which word matches this picture?", img: KID_PICS.tree, options: ["tree", "two", "toy", "top"], answer: 0 },
+        ],
+        caseContext: "", caseOpening: "" },
+      { title: "Word Puzzle", outcome: "Spell the words you learned.", hook: "Now for a puzzle — build the words letter by letter!", minutes: 5, game: "puzzle",
+        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics and word analysis skills in decoding words" }],
+        points: ["Look at the picture", "Tap the letters in the right order", "Spell the whole word!"],
+        reading: "Now for a puzzle! 🧩 Look at the picture, then tap the letters in the right order to spell the word. Take your time — you can do it! ⭐",
+        quiz: [
+          { q: "Spell the word", img: KID_PICS.cat, options: ["cat"], answer: 0 },
+          { q: "Spell the word", img: KID_PICS.dog, options: ["dog"], answer: 0 },
+          { q: "Spell the word", img: KID_PICS.sun, options: ["sun"], answer: 0 },
+          { q: "Spell the word", img: KID_PICS.hat, options: ["hat"], answer: 0 },
         ],
         caseContext: "", caseOpening: "" },
     ],
@@ -367,6 +379,15 @@ function quizHtml(title: string, items: { q: string; options: string[]; answer: 
 <script>const items=${data};const picItems=items.filter(function(x){return x.img;});const totalStars=items.length+picItems.length;let stars=0;function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}function report(s){try{parent.postMessage({type:'activity_result',score:s,payload:{stars:stars}},'*');}catch(e){}}function setStars(){document.getElementById('stars').textContent='⭐ '+stars+' / '+totalStars;document.getElementById('f').style.width=Math.round(stars/totalStars*100)+'%';}function burst(el,kind){var r=el.getBoundingClientRect();var set=kind==='balloon'?['🎈','⭐','🎉','✨']:['🎉','⭐','🌟','🎊','✨','🏆'];var n=kind==='balloon'?9:34;for(var i=0;i<n;i++){var s=document.createElement('span');if(kind==='balloon'){s.className='float';s.style.left=(r.left+Math.random()*r.width)+'px';s.style.top=r.top+'px';s.style.animationDelay=(Math.random()*.25)+'s';}else{s.className='confetti';s.style.left=(Math.random()*100)+'vw';s.style.animationDuration=(1.6+Math.random()*1.4)+'s';s.style.animationDelay=(Math.random()*.4)+'s';}s.textContent=set[i%set.length];document.body.appendChild(s);setTimeout(function(){s.remove();},3600);}}setStars();var quiz=document.getElementById('quiz');var qSolved=0;items.forEach(function(it,qi){var d=document.createElement('div');d.className='q';d.innerHTML=(it.img?'<img class="qimg" src="'+it.img+'" alt="picture">':'')+'<p class="qt">'+(qi+1)+'. '+it.q+'</p>';shuffle(it.options.map(function(o,i){return {o:o,i:i};})).forEach(function(pair){var b=document.createElement('button');b.className='opt';b.innerHTML='<span>'+pair.o+'</span><span class="mk"></span>';b.onclick=function(){if(d.dataset.done)return;var mk=b.querySelector('.mk');if(pair.i===it.answer){b.classList.add('correct');mk.textContent='✅';d.dataset.done='1';d.classList.add('solved');[].slice.call(d.querySelectorAll('.opt')).forEach(function(x){if(x!==b)x.disabled=true;});burst(b,'balloon');stars++;setStars();qSolved++;if(qSolved===items.length)setTimeout(startMatch,550);}else{b.classList.add('wrong');mk.textContent='❌';setTimeout(function(){b.classList.remove('wrong');mk.textContent='';},700);}};d.appendChild(b);});quiz.appendChild(d);});function startMatch(){if(!picItems.length){finish();return;}quiz.style.display='none';document.getElementById('s').style.display='none';document.getElementById('rt').textContent='🧩 Round 2: Match them!';document.getElementById('match').style.display='block';var pcol=document.getElementById('pcol');var wcol=document.getElementById('wcol');var sel=null;shuffle(picItems).forEach(function(it){var b=document.createElement('button');b.className='mpic';b.innerHTML='<img src="'+it.img+'" alt="picture">';b.dataset.word=it.options[it.answer];b.onclick=function(){if(b.dataset.done)return;[].slice.call(pcol.querySelectorAll('.mpic')).forEach(function(x){x.classList.remove('sel');});b.classList.add('sel');sel=b;};pcol.appendChild(b);});shuffle(picItems.map(function(x){return x.options[x.answer];})).forEach(function(w){var b=document.createElement('button');b.className='mword';b.textContent=w;b.onclick=function(){if(b.dataset.done||!sel)return;if(sel.dataset.word===w){sel.dataset.done='1';sel.classList.add('done');sel.classList.remove('sel');b.dataset.done='1';b.classList.add('done');burst(b,'balloon');stars++;setStars();sel=null;if([].slice.call(pcol.querySelectorAll('.mpic')).every(function(x){return x.dataset.done;}))setTimeout(finish,550);}else{b.classList.add('wrong');setTimeout(function(){b.classList.remove('wrong');},500);}};wcol.appendChild(b);});}function finish(){document.getElementById('rt').textContent='';document.getElementById('match').style.display='none';document.getElementById('s').style.display='none';var dn=document.getElementById('done');dn.innerHTML='🎉 You did it! You earned <b>'+stars+'</b> ⭐';dn.style.display='block';burst(document.body,'confetti');setTimeout(function(){report(100);},1500);}</script>`;
 }
 
+// ── Spell-the-word puzzle (a different interaction). Tap letter tiles in order to build the word. ──
+function puzzleHtml(title: string, items: { q: string; options: string[]; answer: number; img?: string }[]): string {
+  const data = JSON.stringify(items).replace(/</g, "\\u003c");
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>:root{--indigo:#4F46E5;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;--no:#b91c1c}*{box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;color:var(--ink);margin:0;padding:18px;background:#FBF7EF;overflow-x:hidden}h2{margin:.2rem 0 .6rem;font-size:1.25rem}#stars{text-align:center;font-weight:800;font-size:1.3rem;margin:0 0 8px}.q{background:#fff;border:2px solid #f0e9da;border-radius:20px;padding:16px 18px;margin:0 0 16px;box-shadow:0 2px 8px rgba(0,0,0,.05)}.q.solved{border-color:var(--ok);background:#f6fbf7}.qt{font-weight:700;font-size:1.1rem;margin:0 0 12px;text-align:center}.qimg{display:block;width:150px;height:150px;object-fit:contain;border-radius:22px;margin:0 auto 12px;background:#eef0fb;padding:10px;filter:drop-shadow(0 5px 9px rgba(0,0,0,.18))}.slots{display:flex;gap:8px;justify-content:center;margin:6px 0 16px}.slot{width:52px;height:60px;border:3px dashed #cdc7b8;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:800;color:var(--indigo)}.slot.filled{border-style:solid;border-color:var(--ok);background:#e9f7ee}.tiles{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}.tile{width:56px;height:56px;border:3px solid #e6e0d0;background:#fff;border-radius:14px;font:inherit;font-size:1.6rem;font-weight:800;cursor:pointer;transition:.15s}.tile:hover{border-color:var(--indigo);transform:translateY(-1px)}.tile.used{opacity:.35;pointer-events:none}.tile.wrong{animation:shake .4s;border-color:var(--no)}@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}.bar{height:12px;background:#eee;border-radius:8px;overflow:hidden;margin:16px 0 8px}.fill{height:100%;width:0;background:linear-gradient(90deg,#F59E0B,#15803d);transition:.4s}.hint{color:#6b7280;font-size:1rem;text-align:center;font-weight:600}.done{display:none;text-align:center;font-weight:800;font-size:1.5rem;color:var(--ok);margin:14px 0}.float{position:fixed;pointer-events:none;font-size:1.9rem;z-index:9;animation:rise 1.4s ease-out forwards}@keyframes rise{0%{transform:translateY(0) scale(.5);opacity:0}20%{opacity:1}100%{transform:translateY(-150px) scale(1.25) rotate(18deg);opacity:0}}.confetti{position:fixed;top:-30px;font-size:1.8rem;animation:fall linear forwards;z-index:9;pointer-events:none}@keyframes fall{to{transform:translateY(110vh) rotate(360deg);opacity:.85}}</style>
+<h2>${title}</h2><div id="stars">⭐ 0</div><p class="hint">Tap the letters in order to spell the word! 👇</p><div id="app"></div><div class="bar"><div class="fill" id="f"></div></div><div id="done" class="done"></div>
+<script>var items=${data};var total=items.length;var stars=0;function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}function report(s){try{parent.postMessage({type:'activity_result',score:s,payload:{stars:stars}},'*');}catch(e){}}function setStars(){document.getElementById('stars').textContent='⭐ '+stars+' / '+total;document.getElementById('f').style.width=Math.round(stars/total*100)+'%';}function burst(el,kind){var r=el.getBoundingClientRect();var set=kind==='balloon'?['🎈','⭐','🎉','✨']:['🎉','⭐','🌟','🎊','✨','🏆'];var n=kind==='balloon'?9:34;for(var i=0;i<n;i++){var s=document.createElement('span');if(kind==='balloon'){s.className='float';s.style.left=(r.left+Math.random()*r.width)+'px';s.style.top=r.top+'px';s.style.animationDelay=(Math.random()*.25)+'s';}else{s.className='confetti';s.style.left=(Math.random()*100)+'vw';s.style.animationDuration=(1.6+Math.random()*1.4)+'s';s.style.animationDelay=(Math.random()*.4)+'s';}s.textContent=set[i%set.length];document.body.appendChild(s);setTimeout(function(){s.remove();},3600);}}setStars();var app=document.getElementById('app');var solvedCount=0;items.forEach(function(it){var word=(it.options[it.answer]||'').toString().toLowerCase();var d=document.createElement('div');d.className='q';d.innerHTML=(it.img?'<img class="qimg" src="'+it.img+'" alt="picture">':'')+'<p class="qt">Spell the word</p>';var slots=document.createElement('div');slots.className='slots';var slotEls=[];word.split('').forEach(function(){var s=document.createElement('div');s.className='slot';slots.appendChild(s);slotEls.push(s);});d.appendChild(slots);d.__filled=0;var tiles=document.createElement('div');tiles.className='tiles';shuffle(word.split('')).forEach(function(ch){var b=document.createElement('button');b.className='tile';b.textContent=ch.toUpperCase();b.onclick=function(){if(d.dataset.done)return;var need=word[d.__filled];if(b.textContent.toLowerCase()===need){var idx=d.__filled;slotEls[idx].textContent=b.textContent;slotEls[idx].classList.add('filled');b.disabled=true;b.classList.add('used');d.__filled=idx+1;if(d.__filled===word.length){d.dataset.done='1';d.classList.add('solved');burst(b,'balloon');stars++;setStars();solvedCount++;if(solvedCount===total)setTimeout(finish,650);}}else{b.classList.add('wrong');setTimeout(function(){b.classList.remove('wrong');},450);}};tiles.appendChild(b);});d.appendChild(tiles);app.appendChild(d);});function finish(){var dn=document.getElementById('done');dn.innerHTML='🎉 You spelled them all! You earned <b>'+stars+'</b> ⭐';dn.style.display='block';burst(document.body,'confetti');setTimeout(function(){report(100);},1500);}</script>`;
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 function firstOrNull<T>(rows: T[]): T | null { return rows.length ? rows[0]! : null; }
 
@@ -435,7 +456,7 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
       organisationId: orgId, courseId: course.id, moduleId: mod.id,
       title: `${m.title}: quick check`,
       instructions: "Answer each question, then check your work. You can retry as many times as you like.",
-      html: quizHtml(`${m.title}: quick check`, m.quiz), source: "html", kind: "quiz",
+      html: (m.game === "puzzle" ? puzzleHtml : quizHtml)(`${m.title}: quick check`, m.quiz), source: "html", kind: "quiz",
       bloomsLevel: "Understand", difficulty: "foundational",
       isLibrary: false, tags: c.tags, published: true, createdByUserId: facultyId,
     });
@@ -524,7 +545,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
       const m = c.modules[i];
       const modId = cmods[i].id;
       await db.update(interactiveActivitiesTable)
-        .set({ html: quizHtml(`${m.title}: quick check`, m.quiz) })
+        .set({ html: (m.game === "puzzle" ? puzzleHtml : quizHtml)(`${m.title}: quick check`, m.quiz) })
         .where(and(eq(interactiveActivitiesTable.moduleId, modId), eq(interactiveActivitiesTable.kind, "quiz")));
       const body = `# ${m.title}\n\n**Think about this:** ${m.hook}\n\n**By the end you can:** ${m.outcome}\n\n${m.reading}\n\n## Big ideas\n\n${m.points.map((p) => `- ${p}`).join("\n")}\n\n**Aligned to:** ${m.standards.map((s) => s.code).join(", ")}`;
       await db.update(moduleReadingsTable).set({ content: body, chars: body.length }).where(eq(moduleReadingsTable.moduleId, modId));
