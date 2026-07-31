@@ -247,7 +247,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             { label: t('nav.k12Lessons', 'My lessons'), href: '/dashboard', icon: LayoutDashboard },
             { label: t('nav.k12Classes', 'My classes'), href: '/courses', icon: BookOpen },
             { label: t('nav.k12Badges', 'My badges'), href: '/credentials', icon: Award },
-            { label: t('nav.k12Tutor', 'My tutor'), href: '/coach-hub', icon: GraduationCap },
             { label: t('nav.k12Help', 'Get help'), href: '/support', icon: LifeBuoy },
           ],
         }];
@@ -260,7 +259,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
           { label: t('nav.myGrades', 'My grades'), href: '/grades', icon: TrendingUp },
-          { label: t('nav.coach', 'Coach'), href: '/coach-hub', icon: GraduationCap },
+          // K-12 has no AI tutor / case studies; older K-12 learners skip the Coach hub too.
+          ...(personaByEmail(user?.email) ? [] : [{ label: t('nav.coach', 'Coach'), href: '/coach-hub', icon: GraduationCap }]),
           { label: t('nav.jotter', 'Jotter'), href: '/jotter', icon: NotebookPen },
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
           { label: t('nav.credentials'), href: '/credentials', icon: Award },

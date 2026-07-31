@@ -71,37 +71,35 @@ interface K12Course {
 const COURSES: K12Course[] = [
   // 0) MATEO · Grade 1 · just starting out (K-2 band) ─────────────────────────
   {
-    title: "Letters & Sounds (Grade 1)", subject: "English Language Arts", emoji: "🔤", grade: 1, gradeLabel: "Grade 1",
+    title: "Letters & First Words (Grade 1)", subject: "English Language Arts", emoji: "🔤", grade: 1, gradeLabel: "Grade 1",
     framework: "Common Core State Standards — Grade 1 Foundational Reading",
-    intro: "Reading starts with sounds! You'll learn the sounds letters make and put them together to read your very first words. Let's go!",
-    outcome: "Match letters to their sounds and blend sounds to read simple words.",
-    tags: ["ela", "reading", "phonics", "grade 1", "common core"],
+    intro: "Let's find letters and read our first words — just look and tap! No reading out loud needed.",
+    outcome: "Recognize letters and match simple words to their pictures.",
+    tags: ["ela", "reading", "letters", "grade 1", "common core"],
     persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.35 },
     modules: [
-      { title: "The sounds letters make", outcome: "Say the sound each letter makes.", hook: "What sound does the letter S make? Sssss — like a snake!", minutes: 5,
-        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics in decoding words" }],
-        points: ["Every letter has a sound", "S says ssss, M says mmm, T says t", "We use sounds to read words"],
-        reading: "Letters make sounds! The letter **S** says *ssss*, like a snake. The letter **M** says *mmm*, like when food is yummy. The letter **T** says *t*, like a tiny tap.\n\nWhen you know the sounds, you can read! Point to a letter and say its sound out loud. You are becoming a reader! 🌟",
+      { title: "Finding letters", outcome: "Find and name letters.", hook: "Letters are everywhere! Can you find the letter B?", minutes: 5,
+        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.1", title: "Demonstrate understanding of the organization and basic features of print" }],
+        points: ["Every letter has a name", "Big letters (A) and small letters (a) are partners", "We can find letters all around us"],
+        reading: "Letters are the building blocks of reading! Every letter has a **big** shape and a **small** shape. Big **A** and small **a** are the same letter — they are partners.\n\nLook for letters everywhere — on signs, on books, on toys. When you see one, just **tap** it. You're a letter detective! 🕵️⭐",
         quiz: [
-          { q: "What sound does S make?", options: ["ssss (like a snake)", "mmm", "t", "zzz"], answer: 0 },
-          { q: "What sound does M make?", options: ["ssss", "mmm (like yummy)", "t", "b"], answer: 1 },
-          { q: "Letters help us…", options: ["read words", "jump high", "eat lunch", "sleep"], answer: 0 },
-          { q: "The letter T says…", options: ["t (a tiny tap)", "ssss", "mmm", "oo"], answer: 0 },
+          { q: "Which one is the letter B?", options: ["B", "D", "P", "R"], answer: 0 },
+          { q: "Which one is a small (little) letter?", options: ["a", "A", "T", "M"], answer: 0 },
+          { q: "The big partner for small 'm' is…", options: ["M", "E", "O", "S"], answer: 0 },
+          { q: "Which one is a letter?", options: ["S", "5", "?", "7"], answer: 0 },
         ],
-        caseContext: "Mateo sees the letter B and isn't sure what sound it makes. Cheer him on and help him say the /b/ sound with a fun example (like 'ball' or 'bounce'). Keep it super simple and happy.",
-        caseOpening: "Let's try the letter B together! It says /b/ — like BALL. Can you say /b/?" },
-      { title: "Sounding out words", outcome: "Blend letter sounds to read a short word.", hook: "c-a-t… put them together… CAT! You read it!", minutes: 5,
-        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics in decoding words" }],
-        points: ["Say each sound slowly", "Then push them together fast", "c-a-t makes cat!"],
-        reading: "To read a word, say each sound, then push them together.\n\nTry **cat**: say *c… a… t*. Now say it fast: **cat**! You did it!\n\nTry **sun**: *s… u… n* → **sun**! Sounding out is like magic — small sounds make a whole word. Keep going, superstar! ⭐",
+        caseContext: "", caseOpening: "" },
+      { title: "Reading picture words", outcome: "Match a word to its picture.", hook: "See the picture, then tap the word that matches!", minutes: 5,
+        standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics and word analysis skills in decoding words" }],
+        points: ["Words name the things we see", "Look at the picture, then find the word", "You can read short words!"],
+        reading: "Words tell us the names of things. When you see a picture, you can find the word that matches it!\n\nA 🐱 is a **cat**. A 🌞 is the **sun**. A 🐶 is a **dog**. Look at the picture, then tap the right word. You're reading! 📖⭐",
         quiz: [
-          { q: "c-a-t sounds out to…", options: ["cat", "dog", "car", "cup"], answer: 0 },
-          { q: "s-u-n makes…", options: ["sun", "sit", "sad", "six"], answer: 0 },
-          { q: "To read a word we…", options: ["say each sound then blend", "close our eyes", "skip it", "sing"], answer: 0 },
-          { q: "m-a-p makes…", options: ["map", "mad", "mop", "man"], answer: 0 },
+          { q: "Which word matches 🐱 ?", options: ["cat", "dog", "sun", "hat"], answer: 0 },
+          { q: "Which word matches 🌞 ?", options: ["sun", "run", "six", "sit"], answer: 0 },
+          { q: "Which word matches 🐶 ?", options: ["dog", "log", "dig", "day"], answer: 0 },
+          { q: "Which word matches 🎩 ?", options: ["hat", "ham", "hop", "cat"], answer: 0 },
         ],
-        caseContext: "Mateo is sounding out 'dog' and gets stuck after d-o. Warmly help him add the /g/ and blend d-o-g into 'dog'. Celebrate when he gets it.",
-        caseOpening: "You've got d… o… — one more sound! What does g say? Let's finish it: d-o-g!" },
+        caseContext: "", caseOpening: "" },
     ],
   },
   // 1) SOFÍA · Grade 3 · Spanish-speaking English learner ─────────────────────
@@ -410,15 +408,9 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
       isLibrary: false, tags: c.tags, published: true, createdByUserId: facultyId,
     });
 
-    // AI tutor case (every module → satisfies the "case study" component; no course-level fallback).
-    await db.insert(caseScenariosTable).values({
-      organisationId: orgId, moduleId: mod.id, createdBy: facultyId, createdByName: "Synops Academy",
-      title: `Tutor: ${m.title}`,
-      learningObjective: m.outcome, contextBlock: m.caseContext, openingQuestion: m.caseOpening,
-      focusAreas: [m.outcome], difficulty: "foundational",
-      status: "published", isLibrary: true, tags: c.tags,
-      guidingInstructions: `You are a warm, patient tutor for a ${c.gradeLabel} student. Coach with questions, never hand over the answer. Match the student's grade: short sentences and everyday examples for younger grades, more analysis for older. Celebrate good thinking and keep it encouraging.`,
-    });
+    // NOTE: K-12 deliberately has NO AI tutor / case study. An open-ended Socratic tutor accepts any
+    // answer (no objective right/wrong), can't hear a child speak, and its live generations pulled in
+    // off-region examples. K-12 practice is the tappable, self-checking quiz above instead.
 
     // Standards.
     for (const s of m.standards) {
@@ -479,6 +471,15 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     if (hasAssign.length === 0) await db.insert(coursePartnerAssignmentsTable).values({ courseId, partnerId: partner.id, assignedBy: facultyId });
     const linked = (await db.select().from(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id))).map((x) => x.courseId);
     if (!linked.includes(courseId)) await db.insert(orgClassCoursesTable).values({ classId: cls.id, courseId });
+  }
+
+  // 3b. K-12 has NO AI tutor / case studies. Courses reused from an earlier seed still carry the
+  // old "Tutor:" cases on their modules, so delete every case scenario on these courses' modules.
+  const k12CourseIds = Object.values(courseByPersona);
+  if (k12CourseIds.length) {
+    const k12Mods = await db.select({ id: modulesTable.id }).from(modulesTable).where(inArray(modulesTable.courseId, k12CourseIds));
+    const k12ModIds = k12Mods.map((m) => m.id);
+    if (k12ModIds.length) await db.delete(caseScenariosTable).where(inArray(caseScenariosTable.moduleId, k12ModIds));
   }
 
   // 4. Teacher (admin) + class staff.

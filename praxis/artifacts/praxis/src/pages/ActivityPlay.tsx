@@ -5,6 +5,9 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActivityPlayer, type ActivityPlayerHandleResult } from "@/components/ActivityPlayer";
 import { activitiesApi } from "@/lib/activitiesApi";
+import { apiFetch } from "@/lib/api";
+import { useSession } from "@/context/SessionContext";
+import { personaByEmail } from "@/lib/k12Personas";
 
 /** Full-screen learner view for completing and handing in an interactive activity. */
 export function ActivityPlay({ params }: { params: { activityId: string } }) {
@@ -23,10 +26,26 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
     onSuccess: (s) => { setDone(true); setScore(s.score); },
   });
 
-  // Where "Next/Continue" goes: back to the lesson this activity belongs to (so the learner keeps
-  // moving through the module), or the dashboard if it isn't homed in a module.
+  // Young K-12 learners should move FORWARD after practice (next lesson / done), not land back on
+  // the same module. Everyone else returns to the lesson they came from.
+  const { user } = useSession();
+  const persona = personaByEmail(user?.email);
+  const young = !!persona && (persona.band === "early" || persona.band === "elementary");
   const a = activity as { courseId?: string | null; moduleId?: string | null } | undefined;
-  const backTo = a?.courseId && a?.moduleId ? `/courses/${a.courseId}/modules/${a.moduleId}` : "/dashboard";
+  const courseId = a?.courseId ?? undefined;
+  const { data: courseModules } = useQuery({
+    queryKey: ["modules", courseId],
+    queryFn: () => apiFetch<{ id: string; order: number }[]>(`/courses/${courseId}/modules`),
+    enabled: young && !!courseId,
+  });
+  const orderedMods = (courseModules ?? []).slice().sort((x, y) => x.order - y.order);
+  const curIdx = orderedMods.findIndex((mm) => mm.id === a?.moduleId);
+  const nextMod = curIdx >= 0 ? orderedMods[curIdx + 1] : undefined;
+  const sameModule = a?.courseId && a?.moduleId ? `/courses/${a.courseId}/modules/${a.moduleId}` : "/dashboard";
+  // Young: go to the next lesson, or back to the course "finish" screen if this was the last one.
+  const backTo = young
+    ? (nextMod ? `/courses/${a?.courseId}/modules/${nextMod.id}` : (a?.courseId ? `/courses/${a.courseId}` : "/dashboard"))
+    : sameModule;
 
   return (
     <div className="min-h-[100dvh] bg-slate-50">
