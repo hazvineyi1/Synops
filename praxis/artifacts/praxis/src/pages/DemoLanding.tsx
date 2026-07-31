@@ -42,9 +42,12 @@ export default function DemoLanding() {
             <span className="h-8 w-8 rounded-lg flex items-center justify-center font-semibold text-white" style={{ background: TEAL }}>S</span>
             <span className="text-[15px] font-medium">Synops <span style={{ color: '#8f8b83' }}>Demo</span></span>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full" style={{ background: '#FBEEDC', color: AMBER, border: '1px solid #ecdcc2' }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: AMBER }} /> Live product, no sign-up
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full" style={{ background: '#FBEEDC', color: AMBER, border: '1px solid #ecdcc2' }}>
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: AMBER }} /> Live product, no sign-up
+            </span>
+            <a href="/sign-in" className="inline-flex items-center rounded-lg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm" style={{ background: TEAL }}>Sign in</a>
+          </div>
         </div>
 
         {/* Hero */}

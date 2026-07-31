@@ -43,9 +43,12 @@ export default function K12Landing() {
             <span className="h-9 w-9 rounded-xl flex items-center justify-center font-bold text-white shadow-sm" style={{ background: `linear-gradient(135deg,${INDIGO},#7C3AED)` }}>S</span>
             <span className="text-[15px] font-semibold">Synops <span style={{ color: '#9b96a8' }}>Academy</span></span>
           </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-full" style={{ background: '#FBEEDC', color: AMBER, border: '1px solid #f2ddbf' }}>
-            <Sparkles className="h-3 w-3" /> Live demo, no sign-up
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-full" style={{ background: '#FBEEDC', color: AMBER, border: '1px solid #f2ddbf' }}>
+              <Sparkles className="h-3 w-3" /> Live demo, no sign-up
+            </span>
+            <a href="/sign-in" className="inline-flex items-center rounded-lg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm" style={{ background: INDIGO }}>Sign in</a>
+          </div>
         </div>
 
         {/* Hero */}
@@ -98,7 +101,7 @@ export default function K12Landing() {
 
         {/* Feature strip */}
         <div className="mt-7 flex flex-wrap gap-2">
-          {['Adapts by grade level', 'Built-in accommodations', 'AI tutor', 'Gamified for engagement', 'English + Español', 'Common Core · NGSS · C3'].map((t) => (
+          {['Adapts by grade level', 'Built-in accommodations', 'Read-aloud on everything', 'Gamified for engagement', 'English + Español', 'Common Core · NGSS · C3'].map((t) => (
             <span key={t} className="text-[11px] px-3 py-1.5 rounded-full bg-white/70" style={{ color: '#5a5766', border: '1px solid #eae6f0' }}>{t}</span>
           ))}
         </div>
