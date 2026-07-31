@@ -492,6 +492,20 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     if (k12ModIds.length) await db.delete(caseScenariosTable).where(inArray(caseScenariosTable.moduleId, k12ModIds));
   }
 
+  // 3c. Refresh the quiz activity HTML on REUSED courses so content edits (e.g. real-photo picture
+  // questions) actually propagate — existing courses are reused, not recreated, on reseed.
+  for (const c of COURSES) {
+    const cid = courseByPersona[c.persona.email];
+    if (!cid) continue;
+    const cmods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, cid)).orderBy(asc(modulesTable.order));
+    for (let i = 0; i < cmods.length && i < c.modules.length; i++) {
+      const m = c.modules[i];
+      await db.update(interactiveActivitiesTable)
+        .set({ html: quizHtml(`${m.title}: quick check`, m.quiz) })
+        .where(and(eq(interactiveActivitiesTable.moduleId, cmods[i].id), eq(interactiveActivitiesTable.kind, "quiz")));
+    }
+  }
+
   // 4. Teacher (admin) + class staff.
   const adminId = await upsertUser({ email: K12_ADMIN_EMAIL, firstName: "Ms.", lastName: "Ramírez", role: "partner_admin", partnerId: partner.id, organisationId: null });
   const existingStaff = (await db.select().from(orgClassStaffTable).where(eq(orgClassStaffTable.classId, cls.id))).map((s) => s.staffId);
