@@ -11,6 +11,23 @@ import { ArrowLeft, Send, Sparkles, CheckCircle2, TrendingUp, BookOpen, Settings
 import { useSession } from "@/context/SessionContext";
 import { personaByEmail } from "@/lib/k12Personas";
 
+// Phonics for the youngest: browser TTS reads "/b/" as "slash b slash". Convert common phoneme
+// notation ("/b/") to an approximate spoken sound ("buh") so a read-aloud actually teaches the sound.
+const KID_PHONEMES: Record<string, string> = {
+  a: "ah", b: "buh", c: "kuh", d: "duh", e: "eh", f: "ff", g: "guh", h: "huh", i: "ih", j: "juh",
+  k: "kuh", l: "lll", m: "mmm", n: "nnn", o: "oh", p: "puh", q: "kwuh", r: "rrr", s: "sss", t: "tuh",
+  u: "uh", v: "vvv", w: "wuh", x: "ks", y: "yuh", z: "zzz",
+};
+function kidSound(letter: string): string {
+  const k = (letter || "").trim().toLowerCase();
+  return KID_PHONEMES[k] ?? `${k}uh`;
+}
+function speakableForKids(text: string): string {
+  return (text || "")
+    .replace(/\/([a-zA-Z]{1,3})\//g, (_m, p1: string) => (p1.length === 1 ? kidSound(p1) : p1))
+    .replace(/\//g, " ");
+}
+
 export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const sessionId = params?.sessionId ?? "";
   const { toast } = useToast();
@@ -54,6 +71,11 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const gender = tutorGender(tutorAvatar);
   const spokeOpening = useRef(false);
 
+  // Young learners get audio ON by default (a phonics lesson makes no sense silent), and a
+  // kid-safe speaker that pronounces "/b/" as "buh". say() is used for every young utterance.
+  useEffect(() => { if (young && supported) setMuted(false); }, [young, supported, setMuted]);
+  const say = (text: string) => speak(young ? speakableForKids(text) : text, gender, lang);
+
   useEffect(() => {
     if (!data) return;
     setMessages(data.messages ?? []);
@@ -67,18 +89,18 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     // Speak the opening question once, when the session first loads.
     if (!spokeOpening.current && data.status !== "completed") {
       const lastTutor = [...(data.messages ?? [])].reverse().find((m) => m.role === "tutor");
-      if (lastTutor?.content) speak(lastTutor.content, tutorGender(data.tutorAvatar || "f1"), data.language ?? "en");
+      if (lastTutor?.content) speak(young ? speakableForKids(lastTutor.content) : lastTutor.content, tutorGender(data.tutorAvatar || "f1"), data.language ?? "en");
       spokeOpening.current = true;
     }
   }, [data, speak]);
 
   useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, streaming]);
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (textArg?: string) => {
+    const text = (textArg ?? input).trim();
     if (!text || streaming) return;
     cancel(); // stop any in-progress speech before the next turn
-    setInput("");
+    if (textArg === undefined) setInput("");
     setMessages((m) => [...m, { role: "learner", content: text }, { role: "tutor", content: "" }]);
     setStreaming(true);
     let acc = "";
@@ -91,7 +113,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
         if (meta.error) { toast({ title: "Something went wrong", description: meta.error, variant: "destructive" }); return; }
         if (typeof meta.promptCount === "number") setPromptCount(meta.promptCount);
         if (meta.budgetReached) setBudgetReached(true);
-        if (acc.trim()) speak(acc, gender, lang); // the tutor "speaks" its question
+        if (acc.trim()) speak(young ? speakableForKids(acc) : acc, gender, lang); // the tutor "speaks" its question
       }
     );
   };
@@ -144,6 +166,17 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   if (analysis) return <AnalysisView a={analysis} onDone={() => navigate("/cases")} />;
 
   const pct = Math.min(100, Math.round((promptCount / promptLimit) * 100));
+
+  // Young "tap to answer": the letters the tutor just referenced (or a default early-phonics set),
+  // plus a replay of the last spoken prompt so the child can hear it again.
+  const lastTutorMsg = [...messages].reverse().find((m) => m.role === "tutor")?.content ?? "";
+  const derivedLetters = [
+    ...(lastTutorMsg.match(/letter\s+([A-Za-z])\b/gi) ?? []).map((s) => s.replace(/letter\s+/i, "")),
+    ...(lastTutorMsg.match(/\/([a-zA-Z])\//g) ?? []).map((s) => s.replace(/\//g, "")),
+  ].map((c) => c.toUpperCase());
+  const answerTiles = [...new Set(derivedLetters)].slice(0, 6);
+  const tiles = answerTiles.length ? answerTiles : ["S", "A", "T", "P", "I", "N"];
+  const replayLast = () => { if (lastTutorMsg) say(lastTutorMsg); };
 
   const facts = (
     <div className="p-4 space-y-3">
@@ -240,21 +273,50 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
                   <Button size="sm" onClick={finish} disabled={analysing} style={young ? { background: kidAccent } : undefined}><Sparkles className="h-4 w-4 mr-1.5" />{analysing ? T("Analysing…", "One sec…") : T("Finish & analyse", "I'm done!")}</Button>
                 </div>
               )}
-              <div className="flex gap-2 items-end">
-                <textarea
-                  className={young ? "flex-1 resize-none rounded-2xl border-2 bg-white px-4 py-3 text-base max-h-32" : "flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm max-h-32"}
-                  style={young ? { borderColor: `${kidAccent}55` } : undefined}
-                  rows={1}
-                  placeholder={T("Type your reasoning…", "Type your answer here…")}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
-                  disabled={streaming}
-                />
-                <Button onClick={() => void send()} disabled={streaming || !input.trim()} className={young ? "h-12 w-12 rounded-full" : undefined} style={young ? { background: kidAccent } : undefined}><Send className={young ? "h-5 w-5" : "h-4 w-4"} /></Button>
-              </div>
-              {!budgetReached && messages.length > 2 && (
-                <button onClick={finish} disabled={analysing} className="mt-2 text-xs text-muted-foreground hover:text-foreground">{T("Finish early & get analysis", "All done? Tap here 🎉")}</button>
+              {young ? (
+                /* Tap to answer: hear the prompt, tap a big letter (which plays its sound), or a quick reply.
+                   No typing or reading required — right for a 6-year-old. */
+                <div className="space-y-3">
+                  <div className="flex justify-center">
+                    <button onClick={replayLast} disabled={streaming}
+                      className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-base font-bold text-white shadow-md active:scale-95 disabled:opacity-50"
+                      style={{ background: kidAccent }}>🔊 {T("Hear it again", "Escúchalo otra vez")}</button>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2.5">
+                    {tiles.map((L) => (
+                      <button key={L} disabled={streaming}
+                        onClick={() => { say(`/${L.toLowerCase()}/`); void send(`It's the letter ${L} — ${L} says /${L.toLowerCase()}/.`); }}
+                        className="h-16 w-16 rounded-2xl text-3xl font-extrabold text-white shadow-md active:scale-90 disabled:opacity-50"
+                        style={{ background: kidAccent }}>{L}</button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <button onClick={() => { replayLast(); void send("I said it!"); }} disabled={streaming}
+                      className="rounded-full px-5 py-2.5 text-base font-bold border-2 bg-white active:scale-95 disabled:opacity-50"
+                      style={{ borderColor: kidAccent, color: kidAccent }}>🗣️ {T("I said it!", "¡Lo dije!")}</button>
+                    <button onClick={() => void send("Can you help me?")} disabled={streaming}
+                      className="rounded-full px-5 py-2.5 text-base font-bold border-2 bg-white active:scale-95 disabled:opacity-50"
+                      style={{ borderColor: kidAccent, color: kidAccent }}>🙋 {T("Help", "Ayuda")}</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2 items-end">
+                    <textarea
+                      className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm max-h-32"
+                      rows={1}
+                      placeholder="Type your reasoning…"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+                      disabled={streaming}
+                    />
+                    <Button onClick={() => void send()} disabled={streaming || !input.trim()}><Send className="h-4 w-4" /></Button>
+                  </div>
+                  {!budgetReached && messages.length > 2 && (
+                    <button onClick={finish} disabled={analysing} className="mt-2 text-xs text-muted-foreground hover:text-foreground">Finish early &amp; get analysis</button>
+                  )}
+                </>
               )}
             </div>
           </div>
