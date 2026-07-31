@@ -493,17 +493,21 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     if (k12ModIds.length) await db.delete(caseScenariosTable).where(inArray(caseScenariosTable.moduleId, k12ModIds));
   }
 
-  // 3c. Refresh the quiz activity HTML on REUSED courses so content edits (e.g. real-photo picture
-  // questions) actually propagate — existing courses are reused, not recreated, on reseed.
+  // 3c. Refresh the quiz HTML AND the reading content + objectives on REUSED courses so content
+  // edits actually propagate — existing courses are reused, not recreated, on reseed.
   for (const c of COURSES) {
     const cid = courseByPersona[c.persona.email];
     if (!cid) continue;
     const cmods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, cid)).orderBy(asc(modulesTable.order));
     for (let i = 0; i < cmods.length && i < c.modules.length; i++) {
       const m = c.modules[i];
+      const modId = cmods[i].id;
       await db.update(interactiveActivitiesTable)
         .set({ html: quizHtml(`${m.title}: quick check`, m.quiz) })
-        .where(and(eq(interactiveActivitiesTable.moduleId, cmods[i].id), eq(interactiveActivitiesTable.kind, "quiz")));
+        .where(and(eq(interactiveActivitiesTable.moduleId, modId), eq(interactiveActivitiesTable.kind, "quiz")));
+      const body = `# ${m.title}\n\n**Think about this:** ${m.hook}\n\n**By the end you can:** ${m.outcome}\n\n${m.reading}\n\n## Big ideas\n\n${m.points.map((p) => `- ${p}`).join("\n")}\n\n**Aligned to:** ${m.standards.map((s) => s.code).join(", ")}`;
+      await db.update(moduleReadingsTable).set({ content: body, chars: body.length }).where(eq(moduleReadingsTable.moduleId, modId));
+      await db.update(modulesTable).set({ objectives: [m.outcome], description: `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}` }).where(eq(modulesTable.id, modId));
     }
   }
 
