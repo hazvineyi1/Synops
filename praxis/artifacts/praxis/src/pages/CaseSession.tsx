@@ -177,6 +177,9 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const answerTiles = [...new Set(derivedLetters)].slice(0, 6);
   const tiles = answerTiles.length ? answerTiles : ["S", "A", "T", "P", "I", "N"];
   const replayLast = () => { if (lastTutorMsg) say(lastTutorMsg); };
+  // Language helper for the tap bar (English vs Español) — follows the conversation language.
+  // NOTE: T() above is adult-vs-kid WORDING, not language; don't use it for translations.
+  const L = (en: string, spa: string) => (lang === "es" ? spa : en);
 
   const facts = (
     <div className="p-4 space-y-3">
@@ -280,7 +283,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
                   <div className="flex justify-center">
                     <button onClick={replayLast} disabled={streaming}
                       className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-base font-bold text-white shadow-md active:scale-95 disabled:opacity-50"
-                      style={{ background: kidAccent }}>🔊 {T("Hear it again", "Escúchalo otra vez")}</button>
+                      style={{ background: kidAccent }}>🔊 {L("Hear it again", "Escúchalo otra vez")}</button>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2.5">
                     {tiles.map((L) => (
@@ -293,10 +296,10 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
                   <div className="flex flex-wrap justify-center gap-2">
                     <button onClick={() => { replayLast(); void send("I said it!"); }} disabled={streaming}
                       className="rounded-full px-5 py-2.5 text-base font-bold border-2 bg-white active:scale-95 disabled:opacity-50"
-                      style={{ borderColor: kidAccent, color: kidAccent }}>🗣️ {T("I said it!", "¡Lo dije!")}</button>
+                      style={{ borderColor: kidAccent, color: kidAccent }}>🗣️ {L("I said it!", "¡Lo dije!")}</button>
                     <button onClick={() => void send("Can you help me?")} disabled={streaming}
                       className="rounded-full px-5 py-2.5 text-base font-bold border-2 bg-white active:scale-95 disabled:opacity-50"
-                      style={{ borderColor: kidAccent, color: kidAccent }}>🙋 {T("Help", "Ayuda")}</button>
+                      style={{ borderColor: kidAccent, color: kidAccent }}>🙋 {L("Help", "Ayuda")}</button>
                   </div>
                 </div>
               ) : (
