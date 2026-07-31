@@ -2318,6 +2318,20 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
   const stripYoung = (md: string) => md.split('\n').filter((l) => !/aligned to/i.test(l) && !/^\s*\*\*by the end you can/i.test(l)).join('\n');
   // Real photos for any picture-words in the reading (matched on the English source content).
   const readingPics = picturesInText(reader?.content ?? '');
+  // Tap a picture → say the word aloud and give it a playful pop. Makes the reading hands-on.
+  const [poppedWord, setPoppedWord] = useState<string | null>(null);
+  const popWord = (w: string) => {
+    try {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(w);
+        u.lang = 'en-US'; u.rate = 0.9; u.pitch = 1.15;
+        window.speechSynthesis.speak(u);
+      }
+    } catch { /* speech optional */ }
+    setPoppedWord(w);
+    window.setTimeout(() => setPoppedWord((cur) => (cur === w ? null : cur)), 700);
+  };
   const [lang, setLang] = useState(es ? 'es' : 'en');
   const [tBusy, setTBusy] = useState(false);
   const [tText, setTText] = useState<string | null>(null);
@@ -2377,18 +2391,25 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
               <div><ReadAloudBar text={tText ?? reader?.content ?? ''} /></div>
               {es && <LangChips value={lang} busy={tBusy} onPick={pickLang} />}
             </div>
-            {/* Real photos for the "picture words" in this reading — much clearer than tiny emoji. */}
+            {/* Interactive photo "stickers" for the picture-words — tap to hear the word and pop. */}
             {readingPics.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-4 sm:gap-6 my-6">
-                {readingPics.map((p) => (
-                  <figure key={p.word} className="text-center m-0">
-                    <img src={p.url} alt={p.word}
-                      className="h-28 w-28 sm:h-36 sm:w-36 rounded-3xl object-cover shadow-md bg-slate-100"
-                      style={{ border: `4px solid ${accent}33` }} />
-                    <figcaption className="mt-2 text-xl sm:text-2xl font-extrabold capitalize" style={{ color: accent }}>{p.word}</figcaption>
-                  </figure>
-                ))}
-              </div>
+              <>
+                <p className="text-center text-sm font-semibold mb-2" style={{ color: `${accent}cc` }}>👆 {T('Tap a picture to hear it!', '¡Toca una foto para escucharla!')}</p>
+                <div className="flex flex-wrap justify-center gap-5 sm:gap-8 my-4">
+                  {readingPics.map((p, idx) => {
+                    const popped = poppedWord === p.word;
+                    return (
+                      <button key={p.word} onClick={() => popWord(p.word)} aria-label={`Hear the word ${p.word}`}
+                        className="m-0 p-0 bg-transparent border-0 cursor-pointer text-center">
+                        <img src={p.url} alt={p.word}
+                          className="h-28 w-28 sm:h-36 sm:w-36 rounded-full object-cover bg-white"
+                          style={{ border: '6px solid #fff', boxShadow: `0 8px 22px ${accent}55`, transform: popped ? 'scale(1.12) rotate(-2deg)' : `rotate(${idx % 2 ? 3 : -3}deg)`, transition: 'transform .2s' }} />
+                        <span className="mt-2 block text-xl sm:text-2xl font-extrabold capitalize" style={{ color: accent, transform: popped ? 'scale(1.12)' : 'none', transition: 'transform .2s' }}>{p.word} {popped ? '🔊' : ''}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
             <div className="border-t pt-5 text-lg leading-relaxed [&_p]:text-lg [&_p]:leading-relaxed [&_li]:text-lg" style={{ borderColor: `${accent}22` }}>
               <MarkdownView text={tText ?? stripYoung(reader?.content ?? T('Loading…', 'Cargando…'))} />
