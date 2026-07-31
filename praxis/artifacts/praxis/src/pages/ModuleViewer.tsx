@@ -2382,8 +2382,8 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
               <div className="flex flex-wrap justify-center gap-4 sm:gap-6 my-6">
                 {readingPics.map((p) => (
                   <figure key={p.word} className="text-center m-0">
-                    <img src={p.url} alt={p.word} loading="lazy"
-                      className="h-28 w-28 sm:h-36 sm:w-36 rounded-3xl object-cover shadow-md"
+                    <img src={p.url} alt={p.word}
+                      className="h-28 w-28 sm:h-36 sm:w-36 rounded-3xl object-cover shadow-md bg-slate-100"
                       style={{ border: `4px solid ${accent}33` }} />
                     <figcaption className="mt-2 text-xl sm:text-2xl font-extrabold capitalize" style={{ color: accent }}>{p.word}</figcaption>
                   </figure>
