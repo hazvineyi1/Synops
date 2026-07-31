@@ -59,7 +59,7 @@ interface SessionState {
    * ("student_alt" = a second learner persona, e.g. the K-12 accommodations learner). `tenant`
    * optionally names which demo tenant to enter (e.g. "synops-k12"), so several demos can share a host.
    */
-  demoSignIn: (role: "student" | "student_alt" | "admin", tenant?: string) => Promise<void>;
+  demoSignIn: (role: "student" | "student_alt" | "admin", tenant?: string, persona?: string) => Promise<void>;
   /** End a server-side impersonation and restore the admin's OWN session (not a sign-out). */
   stopImpersonating: () => Promise<void>;
   signOut: () => Promise<void>;
