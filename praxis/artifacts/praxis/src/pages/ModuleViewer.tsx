@@ -2401,9 +2401,11 @@ function YoungLessonView({ courseId, moduleId, navigate, persona }: {
                     return (
                       <button key={p.word} onClick={() => popWord(p.word)} aria-label={`Hear the word ${p.word}`}
                         className="m-0 p-0 bg-transparent border-0 cursor-pointer text-center">
-                        <img src={p.url} alt={p.word}
-                          className="h-28 w-28 sm:h-36 sm:w-36 rounded-full object-cover bg-white"
-                          style={{ border: '6px solid #fff', boxShadow: `0 8px 22px ${accent}55`, transform: popped ? 'scale(1.12) rotate(-2deg)' : `rotate(${idx % 2 ? 3 : -3}deg)`, transition: 'transform .2s' }} />
+                        <span className="flex items-center justify-center h-32 w-32 sm:h-40 sm:w-40 rounded-[28px]" style={{ background: `${accent}12` }}>
+                          <img src={p.url} alt={p.word}
+                            className="h-28 w-28 sm:h-36 sm:w-36 object-contain"
+                            style={{ filter: 'drop-shadow(0 6px 10px rgba(0,0,0,.22))', transform: popped ? 'scale(1.14) rotate(-2deg)' : `rotate(${idx % 2 ? 3 : -3}deg)`, transition: 'transform .2s' }} />
+                        </span>
                         <span className="mt-2 block text-xl sm:text-2xl font-extrabold capitalize" style={{ color: accent, transform: popped ? 'scale(1.12)' : 'none', transition: 'transform .2s' }}>{p.word} {popped ? '🔊' : ''}</span>
                       </button>
                     );

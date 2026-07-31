@@ -4,13 +4,13 @@
  * real photo instead of a tiny emoji, so a "match the word to the picture" lesson actually shows the
  * picture. Each id was pulled live from unsplash.com and load-checked.
  */
-const U = (id: string) => `https://images.unsplash.com/photo-${id}?w=400&h=400&fit=crop&crop=entropy&auto=format&q=70`;
-
+// Served by the API as a transparent-background "cut-out" PNG (background removed once via
+// remove.bg, cached), with a graceful fallback to the original photo when no key is configured.
 export const KID_PICTURES: Record<string, string> = {
-  cat: U("1514888286974-6c03e2ca1dba"),
-  dog: U("1530281700549-e82e7bf110d6"),
-  sun: U("1563630381190-77c336ea545a"),
-  hat: U("1588850561407-ed78c282e89b"),
+  cat: "/api/kid-cutout/cat.png",
+  dog: "/api/kid-cutout/dog.png",
+  sun: "/api/kid-cutout/sun.png",
+  hat: "/api/kid-cutout/hat.png",
 };
 
 /**

@@ -58,10 +58,12 @@ import translateRouter from "./translate";
 import translationsRouter from "./translations";
 import partnerLandingRouter from "./partnerLanding";
 import documentTemplatesRouter from "./documentTemplates";
+import kidCutoutRouter from "./kidCutout";
 import devRouter, { devRoutesEnabled } from "./dev";
 
 const router = Router();
 
+router.use(kidCutoutRouter);
 router.use(healthRouter);
 router.use(authRouter);
 router.use(mfaRouter);
