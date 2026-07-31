@@ -52,7 +52,7 @@ interface Std { code: string; title: string }
 interface K12Module {
   title: string; outcome: string; hook: string;
   points: string[]; reading: string; minutes: number;
-  standards: Std[]; quiz: { q: string; options: string[]; answer: number }[];
+  standards: Std[]; quiz: { q: string; options: string[]; answer: number; img?: string }[];
   caseContext: string; caseOpening: string;
 }
 interface K12Persona {
@@ -66,6 +66,16 @@ interface K12Course {
   framework: string; intro: string; outcome: string; tags: string[];
   modules: K12Module[]; persona: K12Persona;
 }
+
+// Real, load-checked Unsplash photos for early-reader "picture words" (direct CDN URLs, no API key).
+// Keep in sync with the frontend map in praxis/src/lib/kidPictures.ts.
+const PIC = (id: string) => `https://images.unsplash.com/photo-${id}?w=400&h=400&fit=crop&crop=entropy&auto=format&q=70`;
+const KID_PICS: Record<string, string> = {
+  cat: PIC("1514888286974-6c03e2ca1dba"),
+  dog: PIC("1530281700549-e82e7bf110d6"),
+  sun: PIC("1563630381190-77c336ea545a"),
+  hat: PIC("1588850561407-ed78c282e89b"),
+};
 
 // ── COURSES (one per persona; two comprehensive lessons each) ────────────────
 const COURSES: K12Course[] = [
@@ -94,10 +104,10 @@ const COURSES: K12Course[] = [
         points: ["Words name the things we see", "Look at the picture, then find the word", "You can read short words!"],
         reading: "Words tell us the names of things. When you see a picture, you can find the word that matches it!\n\nA 🐱 is a **cat**. A 🌞 is the **sun**. A 🐶 is a **dog**. Look at the picture, then tap the right word. You're reading! 📖⭐",
         quiz: [
-          { q: "Which word matches 🐱 ?", options: ["cat", "dog", "sun", "hat"], answer: 0 },
-          { q: "Which word matches 🌞 ?", options: ["sun", "run", "six", "sit"], answer: 0 },
-          { q: "Which word matches 🐶 ?", options: ["dog", "log", "dig", "day"], answer: 0 },
-          { q: "Which word matches 🎩 ?", options: ["hat", "ham", "hop", "cat"], answer: 0 },
+          { q: "Which word matches this picture?", img: KID_PICS.cat, options: ["cat", "dog", "sun", "hat"], answer: 0 },
+          { q: "Which word matches this picture?", img: KID_PICS.sun, options: ["sun", "run", "six", "sit"], answer: 0 },
+          { q: "Which word matches this picture?", img: KID_PICS.dog, options: ["dog", "log", "dig", "day"], answer: 0 },
+          { q: "Which word matches this picture?", img: KID_PICS.hat, options: ["hat", "ham", "hop", "cat"], answer: 0 },
         ],
         caseContext: "", caseOpening: "" },
     ],
@@ -327,12 +337,12 @@ const COURSES: K12Course[] = [
 ];
 
 // ── Interactive quiz player (sandboxed HTML). ────────────────────────────────
-function quizHtml(title: string, items: { q: string; options: string[]; answer: number }[]): string {
+function quizHtml(title: string, items: { q: string; options: string[]; answer: number; img?: string }[]): string {
   const data = JSON.stringify(items).replace(/</g, "\\u003c");
   return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>:root{--indigo:#4F46E5;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;--no:#b91c1c}*{box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;color:var(--ink);margin:0;padding:18px;background:#FBF7EF}h2{margin:.2rem 0 1rem;font-size:1.15rem}.q{background:#fff;border:1px solid #ece7db;border-radius:14px;padding:14px 16px;margin:0 0 12px}.qt{font-weight:600;margin:0 0 10px}.opt{display:block;width:100%;text-align:left;border:1px solid #e2ddcf;background:#fff;border-radius:10px;padding:11px 12px;margin:6px 0;font:inherit;cursor:pointer;transition:.15s}.opt:hover{border-color:var(--indigo)}.opt.sel{border-color:var(--indigo);background:#eef0fb}.opt.correct{border-color:var(--ok);background:#e9f7ee}.opt.wrong{border-color:var(--no);background:#fdecec}.bar{height:10px;background:#eee;border-radius:6px;overflow:hidden;margin:14px 0 6px}.fill{height:100%;width:0;background:var(--amber);transition:.4s}button.go{background:var(--indigo);color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:600;cursor:pointer}.score{font-weight:700;font-size:1.05rem;margin:4px 0}.hint{color:#6b7280;font-size:.9rem}</style>
+<style>:root{--indigo:#4F46E5;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;--no:#b91c1c}*{box-sizing:border-box}body{font-family:Inter,system-ui,sans-serif;color:var(--ink);margin:0;padding:18px;background:#FBF7EF}h2{margin:.2rem 0 1rem;font-size:1.15rem}.q{background:#fff;border:1px solid #ece7db;border-radius:14px;padding:14px 16px;margin:0 0 12px}.qt{font-weight:600;margin:0 0 10px}.opt{display:block;width:100%;text-align:left;border:1px solid #e2ddcf;background:#fff;border-radius:10px;padding:11px 12px;margin:6px 0;font:inherit;cursor:pointer;transition:.15s}.opt:hover{border-color:var(--indigo)}.opt.sel{border-color:var(--indigo);background:#eef0fb}.opt.correct{border-color:var(--ok);background:#e9f7ee}.opt.wrong{border-color:var(--no);background:#fdecec}.bar{height:10px;background:#eee;border-radius:6px;overflow:hidden;margin:14px 0 6px}.fill{height:100%;width:0;background:var(--amber);transition:.4s}button.go{background:var(--indigo);color:#fff;border:0;border-radius:10px;padding:11px 18px;font:inherit;font-weight:600;cursor:pointer}.score{font-weight:700;font-size:1.05rem;margin:4px 0}.hint{color:#6b7280;font-size:.9rem}.qimg{display:block;width:160px;height:160px;object-fit:cover;border-radius:16px;margin:0 auto 12px;border:4px solid #eef0fb;background:#f1f5f9}</style>
 <h2>${title}</h2><div id="app"></div><div class="bar"><div class="fill" id="f"></div></div><p id="s" class="hint">Pick an answer for each question.</p><button class="go" id="submit">Check my answers</button>
-<script>const items=${data};const app=document.getElementById('app');const picks=new Array(items.length).fill(-1);let done=false;items.forEach((it,qi)=>{const d=document.createElement('div');d.className='q';d.innerHTML='<p class="qt">'+(qi+1)+'. '+it.q+'</p>';it.options.forEach((o,oi)=>{const b=document.createElement('button');b.className='opt';b.textContent=o;b.onclick=()=>{if(done)return;picks[qi]=oi;[...d.querySelectorAll('.opt')].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');upd();};d.appendChild(b);});app.appendChild(d);});function upd(){const n=picks.filter(p=>p>=0).length;document.getElementById('f').style.width=Math.round(n/items.length*100)+'%';}function report(s){try{parent.postMessage({type:'activity_result',score:s,payload:{picks}},'*');}catch(e){}}document.getElementById('submit').onclick=()=>{if(done)return;let right=0;const qs=[...document.querySelectorAll('.q')];items.forEach((it,qi)=>{const opts=[...qs[qi].querySelectorAll('.opt')];opts.forEach((b,oi)=>{b.disabled=true;if(oi===it.answer)b.classList.add('correct');if(picks[qi]===oi&&oi!==it.answer)b.classList.add('wrong');});if(picks[qi]===it.answer)right++;});const pct=Math.round(right/items.length*100);done=true;document.getElementById('f').style.width='100%';document.getElementById('s').innerHTML='<span class="score">You got '+right+' of '+items.length+' right ('+pct+'%). '+(pct>=75?'Great work! 🎉':'Review the lesson and try again.')+'</span>';report(pct);};</script>`;
+<script>const items=${data};const app=document.getElementById('app');const picks=new Array(items.length).fill(-1);let done=false;items.forEach((it,qi)=>{const d=document.createElement('div');d.className='q';d.innerHTML=(it.img?'<img class="qimg" src="'+it.img+'" alt="picture to read">':'')+'<p class="qt">'+(qi+1)+'. '+it.q+'</p>';it.options.forEach((o,oi)=>{const b=document.createElement('button');b.className='opt';b.textContent=o;b.onclick=()=>{if(done)return;picks[qi]=oi;[...d.querySelectorAll('.opt')].forEach(x=>x.classList.remove('sel'));b.classList.add('sel');upd();};d.appendChild(b);});app.appendChild(d);});function upd(){const n=picks.filter(p=>p>=0).length;document.getElementById('f').style.width=Math.round(n/items.length*100)+'%';}function report(s){try{parent.postMessage({type:'activity_result',score:s,payload:{picks}},'*');}catch(e){}}document.getElementById('submit').onclick=()=>{if(done)return;let right=0;const qs=[...document.querySelectorAll('.q')];items.forEach((it,qi)=>{const opts=[...qs[qi].querySelectorAll('.opt')];opts.forEach((b,oi)=>{b.disabled=true;if(oi===it.answer)b.classList.add('correct');if(picks[qi]===oi&&oi!==it.answer)b.classList.add('wrong');});if(picks[qi]===it.answer)right++;});const pct=Math.round(right/items.length*100);done=true;document.getElementById('f').style.width='100%';document.getElementById('s').innerHTML='<span class="score">You got '+right+' of '+items.length+' right ('+pct+'%). '+(pct>=75?'Great work! 🎉':'Review the lesson and try again.')+'</span>';report(pct);};</script>`;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
