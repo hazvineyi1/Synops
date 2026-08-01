@@ -781,6 +781,7 @@ export function ActivitiesAdmin() {
   const GAME_TYPES: { key: string; label: string }[] = [
     { key: "jeopardy", label: "Jeopardy" }, { key: "feud", label: "Family Feud" }, { key: "bingo", label: "Bingo" },
     { key: "password", label: "Password" }, { key: "wheel", label: "Wheel" }, { key: "escape", label: "Escape Room" },
+    { key: "millionaire", label: "Millionaire" }, { key: "sequence", label: "Put In Order" }, { key: "categorize", label: "Sort It Out" },
   ];
   const BAND_FILTERS: { key: string; label: string }[] = [
     { key: "k2", label: "K–2" }, { key: "35", label: "3–5" }, { key: "68", label: "6–8" }, { key: "912", label: "9–12" },

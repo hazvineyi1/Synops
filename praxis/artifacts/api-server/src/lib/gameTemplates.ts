@@ -177,6 +177,40 @@ function buildEscape(c: unknown): string {
   return page((c as { title?: string }).title || "Escape Room", c, script, "escape", banner);
 }
 
+// ── 7) MILLIONAIRE (rising money ladder + 50:50 lifeline) ────────────────────
+function buildMillionaire(c: unknown): string {
+  const script = "var app=$('app');var qs=DATA.questions;var i=0,won=0,total=0,life=true;"
+    + "qs.forEach(function(q,idx){q.__v=q.value||((idx+1)*100);total+=q.__v;});pts('$0');"
+    + "function render(){app.innerHTML='';var q=qs[i];"
+    + "var lad=document.createElement('div');lad.className='card';lad.style.cssText='text-align:center;font-weight:800';lad.innerHTML='Question '+(i+1)+' of '+qs.length+' — for <span style=\"color:#F59E0B\">$'+q.__v+'</span><div style=\"font-size:.8rem;color:#6b7280\">Banked: $'+won+'</div>';app.appendChild(lad);"
+    + "var d=document.createElement('div');d.className='q';d.innerHTML='<p class=\"qt\">'+q.q+'</p>';var opts=shuffle(q.options.map(function(o,k){return{o:o,k:k};}));"
+    + "if(life){var fifty=document.createElement('button');fifty.className='btn';fifty.style.cssText='display:block;margin:0 auto 10px';fifty.textContent='💡 50:50';fifty.onclick=function(){life=false;fifty.remove();var wrong=opts.filter(function(p){return p.k!==q.answer;});shuffle(wrong).slice(0,2).forEach(function(p){var b=btns[p.k];if(b){b.disabled=true;b.style.visibility='hidden';}});};d.appendChild(fifty);}"
+    + "var btns={};opts.forEach(function(p){var b=document.createElement('button');b.className='opt';b.innerHTML='<span>'+p.o+'</span><span class=\"mk\"></span>';btns[p.k]=b;b.onclick=function(){if(d.dataset.done)return;var mk=b.querySelector('.mk');if(p.k===q.answer){d.dataset.done='1';b.classList.add('correct');mk.textContent='✅';burst(b,'balloon');won+=q.__v;pts('$'+won);i++;setBar(i/qs.length*100);if(i>=qs.length)setTimeout(function(){endGame(100,'You won it all! $'+won+' 🏆');},700);else setTimeout(render,800);}else{b.classList.add('wrong');mk.textContent='❌';[].slice.call(d.querySelectorAll('.opt')).forEach(function(x){x.disabled=true;});setTimeout(function(){endGame(won/total*100,'You banked $'+won+'! Great run.');},900);}};d.appendChild(b);});"
+    + "app.appendChild(d);}$('hint').textContent='Answer to climb the money ladder! One wrong answer banks what you have.';render();";
+  return page((c as { title?: string }).title || "Millionaire", c, script, "jeopardy", "💰 MILLIONAIRE");
+}
+
+// ── 8) SEQUENCE (tap items into the correct order) ───────────────────────────
+function buildSequence(c: unknown): string {
+  const script = "var app=$('app');var rounds=DATA.rounds;var ri=0;"
+    + "function render(){app.innerHTML='';var r=rounds[ri];pts('Round '+(ri+1)+'/'+rounds.length);setBar(ri/rounds.length*100);"
+    + "var qc=document.createElement('div');qc.className='card';qc.style.textAlign='center';qc.innerHTML='<b>'+r.prompt+'</b>';app.appendChild(qc);"
+    + "var slots=document.createElement('div');slots.style.cssText='display:flex;flex-direction:column;gap:6px;margin:10px 0';var n=r.items.length;var next=0;var slotEls=[];for(var s=0;s<n;s++){var se=document.createElement('div');se.className='slot';se.innerHTML='<span>'+(s+1)+'.</span><span></span>';slots.appendChild(se);slotEls.push(se);}app.appendChild(slots);"
+    + "var pool=document.createElement('div');pool.className='row';shuffle(r.items.slice()).forEach(function(it){var b=document.createElement('button');b.className='btn';b.textContent=it;b.onclick=function(){if(b.dataset.done)return;if(it===r.items[next]){b.dataset.done='1';b.classList.add('ok');b.disabled=true;var se=slotEls[next];se.classList.add('filled');se.querySelectorAll('span')[1].textContent=it;next++;if(next===n){setTimeout(nextRound,700);}}else{b.classList.add('no');setTimeout(function(){b.classList.remove('no');},450);}};pool.appendChild(b);});app.appendChild(pool);}"
+    + "function nextRound(){ri++;if(ri>=rounds.length){endGame(100,'You ordered them all! 🎉');}else{setTimeout(render,500);}}$('hint').textContent='Tap the items in the correct order, from first to last.';render();";
+  return page((c as { title?: string }).title || "Put It In Order", c, script, "wheel", "🔢 PUT IT IN ORDER");
+}
+
+// ── 9) CATEGORIZE (sort items into the right groups) ─────────────────────────
+function buildCategorize(c: unknown): string {
+  const script = "var app=$('app');var cats=DATA.categories;var items=DATA.items.slice();var total=items.length,placed=0;pts('0 / '+total);"
+    + "var zwrap=document.createElement('div');zwrap.style.cssText='display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap';var zones={};cats.forEach(function(cat){var z=document.createElement('div');z.style.cssText='flex:1;min-width:120px;border:3px dashed #cdc7b8;border-radius:16px;padding:8px;min-height:120px;display:flex;flex-direction:column;gap:6px';var h=document.createElement('div');h.textContent=cat;h.style.cssText='font-weight:800;text-align:center;color:#4F46E5';z.appendChild(h);z.onclick=function(){place(cat,z);};zones[cat]=z;zwrap.appendChild(z);});app.appendChild(zwrap);"
+    + "var pool=document.createElement('div');pool.className='row';var sel=null;shuffle(items).forEach(function(it){var b=document.createElement('button');b.className='opt';b.style.width='auto';b.textContent=it.text;b.__cat=it.category;b.onclick=function(){if(b.dataset.done)return;[].slice.call(pool.querySelectorAll('.opt')).forEach(function(x){x.style.outline='';});b.style.outline='3px solid #4F46E5';sel=b;};pool.appendChild(b);});app.appendChild(pool);"
+    + "function place(cat,z){if(!sel)return;if(sel.__cat===cat){sel.dataset.done='1';sel.classList.add('correct');sel.style.outline='';sel.disabled=true;z.appendChild(sel);burst(sel,'balloon');placed++;pts(placed+' / '+total);setBar(placed/total*100);sel=null;if(placed===total)setTimeout(function(){endGame(100,'You sorted them all! 🎉');},550);}else{z.style.animation='sh .4s';setTimeout(function(){z.style.animation='';},450);sel.style.outline='';sel=null;}}"
+    + "$('hint').textContent='Tap an item, then tap the group it belongs to.';";
+  return page((c as { title?: string }).title || "Sort It Out", c, script, "bingo", "🗂️ SORT IT OUT");
+}
+
 // ── Sample content per band (seeds the demo library) ─────────────────────────
 type Sample = { title: string; instructions: string; content: unknown };
 
@@ -267,6 +301,72 @@ function sampleEscape(band: Band): Sample {
   ] } };
 }
 
+function sampleMillionaire(band: Band): Sample {
+  const c = band === "912"
+    ? { title: "Science Millionaire — HS", questions: [
+        { q: "The powerhouse of the cell is the…", options: ["Mitochondria", "Nucleus", "Ribosome", "Vacuole"], answer: 0, value: 100 },
+        { q: "Water's chemical formula is…", options: ["CO₂", "H₂O", "O₂", "NaCl"], answer: 1, value: 200 },
+        { q: "The process plants use to make food is…", options: ["Respiration", "Digestion", "Photosynthesis", "Fermentation"], answer: 2, value: 300 },
+        { q: "Force = mass × …", options: ["velocity", "acceleration", "distance", "energy"], answer: 1, value: 500 },
+        { q: "The pH of a neutral solution is…", options: ["0", "7", "14", "1"], answer: 1, value: 800 },
+        { q: "DNA is shaped like a…", options: ["Single line", "Double helix", "Circle", "Square"], answer: 1, value: 1000 },
+      ] }
+    : band === "68"
+    ? { title: "Review Millionaire — Middle", questions: [
+        { q: "6 × 7 =", options: ["42", "36", "48", "54"], answer: 0, value: 100 },
+        { q: "The gas plants release is…", options: ["Carbon dioxide", "Oxygen", "Nitrogen", "Helium"], answer: 1, value: 200 },
+        { q: "A synonym for 'happy' is…", options: ["Sad", "Joyful", "Angry", "Tired"], answer: 1, value: 300 },
+        { q: "20% of 50 is…", options: ["5", "10", "20", "25"], answer: 1, value: 500 },
+        { q: "The largest ocean is the…", options: ["Atlantic", "Indian", "Pacific", "Arctic"], answer: 2, value: 800 },
+        { q: "Which is a prime number?", options: ["9", "15", "21", "13"], answer: 3, value: 1000 },
+      ] }
+    : { title: "Review Millionaire — Grade 4", questions: [
+        { q: "5 + 8 =", options: ["12", "13", "14", "15"], answer: 1, value: 100 },
+        { q: "How many days are in a week?", options: ["5", "6", "7", "8"], answer: 2, value: 200 },
+        { q: "A baby dog is called a…", options: ["Kitten", "Puppy", "Cub", "Calf"], answer: 1, value: 300 },
+        { q: "3 × 4 =", options: ["7", "12", "10", "9"], answer: 1, value: 500 },
+        { q: "Which animal is a mammal?", options: ["Shark", "Frog", "Whale", "Eagle"], answer: 2, value: 800 },
+        { q: "How many sides does a triangle have?", options: ["2", "3", "4", "5"], answer: 1, value: 1000 },
+      ] };
+  return { title: c.title, instructions: "Answer each question to climb the money ladder. Use your one 50:50 wisely — a wrong answer banks what you've already won.", content: c };
+}
+
+function sampleSequence(band: Band): Sample {
+  const c = band === "k2"
+    ? { title: "Put It In Order — K–2", rounds: [
+        { prompt: "Put the numbers in order, smallest first", items: ["1", "2", "3", "4", "5"] },
+        { prompt: "Order the life of a butterfly", items: ["Egg", "Caterpillar", "Chrysalis", "Butterfly"] },
+        { prompt: "Order your morning", items: ["Wake up", "Brush teeth", "Eat breakfast", "Go to school"] },
+      ] }
+    : band === "68"
+    ? { title: "Put It In Order — Middle", rounds: [
+        { prompt: "Order the steps of the scientific method", items: ["Ask a question", "Form a hypothesis", "Do an experiment", "Analyze results", "Draw a conclusion"] },
+        { prompt: "Order these planets from the Sun outward", items: ["Mercury", "Venus", "Earth", "Mars"] },
+        { prompt: "Order these numbers from least to greatest", items: ["-3", "0", "2", "5", "9"] },
+      ] }
+    : { title: "Put It In Order — Grade 3–5", rounds: [
+        { prompt: "Order the water cycle", items: ["Evaporation", "Condensation", "Precipitation", "Collection"] },
+        { prompt: "Order these from smallest to largest", items: ["Ant", "Cat", "Horse", "Elephant"] },
+        { prompt: "Order the numbers from least to greatest", items: ["12", "19", "24", "31"] },
+      ] };
+  return { title: c.title, instructions: "Tap the items in the correct order, from first to last. Wrong taps just bounce back — keep trying!", content: c };
+}
+
+function sampleCategorize(band: Band): Sample {
+  const c = band === "k2"
+    ? { title: "Sort It Out — K–2", categories: ["Animals", "Not Animals"], items: [
+        { text: "Dog", category: "Animals" }, { text: "Cat", category: "Animals" }, { text: "Fish", category: "Animals" }, { text: "Rock", category: "Not Animals" }, { text: "Chair", category: "Not Animals" }, { text: "Cup", category: "Not Animals" }] }
+    : band === "68"
+    ? { title: "States of Matter — Middle", categories: ["Solid", "Liquid", "Gas"], items: [
+        { text: "Ice", category: "Solid" }, { text: "Rock", category: "Solid" }, { text: "Water", category: "Liquid" }, { text: "Milk", category: "Liquid" }, { text: "Steam", category: "Gas" }, { text: "Air", category: "Gas" }, { text: "Wood", category: "Solid" }, { text: "Juice", category: "Liquid" }] }
+    : band === "912"
+    ? { title: "Energy Sources — HS", categories: ["Renewable", "Nonrenewable"], items: [
+        { text: "Solar", category: "Renewable" }, { text: "Wind", category: "Renewable" }, { text: "Hydro", category: "Renewable" }, { text: "Coal", category: "Nonrenewable" }, { text: "Oil", category: "Nonrenewable" }, { text: "Natural gas", category: "Nonrenewable" }, { text: "Geothermal", category: "Renewable" }] }
+    : { title: "Living or Nonliving — Grade 3–5", categories: ["Living", "Nonliving"], items: [
+        { text: "Tree", category: "Living" }, { text: "Dog", category: "Living" }, { text: "Flower", category: "Living" }, { text: "Rock", category: "Nonliving" }, { text: "Water", category: "Nonliving" }, { text: "Toy car", category: "Nonliving" }, { text: "Bird", category: "Living" }] };
+  return { title: c.title, instructions: "Tap an item, then tap the group it belongs in. Sort them all to win!", content: c };
+}
+
 // ── Registry (the repository catalog of built templates) ─────────────────────
 export interface GameTemplate {
   key: string;
@@ -311,6 +411,18 @@ const SCHEMA: Record<string, { hint: string; validate: (c: unknown) => boolean }
     hint: '{"intro":"one-line story setup","stages":[{"prompt":"the puzzle/question","answer":"the exact answer or code","hint":"a helpful hint","choices":["optional multiple-choice options incl. the answer"]}]}  — 3 stages in order; include "choices" only when it should be multiple-choice, otherwise the student types the answer.',
     validate: (c) => obj(c) && arr(c.stages) && c.stages.every((s) => obj(s) && str(s.prompt) && (str(s.answer) || typeof s.answer === "number")),
   },
+  millionaire: {
+    hint: '{"title":"short title","questions":[{"q":"question","options":["correct answer","distractor","distractor","distractor"],"answer":0,"value":100}]}  — 6 questions RISING in difficulty; 3-4 options each; "answer" is the index (0-based) of the correct option; "value" rises down the ladder (100, 200, 300, …).',
+    validate: (c) => obj(c) && arr(c.questions) && c.questions.every((q) => obj(q) && str(q.q) && arr(q.options) && typeof q.answer === "number" && q.answer >= 0 && q.answer < (q.options as unknown[]).length),
+  },
+  sequence: {
+    hint: '{"title":"short title","rounds":[{"prompt":"Put these in order from first to last","items":["first","second","third","fourth"]}]}  — 3 rounds; each "items" list is 3-5 things written IN THE CORRECT ORDER (the game shuffles them for the learner).',
+    validate: (c) => obj(c) && arr(c.rounds) && c.rounds.every((r) => obj(r) && str(r.prompt) && arr(r.items) && (r.items as unknown[]).length >= 2 && (r.items as unknown[]).every(str)),
+  },
+  categorize: {
+    hint: '{"title":"short title","categories":["Group A","Group B"],"items":[{"text":"a thing","category":"Group A"}]}  — 2-3 categories and 6-9 items; each item.category MUST exactly match one of the categories.',
+    validate: (c) => { if (!obj(c) || !arr(c.categories) || !arr(c.items)) return false; const names = (c.categories as unknown[]).map(String); return (c.items as unknown[]).every((it) => obj(it) && str(it.text) && names.indexOf(String(it.category)) >= 0); },
+  },
 };
 
 export const GAME_TEMPLATES: GameTemplate[] = [
@@ -320,6 +432,9 @@ export const GAME_TEMPLATES: GameTemplate[] = [
   { key: "password", name: "Password / Taboo", blurb: "Clue-by-clue vocabulary guessing — fewer clues used means more points.", bands: ["35", "68"], build: buildPassword, sample: samplePassword, schemaHint: SCHEMA.password.hint, validate: SCHEMA.password.validate },
   { key: "wheel", name: "Wheel / Guess the Word", blurb: "Letter-reveal puzzle (Wheel of Fortune + ‘Guess the Sound’) for words and key phrases.", bands: ["k2", "35"], build: buildWheel, sample: sampleWheel, schemaHint: SCHEMA.wheel.hint, validate: SCHEMA.wheel.validate },
   { key: "escape", name: "Escape Room", blurb: "Sequential locked puzzles — solve each to unlock the next. Strong for multi-step review.", bands: ["35", "68", "912"], build: buildEscape, sample: sampleEscape, schemaHint: SCHEMA.escape.hint, validate: SCHEMA.escape.validate },
+  { key: "millionaire", name: "Millionaire", blurb: "Climb a money ladder of rising-difficulty questions, with a 50:50 lifeline. Tense whole-class review.", bands: ["35", "68", "912"], build: buildMillionaire, sample: sampleMillionaire, schemaHint: SCHEMA.millionaire.hint, validate: SCHEMA.millionaire.validate },
+  { key: "sequence", name: "Put It In Order", blurb: "Tap items into the correct order — steps, events, sizes, timelines, number order.", bands: ["k2", "35", "68"], build: buildSequence, sample: sampleSequence, schemaHint: SCHEMA.sequence.hint, validate: SCHEMA.sequence.validate },
+  { key: "categorize", name: "Sort It Out", blurb: "Sort items into the right groups — classify and categorize into 2–3 buckets.", bands: ["k2", "35", "68", "912"], build: buildCategorize, sample: sampleCategorize, schemaHint: SCHEMA.categorize.hint, validate: SCHEMA.categorize.validate },
 ];
 
 export function templateByKey(key: string): GameTemplate | undefined {
