@@ -2311,7 +2311,13 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const { data: courseModules } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<{ id: string; order: number }[]>(`/courses/${courseId}/modules`), enabled: !!courseId });
   const startCase = useMutation({ mutationFn: (cid: string) => apiFetch<{ id: string }>(`/cases/${cid}/sessions`, { method: 'POST', body: JSON.stringify({}) }), onSuccess: (s) => navigate(`/case-run/${s.id}`) });
 
+  // A short teaching video (YouTube) attached to the module, if any.
+  const ytId = (u?: string | null) => { if (!u) return null; const m = String(u).match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/); return m ? m[1] : (/^[A-Za-z0-9_-]{11}$/.test(String(u)) ? String(u) : null); };
+  const videoBeat = (allBeats as { type?: string; videoUrl?: string | null }[] | undefined)?.find((b) => b?.type === 'video' && !!b?.videoUrl);
+  const videoId = ytId(videoBeat?.videoUrl ?? null);
+
   const steps = [
+    { id: 'watch', label: T('Watch', 'Ver'), icon: PlayCircle, has: !!videoId },
     { id: 'read', label: T('Read', 'Leer'), icon: BookOpen, has: (readings?.length ?? 0) > 0 },
     { id: 'practice', label: T('Practice', 'Practicar'), icon: Zap, has: (activities?.length ?? 0) > 0 },
     { id: 'tutor', label: T('Talk to your tutor', 'Habla con tu tutor'), icon: MessageSquare, has: (cases?.length ?? 0) > 0 },
@@ -2396,6 +2402,14 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
         </div>
 
         {/* Active step */}
+        {step?.id === 'watch' && (
+          <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm">
+            <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>🎬 {T('Watch the video, then tap Next!', '¡Mira el video y luego toca Siguiente!')}</p>
+            <div className="relative w-full overflow-hidden rounded-2xl" style={{ paddingBottom: '56.25%', background: '#000' }}>
+              <iframe className="absolute inset-0 w-full h-full" src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`} title="Lesson video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            </div>
+          </div>
+        )}
         {step?.id === 'read' && (
           <div className="rounded-3xl bg-white p-6 sm:p-8 shadow-sm">
             <div className="flex items-center gap-3 flex-wrap mb-4">
