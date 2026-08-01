@@ -59,11 +59,13 @@ import translationsRouter from "./translations";
 import partnerLandingRouter from "./partnerLanding";
 import documentTemplatesRouter from "./documentTemplates";
 import kidCutoutRouter from "./kidCutout";
+import liveGamesRouter from "./liveGames";
 import devRouter, { devRoutesEnabled } from "./dev";
 
 const router = Router();
 
 router.use(kidCutoutRouter);
+router.use(liveGamesRouter);
 router.use(healthRouter);
 router.use(authRouter);
 router.use(mfaRouter);

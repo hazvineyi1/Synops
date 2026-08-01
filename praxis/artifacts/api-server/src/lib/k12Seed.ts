@@ -11,6 +11,7 @@ import {
 import { eq, and, asc, inArray } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
 import { PRIVACY_POLICY_VERSION } from "../lib/popia";
+import { GAME_TEMPLATES, type Band } from "./gameTemplates";
 
 /**
  * Public K-12 demo tenant "Synops Academy" — the investor/prospect link at
@@ -623,6 +624,39 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
         await db.insert(beatsTable).values({ moduleId: modId, type: "video", order: 3, title: TL(lang, "Watch", "Ver"), narration: TL(lang, `Watch this short video, then keep going: ${m.hook}`, `Mira este video corto y luego continúa: ${m.hook}`), videoUrl: m.video });
       }
       await db.update(modulesTable).set({ beatCount: m.video ? 4 : 3 }).where(eq(modulesTable.id, modId));
+    }
+  }
+
+  // 3d. Pre-attach a grade-appropriate game to each NON-young course so games are visibly part of the
+  // classes out of the box (no teacher action needed). Young early/elementary courses (Mateo, Sofía,
+  // Aiden) are skipped on purpose: their lesson view auto-launches the module's first activity, so a
+  // bonus game must never displace the guided quiz. Idempotent: refreshed in place by title.
+  const gamePlan: { email: string; key: string; band: Band }[] = [
+    { email: "maya.k12@synops-demo.test", key: "jeopardy", band: "68" },
+    { email: "leo.k12@synops-demo.test", key: "feud", band: "68" },
+    { email: "jordan.k12@synops-demo.test", key: "escape", band: "68" },
+    { email: "emma.k12@synops-demo.test", key: "jeopardy", band: "912" },
+  ];
+  for (const g of gamePlan) {
+    const cid = courseByPersona[g.email];
+    if (!cid) continue;
+    const tpl = GAME_TEMPLATES.find((t) => t.key === g.key);
+    if (!tpl) continue;
+    const [firstMod] = await db.select().from(modulesTable).where(eq(modulesTable.courseId, cid)).orderBy(asc(modulesTable.order)).limit(1);
+    if (!firstMod) continue;
+    const s = tpl.sample(g.band);
+    const title = `🎮 Class Game: ${s.title}`;
+    const html = tpl.build(s.content);
+    const existing = await db.select().from(interactiveActivitiesTable).where(and(eq(interactiveActivitiesTable.moduleId, firstMod.id), eq(interactiveActivitiesTable.title, title)));
+    if (existing[0]) {
+      await db.update(interactiveActivitiesTable).set({ html, instructions: s.instructions, updatedAt: new Date() }).where(eq(interactiveActivitiesTable.id, existing[0].id));
+    } else {
+      await db.insert(interactiveActivitiesTable).values({
+        organisationId: org.id, courseId: cid, moduleId: firstMod.id,
+        title, instructions: s.instructions, html, source: "html", kind: "game",
+        bloomsLevel: "Apply", difficulty: "intermediate", isLibrary: false,
+        tags: ["game", `game:${g.key}`, `band:${g.band}`], published: true, createdByUserId: facultyId,
+      });
     }
   }
 

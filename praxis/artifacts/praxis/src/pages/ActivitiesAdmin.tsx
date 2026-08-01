@@ -549,6 +549,12 @@ export function ActivitiesAdmin() {
   const [builderOpen, setBuilderOpen] = useState(false);
   const [assignFor, setAssignFor] = useState<Activity | null>(null);
   const [courseFor, setCourseFor] = useState<Activity | null>(null);
+  const [, navigate] = useLocation();
+  const hostLive = useMutation({
+    mutationFn: (activityId: string) => apiFetch<{ code: string }>("/live/host", { method: "POST", body: JSON.stringify({ activityId }) }),
+    onSuccess: (r) => navigate(`/live-host/${r.code}`),
+    onError: (e) => toast({ title: "Could not start the live game", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
   const [rightTab, setRightTab] = useState<"preview" | "edit" | "subs" | "share">("preview");
 
   const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
@@ -697,10 +703,15 @@ export function ActivitiesAdmin() {
                 {a.courseId && <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700">In a course</span>}
               </div>
               {canAuthor && (
-                <div className="pt-1">
+                <div className="pt-1 flex flex-col gap-1">
                   <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full" onClick={(e) => { e.stopPropagation(); setCourseFor(a); }}>
                     <Plus className="h-3 w-3" /> {a.isLibrary ? "Add to a class" : (a.courseId ? "Change course" : "Add to course")}
                   </Button>
+                  {a.source !== "embed" && a.published && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full border-indigo-500/40 text-indigo-700" disabled={hostLive.isPending} onClick={(e) => { e.stopPropagation(); hostLive.mutate(a.id); }}>
+                      <Play className="h-3 w-3" /> {hostLive.isPending ? "Starting…" : "Host live game"}
+                    </Button>
+                  )}
                 </div>
               )}
             </Card>

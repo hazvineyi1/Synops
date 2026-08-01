@@ -71,6 +71,8 @@ import { Compliance } from '@/pages/Compliance';
 import { Accreditation } from '@/pages/Accreditation';
 import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
 import { ActivityPlay } from '@/pages/ActivityPlay';
+import { LivePlay } from '@/pages/LivePlay';
+import { LiveHost } from '@/pages/LiveHost';
 import { ActivityEmbed } from '@/pages/ActivityEmbed';
 import { MyGrades } from '@/pages/MyGrades';
 import { Jotter } from '@/pages/Jotter';
@@ -241,11 +243,14 @@ function Routes() {
         <PublicRoute path="/verify/:credentialId" component={Verify} />
         <PublicRoute path="/c/:token" component={CaseEmbed} />
         <PublicRoute path="/a/:token" component={ActivityEmbed} />
+        <PublicRoute path="/live/:code" component={LivePlay} />
+        <PublicRoute path="/live" component={LivePlay} />
 
         {/* Full-screen focus routes */}
         <FocusRoute path="/learn/:sessionId" component={LearnSession} />
         <FocusRoute path="/case-run/:sessionId" component={CaseSession} />
         <FocusRoute path="/activities/:activityId/play" component={ActivityPlay} />
+        <FocusRoute path="/live-host/:code" component={LiveHost} />
 
         {/* App layout routes */}
         <ProtectedRoute path="/dashboard" component={Dashboard} />
