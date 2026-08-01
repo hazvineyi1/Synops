@@ -32,7 +32,21 @@ const CSS = ":root{--indigo:#4F46E5;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;-
   + ".slot{border:2px dashed #cdc7b8;border-radius:12px;padding:10px 12px;font-weight:700;min-height:44px;display:flex;justify-content:space-between;gap:10px;align-items:center}"
   + ".slot.filled{border-style:solid;border-color:var(--ok);background:#e9f7ee}.tile{width:44px;height:52px;border:2px solid #e6e0d0;background:#fff;border-radius:10px;font-weight:800;font-size:1.3rem}"
   + ".tile.used{opacity:.35;pointer-events:none}.bcell{aspect-ratio:1;border:2px solid #e6e0d0;background:#fff;border-radius:12px;font-weight:800;font-size:1.05rem;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px}"
-  + ".bcell.mark{background:#e9f7ee;border-color:var(--ok);color:var(--ok)}.bcell.free{background:#eef0fb;border-color:var(--indigo);color:var(--indigo)}.blank{display:inline-block;min-width:22px;border-bottom:3px solid var(--ink);margin:0 2px;text-align:center;font-weight:800;font-size:1.4rem}";
+  + ".bcell.mark{background:#e9f7ee;border-color:var(--ok);color:var(--ok)}.bcell.free{background:#eef0fb;border-color:var(--indigo);color:var(--indigo)}.blank{display:inline-block;min-width:22px;border-bottom:3px solid var(--ink);margin:0 2px;text-align:center;font-weight:800;font-size:1.4rem}"
+  // ── Themed stages: a game-show / adventure look per game, with white cards kept readable on top. ──
+  + ".stage{min-height:100vh;padding:16px;margin:-16px}.banner{text-align:center;padding:12px 10px;margin:-16px -16px 12px;font-weight:900;letter-spacing:1px;font-size:1.15rem}"
+  + ".t-jeopardy{background:linear-gradient(160deg,#0a1a63,#1a2f9c)}.t-jeopardy>h2,.t-jeopardy>#stars{color:#fff}.t-jeopardy .banner{background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#0a1a63}"
+  + ".t-feud{background:linear-gradient(160deg,#0b3a6b,#12508c)}.t-feud>h2,.t-feud>#stars{color:#fff}.t-feud .banner{background:linear-gradient(90deg,#22d3ee,#0891b2);color:#04263f}"
+  + ".t-escape{background:linear-gradient(160deg,#23262d,#33373f)}.t-escape>h2,.t-escape>#stars{color:#f8fafc}.t-escape .banner{background:linear-gradient(90deg,#b45309,#f59e0b);color:#2b1a02}"
+  + ".t-wheel{background:linear-gradient(160deg,#efe6ff,#f7f2ff)}.t-wheel .banner{background:linear-gradient(90deg,#8b5cf6,#a78bfa);color:#fff}"
+  + ".t-bingo{background:linear-gradient(160deg,#e6fbf6,#f2fffb)}.t-bingo .banner{background:linear-gradient(90deg,#14b8a6,#2dd4bf);color:#04302a}"
+  + ".t-password{background:linear-gradient(160deg,#fff4e6,#fff9f2)}.t-password .banner{background:linear-gradient(90deg,#f97316,#fb923c);color:#3a1a02}"
+  + ".t-jeopardy .hint,.t-feud .hint,.t-escape .hint{color:#e5e7eb}"
+  // Escape-room door: swings open when the last lock is solved.
+  + ".door-wrap{perspective:600px;display:inline-block;margin:2px auto 0}.door-frame{width:78px;height:104px;background:#1f2937;border-radius:8px;padding:6px;position:relative;box-shadow:inset 0 0 0 3px #f59e0b}"
+  + ".door{width:100%;height:100%;background:linear-gradient(135deg,#7c4a03,#b45309);border-radius:5px;transform-origin:left center;transition:transform 1s ease;position:relative;transform-style:preserve-3d}"
+  + ".door:before{content:'';position:absolute;right:8px;top:46px;width:9px;height:9px;border-radius:50%;background:#fde68a}.door.open{transform:rotateY(-105deg)}.door-frame.lit{box-shadow:inset 0 0 0 3px #22c55e,0 0 22px #22c55e}"
+  + ".lockrow{display:flex;gap:6px;justify-content:center;margin-top:8px}.lockdot{font-size:1.3rem;filter:grayscale(1);opacity:.6;transition:.3s}.lockdot.open{filter:none;opacity:1;transform:scale(1.15)}";
 
 const COMMON = "function $(i){return document.getElementById(i);}"
   + "function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}"
@@ -41,14 +55,19 @@ const COMMON = "function $(i){return document.getElementById(i);}"
   + "function pts(n){var s=$('stars');if(s)s.textContent=n;}"
   + "function speak(t){try{if('speechSynthesis'in window){window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.rate=.95;window.speechSynthesis.speak(u);}}catch(e){}}"
   + "function confetti(){for(var i=0;i<36;i++){var s=document.createElement('span');s.className='cf';s.style.left=(Math.random()*100)+'vw';s.style.animationDuration=(1.6+Math.random()*1.5)+'s';s.style.animationDelay=(Math.random()*.4)+'s';s.textContent=['🎉','⭐','🌟','🎊','✨','🏆'][i%6];document.body.appendChild(s);(function(x){setTimeout(function(){x.remove();},3600);})(s);}}"
+  + "function burst(el,kind){try{var r=el.getBoundingClientRect();var set=['🎈','⭐','🎉','✨'];for(var i=0;i<9;i++){var s=document.createElement('span');s.className='cf';s.style.left=((r.left||0)+Math.random()*Math.max(r.width||20,20))+'px';s.style.top=((r.top||0))+'px';s.style.animationDuration='1.2s';s.style.animationDelay=(Math.random()*.2)+'s';s.textContent=set[i%set.length];document.body.appendChild(s);(function(x){setTimeout(function(){x.remove();},1500);})(s);}}catch(e){}}"
   + "function endGame(pct,msg){setBar(100);var d=$('done');if(d){d.innerHTML='🎉 '+(msg||('You scored '+Math.round(pct)+'%'));d.style.display='block';}var h=$('hint');if(h)h.style.display='none';confetti();setTimeout(function(){report(pct);},1300);}";
 
-function page(title: string, data: unknown, script: string): string {
+function page(title: string, data: unknown, script: string, theme = "default", banner = ""): string {
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
+  const cls = theme && theme !== "default" ? " t-" + theme : "";
   return "<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
     + "<style>" + CSS + "</style>"
+    + "<div class=\"stage" + cls + "\">"
+    + (banner ? "<div class=\"banner\">" + banner + "</div>" : "")
     + "<h2>" + title + "</h2><div id=\"stars\"></div><div id=\"app\"></div>"
     + "<div class=\"bar\"><div class=\"fill\" id=\"f\"></div></div><p id=\"hint\" class=\"hint\"></p><div id=\"done\" class=\"done\"></div>"
+    + "</div>"
     + "<script>var DATA=" + json + ";" + COMMON + "\n" + script + "</script>";
 }
 
@@ -60,15 +79,24 @@ function buildJeopardy(c: unknown): string {
     + "cats.forEach(function(x){var h=document.createElement('div');h.className='card';h.style.cssText='text-align:center;font-weight:800;background:#4F46E5;color:#fff';h.textContent=x.name;board.appendChild(h);});"
     + "var rows=Math.max.apply(null,cats.map(function(x){return x.clues.length;}));"
     + "for(var r=0;r<rows;r++){(function(r){cats.forEach(function(x){var q=x.clues[r];var b=document.createElement('button');b.className='btn';b.style.width='100%';if(!q){b.style.visibility='hidden';board.appendChild(b);return;}b.textContent=q.value;b.style.color='#F59E0B';b.style.fontSize='1.3rem';b.onclick=function(){openClue(q,b);};board.appendChild(b);});})(r);}"
-    + "$('app').appendChild(board);$('hint').textContent='Tap a point value. Read the clue, then say the answer!';"
-    + "function openClue(q,b){if(b.disabled)return;var ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20';"
-    + "var p=document.createElement('div');p.className='card';p.style.cssText='max-width:520px;text-align:center';p.innerHTML='<div style=\"font-weight:800;color:#4F46E5;margin-bottom:8px\">'+q.value+' points</div><div style=\"font-size:1.2rem;margin:10px 0 16px\">'+q.clue+'</div>';"
-    + "var rev=document.createElement('button');rev.className='btn';rev.textContent='Reveal answer';var ansd=document.createElement('div');ansd.style.margin='12px 0';"
-    + "var gb=document.createElement('div');gb.style.cssText='display:none;gap:10px;justify-content:center';rev.onclick=function(){ansd.innerHTML='<b>'+q.answer+'</b>';rev.style.display='none';gb.style.display='flex';};"
-    + "var yes=document.createElement('button');yes.className='btn ok';yes.textContent='✓ Got it';var no=document.createElement('button');no.className='btn';no.textContent='✗ Missed';"
-    + "function close(win){b.disabled=true;b.classList.add(win?'ok':'no');if(win){got+=q.value;pts(got+' pts');}doneCells++;setBar(doneCells/cells*100);document.body.removeChild(ov);if(doneCells===cells)endGame(got/totalPts*100,'Final score: '+got+' points!');}"
-    + "yes.onclick=function(){close(true);};no.onclick=function(){close(false);};gb.appendChild(yes);gb.appendChild(no);p.appendChild(rev);p.appendChild(ansd);p.appendChild(gb);ov.appendChild(p);document.body.appendChild(ov);}";
-  return page((c as { title?: string }).title || "Jeopardy", c, script);
+    + "$('app').appendChild(board);$('hint').textContent='Tap a point value, then type your answer or pick one!';"
+    + "function norm(s){return String(s||'').toLowerCase().replace(/[\\s.,;:!?$]/g,'').replace(/^[a-z]=/,'');}"
+    + "function openClue(q,b){if(b.disabled)return;var ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:18px;z-index:20';"
+    + "var p=document.createElement('div');p.className='card';p.style.cssText='max-width:520px;width:100%;text-align:center';p.innerHTML='<div style=\"font-weight:800;color:#4F46E5;margin-bottom:8px\">'+q.value+' points</div><div style=\"font-size:1.2rem;margin:10px 0 14px\">'+q.clue+'</div>';"
+    + "var tries=0,solved=false;"
+    + "var inrow=document.createElement('div');inrow.className='row';var inp=document.createElement('input');inp.className='tx';inp.placeholder='Type your answer…';var chk=document.createElement('button');chk.className='btn';chk.textContent='Check';inrow.appendChild(inp);inrow.appendChild(chk);"
+    + "var sel=null;if(q.options&&q.options.length){sel=document.createElement('select');sel.className='tx';sel.style.maxWidth='320px';sel.style.marginTop='8px';var o0=document.createElement('option');o0.value='';o0.textContent='…or pick an answer';sel.appendChild(o0);shuffle(q.options.slice()).forEach(function(o){var op=document.createElement('option');op.value=o;op.textContent=o;sel.appendChild(op);});}"
+    + "var fb=document.createElement('div');fb.style.cssText='min-height:22px;font-weight:700;margin:8px 0';"
+    + "function fin(){document.body.removeChild(ov);if(doneCells===cells)endGame(got/totalPts*100,'Final score: '+got+' points!');}"
+    + "function win(){if(solved)return;solved=true;b.disabled=true;b.classList.add('ok');got+=q.value;pts(got+' pts');doneCells++;setBar(doneCells/cells*100);fb.style.color='#15803d';fb.textContent='✓ Correct! +'+q.value;burst(b,'balloon');setTimeout(fin,900);}"
+    + "function miss(){if(solved)return;solved=true;b.disabled=true;b.classList.add('no');doneCells++;setBar(doneCells/cells*100);setTimeout(fin,300);}"
+    + "function tryAns(v){if(solved||!v)return;if(norm(v)===norm(q.answer)||(norm(q.answer).length>=3&&norm(v).indexOf(norm(q.answer))>=0)){win();}else{tries++;fb.style.color='#b91c1c';fb.textContent=tries>=2?('Answer: '+q.answer):'Try again!';inp.classList.add('no');setTimeout(function(){inp.classList.remove('no');},400);if(tries>=2)hand.style.display='inline-block';}}"
+    + "chk.onclick=function(){tryAns(inp.value);};inp.addEventListener('keydown',function(e){if(e.key==='Enter')tryAns(inp.value);});if(sel)sel.onchange=function(){if(sel.value)tryAns(sel.value);};"
+    + "function byHand(){fb.innerHTML='Answer: <b>'+q.answer+'</b>';var gb=document.createElement('div');gb.className='row';var y=document.createElement('button');y.className='btn ok';y.textContent='✓ Got it';var n=document.createElement('button');n.className='btn';n.textContent='✗ Missed';y.onclick=win;n.onclick=miss;gb.appendChild(y);gb.appendChild(n);p.appendChild(gb);hand.style.display='none';say.style.display='none';}"
+    + "var hand=document.createElement('button');hand.className='btn';hand.style.display='none';hand.textContent='Reveal & score by hand';hand.onclick=byHand;"
+    + "var say=document.createElement('button');say.className='btn';say.style.cssText='font-size:.85rem;margin-left:8px';say.textContent='Say it aloud instead';say.onclick=byHand;"
+    + "p.appendChild(inrow);if(sel)p.appendChild(sel);p.appendChild(fb);var opts=document.createElement('div');opts.className='row';opts.appendChild(hand);opts.appendChild(say);p.appendChild(opts);ov.appendChild(p);document.body.appendChild(ov);setTimeout(function(){inp.focus();},50);}";
+  return page((c as { title?: string }).title || "Jeopardy", c, script, "jeopardy", "🎰 JEOPARDY");
 }
 
 // ── 2) FAMILY FEUD ───────────────────────────────────────────────────────────
@@ -83,7 +111,7 @@ function buildFeud(c: unknown): string {
     + "pool.forEach(function(t){var b=document.createElement('button');b.className='btn';b.textContent=t;b.onclick=function(){if(b.disabled)return;var hit=r.answers.filter(function(a){return a.text.toLowerCase()===t.toLowerCase();})[0];if(hit){b.disabled=true;b.classList.add('ok');var s=slotEls[t.toLowerCase()];s.classList.add('filled');s.querySelector('span').textContent='✓ '+hit.text;s.querySelector('.pts').style.visibility='visible';earned+=hit.points;found++;if(found===r.answers.length)next();}else{b.disabled=true;b.classList.add('no');strikes++;strikeEl.textContent='❌'.repeat(strikes);if(strikes>=3){revealRest();}}};opts.appendChild(b);});$('app').appendChild(opts);"
     + "function revealRest(){r.answers.forEach(function(a){var s=slotEls[a.text.toLowerCase()];if(!s.classList.contains('filled')){s.querySelector('span').textContent=a.text;s.querySelector('.pts').style.visibility='visible';}});[].slice.call(opts.querySelectorAll('button')).forEach(function(x){x.disabled=true;});setTimeout(next,1400);}"
     + "}function next(){ri++;if(ri>=rounds.length){endGame(earned/possible*100,'You found '+earned+' of '+possible+' survey points!');}else{setTimeout(render,700);}}render();";
-  return page((c as { title?: string }).title || "Family Feud", c, script);
+  return page((c as { title?: string }).title || "Family Feud", c, script, "feud", "📋 SURVEY SAYS…");
 }
 
 // ── 3) BINGO ─────────────────────────────────────────────────────────────────
@@ -102,7 +130,7 @@ function buildBingo(c: unknown): string {
     + "for(var col2=0;col2<n;col2++){var cl=[];for(var r2=0;r2<n;r2++)cl.push(r2*n+col2);if(line(cl))w=true;}"
     + "var d1=[],d2=[];for(var d=0;d<n;d++){d1.push(d*n+d);d2.push(d*n+(n-1-d));}if(line(d1)||line(d2))w=true;"
     + "if(w){won=true;endGame(100,'BINGO! 🎉');}}";
-  return page((c as { title?: string }).title || "Bingo", c, script);
+  return page((c as { title?: string }).title || "Bingo", c, script, "bingo", "🎱 BINGO");
 }
 
 // ── 4) PASSWORD / TABOO (clue-by-clue word guess) ────────────────────────────
@@ -114,7 +142,7 @@ function buildPassword(c: unknown): string {
     + "var moreWrap=document.createElement('div');moreWrap.style.textAlign='center';moreWrap.style.margin='10px 0';var more=document.createElement('button');more.className='btn';more.textContent='Need another clue (−1)';more.onclick=function(){if(shown<it.clues.length){shown++;paintClues();if(shown>=it.clues.length)more.disabled=true;}};moreWrap.appendChild(more);if(it.clues.length>1)$('app').appendChild(moreWrap);"
     + "var opts=document.createElement('div');opts.className='row';shuffle(it.options).forEach(function(o){var b=document.createElement('button');b.className='btn';b.textContent=o;b.onclick=function(){if(b.disabled)return;if(o.toLowerCase()===it.answer.toLowerCase()){b.classList.add('ok');var earn=Math.max(1,6-shown);score+=earn;[].slice.call(opts.querySelectorAll('button')).forEach(function(x){x.disabled=true;});more.disabled=true;setTimeout(next,700);}else{b.disabled=true;b.classList.add('no');if(shown<it.clues.length){shown++;paintClues();}}};opts.appendChild(b);});$('app').appendChild(opts);}"
     + "function next(){ii++;if(ii>=items.length){endGame(score/possible*100,'You scored '+score+' of '+possible+'!');}else{render();}}render();";
-  return page((c as { title?: string }).title || "Password", c, script);
+  return page((c as { title?: string }).title || "Password", c, script, "password", "🔑 PASSWORD");
 }
 
 // ── 5) WHEEL / LETTER-REVEAL (Wheel of Fortune + Guess the Sound) ─────────────
@@ -128,22 +156,25 @@ function buildWheel(c: unknown): string {
     + "var kb=document.createElement('div');kb.className='row';kb.style.maxWidth='520px';kb.style.margin='0 auto';'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(function(L){var b=document.createElement('button');b.className='btn';b.style.cssText='min-width:40px;padding:8px 10px';b.textContent=L;b.onclick=function(){if(b.disabled)return;b.disabled=true;if(phrase.indexOf(L)>=0){b.classList.add('ok');revealed[L]=true;paint();if(solved()){var earn=Math.max(20,100-wrong*15);score+=earn;[].slice.call(kb.querySelectorAll('button')).forEach(function(x){x.disabled=true;});setTimeout(next,800);}}else{b.classList.add('no');wrong++;}};kb.appendChild(b);});$('app').appendChild(kb);$('hint').textContent='Tap letters to fill in the answer. Fewer wrong guesses = more points!';"
     + "function solved(){return phrase.split('').every(function(ch){return !/[A-Z0-9]/.test(ch)||revealed[ch];});}}"
     + "function next(){pi++;if(pi>=puzzles.length){endGame(score/possible*100,'You solved them! '+score+' points');}else{render();}}render();";
-  return page((c as { title?: string }).title || "Wheel", c, script);
+  return page((c as { title?: string }).title || "Wheel", c, script, "wheel", "🎡 WHEEL");
 }
 
 // ── 6) ESCAPE ROOM (sequential locked stages) ────────────────────────────────
 function buildEscape(c: unknown): string {
+  const banner = '<div class="door-wrap"><div class="door-frame" id="doorframe"><div class="door" id="door"></div></div></div><div style="margin-top:4px">🚪 ESCAPE ROOM</div><div class="lockrow" id="lockrow"></div>';
   const script = "var stages=DATA.stages;var si=0,hintsUsed=0,tries=0;"
+    + "var lr=$('lockrow');if(lr){lr.innerHTML='';for(var i=0;i<stages.length;i++){var dd=document.createElement('span');dd.className='lockdot';dd.textContent='🔒';lr.appendChild(dd);}}"
+    + "function openDoor(){var dr=$('door');if(dr)dr.classList.add('open');var df=$('doorframe');if(df)df.classList.add('lit');}"
     + "var intro=document.createElement('div');intro.className='card';intro.style.textAlign='center';intro.innerHTML='🔒 '+(DATA.intro||'Solve each lock to escape!');$('app').appendChild(intro);"
     + "var stageBox=document.createElement('div');$('app').appendChild(stageBox);"
     + "function render(){var st=stages[si];stageBox.innerHTML='';pts('Lock '+(si+1)+'/'+stages.length);setBar(si/stages.length*100);"
     + "var c1=document.createElement('div');c1.className='card';c1.innerHTML='<div style=\"font-weight:800;color:#4F46E5;margin-bottom:6px\">Lock '+(si+1)+'</div><div style=\"font-size:1.08rem\">'+st.prompt+'</div>';stageBox.appendChild(c1);"
     + "var fb=document.createElement('div');fb.style.cssText='text-align:center;font-weight:700;min-height:22px;margin:8px 0';"
-    + "function solved(){si++;if(si>=stages.length){endGame(Math.max(40,100-hintsUsed*10-tries*3),'You escaped! 🎉🔓');}else{c1.style.borderColor='#15803d';setTimeout(render,700);}}"
+    + "function solved(){var dots=lr?lr.querySelectorAll('.lockdot'):[];if(dots[si]){dots[si].classList.add('open');dots[si].textContent='🔓';}si++;if(si>=stages.length){openDoor();endGame(Math.max(40,100-hintsUsed*10-tries*3),'You escaped! 🎉🔓');}else{c1.style.borderColor='#15803d';setTimeout(render,700);}}"
     + "if(st.choices){var opts=document.createElement('div');opts.className='row';shuffle(st.choices).forEach(function(o){var b=document.createElement('button');b.className='btn';b.textContent=o;b.onclick=function(){if(b.disabled)return;if(o.toLowerCase()===String(st.answer).toLowerCase()){b.classList.add('ok');[].slice.call(opts.querySelectorAll('button')).forEach(function(x){x.disabled=true;});solved();}else{b.disabled=true;b.classList.add('no');tries++;fb.textContent='That lock did not open. Try again.';}};opts.appendChild(b);});stageBox.appendChild(opts);}"
     + "else{var wrap=document.createElement('div');wrap.className='row';var inp=document.createElement('input');inp.className='tx';inp.placeholder='Enter the code…';var go=document.createElement('button');go.className='btn';go.textContent='Unlock';function tryIt(){var v=(inp.value||'').trim().toLowerCase();if(!v)return;if(v===String(st.answer).toLowerCase()){go.classList.add('ok');inp.disabled=true;go.disabled=true;solved();}else{tries++;fb.textContent='🔒 Still locked. Check your work.';inp.classList.add('no');setTimeout(function(){inp.classList.remove('no');},400);}}go.onclick=tryIt;inp.addEventListener('keydown',function(e){if(e.key==='Enter')tryIt();});wrap.appendChild(inp);wrap.appendChild(go);stageBox.appendChild(wrap);}"
     + "stageBox.appendChild(fb);if(st.hint){var hw=document.createElement('div');hw.style.textAlign='center';var hb=document.createElement('button');hb.className='btn';hb.style.fontSize='.9rem';hb.textContent='💡 Hint (−10)';hb.onclick=function(){hintsUsed++;fb.textContent='💡 '+st.hint;hb.disabled=true;};hw.appendChild(hb);stageBox.appendChild(hw);}}render();";
-  return page((c as { title?: string }).title || "Escape Room", c, script);
+  return page((c as { title?: string }).title || "Escape Room", c, script, "escape", banner);
 }
 
 // ── Sample content per band (seeds the demo library) ─────────────────────────
@@ -257,7 +288,7 @@ const str = (x: unknown): x is string => typeof x === "string" && x.trim().lengt
 
 const SCHEMA: Record<string, { hint: string; validate: (c: unknown) => boolean }> = {
   jeopardy: {
-    hint: '{"title":"short title","categories":[{"name":"Category","clues":[{"value":100,"clue":"the clue/prompt","answer":"the answer"}]}]}  — exactly 3 categories, each with 3 clues at values 100, 200, 300 (rising difficulty). Keep answers short.',
+    hint: '{"title":"short title","categories":[{"name":"Category","clues":[{"value":100,"clue":"the clue/prompt","answer":"the answer","options":["the answer","distractor","distractor"]}]}]}  — exactly 3 categories, each with 3 clues at values 100, 200, 300 (rising difficulty). Keep answers short. "options" is OPTIONAL: include 3–4 choices that INCLUDE the exact answer when a multiple-choice dropdown would help learners; omit it for free-response typing.',
     validate: (c) => obj(c) && arr(c.categories) && c.categories.every((cat) => obj(cat) && str(cat.name) && arr(cat.clues) && cat.clues.every((q) => obj(q) && typeof q.value === "number" && str(q.clue) && str(q.answer))),
   },
   feud: {
