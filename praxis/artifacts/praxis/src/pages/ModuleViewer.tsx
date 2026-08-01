@@ -1846,13 +1846,15 @@ function TranscriptEditor({ beatId, initial, moduleId }: { beatId: string; initi
  * sentence being read rather than highlighting inside the text, because the speech engine
  * needs whitespace-normalised chunks and the reading itself keeps its paragraph breaks.
  */
-function ReadAloudBar({ text, rate, pitch }: { text: string; rate?: number; pitch?: number }) {
+function ReadAloudBar({ text, rate, pitch, lang = 'en' }: { text: string; rate?: number; pitch?: number; lang?: string }) {
   const { start, pause, resume, stop, status, index, chunks, supported } = useReadAloud();
+  const es = lang === 'es';
+  const L = (en: string, esT: string) => (es ? esT : en);
 
   if (!supported) {
     return (
       <p className="text-xs text-muted-foreground">
-        Read-aloud is not available in this browser. Chrome, Edge and Safari support it.
+        {L('Read-aloud is not available in this browser. Chrome, Edge and Safari support it.', 'La lectura en voz alta no está disponible en este navegador. Chrome, Edge y Safari la admiten.')}
       </p>
     );
   }
@@ -1865,28 +1867,28 @@ function ReadAloudBar({ text, rate, pitch }: { text: string; rate?: number; pitc
       <div className="flex items-center gap-2 flex-wrap">
         <Headphones className="h-4 w-4 text-emerald-600 shrink-0" />
         {status === 'idle' ? (
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => start(text, 'en', { rate, pitch })}>
-            <Play className="h-3.5 w-3.5" /> Listen
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => start(text, lang, { rate, pitch })}>
+            <Play className="h-3.5 w-3.5" /> {L('Listen', 'Escuchar')}
           </Button>
         ) : (
           <>
             {status === 'playing' ? (
               <Button size="sm" variant="outline" className="gap-1.5" onClick={pause}>
-                <Pause className="h-3.5 w-3.5" /> Pause
+                <Pause className="h-3.5 w-3.5" /> {L('Pause', 'Pausa')}
               </Button>
             ) : (
               <Button size="sm" variant="outline" className="gap-1.5" onClick={resume}>
-                <Play className="h-3.5 w-3.5" /> Resume
+                <Play className="h-3.5 w-3.5" /> {L('Resume', 'Seguir')}
               </Button>
             )}
             <Button size="sm" variant="ghost" className="gap-1.5" onClick={stop}>
-              <Square className="h-3.5 w-3.5" /> Stop
+              <Square className="h-3.5 w-3.5" /> {L('Stop', 'Detener')}
             </Button>
             <span className="text-xs text-muted-foreground">{pct}%</span>
           </>
         )}
         {status === 'idle' && (
-          <span className="text-xs text-muted-foreground">Have this reading read to you.</span>
+          <span className="text-xs text-muted-foreground">{L('Have this reading read to you.', 'Deja que te lean esta lectura.')}</span>
         )}
       </div>
       {current && (
@@ -2326,7 +2328,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const step = steps[Math.min(stepIdx, Math.max(0, steps.length - 1))];
 
   // Strip anything a young child shouldn't see (standards codes, meta "by the end" lines).
-  const stripYoung = (md: string) => md.split('\n').filter((l) => !/aligned to/i.test(l) && !/^\s*\*\*by the end you can/i.test(l)).join('\n');
+  const stripYoung = (md: string) => md.split('\n').filter((l) => !/aligned to|alineado con/i.test(l) && !/^\s*\*\*(by the end you can|al terminar podrás)/i.test(l)).join('\n');
   // Clean text for the read-aloud so it doesn't say "hashtag" / "asterisk" / emoji names and sounds
   // less robotic — strip markdown symbols and emoji, keep the words.
   const speechClean = (md: string) => stripYoung(md)
@@ -2353,14 +2355,17 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const [tBusy, setTBusy] = useState(false);
   const [tText, setTText] = useState<string | null>(null);
   useEffect(() => { setTText(null); setLang(es ? 'es' : 'en'); }, [readingId, es]);
+  // The stored reading is already written in the course's native language (Spanish for Sofía, English
+  // otherwise). So the native language shows the base text directly — no AI round-trip — and we only
+  // translate when the learner picks the OTHER language.
+  const native = es ? 'es' : 'en';
   const pickLang = async (code: string) => {
     setLang(code);
-    if (code === 'en' || !reader?.content) { setTText(null); return; }
+    if (code === native || !reader?.content) { setTText(null); return; }
     setTBusy(true);
     const [c] = await translateContent([stripYoung(reader.content)], code);
     setTText(c); setTBusy(false);
   };
-  useEffect(() => { if (es && reader?.content && lang === 'es' && !tText && !tBusy) { void pickLang('es'); } }, [es, reader?.content]); // eslint-disable-line
 
   const orderedMods = (courseModules ?? []).slice().sort((a, b) => a.order - b.order);
   const curIdx = orderedMods.findIndex((m) => m.id === moduleId);
@@ -2413,7 +2418,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
         {step?.id === 'read' && (
           <div className="rounded-3xl bg-white p-6 sm:p-8 shadow-sm">
             <div className="flex items-center gap-3 flex-wrap mb-4">
-              <div><ReadAloudBar text={speechClean(tText ?? reader?.content ?? '')} rate={0.85} pitch={1.15} /></div>
+              <div><ReadAloudBar text={speechClean(tText ?? reader?.content ?? '')} rate={0.85} pitch={1.15} lang={lang} /></div>
               {es && <LangChips value={lang} busy={tBusy} onPick={pickLang} />}
             </div>
             {/* The reading first… */}

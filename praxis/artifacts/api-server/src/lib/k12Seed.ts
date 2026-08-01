@@ -54,7 +54,7 @@ interface K12Module {
   points: string[]; reading: string; minutes: number;
   standards: Std[]; quiz: { q: string; options: string[]; answer: number; img?: string }[];
   caseContext: string; caseOpening: string;
-  game?: "choice" | "find" | "match" | "memory" | "puzzle";   // default "choice"; each lesson uses a different one
+  game?: "choice" | "find" | "match" | "memory" | "puzzle" | "pair" | "sort";   // default "choice"; each lesson uses a different one
   video?: string;   // YouTube id/URL → adds a "Watch" step to the lesson
 }
 interface K12Persona {
@@ -152,43 +152,49 @@ const COURSES: K12Course[] = [
   {
     title: "Aventura de Lectura (Grado 3)", subject: "Lectura", emoji: "📚", grade: 3, gradeLabel: "Grade 3", lang: "es",
     framework: "Common Core State Standards — Grade 3 ELA/Literacy",
-    intro: "¡Una aventura de lectura! En cada lección miras un video, lees un texto corto y juegas — para encontrar la idea principal, aprender palabras nuevas y usar pistas del contexto. Todo en español (o en inglés si prefieres).",
+    intro: "¡Una aventura de lectura en español! En cada lección lees un texto corto y juegas de una forma distinta — clasificas ideas, unes palabras con su significado y usas pistas del contexto para descubrir palabras nuevas. Todo en español (o en inglés si prefieres).",
     outcome: "Encontrar la idea principal, aprender vocabulario y usar pistas del contexto.",
     tags: ["lectura", "español", "grade 3", "common core"],
     persona: { email: "sofia.k12@synops-demo.test", firstName: "Sofía", lastName: "Ramírez", grade: 3, gradeLabel: "Grade 3", learningStyle: "visual", accommodations: ["simplified_language", "concrete_examples", "scaffolded_questions", "positive_reinforcement", "chunked_content"], progressFraction: 0.15 },
     modules: [
-      { title: "La idea principal", outcome: "Decir de qué trata un texto en una oración.",
-        hook: "Una página entera sobre los pandas — ¿de qué trata CASI todo?", minutes: 8, game: "choice", video: "PyCTNOq8SmU",
+      { title: "La idea principal", outcome: "Distinguir la idea principal de los detalles de un texto.",
+        hook: "Un texto tiene UNA idea grande y muchos detalles pequeños. ¿Puedes separarlos?", minutes: 8, game: "sort",
         standards: [{ code: "CCSS.ELA-LITERACY.RI.3.2", title: "Determine the main idea; recount key details" }],
-        points: ["La idea principal es de qué trata CASI todo el texto", "Los detalles son datos pequeños que dan más información", "Pregunta: ¿de qué le diría a un amigo que trató?"],
-        reading: "Cuando lees, tu cerebro siempre pregunta algo importante: **¿de qué trata esto casi todo el tiempo?** Esa respuesta es la **idea principal**.\n\nImagina una página sobre los pandas. Dice que los pandas comen bambú, viven en China y los bebés son pequeños y rosados. Esos son **detalles** — datos pequeños. Pero la **idea principal** los une: *los pandas son animales especiales.*\n\nTruco de detective: después de leer, tapa la página y dile a un amigo en UNA oración de qué trató. Si dices \"trató de los pandas y cómo viven\", ¡encontraste la idea principal! 🕵️",
+        points: ["La idea principal es de qué trata CASI todo el texto", "Los detalles son datos pequeños que apoyan la idea principal", "Un texto tiene una idea principal, pero muchos detalles"],
+        reading: "Cuando lees, tu cerebro busca la **idea principal**: de qué trata *casi todo* el texto. Lo demás son **detalles** — datos pequeños que dan más información sobre esa idea.\n\nLee esto: *Los delfines son mamíferos marinos muy inteligentes. Usan sonidos para hablar entre ellos, nadan muy rápido y salen a la superficie para respirar aire.* La **idea principal** es que *los delfines son mamíferos muy inteligentes*. Que usen sonidos o que respiren aire son **detalles**.\n\nAhora otro: *Un volcán es una montaña que puede expulsar lava caliente. La lava es roca derretida, y algunos volcanes están escondidos bajo el mar.* ¿Cuál es la idea grande? *Un volcán puede expulsar lava.* Lo demás son detalles.\n\nEn el juego, lee cada tarjeta y decide: ¿es la **idea principal** o un **detalle**? 🕵️",
         quiz: [
-          { q: "La idea principal es…", options: ["Un dato pequeño", "De qué trata casi todo el texto", "Solo el título", "La palabra más larga"], answer: 1 },
-          { q: "Un texto dice: los leones cazan, rugen y viven en grupos. La idea principal es…", options: ["Los leones son ruidosos", "Cómo viven los leones", "Los leones son anaranjados", "Un solo león"], answer: 1 },
-          { q: "Los detalles son…", options: ["La idea grande", "Datos pequeños que dan más información", "El número de página", "El autor"], answer: 1 },
-          { q: "Para encontrar la idea principal puedes…", options: ["Contar las palabras", "Decirle a un amigo en una oración de qué trató", "Mirar la última letra", "Saltarlo"], answer: 1 },
+          { q: "Los delfines son mamíferos marinos muy inteligentes.", options: ["Idea principal", "Detalle"], answer: 0 },
+          { q: "Los delfines usan sonidos para hablar entre ellos.", options: ["Idea principal", "Detalle"], answer: 1 },
+          { q: "Los delfines salen a la superficie para respirar aire.", options: ["Idea principal", "Detalle"], answer: 1 },
+          { q: "Un volcán es una montaña que puede expulsar lava.", options: ["Idea principal", "Detalle"], answer: 0 },
+          { q: "La lava es roca derretida.", options: ["Idea principal", "Detalle"], answer: 1 },
+          { q: "Algunos volcanes están escondidos bajo el mar.", options: ["Idea principal", "Detalle"], answer: 1 },
         ],
         caseContext: "", caseOpening: "" },
-      { title: "Vocabulario con dibujos", outcome: "Unir cada palabra en español con su dibujo.",
-        hook: "¡Aprende palabras nuevas mirando los dibujos!", minutes: 8, game: "match", video: "X1sQg4nxEe8",
+      { title: "Vocabulario en contexto", outcome: "Unir palabras nuevas de tercer grado con su significado.",
+        hook: "Palabras nuevas: veloz, enorme, frágil… ¿sabes qué significan?", minutes: 8, game: "pair",
         standards: [{ code: "CCSS.ELA-LITERACY.L.3.4", title: "Determine the meaning of words and phrases" }],
-        points: ["Las palabras nombran las cosas que vemos", "Mira el dibujo y aprende su palabra", "¡Une cada dibujo con su palabra!"],
-        reading: "¡Las palabras nombran las cosas que vemos! Mira cada dibujo y aprende su palabra.\n\nEl **gato** dice miau. El **perro** dice guau. El **sol** brilla en el cielo. El **sombrero** va en la cabeza.\n\nEn este juego, une cada dibujo con su palabra. ¡Tú puedes, detective de palabras! 📖⭐",
+        points: ["Mientras más palabras conoces, mejor entiendes lo que lees", "Cada palabra tiene un significado exacto", "Une cada palabra con lo que significa"],
+        reading: "Los buenos lectores conocen muchas palabras. Mientras más palabras sabes, mejor entiendes lo que lees. Aquí tienes palabras nuevas de tercer grado — fíjate cómo se usan en una oración.\n\nUn guepardo es **veloz**: corre muy rápido. Una ballena es **enorme**: es muy grande. Un vaso de vidrio es **frágil**: se rompe con facilidad. Un bombero es **valiente**: no siente miedo cuando ayuda. El sol es **brillante**: da mucha luz. Y una biblioteca es **silenciosa**: casi no hace ruido.\n\nEn el juego, une cada palabra con su significado. ¡Tú puedes! 📖⭐",
         quiz: [
-          { q: "Une el dibujo con la palabra", img: KID_PICS.cat, options: ["el gato"], answer: 0 },
-          { q: "Une el dibujo con la palabra", img: KID_PICS.dog, options: ["el perro"], answer: 0 },
-          { q: "Une el dibujo con la palabra", img: KID_PICS.sun, options: ["el sol"], answer: 0 },
-          { q: "Une el dibujo con la palabra", img: KID_PICS.hat, options: ["el sombrero"], answer: 0 },
+          { q: "veloz", options: ["muy rápido"], answer: 0 },
+          { q: "enorme", options: ["muy grande"], answer: 0 },
+          { q: "frágil", options: ["que se rompe con facilidad"], answer: 0 },
+          { q: "valiente", options: ["que no siente miedo"], answer: 0 },
+          { q: "brillante", options: ["que da mucha luz"], answer: 0 },
+          { q: "silencioso", options: ["que casi no hace ruido"], answer: 0 },
         ],
         caseContext: "", caseOpening: "" },
-      { title: "Pistas del contexto", outcome: "Usar las palabras cercanas para adivinar una palabra nueva.",
-        hook: "Lees una palabra que nunca has visto. ¿Te rindes? ¡Claro que no!", minutes: 8, game: "choice", video: "EY_fTE4n3is",
+      { title: "Pistas del contexto", outcome: "Usar las palabras cercanas para descubrir una palabra nueva.",
+        hook: "Lees una palabra que nunca has visto. ¿Te rindes? ¡Claro que no!", minutes: 8, game: "choice",
         standards: [{ code: "CCSS.ELA-LITERACY.L.3.4", title: "Determine the meaning of unknown words using context clues" }],
         points: ["Las pistas del contexto son las otras palabras cercanas", "Lee toda la oración, no solo la palabra difícil", "Adivina y luego revisa si tiene sentido"],
-        reading: "¿Qué haces cuando encuentras una palabra que no conoces? ¡Te vuelves **detective de palabras** y buscas **pistas del contexto** — las otras palabras cercanas que dan pistas!\n\nLee esto: *\"El perrito era tan **tímido** que se escondió detrás del sofá cuando llegaron las visitas.\"* Aunque no conozcas **tímido**, las pistas ayudan: se *escondió* cuando llegó gente. ¡Entonces tímido significa *penoso o asustado*! Lo resolviste sin diccionario. 🌟",
+        reading: "¿Qué haces cuando encuentras una palabra que no conoces? ¡Te vuelves **detective de palabras** y buscas **pistas del contexto** — las otras palabras cercanas que te dan pistas de lo que significa!\n\nLee esto: *\"El perrito era tan **tímido** que se escondió detrás del sofá cuando llegaron las visitas.\"* Aunque no conozcas la palabra **tímido**, las pistas ayudan: se *escondió* cuando llegó gente. ¡Entonces tímido significa *penoso o asustado*! Lo resolviste sin diccionario.\n\nSiempre haz lo mismo: lee toda la oración, busca las pistas, adivina el significado y vuelve a leer para ver si tiene sentido. 🌟",
         quiz: [
           { q: "Las pistas del contexto son…", options: ["Las otras palabras cerca de la palabra difícil", "El número de página", "Solo los dibujos", "El título"], answer: 0 },
-          { q: "\"La sopa estaba tan sosa que necesitaba sal.\" Sosa significa…", options: ["Muy picante", "Sin mucho sabor", "Muy caliente", "Congelada"], answer: 1 },
+          { q: "\"La sopa estaba tan **sosa** que necesitaba sal.\" Sosa significa…", options: ["Muy picante", "Sin mucho sabor", "Muy caliente", "Congelada"], answer: 1 },
+          { q: "\"El sendero era tan **empinado** que nos costó mucho subir.\" Empinado significa…", options: ["Muy plano", "Con mucha subida", "Muy corto", "Muy ancho"], answer: 1 },
+          { q: "\"La niña estaba **agotada** después de correr todo el día.\" Agotada significa…", options: ["Muy cansada", "Muy contenta", "Con hambre", "Muy veloz"], answer: 0 },
           { q: "Cuando encuentras una palabra nueva, primero debes…", options: ["Saltar toda la página", "Leer toda la oración para buscar pistas", "Cerrar el libro", "Adivinar cualquier palabra"], answer: 1 },
           { q: "Después de adivinar el significado, debes…", options: ["Dejar de leer", "Releer para ver si tiene sentido", "Borrarlo", "No preguntarle a nadie"], answer: 1 },
         ],
@@ -382,8 +388,9 @@ const COURSES: K12Course[] = [
   },
 ];
 
-// ── Interactive game engine (sandboxed HTML). Five DIFFERENT games so lessons don't repeat:
-//    choice (multiple choice) · find (tap the picture) · match (pairs) · memory (flip cards) · puzzle (spell). ──
+// ── Interactive game engine (sandboxed HTML). DIFFERENT games so lessons don't repeat.
+//    Picture games (young readers): find (tap the picture) · match (picture↔word pairs) · memory (flip cards) · puzzle (spell).
+//    Text games (older readers): choice (multiple choice) · pair (word↔meaning, no pictures) · sort (drag cards into two groups). ──
 function gameHtml(title: string, items: { q: string; options: string[]; answer: number; img?: string }[], mode: string, lang = "en"): string {
   const data = JSON.stringify(items).replace(/</g, "\\u003c");
   return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -395,11 +402,27 @@ function renderFind(){total=items.length;setStars();hint.textContent=L('Tap the 
 function renderMatch(){total=pics.length;setStars();hint.textContent=L('Tap a picture, then its word! 👆','¡Toca una imagen y luego su palabra! 👆');var wrap=document.createElement('div');wrap.className='q';var mrow=document.createElement('div');mrow.className='mrow';var pcol=document.createElement('div');pcol.className='mcol';var wcol=document.createElement('div');wcol.className='mcol';mrow.appendChild(pcol);mrow.appendChild(wcol);wrap.appendChild(mrow);app.appendChild(wrap);var sel=null;var done2=0;shuffle(pics).forEach(function(it){var b=document.createElement('button');b.className='mpic';b.innerHTML='<img src="'+it.img+'" alt="picture">';b.dataset.word=it.options[it.answer];b.onclick=function(){if(b.dataset.done)return;[].slice.call(pcol.querySelectorAll('.mpic')).forEach(function(x){x.classList.remove('sel');});b.classList.add('sel');sel=b;};pcol.appendChild(b);});shuffle(pics.map(function(x){return x.options[x.answer];})).forEach(function(w){var b=document.createElement('button');b.className='mword';b.textContent=w;b.onclick=function(){if(b.dataset.done||!sel)return;if(sel.dataset.word===w){sel.dataset.done='1';sel.classList.add('done');sel.classList.remove('sel');b.dataset.done='1';b.classList.add('done');burst(b,'balloon');stars++;setStars();sel=null;done2++;if(done2===total)setTimeout(function(){finish(L('Perfect matching!','¡Emparejaste todo!'));},550);}else{b.classList.add('wrong');setTimeout(function(){b.classList.remove('wrong');},500);}};wcol.appendChild(b);});}
 function renderMemory(){total=pics.length;setStars();hint.textContent=L('Flip two cards to find a pair! 👆','¡Voltea dos cartas para encontrar un par! 👆');var cards=[];pics.forEach(function(it){var key=it.options[it.answer];cards.push({key:key,type:'pic',img:it.img});cards.push({key:key,type:'word'});});cards=shuffle(cards);var grid=document.createElement('div');grid.className='mgrid';app.appendChild(grid);var first=null,lock=false,matched=0;cards.forEach(function(cd){var b=document.createElement('button');b.className='card';b.innerHTML='<span class="face">?</span>';b.onclick=function(){if(lock||b.classList.contains('open')||b.classList.contains('done'))return;b.classList.add('open');b.querySelector('.face').innerHTML=cd.type==='pic'?'<img src="'+cd.img+'" alt="">':cd.key;if(!first){first=b;first.__key=cd.key;}else{lock=true;if(first.__key===cd.key&&first!==b){setTimeout(function(){first.classList.add('done');b.classList.add('done');burst(b,'balloon');stars++;setStars();matched++;first=null;lock=false;if(matched===total)setTimeout(function(){finish(L('Amazing memory!','¡Qué buena memoria!'));},550);},400);}else{setTimeout(function(){first.classList.remove('open');first.querySelector('.face').innerHTML='?';b.classList.remove('open');b.querySelector('.face').innerHTML='?';first=null;lock=false;},850);}}};grid.appendChild(b);});}
 function renderPuzzle(){total=items.length;setStars();hint.textContent=L('Tap the letters in order to spell the word! 👇','¡Toca las letras en orden para escribir la palabra! 👇');var solved=0;items.forEach(function(it){var word=(it.options[it.answer]||'').toString().toLowerCase();var d=document.createElement('div');d.className='q';d.innerHTML=(it.img?'<img class="qimg" src="'+it.img+'" alt="picture">':'')+'<p class="qt">'+L('Spell the word','Escribe la palabra')+'</p>';var slots=document.createElement('div');slots.className='slots';var slotEls=[];word.split('').forEach(function(){var s=document.createElement('div');s.className='slot';slots.appendChild(s);slotEls.push(s);});d.appendChild(slots);d.__filled=0;var tiles=document.createElement('div');tiles.className='tiles';shuffle(word.split('')).forEach(function(ch){var b=document.createElement('button');b.className='tile';b.textContent=ch.toUpperCase();b.onclick=function(){if(d.dataset.done)return;var need=word[d.__filled];if(b.textContent.toLowerCase()===need){var idx=d.__filled;slotEls[idx].textContent=b.textContent;slotEls[idx].classList.add('filled');b.disabled=true;b.classList.add('used');d.__filled=idx+1;if(d.__filled===word.length){d.dataset.done='1';d.classList.add('solved');burst(b,'balloon');stars++;setStars();solved++;if(solved===total)setTimeout(function(){finish(L('You spelled them all!','¡Las escribiste todas!'));},650);}}else{b.classList.add('wrong');setTimeout(function(){b.classList.remove('wrong');},450);}};tiles.appendChild(b);});d.appendChild(tiles);app.appendChild(d);});}
-if(MODE==='find')renderFind();else if(MODE==='match')renderMatch();else if(MODE==='memory')renderMemory();else if(MODE==='puzzle')renderPuzzle();else renderChoice();</script>`;
+function renderPair(){total=items.length;setStars();hint.textContent=L('Tap a word, then its meaning! 👆','¡Toca una palabra y luego su significado! 👆');var wrap=document.createElement('div');wrap.className='q';var mrow=document.createElement('div');mrow.className='mrow';var lcol=document.createElement('div');lcol.className='mcol';var rcol=document.createElement('div');rcol.className='mcol';mrow.appendChild(lcol);mrow.appendChild(rcol);wrap.appendChild(mrow);app.appendChild(wrap);function stylePair(b){b.style.height='auto';b.style.minHeight='58px';b.style.padding='12px 16px';b.style.fontSize='1.05rem';b.style.whiteSpace='normal';b.style.lineHeight='1.25';b.style.maxWidth='240px';}var sel=null,done2=0;shuffle(items).forEach(function(it){var b=document.createElement('button');b.className='mword';stylePair(b);b.textContent=it.q;b.dataset.mean=it.options[it.answer];b.onclick=function(){if(b.dataset.done)return;[].slice.call(lcol.querySelectorAll('.mword')).forEach(function(x){x.classList.remove('sel');});b.classList.add('sel');sel=b;};lcol.appendChild(b);});shuffle(items.map(function(x){return x.options[x.answer];})).forEach(function(w){var b=document.createElement('button');b.className='mword';stylePair(b);b.textContent=w;b.onclick=function(){if(b.dataset.done||!sel)return;if(sel.dataset.mean===w){sel.dataset.done='1';sel.classList.add('done');sel.classList.remove('sel');b.dataset.done='1';b.classList.add('done');burst(b,'balloon');stars++;setStars();sel=null;done2++;if(done2===total)setTimeout(function(){finish(L('Perfect!','¡Perfecto!'));},550);}else{b.classList.add('wrong');setTimeout(function(){b.classList.remove('wrong');},500);}};rcol.appendChild(b);});}
+function renderSort(){total=items.length;setStars();var labels=(items[0]&&items[0].options)||['A','B'];hint.textContent=L('Tap a card, then the group it belongs to! 👆','¡Toca una tarjeta y luego el grupo al que pertenece! 👆');var wrap=document.createElement('div');wrap.className='q';var pool=document.createElement('div');pool.style.display='flex';pool.style.flexDirection='column';pool.style.gap='8px';pool.style.marginBottom='14px';wrap.appendChild(pool);var zrow=document.createElement('div');zrow.style.display='flex';zrow.style.gap='12px';var zones=[];labels.forEach(function(lab,zi){var z=document.createElement('div');z.style.flex='1';z.style.minWidth='140px';z.style.border='3px dashed #cdc7b8';z.style.borderRadius='16px';z.style.padding='10px';z.style.minHeight='120px';z.style.display='flex';z.style.flexDirection='column';z.style.gap='8px';var h=document.createElement('div');h.textContent=lab;h.style.fontWeight='800';h.style.textAlign='center';h.style.color='#4F46E5';z.appendChild(h);z.onclick=function(){place(zi,z);};zones.push(z);zrow.appendChild(z);});wrap.appendChild(zrow);app.appendChild(wrap);var sel=null,placed=0;shuffle(items).forEach(function(it){var b=document.createElement('button');b.className='opt';b.style.width='100%';b.style.textAlign='left';b.textContent=it.q;b.__ans=it.answer;b.onclick=function(){if(b.dataset.done)return;[].slice.call(pool.querySelectorAll('.opt')).forEach(function(x){x.style.outline='';});b.style.outline='3px solid #4F46E5';sel=b;};pool.appendChild(b);});function place(zi,z){if(!sel)return;if(sel.__ans===zi){sel.dataset.done='1';sel.classList.add('correct');sel.style.outline='';sel.disabled=true;z.appendChild(sel);burst(sel,'balloon');stars++;setStars();sel=null;placed++;if(placed===total)setTimeout(function(){finish(L('You sorted them all!','¡Los clasificaste todos!'));},550);}else{z.style.animation='shake .4s';setTimeout(function(){z.style.animation='';},450);sel.style.outline='';sel=null;}}}
+if(MODE==='find')renderFind();else if(MODE==='match')renderMatch();else if(MODE==='memory')renderMemory();else if(MODE==='puzzle')renderPuzzle();else if(MODE==='pair')renderPair();else if(MODE==='sort')renderSort();else renderChoice();</script>`;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 function firstOrNull<T>(rows: T[]): T | null { return rows.length ? rows[0]! : null; }
+
+// Localise a string by course language so a Spanish course reads Spanish end-to-end (headers, beat
+// titles, narration) — not just the game instructions.
+function TL(lang: string | undefined, en: string, es: string): string { return lang === "es" ? es : en; }
+
+// The reading-step body for a module, with its section headers in the course language. Shared by the
+// fresh-course build and the reused-course refresh so a language change propagates on the next reseed.
+function readingBody(m: K12Module, lang?: string): string {
+  const think = TL(lang, "Think about this:", "Piensa en esto:");
+  const byEnd = TL(lang, "By the end you can:", "Al terminar podrás:");
+  const bigIdeas = TL(lang, "Big ideas", "Ideas importantes");
+  const aligned = TL(lang, "Aligned to:", "Alineado con:");
+  return `# ${m.title}\n\n**${think}** ${m.hook}\n\n**${byEnd}** ${m.outcome}\n\n${m.reading}\n\n## ${bigIdeas}\n\n${m.points.map((p) => `- ${p}`).join("\n")}\n\n**${aligned}** ${m.standards.map((s) => s.code).join(", ")}`;
+}
 
 async function applyBrand(partnerId: string): Promise<void> {
   const fields = { ...BRAND, updatedAt: new Date() };
@@ -448,16 +471,17 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
       description: `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}`,
     }).returning();
 
+    const lang = c.lang;
     await db.insert(beatsTable).values([
-      { moduleId: mod.id, type: "title_card", order: 0, title: m.title, narration: `${m.hook}  By the end of this lesson you'll be able to: ${m.outcome}` },
-      { moduleId: mod.id, type: "points", order: 1, title: "Big ideas", narration: `Keep the question in mind: ${m.hook}`, bulletPoints: m.points },
-      { moduleId: mod.id, type: "close", order: 2, title: "You've got this", narration: `Nice work — you can now ${m.outcome.toLowerCase()} Try the practice, then move on.` },
+      { moduleId: mod.id, type: "title_card", order: 0, title: m.title, narration: TL(lang, `${m.hook}  By the end of this lesson you'll be able to: ${m.outcome}`, `${m.hook}  Al terminar esta lección podrás: ${m.outcome}`) },
+      { moduleId: mod.id, type: "points", order: 1, title: TL(lang, "Big ideas", "Ideas importantes"), narration: TL(lang, `Keep the question in mind: ${m.hook}`, `Ten presente la pregunta: ${m.hook}`), bulletPoints: m.points },
+      { moduleId: mod.id, type: "close", order: 2, title: TL(lang, "You've got this", "¡Tú puedes!"), narration: TL(lang, `Nice work — you can now ${m.outcome.toLowerCase()} Try the practice, then move on.`, `¡Buen trabajo! Ya puedes ${m.outcome.toLowerCase()} Haz la práctica y sigue adelante.`) },
       // Optional teaching video (YouTube) — surfaced as a "Watch" step in the young lesson view.
-      ...(m.video ? [{ moduleId: mod.id, type: "video" as const, order: 3, title: "Watch", narration: `Watch this short video, then keep going: ${m.hook}`, videoUrl: m.video }] : []),
+      ...(m.video ? [{ moduleId: mod.id, type: "video" as const, order: 3, title: TL(lang, "Watch", "Ver"), narration: TL(lang, `Watch this short video, then keep going: ${m.hook}`, `Mira este video corto y luego continúa: ${m.hook}`), videoUrl: m.video }] : []),
     ]);
     await db.update(modulesTable).set({ beatCount: m.video ? 4 : 3 }).where(eq(modulesTable.id, mod.id));
 
-    const body = `# ${m.title}\n\n**Think about this:** ${m.hook}\n\n**By the end you can:** ${m.outcome}\n\n${m.reading}\n\n## Big ideas\n\n${m.points.map((p) => `- ${p}`).join("\n")}\n\n**Aligned to:** ${m.standards.map((s) => s.code).join(", ")}`;
+    const body = readingBody(m, lang);
     await db.insert(moduleReadingsTable).values({
       moduleId: mod.id, courseId: course.id, title: `Lesson: ${m.title}`,
       kind: "note", content: body, chars: body.length, order: 0, published: true, createdBy: facultyId,
@@ -579,12 +603,26 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     for (let i = 0; i < cmods.length && i < c.modules.length; i++) {
       const m = c.modules[i];
       const modId = cmods[i].id;
+      const lang = c.lang;
       await db.update(interactiveActivitiesTable)
-        .set({ html: gameHtml(`${m.title}: quick check`, m.quiz, m.game ?? "choice", c.lang ?? "en") })
+        .set({ title: `${m.title}: quick check`, html: gameHtml(`${m.title}: quick check`, m.quiz, m.game ?? "choice", lang ?? "en") })
         .where(and(eq(interactiveActivitiesTable.moduleId, modId), eq(interactiveActivitiesTable.kind, "quiz")));
-      const body = `# ${m.title}\n\n**Think about this:** ${m.hook}\n\n**By the end you can:** ${m.outcome}\n\n${m.reading}\n\n## Big ideas\n\n${m.points.map((p) => `- ${p}`).join("\n")}\n\n**Aligned to:** ${m.standards.map((s) => s.code).join(", ")}`;
-      await db.update(moduleReadingsTable).set({ content: body, chars: body.length }).where(eq(moduleReadingsTable.moduleId, modId));
-      await db.update(modulesTable).set({ objectives: [m.outcome], description: `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}` }).where(eq(modulesTable.id, modId));
+      const body = readingBody(m, lang);
+      await db.update(moduleReadingsTable).set({ title: `Lesson: ${m.title}`, content: body, chars: body.length }).where(eq(moduleReadingsTable.moduleId, modId));
+      await db.update(modulesTable).set({ title: m.title, objectives: [m.outcome], description: `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}` }).where(eq(modulesTable.id, modId));
+      // Converge the story beats in place (keeps beatIds → pre-filled progress intact) so a language or
+      // title change propagates, and reconcile the optional video beat (remove it if the module no longer
+      // has a video, add it if it gained one).
+      await db.update(beatsTable).set({ title: m.title, narration: TL(lang, `${m.hook}  By the end of this lesson you'll be able to: ${m.outcome}`, `${m.hook}  Al terminar esta lección podrás: ${m.outcome}`) }).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.order, 0)));
+      await db.update(beatsTable).set({ title: TL(lang, "Big ideas", "Ideas importantes"), narration: TL(lang, `Keep the question in mind: ${m.hook}`, `Ten presente la pregunta: ${m.hook}`), bulletPoints: m.points }).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.order, 1)));
+      await db.update(beatsTable).set({ title: TL(lang, "You've got this", "¡Tú puedes!"), narration: TL(lang, `Nice work — you can now ${m.outcome.toLowerCase()} Try the practice, then move on.`, `¡Buen trabajo! Ya puedes ${m.outcome.toLowerCase()} Haz la práctica y sigue adelante.`) }).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.order, 2)));
+      const vbeats = await db.select().from(beatsTable).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.type, "video")));
+      if (!m.video && vbeats.length) {
+        await db.delete(beatsTable).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.type, "video")));
+      } else if (m.video && !vbeats.length) {
+        await db.insert(beatsTable).values({ moduleId: modId, type: "video", order: 3, title: TL(lang, "Watch", "Ver"), narration: TL(lang, `Watch this short video, then keep going: ${m.hook}`, `Mira este video corto y luego continúa: ${m.hook}`), videoUrl: m.video });
+      }
+      await db.update(modulesTable).set({ beatCount: m.video ? 4 : 3 }).where(eq(modulesTable.id, modId));
     }
   }
 

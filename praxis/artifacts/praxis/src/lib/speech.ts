@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 
-const BCP47_MAP: Record<string, string> = { en: "en-ZA", zu: "zu-ZA", xh: "xh-ZA", af: "af-ZA", sn: "sn-ZW" };
+const BCP47_MAP: Record<string, string> = { en: "en-ZA", es: "es-US", zu: "zu-ZA", xh: "xh-ZA", af: "af-ZA", sn: "sn-ZW" };
 const FEMALE_HINT = /female|woman|zira|samantha|victoria|karen|moira|tessa|serena|fiona|susan|linda|amelie|joana/i;
 const MALE_HINT = /male|man|david|mark|daniel|alex|fred|george|arthur|thomas|oliver|rishi/i;
 
@@ -159,7 +159,7 @@ export function useSpeech() {
     if (v && supported) { window.speechSynthesis.cancel(); setSpeaking(false); }
   }, [supported]);
 
-  const BCP47: Record<string, string> = { en: "en-ZA", zu: "zu-ZA", xh: "xh-ZA", af: "af-ZA", sn: "sn-ZW" };
+  const BCP47: Record<string, string> = { en: "en-ZA", es: "es-US", zu: "zu-ZA", xh: "xh-ZA", af: "af-ZA", sn: "sn-ZW" };
 
   const femaleHint = /female|woman|zira|samantha|victoria|karen|moira|tessa|serena|fiona|susan|linda|amelie|joana/i;
   const maleHint = /male|man|david|mark|daniel|alex|fred|george|arthur|thomas|oliver|rishi/i;
