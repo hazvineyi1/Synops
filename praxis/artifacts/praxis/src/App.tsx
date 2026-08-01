@@ -73,6 +73,7 @@ import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
 import { ActivityPlay } from '@/pages/ActivityPlay';
 import { LivePlay } from '@/pages/LivePlay';
 import { LiveHost } from '@/pages/LiveHost';
+import { MathCoach } from '@/pages/MathCoach';
 import { ActivityEmbed } from '@/pages/ActivityEmbed';
 import { MyGrades } from '@/pages/MyGrades';
 import { Jotter } from '@/pages/Jotter';
@@ -250,6 +251,7 @@ function Routes() {
         <FocusRoute path="/learn/:sessionId" component={LearnSession} />
         <FocusRoute path="/case-run/:sessionId" component={CaseSession} />
         <FocusRoute path="/activities/:activityId/play" component={ActivityPlay} />
+        <FocusRoute path="/math-coach/:activityId" component={MathCoach} />
         <FocusRoute path="/live-host/:code" component={LiveHost} />
 
         {/* App layout routes */}

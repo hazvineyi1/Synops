@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
@@ -20,6 +20,11 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
     queryKey: ["activity", id],
     queryFn: () => activitiesApi.get(id),
   });
+
+  // Coach-assisted math activities have their own interactive surface, not the sandboxed player.
+  useEffect(() => {
+    if ((activity as { kind?: string } | undefined)?.kind === "math-coach") setLocation(`/math-coach/${id}`);
+  }, [activity, id, setLocation]);
 
   const submit = useMutation({
     mutationFn: (r: ActivityPlayerHandleResult) => activitiesApi.submit(id, r.payload, r.score),

@@ -545,7 +545,7 @@ function GameStudioDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
   const { user } = useSession();
   const isHub = !!user && ["super_admin", "instructional_designer"].includes(user.role);
   const { data: meta } = useQuery({ queryKey: ["game-templates"], queryFn: () => apiFetch<GameMeta>("/game-templates") });
-  const templates = meta?.templates ?? [];
+  const templates = [...(meta?.templates ?? []), { key: "mathcoach", name: "🧮 Math Coach", blurb: "Interactive problems with a Socratic coach that hints without giving the answer — great for visual, step-by-step math.", bands: ["k2", "35", "68", "912"] }];
   const bands = meta?.bands ?? [{ key: "k2", label: "K–2" }, { key: "35", label: "Grades 3–5" }, { key: "68", label: "Grades 6–8" }, { key: "912", label: "Grades 9–12" }];
   const rigorLevels = meta?.rigor ?? ["foundational", "intermediate", "advanced"];
 
@@ -567,29 +567,36 @@ function GameStudioDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
   const { data: modules } = useQuery({ queryKey: ["modules", courseId], queryFn: () => apiFetch<{ id: string; title: string; order: number }[]>(`/courses/${courseId}/modules`), enabled: mode === "module" && !!courseId });
 
   const tpl = templates.find((t) => t.key === templateKey);
+  const isMath = templateKey === "mathcoach";
+  const gradeLabel = bands.find((b) => b.key === band)?.label ?? band;
   const availableBands = tpl ? bands.filter((b) => tpl.bands.includes(b.key)) : bands;
 
   const generate = useMutation({
-    mutationFn: () => apiFetch<{ title: string; content: unknown; html: string }>("/games/generate", { method: "POST", body: JSON.stringify({ templateKey, subject, band, rigor: rig, content: mode === "paste" ? content : "", moduleId: mode === "module" ? moduleId : "" }) }),
+    mutationFn: async (): Promise<{ title: string; content: unknown; html: string }> => {
+      if (isMath) {
+        const r = await apiFetch<{ title: string; problems: unknown[] }>("/math-coach/generate", { method: "POST", body: JSON.stringify({ subject, grade: gradeLabel, rigor: rig, content: mode === "paste" ? content : "", moduleId: mode === "module" ? moduleId : "" }) });
+        return { title: r.title, content: { problems: r.problems }, html: "" };
+      }
+      return apiFetch<{ title: string; content: unknown; html: string }>("/games/generate", { method: "POST", body: JSON.stringify({ templateKey, subject, band, rigor: rig, content: mode === "paste" ? content : "", moduleId: mode === "module" ? moduleId : "" }) });
+    },
     onSuccess: (d) => { setDraft(d); setTitle(d.title); setInstructions(""); setJsonText(JSON.stringify(d.content, null, 2)); setShowJson(false); },
-    onError: (e) => toast({ title: "Could not generate a game", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+    onError: (e) => toast({ title: "Could not generate", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
   const rerender = useMutation({
     mutationFn: (c: unknown) => apiFetch<{ html: string }>("/games/render", { method: "POST", body: JSON.stringify({ templateKey, content: c }) }),
     onSuccess: (d) => setDraft((cur) => (cur ? { ...cur, html: d.html } : cur)),
     onError: (e) => toast({ title: "That game content isn't valid yet", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
-  const applyJson = () => { try { const c = JSON.parse(jsonText); setDraft((cur) => (cur ? { ...cur, content: c } : cur)); rerender.mutate(c); } catch { toast({ title: "That isn't valid JSON", variant: "destructive" }); } };
+  const applyJson = () => { try { const c = JSON.parse(jsonText); setDraft((cur) => (cur ? { ...cur, content: c } : cur)); if (!isMath) rerender.mutate(c); } catch { toast({ title: "That isn't valid JSON", variant: "destructive" }); } };
 
   const save = useMutation({
-    mutationFn: () => apiFetch("/activities", { method: "POST", body: JSON.stringify({
-      title: title.trim() || draft!.title, instructions: instructions.trim() || undefined, html: draft!.html,
-      source: "html", kind: "game", bloomsLevel: "Apply", difficulty: rig,
-      isLibrary: isHub, published: true,
-      tags: ["game-library", `game:${templateKey}`, `band:${band}`, ...(subject.trim() ? [`subject:${subject.trim()}`] : []), `rigor:${rig}`, ...(tpl ? [tpl.name] : [])],
-    }) }),
-    onSuccess: () => { toast({ title: isHub ? "Game saved to the library" : "Game saved" }); onSaved(); },
-    onError: (e) => toast({ title: "Could not save the game", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+    mutationFn: () => apiFetch("/activities", { method: "POST", body: JSON.stringify(
+      isMath
+        ? { title: title.trim() || draft!.title, instructions: instructions.trim() || undefined, html: JSON.stringify({ problems: (draft!.content as { problems: unknown[] }).problems }), source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: rig, isLibrary: isHub, published: true, tags: ["game-library", "game:mathcoach", "math-coach", `band:${band}`, ...(subject.trim() ? [`subject:${subject.trim()}`] : []), `rigor:${rig}`, "Math Coach"] }
+        : { title: title.trim() || draft!.title, instructions: instructions.trim() || undefined, html: draft!.html, source: "html", kind: "game", bloomsLevel: "Apply", difficulty: rig, isLibrary: isHub, published: true, tags: ["game-library", `game:${templateKey}`, `band:${band}`, ...(subject.trim() ? [`subject:${subject.trim()}`] : []), `rigor:${rig}`, ...(tpl ? [tpl.name] : [])] }
+    ) }),
+    onSuccess: () => { toast({ title: isHub ? "Saved to the library" : "Saved" }); onSaved(); },
+    onError: (e) => toast({ title: "Could not save", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
   const canGenerate = !!templateKey && (mode === "paste" ? content.trim().length > 20 : !!moduleId);
@@ -681,7 +688,16 @@ function GameStudioDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
             </div>
 
             <div className="rounded-xl overflow-hidden border">
-              <ActivityPlayer html={draft.html} disabled />
+              {isMath ? (
+                <div className="p-4 space-y-1.5 max-h-72 overflow-y-auto bg-white">
+                  <div className="text-xs text-muted-foreground mb-1">Problems (students solve these with the coach's help):</div>
+                  {(((draft.content as { problems?: { prompt: string; answer: string }[] }).problems) ?? []).map((pr, i) => (
+                    <div key={i} className="text-sm border-b pb-1"><span className="font-semibold">{i + 1}. {pr.prompt}</span> <span className="text-emerald-700">→ {pr.answer}</span></div>
+                  ))}
+                </div>
+              ) : (
+                <ActivityPlayer html={draft.html} disabled />
+              )}
             </div>
 
             <div>
@@ -924,9 +940,14 @@ export function ActivitiesAdmin() {
                   <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full" onClick={(e) => { e.stopPropagation(); setCourseFor(a); }}>
                     <Plus className="h-3 w-3" /> {a.isLibrary ? "Add to a class" : (a.courseId ? "Change course" : "Add to course")}
                   </Button>
-                  {a.source !== "embed" && a.published && (
+                  {a.source !== "embed" && a.published && a.kind !== "math-coach" && (
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full border-indigo-500/40 text-indigo-700" disabled={hostLive.isPending} onClick={(e) => { e.stopPropagation(); hostLive.mutate(a.id); }}>
                       <Play className="h-3 w-3" /> {hostLive.isPending ? "Starting…" : "Host live game"}
+                    </Button>
+                  )}
+                  {a.kind === "math-coach" && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full border-indigo-500/40 text-indigo-700" onClick={(e) => { e.stopPropagation(); navigate(`/math-coach/${a.id}`); }}>
+                      <Play className="h-3 w-3" /> Open Math Coach
                     </Button>
                   )}
                 </div>

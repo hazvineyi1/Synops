@@ -708,6 +708,37 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     }
   }
 
+  // 3e. A coach-assisted "Math Coach" activity for the Grade-6 math class: interactive problems with a
+  // draggable number line and a Socratic coach that hints (never gives the answer). Its own surface at
+  // /math-coach/:id, so it is stored as kind "math-coach" with the problems as JSON.
+  const mcCourseId = courseByPersona["maya.k12@synops-demo.test"];
+  if (mcCourseId) {
+    const [mcMod] = await db.select().from(modulesTable).where(eq(modulesTable.courseId, mcCourseId)).orderBy(asc(modulesTable.order)).limit(1);
+    if (mcMod) {
+      const problems = { problems: [
+        { prompt: "120 miles in 2 hours is how many miles per hour?", answer: "60", kind: "number", min: 0, max: 120, hint: "Divide the miles by the number of hours." },
+        { prompt: "$6 for 3 pounds. What is the price per pound, in dollars?", answer: "2", kind: "number", min: 0, max: 10, hint: "Divide the total cost by the number of pounds." },
+        { prompt: "The ratio of boys to girls is 3 to 4. If there are 12 boys, how many girls are there?", answer: "16", kind: "number", min: 0, max: 30, hint: "How many times bigger is 12 than 3? Do the same to the 4." },
+        { prompt: "A car travels 150 miles on 5 gallons. How many miles per gallon is that?", answer: "30", kind: "number", min: 0, max: 60, hint: "Miles divided by gallons." },
+        { prompt: "3 pens cost $1.50. How much do 5 pens cost, in dollars?", answer: "2.5", kind: "number", min: 0, max: 5, hint: "Find the cost of one pen first, then multiply by 5." },
+        { prompt: "A map scale is 1 inch = 20 miles. How many miles is 3 inches?", answer: "60", kind: "number", min: 0, max: 100, hint: "Multiply the number of inches by 20." },
+      ] };
+      const title = "🧮 Math Coach: Ratios & Rates";
+      const html = JSON.stringify(problems);
+      const existing = await db.select().from(interactiveActivitiesTable).where(and(eq(interactiveActivitiesTable.moduleId, mcMod.id), eq(interactiveActivitiesTable.title, title)));
+      if (existing[0]) {
+        await db.update(interactiveActivitiesTable).set({ html, updatedAt: new Date() }).where(eq(interactiveActivitiesTable.id, existing[0].id));
+      } else {
+        await db.insert(interactiveActivitiesTable).values({
+          organisationId: org.id, courseId: mcCourseId, moduleId: mcMod.id, title,
+          instructions: "Solve each problem. Drag the dot on the number line or type your answer. Stuck? Ask the coach — it helps you with hints, never the answer!",
+          html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "intermediate",
+          isLibrary: false, tags: ["math-coach", "game:mathcoach", "band:68", "subject:Math"], published: true, createdByUserId: facultyId,
+        });
+      }
+    }
+  }
+
   // 4. Teacher (admin) + class staff.
   const adminId = await upsertUser({ email: K12_ADMIN_EMAIL, firstName: "Ms.", lastName: "Ramírez", role: "partner_admin", partnerId: partner.id, organisationId: null });
   const existingStaff = (await db.select().from(orgClassStaffTable).where(eq(orgClassStaffTable.classId, cls.id))).map((s) => s.staffId);
