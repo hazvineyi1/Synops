@@ -940,7 +940,7 @@ export function ActivitiesAdmin() {
                   <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full" onClick={(e) => { e.stopPropagation(); setCourseFor(a); }}>
                     <Plus className="h-3 w-3" /> {a.isLibrary ? "Add to a class" : (a.courseId ? "Change course" : "Add to course")}
                   </Button>
-                  {a.source !== "embed" && a.published && a.kind !== "math-coach" && (
+                  {a.source !== "embed" && a.published && (
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full border-indigo-500/40 text-indigo-700" disabled={hostLive.isPending} onClick={(e) => { e.stopPropagation(); hostLive.mutate(a.id); }}>
                       <Play className="h-3 w-3" /> {hostLive.isPending ? "Starting…" : "Host live game"}
                     </Button>

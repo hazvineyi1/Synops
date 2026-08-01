@@ -20,6 +20,7 @@ export interface LiveRoom {
   code: string;
   activityId: string;
   title: string;
+  kind: string;
   hostUserId: string;
   createdAt: number;
   lastActivity: number;
@@ -63,7 +64,7 @@ function genCode(): string {
   return newId().slice(0, 6).toUpperCase();
 }
 
-export function createRoom(activityId: string, title: string, hostUserId: string): LiveRoom {
+export function createRoom(activityId: string, title: string, kind: string, hostUserId: string): LiveRoom {
   prune();
   if (rooms.size >= MAX_ROOMS) {
     // Evict the most stale room so a live class is never blocked by abandoned ones.
@@ -73,7 +74,7 @@ export function createRoom(activityId: string, title: string, hostUserId: string
   }
   const code = genCode();
   const room: LiveRoom = {
-    code, activityId, title: clean(title, 120) || "Live game", hostUserId,
+    code, activityId, title: clean(title, 120) || "Live game", kind: kind || "game", hostUserId,
     createdAt: now(), lastActivity: now(), buzzOpen: true,
     players: new Map(), buzzes: [], chat: [],
   };
@@ -153,7 +154,7 @@ export function postChat(code: string, playerId: string, text: string): boolean 
 }
 
 export function roomState(code: string): {
-  code: string; title: string; activityId: string; buzzOpen: boolean;
+  code: string; title: string; activityId: string; kind: string; buzzOpen: boolean;
   players: { name: string; team: string; score: number }[];
   teams: { team: string; total: number; players: number }[];
   buzzes: LiveBuzz[]; chat: LiveChat[]; playerCount: number;
@@ -172,7 +173,7 @@ export function roomState(code: string): {
     .map(([team, v]) => ({ team, total: v.total, players: v.players }))
     .sort((a, b) => b.total - a.total);
   return {
-    code: r.code, title: r.title, activityId: r.activityId, buzzOpen: r.buzzOpen,
+    code: r.code, title: r.title, activityId: r.activityId, kind: r.kind, buzzOpen: r.buzzOpen,
     players, teams, buzzes: r.buzzes.slice(), chat: r.chat.slice(-30), playerCount: r.players.size,
   };
 }

@@ -6,6 +6,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import {
   createRoom, getRoom, joinRoom, setScore, touch, addBuzz, resetBuzz, postChat, roomState,
 } from "../lib/liveGames";
+import { mathHint, mathWorkedExample } from "../lib/mathCoach";
 
 /**
  * Live multiplayer "host a game for the class" endpoints over the in-memory room store (see
@@ -20,15 +21,33 @@ router.post("/live/host", requireAuth, async (req, res) => {
   if (!activityId) { res.status(400).json({ error: "An activityId is required." }); return; }
   const [a] = await db.select().from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.id, activityId)).limit(1);
   if (!a) { res.status(404).json({ error: "Activity not found" }); return; }
-  const room = createRoom(a.id, a.title, req.userId!);
-  res.status(201).json({ code: room.code, activityId: a.id, title: room.title });
+  const room = createRoom(a.id, a.title, a.kind, req.userId!);
+  res.status(201).json({ code: room.code, activityId: a.id, title: room.title, kind: a.kind });
 });
 
 // Public preview of a room (the join screen checks the code before asking for a name).
 router.get("/live/:code", (req, res) => {
   const r = getRoom(req.params.code);
   if (!r) { res.status(404).json({ error: "No game with that code." }); return; }
-  res.json({ ok: true, code: r.code, title: r.title, activityId: r.activityId, playerCount: r.players.size });
+  res.json({ ok: true, code: r.code, title: r.title, activityId: r.activityId, kind: r.kind, playerCount: r.players.size });
+});
+
+// Code-gated Socratic coach for a Math Coach room, so joiners without accounts still get hints.
+router.post("/live/:code/hint", async (req, res) => {
+  const r = getRoom(req.params.code);
+  if (!r) { res.status(404).json({ error: "No game with that code." }); return; }
+  const b = req.body ?? {};
+  if (!String(b.problem ?? "").trim()) { res.status(400).json({ error: "A problem is required." }); return; }
+  const out = await mathHint({ problem: String(b.problem), answer: String(b.answer ?? ""), studentAnswer: b.studentAnswer ? String(b.studentAnswer) : undefined, attempts: Number(b.attempts) || 1, grade: b.grade ? String(b.grade) : undefined });
+  res.json(out);
+});
+router.post("/live/:code/worked-example", async (req, res) => {
+  const r = getRoom(req.params.code);
+  if (!r) { res.status(404).json({ error: "No game with that code." }); return; }
+  const b = req.body ?? {};
+  if (!String(b.problem ?? "").trim()) { res.status(400).json({ error: "A problem is required." }); return; }
+  const out = await mathWorkedExample({ problem: String(b.problem), answer: String(b.answer ?? ""), grade: b.grade ? String(b.grade) : undefined });
+  res.json(out);
 });
 
 // The hosted game's HTML — public but CODE-GATED (only the one activity being hosted, nothing else),

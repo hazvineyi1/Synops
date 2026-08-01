@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { ActivityPlayer } from "@/components/ActivityPlayer";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trophy, Hand, Users } from "lucide-react";
+import { Loader2, Trophy, Hand, Users, Lightbulb } from "lucide-react";
+import { NumberLine, BarModel, BalanceScale, check, type MathProblem } from "@/components/MathViz";
 
 interface LiveState {
   title: string; buzzOpen: boolean; playerCount: number;
@@ -14,6 +15,58 @@ const TEAMS = ["Red", "Blue", "Green", "Gold", "Solo"];
 const TEAM_COLOR: Record<string, string> = {
   Red: "bg-red-500", Blue: "bg-blue-500", Green: "bg-emerald-500", Gold: "bg-amber-500", Solo: "bg-slate-500",
 };
+
+/** A lean, multiplayer Math Coach player: same manipulatives + Socratic coach as the solo page, but
+ *  scores stream to the live-room leaderboard and the coach uses the code-gated hint endpoint. */
+function LiveMathPlayer({ problems, code, playerId, onScore }: { problems: MathProblem[]; code: string; playerId: string | null; onScore: (score: number) => void }) {
+  const [idx, setIdx] = useState(0);
+  const [typed, setTyped] = useState("");
+  const [lineVal, setLineVal] = useState<number | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const [flags, setFlags] = useState<boolean[]>([]);
+  const [fb, setFb] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [coach, setCoach] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const p = problems[idx];
+  const current = p?.kind === "number" && lineVal != null ? String(lineVal) : typed;
+  const post = (f: boolean[]) => onScore(Math.round((f.filter(Boolean).length / Math.max(1, problems.length)) * 100));
+  const next = (ok: boolean) => {
+    const f = flags.slice(); f[idx] = ok; setFlags(f); post(f);
+    if (idx + 1 >= problems.length) setDone(true);
+    else { setIdx(idx + 1); setTyped(""); setLineVal(null); setAttempts(0); setFb(null); setCoach([]); }
+  };
+  const checkIt = () => {
+    if (!p || !current) { setFb({ ok: false, msg: "Enter an answer." }); return; }
+    if (check(current, p.answer)) { setFb({ ok: true, msg: "Correct! 🎉" }); setTimeout(() => next(true), 800); }
+    else { setAttempts((a) => a + 1); setFb({ ok: false, msg: "Not quite — try again or ask the coach." }); }
+  };
+  const ask = async () => {
+    if (!p) return; setBusy(true);
+    try { const r = await apiFetch<{ hint: string }>(`/live/${code}/hint`, { method: "POST", body: JSON.stringify({ problem: p.prompt, answer: p.answer, studentAnswer: current || undefined, attempts: Math.max(1, attempts) }) }); setCoach((c) => [...c, r.hint]); }
+    catch { setCoach((c) => [...c, "What could you do first? Try one small step."]); }
+    finally { setBusy(false); }
+  };
+  if (done) return <div className="p-6 text-center"><div className="text-4xl mb-2">🏆</div><div className="font-bold">You finished! {flags.filter(Boolean).length}/{problems.length} correct</div><div className="text-sm text-muted-foreground">Your score is on the leaderboard.</div></div>;
+  if (!p) return <div className="p-6 text-center text-muted-foreground">No problems in this game.</div>;
+  return (
+    <div className="p-4 space-y-3">
+      <div className="text-xs font-semibold text-indigo-600">Problem {idx + 1}/{problems.length}</div>
+      <p className="text-lg font-semibold">{p.prompt}</p>
+      {p.visual === "balance" && p.eq ? <BalanceScale eq={p.eq} onSolved={(x) => { setTyped(String(x)); setLineVal(null); }} />
+        : p.visual === "bar" && p.bars && p.bars.length ? <BarModel bars={p.bars} onPick={(v) => { setTyped(String(v)); setLineVal(null); }} />
+        : p.kind === "number" && typeof p.min === "number" && typeof p.max === "number" ? <NumberLine min={p.min} max={p.max} value={lineVal} onChange={(v) => { setLineVal(v); setTyped(String(v)); }} />
+        : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <input value={typed} onChange={(e) => { setTyped(e.target.value); const n = Number(e.target.value); setLineVal(Number.isFinite(n) && e.target.value.trim() !== "" ? n : null); }} onKeyDown={(e) => { if (e.key === "Enter") checkIt(); }} placeholder="Your answer" className="rounded-xl border-2 border-indigo-200 px-3 py-2 w-36 outline-none focus:border-indigo-500" />
+        <Button onClick={checkIt}>Check</Button>
+        <Button variant="outline" className="gap-1 border-amber-400/50 text-amber-700" disabled={busy} onClick={ask}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />} Coach</Button>
+        {fb && <span className={`text-sm font-semibold ${fb.ok ? "text-emerald-700" : "text-amber-700"}`}>{fb.msg}</span>}
+      </div>
+      {coach.length > 0 && <div className="rounded-xl bg-amber-50 border border-amber-200 p-2 text-sm space-y-1">{coach.map((c, i) => <div key={i}>💡 {c}</div>)}</div>}
+    </div>
+  );
+}
 
 /**
  * Public "join a live game" screen. A student enters the code their teacher shows, picks a name and
@@ -30,6 +83,8 @@ export function LivePlay({ params }: { params?: { code?: string } }) {
   const [team, setTeam] = useState("Solo");
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [game, setGame] = useState<{ html: string; embedUrl?: string | null; instructions?: string | null } | null>(null);
+  const [kind, setKind] = useState<string>("game");
+  const [problems, setProblems] = useState<MathProblem[]>([]);
   const [state, setState] = useState<LiveState | null>(null);
   const [myScore, setMyScore] = useState<number | null>(null);
   const [buzzed, setBuzzed] = useState(false);
@@ -38,8 +93,8 @@ export function LivePlay({ params }: { params?: { code?: string } }) {
     if (!c || c.length < 4) { setErr("Enter the 4-letter code from your teacher."); return; }
     setErr(null); setBusy(true);
     try {
-      const r = await apiFetch<{ ok: boolean; title: string }>(`/live/${c}`);
-      setRoomTitle(r.title); setCode(c); setPhase("name");
+      const r = await apiFetch<{ ok: boolean; title: string; kind?: string }>(`/live/${c}`);
+      setRoomTitle(r.title); setKind(r.kind || "game"); setCode(c); setPhase("name");
     } catch { setErr("No game with that code. Double-check with your teacher."); }
     finally { setBusy(false); }
   };
@@ -53,7 +108,9 @@ export function LivePlay({ params }: { params?: { code?: string } }) {
       const r = await apiFetch<{ playerId: string }>(`/live/${code}/join`, { method: "POST", body: JSON.stringify({ name: name.trim(), team }) });
       setPlayerId(r.playerId);
       const g = await apiFetch<{ html: string; embedUrl?: string | null; instructions?: string | null }>(`/live/${code}/activity`);
-      setGame(g); setPhase("play");
+      setGame(g);
+      if (kind === "math-coach") { try { const j = JSON.parse(g.html || "{}"); setProblems(Array.isArray(j.problems) ? j.problems : []); } catch { setProblems([]); } }
+      setPhase("play");
     } catch (e) { setErr(e instanceof Error ? e.message : "Could not join."); }
     finally { setBusy(false); }
   };
@@ -141,9 +198,11 @@ export function LivePlay({ params }: { params?: { code?: string } }) {
             </div>
 
             <div className="rounded-2xl overflow-hidden border shadow-sm bg-white">
-              <ActivityPlayer html={game.html} embedUrl={game.embedUrl} onSubmit={onSubmit} />
+              {kind === "math-coach"
+                ? <LiveMathPlayer problems={problems} code={code} playerId={playerId} onScore={(s) => onSubmit({ score: s })} />
+                : <ActivityPlayer html={game.html} embedUrl={game.embedUrl} onSubmit={onSubmit} />}
             </div>
-            {myScore != null && <div className="text-center text-sm font-semibold text-emerald-700">Your score this round: {myScore} — sent to the leaderboard! 🎉</div>}
+            {myScore != null && kind !== "math-coach" && <div className="text-center text-sm font-semibold text-emerald-700">Your score this round: {myScore} — sent to the leaderboard! 🎉</div>}
 
             {state && (
               <div className="grid sm:grid-cols-2 gap-4">
