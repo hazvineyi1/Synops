@@ -453,7 +453,7 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
       { moduleId: mod.id, type: "points", order: 1, title: "Big ideas", narration: `Keep the question in mind: ${m.hook}`, bulletPoints: m.points },
       { moduleId: mod.id, type: "close", order: 2, title: "You've got this", narration: `Nice work — you can now ${m.outcome.toLowerCase()} Try the practice, then move on.` },
       // Optional teaching video (YouTube) — surfaced as a "Watch" step in the young lesson view.
-      ...(m.video ? [{ moduleId: mod.id, type: "video" as const, order: 3, title: "Watch", videoUrl: m.video }] : []),
+      ...(m.video ? [{ moduleId: mod.id, type: "video" as const, order: 3, title: "Watch", narration: `Watch this short video, then keep going: ${m.hook}`, videoUrl: m.video }] : []),
     ]);
     await db.update(modulesTable).set({ beatCount: m.video ? 4 : 3 }).where(eq(modulesTable.id, mod.id));
 
@@ -524,7 +524,30 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   let standardsCount = 0;
   const courseByPersona: Record<string, string> = {};
   for (const c of COURSES) {
-    const existing = firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
+    let existing = firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
+    // Self-heal a PARTIAL course. A prior seed can abort mid-build (e.g. an insert error on one
+    // module), leaving a course with fewer modules than it should have — which idempotent reuse
+    // would then keep forever. If the existing course is short on modules, tear it and its
+    // dependents down completely so it rebuilds clean below.
+    if (existing) {
+      const emods = await db.select({ id: modulesTable.id }).from(modulesTable).where(eq(modulesTable.courseId, existing.id));
+      if (emods.length < c.modules.length) {
+        const emodIds = emods.map((m) => m.id);
+        if (emodIds.length) {
+          await db.delete(beatsTable).where(inArray(beatsTable.moduleId, emodIds));
+          await db.delete(moduleReadingsTable).where(inArray(moduleReadingsTable.moduleId, emodIds));
+          await db.delete(interactiveActivitiesTable).where(inArray(interactiveActivitiesTable.moduleId, emodIds));
+          await db.delete(caseScenariosTable).where(inArray(caseScenariosTable.moduleId, emodIds));
+        }
+        await db.delete(beatProgressTable).where(eq(beatProgressTable.courseId, existing.id));
+        await db.delete(enrolmentsTable).where(eq(enrolmentsTable.courseId, existing.id));
+        await db.delete(orgClassCoursesTable).where(eq(orgClassCoursesTable.courseId, existing.id));
+        await db.delete(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.courseId, existing.id));
+        await db.delete(modulesTable).where(eq(modulesTable.courseId, existing.id));
+        await db.delete(coursesTable).where(eq(coursesTable.id, existing.id));
+        existing = null;
+      }
+    }
     const courseId = existing ? existing.id : await createK12Course(c, org.id, facultyId);
     courseByPersona[c.persona.email] = courseId;
     standardsCount += c.modules.reduce((n, m) => n + m.standards.length, 0);
