@@ -46,7 +46,11 @@ const CSS = ":root{--indigo:#4F46E5;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;-
   + ".door-wrap{perspective:600px;display:inline-block;margin:2px auto 0}.door-frame{width:78px;height:104px;background:#1f2937;border-radius:8px;padding:6px;position:relative;box-shadow:inset 0 0 0 3px #f59e0b}"
   + ".door{width:100%;height:100%;background:linear-gradient(135deg,#7c4a03,#b45309);border-radius:5px;transform-origin:left center;transition:transform 1s ease;position:relative;transform-style:preserve-3d}"
   + ".door:before{content:'';position:absolute;right:8px;top:46px;width:9px;height:9px;border-radius:50%;background:#fde68a}.door.open{transform:rotateY(-105deg)}.door-frame.lit{box-shadow:inset 0 0 0 3px #22c55e,0 0 22px #22c55e}"
-  + ".lockrow{display:flex;gap:6px;justify-content:center;margin-top:8px}.lockdot{font-size:1.3rem;filter:grayscale(1);opacity:.6;transition:.3s}.lockdot.open{filter:none;opacity:1;transform:scale(1.15)}";
+  + ".lockrow{display:flex;gap:6px;justify-content:center;margin-top:8px}.lockdot{font-size:1.3rem;filter:grayscale(1);opacity:.6;transition:.3s}.lockdot.open{filter:none;opacity:1;transform:scale(1.15)}"
+  // AI opponent ("Coach Bot") controls + race bar.
+  + ".botctl{text-align:center;font-size:.85rem;color:#94a3b8;margin:8px 0}.botctl button{border:2px solid #e6e0d0;background:#fff;color:var(--ink);border-radius:10px;padding:3px 11px;font-weight:700;margin:0 3px;cursor:pointer}.botctl button:hover{border-color:var(--indigo)}"
+  + "#botrow{display:flex;align-items:center;gap:8px;margin:4px 0}#botrow span{font-size:.8rem;font-weight:800;color:#ef4444;white-space:nowrap}#botrow .bar{flex:1;margin:0}#bf{background:linear-gradient(90deg,#ef4444,#f59e0b)}"
+  + ".rematch{border:2px solid var(--indigo);background:#fff;color:var(--indigo);border-radius:12px;padding:6px 16px;font-weight:800;cursor:pointer;margin-top:8px}";
 
 const COMMON = "function $(i){return document.getElementById(i);}"
   + "function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}"
@@ -56,7 +60,12 @@ const COMMON = "function $(i){return document.getElementById(i);}"
   + "function speak(t){try{if('speechSynthesis'in window){window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance(t);u.rate=.95;window.speechSynthesis.speak(u);}}catch(e){}}"
   + "function confetti(){for(var i=0;i<36;i++){var s=document.createElement('span');s.className='cf';s.style.left=(Math.random()*100)+'vw';s.style.animationDuration=(1.6+Math.random()*1.5)+'s';s.style.animationDelay=(Math.random()*.4)+'s';s.textContent=['🎉','⭐','🌟','🎊','✨','🏆'][i%6];document.body.appendChild(s);(function(x){setTimeout(function(){x.remove();},3600);})(s);}}"
   + "function burst(el,kind){try{var r=el.getBoundingClientRect();var set=['🎈','⭐','🎉','✨'];for(var i=0;i<9;i++){var s=document.createElement('span');s.className='cf';s.style.left=((r.left||0)+Math.random()*Math.max(r.width||20,20))+'px';s.style.top=((r.top||0))+'px';s.style.animationDuration='1.2s';s.style.animationDelay=(Math.random()*.2)+'s';s.textContent=set[i%set.length];document.body.appendChild(s);(function(x){setTimeout(function(){x.remove();},1500);})(s);}}catch(e){}}"
-  + "function endGame(pct,msg){setBar(100);var d=$('done');if(d){d.innerHTML='🎉 '+(msg||('You scored '+Math.round(pct)+'%'));d.style.display='block';}var h=$('hint');if(h)h.style.display='none';confetti();setTimeout(function(){report(pct);},1300);}";
+  + "var BOT={on:false,dur:0,t0:0,iv:null,frac:0};"
+  + "function botTick(){var e=(Date.now()-BOT.t0)/1000;BOT.frac=Math.min(1,e/BOT.dur);var bf=$('bf');if(bf)bf.style.width=Math.round(BOT.frac*100)+'%';var s=$('botlbl');if(s)s.textContent=BOT.frac>=1?'🤖 Bot: done!':'🤖 Coach Bot';if(BOT.frac>=1&&BOT.iv){clearInterval(BOT.iv);BOT.iv=null;}}"
+  + "function botStart(dur){if(BOT.on)return;BOT.on=true;BOT.dur=dur;BOT.t0=Date.now();var tog=$('bottog');if(tog)tog.style.display='none';var row=$('botrow');if(row)row.style.display='flex';botTick();BOT.iv=setInterval(botTick,300);}"
+  + "function botInit(){var e=$('bote'),m=$('botm'),h=$('both');if(e)e.onclick=function(){botStart(90);};if(m)m.onclick=function(){botStart(60);};if(h)h.onclick=function(){botStart(40);};}"
+  + "function endGame(pct,msg){if(BOT.iv){clearInterval(BOT.iv);BOT.iv=null;}var extra='';if(BOT.on){var beat=BOT.frac<1;extra=beat?'<div style=\"color:#15803d;margin-top:4px\">You beat the 🤖 Coach Bot! 🏆</div>':'<div style=\"color:#b91c1c;margin-top:4px\">The 🤖 Coach Bot finished first — so close! Try a rematch.</div>';extra+='<div><button class=\"rematch\" id=\"rematch\">🔁 Rematch</button></div>';}setBar(100);var d=$('done');if(d){d.innerHTML='🎉 '+(msg||('You scored '+Math.round(pct)+'%'))+extra;d.style.display='block';var rb=$('rematch');if(rb)rb.onclick=function(){location.reload();};}var h2=$('hint');if(h2)h2.style.display='none';confetti();setTimeout(function(){report(pct);},1300);}"
+  + "botInit();";
 
 function page(title: string, data: unknown, script: string, theme = "default", banner = ""): string {
   const json = JSON.stringify(data).replace(/</g, "\\u003c");
@@ -66,7 +75,10 @@ function page(title: string, data: unknown, script: string, theme = "default", b
     + "<div class=\"stage" + cls + "\">"
     + (banner ? "<div class=\"banner\">" + banner + "</div>" : "")
     + "<h2>" + title + "</h2><div id=\"stars\"></div><div id=\"app\"></div>"
-    + "<div class=\"bar\"><div class=\"fill\" id=\"f\"></div></div><p id=\"hint\" class=\"hint\"></p><div id=\"done\" class=\"done\"></div>"
+    + "<div class=\"bar\"><div class=\"fill\" id=\"f\"></div></div>"
+    + "<div id=\"botrow\" style=\"display:none\"><span id=\"botlbl\">🤖 Coach Bot</span><div class=\"bar\"><div class=\"fill\" id=\"bf\"></div></div></div>"
+    + "<div id=\"bottog\" class=\"botctl\">Play against the Coach Bot? <button id=\"bote\">🤖 Easy</button><button id=\"botm\">Medium</button><button id=\"both\">Hard</button></div>"
+    + "<p id=\"hint\" class=\"hint\"></p><div id=\"done\" class=\"done\"></div>"
     + "</div>"
     + "<script>var DATA=" + json + ";" + COMMON + "\n" + script + "</script>";
 }
