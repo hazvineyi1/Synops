@@ -718,7 +718,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
       const problems = { problems: [
         { prompt: "120 miles in 2 hours is how many miles per hour?", answer: "60", kind: "number", min: 0, max: 120, hint: "Divide the miles by the number of hours." },
         { prompt: "$6 for 3 pounds. What is the price per pound, in dollars?", answer: "2", kind: "number", min: 0, max: 10, hint: "Divide the total cost by the number of pounds." },
-        { prompt: "The ratio of boys to girls is 3 to 4. If there are 12 boys, how many girls are there?", answer: "16", kind: "number", min: 0, max: 30, hint: "How many times bigger is 12 than 3? Do the same to the 4." },
+        { prompt: "The ratio of boys to girls is 3 to 4. If there are 12 boys, how many girls are there?", answer: "16", kind: "number", min: 0, max: 30, visual: "bar", bars: [{ label: "Boys", units: 3 }, { label: "Girls", units: 4 }], hint: "Make the Boys bar equal 12. What is each unit worth? Now read the Girls bar." },
         { prompt: "A car travels 150 miles on 5 gallons. How many miles per gallon is that?", answer: "30", kind: "number", min: 0, max: 60, hint: "Miles divided by gallons." },
         { prompt: "3 pens cost $1.50. How much do 5 pens cost, in dollars?", answer: "2.5", kind: "number", min: 0, max: 5, hint: "Find the cost of one pen first, then multiply by 5." },
         { prompt: "A map scale is 1 inch = 20 miles. How many miles is 3 inches?", answer: "60", kind: "number", min: 0, max: 100, hint: "Multiply the number of inches by 20." },
@@ -734,6 +734,36 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
           instructions: "Solve each problem. Drag the dot on the number line or type your answer. Stuck? Ask the coach — it helps you with hints, never the answer!",
           html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "intermediate",
           isLibrary: false, tags: ["math-coach", "game:mathcoach", "band:68", "subject:Math"], published: true, createdByUserId: facultyId,
+        });
+      }
+    }
+  }
+
+  // 3f. A balance-scale Math Coach for the Grade-11 Algebra class: solve linear equations by keeping
+  // the scale balanced (do the same to both sides), with Socratic coaching.
+  const algCourseId = courseByPersona["emma.k12@synops-demo.test"];
+  if (algCourseId) {
+    const [algMod] = await db.select().from(modulesTable).where(eq(modulesTable.courseId, algCourseId)).orderBy(asc(modulesTable.order)).limit(1);
+    if (algMod) {
+      const problems = { problems: [
+        { prompt: "Solve for x:  2x + 3 = 11", answer: "4", kind: "number", min: 0, max: 12, visual: "balance", eq: { a: 2, b: 3, c: 11 }, hint: "First get the x-boxes by themselves — clear the +3." },
+        { prompt: "Solve for x:  4x = 20", answer: "5", kind: "number", min: 0, max: 12, visual: "balance", eq: { a: 4, b: 0, c: 20 }, hint: "Divide both sides by 4." },
+        { prompt: "Solve for x:  3x − 6 = 9", answer: "5", kind: "number", min: 0, max: 12, visual: "balance", eq: { a: 3, b: -6, c: 9 }, hint: "Add 6 to both sides first, then divide." },
+        { prompt: "Solve for x:  2x − 4 = 10", answer: "7", kind: "number", min: 0, max: 15, visual: "balance", eq: { a: 2, b: -4, c: 10 }, hint: "Add 4 to both sides, then divide by 2." },
+        { prompt: "The slope of  y = 4x + 2  is…", answer: "4", kind: "number", min: 0, max: 10, hint: "In y = mx + b, m is the slope." },
+        { prompt: "If  f(x) = 2x + 1,  find f(3).", answer: "7", kind: "number", min: 0, max: 15, hint: "Put 3 in place of x, then work it out." },
+      ] };
+      const title = "🧮 Math Coach: Solving Equations";
+      const html = JSON.stringify(problems);
+      const existing = await db.select().from(interactiveActivitiesTable).where(and(eq(interactiveActivitiesTable.moduleId, algMod.id), eq(interactiveActivitiesTable.title, title)));
+      if (existing[0]) {
+        await db.update(interactiveActivitiesTable).set({ html, updatedAt: new Date() }).where(eq(interactiveActivitiesTable.id, existing[0].id));
+      } else {
+        await db.insert(interactiveActivitiesTable).values({
+          organisationId: org.id, courseId: algCourseId, moduleId: algMod.id, title,
+          instructions: "Solve each equation by keeping the scale balanced — do the same to both sides until one x is left. Stuck? Ask the coach for a hint.",
+          html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "advanced",
+          isLibrary: false, tags: ["math-coach", "game:mathcoach", "band:912", "subject:Math"], published: true, createdByUserId: facultyId,
         });
       }
     }

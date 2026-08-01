@@ -89,7 +89,16 @@ Rules:
   }
 }
 
-export interface MathProblem { prompt: string; answer: string; kind: "number" | "text"; min?: number; max?: number; hint?: string }
+export interface MathProblem {
+  prompt: string; answer: string; kind: "number" | "text"; min?: number; max?: number; hint?: string;
+  // Optional visual manipulative the learner works with:
+  //   "bar"     — a tape/bar model for ratios & part-whole. Provide `bars` (each with a label + unit count).
+  //   "balance" — a balance scale for linear equations a*x + b = c. Provide `eq`.
+  //   default is a number line (for a single numeric answer).
+  visual?: "numberline" | "bar" | "balance";
+  bars?: { label: string; units: number }[];
+  eq?: { a: number; b: number; c: number };
+}
 
 /** Generate a set of math problems grounded in the lesson content, at a grade + rigor. */
 export async function generateMathSet(input: { subject: string; grade: string; rigor: string; content: string; topic?: string }): Promise<{ title: string; problems: MathProblem[] }> {
@@ -97,13 +106,17 @@ export async function generateMathSet(input: { subject: string; grade: string; r
   if (content.length < 20) throw new Error("Add more lesson content to generate math problems from.");
   const system = `You are an expert math teacher. Create a set of practice problems grounded strictly in the provided lesson content, pitched to ${input.grade} at ${input.rigor} rigor.
 Return ONLY strict JSON of this exact shape:
-{"title": string, "problems": [{"prompt": string, "answer": string, "kind": "number" | "text", "min": number, "max": number, "hint": string}]}
+{"title": string, "problems": [{"prompt": string, "answer": string, "kind": "number" | "text", "min": number, "max": number, "hint": string, "visual": "numberline" | "bar" | "balance", "bars": [{"label": string, "units": number}], "eq": {"a": number, "b": number, "c": number}}]}
 Rules:
 - 6 problems, rising in difficulty.
 - "prompt" is the problem the student solves (e.g. "Solve: 2x - 4 = 10" or "A recipe uses 2 cups flour for 3 cups sugar. How many cups of flour for 9 cups of sugar?").
 - "answer" is the exact answer (e.g. "7", "6 cups", "x = 5"). Keep it short.
-- "kind": "number" when the answer is a single number the student can place on a number line; otherwise "text".
-- For "number" kind, set "min" and "max" to a sensible whole-number range that BRACKETS the answer for a number-line (e.g. answer 7 -> min 0, max 15). Omit or 0 for "text".
+- "kind": "number" when the answer is a single number; otherwise "text".
+- Choose the best VISUAL manipulative per problem:
+  - "balance": for a LINEAR EQUATION of the form a*x + b = c (b may be negative). Set "eq":{"a":..,"b":..,"c":..}; the answer is x. Use ONLY small whole-number coefficients and a whole-number solution.
+  - "bar": for a RATIO or part-whole problem. Set "bars" to the parts as whole unit counts (e.g. boys 3 units, girls 4 units). Keep it to 2 bars.
+  - "numberline": for any other single-number answer. Set "min" and "max" to a whole-number range that BRACKETS the answer (e.g. answer 7 -> min 0, max 15).
+- Always still set "kind", and "min"/"max" whenever the answer is a single number (even for bar/balance) so it can be checked. For "text" answers use "numberline" only if numeric; otherwise omit min/max.
 - "hint": one short first-step nudge (never the answer).
 - Ground every problem in the lesson content. Plain text only.`;
   const user = `Subject: ${input.subject || "Math"}. ${input.topic ? "Focus: " + input.topic + ". " : ""}Build the problems from this LESSON CONTENT:\n\n${content.slice(0, 12000)}\n\nReturn ONLY the JSON.`;
@@ -122,12 +135,22 @@ Rules:
     .filter((p): p is Record<string, unknown> => !!p && typeof p === "object" && typeof (p as { prompt?: unknown }).prompt === "string" && String((p as { prompt?: unknown }).prompt).trim().length > 0)
     .map((p) => {
       const kind = (p.kind === "number" && Number.isFinite(Number(p.min)) && Number.isFinite(Number(p.max))) ? "number" : "text";
+      const eq = p.eq as { a?: unknown; b?: unknown; c?: unknown } | undefined;
+      const eqOk = !!eq && [eq.a, eq.b, eq.c].every((n) => Number.isFinite(Number(n)));
+      const barsRaw = Array.isArray(p.bars) ? (p.bars as { label?: unknown; units?: unknown }[]) : [];
+      const bars = barsRaw.filter((x) => x && Number.isFinite(Number(x.units))).map((x) => ({ label: String(x.label ?? ""), units: Number(x.units) }));
+      let visual: "numberline" | "bar" | "balance" = "numberline";
+      if (p.visual === "balance" && eqOk) visual = "balance";
+      else if (p.visual === "bar" && bars.length >= 1) visual = "bar";
       return {
         prompt: String(p.prompt),
         answer: String(p.answer ?? ""),
         kind: kind as "number" | "text",
         ...(kind === "number" ? { min: Number(p.min), max: Number(p.max) } : {}),
         hint: typeof p.hint === "string" ? p.hint : undefined,
+        visual,
+        ...(visual === "bar" ? { bars } : {}),
+        ...(visual === "balance" && eqOk ? { eq: { a: Number(eq!.a), b: Number(eq!.b), c: Number(eq!.c) } } : {}),
       };
     })
     .slice(0, 8);
