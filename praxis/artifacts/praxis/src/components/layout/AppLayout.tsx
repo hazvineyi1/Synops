@@ -41,6 +41,7 @@ import {
   FileWarning,
   Search,
   RotateCcw,
+  ChevronDown,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
@@ -420,11 +421,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Breadcrumb label for the super-admin command bar: the most-specific active nav item.
   const activeNavLabel = flatNav.find((i) => isNavActive(i.href))?.label ?? '';
 
-  const groupHeading = (text: string) => (
-    <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.32)' }}>
-      {text}
-    </p>
-  );
+  // Collapsible nav sections. Every section TITLE stays visible so the whole menu is scannable at a
+  // glance (no more hunting via a tiny scrollbar); the section you're currently in is always open, and
+  // any other sections you open are remembered across visits.
+  const activeHeading = navGroups.find((g) => g.heading && g.items.some((i) => isNavActive(i.href)))?.heading ?? null;
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('navOpenSections') || '{}'); } catch { return {}; }
+  });
+  const sectionOpen = (heading: string) => heading === activeHeading || openSections[heading] === true;
+  const toggleSection = (heading: string) => setOpenSections((prev) => {
+    const next = { ...prev, [heading]: !(prev[heading] === true) };
+    try { localStorage.setItem('navOpenSections', JSON.stringify(next)); } catch { /* ignore */ }
+    return next;
+  });
+  const collapsibleHeading = (text: string) => {
+    const open = sectionOpen(text);
+    const isActive = text === activeHeading;
+    return (
+      <button type="button" onClick={() => toggleSection(text)} aria-expanded={open}
+        className="w-full flex items-center gap-1.5 px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider hover:text-white/60 transition-colors"
+        style={{ color: 'rgba(255,255,255,0.32)' }}>
+        <ChevronDown className="h-3 w-3 shrink-0 transition-transform duration-150" style={{ transform: open ? 'none' : 'rotate(-90deg)' }} />
+        <span className="truncate">{text}</span>
+        {isActive && !open && <span className="ml-auto h-1.5 w-1.5 rounded-full" style={{ background: '#c4b5fd' }} />}
+      </button>
+    );
+  };
 
   return (
     <div className="flex h-[100dvh] overflow-hidden" style={{ background: CONTENT_BG }}>
@@ -479,15 +501,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         )}
 
-        <nav className="flex-1 py-5 px-3 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.25) transparent" }}>
-          {navGroups.map((group, gi) => (
-            <div key={gi} className="mb-1 space-y-0.5">
-              {group.heading && groupHeading(group.heading)}
-              {group.items.map((item) => (
-                <ShellNavLink key={item.href + item.label} item={item} active={isNavActive(item.href)} />
-              ))}
-            </div>
-          ))}
+        <nav className="flex-1 py-4 px-3 overflow-y-auto" style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.25) transparent" }}>
+          {navGroups.map((group, gi) => {
+            const open = group.heading ? sectionOpen(group.heading) : true;
+            return (
+              <div key={gi} className="mb-0.5 space-y-0.5">
+                {group.heading && collapsibleHeading(group.heading)}
+                {open && group.items.map((item) => (
+                  <ShellNavLink key={item.href + item.label} item={item} active={isNavActive(item.href)} />
+                ))}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="p-4 space-y-1" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
@@ -603,20 +628,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="flex-1 overflow-y-auto px-4 py-4">
-            {navGroups.map((group, gi) => (
-              <div key={gi} className="mb-1 space-y-0.5">
-                {group.heading && groupHeading(group.heading)}
-                {group.items.map((item) => (
-                  <ShellNavLink
-                    key={item.href + item.label}
-                    item={item}
-                    active={isNavActive(item.href)}
-                    large
-                    onClick={() => setMobileMenuOpen(false)}
-                  />
-                ))}
-              </div>
-            ))}
+            {navGroups.map((group, gi) => {
+              const open = group.heading ? sectionOpen(group.heading) : true;
+              return (
+                <div key={gi} className="mb-0.5 space-y-0.5">
+                  {group.heading && collapsibleHeading(group.heading)}
+                  {open && group.items.map((item) => (
+                    <ShellNavLink
+                      key={item.href + item.label}
+                      item={item}
+                      active={isNavActive(item.href)}
+                      large
+                      onClick={() => setMobileMenuOpen(false)}
+                    />
+                  ))}
+                </div>
+              );
+            })}
 
             <ShellNavLink
               item={{ label: t('nav.notifications'), href: '/notifications', icon: Bell }}
