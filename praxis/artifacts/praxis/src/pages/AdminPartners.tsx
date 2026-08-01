@@ -483,6 +483,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not seed Synops K-12', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Seed the reusable Game Library repository (Jeopardy, Feud, Bingo, Password, Wheel, Escape Room per
+  // grade band) + a curated linked catalog of commercial titles. Platform library, browsable by every tenant.
+  const seedGameLibrary = useMutation({
+    mutationFn: () => apiFetch<{ games: number; catalog: number; created: number; updated: number }>('/platform/seed-game-library', { method: 'POST' }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['activities'] });
+      toast({ title: 'Game Library ready', description: `${r.games} game activities + ${r.catalog} catalog links (${r.created} new, ${r.updated} updated).` });
+    },
+    onError: (e: any) => toast({ title: 'Could not seed Game Library', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   return (
     <div className="space-y-8 animate-in fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -550,6 +561,11 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Provision the public K-12 demo (praxis.synops-consulting.com/k12): Grade-6 Math/ELA/Science/Social Studies/History aligned to Common Core, NGSS and C3, plus Maya (standard) and Leo (accommodations)?')) seedK12.mutate(); }}
                 title="Provision the Synops K-12 demo tenant for praxis.synops-consulting.com/k12">
                 {seedK12.isPending ? 'Provisioning…' : 'Seed K-12 Demo'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedGameLibrary.isPending}
+                onClick={() => { if (window.confirm('Seed the reusable Game Library: Jeopardy, Family Feud, Bingo, Password, Wheel/Guess-the-Word and Escape Room per grade band, plus a curated catalog of commercial titles. Safe to re-run.')) seedGameLibrary.mutate(); }}
+                title="Seed the shared Game Library repository of ready-to-use game activities">
+                {seedGameLibrary.isPending ? 'Seeding…' : 'Seed Game Library'}
               </Button>
               <Button variant="outline" size="sm" disabled={resync.isPending}
                 onClick={() => { if (window.confirm('Resync demo learner progress against the current content?')) resync.mutate(); }}

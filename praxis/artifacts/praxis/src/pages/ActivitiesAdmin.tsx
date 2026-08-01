@@ -496,32 +496,38 @@ function AddActivityToCourseDialog({ activity, onClose }: { activity: Activity; 
   const [moduleId, setModuleId] = useState<string>(activity.moduleId ?? "");
   const { data: courses } = useQuery({ queryKey: ["courses", "authoring"], queryFn: () => apiFetch<{ id: string; title: string }[]>("/courses?includeIncomplete=true") });
   const { data: modules } = useQuery({ queryKey: ["modules", courseId], queryFn: () => apiFetch<{ id: string; title: string; order: number }[]>(`/courses/${courseId}/modules`), enabled: !!courseId });
+  // A shared library game is CLONED into the chosen module (a copy for the class), leaving the
+  // library original untouched. A tenant-owned activity is simply re-homed via PATCH.
+  const isClone = activity.isLibrary;
   const save = useMutation({
-    mutationFn: () => apiFetch(`/activities/${activity.id}`, { method: "PATCH", body: JSON.stringify({ courseId: courseId || null, moduleId: moduleId || null }) }),
-    onSuccess: () => { toast({ title: courseId ? "Added to course" : "Removed from course" }); qc.invalidateQueries({ queryKey: ["activities"] }); onClose(); },
+    mutationFn: () => isClone
+      ? apiFetch(`/activities/${activity.id}/clone-to-module`, { method: "POST", body: JSON.stringify({ moduleId }) })
+      : apiFetch(`/activities/${activity.id}`, { method: "PATCH", body: JSON.stringify({ courseId: courseId || null, moduleId: moduleId || null }) }),
+    onSuccess: () => { toast({ title: isClone ? "Game added to the class" : (courseId ? "Added to course" : "Removed from course") }); qc.invalidateQueries({ queryKey: ["activities"] }); onClose(); },
     onError: (e) => toast({ title: "Could not save", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <Card className="w-full max-w-md p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-        <div className="font-semibold text-sm">Add &quot;{activity.title}&quot; to a course</div>
+        <div className="font-semibold text-sm">{isClone ? "Add" : "Add"} &quot;{activity.title}&quot; to a {isClone ? "class" : "course"}</div>
+        {isClone && <p className="text-xs text-muted-foreground">Pick the course your class is taking and a module. A copy of this game is placed there for your learners — the library original stays put.</p>}
         <div>
           <Label className="text-sm">Course</Label>
           <select value={courseId} onChange={(e) => { setCourseId(e.target.value); setModuleId(""); }} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm">
-            <option value="">Standalone (not in a course)</option>
+            <option value="">{isClone ? "Pick a course…" : "Standalone (not in a course)"}</option>
             {(courses ?? []).map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
         </div>
         <div>
-          <Label className="text-sm">Module (optional)</Label>
+          <Label className="text-sm">Module{isClone ? "" : " (optional)"}</Label>
           <select value={moduleId} onChange={(e) => setModuleId(e.target.value)} disabled={!courseId} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm disabled:opacity-50">
-            <option value="">{courseId ? "Whole course (not module-specific)" : "Pick a course first"}</option>
+            <option value="">{courseId ? (isClone ? "Pick a module…" : "Whole course (not module-specific)") : "Pick a course first"}</option>
             {(modules ?? []).slice().sort((a, b) => a.order - b.order).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
           </select>
         </div>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-          <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : "Save"}</Button>
+          <Button size="sm" disabled={save.isPending || (isClone && !moduleId)} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : (isClone ? "Add to class" : "Save")}</Button>
         </div>
       </Card>
     </div>
@@ -693,7 +699,7 @@ export function ActivitiesAdmin() {
               {canAuthor && (
                 <div className="pt-1">
                   <Button variant="outline" size="sm" className="h-7 text-xs gap-1 w-full" onClick={(e) => { e.stopPropagation(); setCourseFor(a); }}>
-                    <Plus className="h-3 w-3" /> {a.courseId ? "Change course" : "Add to course"}
+                    <Plus className="h-3 w-3" /> {a.isLibrary ? "Add to a class" : (a.courseId ? "Change course" : "Add to course")}
                   </Button>
                 </div>
               )}

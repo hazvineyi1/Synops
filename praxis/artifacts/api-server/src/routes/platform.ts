@@ -30,6 +30,7 @@ import { seedEnza } from "../lib/enzaSeed";
 import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
 import { seedSynopsDemo } from "../lib/synopsDemoSeed";
 import { seedK12 } from "../lib/k12Seed";
+import { seedGameLibrary } from "../lib/gameLibrarySeed";
 import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
@@ -1126,6 +1127,23 @@ router.post("/platform/seed-k12", requireAuth, requireSuperAdmin, async (req, re
   try {
     const result = await seedK12();
     await audit(req, "platform.seed_k12", "partner", result.partnerId ?? "synops-k12", { courses: result.courses, learners: result.learners, standards: result.standards });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * POST /platform/seed-game-library - seeds the reusable Game Library repository: ready-to-use
+ * game-show activities (Jeopardy, Family Feud, Bingo, Password, Wheel/Guess-the-Word, Escape Room)
+ * rendered per grade band, plus a curated linked catalog of commercial digital titles. All are
+ * platform library items (isLibrary, org null) so every tenant can browse and add them to classes.
+ * Idempotent. Super admin only.
+ */
+router.post("/platform/seed-game-library", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const result = await seedGameLibrary(req.userId!);
+    await audit(req, "platform.seed_game_library", "activity", "game-library", result);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });

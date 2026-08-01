@@ -10,6 +10,8 @@ import {
   partnersTable,
   organisationsTable,
   coursesTable,
+  modulesTable,
+  coursePartnerAssignmentsTable,
   courseGroupsTable,
   courseGroupMembersTable,
   type InteractiveActivity,
@@ -198,6 +200,48 @@ router.post("/activities", requireAuth, requireAuthor, async (req, res) => {
     })
     .returning();
   await logAudit(req, "activity.create", "activity", row.id, { title, organisationId, source: row.source });
+  res.status(201).json(activityResponse(row));
+});
+
+/**
+ * POST /activities/:id/clone-to-module  { moduleId }
+ *
+ * Add a game from the shared library into one of a class's courses. Library items are shared
+ * platform records, so we never mutate the original — we CLONE it into the target module as a
+ * tenant-owned, published activity the class's learners will see. This is how a teacher "adds a
+ * game to a class": pick a module in a course the class is taking, and drop a copy of the game in.
+ */
+router.post("/activities/:id/clone-to-module", requireAuth, requireAuthor, async (req, res) => {
+  const u = req.dbUser! as U;
+  const [src] = await db.select().from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.id, req.params.id)).limit(1);
+  if (!src) { res.status(404).json({ error: "Activity not found" }); return; }
+  if (!activityInScope(u, src)) { res.status(404).json({ error: "Activity not found" }); return; }
+  const moduleId = String(req.body?.moduleId ?? "").trim();
+  if (!moduleId) { res.status(400).json({ error: "A moduleId is required." }); return; }
+  const [mod] = await db.select().from(modulesTable).where(eq(modulesTable.id, moduleId)).limit(1);
+  if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
+  const [course] = await db.select().from(coursesTable).where(eq(coursesTable.id, mod.courseId)).limit(1);
+
+  // Authorise on the target course: hub roles anywhere; otherwise the course must belong to the
+  // caller's tenant, or be a platform course assigned to their partner.
+  let allowed = hasHubAccess(u.role) || userOwnsTenant(u, course?.tenantId ?? null);
+  if (!allowed && u.partnerId) {
+    const asn = await db.select().from(coursePartnerAssignmentsTable)
+      .where(and(eq(coursePartnerAssignmentsTable.courseId, mod.courseId), eq(coursePartnerAssignmentsTable.partnerId, u.partnerId)));
+    allowed = asn.length > 0;
+  }
+  if (!allowed) { res.status(403).json({ error: "You don't have access to that course." }); return; }
+
+  const organisationId = u.organisationId ?? u.partnerId ?? null;
+  const [row] = await db.insert(interactiveActivitiesTable).values({
+    organisationId, courseId: mod.courseId, moduleId,
+    title: src.title, instructions: src.instructions, html: src.html,
+    source: src.source, embedUrl: src.embedUrl, kind: src.kind,
+    bloomsLevel: src.bloomsLevel, difficulty: src.difficulty,
+    isLibrary: false, tags: src.tags, maxScore: src.maxScore,
+    published: true, createdByUserId: u.id,
+  }).returning();
+  await logAudit(req, "activity.clone_to_module", "activity", row.id, { from: src.id, moduleId, courseId: mod.courseId });
   res.status(201).json(activityResponse(row));
 });
 
