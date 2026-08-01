@@ -70,6 +70,7 @@ import { MyAttendance } from '@/pages/MyAttendance';
 import { Compliance } from '@/pages/Compliance';
 import { Accreditation } from '@/pages/Accreditation';
 import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
+import { ClassInsights } from '@/pages/ClassInsights';
 import { ActivityPlay } from '@/pages/ActivityPlay';
 import { LivePlay } from '@/pages/LivePlay';
 import { LiveHost } from '@/pages/LiveHost';
@@ -279,6 +280,7 @@ function Routes() {
         />
         <ProtectedRoute path="/courses/:courseId/gradebook" component={CourseGradebook} />
         <ProtectedRoute path="/grades" component={MyGrades} />
+        <ProtectedRoute path="/class-insights" component={ClassInsights} />
         <ProtectedRoute path="/jotter" component={Jotter} />
         {/* Partner Hub (partner_admin tier) */}
         <ProtectedRoute path="/partner" component={PartnerOverview} />

@@ -342,6 +342,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {
           heading: t('nav.groups.delivery', 'Delivery & Coaching'),
           items: [
+            { label: t('nav.classInsights', 'Class insights'), href: '/class-insights', icon: Activity },
             { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
             { label: t('nav.learners', 'Coaching'), href: '/coach', icon: Users },
             { label: t('nav.coachingSections', 'Sections'), href: '/coaching/sections', icon: UserCog },

@@ -3,7 +3,7 @@ import {
   partnersTable, brandThemesTable, organisationsTable, usersTable,
   coursesTable, modulesTable, beatsTable, moduleReadingsTable,
   caseScenariosTable, interactiveActivitiesTable, discussionsTable, assignmentsTable,
-  coursePartnerAssignmentsTable, enrolmentsTable,
+  coursePartnerAssignmentsTable, enrolmentsTable, activitySubmissionsTable,
   orgClassesTable, orgClassCoursesTable, orgClassStaffTable,
   beatProgressTable, credentialsTable,
   unitStandardsTable, unitStandardMappingsTable,
@@ -810,6 +810,25 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     if (p.email === "maya.k12@synops-demo.test" && mods[0]) {
       const has = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, learnerId), eq(credentialsTable.moduleId, mods[0].id)));
       if (has.length === 0) await db.insert(credentialsTable).values({ userId: learnerId, moduleId: mods[0].id, moduleTitle: mods[0].title, partnerId: partner.id, partnerName: "Synops Academy", status: "valid", masteryScore: "0.9100", evidenceSummary: "Completed the lesson and passed the check.", decayDate: daysFromNow(365) });
+    }
+
+    // Demo: pre-populate a few game / Math-Coach submissions for the older learners so the Class
+    // Insights dashboard shows real scores and a spread of on-track / at-risk / off-track out of the box.
+    const subPlan: Record<string, { score: number; days: number }> = {
+      "maya.k12@synops-demo.test": { score: 92, days: 1 },
+      "leo.k12@synops-demo.test": { score: 68, days: 3 },
+      "jordan.k12@synops-demo.test": { score: 54, days: 9 },
+      "emma.k12@synops-demo.test": { score: 85, days: 2 },
+    };
+    const sp = subPlan[p.email];
+    if (sp) {
+      const gacts = await db.select({ id: interactiveActivitiesTable.id, kind: interactiveActivitiesTable.kind }).from(interactiveActivitiesTable)
+        .where(and(eq(interactiveActivitiesTable.courseId, myCourseId), inArray(interactiveActivitiesTable.kind, ["game", "math-coach"])));
+      for (const a of gacts) {
+        await db.delete(activitySubmissionsTable).where(and(eq(activitySubmissionsTable.userId, learnerId), eq(activitySubmissionsTable.activityId, a.id)));
+        const score = a.kind === "math-coach" ? Math.max(40, sp.score - 8) : sp.score;
+        await db.insert(activitySubmissionsTable).values({ userId: learnerId, activityId: a.id, payload: { demo: true }, score: String(score), submittedAt: daysAgo(sp.days) });
+      }
     }
   }
 

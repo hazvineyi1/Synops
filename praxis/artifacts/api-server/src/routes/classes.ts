@@ -9,6 +9,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { isSuperAdmin } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 import { orgCourseIds, aggregateOrgCourses } from "../lib/orgCourseAgg";
+import { computeClassInsights } from "../lib/classInsights";
 
 /**
  * Organisation classes (cohorts) — real, persistent. Access: super admin, the org's partner_admin,
@@ -124,6 +125,50 @@ router.get("/classes/:classId", requireAuth, async (req, res) => {
     db.select({ staffId: orgClassStaffTable.staffId, role: orgClassStaffTable.role }).from(orgClassStaffTable).where(eq(orgClassStaffTable.classId, cls.id)),
   ]);
   res.json({ id: cls.id, orgId: cls.orgId, name: cls.name, learnerIds: learners.map((r) => r.v), courseIds: courses.map((r) => r.v), staff });
+});
+
+// GET /my-classes — the classes the caller can see (for the teacher insight dashboard picker).
+router.get("/my-classes", requireAuth, async (req, res) => {
+  const u = req.dbUser!;
+  try {
+    await ensureTables();
+    let classes: { id: string; name: string; orgId: string }[] = [];
+    if (isSuperAdmin(u.role)) {
+      classes = await db.select({ id: orgClassesTable.id, name: orgClassesTable.name, orgId: orgClassesTable.orgId }).from(orgClassesTable).orderBy(desc(orgClassesTable.createdAt)).limit(300);
+    } else if (u.role === "coach") {
+      const staffRows = await db.select({ classId: orgClassStaffTable.classId }).from(orgClassStaffTable).where(eq(orgClassStaffTable.staffId, u.id));
+      const ids = [...new Set(staffRows.map((r) => r.classId))];
+      classes = ids.length ? await db.select({ id: orgClassesTable.id, name: orgClassesTable.name, orgId: orgClassesTable.orgId }).from(orgClassesTable).where(inArray(orgClassesTable.id, ids)) : [];
+    } else if (u.partnerId) {
+      classes = await db.select({ id: orgClassesTable.id, name: orgClassesTable.name, orgId: orgClassesTable.orgId }).from(orgClassesTable).where(eq(orgClassesTable.partnerId, u.partnerId)).orderBy(desc(orgClassesTable.createdAt));
+    } else if (u.organisationId) {
+      classes = await db.select({ id: orgClassesTable.id, name: orgClassesTable.name, orgId: orgClassesTable.orgId }).from(orgClassesTable).where(eq(orgClassesTable.orgId, u.organisationId)).orderBy(desc(orgClassesTable.createdAt));
+    }
+    const ids = classes.map((c) => c.id);
+    const lc = ids.length ? await db.select({ classId: orgClassLearnersTable.classId }).from(orgClassLearnersTable).where(inArray(orgClassLearnersTable.classId, ids)) : [];
+    const count = lc.reduce<Record<string, number>>((m, r) => { m[r.classId] = (m[r.classId] ?? 0) + 1; return m; }, {});
+    res.json(classes.map((c) => ({ id: c.id, name: c.name, orgId: c.orgId, learnerCount: count[c.id] ?? 0 })));
+  } catch {
+    res.json([]);
+  }
+});
+
+// GET /classes/:classId/insights — aggregated per-learner + class-level stats for the teacher dashboard.
+router.get("/classes/:classId/insights", requireAuth, async (req, res) => {
+  const { cls, org } = await classWithOrg(req.params.classId);
+  if (!cls) { res.status(404).json({ error: "Not found" }); return; }
+  let allowed = canAccessOrg(req.dbUser!, org);
+  if (!allowed) {
+    const staff = await db.select({ id: orgClassStaffTable.id }).from(orgClassStaffTable).where(and(eq(orgClassStaffTable.classId, cls.id), eq(orgClassStaffTable.staffId, req.dbUser!.id)));
+    allowed = staff.length > 0;
+  }
+  if (!allowed) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    const insights = await computeClassInsights(cls.id);
+    res.json({ ...insights, className: cls.name });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Failed to load insights" });
+  }
 });
 
 router.patch("/classes/:classId", requireAuth, async (req, res) => {
