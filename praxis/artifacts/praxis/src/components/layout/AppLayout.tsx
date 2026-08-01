@@ -428,6 +428,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem('navOpenSections') || '{}'); } catch { return {}; }
   });
+  const [accountOpen, setAccountOpen] = useState(false);
   const sectionOpen = (heading: string) => heading === activeHeading || openSections[heading] === true;
   const toggleSection = (heading: string) => setOpenSections((prev) => {
     const next = { ...prev, [heading]: !(prev[heading] === true) };
@@ -515,15 +516,65 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 space-y-1" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
-          <div className="flex items-center gap-3 px-3 py-2 mb-2">
+        {/* Compact account area: one row that opens an upward dropdown with the account/utility links,
+            so the footer no longer stacks six rows and push the nav into a scroll. */}
+        <div className="relative p-3" style={{ borderTop: `1px solid ${HAIRLINE}` }}>
+          {accountOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setAccountOpen(false)} />
+              <div className="absolute bottom-full left-3 right-3 mb-2 z-20 rounded-xl py-1 shadow-2xl"
+                style={{ background: `linear-gradient(rgba(255,255,255,0.06), rgba(255,255,255,0.06)), ${sidebarBg}`, border: `1px solid ${HAIRLINE}` }}>
+                {!youngKid && (
+                  <>
+                    <div className="relative">
+                      <ShellNavLink item={{ label: t('nav.notifications'), href: '/notifications', icon: Bell }} active={isNavActive('/notifications')} onClick={() => setAccountOpen(false)} />
+                      {unreadCount > 0 && (
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                      )}
+                    </div>
+                    <ShellNavLink item={{ label: t('nav.security', 'Security'), href: '/security', icon: ShieldCheck }} active={isNavActive('/security')} onClick={() => setAccountOpen(false)} />
+                    <ShellNavLink item={{ label: t('nav.privacyData', 'Privacy & my data'), href: '/privacy/data', icon: FileText }} active={isNavActive('/privacy/data')} onClick={() => setAccountOpen(false)} />
+                  </>
+                )}
+                <div className="px-2 py-1"><LanguageSwitcher variant="full" /></div>
+                <div className="my-1 mx-2" style={{ borderTop: `1px solid ${HAIRLINE}` }} />
+                {user?.email?.toLowerCase().endsWith('@synops-demo.test') && (
+                  <button
+                    onClick={async () => {
+                      setAccountOpen(false);
+                      if (!window.confirm('Reset this demo learner\'s progress so you can run through the lessons again?')) return;
+                      try { await apiFetch('/learn/demo-reset', { method: 'POST', body: JSON.stringify({}) }); } catch { /* ignore */ }
+                      window.location.href = '/dashboard';
+                    }}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors hover:bg-white/5"
+                    style={{ color: 'rgba(255,255,255,0.6)' }} title="Reset progress (demo only)"
+                  >
+                    <RotateCcw className="h-4 w-4 shrink-0" /> Reset demo
+                  </button>
+                )}
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors hover:bg-white/5"
+                  style={{ color: 'rgba(255,255,255,0.7)' }}
+                >
+                  <LogOut className="h-4 w-4 shrink-0" /> {t('nav.signOut')}
+                </button>
+              </div>
+            </>
+          )}
+
+          <button
+            onClick={() => setAccountOpen((o) => !o)}
+            className="flex items-center gap-3 w-full px-2 py-2 rounded-lg transition-colors hover:bg-white/5"
+            aria-expanded={accountOpen}
+          >
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarImage src={user.avatarUrl || undefined} />
               <AvatarFallback style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>
                 {user.firstName?.[0] || user.email[0]}
               </AvatarFallback>
             </Avatar>
-            <div className="flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 text-left">
               <span className="text-sm font-medium leading-none truncate" style={{ color: 'rgba(255,255,255,0.9)' }}>
                 {user.firstName} {user.lastName}
               </span>
@@ -531,66 +582,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {user.role.replace('_', ' ')}
               </span>
             </div>
-          </div>
-
-          {!youngKid && (
-            <>
-              <ShellNavLink
-                item={{ label: t('nav.notifications'), href: '/notifications', icon: Bell }}
-                active={isNavActive('/notifications')}
-              />
-              {unreadCount > 0 && (
-                <span className="ml-3 inline-block bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  {unreadCount > 9 ? '9+' : unreadCount} new
-                </span>
-              )}
-
-              <ShellNavLink
-                item={{ label: t('nav.security', 'Security'), href: '/security', icon: ShieldCheck }}
-                active={isNavActive('/security')}
-              />
-
-              <ShellNavLink
-                item={{ label: t('nav.privacyData', 'Privacy & my data'), href: '/privacy/data', icon: FileText }}
-                active={isNavActive('/privacy/data')}
-              />
-            </>
-          )}
-
-          {/* System health, Environment cleanup, Translation review and Data requests now live in
-              the Operations nav group above (super admin), so the footer stays a compact account
-              area rather than a second, competing menu. */}
-
-          <div className="px-1"><LanguageSwitcher variant="full" /></div>
-
-          {/* Demo-only: reset this synthetic learner's progress so the lessons can be run again. */}
-          {user?.email?.toLowerCase().endsWith('@synops-demo.test') && (
-            <button
-              onClick={async () => {
-                if (!window.confirm('Reset this demo learner\'s progress so you can run through the lessons again?')) return;
-                try { await apiFetch('/learn/demo-reset', { method: 'POST', body: JSON.stringify({}) }); } catch { /* ignore */ }
-                window.location.href = '/dashboard';
-              }}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-              style={{ color: 'rgba(255,255,255,0.5)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
-              title="Reset progress (demo only)"
-            >
-              <RotateCcw className="h-4 w-4 shrink-0" />
-              Reset demo
-            </button>
-          )}
-
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
-            style={{ color: 'rgba(255,255,255,0.5)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            {t('nav.signOut')}
+            {!youngKid && unreadCount > 0 && !accountOpen && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
+            <ChevronDown className="h-4 w-4 shrink-0 transition-transform" style={{ color: 'rgba(255,255,255,0.4)', transform: accountOpen ? 'rotate(180deg)' : 'none' }} />
           </button>
         </div>
       </aside>
