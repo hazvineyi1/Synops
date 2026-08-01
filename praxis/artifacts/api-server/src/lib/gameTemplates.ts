@@ -244,15 +244,51 @@ export interface GameTemplate {
   bands: Band[];
   build: (content: unknown) => string;
   sample: (band: Band) => Sample;
+  // For the AI generator: the exact JSON shape the model must return, and a shape-check so a malformed
+  // generation never reaches the renderer.
+  schemaHint: string;
+  validate: (content: unknown) => boolean;
 }
 
+// Small shape helpers for the validators below.
+const arr = (x: unknown): x is unknown[] => Array.isArray(x) && x.length > 0;
+const obj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
+const str = (x: unknown): x is string => typeof x === "string" && x.trim().length > 0;
+
+const SCHEMA: Record<string, { hint: string; validate: (c: unknown) => boolean }> = {
+  jeopardy: {
+    hint: '{"title":"short title","categories":[{"name":"Category","clues":[{"value":100,"clue":"the clue/prompt","answer":"the answer"}]}]}  — exactly 3 categories, each with 3 clues at values 100, 200, 300 (rising difficulty). Keep answers short.',
+    validate: (c) => obj(c) && arr(c.categories) && c.categories.every((cat) => obj(cat) && str(cat.name) && arr(cat.clues) && cat.clues.every((q) => obj(q) && typeof q.value === "number" && str(q.clue) && str(q.answer))),
+  },
+  feud: {
+    hint: '{"title":"short title","rounds":[{"question":"Name a…","answers":[{"text":"answer","points":40}],"distractors":["wrong but plausible"]}]}  — 2 rounds; each round has 4 answers whose points sum to about 100 (most popular = highest), plus 2 distractors.',
+    validate: (c) => obj(c) && arr(c.rounds) && c.rounds.every((r) => obj(r) && str(r.question) && arr(r.answers) && r.answers.every((a) => obj(a) && str(a.text) && typeof a.points === "number")),
+  },
+  bingo: {
+    hint: '{"title":"short title","size":5,"pool":["term or number", "…"]}  — pool of at least 24 short items (facts, vocabulary, or numbers) that a teacher can call out.',
+    validate: (c) => obj(c) && Array.isArray(c.pool) && (c.pool as unknown[]).length >= 16 && (c.pool as unknown[]).every((x) => str(x) || typeof x === "number"),
+  },
+  password: {
+    hint: '{"title":"short title","items":[{"answer":"the word","clues":["clue 1 (broad)","clue 2","clue 3 (specific)"],"options":["the word","distractor","distractor","distractor"]}]}  — 5 items; options MUST include the exact answer plus 3 distractors.',
+    validate: (c) => obj(c) && arr(c.items) && c.items.every((it) => obj(it) && str(it.answer) && arr(it.clues) && arr(it.options) && (it.options as unknown[]).some((o) => str(o) && (o as string).toLowerCase() === (it.answer as string).toLowerCase())),
+  },
+  wheel: {
+    hint: '{"title":"short title","puzzles":[{"phrase":"KEY PHRASE","hint":"a clue to the phrase"}]}  — 3 puzzles; phrases are short key terms/phrases (letters, spaces, and digits only).',
+    validate: (c) => obj(c) && arr(c.puzzles) && c.puzzles.every((p) => obj(p) && str(p.phrase)),
+  },
+  escape: {
+    hint: '{"intro":"one-line story setup","stages":[{"prompt":"the puzzle/question","answer":"the exact answer or code","hint":"a helpful hint","choices":["optional multiple-choice options incl. the answer"]}]}  — 3 stages in order; include "choices" only when it should be multiple-choice, otherwise the student types the answer.',
+    validate: (c) => obj(c) && arr(c.stages) && c.stages.every((s) => obj(s) && str(s.prompt) && (str(s.answer) || typeof s.answer === "number")),
+  },
+};
+
 export const GAME_TEMPLATES: GameTemplate[] = [
-  { key: "jeopardy", name: "Jeopardy", blurb: "Category board with point values — the classic content-review show. Great for whole-class team review.", bands: ["35", "68", "912"], build: buildJeopardy, sample: sampleJeopardy },
-  { key: "feud", name: "Family Feud", blurb: "Class-survey guessing game — reveals ranked answers as a live data lesson.", bands: ["35", "68", "912"], build: buildFeud, sample: sampleFeud },
-  { key: "bingo", name: "Bingo", blurb: "Caller-and-card recognition game for numbers, letters, sight words, or facts. Read-aloud built in.", bands: ["k2", "35"], build: buildBingo, sample: sampleBingo },
-  { key: "password", name: "Password / Taboo", blurb: "Clue-by-clue vocabulary guessing — fewer clues used means more points.", bands: ["35", "68"], build: buildPassword, sample: samplePassword },
-  { key: "wheel", name: "Wheel / Guess the Word", blurb: "Letter-reveal puzzle (Wheel of Fortune + ‘Guess the Sound’) for words and key phrases.", bands: ["k2", "35"], build: buildWheel, sample: sampleWheel },
-  { key: "escape", name: "Escape Room", blurb: "Sequential locked puzzles — solve each to unlock the next. Strong for multi-step review.", bands: ["35", "68", "912"], build: buildEscape, sample: sampleEscape },
+  { key: "jeopardy", name: "Jeopardy", blurb: "Category board with point values — the classic content-review show. Great for whole-class team review.", bands: ["35", "68", "912"], build: buildJeopardy, sample: sampleJeopardy, schemaHint: SCHEMA.jeopardy.hint, validate: SCHEMA.jeopardy.validate },
+  { key: "feud", name: "Family Feud", blurb: "Class-survey guessing game — reveals ranked answers as a live data lesson.", bands: ["35", "68", "912"], build: buildFeud, sample: sampleFeud, schemaHint: SCHEMA.feud.hint, validate: SCHEMA.feud.validate },
+  { key: "bingo", name: "Bingo", blurb: "Caller-and-card recognition game for numbers, letters, sight words, or facts. Read-aloud built in.", bands: ["k2", "35"], build: buildBingo, sample: sampleBingo, schemaHint: SCHEMA.bingo.hint, validate: SCHEMA.bingo.validate },
+  { key: "password", name: "Password / Taboo", blurb: "Clue-by-clue vocabulary guessing — fewer clues used means more points.", bands: ["35", "68"], build: buildPassword, sample: samplePassword, schemaHint: SCHEMA.password.hint, validate: SCHEMA.password.validate },
+  { key: "wheel", name: "Wheel / Guess the Word", blurb: "Letter-reveal puzzle (Wheel of Fortune + ‘Guess the Sound’) for words and key phrases.", bands: ["k2", "35"], build: buildWheel, sample: sampleWheel, schemaHint: SCHEMA.wheel.hint, validate: SCHEMA.wheel.validate },
+  { key: "escape", name: "Escape Room", blurb: "Sequential locked puzzles — solve each to unlock the next. Strong for multi-step review.", bands: ["35", "68", "912"], build: buildEscape, sample: sampleEscape, schemaHint: SCHEMA.escape.hint, validate: SCHEMA.escape.validate },
 ];
 
 export function templateByKey(key: string): GameTemplate | undefined {

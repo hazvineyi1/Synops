@@ -534,6 +534,180 @@ function AddActivityToCourseDialog({ activity, onClose }: { activity: Activity; 
   );
 }
 
+/**
+ * Game Studio — generate a playable game from lesson content with AI, preview and edit it, then save
+ * it to the library. Admin picks the game type, subject, grade band and rigor, and either pastes
+ * content or pulls a module's reading. The result is grounded in that content and organized by tags.
+ */
+interface GameMeta { templates: { key: string; name: string; blurb: string; bands: string[] }[]; bands: { key: string; label: string }[]; rigor: string[] }
+function GameStudioDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const { toast } = useToast();
+  const { user } = useSession();
+  const isHub = !!user && ["super_admin", "instructional_designer"].includes(user.role);
+  const { data: meta } = useQuery({ queryKey: ["game-templates"], queryFn: () => apiFetch<GameMeta>("/game-templates") });
+  const templates = meta?.templates ?? [];
+  const bands = meta?.bands ?? [{ key: "k2", label: "K–2" }, { key: "35", label: "Grades 3–5" }, { key: "68", label: "Grades 6–8" }, { key: "912", label: "Grades 9–12" }];
+  const rigorLevels = meta?.rigor ?? ["foundational", "intermediate", "advanced"];
+
+  const [templateKey, setTemplateKey] = useState("");
+  const [subject, setSubject] = useState("");
+  const [band, setBand] = useState("35");
+  const [rig, setRig] = useState("intermediate");
+  const [mode, setMode] = useState<"paste" | "module">("paste");
+  const [content, setContent] = useState("");
+  const [courseId, setCourseId] = useState("");
+  const [moduleId, setModuleId] = useState("");
+  const [draft, setDraft] = useState<{ title: string; content: unknown; html: string } | null>(null);
+  const [title, setTitle] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [jsonText, setJsonText] = useState("");
+  const [showJson, setShowJson] = useState(false);
+
+  const { data: courses } = useQuery({ queryKey: ["courses", "authoring"], queryFn: () => apiFetch<{ id: string; title: string }[]>("/courses?includeIncomplete=true"), enabled: mode === "module" });
+  const { data: modules } = useQuery({ queryKey: ["modules", courseId], queryFn: () => apiFetch<{ id: string; title: string; order: number }[]>(`/courses/${courseId}/modules`), enabled: mode === "module" && !!courseId });
+
+  const tpl = templates.find((t) => t.key === templateKey);
+  const availableBands = tpl ? bands.filter((b) => tpl.bands.includes(b.key)) : bands;
+
+  const generate = useMutation({
+    mutationFn: () => apiFetch<{ title: string; content: unknown; html: string }>("/games/generate", { method: "POST", body: JSON.stringify({ templateKey, subject, band, rigor: rig, content: mode === "paste" ? content : "", moduleId: mode === "module" ? moduleId : "" }) }),
+    onSuccess: (d) => { setDraft(d); setTitle(d.title); setInstructions(""); setJsonText(JSON.stringify(d.content, null, 2)); setShowJson(false); },
+    onError: (e) => toast({ title: "Could not generate a game", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+  const rerender = useMutation({
+    mutationFn: (c: unknown) => apiFetch<{ html: string }>("/games/render", { method: "POST", body: JSON.stringify({ templateKey, content: c }) }),
+    onSuccess: (d) => setDraft((cur) => (cur ? { ...cur, html: d.html } : cur)),
+    onError: (e) => toast({ title: "That game content isn't valid yet", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+  const applyJson = () => { try { const c = JSON.parse(jsonText); setDraft((cur) => (cur ? { ...cur, content: c } : cur)); rerender.mutate(c); } catch { toast({ title: "That isn't valid JSON", variant: "destructive" }); } };
+
+  const save = useMutation({
+    mutationFn: () => apiFetch("/activities", { method: "POST", body: JSON.stringify({
+      title: title.trim() || draft!.title, instructions: instructions.trim() || undefined, html: draft!.html,
+      source: "html", kind: "game", bloomsLevel: "Apply", difficulty: rig,
+      isLibrary: isHub, published: true,
+      tags: ["game-library", `game:${templateKey}`, `band:${band}`, ...(subject.trim() ? [`subject:${subject.trim()}`] : []), `rigor:${rig}`, ...(tpl ? [tpl.name] : [])],
+    }) }),
+    onSuccess: () => { toast({ title: isHub ? "Game saved to the library" : "Game saved" }); onSaved(); },
+    onError: (e) => toast({ title: "Could not save the game", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+
+  const canGenerate = !!templateKey && (mode === "paste" ? content.trim().length > 20 : !!moduleId);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto" onClick={onClose}>
+      <Card className="w-full max-w-2xl my-6 p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div className="font-semibold flex items-center gap-2"><Play className="h-4 w-4 text-indigo-600" /> Generate a game from your content</div>
+          <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
+        </div>
+
+        {!draft ? (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm">Game type</Label>
+              <div className="flex flex-wrap gap-2 mt-1">
+                {templates.map((t) => (
+                  <button key={t.key} onClick={() => { setTemplateKey(t.key); if (!t.bands.includes(band)) setBand(t.bands[0]); }}
+                    className={`px-3 py-1.5 rounded-full text-sm font-semibold border transition ${templateKey === t.key ? "bg-indigo-600 text-white border-indigo-600" : "hover:border-indigo-400"}`}>
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+              {tpl && <p className="text-xs text-muted-foreground mt-1">{tpl.blurb}</p>}
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label className="text-sm">Subject</Label>
+                <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Ecosystems" className="w-full mt-1 rounded-md border border-input bg-background px-2 py-2 text-sm" />
+              </div>
+              <div>
+                <Label className="text-sm">Grade</Label>
+                <select value={band} onChange={(e) => setBand(e.target.value)} className="w-full mt-1 rounded-md border border-input bg-background px-2 py-2 text-sm">
+                  {availableBands.map((b) => <option key={b.key} value={b.key}>{b.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label className="text-sm">Rigor</Label>
+                <select value={rig} onChange={(e) => setRig(e.target.value)} className="w-full mt-1 rounded-md border border-input bg-background px-2 py-2 text-sm capitalize">
+                  {rigorLevels.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Label className="text-sm">Lesson content</Label>
+                <div className="ml-auto flex gap-1 text-xs">
+                  <button className={`px-2 py-0.5 rounded-full border ${mode === "paste" ? "bg-muted font-semibold" : ""}`} onClick={() => setMode("paste")}>Paste</button>
+                  <button className={`px-2 py-0.5 rounded-full border ${mode === "module" ? "bg-muted font-semibold" : ""}`} onClick={() => setMode("module")}>Pull from a module</button>
+                </div>
+              </div>
+              {mode === "paste" ? (
+                <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={6} placeholder="Paste the lesson text, key facts, or vocabulary the game should review…" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={courseId} onChange={(e) => { setCourseId(e.target.value); setModuleId(""); }} className="rounded-md border border-input bg-background px-2 py-2 text-sm">
+                    <option value="">Pick a course…</option>
+                    {(courses ?? []).map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                  </select>
+                  <select value={moduleId} onChange={(e) => setModuleId(e.target.value)} disabled={!courseId} className="rounded-md border border-input bg-background px-2 py-2 text-sm disabled:opacity-50">
+                    <option value="">{courseId ? "Pick a module…" : "Course first"}</option>
+                    {(modules ?? []).slice().sort((a, b) => a.order - b.order).map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+              <Button size="sm" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate()}>
+                {generate.isPending ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Generating…</> : <><Sparkles className="h-4 w-4 mr-1.5" /> Generate</>}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm">Title</Label>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full mt-1 rounded-md border border-input bg-background px-2 py-2 text-sm" />
+              </div>
+              <div>
+                <Label className="text-sm">Instructions (optional)</Label>
+                <input value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="How to play…" className="w-full mt-1 rounded-md border border-input bg-background px-2 py-2 text-sm" />
+              </div>
+            </div>
+
+            <div className="rounded-xl overflow-hidden border">
+              <ActivityPlayer html={draft.html} disabled />
+            </div>
+
+            <div>
+              <button className="text-xs text-indigo-700 underline" onClick={() => setShowJson((v) => !v)}>{showJson ? "Hide" : "Edit the game content (advanced)"}</button>
+              {showJson && (
+                <div className="mt-2 space-y-2">
+                  <textarea value={jsonText} onChange={(e) => setJsonText(e.target.value)} rows={10} spellCheck={false} className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono" />
+                  <Button variant="outline" size="sm" disabled={rerender.isPending} onClick={applyJson}>{rerender.isPending ? "Updating…" : "Apply changes & preview"}</Button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between gap-2 pt-1">
+              <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>← Change settings</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={generate.isPending} onClick={() => generate.mutate()}>{generate.isPending ? "…" : "Regenerate"}</Button>
+                <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>{save.isPending ? "Saving…" : (isHub ? "Save to library" : "Save game")}</Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 /* ══════════════════════════ Page ══════════════════════════ */
 export function ActivitiesAdmin() {
   const { user } = useSession();
@@ -546,6 +720,10 @@ export function ActivitiesAdmin() {
   const [seed, setSeed] = useState<Partial<Activity> | null>(null);
   const [newMenu, setNewMenu] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [gameStudioOpen, setGameStudioOpen] = useState(false);
+  const [gameFilter, setGameFilter] = useState("");
+  const [bandFilter, setBandFilter] = useState("");
+  const [gameQuery, setGameQuery] = useState("");
   const [builderOpen, setBuilderOpen] = useState(false);
   const [assignFor, setAssignFor] = useState<Activity | null>(null);
   const [courseFor, setCourseFor] = useState<Activity | null>(null);
@@ -583,6 +761,26 @@ export function ActivitiesAdmin() {
 
   const startNew = (mode: NewMode) => { setSeed(preCourseId ? { courseId: preCourseId } : null); setNewMode(mode); setCreating(true); setSelectedId(null); setRightTab("edit"); setNewMenu(false); };
 
+  // Library filters — make games easy to locate by type and grade band.
+  const GAME_TYPES: { key: string; label: string }[] = [
+    { key: "jeopardy", label: "Jeopardy" }, { key: "feud", label: "Family Feud" }, { key: "bingo", label: "Bingo" },
+    { key: "password", label: "Password" }, { key: "wheel", label: "Wheel" }, { key: "escape", label: "Escape Room" },
+  ];
+  const BAND_FILTERS: { key: string; label: string }[] = [
+    { key: "k2", label: "K–2" }, { key: "35", label: "3–5" }, { key: "68", label: "6–8" }, { key: "912", label: "9–12" },
+  ];
+  const filtersActive = !!(gameFilter || bandFilter || gameQuery.trim());
+  const filteredActivities = (activities ?? []).filter((a) => {
+    const tags = a.tags ?? [];
+    if (gameFilter && !tags.includes(`game:${gameFilter}`)) return false;
+    if (bandFilter && !tags.includes(`band:${bandFilter}`)) return false;
+    if (gameQuery.trim()) {
+      const s = gameQuery.toLowerCase();
+      if (!(a.title ?? "").toLowerCase().includes(s) && !tags.some((t) => t.toLowerCase().includes(s))) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       {aiOpen && <AIGenerateDialog onClose={() => setAiOpen(false)} onUse={(g) => { setSeed({ title: g.title, instructions: g.instructions, html: renderActivity(g.type as InteractionType, g.spec as ActivitySpec), kind: g.type, bloomsLevel: g.bloomsLevel, difficulty: g.difficulty as Activity["difficulty"], source: "ai", ...(preCourseId ? { courseId: preCourseId } : {}) }); setNewMode("html"); setCreating(true); setSelectedId(null); setRightTab("edit"); setAiOpen(false); }} />}
@@ -594,6 +792,7 @@ export function ActivitiesAdmin() {
       {builderOpen && <ActivityBuilder onClose={() => setBuilderOpen(false)} onCreated={(a) => { setBuilderOpen(false); setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} />}
       {assignFor && <ActivityAssignDialog activityId={assignFor.id} activityTitle={assignFor.title} onClose={() => setAssignFor(null)} />}
       {courseFor && <AddActivityToCourseDialog activity={courseFor} onClose={() => setCourseFor(null)} />}
+      {gameStudioOpen && <GameStudioDialog onClose={() => setGameStudioOpen(false)} onSaved={() => { setGameStudioOpen(false); qc.invalidateQueries({ queryKey: ["activities"] }); }} />}
 
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -601,6 +800,7 @@ export function ActivitiesAdmin() {
           <p className="text-muted-foreground">Build or embed activities, or let AI generate gamified ones from your content — then publish and assign.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" className="border-indigo-500/40 text-indigo-700" onClick={() => setGameStudioOpen(true)}><Play className="h-4 w-4 mr-1.5" /> Generate a game</Button>
           <Button variant="outline" onClick={() => setAiOpen(true)}><Sparkles className="h-4 w-4 mr-1.5" /> Generate with AI</Button>
           <div className="relative">
             <Button onClick={() => setNewMenu((o) => !o)}><Plus className="h-4 w-4 mr-1" /> New activity</Button>
@@ -684,10 +884,27 @@ export function ActivitiesAdmin() {
       ) : isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <Card key={i} className="h-32" />)}</div>
       ) : !activities || activities.length === 0 ? (
-        <Card className="p-12 text-center text-muted-foreground">No activities yet — use “New activity” or “Generate with AI” to make one.</Card>
+        <Card className="p-12 text-center text-muted-foreground">No activities yet — use “New activity”, “Generate a game”, or “Generate with AI” to make one.</Card>
       ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 p-2">
+            <input value={gameQuery} onChange={(e) => setGameQuery(e.target.value)} placeholder="Search games & activities…" className="rounded-md border border-input bg-background px-2 py-1.5 text-sm w-48" />
+            <span className="text-xs text-muted-foreground">Type:</span>
+            {GAME_TYPES.map((t) => (
+              <button key={t.key} onClick={() => setGameFilter(gameFilter === t.key ? "" : t.key)} className={`px-2 py-0.5 rounded-full text-xs border ${gameFilter === t.key ? "bg-indigo-600 text-white border-indigo-600" : "hover:border-indigo-400"}`}>{t.label}</button>
+            ))}
+            <span className="text-xs text-muted-foreground ml-1">Grade:</span>
+            {BAND_FILTERS.map((b) => (
+              <button key={b.key} onClick={() => setBandFilter(bandFilter === b.key ? "" : b.key)} className={`px-2 py-0.5 rounded-full text-xs border ${bandFilter === b.key ? "bg-emerald-600 text-white border-emerald-600" : "hover:border-emerald-400"}`}>{b.label}</button>
+            ))}
+            {filtersActive && <button onClick={() => { setGameFilter(""); setBandFilter(""); setGameQuery(""); }} className="text-xs text-muted-foreground underline ml-1">Clear</button>}
+            <span className="ml-auto text-xs text-muted-foreground">{filteredActivities.length} shown</span>
+          </div>
+          {filteredActivities.length === 0 ? (
+            <Card className="p-10 text-center text-muted-foreground">No activities match these filters.</Card>
+          ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {activities.map((a) => (
+          {filteredActivities.map((a) => (
             <Card key={a.id} onClick={() => { setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} className="p-4 cursor-pointer border hover:border-primary/40 hover:shadow-sm transition-colors flex flex-col gap-2">
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-semibold text-sm leading-snug">{a.title}</h3>
@@ -716,6 +933,8 @@ export function ActivitiesAdmin() {
               )}
             </Card>
           ))}
+        </div>
+          )}
         </div>
       )}
     </div>

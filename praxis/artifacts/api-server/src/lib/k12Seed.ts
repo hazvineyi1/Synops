@@ -8,7 +8,7 @@ import {
   beatProgressTable, credentialsTable,
   unitStandardsTable, unitStandardMappingsTable,
 } from "@workspace/db";
-import { eq, and, asc, inArray } from "drizzle-orm";
+import { eq, and, asc, inArray, ne, like } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
 import { PRIVACY_POLICY_VERSION } from "../lib/popia";
 import { GAME_TEMPLATES, type Band } from "./gameTemplates";
@@ -631,11 +631,54 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   // classes out of the box (no teacher action needed). Young early/elementary courses (Mateo, Sofía,
   // Aiden) are skipped on purpose: their lesson view auto-launches the module's first activity, so a
   // bonus game must never displace the guided quiz. Idempotent: refreshed in place by title.
-  const gamePlan: { email: string; key: string; band: Band }[] = [
-    { email: "maya.k12@synops-demo.test", key: "jeopardy", band: "68" },
-    { email: "leo.k12@synops-demo.test", key: "feud", band: "68" },
-    { email: "jordan.k12@synops-demo.test", key: "escape", band: "68" },
-    { email: "emma.k12@synops-demo.test", key: "jeopardy", band: "912" },
+  // Each game's content is written to REVIEW that specific course — not generic trivia — so the game is
+  // clearly relevant to the lesson it sits in.
+  const gamePlan: { email: string; key: string; band: Band; instructions: string; content: Record<string, unknown> }[] = [
+    { email: "maya.k12@synops-demo.test", key: "jeopardy", band: "68",
+      instructions: "Pick a value, read the clue, work it out as a team, then reveal and score. All about ratios and rates!",
+      content: { title: "Ratios & Rates Jeopardy", categories: [
+        { name: "Ratios", clues: [
+          { value: 100, clue: "The ratio 6 cats to 9 dogs, simplified", answer: "2 to 3" },
+          { value: 200, clue: "A recipe uses 2 cups flour to 3 cups sugar. Flour-to-sugar ratio?", answer: "2 : 3" },
+          { value: 300, clue: "Boys to girls is 3 : 4. If there are 12 boys, how many girls?", answer: "16" } ] },
+        { name: "Unit Rates", clues: [
+          { value: 100, clue: "120 miles in 2 hours is how many miles per hour?", answer: "60 mph" },
+          { value: 200, clue: "$6 for 3 pounds is what price per pound?", answer: "$2 per pound" },
+          { value: 300, clue: "A car goes 150 miles on 5 gallons. Miles per gallon?", answer: "30 mpg" } ] },
+        { name: "Proportions", clues: [
+          { value: 100, clue: "Solve: 2/4 = x/8", answer: "x = 4" },
+          { value: 200, clue: "3 pens cost $1.50. How much for 5 pens?", answer: "$2.50" },
+          { value: 300, clue: "Map scale 1 inch = 20 miles. How far is 3.5 inches?", answer: "70 miles" } ] },
+      ] } },
+    { email: "leo.k12@synops-demo.test", key: "feud", band: "68",
+      instructions: "Read the survey question about ecosystems. Tap the answers you think are most popular — three misses ends the round.",
+      content: { title: "Ecosystems Survey Feud", rounds: [
+        { question: "Name a living or non-living part of an ecosystem.", answers: [{ text: "Plants", points: 32 }, { text: "Animals", points: 28 }, { text: "Water", points: 22 }, { text: "Sunlight", points: 18 }], distractors: ["Cars", "Buildings"] },
+        { question: "Name a role an organism can play in a food chain.", answers: [{ text: "Producer", points: 38 }, { text: "Consumer", points: 34 }, { text: "Decomposer", points: 28 }], distractors: ["Spectator", "Referee"] },
+      ] } },
+    { email: "jordan.k12@synops-demo.test", key: "escape", band: "68",
+      instructions: "You're drafting an argument essay. Unlock each step in order to finish it. Use a hint only if you're stuck.",
+      content: { title: "Argument Writing Escape Room", intro: "Build a strong argument, one lock at a time, to finish your essay!", stages: [
+        { prompt: "What do we call the position you are arguing for? (one word)", answer: "claim", hint: "It states plainly what you believe." },
+        { prompt: "Which sentence is the STRONGEST evidence?", answer: "Studies show later start times raise attendance and grades.", choices: ["School is important.", "Studies show later start times raise attendance and grades.", "I think it's just better.", "Everyone already agrees."], hint: "Evidence is specific and factual, not an opinion." },
+        { prompt: "What do we call fairly naming the other side's view and answering it? (one word)", answer: "counterargument", hint: "You bring up the objection yourself, then respond." },
+      ] } },
+    { email: "emma.k12@synops-demo.test", key: "jeopardy", band: "912",
+      instructions: "Choose a value, solve as a team, then reveal and score. Straight from your Algebra I lessons.",
+      content: { title: "Algebra I Jeopardy", categories: [
+        { name: "Solving", clues: [
+          { value: 100, clue: "Solve: x + 7 = 12", answer: "x = 5" },
+          { value: 200, clue: "Solve: 3x = 21", answer: "x = 7" },
+          { value: 300, clue: "Solve: 2x − 4 = 10", answer: "x = 7" } ] },
+        { name: "Slope", clues: [
+          { value: 100, clue: "The slope in y = 4x + 2", answer: "4" },
+          { value: 200, clue: "Slope between (0, 0) and (2, 6)", answer: "3" },
+          { value: 300, clue: "A line rises 6 for every run of 3. Its slope?", answer: "2" } ] },
+        { name: "Functions", clues: [
+          { value: 100, clue: "In y = mx + b, b is called the…", answer: "y-intercept" },
+          { value: 200, clue: "If f(x) = 2x + 1, find f(3)", answer: "7" },
+          { value: 300, clue: "Is y = 3x + 1 linear or nonlinear?", answer: "Linear" } ] },
+      ] } },
   ];
   for (const g of gamePlan) {
     const cid = courseByPersona[g.email];
@@ -644,16 +687,21 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     if (!tpl) continue;
     const [firstMod] = await db.select().from(modulesTable).where(eq(modulesTable.courseId, cid)).orderBy(asc(modulesTable.order)).limit(1);
     if (!firstMod) continue;
-    const s = tpl.sample(g.band);
-    const title = `🎮 Class Game: ${s.title}`;
-    const html = tpl.build(s.content);
+    const title = `🎮 Class Game: ${g.content.title as string}`;
+    const html = tpl.build(g.content);
+    // Remove any earlier pre-attached class game on this module with a different (e.g. generic) title,
+    // so reseeding swaps stale demo games for the current relevant one instead of stacking duplicates.
+    await db.delete(interactiveActivitiesTable).where(and(
+      eq(interactiveActivitiesTable.moduleId, firstMod.id), eq(interactiveActivitiesTable.kind, "game"),
+      like(interactiveActivitiesTable.title, "🎮 Class Game:%"), ne(interactiveActivitiesTable.title, title),
+    ));
     const existing = await db.select().from(interactiveActivitiesTable).where(and(eq(interactiveActivitiesTable.moduleId, firstMod.id), eq(interactiveActivitiesTable.title, title)));
     if (existing[0]) {
-      await db.update(interactiveActivitiesTable).set({ html, instructions: s.instructions, updatedAt: new Date() }).where(eq(interactiveActivitiesTable.id, existing[0].id));
+      await db.update(interactiveActivitiesTable).set({ html, instructions: g.instructions, updatedAt: new Date() }).where(eq(interactiveActivitiesTable.id, existing[0].id));
     } else {
       await db.insert(interactiveActivitiesTable).values({
         organisationId: org.id, courseId: cid, moduleId: firstMod.id,
-        title, instructions: s.instructions, html, source: "html", kind: "game",
+        title, instructions: g.instructions, html, source: "html", kind: "game",
         bloomsLevel: "Apply", difficulty: "intermediate", isLibrary: false,
         tags: ["game", `game:${g.key}`, `band:${g.band}`], published: true, createdByUserId: facultyId,
       });
