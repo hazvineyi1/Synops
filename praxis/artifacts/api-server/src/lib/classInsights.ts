@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import {
-  orgClassLearnersTable, orgClassCoursesTable, usersTable,
+  orgClassLearnersTable, orgClassCoursesTable, usersTable, enrolmentsTable,
   interactiveActivitiesTable, activitySubmissionsTable,
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
@@ -62,6 +62,14 @@ export async function computeClassInsights(classId: string): Promise<ClassInsigh
   const users = await db.select({ id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email }).from(usersTable).where(inArray(usersTable.id, learnerIds));
   const userById = new Map(users.map((u) => [u.id, u]));
 
+  // Which of the class's courses each learner is actually enrolled in — progress is averaged over
+  // those, not all class courses (a learner may only take one subject in the class).
+  const enrols = courseIds.length
+    ? await db.select({ userId: enrolmentsTable.userId, courseId: enrolmentsTable.courseId }).from(enrolmentsTable).where(and(inArray(enrolmentsTable.userId, learnerIds), inArray(enrolmentsTable.courseId, courseIds)))
+    : [];
+  const coursesByUser = new Map<string, string[]>();
+  for (const e of enrols) { const arr = coursesByUser.get(e.userId) ?? []; arr.push(e.courseId); coursesByUser.set(e.userId, arr); }
+
   // Activities (games + Math Coach + quizzes) that belong to the class's courses.
   const acts = courseIds.length
     ? await db.select({ id: interactiveActivitiesTable.id, title: interactiveActivitiesTable.title, kind: interactiveActivitiesTable.kind, maxScore: interactiveActivitiesTable.maxScore })
@@ -101,11 +109,12 @@ export async function computeClassInsights(classId: string): Promise<ClassInsigh
   const learners: LearnerInsight[] = [];
   for (const uid of learnerIds) {
     const u = userById.get(uid);
-    // Average lesson progress across the class's courses.
+    // Average lesson progress across the courses THIS learner is enrolled in (within the class).
     let progressPct = 0;
-    if (courseIds.length) {
-      const progs = await Promise.all(courseIds.map((cid) => courseProgress(uid, cid).catch(() => ({ percent: 0 }))));
-      progressPct = Math.round(progs.reduce((a, p) => a + (p.percent || 0), 0) / courseIds.length);
+    const myCourses = coursesByUser.get(uid) ?? [];
+    if (myCourses.length) {
+      const progs = await Promise.all(myCourses.map((cid) => courseProgress(uid, cid).catch(() => ({ percent: 0 }))));
+      progressPct = Math.round(progs.reduce((a, p) => a + (p.percent || 0), 0) / myCourses.length);
     }
     const best = bestByUser.get(uid);
     const bestVals = best ? [...best.values()] : [];

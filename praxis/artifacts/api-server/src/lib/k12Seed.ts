@@ -4,7 +4,7 @@ import {
   coursesTable, modulesTable, beatsTable, moduleReadingsTable,
   caseScenariosTable, interactiveActivitiesTable, discussionsTable, assignmentsTable,
   coursePartnerAssignmentsTable, enrolmentsTable, activitySubmissionsTable,
-  orgClassesTable, orgClassCoursesTable, orgClassStaffTable,
+  orgClassesTable, orgClassCoursesTable, orgClassStaffTable, orgClassLearnersTable,
   beatProgressTable, credentialsTable,
   unitStandardsTable, unitStandardMappingsTable,
 } from "@workspace/db";
@@ -793,6 +793,10 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     // Enrol in their own course.
     const already = enrolled.some((e) => e.courseId === myCourseId);
     if (!already) await db.insert(enrolmentsTable).values({ userId: learnerId, courseId: myCourseId, status: "active" as const, enrolledAt: daysAgo(20) });
+
+    // Add the learner to the class roster so the Class Insights dashboard sees them.
+    const inClass = await db.select().from(orgClassLearnersTable).where(and(eq(orgClassLearnersTable.classId, cls.id), eq(orgClassLearnersTable.learnerId, learnerId)));
+    if (!inClass.length) await db.insert(orgClassLearnersTable).values({ classId: cls.id, learnerId });
 
     // Pre-fill progress up to their fraction.
     const mods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, myCourseId)).orderBy(asc(modulesTable.order));
