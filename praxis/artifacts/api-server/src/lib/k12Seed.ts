@@ -892,7 +892,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
         .where(and(eq(interactiveActivitiesTable.moduleId, modId), eq(interactiveActivitiesTable.kind, "quiz")));
       const body = readingBody(m, lang);
       await db.update(moduleReadingsTable).set({ title: TL(lang, `Lesson: ${m.title}`, `Lección: ${m.title}`), content: body, chars: body.length }).where(eq(moduleReadingsTable.moduleId, modId));
-      await db.update(modulesTable).set({ title: m.title, objectives: [m.outcome], description: `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}` }).where(eq(modulesTable.id, modId));
+      await db.update(modulesTable).set({ title: m.title, objectives: [m.outcome], estimatedMinutes: m.minutes, description: TL(lang, `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}`, `${c.subject} · ${c.gradeLabel}. Meta: ${m.outcome}`) }).where(eq(modulesTable.id, modId));
       // Converge the story beats in place (keeps beatIds → pre-filled progress intact) so a language or
       // title change propagates, and reconcile the optional video beat (remove it if the module no longer
       // has a video, add it if it gained one).
