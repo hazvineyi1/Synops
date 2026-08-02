@@ -82,44 +82,16 @@ const KID_PICS: Record<string, string> = {
   apple: CUT("apple"), ball: CUT("ball"), fish: CUT("fish"), tree: CUT("tree"),
 };
 
-// Topical background-removed photos for each module's quiz questions, so EVERY class shows real
-// photographs — not just the picture-reading courses. Keyed by module title → cut-out keys to cycle
-// through the questions. Only quizzes rendered as "choice"/"find"/"match"/"memory"/"puzzle" display
-// images (pair/sort ignore them), which is fine: each course has at least one choice-mode quiz.
+// Real photos on a quiz ONLY where a photo is genuinely on-topic — currently the science modules,
+// where the objects (fish, tree, sun, ball) actually illustrate the concept. Everything else carries
+// its visuals a better way: the young reading course has real picture-words, young math uses countable
+// emoji in the questions, and every class has a curated video clip + a themed game. This avoids the
+// "recycled / not applicable" problem of stamping a generic photo onto abstract questions.
 const MODULE_IMAGES: Record<string, string[]> = {
-  // Math (countable objects)
-  "Level 1: Equal groups": ["apple", "ball"],
-  "Level 2: Arrays": ["ball", "apple"],
-  "Ratios and rates": ["apple", "ball"],
-  "Solving rate problems": ["ball", "apple"],
-  "Counting On to Add": ["apple", "ball"],
-  "Teen Numbers: Ten and Some Ones": ["ball", "apple"],
-  "Grupos Iguales": ["apple", "ball"],
-  "Problemas con Multiplicación": ["ball", "apple"],
-  "Solving linear equations": ["pencil", "apple"],
-  "Slope as rate of change": ["apple", "pencil"],
-  // Science
   "Food webs": ["fish", "tree", "sun"],
   "Energy flow": ["sun", "fish", "tree"],
   "Speed and Energy of Motion": ["ball", "sun"],
   "How Energy Moves From Place to Place": ["sun", "ball"],
-  // Writing
-  "Claim and evidence": ["pencil", "book"],
-  "Answering the other side": ["book", "pencil"],
-  // Civics / Government
-  "The Three Branches of Government": ["flag", "gavel"],
-  "The Roles of Citizens": ["gavel", "flag"],
-  "Separation of Powers, Checks and Balances, and Federalism": ["flag", "gavel"],
-  "How a Bill Becomes a Law and How Citizens Influence Policy": ["gavel", "flag"],
-  // History
-  "Why Civilizations Began Near Rivers": ["globe", "book"],
-  "Inventions of Early Civilizations": ["book", "globe"],
-  "Why the Framers Wrote the Constitution": ["flag", "book"],
-  "The Bill of Rights": ["book", "flag"],
-  // Reading (Spanish) — text games are pair/sort so images won't show, but harmless if mapped.
-  "La idea principal": ["book"],
-  "Vocabulario en contexto": ["book"],
-  "Pistas del contexto": ["book"],
 };
 
 // Demo interactive checkpoints — a question that pops mid-clip on a few Khan videos so the clips are
@@ -449,25 +421,25 @@ const SECOND_COURSES: K12Course[] = [
     tags: ["math", "counting", "addition", "grade 1", "common core"],
     persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.1 },
     modules: [
-      { title: "Counting On to Add", outcome: "I can start at a big number and count on to add within 10.", hook: "If you have 4 blocks and get 3 more, do you have to count them all again?", minutes: 7, game: "choice",
+      { title: "Count and Add", outcome: "I can count the pictures and add to 10.", hook: "🍎🍎 and 🍎🍎🍎 — how many apples?", minutes: 6, game: "choice",
         standards: [{ code: "CCSS.MATH.CONTENT.1.OA.C.6", title: "Add and subtract within 20" }],
-        points: ["Start with the bigger number in your head.", "Count on with your fingers to add the smaller number.", "The last number you say is the answer."],
-        reading: "When we **add**, we put two groups together to make one bigger group.\n\nHere is a fast way. You do NOT have to start at 1 every time. You can **count on**. That means you say the first number, then keep counting up.\n\nLet's try **4 + 3**. Start at the bigger number, **4**. Now hold up 3 fingers and count on: \"5... 6... 7.\" The last number you say is **7**. So 4 + 3 = 7!\n\nCounting on is like hopping up a stairway. You are already on step 4, so you just take 3 more hops: 5, 6, 7.\n\nTry it with your own toys. Put 5 toys in a pile. Say \"five,\" then add 2 more, one at a time: \"six, seven.\" You have **7** toys. Counting on makes adding fast and fun.",
+        points: ["Adding puts two groups together.", "Count them ALL to find how many.", "The last number you say is the answer."],
+        reading: "Adding means we put things together and count them all! 🎉\n\n🍎🍎 and 🍎 makes 🍎🍎🍎. Count them: 1, 2, 3. That is **3**!\n\nPoint to each one and count out loud. The last number you say is the answer. You can do it! ⭐",
         quiz: [
-          { q: "To add 5 + 2 by counting on, which number do you start with?", options: ["1", "2", "5", "7"], answer: 2 },
-          { q: "What is 6 + 3?", options: ["8", "9", "10", "7"], answer: 1 },
-          { q: "You start at 4 and count on 2 more. What do you say?", options: ["5, 6", "3, 2", "4, 4", "6, 7"], answer: 0 },
-          { q: "What is 3 + 4?", options: ["6", "8", "5", "7"], answer: 3 },
+          { q: "🍎🍎 and 🍎🍎🍎 — how many?", options: ["4", "5", "6", "3"], answer: 1 },
+          { q: "🐟🐟🐟🐟 and 🐟 — how many?", options: ["5", "4", "6", "3"], answer: 0 },
+          { q: "⭐⭐⭐ and ⭐⭐⭐ — how many?", options: ["7", "5", "6", "4"], answer: 2 },
+          { q: "🎈🎈 and 🎈🎈 — how many?", options: ["3", "5", "2", "4"], answer: 3 },
         ], caseContext: "", caseOpening: "" },
-      { title: "Teen Numbers: Ten and Some Ones", outcome: "I can show a teen number as one ten and some ones.", hook: "What is hiding inside the number 14?", minutes: 7, game: "pair",
+      { title: "Ten and Some More", outcome: "I can make a teen number as ten and some more.", hook: "🔟 and 🍎🍎 — what number?", minutes: 6, game: "choice",
         standards: [{ code: "CCSS.MATH.CONTENT.1.NBT.B.2", title: "Understand place value: tens and ones" }],
-        points: ["A teen number is made of one ten and some ones.", "11 is 10 and 1 more; 15 is 10 and 5 more.", "The ten stays the same and the ones change."],
-        reading: "Numbers from 11 to 19 are called **teen numbers**. Every teen number has a secret! It is made of **one ten** and some **ones**.\n\nLet's look at **11**. Take 10 blocks and snap them into one stick of ten. Then add **1** more block. That is 10 and 1, which makes **11**.\n\nNow try **15**. Start with your stick of **ten** blocks. Then count out **5** more single blocks. Ten and five more is **15**!\n\nDo you see the pattern? The **ten** stays the same. Only the **ones** change. 13 is ten and 3. 17 is ten and 7.\n\nThis helps us understand big numbers. When you see a teen number, think: \"one ten, and how many ones?\" That makes counting much easier.",
+        points: ["A teen number is ten and some more.", "Ten and 1 more is 11. Ten and 2 more is 12.", "Start at ten, then count on!"],
+        reading: "Big-kid numbers! A teen number is **ten and some more**. 🎉\n\n🔟 and 🍎 is **eleven (11)**.\n🔟 and 🍎🍎 is **twelve (12)**.\n\nStart at ten, then keep counting: 11, 12, 13… You are a number star! ⭐",
         quiz: [
-          { q: "The number 12 is made of one ten and how many ones?", options: ["1", "2", "3", "12"], answer: 1 },
-          { q: "Ten and 6 more makes which number?", options: ["16", "60", "6", "10"], answer: 0 },
-          { q: "Which number is one ten and 8 ones?", options: ["80", "8", "18", "10"], answer: 2 },
-          { q: "In the number 14, how many tens are there?", options: ["4", "14", "0", "1"], answer: 3 },
+          { q: "🔟 and 🍎🍎 — what number?", options: ["2", "12", "20", "10"], answer: 1 },
+          { q: "Ten and 4 more — what number?", options: ["14", "40", "4", "11"], answer: 0 },
+          { q: "🔟 and 🍎🍎🍎🍎🍎 — what number?", options: ["50", "5", "15", "16"], answer: 2 },
+          { q: "Ten and 1 more — what number?", options: ["10", "1", "12", "11"], answer: 3 },
         ], caseContext: "", caseOpening: "" },
     ],
   },

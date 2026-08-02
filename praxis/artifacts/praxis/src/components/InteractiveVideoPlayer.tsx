@@ -73,6 +73,7 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQues
     enabled: !!beatId && !inlineQuestions,
   });
   const questions = inlineQuestions ?? fetched;
+  const hasQuestions = questions.length > 0;
   const questionsRef = useRef<IVQuestion[]>([]);
   questionsRef.current = questions;
 
@@ -108,7 +109,7 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQues
 
   // YouTube: create the IFrame-API player and poll currentTime.
   useEffect(() => {
-    if (!ytId || !ytDivRef.current) return;
+    if (!ytId || !hasQuestions || !ytDivRef.current) return;
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
     loadYouTubeApi().then((YT) => {
@@ -129,7 +130,7 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQues
     });
     return () => { cancelled = true; if (interval) clearInterval(interval); try { ytPlayerRef.current?.destroy?.(); } catch { /* noop */ } ytPlayerRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ytId]);
+  }, [ytId, hasQuestions]);
 
   const onFileTime = useCallback(() => {
     const t = videoRef.current?.currentTime ?? 0;
@@ -167,7 +168,7 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQues
   return (
     <div className="space-y-3">
       <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
-        {ytId ? (
+        {ytId && hasQuestions ? (
           <div ref={ytDivRef} className="absolute inset-0 w-full h-full" />
         ) : isFile ? (
           <video ref={videoRef} src={resolved.src} className="w-full h-full object-contain" controls={!activeQuestion} onTimeUpdate={onFileTime} onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)} />

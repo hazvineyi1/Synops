@@ -2432,7 +2432,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(w);
-        u.lang = 'en-US'; u.rate = 0.9; u.pitch = 1.15;
+        u.lang = es ? 'es-ES' : 'en-US'; u.rate = 0.9; u.pitch = 1.15;
         window.speechSynthesis.speak(u);
       }
     } catch { /* speech optional */ }

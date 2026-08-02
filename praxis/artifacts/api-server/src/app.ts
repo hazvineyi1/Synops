@@ -63,7 +63,7 @@ app.use(helmet({
 // "Content-Security-Policy-Report-Only" — that instantly stops blocking while keeping the reports.
 const CSP_BASE = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
