@@ -13,7 +13,7 @@ router.get("/k12/commendations", async (_req, res) => {
   try {
     const report = await buildK12Commendations();
     if (!report) { res.status(404).json({ error: "K-12 demo not provisioned" }); return; }
-    res.set("Cache-Control", "public, max-age=300");
+    res.set("Cache-Control", "public, max-age=30");
     res.json(report);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Failed to build commendations" });

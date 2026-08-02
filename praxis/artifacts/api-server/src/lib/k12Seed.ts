@@ -808,6 +808,16 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     if (!linked.includes(courseId)) await db.insert(orgClassCoursesTable).values({ classId: cls.id, courseId });
   }
 
+  // 3a2. Reconcile the class roster of COURSES: drop stale attachments left by earlier seeds (old
+  // duplicate courses like "Reading Lab") so the class — and the public commendations page — shows
+  // exactly the current two-subjects-per-learner set, nothing orphaned.
+  {
+    const planCourseIds = Object.values(courseIdByTitle);
+    const attached = await db.select().from(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id));
+    const staleAttach = attached.filter((a) => !planCourseIds.includes(a.courseId)).map((a) => a.courseId);
+    if (staleAttach.length) await db.delete(orgClassCoursesTable).where(and(eq(orgClassCoursesTable.classId, cls.id), inArray(orgClassCoursesTable.courseId, staleAttach)));
+  }
+
   // 3b. K-12 has NO AI tutor / case studies. Courses reused from an earlier seed still carry the
   // old "Tutor:" cases on their modules, so delete every case scenario on these courses' modules.
   const k12CourseIds = Object.values(courseIdByTitle);
