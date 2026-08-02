@@ -25,6 +25,12 @@ const KID_SRC: Record<string, string> = {
   ball: S("1498940757830-82f7813bf178"),
   fish: S("1522069169874-c58ec4b76be5"),
   tree: S("1502082553048-f009c37129b9"),
+  // Topical objects so EVERY subject (not just reading) shows a real background-removed photo.
+  flag: S("1626836014893-37663794dca7"),    // US flag — civics / government
+  gavel: S("1676181739859-08330dea8999"),   // gavel — civics / law
+  book: S("1610116306796-6fea9f4fae38"),     // open books — reading / history / writing
+  pencil: S("1595584354232-f07d525d87c1"),   // pencil — writing / math
+  pyramid: S("1600520611035-84157ad4084d"),  // pyramids — early civilizations / history
 };
 
 const cache = new Map<string, Buffer>();

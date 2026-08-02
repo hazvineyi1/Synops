@@ -81,6 +81,46 @@ const KID_PICS: Record<string, string> = {
   apple: CUT("apple"), ball: CUT("ball"), fish: CUT("fish"), tree: CUT("tree"),
 };
 
+// Topical background-removed photos for each module's quiz questions, so EVERY class shows real
+// photographs — not just the picture-reading courses. Keyed by module title → cut-out keys to cycle
+// through the questions. Only quizzes rendered as "choice"/"find"/"match"/"memory"/"puzzle" display
+// images (pair/sort ignore them), which is fine: each course has at least one choice-mode quiz.
+const MODULE_IMAGES: Record<string, string[]> = {
+  // Math (countable objects)
+  "Level 1: Equal groups": ["apple", "ball"],
+  "Level 2: Arrays": ["ball", "apple"],
+  "Ratios and rates": ["apple", "ball"],
+  "Solving rate problems": ["ball", "apple"],
+  "Counting On to Add": ["apple", "ball"],
+  "Teen Numbers: Ten and Some Ones": ["ball", "apple"],
+  "Grupos Iguales": ["apple", "ball"],
+  "Problemas con Multiplicación": ["ball", "apple"],
+  "Solving linear equations": ["pencil", "apple"],
+  "Slope as rate of change": ["apple", "pencil"],
+  // Science
+  "Food webs": ["fish", "tree", "sun"],
+  "Energy flow": ["sun", "fish", "tree"],
+  "Speed and Energy of Motion": ["ball", "sun"],
+  "How Energy Moves From Place to Place": ["sun", "ball"],
+  // Writing
+  "Claim and evidence": ["pencil", "book"],
+  "Answering the other side": ["book", "pencil"],
+  // Civics / Government
+  "The Three Branches of Government": ["flag", "gavel"],
+  "The Roles of Citizens": ["gavel", "flag"],
+  "Separation of Powers, Checks and Balances, and Federalism": ["flag", "gavel"],
+  "How a Bill Becomes a Law and How Citizens Influence Policy": ["gavel", "flag"],
+  // History
+  "Why Civilizations Began Near Rivers": ["pyramid", "book"],
+  "Inventions of Early Civilizations": ["book", "pyramid"],
+  "Why the Framers Wrote the Constitution": ["flag", "book"],
+  "The Bill of Rights": ["book", "flag"],
+  // Reading (Spanish) — text games are pair/sort so images won't show, but harmless if mapped.
+  "La idea principal": ["book"],
+  "Vocabulario en contexto": ["book"],
+  "Pistas del contexto": ["book"],
+};
+
 // ── COURSES (one per persona; two comprehensive lessons each) ────────────────
 const COURSES: K12Course[] = [
   // 0) MATEO · Grade 1 · just starting out (K-2 band) ─────────────────────────
@@ -643,6 +683,27 @@ function readingBody(m: K12Module, lang?: string): string {
   return `# ${m.title}\n\n**${think}** ${m.hook}\n\n**${byEnd}** ${m.outcome}\n\n${m.reading}\n\n## ${bigIdeas}\n\n${m.points.map((p) => `- ${p}`).join("\n")}\n\n**${aligned}** ${m.standards.map((s) => s.code).join(", ")}`;
 }
 
+// A quiz activity's title + instructions, in the course language and stating the learning objective —
+// so EVERY activity has clear, localized instructions and a stated objective (not a bare English label).
+function quizTitle(m: K12Module, lang?: string): string {
+  return TL(lang, `${m.title}: practice check`, `${m.title}: repaso`);
+}
+function quizInstructions(m: K12Module, lang?: string): string {
+  return TL(lang,
+    `Objective: ${m.outcome} Answer each question and check your work — you can retry as many times as you like.`,
+    `Objetivo: ${m.outcome} Responde cada pregunta y revisa tu trabajo — puedes intentarlo las veces que quieras.`);
+}
+
+// Give every quiz question a relevant background-removed photograph (served cut-out via /api/kid-cutout),
+// so EVERY class shows real photos — not only the reading courses. Keyed by module title → the cut-out
+// keys to cycle through its questions; falls back to no image if a module isn't mapped (e.g. the picture
+// reading courses already carry their own per-item images).
+function withImages(m: K12Module): K12Module["quiz"] {
+  const keys = MODULE_IMAGES[m.title];
+  if (!keys || !keys.length) return m.quiz;
+  return m.quiz.map((q, i) => (q.img ? q : { ...q, img: CUT(keys[i % keys.length]!) }));
+}
+
 async function applyBrand(partnerId: string): Promise<void> {
   const fields = { ...BRAND, updatedAt: new Date() };
   const current = firstOrNull(await db.select().from(brandThemesTable).where(eq(brandThemesTable.tenantId, partnerId)));
@@ -676,7 +737,7 @@ async function upsertUser(u: {
 
 async function createK12Course(c: K12Course, orgId: string, facultyId: string): Promise<string> {
   const outcomes = c.modules.map((m) => m.outcome);
-  const description = `${c.emoji} ${c.intro}\n\nCourse goal: ${c.outcome}`;
+  const description = `${c.emoji} ${c.intro}\n\n${TL(c.lang, "Course goal", "Meta del curso")}: ${c.outcome}`;
   const [course] = await db.insert(coursesTable).values({
     title: c.title, description, tenantId: "platform", status: "published",
     competencyTags: [...c.tags, c.subject, c.gradeLabel], objectives: outcomes, nqfLevel: c.grade,
@@ -687,7 +748,7 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
     const [mod] = await db.insert(modulesTable).values({
       courseId: course.id, title: m.title, status: "published", lessonType: "slides",
       modality: "async", order: mi, objectives: [m.outcome], estimatedMinutes: m.minutes,
-      description: `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}`,
+      description: `${c.subject} · ${c.gradeLabel}. ${TL(c.lang, "Goal", "Meta")}: ${m.outcome}`,
     }).returning();
 
     const lang = c.lang;
@@ -702,16 +763,16 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
 
     const body = readingBody(m, lang);
     await db.insert(moduleReadingsTable).values({
-      moduleId: mod.id, courseId: course.id, title: `Lesson: ${m.title}`,
+      moduleId: mod.id, courseId: course.id, title: TL(lang, `Lesson: ${m.title}`, `Lección: ${m.title}`),
       kind: "note", content: body, chars: body.length, order: 0, published: true, createdBy: facultyId,
     });
 
     // Interactive quiz (every module → satisfies the "interactive" completeness component).
     await db.insert(interactiveActivitiesTable).values({
       organisationId: orgId, courseId: course.id, moduleId: mod.id,
-      title: `${m.title}: quick check`,
-      instructions: "Answer each question, then check your work. You can retry as many times as you like.",
-      html: gameHtml(`${m.title}: quick check`, m.quiz, m.game ?? "choice", c.lang ?? "en"), source: "html", kind: "quiz",
+      title: quizTitle(m, c.lang),
+      instructions: quizInstructions(m, c.lang),
+      html: gameHtml(quizTitle(m, c.lang), withImages(m), m.game ?? "choice", c.lang ?? "en"), source: "html", kind: "quiz",
       bloomsLevel: "Understand", difficulty: "foundational",
       isLibrary: false, tags: c.tags, published: true, createdByUserId: facultyId,
     });
@@ -735,15 +796,19 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
   // Course-level assignment + discussion (module_id NULL) → satisfies those components for EVERY module.
   await db.insert(assignmentsTable).values({
     courseId: course.id, moduleId: null,
-    title: `Show what you learned: ${c.subject}`,
-    description: `A short, friendly wrap-up task for ${c.title}.`,
-    instructions: `In your own words (or a quick recording), explain the most important thing you learned in this course and give one example.`,
+    title: TL(c.lang, `Show what you learned: ${c.subject}`, `Muestra lo que aprendiste: ${c.subject}`),
+    description: TL(c.lang, `A short, friendly wrap-up task for ${c.title}.`, `Una tarea corta y amigable para cerrar ${c.title}.`),
+    instructions: TL(c.lang,
+      `Objective: ${c.outcome} In your own words (or a quick recording), explain the most important thing you learned in this course and give one example.`,
+      `Objetivo: ${c.outcome} Con tus propias palabras (o una grabación corta), explica lo más importante que aprendiste en este curso y da un ejemplo.`),
     submissionType: "file_upload", pointsPossible: "100", published: true, position: 0,
   });
   await db.insert(discussionsTable).values({
     courseId: course.id, authorId: facultyId, moduleId: null,
-    title: `Class discussion: ${c.title}`,
-    body: `Share one thing that surprised you in this course, and reply kindly to a classmate.`,
+    title: TL(c.lang, `Class discussion: ${c.title}`, `Conversación de clase: ${c.title}`),
+    body: TL(c.lang,
+      `Share one thing that surprised you in this course, and reply kindly to a classmate.`,
+      `Comparte algo que te sorprendió en este curso y responde con amabilidad a un compañero.`),
     aiFacilitated: true, requireInitialPost: true, graded: false,
   });
 
@@ -838,10 +903,10 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
       const modId = cmods[i].id;
       const lang = c.lang;
       await db.update(interactiveActivitiesTable)
-        .set({ title: `${m.title}: quick check`, html: gameHtml(`${m.title}: quick check`, m.quiz, m.game ?? "choice", lang ?? "en") })
+        .set({ title: quizTitle(m, lang), instructions: quizInstructions(m, lang), html: gameHtml(quizTitle(m, lang), withImages(m), m.game ?? "choice", lang ?? "en") })
         .where(and(eq(interactiveActivitiesTable.moduleId, modId), eq(interactiveActivitiesTable.kind, "quiz")));
       const body = readingBody(m, lang);
-      await db.update(moduleReadingsTable).set({ title: `Lesson: ${m.title}`, content: body, chars: body.length }).where(eq(moduleReadingsTable.moduleId, modId));
+      await db.update(moduleReadingsTable).set({ title: TL(lang, `Lesson: ${m.title}`, `Lección: ${m.title}`), content: body, chars: body.length }).where(eq(moduleReadingsTable.moduleId, modId));
       await db.update(modulesTable).set({ title: m.title, objectives: [m.outcome], description: `${c.subject} · ${c.gradeLabel}. Goal: ${m.outcome}` }).where(eq(modulesTable.id, modId));
       // Converge the story beats in place (keeps beatIds → pre-filled progress intact) so a language or
       // title change propagates, and reconcile the optional video beat (remove it if the module no longer
