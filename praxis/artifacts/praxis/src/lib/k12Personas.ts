@@ -73,8 +73,8 @@ export const K12_PERSONAS: K12Persona[] = [
   },
   {
     key: "sofia", email: "sofia.k12@synops-demo.test", first: "Sofía", name: "Sofía Ramírez",
-    grade: 3, gradeLabel: "Grade 3", band: "early", subject: "Reading", subjectEmoji: "📚",
-    challenge: "English learner", challengeLong: "A native Spanish speaker learning to read in English.",
+    grade: 3, gradeLabel: "Grade 3", band: "early", subject: "Lectura y Matemáticas", subjectEmoji: "📚",
+    challenge: "Spanish-first learner", challengeLong: "A Spanish-speaking student who learns entirely in Spanish — interface, lessons, games, and read-aloud.",
     learningStyleLabel: "Visual learner",
     accent: "#0D9488", avatarBg: "#0D9488", rootPx: 16.5, highContrast: false, calm: false, gamified: true, autismMode: false, defaultLang: "es",
     supports: "Spanish interface + bilingual read-aloud, simpler wording, big friendly text, and one idea at a time.",

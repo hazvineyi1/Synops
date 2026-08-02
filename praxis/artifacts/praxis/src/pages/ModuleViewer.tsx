@@ -3175,9 +3175,7 @@ function ModuleHubView({
                         : ' The lesson notes below cover the same material if you prefer to read.'}
                     </Instruction>
                     {b.videoUrl ? (
-                      <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-sm">
-                        <video src={b.videoUrl} controls className="w-full h-full" />
-                      </div>
+                      <InteractiveVideoPlayer beatId={b.id} videoUrl={b.videoUrl} onComplete={() => markHubBeatViewed.mutate(b.id)} />
                     ) : (b.visualData?.slides && b.visualData.slides.length > 0) ? (
                       <SlideLesson slides={b.visualData.slides} onReachedEnd={() => markHubBeatViewed.mutate(b.id)} />
                     ) : (
