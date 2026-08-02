@@ -4,6 +4,9 @@ import {
   coursesTable,
   modulesTable,
   enrolmentsTable,
+  usersTable,
+  orgClassesTable,
+  orgClassCoursesTable,
   unitStandardsTable,
   unitStandardMappingsTable,
   caseScenariosTable,
@@ -93,7 +96,32 @@ export async function buildAccreditationReport(orgId: string): Promise<Accredita
   const tenantIds = [orgId, ...(org?.partnerId ? [org.partnerId] : [])];
 
   // ── Org scope ──────────────────────────────────────────────────────────────
-  const courses = await db.select().from(coursesTable).where(inArray(coursesTable.tenantId, tenantIds));
+  // Courses OWNED by the org/partner, PLUS courses DELIVERED to the org — attached to its classes
+  // or that its members are enrolled in. K-12 (and adopted) courses are platform-owned, so a
+  // tenant-only scope would miss them entirely.
+  const [ownedCourses, orgMembers, orgClasses] = await Promise.all([
+    db.select({ id: coursesTable.id }).from(coursesTable).where(inArray(coursesTable.tenantId, tenantIds)),
+    db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.organisationId, orgId)),
+    db.select({ id: orgClassesTable.id }).from(orgClassesTable).where(eq(orgClassesTable.orgId, orgId)),
+  ]);
+  const memberIds = orgMembers.map((m) => m.id);
+  const classIds = orgClasses.map((c) => c.id);
+  const [classCourseRows, memberEnrolRows] = await Promise.all([
+    classIds.length
+      ? db.select({ courseId: orgClassCoursesTable.courseId }).from(orgClassCoursesTable).where(inArray(orgClassCoursesTable.classId, classIds))
+      : Promise.resolve([] as { courseId: string }[]),
+    memberIds.length
+      ? db.select({ courseId: enrolmentsTable.courseId }).from(enrolmentsTable).where(inArray(enrolmentsTable.userId, memberIds))
+      : Promise.resolve([] as { courseId: string }[]),
+  ]);
+  const scopeCourseIds = [...new Set([
+    ...ownedCourses.map((c) => c.id),
+    ...classCourseRows.map((r) => r.courseId),
+    ...memberEnrolRows.map((r) => r.courseId),
+  ])];
+  const courses = scopeCourseIds.length
+    ? await db.select().from(coursesTable).where(inArray(coursesTable.id, scopeCourseIds))
+    : [];
   const courseIds = courses.map((c) => c.id);
   const courseById = new Map(courses.map((c) => [c.id, c]));
 
