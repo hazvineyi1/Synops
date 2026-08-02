@@ -1088,6 +1088,9 @@ export function CourseDetail() {
   const isYoungBand = !!youngPersona && (youngPersona.band === 'early' || youngPersona.band === 'elementary');
   // Show the Aventura mascot for all K-12 learners except the low-vision / high-contrast profile.
   const showMascot = !!youngPersona && !youngPersona.highContrast;
+  // Any K-12 demo learner gets the streamlined course page (skip the adult overview/objectives/skills
+  // blocks) so they land on their lessons ("Start here") with minimal scrolling.
+  const isK12Learner = !!youngPersona;
   // Spanish-first learner (Sofía): every label on this page reads in her language.
   const es = youngPersona?.defaultLang === 'es';
   const L = (en: string, esT: string) => (es ? esT : en);
@@ -1187,8 +1190,8 @@ export function CourseDetail() {
           <p className="text-muted-foreground mt-1 text-sm max-w-2xl">{course.description}</p>
           <div className="flex flex-wrap gap-2 mt-3">
             {courseLevelLabel(course) && <Badge variant="outline">{es ? courseLevelLabel(course)!.replace(/^Grade /, 'Grado ') : courseLevelLabel(course)}</Badge>}
-            {/* Standards/skill tags are jargon for the youngest — hidden for K-5. */}
-            {!isYoungBand && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+            {/* Standards/skill tags are jargon for K-12 learners — hidden so the page stays short. */}
+            {!isK12Learner && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
           </div>
         </div>
         {role === 'learner' && !enrolment && (
@@ -1291,16 +1294,16 @@ export function CourseDetail() {
           <div className={isYoungBand ? '' : 'lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8'}>
             {/* Main column: the single learning flow */}
             <div className="space-y-10 min-w-0">
-              {/* 1. Course overview — hidden for the youngest (no paragraph of adult prose) */}
-              {course.description && !isYoungBand && (
+              {/* 1. Course overview — hidden for all K-12 learners (already in the header; keeps modules high) */}
+              {course.description && !isK12Learner && (
                 <section>
                   <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course overview</h2>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{course.description}</p>
                 </section>
               )}
 
-              {/* 2-4. Objectives, structure, skills — all hidden for the youngest */}
-              {!isYoungBand && (<>
+              {/* 2-4. Objectives, structure, skills — hidden for all K-12 learners to minimize scrolling to lessons */}
+              {!isK12Learner && (<>
               <section>
                 <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course learning objectives</h2>
                 {(course.objectives && course.objectives.length > 0) ? (
