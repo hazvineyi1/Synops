@@ -11,10 +11,12 @@ import {
   caseSessionsTable,
   credentialsTable,
   evidenceRecordsTable,
+  interactiveActivitiesTable,
+  activitySubmissionsTable,
   type RubricCriterion,
   type CaseRubricScore,
 } from "@workspace/db";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, or } from "drizzle-orm";
 
 /**
  * Accreditation Readiness aggregation.
@@ -141,6 +143,37 @@ export async function buildAccreditationReport(orgId: string): Promise<Accredita
   const evidence = credentialIds.length
     ? await db.select().from(evidenceRecordsTable).where(inArray(evidenceRecordsTable.credentialId, credentialIds))
     : [];
+
+  // ── Interactive activities (games, Math Coach, quizzes) as assessed outcomes ──
+  // Any scored activity attached to a mapped module/course contributes its learners' best scores as
+  // per-standard mastery — so accreditation reflects the real activity data, not just cases.
+  const actConds = [];
+  if (moduleIds.length) actConds.push(inArray(interactiveActivitiesTable.moduleId, moduleIds));
+  if (courseIds.length) actConds.push(inArray(interactiveActivitiesTable.courseId, courseIds));
+  const activities = actConds.length
+    ? await db.select({ id: interactiveActivitiesTable.id, moduleId: interactiveActivitiesTable.moduleId, courseId: interactiveActivitiesTable.courseId, maxScore: interactiveActivitiesTable.maxScore })
+        .from(interactiveActivitiesTable).where(actConds.length === 1 ? actConds[0] : or(...actConds))
+    : [];
+  const actMax = new Map(activities.map((a) => [a.id, Number(a.maxScore) || 100]));
+  const activityIds = activities.map((a) => a.id);
+  const actsByModule = new Map<string, string[]>();
+  const actsByCourse = new Map<string, string[]>();
+  for (const a of activities) {
+    if (a.moduleId) { const l = actsByModule.get(a.moduleId) ?? []; l.push(a.id); actsByModule.set(a.moduleId, l); }
+    if (a.courseId) { const l = actsByCourse.get(a.courseId) ?? []; l.push(a.id); actsByCourse.set(a.courseId, l); }
+  }
+  const actSubs = activityIds.length
+    ? await db.select({ userId: activitySubmissionsTable.userId, activityId: activitySubmissionsTable.activityId, score: activitySubmissionsTable.score }).from(activitySubmissionsTable).where(inArray(activitySubmissionsTable.activityId, activityIds))
+    : [];
+  const bestSub = new Map<string, Map<string, number>>(); // activityId -> userId -> best fraction (0-1)
+  for (const s of actSubs) {
+    const sc = Number(s.score); if (!Number.isFinite(sc)) continue;
+    const max = actMax.get(s.activityId) || 100;
+    const frac = Math.max(0, Math.min(1, max > 0 ? sc / max : sc / 100));
+    const byU = bestSub.get(s.activityId) ?? new Map<string, number>();
+    if (frac > (byU.get(s.userId) ?? -1)) byU.set(s.userId, frac);
+    bestSub.set(s.activityId, byU);
+  }
 
   // ── Standards + mappings in scope ────────────────────────────────────────────
   const standards = await db.select().from(unitStandardsTable);
@@ -271,6 +304,23 @@ export async function buildAccreditationReport(orgId: string): Promise<Accredita
         }
       }
     }
+    // Activity-based mastery: each learner's best score on this standard's mapped activities (games,
+    // Math Coach, quizzes) is blended in alongside any case scores.
+    const stdActIds = new Set<string>();
+    modSet.forEach((mid) => (actsByModule.get(mid) ?? []).forEach((id) => stdActIds.add(id)));
+    courseSet.forEach((cid) => (actsByCourse.get(cid) ?? []).forEach((id) => stdActIds.add(id)));
+    let hasActivityAssess = false;
+    for (const aid of stdActIds) {
+      const byU = bestSub.get(aid);
+      if (!byU || byU.size === 0) continue;
+      hasActivityAssess = true;
+      evidenceCount += byU.size;
+      for (const [u, frac] of byU) {
+        if (!perLearner.has(u)) perLearner.set(u, []);
+        perLearner.get(u)!.push(frac);
+      }
+    }
+
     const learnerAvgs = [...perLearner.entries()].map(([u, fr]) => {
       const avg = fr.reduce((a, b) => a + b, 0) / fr.length;
       learnersEvaluated.add(u);
@@ -286,7 +336,7 @@ export async function buildAccreditationReport(orgId: string): Promise<Accredita
 
     const hasCaseAssess = (stdCaseIds.get(sid)?.size ?? 0) > 0;
     const coverageLevel: StandardRow["coverageLevel"] =
-      hasCaseAssess || evidenceCount > 0
+      hasCaseAssess || hasActivityAssess || evidenceCount > 0
         ? "Assessed"
         : modSet.size > 0
           ? "Practised"
