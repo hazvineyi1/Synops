@@ -1,6 +1,8 @@
 import React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useSession } from "@/context/SessionContext";
+import { personaByEmail } from "@/lib/k12Personas";
 import { useLocation } from "wouter";
 import {
   Flame,
@@ -147,6 +149,11 @@ function timeAgo(iso: string): string {
 export function LearnerHome({ firstName }: { firstName?: string | null }) {
   const [, navigate] = useLocation();
   const { t } = useTranslation();
+  const { user } = useSession();
+  const persona = personaByEmail(user?.email);
+  const isK12 = !!persona;
+  const es = persona?.defaultLang === "es";
+  const L = (en: string, esT: string) => (es ? esT : en);
 
   const { data: prog, isLoading: progLoading } = useQuery({
     queryKey: ["progress", "me"],
@@ -259,7 +266,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
       {/* Attention strip. A flagged learner sees their off-track status + a route to the plan
           and their AI Coach, front and centre. A learner who is on track sees a positive green
           confirmation rather than a blank space -- reassurance, not silence. */}
-      {flagged.length > 0 ? (
+      {!isK12 && (flagged.length > 0 ? (
         <Card className={cn("p-4 sm:p-5", offTrack ? "border-red-200 bg-red-50/70 dark:bg-red-950/20" : "border-amber-200 bg-amber-50/70 dark:bg-amber-950/20")}>
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className={cn("h-11 w-11 shrink-0 rounded-xl flex items-center justify-center", offTrack ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600")}>
@@ -297,7 +304,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
             </div>
           </div>
         </Card>
-      )}
+      ))}
 
       {/* Gamification / at-a-glance strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -305,13 +312,13 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[76px] rounded-xl" />)
         ) : (
           <>
-            <StatCard icon={Flame} label={prog?.streak ? "Day streak" : "Start a streak today"} value={prog?.streak ?? 0} tint="bg-amber-500/10 text-amber-600" />
+            <StatCard icon={Flame} label={prog?.streak ? L("Day streak", "Días seguidos") : L("Start a streak today", "Empieza tu racha hoy")} value={prog?.streak ?? 0} tint="bg-amber-500/10 text-amber-600" />
             {/* Counted from the same list the cards below render, so the number and the list
                 can never disagree. The server's coursesInProgress uses a percent-only rule
                 and drifts from the enrolment status shown on each card. */}
-            <StatCard icon={BookOpen} label="Courses in progress" value={inProgress.length} tint="bg-indigo-500/10 text-indigo-600" />
-            <StatCard icon={Award} label="Credentials earned" value={credentials?.length ?? 0} tint="bg-emerald-500/10 text-emerald-600" />
-            <StatCard icon={Clock} label="Learning time" value={formatHours(prog?.totalMinutes ?? 0)} tint="bg-sky-500/10 text-sky-600" />
+            <StatCard icon={BookOpen} label={L("Courses in progress", "Cursos en progreso")} value={inProgress.length} tint="bg-indigo-500/10 text-indigo-600" />
+            <StatCard icon={Award} label={L("Credentials earned", "Insignias ganadas")} value={credentials?.length ?? 0} tint="bg-emerald-500/10 text-emerald-600" />
+            <StatCard icon={Clock} label={L("Learning time", "Tiempo de aprendizaje")} value={formatHours(prog?.totalMinutes ?? 0)} tint="bg-sky-500/10 text-sky-600" />
           </>
         )}
       </div>

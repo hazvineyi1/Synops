@@ -2482,7 +2482,12 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
             const Icon = s.icon; const active = i === stepIdx; const done = i < stepIdx;
             return (
               <div key={s.id} className="flex items-center gap-2">
-                <button onClick={() => setStepIdx(i)}
+                <button onClick={() => {
+                    // Practice / tutor steps launch the activity directly — no extra "Start" card in between.
+                    if (s.id === 'practice' && activities?.[0]) { navigate(`/activities/${activities[0].id}/play`); return; }
+                    if (s.id === 'tutor' && cases?.[0]) { startCase.mutate(cases[0].id); return; }
+                    setStepIdx(i);
+                  }}
                   className="inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold shadow-sm transition-transform active:scale-95"
                   style={active ? { background: accent, color: '#fff' } : { background: '#fff', color: done ? accent : '#6b7280', border: `2px solid ${done ? accent : '#eee'}` }}>
                   <Icon className="h-5 w-5" /> {s.label} {done && '✓'}
