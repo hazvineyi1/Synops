@@ -14,7 +14,7 @@ import { resolveVideo } from '@/lib/videoEmbed';
  * providers (Vimeo, TikTok…) fall back to a plain inline embed without checkpoints. With zero questions
  * it degrades gracefully to a normal inline player.
  */
-interface IVQuestion {
+export interface IVQuestion {
   id: string;
   videoTimestamp: number;
   stem: string;
@@ -22,9 +22,14 @@ interface IVQuestion {
   questionType: string;
   points: number;
   pauseOnReach: boolean;
+  // Present only for inline (catalog-authored) questions — enables local grading with no beat.
+  correctOptionIds?: string[];
+  feedbackCorrect?: string;
+  feedbackIncorrect?: string;
 }
 interface IVResponse { correct: boolean | null; feedback?: string; correctOptionIds?: string[] }
-interface Props { beatId: string; videoUrl: string; onComplete?: () => void }
+/** Provide beatId (module video, graded server-side) OR questions (inline, graded locally). */
+interface Props { beatId?: string; videoUrl: string; questions?: IVQuestion[]; onComplete?: () => void }
 
 // Load the YouTube IFrame API once and resolve when ready.
 let ytApiPromise: Promise<any> | null = null;
@@ -44,7 +49,7 @@ function loadYouTubeApi(): Promise<any> {
   return ytApiPromise;
 }
 
-export function InteractiveVideoPlayer({ beatId, videoUrl, onComplete }: Props) {
+export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQuestions, onComplete }: Props) {
   const resolved = resolveVideo(videoUrl);
   const ytId = (resolved.provider === 'youtube' || resolved.provider === 'khan')
     ? (resolved.src.match(/embed\/([A-Za-z0-9_-]{11})/)?.[1] ?? '') : '';
@@ -62,11 +67,12 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, onComplete }: Props) 
   const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
   const triggeredRef = useRef<Set<string>>(new Set());
 
-  const { data: questions = [] } = useQuery<IVQuestion[]>({
+  const { data: fetched = [] } = useQuery<IVQuestion[]>({
     queryKey: ['iv-questions', beatId],
     queryFn: () => apiFetch(`/beats/${beatId}/interactive-questions`),
-    enabled: !!beatId,
+    enabled: !!beatId && !inlineQuestions,
   });
+  const questions = inlineQuestions ?? fetched;
   const questionsRef = useRef<IVQuestion[]>([]);
   questionsRef.current = questions;
 
@@ -139,8 +145,17 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, onComplete }: Props) 
   };
   const handleSubmit = () => {
     if (!activeQuestion || selectedOptions.length === 0) return;
-    const resp = activeQuestion.questionType === 'check_all' ? selectedOptions : selectedOptions[0];
-    respondMutation.mutate({ questionId: activeQuestion.id, response: resp });
+    if (beatId) {
+      const resp = activeQuestion.questionType === 'check_all' ? selectedOptions : selectedOptions[0];
+      respondMutation.mutate({ questionId: activeQuestion.id, response: resp });
+    } else {
+      // Inline (catalog) question — grade locally against the provided correct answers.
+      const correctIds = activeQuestion.correctOptionIds ?? [];
+      const isCorrect = activeQuestion.questionType === 'check_all'
+        ? correctIds.length === selectedOptions.length && correctIds.every((c) => selectedOptions.includes(c))
+        : correctIds.includes(selectedOptions[0]);
+      setResponse({ correct: isCorrect, correctOptionIds: correctIds, feedback: isCorrect ? activeQuestion.feedbackCorrect : activeQuestion.feedbackIncorrect });
+    }
   };
   const toggleOption = (optId: string) => {
     if (activeQuestion?.questionType === 'check_all') setSelectedOptions((p) => p.includes(optId) ? p.filter((o) => o !== optId) : [...p, optId]);

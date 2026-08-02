@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Layers, Boxes, Gamepad2, BookOpen, Send, Building2, GraduationCap, Sparkles, ShieldCheck } from "lucide-react";
+import { resolveVideo, VIDEO_PROVIDERS_HINT } from "@/lib/videoEmbed";
+import { Layers, Boxes, Gamepad2, BookOpen, Send, Building2, GraduationCap, Sparkles, ShieldCheck, Video, Trash2 } from "lucide-react";
 
 /**
  * Super-admin Content Catalog. One shared "Platform Templates & Games" catalog plus one catalog per
@@ -24,6 +25,7 @@ export default function ContentCatalog() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [newVideo, setNewVideo] = useState(false);
 
   useEffect(() => {
     apiFetch<{ tenants: Tenant[] }>("/admin/catalog/tenants").then((d) => setTenants(d.tenants || [])).catch(() => setTenants([]));
@@ -126,7 +128,11 @@ export default function ContentCatalog() {
                 <div className="flex items-center gap-2 mb-2">
                   <Boxes className="h-4 w-4 text-indigo-600" />
                   <h3 className="font-semibold text-sm">Games & activities <span className="font-normal text-muted-foreground">· {cat.activities.length}</span></h3>
+                  <button onClick={() => setNewVideo((v) => !v)} className="ml-auto inline-flex items-center gap-1 text-[12px] font-medium rounded-md px-2.5 py-1 bg-indigo-600 text-white">
+                    <Video className="h-3 w-3" /> New video lesson
+                  </button>
                 </div>
+                {newVideo && <VideoLessonCreator tenantId={sel} tenantName={selTenant?.name ?? cat.tenant.name} onDone={(m) => { setNewVideo(false); if (m) setMsg(m); loadCatalog(sel); }} onCancel={() => setNewVideo(false)} />}
                 {cat.activities.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No games or activities in this catalog yet.</p>
                 ) : (
@@ -179,6 +185,78 @@ export default function ContentCatalog() {
             </div>
           )}
         </main>
+      </div>
+    </div>
+  );
+}
+
+interface Checkpoint { t: string; stem: string; opts: string[]; correct: number; fb: string }
+
+/** Create a video lesson (link/upload + optional interactive checkpoints) into a tenant's catalog. */
+function VideoLessonCreator({ tenantId, tenantName, onDone, onCancel }: {
+  tenantId: string; tenantName: string; onDone: (msg?: string) => void; onCancel: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
+  const [cps, setCps] = useState<Checkpoint[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const v = resolveVideo(videoUrl);
+
+  const addCp = () => setCps((p) => [...p, { t: "30", stem: "", opts: ["", "", "", ""], correct: 0, fb: "" }]);
+  const setCp = (i: number, patch: Partial<Checkpoint>) => setCps((p) => p.map((c, j) => j === i ? { ...c, ...patch } : c));
+  const delCp = (i: number) => setCps((p) => p.filter((_, j) => j !== i));
+
+  const save = async () => {
+    if (!title.trim() || v.kind === "none") { setErr("Add a title and a valid video link."); return; }
+    setBusy(true); setErr(null);
+    try {
+      const questions = cps.filter((c) => c.stem.trim() && c.opts.filter((o) => o.trim()).length >= 2).map((c, qi) => {
+        const options = c.opts.map((t, i) => ({ id: `o${i}`, text: t.trim() })).filter((o) => o.text);
+        return { id: `q${qi}`, videoTimestamp: Number(c.t) || 0, questionType: "multiple_choice", stem: c.stem.trim(), options, correctOptionIds: [`o${c.correct}`], feedbackCorrect: c.fb || undefined, pauseOnReach: true, points: 1 };
+      });
+      await apiFetch("/admin/catalog/activity", { method: "POST", body: JSON.stringify({
+        targetTenantId: tenantId, title: title.trim(), kind: "video", source: "html",
+        html: JSON.stringify({ videoUrl, questions }), instructions: "Watch the clip; answer each checkpoint to continue.",
+        tags: ["video", ...(questions.length ? ["interactive"] : [])], published: true,
+      }) });
+      onDone(`Video lesson “${title.trim()}” added to ${tenantName}${questions.length ? ` with ${questions.length} checkpoint(s)` : ""}.`);
+    } catch (e) { setErr(e instanceof Error ? e.message : "Save failed"); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 mb-3 space-y-3">
+      <div className="text-sm font-semibold flex items-center gap-1.5"><Video className="h-4 w-4 text-indigo-600" /> New video lesson · <span className="font-normal text-muted-foreground">saved to {tenantName}</span></div>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Lesson title" className="h-9 w-full rounded-md border px-3 text-sm bg-background" />
+      <input value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="Paste a YouTube, Khan Academy, Vimeo, TikTok, Loom or Drive link (or a file URL)" className="h-9 w-full rounded-md border px-3 text-sm bg-background" />
+      <p className="text-[11px] text-muted-foreground -mt-1">{videoUrl.trim() ? (v.kind === "none" ? "Couldn't recognise that link." : <>Plays inline as a <span className="capitalize font-medium">{v.provider}</span> clip.</>) : VIDEO_PROVIDERS_HINT}</p>
+
+      <div className="space-y-2">
+        <div className="text-[12px] font-medium">Interactive checkpoints <span className="font-normal text-muted-foreground">(optional — a question pops mid-clip; YouTube/Khan/file)</span></div>
+        {cps.map((c, i) => (
+          <div key={i} className="rounded-lg border bg-background p-2.5 space-y-2">
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] text-muted-foreground">At (s)<input value={c.t} onChange={(e) => setCp(i, { t: e.target.value.replace(/[^0-9]/g, "") })} className="ml-1 h-7 w-16 rounded border px-2 text-sm bg-background" /></label>
+              <button onClick={() => delCp(i)} className="ml-auto text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+            </div>
+            <input value={c.stem} onChange={(e) => setCp(i, { stem: e.target.value })} placeholder="Question…" className="h-8 w-full rounded border px-2 text-sm bg-background" />
+            {c.opts.map((o, oi) => (
+              <div key={oi} className="flex items-center gap-2">
+                <input type="radio" name={`c${i}`} checked={c.correct === oi} onChange={() => setCp(i, { correct: oi })} title="Correct" />
+                <input value={o} onChange={(e) => setCp(i, { opts: c.opts.map((x, j) => j === oi ? e.target.value : x) })} placeholder={`Option ${oi + 1}${oi === c.correct ? " (correct)" : ""}`} className="h-8 flex-1 rounded border px-2 text-sm bg-background" />
+              </div>
+            ))}
+            <input value={c.fb} onChange={(e) => setCp(i, { fb: e.target.value })} placeholder="Feedback when correct (optional)" className="h-8 w-full rounded border px-2 text-sm bg-background" />
+          </div>
+        ))}
+        <button onClick={addCp} className="text-[12px] text-indigo-600 font-medium">+ Add checkpoint</button>
+      </div>
+
+      {err && <p className="text-[12px] text-red-600">{err}</p>}
+      <div className="flex gap-2">
+        <button disabled={busy} onClick={save} className="text-[12px] font-medium rounded-md px-3 py-1.5 bg-indigo-600 text-white disabled:opacity-50">{busy ? "Saving…" : "Save video lesson"}</button>
+        <button onClick={onCancel} className="text-[12px] rounded-md px-3 py-1.5 border">Cancel</button>
       </div>
     </div>
   );

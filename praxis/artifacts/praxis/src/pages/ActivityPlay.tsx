@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActivityPlayer, type ActivityPlayerHandleResult } from "@/components/ActivityPlayer";
+import { InteractiveVideoPlayer, type IVQuestion } from "@/components/InteractiveVideoPlayer";
 import { activitiesApi } from "@/lib/activitiesApi";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
@@ -102,7 +103,14 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
               )}
             </div>
 
-            <ActivityPlayer html={activity.html} embedUrl={activity.embedUrl} onSubmit={(r) => submit.mutate(r)} />
+            {(activity as { kind?: string }).kind === "video" ? (() => {
+              let vid = ""; let qs: IVQuestion[] = [];
+              try { const p = JSON.parse(activity.html || "{}"); vid = p.videoUrl || activity.embedUrl || ""; qs = Array.isArray(p.questions) ? p.questions : []; }
+              catch { vid = activity.embedUrl || activity.html || ""; }
+              return <InteractiveVideoPlayer videoUrl={vid} questions={qs} onComplete={() => submit.mutate({ payload: { watched: true }, score: 100 })} />;
+            })() : (
+              <ActivityPlayer html={activity.html} embedUrl={activity.embedUrl} onSubmit={(r) => submit.mutate(r)} />
+            )}
 
             {submit.isPending && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
