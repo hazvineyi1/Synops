@@ -223,10 +223,10 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
     return c.percent > 0 ? 'in_progress' : 'not_started';
   };
   const STATE_META: Record<string, { label: string; cls: string; rank: number }> = {
-    in_progress: { label: 'In progress', cls: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30', rank: 0 },
-    not_started: { label: 'Not started', cls: 'bg-muted text-muted-foreground border-border', rank: 1 },
-    completed:   { label: 'Completed',   cls: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30', rank: 2 },
-    withdrawn:   { label: 'Withdrawn',   cls: 'bg-muted text-muted-foreground border-border', rank: 3 },
+    in_progress: { label: L('In progress', 'En progreso'), cls: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30', rank: 0 },
+    not_started: { label: L('Not started', 'Sin empezar'), cls: 'bg-muted text-muted-foreground border-border', rank: 1 },
+    completed:   { label: L('Completed', 'Completado'),   cls: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30', rank: 2 },
+    withdrawn:   { label: L('Withdrawn', 'Retirado'),   cls: 'bg-muted text-muted-foreground border-border', rank: 3 },
   };
   const myCourses = courses
     .map((c) => ({ ...c, state: courseState(c) }))
@@ -323,9 +323,9 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={cn("grid grid-cols-1 gap-6", !isK12 && "lg:grid-cols-3")}>
         {/* Main column */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className={cn("space-y-8", !isK12 && "lg:col-span-2")}>
           {/* Continue learning */}
           <section>
             <SectionTitle
@@ -376,14 +376,14 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
 
                       <div className="mt-auto">
                         <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                          <span>{c.viewedBeats} of {c.totalBeats} steps</span>
+                          <span>{c.viewedBeats} {L('of', 'de')} {c.totalBeats} {L('steps', 'pasos')}</span>
                           <span className="tabular-nums font-medium">{c.percent}%</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                           <div className={cn("h-full rounded-full transition-all", a.bar)} style={{ width: `${c.percent}%` }} />
                         </div>
                         <div className={cn("mt-4 inline-flex items-center gap-1 text-sm font-medium", a.text)}>
-                          {c.state === 'completed' ? 'Review' : c.state === 'not_started' ? 'Start' : 'Continue'}
+                          {c.state === 'completed' ? L('Review', 'Repasar') : c.state === 'not_started' ? L('Start', 'Empezar') : L('Continue', 'Continuar')}
                           <ArrowRight className="h-4 w-4" />
                         </div>
                       </div>
@@ -396,11 +396,11 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
 
           {/* Due soon */}
           <section>
-            <SectionTitle>Due soon</SectionTitle>
+            <SectionTitle>{L("Due soon", "Para pronto")}</SectionTitle>
             <Card className="divide-y divide-border">
               {upcoming.length === 0 ? (
                 <div className="p-6 text-center text-sm text-muted-foreground">
-                  Nothing due right now. Nice and clear.
+                  {L("Nothing due right now. Nice and clear.", "Nada pendiente por ahora. ¡Todo al día!")}
                 </div>
               ) : (
                 upcoming.map((e) => {
@@ -432,7 +432,9 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
           </section>
         </div>
 
-        {/* Right column */}
+        {/* Right column — adult chrome (coach path, announcements, credentials) with English/generated
+            copy. Hidden for K-12 learners: it declutters their home and avoids non-localized text. */}
+        {!isK12 && (
         <div className="space-y-6">
           {/* Coach next session for on-track learners. Off-track learners already get the attention
               banner above (which opens the Coach hub), so we do not duplicate a catch-up card here. */}
@@ -516,6 +518,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
             </Card>
           )}
         </div>
+        )}
       </div>
     </div>
   );
