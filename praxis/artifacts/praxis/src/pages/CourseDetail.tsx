@@ -1085,6 +1085,9 @@ export function CourseDetail() {
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
   const isYoungBand = !!youngPersona && (youngPersona.band === 'early' || youngPersona.band === 'elementary');
+  // Spanish-first learner (Sofía): every label on this page reads in her language.
+  const es = youngPersona?.defaultLang === 'es';
+  const L = (en: string, esT: string) => (es ? esT : en);
 
   const setTab = (tab: string) => navigate(`/courses/${courseId}?tab=${tab}`);
 
@@ -1169,7 +1172,7 @@ export function CourseDetail() {
     <div className="space-y-0">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <a href="/courses" className="hover:text-foreground transition-colors">Courses</a>
+        <a href="/courses" className="hover:text-foreground transition-colors">{L('Courses', 'Cursos')}</a>
         <ChevronRight className="h-4 w-4" />
         <span className="text-foreground font-medium truncate max-w-xs">{course.title}</span>
       </div>
@@ -1180,7 +1183,7 @@ export function CourseDetail() {
           <h1 className="text-2xl font-bold text-foreground">{course.title}</h1>
           <p className="text-muted-foreground mt-1 text-sm max-w-2xl">{course.description}</p>
           <div className="flex flex-wrap gap-2 mt-3">
-            {courseLevelLabel(course) && <Badge variant="outline">{courseLevelLabel(course)}</Badge>}
+            {courseLevelLabel(course) && <Badge variant="outline">{es ? courseLevelLabel(course)!.replace(/^Grade /, 'Grado ') : courseLevelLabel(course)}</Badge>}
             {/* Standards/skill tags are jargon for the youngest — hidden for K-5. */}
             {!isYoungBand && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
           </div>
@@ -1190,7 +1193,7 @@ export function CourseDetail() {
             Enrolment is managed by your organisation. Ask your admin to assign this course to you.
           </div>
         )}
-        {enrolment && <Badge variant="outline" className="text-green-600 border-green-600">Enrolled</Badge>}
+        {enrolment && <Badge variant="outline" className="text-green-600 border-green-600">{L('Enrolled', 'Inscrito')}</Badge>}
       </div>
 
       {/* Real completion, from beats actually viewed. Only shown to enrolled learners:
@@ -1346,10 +1349,10 @@ export function CourseDetail() {
               {/* 5. Start here -> pick a module */}
               <section>
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className={isYoungBand ? 'text-2xl font-bold tracking-tight' : 'text-lg font-serif font-semibold tracking-tight'} style={isYoungBand ? { color: youngPersona!.accent } : undefined}>{isYoungBand ? "Let's start! 🚀" : 'Start here'}</h2>
-                  <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% {isYoungBand ? 'done' : 'complete'}</span>
+                  <h2 className={isYoungBand ? 'text-2xl font-bold tracking-tight' : 'text-lg font-serif font-semibold tracking-tight'} style={isYoungBand ? { color: youngPersona!.accent } : undefined}>{isYoungBand ? L("Let's start! 🚀", '¡Empecemos! 🚀') : 'Start here'}</h2>
+                  <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% {isYoungBand ? L('done', 'listo') : 'complete'}</span>
                 </div>
-                <p className="text-sm text-muted-foreground mb-3">{isYoungBand ? 'Tap a lesson to begin. 👇' : 'Pick a module to work on. We suggest starting with the recommended one.'}</p>
+                <p className="text-sm text-muted-foreground mb-3">{isYoungBand ? L('Tap a lesson to begin. 👇', 'Toca una lección para empezar. 👇') : 'Pick a module to work on. We suggest starting with the recommended one.'}</p>
                 {orderedModules.length > 0 ? (
                   <div className="space-y-2">
                     {orderedModules.map(({ m, seq }) => {
@@ -1377,7 +1380,7 @@ export function CourseDetail() {
                               <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{m.estimatedMinutes ?? 0} min</span>
                               {certified && !done && <span className="text-amber-600">Mastered</span>}
                               {pct > 0 && !done && <span>{pct}% viewed</span>}
-                              {done && <span className="text-emerald-600">Complete</span>}
+                              {done && <span className="text-emerald-600">{L('Complete', 'Completado')}</span>}
                             </div>
                           </div>
                           <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />

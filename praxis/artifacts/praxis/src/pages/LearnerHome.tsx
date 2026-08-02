@@ -331,11 +331,11 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
             <SectionTitle
               action={
                 <button onClick={() => navigate("/courses")} className="text-sm font-medium text-primary hover:underline">
-                  All courses
+                  {L("All courses", "Todos los cursos")}
                 </button>
               }
             >
-              Continue learning
+              {L("Continue learning", "Seguir aprendiendo")}
             </SectionTitle>
 
             {progLoading ? (
@@ -448,7 +448,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                   <p className="font-medium leading-snug mb-1">{nextUp.moduleTitle}</p>
                   <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{nextUp.reason}</p>
                   <Button className="w-full" onClick={() => launchItem(nextUp)} disabled={startSession.isPending}>
-                    {startSession.isPending ? "Starting…" : "Start session"}
+                    {startSession.isPending ? L("Starting…", "Empezando…") : L("Start session", "Empezar sesión")}
                   </Button>
                 </>
               ) : (

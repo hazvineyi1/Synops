@@ -886,6 +886,9 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   for (const c of ALL_COURSES) {
     const cid = courseIdByTitle[c.title];
     if (!cid) continue;
+    // Refresh the COURSE description too (localized "Meta del curso" label), so a reused Spanish
+    // course never keeps a stale English "Course goal:" from an earlier seed.
+    await db.update(coursesTable).set({ description: `${c.emoji} ${c.intro}\n\n${TL(c.lang, "Course goal", "Meta del curso")}: ${c.outcome}` }).where(eq(coursesTable.id, cid));
     const cmods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, cid)).orderBy(asc(modulesTable.order));
     for (let i = 0; i < cmods.length && i < c.modules.length; i++) {
       const m = c.modules[i];

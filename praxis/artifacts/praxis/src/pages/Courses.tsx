@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { cn } from "@/lib/utils";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { personaByEmail } from "@/lib/k12Personas";
 import { courseAccent } from "@/lib/courseColor";
 import { courseLevelLabel } from "@/lib/courseLevel";
 import { PageHeader } from "@/components/PageHeader";
@@ -64,6 +65,10 @@ export function Courses() {
     queryKey: ["progress", "me"],
     queryFn: () => apiFetch<ProgressMe>("/progress/me"),
   });
+
+  // Spanish-first K-12 learner (Sofía): the whole page must read in her language.
+  const es = personaByEmail(user?.email)?.defaultLang === "es";
+  const L = (en: string, esT: string) => (es ? esT : en);
 
   const canAuthor = !!user && CAN_AUTHOR.includes(user.role);
   const isSuper = user?.role === "super_admin";
@@ -142,9 +147,9 @@ export function Courses() {
   return (
     <div className="space-y-10 animate-in fade-in duration-500">
       <PageHeader
-        title={hasEnrolled ? "My Courses" : "Course Catalog"}
+        title={hasEnrolled ? L("My Courses", "Mis cursos") : L("Course Catalog", "Catálogo de cursos")}
         icon={BookOpen}
-        subtitle={hasEnrolled ? "Pick up a course in progress, or explore something new." : "Browse available programs and begin your mastery journey."}
+        subtitle={hasEnrolled ? L("Pick up a course in progress, or explore something new.", "Continúa un curso o explora algo nuevo.") : L("Browse available programs and begin your mastery journey.", "Explora los programas disponibles y empieza tu aprendizaje.")}
         action={canAuthor ? (
           <div className="flex items-center gap-2">
             {isSuper && (
@@ -160,7 +165,7 @@ export function Courses() {
       {/* Enrolled */}
       {hasEnrolled && (
         <section>
-          <h2 className="text-lg font-serif font-semibold tracking-tight mb-4">In your enrolment</h2>
+          <h2 className="text-lg font-serif font-semibold tracking-tight mb-4">{L("In your enrolment", "Tus cursos")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {enrolled.map((c) => {
               const a = courseAccent(c.courseId);
@@ -200,7 +205,7 @@ export function Courses() {
 
                   <div className="mt-auto">
                     <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                      <span>{done ? "Complete" : `${c.viewedBeats} of ${c.totalBeats} steps`}</span>
+                      <span>{done ? L("Complete", "Completado") : L(`${c.viewedBeats} of ${c.totalBeats} steps`, `${c.viewedBeats} de ${c.totalBeats} pasos`)}</span>
                       <span className="tabular-nums font-medium">{c.percent}%</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -210,7 +215,7 @@ export function Courses() {
                       />
                     </div>
                     <div className={cn("mt-4 inline-flex items-center gap-1 text-sm font-medium", done ? "text-emerald-600" : a.text)}>
-                      {done ? "Review" : c.percent > 0 ? "Continue" : "Start"} <ArrowRight className="h-4 w-4" />
+                      {done ? L("Review", "Repasar") : c.percent > 0 ? L("Continue", "Continuar") : L("Start", "Empezar")} <ArrowRight className="h-4 w-4" />
                     </div>
                   </div>
                 </Card>
