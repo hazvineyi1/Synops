@@ -34,6 +34,8 @@ export function K12Gamification() {
   const level = Math.floor(xp / 100) + 1;
   const intoLevel = xp % 100;
   const accent = persona.accent;
+  const es = persona.defaultLang === "es";
+  const L = (en: string, esT: string) => (es ? esT : en);
 
   // Quest path: one dot per lesson (module), filled by overall percent.
   const pct = course?.percent ?? 0;
@@ -59,12 +61,12 @@ export function K12Gamification() {
             <Trophy className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <p className="font-semibold leading-tight">Level {level} · {xp.toLocaleString()} XP</p>
-            <p className="text-xs text-muted-foreground">Keep going — {100 - intoLevel} XP to Level {level + 1}.</p>
+            <p className="font-semibold leading-tight">{L("Level", "Nivel")} {level} · {xp.toLocaleString()} XP</p>
+            <p className="text-xs text-muted-foreground">{L(`Keep going — ${100 - intoLevel} XP to Level ${level + 1}.`, `¡Sigue así! — ${100 - intoLevel} XP para el Nivel ${level + 1}.`)}</p>
           </div>
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: accent }}><Star className="h-4 w-4" /> {badges} badge{badges === 1 ? "" : "s"}</span>
-            <span className="inline-flex items-center gap-1.5 font-medium text-amber-600"><Zap className="h-4 w-4" /> {streak} day streak</span>
+            <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: accent }}><Star className="h-4 w-4" /> {badges} {es ? (badges === 1 ? "insignia" : "insignias") : `badge${badges === 1 ? "" : "s"}`}</span>
+            <span className="inline-flex items-center gap-1.5 font-medium text-amber-600"><Zap className="h-4 w-4" /> {L(`${streak} day streak`, `racha de ${streak} día${streak === 1 ? "" : "s"}`)}</span>
           </div>
         </div>
         <div className="mt-3 h-3 w-full rounded-full bg-black/5 overflow-hidden">
@@ -87,7 +89,7 @@ export function K12Gamification() {
             );
           })}
         </div>
-        <p className="mt-1.5 text-[11px] text-muted-foreground">Your quest: {doneLessons} of {lessons} lessons complete</p>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">{L(`Your quest: ${doneLessons} of ${lessons} lessons complete`, `Tu misión: ${doneLessons} de ${lessons} lecciones completadas`)}</p>
       </Card>
 
       {/* Autism-friendly: visual schedule + star/token board */}

@@ -22,6 +22,17 @@ const FRIENDLY: Record<string, string> = {
   extended_processing: "Extra thinking time",
   literal_language: "Direct, literal language",
 };
+const FRIENDLY_ES: Record<string, string> = {
+  scaffolded_questions: "Preguntas paso a paso",
+  simplified_language: "Palabras más sencillas",
+  concrete_examples: "Ejemplos de la vida real",
+  positive_reinforcement: "Ánimo y motivación",
+  chunked_content: "Una idea a la vez",
+  explicit_transitions: "Indicaciones claras",
+  predictable_structure: "Diseño predecible",
+  extended_processing: "Más tiempo para pensar",
+  literal_language: "Lenguaje directo y claro",
+};
 
 const EASY_CLASS = "easy-reading";
 const EASY_KEY = "k12-easy-reading";
@@ -41,6 +52,8 @@ export function AccommodationsPanel() {
   const { data: profile } = useCoachProfile();
   const accommodations = profile?.accommodations ?? [];
   const persona = personaByEmail(user?.email);
+  const es = persona?.defaultLang === "es";
+  const L = (en: string, esT: string) => (es ? esT : en);
   const [easy, setEasy] = useState(false);
 
   useEffect(() => {
@@ -82,13 +95,13 @@ export function AccommodationsPanel() {
         </div>
         <div className="min-w-0">
           <p className="font-semibold leading-tight">
-            {persona ? `${persona.first} learns with ${persona.challenge.toLowerCase()}` : "Your learning supports"}
+            {persona ? L(`How ${persona.first} learns`, `Los apoyos de ${persona.first}`) : L("Your learning supports", "Tus apoyos de aprendizaje")}
           </p>
           <p className="text-xs text-muted-foreground">
-            {persona ? `${persona.challengeLong} Here's what's turned on to help — always active.` : "Turned on for you — always active while you learn."}
+            {L("Here's what's turned on to help — always active.", "Esto es lo que está activado para ayudarte — siempre activo.")}
           </p>
         </div>
-        <span className="ml-auto text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 shrink-0">Active</span>
+        <span className="ml-auto text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 shrink-0">{L("Active", "Activo")}</span>
       </div>
 
       {/* Supports as chips */}
@@ -96,20 +109,20 @@ export function AccommodationsPanel() {
         {accommodations.map((a) => (
           <span key={a} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-white dark:bg-white/5" style={{ border: `1px solid ${accent}33`, color: accent }}>
             <Check className="h-3.5 w-3.5" style={{ color: accent }} />
-            {FRIENDLY[a] ?? a.replace(/_/g, " ")}
+            {(es ? FRIENDLY_ES[a] : FRIENDLY[a]) ?? a.replace(/_/g, " ")}
           </span>
         ))}
         <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-white dark:bg-white/5" style={{ border: `1px solid ${accent}33`, color: accent }}>
-          <Captions className="h-3.5 w-3.5" /> Captions on videos
+          <Captions className="h-3.5 w-3.5" /> {L("Captions on videos", "Subtítulos en los videos")}
         </span>
         {isDysgraphia && (
           <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-white dark:bg-white/5" style={{ border: `1px solid ${accent}33`, color: accent }}>
-            <Mic className="h-3.5 w-3.5" /> Speak-to-write
+            <Mic className="h-3.5 w-3.5" /> {L("Speak-to-write", "Hablar para escribir")}
           </span>
         )}
         {hasExtraTime && (
           <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-200 text-amber-700">
-            <Clock className="h-3.5 w-3.5" /> Extra time on activities
+            <Clock className="h-3.5 w-3.5" /> {L("Extra time on activities", "Más tiempo en las actividades")}
           </span>
         )}
       </div>
@@ -119,7 +132,7 @@ export function AccommodationsPanel() {
         <button onClick={toggleEasy} aria-pressed={easy}
           className="inline-flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-lg border transition-colors"
           style={easy ? { background: accent, color: "#fff", borderColor: accent } : { background: "transparent", color: accent, borderColor: `${accent}55` }}>
-          <Type className="h-4 w-4" /> Easy-reading text: {easy ? "On" : "Off"}
+          <Type className="h-4 w-4" /> {L("Easy-reading text", "Texto de lectura fácil")}: {easy ? L("On", "Activado") : L("Off", "Desactivado")}
         </button>
         <button onClick={speakSample}
           className="inline-flex items-center gap-2 text-sm font-medium px-3.5 py-2 rounded-lg border"
@@ -127,7 +140,7 @@ export function AccommodationsPanel() {
           <Volume2 className="h-4 w-4" /> {persona?.defaultLang === "es" ? "Escuchar (leer en voz alta)" : "Hear read-aloud"}
         </button>
         <p className="text-xs text-muted-foreground basis-full sm:basis-auto sm:ml-1">
-          The AI tutor also adapts automatically — shorter steps, simpler wording, and encouragement.
+          {L("The AI tutor also adapts automatically — shorter steps, simpler wording, and encouragement.", "El tutor de IA también se adapta solo: pasos más cortos, palabras sencillas y ánimo.")}
         </p>
       </div>
     </Card>
