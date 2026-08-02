@@ -4,6 +4,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { resolveVideo, VIDEO_PROVIDERS_HINT } from '@/lib/videoEmbed';
+
+/** Render any provider's clip (YouTube, Khan, Vimeo, TikTok, Loom, Drive, file) inline — never a link out. */
+function VideoFrame({ url }: { url?: string | null }) {
+  const v = resolveVideo(url);
+  if (v.kind === 'none') return null;
+  return (
+    <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-md">
+      {v.kind === 'iframe' ? (
+        <iframe src={v.src} title="Lesson video" className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+      ) : (
+        <video src={v.src} controls className="w-full h-full" />
+      )}
+    </div>
+  );
+}
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -437,9 +453,7 @@ function VideoBeat({ beat }: { beat: Beat }) {
     <div className="px-8 py-12 max-w-3xl mx-auto">
       <p className="text-muted-foreground mb-6 leading-relaxed">{toBeatText(beat.narration)}</p>
       {beat.videoUrl ? (
-        <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-md">
-          <video src={beat.videoUrl} controls className="w-full h-full" />
-        </div>
+        <VideoFrame url={beat.videoUrl} />
       ) : slides && slides.length > 0 ? (
         <SlideLesson slides={slides} />
       ) : (
@@ -1219,13 +1233,7 @@ export function ModuleViewer() {
           {mode === 'video' && (
             <div className="px-6 pt-6 pb-2">
               {allBeats.some(b => b.videoUrl) ? (
-                <div className="aspect-video rounded-xl overflow-hidden bg-black shadow-lg border border-border">
-                  <video
-                    src={allBeats.find(b => b.videoUrl)!.videoUrl!}
-                    controls
-                    className="w-full h-full"
-                  />
-                </div>
+                <VideoFrame url={allBeats.find(b => b.videoUrl)!.videoUrl!} />
               ) : allBeats.find(b => b.visualData?.slides && b.visualData.slides.length > 0) ? (
                 <SlideLesson slides={allBeats.find(b => b.visualData?.slides && b.visualData.slides.length > 0)!.visualData!.slides!} />
               ) : (
@@ -2275,7 +2283,13 @@ function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBea
       <label className="text-xs block"><span className="mb-1 block text-muted-foreground">Video title</span>
         <input value={title} onChange={(e) => setTitle(e.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
       <label className="text-xs block"><span className="mb-1 block text-muted-foreground">Video URL (paste a link, or upload below)</span>
-        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://... (mp4 / storage / streaming URL)" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+        <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="YouTube, Khan Academy, Vimeo, TikTok, Loom, Drive… or a file URL" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+      {(() => { const v = resolveVideo(url); return url.trim() ? (
+        <p className="text-[11px] text-muted-foreground -mt-1">
+          {v.kind === 'none' ? "Couldn't recognise that link — paste a share URL or the provider's embed code." :
+            <>Plays inline as a <span className="capitalize font-medium text-foreground">{v.provider}</span> clip{v.start ? ` starting at ${v.start}s` : ''}.</>}
+        </p>
+      ) : <p className="text-[11px] text-muted-foreground -mt-1">{VIDEO_PROVIDERS_HINT}</p>; })()}
       <input ref={fileRef} type="file" accept="video/*" className="hidden" onChange={(e) => onFile(e.target.files?.[0] ?? null)} />
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" disabled={busy} onClick={() => fileRef.current?.click()}><Link2 className="h-3.5 w-3.5" /> Upload file</Button>
@@ -2314,12 +2328,11 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const startCase = useMutation({ mutationFn: (cid: string) => apiFetch<{ id: string }>(`/cases/${cid}/sessions`, { method: 'POST', body: JSON.stringify({}) }), onSuccess: (s) => navigate(`/case-run/${s.id}`) });
 
   // A short teaching video (YouTube) attached to the module, if any.
-  const ytId = (u?: string | null) => { if (!u) return null; const m = String(u).match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/); return m ? m[1] : (/^[A-Za-z0-9_-]{11}$/.test(String(u)) ? String(u) : null); };
   const videoBeat = (allBeats as { type?: string; videoUrl?: string | null }[] | undefined)?.find((b) => b?.type === 'video' && !!b?.videoUrl);
-  const videoId = ytId(videoBeat?.videoUrl ?? null);
+  const resolvedVid = resolveVideo(videoBeat?.videoUrl ?? null);
 
   const steps = [
-    { id: 'watch', label: T('Watch', 'Ver'), icon: PlayCircle, has: !!videoId },
+    { id: 'watch', label: T('Watch', 'Ver'), icon: PlayCircle, has: resolvedVid.kind !== 'none' },
     { id: 'read', label: T('Read', 'Leer'), icon: BookOpen, has: (readings?.length ?? 0) > 0 },
     { id: 'practice', label: T('Practice', 'Practicar'), icon: Zap, has: (activities?.length ?? 0) > 0 },
     { id: 'tutor', label: T('Talk to your tutor', 'Habla con tu tutor'), icon: MessageSquare, has: (cases?.length ?? 0) > 0 },
@@ -2411,7 +2424,11 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
           <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm">
             <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>🎬 {T('Watch the video, then tap Next!', '¡Mira el video y luego toca Siguiente!')}</p>
             <div className="relative w-full overflow-hidden rounded-2xl" style={{ paddingBottom: '56.25%', background: '#000' }}>
-              <iframe className="absolute inset-0 w-full h-full" src={`https://www.youtube-nocookie.com/embed/${videoId}?rel=0&modestbranding=1`} title="Lesson video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+              {resolvedVid.kind === 'iframe' ? (
+                <iframe className="absolute inset-0 w-full h-full" src={resolvedVid.src} title="Lesson video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+              ) : (
+                <video className="absolute inset-0 w-full h-full" src={resolvedVid.src} controls />
+              )}
             </div>
           </div>
         )}
