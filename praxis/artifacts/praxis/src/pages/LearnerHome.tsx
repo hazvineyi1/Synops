@@ -235,6 +235,16 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
     .map((c) => ({ ...c, state: courseState(c) }))
     .sort((a, b) => STATE_META[a.state].rank - STATE_META[b.state].rank || b.percent - a.percent);
   const inProgress = myCourses.filter((c) => c.state === 'in_progress');
+  // "Next up": the single best next action for a K-12 learner — continue an in-progress course,
+  // else start a new one, else (all done) review the first. Drives the hero card.
+  const nextCourse = isK12
+    ? (myCourses.find((c) => c.state === 'in_progress') ?? myCourses.find((c) => c.state === 'not_started') ?? myCourses[0])
+    : undefined;
+  const nextCta = nextCourse
+    ? (nextCourse.state === 'in_progress' ? L('Continue', 'Continuar')
+       : nextCourse.state === 'not_started' ? L('Start', 'Empezar')
+       : L('Review', 'Repasar'))
+    : '';
   const upcoming = (dueSoon ?? [])
     .filter((e) => new Date(e.startDate).getTime() >= Date.now() - 86400000)
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
@@ -332,7 +342,26 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
       <div className={cn("grid grid-cols-1 gap-6", !isK12 && "lg:grid-cols-3")}>
         {/* Main column */}
         <div className={cn(!isK12 && "lg:col-span-2", isK12 ? "space-y-5" : "space-y-8")}>
-          {/* Continue learning */}
+          {/* Next up: the single hero action for K-12 learners. */}
+          {isK12 && nextCourse && (
+            <button
+              onClick={() => navigate(`/courses/${nextCourse.courseId}`)}
+              className="w-full text-left border p-5 transition-shadow hover:shadow-md"
+              style={{ borderColor: `${persona!.accent}55`, background: `${persona!.accent}0D`, borderRadius: 6 }}
+            >
+              <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: persona!.accent }}>{L('Next up', 'Continúa aquí')}</div>
+              <h2 className="text-xl font-bold mt-0.5" style={{ color: '#20242E' }}>{nextCourse.title}</h2>
+              <div className="text-sm text-muted-foreground mt-1">{nextCourse.viewedBeats} {L('of', 'de')} {nextCourse.totalBeats} {L('steps', 'pasos')} · {nextCourse.percent}%</div>
+              <div className="mt-2 h-2 w-full bg-black/5 overflow-hidden" style={{ borderRadius: 3 }}>
+                <div className="h-full" style={{ width: `${nextCourse.percent}%`, background: persona!.accent, borderRadius: 3 }} />
+              </div>
+              <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-white px-4 py-2" style={{ background: persona!.accent, borderRadius: 4 }}>
+                {nextCta} <ArrowRight className="h-4 w-4" />
+              </span>
+            </button>
+          )}
+
+          {/* Course list (K-12: the OTHER courses; everyone else: continue learning) */}
           <section>
             <SectionTitle
               action={
@@ -341,7 +370,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                 </button>
               }
             >
-              {L("Continue learning", "Seguir aprendiendo")}
+              {isK12 ? L("Your courses", "Tus cursos") : L("Continue learning", "Seguir aprendiendo")}
             </SectionTitle>
 
             {progLoading ? (
@@ -357,7 +386,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
               </Card>
             ) : (
               <div className="grid sm:grid-cols-2 gap-4">
-                {myCourses.slice(0, 4).map((c) => {
+                {(isK12 ? myCourses.filter((c) => c.courseId !== nextCourse?.courseId) : myCourses).slice(0, 4).map((c) => {
                   const a = courseAccent(c.courseId);
                   return (
                     <Card
