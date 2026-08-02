@@ -260,7 +260,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
       {/* K-12: one slim status band (level/XP + supports) sits ABOVE the lessons but stays small, so the
           lessons remain the hero. Non-K-12 learners keep the full supports + gamification panels. */}
       {isK12 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2.5">
           <K12Gamification compact />
           <AccommodationsPanel compact />
         </div>
