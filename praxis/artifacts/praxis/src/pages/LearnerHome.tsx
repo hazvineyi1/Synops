@@ -26,6 +26,7 @@ import { courseAccent } from "@/lib/courseColor";
 import { StatCard, SectionTitle } from "@/components/StatCard";
 import { AccommodationsPanel } from "@/components/AccommodationsPanel";
 import { K12Gamification } from "@/components/K12Gamification";
+import { FishMascot, BookMascot } from "@/components/k12/Mascots";
 
 /**
  * Learner hub.
@@ -152,6 +153,8 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
   const { user } = useSession();
   const persona = personaByEmail(user?.email);
   const isK12 = !!persona;
+  // Young learners (K-5) get the playful "Aventura" mascots; older K-12 keep the cleaner look.
+  const young = !!persona && (persona.band === "early" || persona.band === "elementary");
   const es = persona?.defaultLang === "es";
   const L = (en: string, esT: string) => (es ? esT : en);
 
@@ -245,16 +248,19 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
 
   return (
     <div className={cn("animate-in fade-in duration-500", isK12 ? "space-y-5" : "space-y-8")}>
-      {/* Greeting */}
-      <div>
-        <h1 className={cn("font-serif font-bold tracking-tight", isK12 ? "text-2xl" : "text-3xl")}>
-          {t(greetingKey())}{firstName ? `, ${firstName}` : ""} <span className="inline-block">👋</span>
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          {inProgress.length > 0
-            ? t("learnerHome.subtitle")
-            : t("learnerHome.subtitleEmpty")}
-        </p>
+      {/* Greeting — young learners get a friendly mascot alongside the hello. */}
+      <div className="flex items-center gap-3">
+        {young && <FishMascot size={64} />}
+        <div>
+          <h1 className={cn("font-serif font-bold tracking-tight", isK12 ? "text-2xl" : "text-3xl")}>
+            {t(greetingKey())}{firstName ? `, ${firstName}` : ""} <span className="inline-block">👋</span>
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            {inProgress.length > 0
+              ? t("learnerHome.subtitle")
+              : t("learnerHome.subtitleEmpty")}
+          </p>
+        </div>
       </div>
 
       {/* K-12: one slim status band (level/XP + supports) sits ABOVE the lessons but stays small, so the
@@ -368,9 +374,13 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                       onClick={() => navigate(`/courses/${c.courseId}`)}
                     >
                       <div className="flex items-start gap-3 mb-4">
-                        <div className={cn("h-10 w-10 shrink-0 rounded-lg flex items-center justify-center", a.soft, a.text)}>
-                          <BookOpen className="h-5 w-5" />
-                        </div>
+                        {young ? (
+                          <div className="shrink-0"><BookMascot size={48} /></div>
+                        ) : (
+                          <div className={cn("h-10 w-10 shrink-0 rounded-lg flex items-center justify-center", a.soft, a.text)}>
+                            <BookOpen className="h-5 w-5" />
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1">
                           <h3 className="font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                             {c.title}
@@ -390,10 +400,17 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                         <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
                           <div className={cn("h-full rounded-full transition-all", a.bar)} style={{ width: `${c.percent}%` }} />
                         </div>
-                        <div className={cn("mt-4 inline-flex items-center gap-1 text-sm font-medium", a.text)}>
-                          {c.state === 'completed' ? L('Review', 'Repasar') : c.state === 'not_started' ? L('Start', 'Empezar') : L('Continue', 'Continuar')}
-                          <ArrowRight className="h-4 w-4" />
-                        </div>
+                        {young ? (
+                          <div className="mt-4 inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-white shadow-sm" style={{ background: "#FF6B6B" }}>
+                            {c.state === 'completed' ? L('Review', 'Repasar') : c.state === 'not_started' ? L('Start', '¡Jugar!') : L('Continue', 'Continuar')}
+                            <ArrowRight className="h-4 w-4" />
+                          </div>
+                        ) : (
+                          <div className={cn("mt-4 inline-flex items-center gap-1 text-sm font-medium", a.text)}>
+                            {c.state === 'completed' ? L('Review', 'Repasar') : c.state === 'not_started' ? L('Start', 'Empezar') : L('Continue', 'Continuar')}
+                            <ArrowRight className="h-4 w-4" />
+                          </div>
+                        )}
                       </div>
                     </Card>
                   );
