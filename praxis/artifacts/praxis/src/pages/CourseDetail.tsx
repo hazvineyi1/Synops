@@ -5,6 +5,7 @@ import { apiFetch, API } from '@/lib/api';
 import { BLOOM_LEVELS, bloomColor, generateObjectives, type BloomLevel } from '@/lib/courseDevEngine';
 import { courseLevelLabel } from '@/lib/courseLevel';
 import { personaByEmail } from '@/lib/k12Personas';
+import { FishMascot } from '@/components/k12/Mascots';
 import { useGetMe } from '@workspace/api-client-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1349,7 +1350,10 @@ export function CourseDetail() {
               {/* 5. Start here -> pick a module */}
               <section>
                 <div className="flex items-center justify-between mb-1">
-                  <h2 className={isYoungBand ? 'text-2xl font-bold tracking-tight' : 'text-lg font-serif font-semibold tracking-tight'} style={isYoungBand ? { color: youngPersona!.accent } : undefined}>{isYoungBand ? L("Let's start! 🚀", '¡Empecemos! 🚀') : 'Start here'}</h2>
+                  <div className="flex items-center gap-2">
+                    {isYoungBand && <FishMascot size={40} />}
+                    <h2 className={isYoungBand ? 'text-2xl font-bold tracking-tight' : 'text-lg font-serif font-semibold tracking-tight'} style={isYoungBand ? { color: youngPersona!.accent } : undefined}>{isYoungBand ? L("Let's start! 🚀", '¡Empecemos! 🚀') : 'Start here'}</h2>
+                  </div>
                   <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% {isYoungBand ? L('done', 'listo') : 'complete'}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">{isYoungBand ? L('Tap a lesson to begin. 👇', 'Toca una lección para empezar. 👇') : 'Pick a module to work on. We suggest starting with the recommended one.'}</p>
