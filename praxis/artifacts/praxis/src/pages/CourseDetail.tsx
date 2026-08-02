@@ -1086,6 +1086,8 @@ export function CourseDetail() {
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
   const isYoungBand = !!youngPersona && (youngPersona.band === 'early' || youngPersona.band === 'elementary');
+  // Show the Aventura mascot for all K-12 learners except the low-vision / high-contrast profile.
+  const showMascot = !!youngPersona && !youngPersona.highContrast;
   // Spanish-first learner (Sofía): every label on this page reads in her language.
   const es = youngPersona?.defaultLang === 'es';
   const L = (en: string, esT: string) => (es ? esT : en);
@@ -1351,7 +1353,7 @@ export function CourseDetail() {
               <section>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    {isYoungBand && <FishMascot size={40} />}
+                    {showMascot && <FishMascot size={isYoungBand ? 40 : 32} />}
                     <h2 className={isYoungBand ? 'text-2xl font-bold tracking-tight' : 'text-lg font-serif font-semibold tracking-tight'} style={isYoungBand ? { color: youngPersona!.accent } : undefined}>{isYoungBand ? L("Let's start! 🚀", '¡Empecemos! 🚀') : 'Start here'}</h2>
                   </div>
                   <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% {isYoungBand ? L('done', 'listo') : 'complete'}</span>

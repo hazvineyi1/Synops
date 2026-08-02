@@ -153,8 +153,9 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
   const { user } = useSession();
   const persona = personaByEmail(user?.email);
   const isK12 = !!persona;
-  // Young learners (K-5) get the playful "Aventura" mascots; older K-12 keep the cleaner look.
-  const young = !!persona && (persona.band === "early" || persona.band === "elementary");
+  // The playful "Aventura" mascots now cover ALL K-12 learners, except the low-vision / high-contrast
+  // profile (Emma) — that one stays clean and distraction-free for accessibility. (Name kept as `young`.)
+  const young = isK12 && !persona?.highContrast;
   const es = persona?.defaultLang === "es";
   const L = (en: string, esT: string) => (es ? esT : en);
 
