@@ -40,7 +40,6 @@ import { useReadAloud } from '@/lib/speech';
 import { useSession } from '@/context/SessionContext';
 import { isK12DemoEmail, personaByEmail, type K12Persona } from '@/lib/k12Personas';
 import { picturesInText } from '@/lib/kidPictures';
-import { FishMascot, BookMascot, StarMascot } from '@/components/k12/Mascots';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2475,7 +2474,6 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
           <button onClick={() => navigate(`/courses/${courseId}`)} className="h-11 w-11 rounded-full bg-white shadow-sm flex items-center justify-center" style={{ color: accent }} aria-label={T('Back', 'Atrás')}>
             <ChevronLeft className="h-6 w-6" />
           </button>
-          <BookMascot size={44} />
           <h1 className="text-2xl font-bold" style={{ color: '#20242E' }}>{mod?.title ?? '…'}</h1>
         </div>
 
@@ -2503,17 +2501,16 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
 
         {/* Active step */}
         {step?.id === 'watch' && (
-          <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm">
+          <div className="rounded-lg bg-white p-4 sm:p-6 shadow-sm">
             <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>🎬 {T('Watch the video, then tap Next!', '¡Mira el video y luego toca Siguiente!')}</p>
             {videoBeat && <VideoFrame url={videoBeat.videoUrl as string} />}
           </div>
         )}
         {step?.id === 'read' && (
-          <div className="rounded-3xl bg-white p-6 sm:p-8 shadow-sm">
+          <div className="rounded-lg bg-white p-6 sm:p-8 shadow-sm">
             <div className="flex items-center gap-3 flex-wrap mb-4">
               <div><ReadAloudBar text={speechClean(tText ?? reader?.content ?? '')} rate={0.85} pitch={1.15} lang={lang} /></div>
               {es && <LangChips value={lang} busy={tBusy} onPick={pickLang} />}
-              <div className="ml-auto hidden sm:block"><FishMascot size={52} /></div>
             </div>
             {/* The reading first… */}
             <div className="text-lg leading-relaxed [&_p]:text-lg [&_p]:leading-relaxed [&_li]:text-lg">
@@ -2544,7 +2541,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
           </div>
         )}
         {step?.id === 'practice' && (
-          <div className="rounded-3xl bg-white p-8 shadow-sm text-center">
+          <div className="rounded-lg bg-white p-8 shadow-sm text-center">
             <div className="text-6xl mb-3">🎮</div>
             <h2 className="text-2xl font-bold mb-2">{T('Time to practice!', '¡A practicar!')}</h2>
             <p className="text-muted-foreground mb-5">{T('A few quick questions. You can try as many times as you like.', 'Unas preguntas rápidas. Puedes intentarlo las veces que quieras.')}</p>
@@ -2552,7 +2549,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
           </div>
         )}
         {step?.id === 'tutor' && (
-          <div className="rounded-3xl bg-white p-8 shadow-sm text-center">
+          <div className="rounded-lg bg-white p-8 shadow-sm text-center">
             <div className="text-6xl mb-3">🤖</div>
             <h2 className="text-2xl font-bold mb-2">{T('Talk to your tutor', 'Habla con tu tutor')}</h2>
             <p className="text-muted-foreground mb-5">{T('Your friendly tutor will help you, one step at a time.', 'Tu tutor amable te ayudará, paso a paso.')}</p>
@@ -2579,8 +2576,8 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
               {T('Next lesson', 'Siguiente lección')} <ChevronRight className="h-7 w-7" />
             </button>
           ) : (
-            <button onClick={() => navigate(`/courses/${courseId}`)} className={cn(bigBtn, 'gap-2')} style={{ background: accent }}>
-              <StarMascot size={28} animated={false} /> {T('All done!', '¡Todo listo!')}
+            <button onClick={() => navigate(`/courses/${courseId}`)} className={bigBtn} style={{ background: accent }}>
+              {T('All done!', '¡Todo listo!')}
             </button>
           )}
         </div>

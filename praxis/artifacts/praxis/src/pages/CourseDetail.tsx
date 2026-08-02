@@ -5,7 +5,6 @@ import { apiFetch, API } from '@/lib/api';
 import { BLOOM_LEVELS, bloomColor, generateObjectives, type BloomLevel } from '@/lib/courseDevEngine';
 import { courseLevelLabel } from '@/lib/courseLevel';
 import { personaByEmail } from '@/lib/k12Personas';
-import { FishMascot } from '@/components/k12/Mascots';
 import { useGetMe } from '@workspace/api-client-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1086,8 +1085,6 @@ export function CourseDetail() {
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
   const isYoungBand = !!youngPersona && (youngPersona.band === 'early' || youngPersona.band === 'elementary');
-  // Show the Aventura mascot for all K-12 learners except the low-vision / high-contrast profile.
-  const showMascot = !!youngPersona && !youngPersona.highContrast;
   // Any K-12 demo learner gets the streamlined course page (skip the adult overview/objectives/skills
   // blocks) so they land on their lessons ("Start here") with minimal scrolling.
   const isK12Learner = !!youngPersona;
@@ -1355,10 +1352,7 @@ export function CourseDetail() {
               {/* 5. Start here -> pick a module */}
               <section>
                 <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    {showMascot && <FishMascot size={isYoungBand ? 40 : 32} />}
-                    <h2 className={isYoungBand ? 'text-2xl font-bold tracking-tight' : 'text-lg font-serif font-semibold tracking-tight'} style={isYoungBand ? { color: youngPersona!.accent } : undefined}>{isYoungBand ? L("Let's start! 🚀", '¡Empecemos! 🚀') : 'Start here'}</h2>
-                  </div>
+                  <h2 className={isYoungBand ? 'text-2xl font-bold tracking-tight' : 'text-lg font-serif font-semibold tracking-tight'} style={isYoungBand ? { color: youngPersona!.accent } : undefined}>{isYoungBand ? L("Let's start!", '¡Empecemos!') : 'Start here'}</h2>
                   <span className="text-xs text-muted-foreground tabular-nums">{progress?.percent ?? 0}% {isYoungBand ? L('done', 'listo') : 'complete'}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mb-3">{isYoungBand ? L('Tap a lesson to begin. 👇', 'Toca una lección para empezar. 👇') : 'Pick a module to work on. We suggest starting with the recommended one.'}</p>

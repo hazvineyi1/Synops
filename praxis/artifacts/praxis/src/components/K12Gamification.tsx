@@ -4,7 +4,6 @@ import { useSession } from "@/context/SessionContext";
 import { personaByEmail } from "@/lib/k12Personas";
 import { Card } from "@/components/ui/card";
 import { Star, Trophy, Zap, CheckCircle2, Circle, Lock, ListChecks } from "lucide-react";
-import { StarMascot, ChestMascot } from "@/components/k12/Mascots";
 
 /**
  * Gamification suite for K-12 demo learners (persona.gamified). Turns real progress into game feel:
@@ -58,31 +57,15 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
   if (compact) {
     return (
       <div className="py-1">
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 font-semibold text-sm" style={{ color: accent }}>
-            <Trophy className="h-4 w-4" /> {L("Level", "Nivel")} {level} · {xp.toLocaleString()} XP
-          </span>
-          <span className="ml-auto inline-flex items-center gap-2.5 text-xs">
-            <span className="inline-flex items-center gap-1 font-medium" style={{ color: accent }}><Star className="h-3.5 w-3.5" /> {badges}</span>
-            <span className="inline-flex items-center gap-1 font-medium text-amber-600"><Zap className="h-3.5 w-3.5" /> {streak}</span>
-          </span>
+        <div className="flex items-center justify-between gap-3">
+          <span className="font-semibold text-sm" style={{ color: accent }}>{L("Level", "Nivel")} {level} · {xp.toLocaleString()} XP</span>
+          <span className="text-[11px] text-muted-foreground">{L(`${doneLessons} of ${lessons} lessons done`, `${doneLessons} de ${lessons} lecciones`)}</span>
         </div>
-        {/* Quest map: a star for each finished lesson, leading to the treasure chest. */}
-        <div className="flex items-center gap-1.5 mt-2">
-          {Array.from({ length: lessons }).map((_, i) => (
-            <div key={i} className="flex items-center gap-1.5 flex-1 last:flex-none">
-              {i < doneLessons
-                ? <StarMascot size={22} animated={false} />
-                : <span className="h-4 w-4 shrink-0 rounded-full bg-white" style={{ border: "2px solid #CBD5E1" }} />}
-              {i < lessons - 1 && <span className="h-1 flex-1 rounded-full" style={{ background: i < doneLessons ? accent : "#e6e6e6" }} />}
-            </div>
-          ))}
-          <span className="h-1 w-3 rounded-full" style={{ background: doneLessons >= lessons ? accent : "#e6e6e6" }} />
-          <ChestMascot size={28} />
+        <div className="mt-2 h-2 w-full bg-black/5 overflow-hidden" style={{ borderRadius: 3 }}>
+          <div className="h-full" style={{ width: `${intoLevel}%`, background: accent, borderRadius: 3 }} />
         </div>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          {L(`${doneLessons} of ${lessons} lessons · ${100 - intoLevel} XP to Level ${level + 1}`,
-             `${doneLessons} de ${lessons} lecciones · ${100 - intoLevel} XP para el Nivel ${level + 1}`)}
+          {L(`${100 - intoLevel} XP to Level ${level + 1}`, `${100 - intoLevel} XP para el Nivel ${level + 1}`)}
         </p>
       </div>
     );
