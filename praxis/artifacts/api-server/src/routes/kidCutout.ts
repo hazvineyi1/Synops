@@ -8,6 +8,11 @@ import { logger } from "../lib/logger";
  * `/api/kid-cutout/:key.png`. The background is removed once via remove.bg (server-side, using the
  * REMOVEBG_API_KEY env var) and cached in memory, so the browser only ever sees a same-origin PNG.
  *
+ * IMPORTANT: REMOVEBG_API_KEY must be set as an env var on the praxis-api Railway service (and the
+ * remove.bg account must have quota). Without it, backgrounds are NOT removed — every key 302-redirects
+ * to the full source photo (still a real photo, just with its background). Setting the key upgrades the
+ * images to cut-outs automatically on next load (the fallback is served no-store), no redeploy needed.
+ *
  * Safety: only the fixed whitelist below can be fetched (no arbitrary URL → no SSRF).
  * Graceful fallback: if no API key is set, or remove.bg fails, we 302 to the original photo so the
  * pictures still render (as normal photos) instead of breaking.
@@ -28,9 +33,9 @@ const KID_SRC: Record<string, string> = {
   // Topical objects so EVERY subject (not just reading) shows a real background-removed photo.
   flag: S("1626836014893-37663794dca7"),    // US flag — civics / government
   gavel: S("1676181739859-08330dea8999"),   // gavel — civics / law
-  book: S("1610116306796-6fea9f4fae38"),     // open books — reading / history / writing
+  book: S("1527176930608-09cb256ab504"),     // single open book on white — reading / history / writing
   pencil: S("1595584354232-f07d525d87c1"),   // pencil — writing / math
-  pyramid: S("1600520611035-84157ad4084d"),  // pyramids — early civilizations / history
+  globe: S("1593632717071-218c1d85c663"),    // desk globe on light bg — world history / civilizations
 };
 
 const cache = new Map<string, Buffer>();

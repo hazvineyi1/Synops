@@ -111,8 +111,8 @@ const MODULE_IMAGES: Record<string, string[]> = {
   "Separation of Powers, Checks and Balances, and Federalism": ["flag", "gavel"],
   "How a Bill Becomes a Law and How Citizens Influence Policy": ["gavel", "flag"],
   // History
-  "Why Civilizations Began Near Rivers": ["pyramid", "book"],
-  "Inventions of Early Civilizations": ["book", "pyramid"],
+  "Why Civilizations Began Near Rivers": ["globe", "book"],
+  "Inventions of Early Civilizations": ["book", "globe"],
   "Why the Framers Wrote the Constitution": ["flag", "book"],
   "The Bill of Rights": ["book", "flag"],
   // Reading (Spanish) — text games are pair/sort so images won't show, but harmless if mapped.
