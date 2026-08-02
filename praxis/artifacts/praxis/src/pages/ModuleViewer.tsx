@@ -2561,7 +2561,13 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
         {!(step?.id === 'practice' || step?.id === 'tutor') && (
         <div className="mt-7 flex flex-col items-center gap-2">
           {stepIdx < steps.length - 1 ? (
-            <button onClick={() => setStepIdx(stepIdx + 1)} className={bigBtn} style={{ background: accent }}>
+            <button onClick={() => {
+              // Launch practice/tutor straight from "Next" — no intermediate "Start" card.
+              const nx = steps[stepIdx + 1];
+              if (nx.id === 'practice' && activities?.[0]) { navigate(`/activities/${activities[0].id}/play`); return; }
+              if (nx.id === 'tutor' && cases?.[0]) { startCase.mutate(cases[0].id); return; }
+              setStepIdx(stepIdx + 1);
+            }} className={bigBtn} style={{ background: accent }}>
               {T('Next', 'Siguiente')}: {steps[stepIdx + 1].label} <ChevronRight className="h-7 w-7" />
             </button>
           ) : nextMod ? (
