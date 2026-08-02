@@ -145,6 +145,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // Security, Privacy & my data) that a child would not understand.
   const k12FooterPersona = personaByEmail(user?.email);
   const youngKid = !!k12FooterPersona && (k12FooterPersona.band === 'early' || k12FooterPersona.band === 'elementary');
+  // Spanish-first K-12 learner (Sofía): even the role chip reads in her language.
+  const roleLabel = k12FooterPersona?.defaultLang === 'es' && role === 'learner'
+    ? 'estudiante'
+    : role.replace('_', ' ');
 
   // Shell colour + context ribbon. A super admin at the platform level is violet; inside a partner
   // (or a partner admin) it is navy, so the colour itself tells you which context you are in.
@@ -581,7 +585,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {user.firstName} {user.lastName}
               </span>
               <span className="text-xs mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                {user.role.replace('_', ' ')}
+                {roleLabel}
               </span>
             </div>
             {!youngKid && unreadCount > 0 && !accountOpen && <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />}
@@ -617,7 +621,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {user.firstName} {user.lastName}
               </p>
               <p className="text-xs uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                {user.role.replace('_', ' ')}
+                {roleLabel}
               </p>
             </div>
           </div>
