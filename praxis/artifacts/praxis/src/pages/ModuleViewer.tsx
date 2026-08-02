@@ -13,7 +13,7 @@ function VideoFrame({ url }: { url?: string | null }) {
   return (
     <div className="aspect-video rounded-xl overflow-hidden bg-black border border-border shadow-md">
       {v.kind === 'iframe' ? (
-        <iframe src={v.src} title="Lesson video" className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+        <iframe src={v.src} title="Lesson video" className="w-full h-full" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
       ) : (
         <video src={v.src} controls className="w-full h-full" />
       )}
@@ -2425,7 +2425,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
             <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>🎬 {T('Watch the video, then tap Next!', '¡Mira el video y luego toca Siguiente!')}</p>
             <div className="relative w-full overflow-hidden rounded-2xl" style={{ paddingBottom: '56.25%', background: '#000' }}>
               {resolvedVid.kind === 'iframe' ? (
-                <iframe className="absolute inset-0 w-full h-full" src={resolvedVid.src} title="Lesson video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                <iframe className="absolute inset-0 w-full h-full" src={resolvedVid.src} title="Lesson video" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
               ) : (
                 <video className="absolute inset-0 w-full h-full" src={resolvedVid.src} controls />
               )}

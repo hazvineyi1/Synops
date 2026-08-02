@@ -251,7 +251,7 @@ const COURSES: K12Course[] = [
     tags: ["math", "multiplication", "grade 4", "common core"],
     persona: { email: "aiden.k12@synops-demo.test", firstName: "Aiden", lastName: "Walsh", grade: 4, gradeLabel: "Grade 4", learningStyle: "kinesthetic", accommodations: ["predictable_structure", "chunked_content", "explicit_transitions", "positive_reinforcement", "literal_language", "extended_processing"], progressFraction: 0.5 },
     modules: [
-      { title: "Level 1: Equal groups", outcome: "See multiplication as a number of equal groups.",
+      { title: "Level 1: Equal groups", outcome: "See multiplication as a number of equal groups.", video: "https://www.youtube.com/watch?v=RNxwasijbAo",
         hook: "4 baskets. 3 apples in each. How many apples — WITHOUT counting one by one?", minutes: 7,
         standards: [{ code: "CCSS.MATH.CONTENT.4.OA.A.1", title: "Interpret a multiplication equation as a comparison / equal groups" }],
         points: ["Multiplication is a fast way to add equal groups", "4 × 3 means 4 groups of 3", "The answer is called the product"],
@@ -288,7 +288,7 @@ const COURSES: K12Course[] = [
     tags: ["math", "ratios", "rates", "grade 6", "common core"],
     persona: { email: "maya.k12@synops-demo.test", firstName: "Maya", lastName: "Chen", grade: 6, gradeLabel: "Grade 6", learningStyle: "reading_writing", accommodations: [], progressFraction: 0.75 },
     modules: [
-      { title: "Ratios and rates", outcome: "Describe a relationship with a ratio and find a unit rate.",
+      { title: "Ratios and rates", outcome: "Describe a relationship with a ratio and find a unit rate.", video: "https://www.youtube.com/watch?v=bIKmw0aTmYc",
         hook: "Your playlist plays 3 songs every 12 minutes. How long for 10 songs?", minutes: 8,
         standards: [{ code: "CCSS.MATH.CONTENT.6.RP.A.1", title: "Understand the concept of a ratio and use ratio language" }, { code: "CCSS.MATH.CONTENT.6.RP.A.2", title: "Understand unit rate and use rate language" }],
         points: ["A ratio compares two amounts (3 songs to 12 minutes)", "A unit rate is 'per one' — 1 song every 4 minutes", "Divide to find a unit rate"],
@@ -325,7 +325,7 @@ const COURSES: K12Course[] = [
     tags: ["science", "ecosystems", "food web", "grade 6", "ngss"],
     persona: { email: "leo.k12@synops-demo.test", firstName: "Leo", lastName: "Rivera", grade: 6, gradeLabel: "Grade 6", learningStyle: "auditory", accommodations: ["simplified_language", "chunked_content", "scaffolded_questions", "extended_processing", "concrete_examples", "positive_reinforcement"], progressFraction: 0.4 },
     modules: [
-      { title: "Food webs", outcome: "Trace how energy moves from the sun to plants to animals.",
+      { title: "Food webs", outcome: "Trace how energy moves from the sun to plants to animals.", video: "https://www.youtube.com/watch?v=qIgL05zOx5U",
         hook: "Grass never chases anything. So where does a hawk's energy really come from?", minutes: 8,
         standards: [{ code: "NGSS.MS-LS2-3", title: "Develop a model to describe the cycling of matter and flow of energy" }],
         points: ["Producers (plants) capture the sun's energy", "Energy flows: producers → herbivores → predators", "A food web links many food chains together"],
@@ -399,7 +399,7 @@ const COURSES: K12Course[] = [
     tags: ["math", "algebra", "linear equations", "grade 11", "common core"],
     persona: { email: "emma.k12@synops-demo.test", firstName: "Emma", lastName: "Novak", grade: 11, gradeLabel: "Grade 11", learningStyle: "visual", accommodations: ["concrete_examples", "extended_processing", "scaffolded_questions", "chunked_content"], progressFraction: 0.55 },
     modules: [
-      { title: "Solving linear equations", outcome: "Solve a one-variable equation by keeping it balanced.",
+      { title: "Solving linear equations", outcome: "Solve a one-variable equation by keeping it balanced.", video: "https://www.youtube.com/watch?v=f15zA0PhSek",
         hook: "3x + 4 = 19. What is x — and how do you know you're right?", minutes: 10,
         standards: [{ code: "CCSS.MATH.CONTENT.HSA.REI.B.3", title: "Solve linear equations in one variable" }],
         points: ["An equation is a balance: do the same to both sides", "Undo operations in reverse order", "Check by substituting your answer back in"],
@@ -470,7 +470,7 @@ const SECOND_COURSES: K12Course[] = [
     tags: ["matematicas", "multiplicacion", "grade 3", "common core"],
     persona: { email: "sofia.k12@synops-demo.test", firstName: "Sofía", lastName: "Ramírez", grade: 3, gradeLabel: "Grade 3", learningStyle: "visual", accommodations: ["simplified_language", "concrete_examples", "scaffolded_questions", "positive_reinforcement", "chunked_content"], progressFraction: 0.1 },
     modules: [
-      { title: "Grupos Iguales", outcome: "Puedo mostrar una multiplicación como grupos iguales de objetos.", hook: "¿Cómo puedes contar 3 cajas con 4 galletas cada una sin contar una por una?", minutes: 8, game: "choice",
+      { title: "Grupos Iguales", outcome: "Puedo mostrar una multiplicación como grupos iguales de objetos.", video: "https://www.youtube.com/watch?v=nnBBmOaBn_s", hook: "¿Cómo puedes contar 3 cajas con 4 galletas cada una sin contar una por una?", minutes: 8, game: "choice",
         standards: [{ code: "CCSS.MATH.CONTENT.3.OA.A.1", title: "Interpret products as equal groups" }],
         points: ["Multiplicar es juntar grupos que tienen la misma cantidad.", "3 × 4 quiere decir 3 grupos de 4 cosas.", "Multiplicar es una suma rápida de grupos iguales."],
         reading: "La **multiplicación** es una manera rápida de sumar **grupos iguales**. Un grupo igual es un grupo que tiene siempre la misma cantidad de cosas.\n\nImagina que tienes **3 platos**, y en cada plato hay **4 galletas**. Puedes contar de una en una: 1, 2, 3, 4... pero es lento.\n\nEs más fácil escribir **3 × 4**. Esto quiere decir \"**3 grupos de 4**\". El primer número dice **cuántos grupos** hay. El segundo número dice **cuántos hay en cada grupo**.\n\nPara resolverlo, puedes sumar los grupos: 4 + 4 + 4 = **12**. Entonces 3 × 4 = **12**. Hay 12 galletas en total.\n\nEl signo **×** significa \"veces\". Así que 3 × 4 se lee \"3 veces 4\". Buscar grupos iguales te ayuda a multiplicar rápido.",
@@ -530,7 +530,7 @@ const SECOND_COURSES: K12Course[] = [
     tags: ["civics", "government", "citizenship", "grade 6", "c3"],
     persona: { email: "maya.k12@synops-demo.test", firstName: "Maya", lastName: "Chen", grade: 6, gradeLabel: "Grade 6", learningStyle: "reading_writing", accommodations: [], progressFraction: 0.5 },
     modules: [
-      { title: "The Three Branches of Government", outcome: "I can identify the three branches of government and the job of each one.", hook: "Why does one group get to make laws, another enforce them, and a third decide what they mean?", minutes: 9, game: "choice",
+      { title: "The Three Branches of Government", outcome: "I can identify the three branches of government and the job of each one.", video: "https://www.youtube.com/watch?v=F6ZhV09DgMA", hook: "Why does one group get to make laws, another enforce them, and a third decide what they mean?", minutes: 9, game: "choice",
         standards: [{ code: "C3.D2.CIV.1.6-8", title: "Distinguish the powers and responsibilities of citizens and institutions" }],
         points: ["The government is split into three branches with different jobs.", "Legislative makes laws, executive enforces them, judicial interprets them.", "Separating power keeps any one branch from becoming too strong."],
         reading: "The United States government is divided into **three branches**. Each branch has its own job, and together they run the country. This design keeps power balanced.\n\nThe **legislative branch** is Congress. Its job is to **make laws**. Congress is made up of the Senate and the House of Representatives, whose members are elected by citizens.\n\nThe **executive branch** is led by the President. Its job is to **carry out and enforce laws**. The President also leads the military and represents the nation to the world.\n\nThe **judicial branch** is the courts, including the Supreme Court. Its job is to **interpret laws** and decide what they mean when people disagree.\n\nWhy split the work this way? The framers of the Constitution worried that too much power in one place could lead to unfairness. By giving each branch a separate role, they created a system where the branches check one another, protecting people's freedom.",
@@ -560,7 +560,7 @@ const SECOND_COURSES: K12Course[] = [
     tags: ["history", "civilizations", "mesopotamia", "grade 6", "c3"],
     persona: { email: "leo.k12@synops-demo.test", firstName: "Leo", lastName: "Rivera", grade: 6, gradeLabel: "Grade 6", learningStyle: "auditory", accommodations: ["simplified_language", "chunked_content", "scaffolded_questions", "extended_processing", "concrete_examples", "positive_reinforcement"], progressFraction: 0.35 },
     modules: [
-      { title: "Why Civilizations Began Near Rivers", outcome: "I can explain why the first civilizations grew up next to rivers.", hook: "Why did people long ago choose to build their first cities right next to rivers?", minutes: 8, game: "choice",
+      { title: "Why Civilizations Began Near Rivers", outcome: "I can explain why the first civilizations grew up next to rivers.", video: "https://www.youtube.com/watch?v=9GQdh2eGP-Y", hook: "Why did people long ago choose to build their first cities right next to rivers?", minutes: 8, game: "choice",
         standards: [{ code: "C3.D2.HIS.1.6-8", title: "Analyze connections among events and developments in broad historical contexts" }],
         points: ["Rivers gave people water to drink and to grow food.", "Good farming near rivers meant extra food and bigger towns.", "Mesopotamia and Egypt both grew along great rivers."],
         reading: "The first **civilizations** were large groups of people who lived together in cities with shared rules. Most of them began near **rivers**. Why?\n\nA river gives people **water**. They can drink it, and they can use it to water crops. Rivers also flood and leave behind rich, dark soil that is great for **farming**.\n\nWhen farming works well, people grow **extra food**. Extra food means not everyone has to farm. Some people can become builders, traders, or leaders. Towns grow into cities.\n\nOne early civilization was **Mesopotamia**, which grew between two rivers called the Tigris and the Euphrates. Another grew in **Egypt** along the **Nile River**. The Nile flooded each year and made the land good for crops.\n\nSo rivers gave water, food, and a way to travel by boat. These gifts helped the first civilizations begin and grow strong.",
@@ -590,7 +590,7 @@ const SECOND_COURSES: K12Course[] = [
     tags: ["us history", "constitution", "government", "grade 8", "c3"],
     persona: { email: "jordan.k12@synops-demo.test", firstName: "Jordan", lastName: "Bell", grade: 8, gradeLabel: "Grade 8", learningStyle: "auditory", accommodations: ["extended_processing", "scaffolded_questions", "chunked_content", "concrete_examples"], progressFraction: 0.3 },
     modules: [
-      { title: "Why the Framers Wrote the Constitution", outcome: "I can explain why the Constitution was created and what separation of powers means.", hook: "What made America's first plan of government fail, and how did the framers fix it?", minutes: 9, game: "choice",
+      { title: "Why the Framers Wrote the Constitution", outcome: "I can explain why the Constitution was created and what separation of powers means.", video: "https://www.youtube.com/watch?v=s4GUt8G4Wd8", hook: "What made America's first plan of government fail, and how did the framers fix it?", minutes: 9, game: "choice",
         standards: [{ code: "C3.D2.CIV.4.6-8", title: "Explain the origins, functions, and structure of the Constitution" }],
         points: ["The first government under the Articles of Confederation was too weak.", "The Constitution created a stronger national government.", "Separation of powers divides government into three branches."],
         reading: "After winning independence, the United States needed a plan for government. Its first plan, the **Articles of Confederation**, made the national government very **weak**. It could not collect taxes or keep order well, and the country struggled.\n\nIn 1787, leaders called **framers** met at the Constitutional Convention to fix these problems. They wrote a new plan: the **Constitution**. It created a stronger national government that could tax, defend the country, and settle disputes between states.\n\nBut the framers also feared giving one person or group too much power. Their solution was **separation of powers**. This idea divides the government into three branches: the legislative branch makes laws, the executive branch enforces them, and the judicial branch interprets them.\n\nEach branch can also check the others, a system called checks and balances. By separating power, the framers hoped to protect freedom and prevent any leader from becoming a tyrant. The Constitution remains the foundation of American government today.",
@@ -620,7 +620,7 @@ const SECOND_COURSES: K12Course[] = [
     tags: ["government", "democracy", "federalism", "grade 11", "c3"],
     persona: { email: "emma.k12@synops-demo.test", firstName: "Emma", lastName: "Novak", grade: 11, gradeLabel: "Grade 11", learningStyle: "visual", accommodations: ["concrete_examples", "extended_processing", "scaffolded_questions", "chunked_content"], progressFraction: 0.45 },
     modules: [
-      { title: "Separation of Powers, Checks and Balances, and Federalism", outcome: "I can explain how the Constitution distributes and constrains political power.", hook: "How does a written document stop any single person or level of government from seizing total control?", minutes: 10, game: "choice",
+      { title: "Separation of Powers, Checks and Balances, and Federalism", outcome: "I can explain how the Constitution distributes and constrains political power.", video: "https://www.youtube.com/watch?v=APcKEHAPYEg", hook: "How does a written document stop any single person or level of government from seizing total control?", minutes: 10, game: "choice",
         standards: [{ code: "C3.D2.CIV.4.9-12", title: "Explain how constitutions distribute and constrain political power" }],
         points: ["Separation of powers divides government into three branches.", "Checks and balances let each branch limit the others.", "Federalism divides power between national and state governments."],
         reading: "The U.S. Constitution limits power through three connected principles that work together to protect liberty.\n\nFirst is **separation of powers**. Governing authority is divided among three branches: the **legislative** branch makes laws, the **executive** branch enforces them, and the **judicial** branch interprets them. No single branch holds all authority.\n\nSecond is **checks and balances**. Each branch can restrain the others. For example, Congress passes a bill, but the President can **veto** it; Congress can then override the veto with a two-thirds vote. Courts can rule laws unconstitutional. These overlapping powers force branches to cooperate.\n\nThird is **federalism**, which divides power between the **national government** and the **states**. Some powers, like coining money, belong to the national government. Others, like running schools, belong mostly to states. Some are shared.\n\nTogether, these principles spread power across branches and levels of government. This design makes it difficult for any person or group to gain unchecked control, safeguarding democratic government.",
