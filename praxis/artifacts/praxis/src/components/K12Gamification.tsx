@@ -73,7 +73,7 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
             <div key={i} className="flex items-center gap-1.5 flex-1 last:flex-none">
               {i < doneLessons
                 ? <StarMascot size={22} animated={false} />
-                : <span className="h-4 w-4 shrink-0 rounded-full" style={{ border: `2px solid ${accent}`, opacity: 0.4 }} />}
+                : <span className="h-4 w-4 shrink-0 rounded-full bg-white" style={{ border: "2px solid #CBD5E1" }} />}
               {i < lessons - 1 && <span className="h-1 flex-1 rounded-full" style={{ background: i < doneLessons ? accent : "#e6e6e6" }} />}
             </div>
           ))}
