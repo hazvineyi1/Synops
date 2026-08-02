@@ -262,12 +262,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
 
       {/* K-12: one slim status band (level/XP + supports) sits ABOVE the lessons but stays small, so the
           lessons remain the hero. Non-K-12 learners keep the full supports + gamification panels. */}
-      {isK12 && (
-        <div className="space-y-2.5">
-          <K12Gamification compact />
-          <AccommodationsPanel compact />
-        </div>
-      )}
+      {isK12 && <K12Gamification compact />}
       {!isK12 && <AccommodationsPanel />}
       {!isK12 && <K12Gamification />}
 
@@ -531,6 +526,9 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         </div>
         )}
       </div>
+
+      {/* K-12 supports: reference info, relegated to a quiet strip at the very bottom. */}
+      {isK12 && <AccommodationsPanel compact />}
     </div>
   );
 }
