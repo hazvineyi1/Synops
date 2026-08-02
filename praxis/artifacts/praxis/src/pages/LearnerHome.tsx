@@ -244,7 +244,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
   const offTrack = flagged.some((i) => i.status === "off_track");
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className={cn("animate-in fade-in duration-500", isK12 ? "space-y-5" : "space-y-8")}>
       {/* Greeting */}
       <div>
         <h1 className="text-3xl font-serif font-bold tracking-tight">
@@ -257,11 +257,10 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         </p>
       </div>
 
-      {/* Visible learning-supports panel. Self-guards: renders only for learners with accommodations. */}
-      <AccommodationsPanel />
-
-      {/* Gamification (XP, quest, badges + autism visual schedule / star board). Self-guards to K-12. */}
-      <K12Gamification />
+      {/* Non-K-12 learners keep supports + gamification up top. For K-12, these move BELOW the courses
+          (rendered after the grid) so the first thing a child sees is where to start — their lessons. */}
+      {!isK12 && <AccommodationsPanel />}
+      {!isK12 && <K12Gamification />}
 
       {/* Attention strip. A flagged learner sees their off-track status + a route to the plan
           and their AI Coach, front and centre. A learner who is on track sees a positive green
@@ -306,7 +305,9 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         </Card>
       ))}
 
-      {/* Gamification / at-a-glance strip */}
+      {/* At-a-glance stat strip — hidden for K-12 (their gamification bar already shows streak/badges,
+          and it pushed the courses down the page). */}
+      {!isK12 && (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {progLoading ? (
           Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[76px] rounded-xl" />)
@@ -322,10 +323,11 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
           </>
         )}
       </div>
+      )}
 
       <div className={cn("grid grid-cols-1 gap-6", !isK12 && "lg:grid-cols-3")}>
         {/* Main column */}
-        <div className={cn("space-y-8", !isK12 && "lg:col-span-2")}>
+        <div className={cn(!isK12 && "lg:col-span-2", isK12 ? "space-y-5" : "space-y-8")}>
           {/* Continue learning */}
           <section>
             <SectionTitle
@@ -520,6 +522,11 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         </div>
         )}
       </div>
+
+      {/* K-12: supports + gamification live here, AFTER the courses, so the child lands on their
+          lessons first and the encouraging extras follow. */}
+      {isK12 && <K12Gamification />}
+      {isK12 && <AccommodationsPanel />}
     </div>
   );
 }

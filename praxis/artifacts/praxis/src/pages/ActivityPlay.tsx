@@ -58,7 +58,7 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
   return (
     <div className="min-h-[100dvh] bg-slate-50">
       <header className="sticky top-0 z-10 border-b border-border bg-white/90 backdrop-blur">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className={`${young ? 'max-w-5xl' : 'max-w-3xl'} mx-auto px-4 py-3 flex items-center gap-3`}>
           <Button variant="ghost" size="sm" onClick={() => history.length > 1 ? history.back() : setLocation("/dashboard")}>
             <ArrowLeft className="h-4 w-4 mr-1" /> Back
           </Button>
@@ -69,7 +69,7 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-6">
+      <main className={`${young ? 'max-w-5xl' : 'max-w-3xl'} mx-auto px-4 py-6`}>
         {isLoading ? (
           <div className="flex items-center gap-2 text-muted-foreground py-20 justify-center">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading activity…
