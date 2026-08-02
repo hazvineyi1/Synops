@@ -1920,10 +1920,11 @@ const K12_LANGS: [string, string][] = [['en', 'English'], ['es', 'Español']];
 /** A row of language chips. The parent runs the actual translation for the content it owns. */
 function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onPick: (code: string) => void }) {
   const { user } = useSession();
+  const esUi = personaByEmail(user?.email)?.defaultLang === 'es';
   const langs = isK12DemoEmail(user?.email) ? K12_LANGS : LANGS;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Languages className="h-3.5 w-3.5" /> Read in:</span>
+      <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Languages className="h-3.5 w-3.5" /> {esUi ? 'Leer en:' : 'Read in:'}</span>
       {langs.map(([code, name]) => (
         <button key={code} type="button" disabled={busy} onClick={() => onPick(code)}
           className={cn('text-xs rounded-full px-2.5 py-1 border transition-colors disabled:opacity-50',
@@ -1931,7 +1932,7 @@ function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onP
           {name}
         </button>
       ))}
-      {busy && <span className="text-xs text-muted-foreground animate-pulse">translating…</span>}
+      {busy && <span className="text-xs text-muted-foreground animate-pulse">{esUi ? 'traduciendo…' : 'translating…'}</span>}
     </div>
   );
 }
