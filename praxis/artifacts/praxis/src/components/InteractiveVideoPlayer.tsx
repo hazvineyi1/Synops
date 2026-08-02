@@ -4,8 +4,16 @@ import { apiFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Play, Pause, CheckCircle, XCircle } from 'lucide-react';
+import { CheckCircle, XCircle } from 'lucide-react';
+import { resolveVideo } from '@/lib/videoEmbed';
 
+/**
+ * Interactive video player. Plays a clip inline and pauses at each checkpoint timestamp to pop a
+ * question, so a short clip is active rather than passive. Works with YouTube/Khan (via the YouTube
+ * IFrame API, which lets us read currentTime and pause/resume) and with direct video files. Other
+ * providers (Vimeo, TikTok…) fall back to a plain inline embed without checkpoints. With zero questions
+ * it degrades gracefully to a normal inline player.
+ */
 interface IVQuestion {
   id: string;
   videoTimestamp: number;
@@ -13,36 +21,41 @@ interface IVQuestion {
   options: { id: string; text: string }[];
   questionType: string;
   points: number;
-  feedbackCorrect?: string;
-  feedbackIncorrect?: string;
   pauseOnReach: boolean;
 }
+interface IVResponse { correct: boolean | null; feedback?: string; correctOptionIds?: string[] }
+interface Props { beatId: string; videoUrl: string; onComplete?: () => void }
 
-interface IVResponse {
-  correct: boolean | null;
-  feedback?: string;
-  correctOptionIds?: string[];
-}
-
-interface Props {
-  beatId: string;
-  videoUrl: string;
-  onComplete?: () => void;
-}
-
-function isYoutube(url: string) {
-  return url.includes('youtube') || url.includes('youtu.be');
-}
-
-function getYoutubeId(url: string) {
-  const match = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
-  return match?.[1] ?? '';
+// Load the YouTube IFrame API once and resolve when ready.
+let ytApiPromise: Promise<any> | null = null;
+function loadYouTubeApi(): Promise<any> {
+  const w = window as any;
+  if (w.YT && w.YT.Player) return Promise.resolve(w.YT);
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise((resolve) => {
+    const prev = w.onYouTubeIframeAPIReady;
+    w.onYouTubeIframeAPIReady = () => { if (typeof prev === 'function') prev(); resolve(w.YT); };
+    if (!document.getElementById('yt-iframe-api')) {
+      const s = document.createElement('script');
+      s.id = 'yt-iframe-api'; s.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(s);
+    }
+  });
+  return ytApiPromise;
 }
 
 export function InteractiveVideoPlayer({ beatId, videoUrl, onComplete }: Props) {
+  const resolved = resolveVideo(videoUrl);
+  const ytId = (resolved.provider === 'youtube' || resolved.provider === 'khan')
+    ? (resolved.src.match(/embed\/([A-Za-z0-9_-]{11})/)?.[1] ?? '') : '';
+  const isFile = resolved.kind === 'file';
+  const canCheckpoint = !!ytId || isFile;
+
   const videoRef = useRef<HTMLVideoElement>(null);
+  const ytPlayerRef = useRef<any>(null);
+  const ytDivRef = useRef<HTMLDivElement>(null);
+  const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [paused, setPaused] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState<IVQuestion | null>(null);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [response, setResponse] = useState<IVResponse | null>(null);
@@ -52,102 +65,108 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, onComplete }: Props) 
   const { data: questions = [] } = useQuery<IVQuestion[]>({
     queryKey: ['iv-questions', beatId],
     queryFn: () => apiFetch(`/beats/${beatId}/interactive-questions`),
+    enabled: !!beatId,
   });
+  const questionsRef = useRef<IVQuestion[]>([]);
+  questionsRef.current = questions;
 
   const respondMutation = useMutation({
     mutationFn: ({ questionId, response }: { questionId: string; response: string | string[] }) =>
-      apiFetch<IVResponse>(`/interactive-questions/${questionId}/respond`, {
-        method: 'POST', body: JSON.stringify({ response }),
-      }),
+      apiFetch<IVResponse>(`/interactive-questions/${questionId}/respond`, { method: 'POST', body: JSON.stringify({ response }) }),
     onSuccess: (data) => setResponse(data),
   });
+
+  const pausePlayer = useCallback(() => {
+    if (ytPlayerRef.current?.pauseVideo) ytPlayerRef.current.pauseVideo();
+    else videoRef.current?.pause();
+  }, []);
+  const playPlayer = useCallback(() => {
+    if (ytPlayerRef.current?.playVideo) ytPlayerRef.current.playVideo();
+    else videoRef.current?.play().catch(() => {});
+  }, []);
 
   const triggerQuestion = useCallback((q: IVQuestion) => {
     if (triggeredRef.current.has(q.id)) return;
     triggeredRef.current.add(q.id);
-    if (videoRef.current && q.pauseOnReach) videoRef.current.pause();
-    setPaused(true);
+    if (q.pauseOnReach) pausePlayer();
     setActiveQuestion(q);
     setSelectedOptions([]);
     setResponse(null);
-  }, []);
+  }, [pausePlayer]);
 
-  const handleTimeUpdate = useCallback(() => {
-    const t = videoRef.current?.currentTime ?? 0;
-    setCurrentTime(t);
-    for (const q of questions) {
-      if (!triggeredRef.current.has(q.id) && t >= q.videoTimestamp && q.pauseOnReach) {
-        triggerQuestion(q);
-        break;
-      }
+  const checkCheckpoints = useCallback((t: number) => {
+    for (const q of questionsRef.current) {
+      if (!triggeredRef.current.has(q.id) && t >= q.videoTimestamp && q.pauseOnReach) { triggerQuestion(q); break; }
     }
-  }, [questions, triggerQuestion]);
+  }, [triggerQuestion]);
+
+  // YouTube: create the IFrame-API player and poll currentTime.
+  useEffect(() => {
+    if (!ytId || !ytDivRef.current) return;
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    loadYouTubeApi().then((YT) => {
+      if (cancelled || !ytDivRef.current) return;
+      ytPlayerRef.current = new YT.Player(ytDivRef.current, {
+        videoId: ytId,
+        playerVars: { rel: 0, modestbranding: 1, playsinline: 1, origin: window.location.origin },
+        events: { onReady: (e: any) => setDuration(e.target.getDuration?.() || 0) },
+      });
+      interval = setInterval(() => {
+        const p = ytPlayerRef.current;
+        if (!p || !p.getCurrentTime) return;
+        const t = p.getCurrentTime() || 0;
+        setCurrentTime(t);
+        if (!duration && p.getDuration) setDuration(p.getDuration() || 0);
+        checkCheckpoints(t);
+      }, 500);
+    });
+    return () => { cancelled = true; if (interval) clearInterval(interval); try { ytPlayerRef.current?.destroy?.(); } catch { /* noop */ } ytPlayerRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ytId]);
+
+  const onFileTime = useCallback(() => {
+    const t = videoRef.current?.currentTime ?? 0;
+    setCurrentTime(t); checkCheckpoints(t);
+  }, [checkCheckpoints]);
 
   const handleContinue = () => {
-    if (activeQuestion) setAnsweredIds(prev => new Set([...prev, activeQuestion.id]));
-    setActiveQuestion(null);
-    setResponse(null);
-    setSelectedOptions([]);
-    if (videoRef.current) videoRef.current.play().catch(() => {});
-    setPaused(false);
-    if (questions.length > 0 && answeredIds.size + 1 >= questions.length) {
-      onComplete?.();
-    }
+    if (activeQuestion) setAnsweredIds((prev) => new Set([...prev, activeQuestion.id]));
+    const wasLast = questions.length > 0 && answeredIds.size + 1 >= questions.length;
+    setActiveQuestion(null); setResponse(null); setSelectedOptions([]);
+    playPlayer();
+    if (wasLast) onComplete?.();
   };
-
   const handleSubmit = () => {
     if (!activeQuestion || selectedOptions.length === 0) return;
     const resp = activeQuestion.questionType === 'check_all' ? selectedOptions : selectedOptions[0];
     respondMutation.mutate({ questionId: activeQuestion.id, response: resp });
   };
-
   const toggleOption = (optId: string) => {
-    if (activeQuestion?.questionType === 'check_all') {
-      setSelectedOptions(prev => prev.includes(optId) ? prev.filter(o => o !== optId) : [...prev, optId]);
-    } else {
-      setSelectedOptions([optId]);
-    }
+    if (activeQuestion?.questionType === 'check_all') setSelectedOptions((p) => p.includes(optId) ? p.filter((o) => o !== optId) : [...p, optId]);
+    else setSelectedOptions([optId]);
   };
 
-  const durationApprox = videoRef.current?.duration ?? 0;
-  const youtube = isYoutube(videoUrl);
-  const youtubeId = youtube ? getYoutubeId(videoUrl) : '';
   const allAnswered = questions.length > 0 && answeredIds.size >= questions.length;
 
   return (
     <div className="space-y-3">
-      {/* Video */}
       <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
-        {youtube ? (
-          <iframe
-            src={`https://www.youtube.com/embed/${youtubeId}?enablejsapi=1`}
-            className="absolute inset-0 w-full h-full"
-            allowFullScreen
-            allow="autoplay; encrypted-media"
-          />
+        {ytId ? (
+          <div ref={ytDivRef} className="absolute inset-0 w-full h-full" />
+        ) : isFile ? (
+          <video ref={videoRef} src={resolved.src} className="w-full h-full object-contain" controls={!activeQuestion} onTimeUpdate={onFileTime} onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)} />
         ) : (
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            className="w-full h-full object-contain"
-            controls={!activeQuestion}
-            onTimeUpdate={handleTimeUpdate}
-            onPlay={() => setPaused(false)}
-            onPause={() => setPaused(true)}
-          />
+          // Providers without a JS API (Vimeo, TikTok…) — inline embed, no checkpoints.
+          <iframe src={resolved.src} title="Lesson video" className="absolute inset-0 w-full h-full" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
         )}
 
-        {/* Question overlay */}
         {activeQuestion && (
           <div className="absolute inset-0 bg-black/85 flex items-center justify-center p-4 z-10">
             <div className="bg-background rounded-xl shadow-2xl p-6 max-w-lg w-full space-y-4">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">Question · {activeQuestion.points} pt{activeQuestion.points !== 1 ? 's' : ''}</Badge>
-                {response && (
-                  <Badge variant={response.correct ? 'default' : 'destructive'} className="text-xs">
-                    {response.correct ? '✓ Correct' : '✗ Incorrect'}
-                  </Badge>
-                )}
+                <Badge variant="outline" className="text-xs">Checkpoint · {activeQuestion.points} pt{activeQuestion.points !== 1 ? 's' : ''}</Badge>
+                {response && <Badge variant={response.correct ? 'default' : 'destructive'} className="text-xs">{response.correct ? '✓ Correct' : '✗ Try again next time'}</Badge>}
               </div>
               <p className="text-foreground font-medium leading-relaxed">{activeQuestion.stem}</p>
               <div className="space-y-2">
@@ -156,17 +175,11 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, onComplete }: Props) 
                   const isCorrect = response?.correctOptionIds?.includes(opt.id);
                   const isWrong = response && selected && !isCorrect;
                   return (
-                    <button
-                      key={opt.id}
-                      onClick={() => !response && toggleOption(opt.id)}
-                      disabled={!!response}
-                      className={cn(
-                        "w-full text-left px-4 py-3 rounded-lg border text-sm transition-all",
+                    <button key={opt.id} onClick={() => !response && toggleOption(opt.id)} disabled={!!response}
+                      className={cn("w-full text-left px-4 py-3 rounded-lg border text-sm transition-all",
                         selected && !response ? "border-primary bg-primary/10 text-primary font-medium" : "border-border hover:border-primary/50 text-foreground",
                         isCorrect ? "border-green-500 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400" : "",
-                        isWrong ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400" : ""
-                      )}
-                    >
+                        isWrong ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400" : "")}>
                       {opt.text}
                     </button>
                   );
@@ -174,16 +187,11 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, onComplete }: Props) 
               </div>
               {response?.feedback && (
                 <div className={cn("p-3 rounded-md text-sm", response.correct ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-300" : "bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300")}>
-                  {response.correct ? <CheckCircle className="h-4 w-4 inline mr-1" /> : <XCircle className="h-4 w-4 inline mr-1" />}
-                  {response.feedback}
+                  {response.correct ? <CheckCircle className="h-4 w-4 inline mr-1" /> : <XCircle className="h-4 w-4 inline mr-1" />}{response.feedback}
                 </div>
               )}
               <div className="flex gap-2">
-                {!response && (
-                  <Button size="sm" onClick={handleSubmit} disabled={selectedOptions.length === 0 || respondMutation.isPending}>
-                    {respondMutation.isPending ? 'Checking...' : 'Submit Answer'}
-                  </Button>
-                )}
+                {!response && <Button size="sm" onClick={handleSubmit} disabled={selectedOptions.length === 0 || respondMutation.isPending}>{respondMutation.isPending ? 'Checking…' : 'Submit'}</Button>}
                 {response && <Button size="sm" onClick={handleContinue}>Continue →</Button>}
               </div>
             </div>
@@ -191,29 +199,22 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, onComplete }: Props) 
         )}
       </div>
 
-      {/* Question timestamp dots */}
-      {questions.length > 0 && !youtube && (
-        <div className="relative h-6 bg-muted rounded-full overflow-hidden">
-          <div className="absolute inset-y-0 left-0 bg-primary/20 rounded-full transition-all" style={{ width: durationApprox > 0 ? `${(currentTime / durationApprox) * 100}%` : '0%' }} />
-          {durationApprox > 0 && questions.map((q) => (
-            <div
-              key={q.id}
-              title={`Question at ${q.videoTimestamp}s`}
-              className={cn("absolute top-1/2 -translate-y-1/2 h-4 w-4 rounded-full border-2 border-background transition-colors cursor-pointer", answeredIds.has(q.id) ? "bg-green-500" : "bg-primary")}
-              style={{ left: `${(q.videoTimestamp / durationApprox) * 100}%` }}
-            />
+      {/* Checkpoint markers along the timeline */}
+      {questions.length > 0 && canCheckpoint && duration > 0 && (
+        <div className="relative h-2.5 bg-muted rounded-full overflow-hidden">
+          <div className="absolute inset-y-0 left-0 bg-primary/25" style={{ width: `${Math.min(100, (currentTime / duration) * 100)}%` }} />
+          {questions.map((q) => (
+            <div key={q.id} title={`Checkpoint at ${q.videoTimestamp}s`}
+              className={cn("absolute top-1/2 -translate-y-1/2 h-3 w-3 rounded-full border-2 border-background", answeredIds.has(q.id) ? "bg-green-500" : "bg-primary")}
+              style={{ left: `calc(${Math.min(100, (q.videoTimestamp / duration) * 100)}% - 6px)` }} />
           ))}
         </div>
       )}
 
-      {/* Summary */}
       {questions.length > 0 && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          {allAnswered ? (
-            <><CheckCircle className="h-4 w-4 text-green-500" /> <span className="text-green-600 font-medium">All {questions.length} questions answered</span></>
-          ) : (
-            <><span>{answeredIds.size} / {questions.length} questions answered</span></>
-          )}
+          {allAnswered ? <><CheckCircle className="h-4 w-4 text-green-500" /> <span className="text-green-600 font-medium">All {questions.length} checkpoints answered</span></>
+            : <span>{answeredIds.size} / {questions.length} checkpoints answered</span>}
         </div>
       )}
     </div>

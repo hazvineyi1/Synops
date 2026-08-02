@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { resolveVideo, VIDEO_PROVIDERS_HINT } from '@/lib/videoEmbed';
+import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 
 /** Render any provider's clip (YouTube, Khan, Vimeo, TikTok, Loom, Drive, file) inline — never a link out. */
 function VideoFrame({ url }: { url?: string | null }) {
@@ -453,7 +454,7 @@ function VideoBeat({ beat }: { beat: Beat }) {
     <div className="px-8 py-12 max-w-3xl mx-auto">
       <p className="text-muted-foreground mb-6 leading-relaxed">{toBeatText(beat.narration)}</p>
       {beat.videoUrl ? (
-        <VideoFrame url={beat.videoUrl} />
+        <InteractiveVideoPlayer beatId={beat.id} videoUrl={beat.videoUrl} />
       ) : slides && slides.length > 0 ? (
         <SlideLesson slides={slides} />
       ) : (
@@ -2297,6 +2298,80 @@ function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBea
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
       </div>
       <p className="text-xs text-muted-foreground">Direct file upload uses Supabase Storage; until that is configured, paste a hosted video URL. Learners see the video in this section once saved.</p>
+      {existing?.id && <CheckpointEditor beatId={existing.id} />}
+    </div>
+  );
+}
+
+/**
+ * Make a clip interactive: add checkpoint questions that pop at a timestamp while the video plays.
+ * Available on any saved video (YouTube/Khan/file). Backed by /beats/:id/interactive-questions.
+ */
+function CheckpointEditor({ beatId }: { beatId: string }) {
+  const qc = useQueryClient();
+  const { data: questions = [] } = useQuery<{ id: string; videoTimestamp: number; stem: string }[]>({
+    queryKey: ['iv-questions', beatId], queryFn: () => apiFetch(`/beats/${beatId}/interactive-questions`), enabled: !!beatId,
+  });
+  const [open, setOpen] = useState(false);
+  const [ts, setTs] = useState('30');
+  const [stem, setStem] = useState('');
+  const [opts, setOpts] = useState(['', '', '', '']);
+  const [correct, setCorrect] = useState(0);
+  const [fb, setFb] = useState('');
+  const [busy, setBusy] = useState(false);
+  const reset = () => { setTs('30'); setStem(''); setOpts(['', '', '', '']); setCorrect(0); setFb(''); };
+  const refresh = () => qc.invalidateQueries({ queryKey: ['iv-questions', beatId] });
+
+  const add = async () => {
+    const filled = opts.map((t, i) => ({ id: `o${i}`, text: t.trim() })).filter((o) => o.text);
+    if (!stem.trim() || filled.length < 2 || !filled[correct]) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/beats/${beatId}/interactive-questions`, { method: 'POST', body: JSON.stringify({
+        videoTimestamp: Number(ts) || 0, questionType: 'multiple_choice', stem: stem.trim(),
+        options: filled, correctOptionIds: [`o${correct}`], feedbackCorrect: fb || null, pauseOnReach: true, points: 1,
+      }) });
+      reset(); setOpen(false); refresh();
+    } finally { setBusy(false); }
+  };
+  const del = async (id: string) => { await apiFetch(`/interactive-questions/${id}`, { method: 'DELETE' }); refresh(); };
+
+  return (
+    <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-2">
+      <div className="text-xs font-semibold flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-amber-500" /> Interactive checkpoints <span className="font-normal text-muted-foreground">· pop a question mid-clip (YouTube/Khan/file)</span></div>
+      {questions.length > 0 && (
+        <ul className="space-y-1">
+          {questions.sort((a, b) => a.videoTimestamp - b.videoTimestamp).map((q) => (
+            <li key={q.id} className="flex items-center gap-2 text-xs bg-background rounded px-2 py-1.5 border">
+              <span className="font-mono text-[11px] text-primary shrink-0">{Math.floor(q.videoTimestamp / 60)}:{String(Math.floor(q.videoTimestamp % 60)).padStart(2, '0')}</span>
+              <span className="flex-1 truncate">{q.stem}</span>
+              <button onClick={() => del(q.id)} className="text-red-500 hover:text-red-700 shrink-0">Remove</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {!open ? (
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setOpen(true)}>+ Add checkpoint</Button>
+      ) : (
+        <div className="space-y-2 bg-background rounded-lg border p-2.5">
+          <div className="flex gap-2">
+            <label className="text-[11px] text-muted-foreground">At (seconds)
+              <input value={ts} onChange={(e) => setTs(e.target.value.replace(/[^0-9]/g, ''))} className="mt-0.5 h-8 w-24 rounded border border-input bg-background px-2 text-sm" /></label>
+          </div>
+          <input value={stem} onChange={(e) => setStem(e.target.value)} placeholder="Question…" className="h-8 w-full rounded border border-input bg-background px-2 text-sm" />
+          {opts.map((o, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} title="Correct answer" />
+              <input value={o} onChange={(e) => setOpts((p) => p.map((x, j) => j === i ? e.target.value : x))} placeholder={`Option ${i + 1}${i === correct ? ' (correct)' : ''}`} className="h-8 flex-1 rounded border border-input bg-background px-2 text-sm" />
+            </div>
+          ))}
+          <input value={fb} onChange={(e) => setFb(e.target.value)} placeholder="Feedback when correct (optional)" className="h-8 w-full rounded border border-input bg-background px-2 text-sm" />
+          <div className="flex gap-2">
+            <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={add}>Save checkpoint</Button>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setOpen(false); reset(); }}>Cancel</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2328,7 +2403,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const startCase = useMutation({ mutationFn: (cid: string) => apiFetch<{ id: string }>(`/cases/${cid}/sessions`, { method: 'POST', body: JSON.stringify({}) }), onSuccess: (s) => navigate(`/case-run/${s.id}`) });
 
   // A short teaching video (YouTube) attached to the module, if any.
-  const videoBeat = (allBeats as { type?: string; videoUrl?: string | null }[] | undefined)?.find((b) => b?.type === 'video' && !!b?.videoUrl);
+  const videoBeat = (allBeats as { id: string; type?: string; videoUrl?: string | null }[] | undefined)?.find((b) => b?.type === 'video' && !!b?.videoUrl);
   const resolvedVid = resolveVideo(videoBeat?.videoUrl ?? null);
 
   const steps = [
@@ -2423,13 +2498,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
         {step?.id === 'watch' && (
           <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm">
             <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>🎬 {T('Watch the video, then tap Next!', '¡Mira el video y luego toca Siguiente!')}</p>
-            <div className="relative w-full overflow-hidden rounded-2xl" style={{ paddingBottom: '56.25%', background: '#000' }}>
-              {resolvedVid.kind === 'iframe' ? (
-                <iframe className="absolute inset-0 w-full h-full" src={resolvedVid.src} title="Lesson video" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-              ) : (
-                <video className="absolute inset-0 w-full h-full" src={resolvedVid.src} controls />
-              )}
-            </div>
+            {videoBeat && <InteractiveVideoPlayer beatId={videoBeat.id as string} videoUrl={videoBeat.videoUrl as string} />}
           </div>
         )}
         {step?.id === 'read' && (

@@ -7,6 +7,7 @@ import {
   orgClassesTable, orgClassCoursesTable, orgClassStaffTable, orgClassLearnersTable,
   beatProgressTable, credentialsTable,
   unitStandardsTable, unitStandardMappingsTable,
+  interactiveVideoQuestionsTable,
 } from "@workspace/db";
 import { eq, and, asc, inArray, ne, like } from "drizzle-orm";
 import { hashPassword } from "../lib/auth";
@@ -119,6 +120,14 @@ const MODULE_IMAGES: Record<string, string[]> = {
   "La idea principal": ["book"],
   "Vocabulario en contexto": ["book"],
   "Pistas del contexto": ["book"],
+};
+
+// Demo interactive checkpoints — a question that pops mid-clip on a few Khan videos so the clips are
+// active, not passive. Keyed by module title. (Teachers add their own via the module video panel.)
+const VIDEO_CHECKPOINTS: Record<string, { t: number; stem: string; options: string[]; correct: number; feedback: string }[]> = {
+  "Ratios and rates": [{ t: 45, stem: "A ratio compares two amounts. Which shows the ratio of 2 cats to 3 dogs?", options: ["2 to 3", "3 to 2", "2 + 3", "5"], correct: 0, feedback: "Right — a ratio compares the two amounts, in order." }],
+  "Why Civilizations Began Near Rivers": [{ t: 30, stem: "Why did the first cities grow up next to rivers?", options: ["For water and good farmland", "To hide from enemies", "To find gold", "Purely by chance"], correct: 0, feedback: "Exactly — rivers gave water and rich soil for farming." }],
+  "Food webs": [{ t: 40, stem: "In a food web, where does the energy start?", options: ["The sun and plants", "Top predators", "Decomposers only", "Rocks and soil"], correct: 0, feedback: "Yes — energy flows from the sun to plants, then onward." }],
 };
 
 // ── COURSES (one per persona; two comprehensive lessons each) ────────────────
@@ -921,6 +930,22 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
         await db.insert(beatsTable).values({ moduleId: modId, type: "video", order: 3, title: TL(lang, "Watch", "Ver"), narration: TL(lang, `Watch this short video, then keep going: ${m.hook}`, `Mira este video corto y luego continúa: ${m.hook}`), videoUrl: m.video });
       }
       await db.update(modulesTable).set({ beatCount: m.video ? 4 : 3 }).where(eq(modulesTable.id, modId));
+
+      // Interactive checkpoints on the module's video (idempotent: rebuild the demo set each reseed).
+      const cps = VIDEO_CHECKPOINTS[m.title];
+      if (m.video && cps) {
+        const [vb] = await db.select().from(beatsTable).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.type, "video"))).limit(1);
+        if (vb) {
+          await db.delete(interactiveVideoQuestionsTable).where(eq(interactiveVideoQuestionsTable.beatId, vb.id));
+          for (const cp of cps) {
+            await db.insert(interactiveVideoQuestionsTable).values({
+              beatId: vb.id, videoTimestamp: String(cp.t), questionType: "multiple_choice", stem: cp.stem,
+              options: cp.options.map((t, i) => ({ id: `o${i}`, text: t })), correctOptionIds: [`o${cp.correct}`],
+              feedbackCorrect: cp.feedback, pauseOnReach: true, required: true, points: String(1),
+            });
+          }
+        }
+      }
     }
   }
 
