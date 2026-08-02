@@ -389,6 +389,224 @@ const COURSES: K12Course[] = [
   },
 ];
 
+// ── SECOND SUBJECT per learner (each persona takes TWO different subjects, e.g. math + civics,
+//    science + history) so every K-12 class spans two subjects, fully built and gamified. ──────────
+const SECOND_COURSES: K12Course[] = [
+  {
+    title: "Grade 1 Math: Counting & Adding", subject: "Mathematics", emoji: "🔢", grade: 1, gradeLabel: "Grade 1",
+    framework: "Common Core State Standards — Grade 1 Operations & Algebraic Thinking",
+    intro: "Let's learn to count and add small numbers. We will use our fingers, toys, and pictures to see how numbers grow.",
+    outcome: "I can count on from a number and add two numbers within 10.",
+    tags: ["math", "counting", "addition", "grade 1", "common core"],
+    persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.1 },
+    modules: [
+      { title: "Counting On to Add", outcome: "I can start at a big number and count on to add within 10.", hook: "If you have 4 blocks and get 3 more, do you have to count them all again?", minutes: 7, game: "choice",
+        standards: [{ code: "CCSS.MATH.CONTENT.1.OA.C.6", title: "Add and subtract within 20" }],
+        points: ["Start with the bigger number in your head.", "Count on with your fingers to add the smaller number.", "The last number you say is the answer."],
+        reading: "When we **add**, we put two groups together to make one bigger group.\n\nHere is a fast way. You do NOT have to start at 1 every time. You can **count on**. That means you say the first number, then keep counting up.\n\nLet's try **4 + 3**. Start at the bigger number, **4**. Now hold up 3 fingers and count on: \"5... 6... 7.\" The last number you say is **7**. So 4 + 3 = 7!\n\nCounting on is like hopping up a stairway. You are already on step 4, so you just take 3 more hops: 5, 6, 7.\n\nTry it with your own toys. Put 5 toys in a pile. Say \"five,\" then add 2 more, one at a time: \"six, seven.\" You have **7** toys. Counting on makes adding fast and fun.",
+        quiz: [
+          { q: "To add 5 + 2 by counting on, which number do you start with?", options: ["1", "2", "5", "7"], answer: 2 },
+          { q: "What is 6 + 3?", options: ["8", "9", "10", "7"], answer: 1 },
+          { q: "You start at 4 and count on 2 more. What do you say?", options: ["5, 6", "3, 2", "4, 4", "6, 7"], answer: 0 },
+          { q: "What is 3 + 4?", options: ["6", "8", "5", "7"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+      { title: "Teen Numbers: Ten and Some Ones", outcome: "I can show a teen number as one ten and some ones.", hook: "What is hiding inside the number 14?", minutes: 7, game: "pair",
+        standards: [{ code: "CCSS.MATH.CONTENT.1.NBT.B.2", title: "Understand place value: tens and ones" }],
+        points: ["A teen number is made of one ten and some ones.", "11 is 10 and 1 more; 15 is 10 and 5 more.", "The ten stays the same and the ones change."],
+        reading: "Numbers from 11 to 19 are called **teen numbers**. Every teen number has a secret! It is made of **one ten** and some **ones**.\n\nLet's look at **11**. Take 10 blocks and snap them into one stick of ten. Then add **1** more block. That is 10 and 1, which makes **11**.\n\nNow try **15**. Start with your stick of **ten** blocks. Then count out **5** more single blocks. Ten and five more is **15**!\n\nDo you see the pattern? The **ten** stays the same. Only the **ones** change. 13 is ten and 3. 17 is ten and 7.\n\nThis helps us understand big numbers. When you see a teen number, think: \"one ten, and how many ones?\" That makes counting much easier.",
+        quiz: [
+          { q: "The number 12 is made of one ten and how many ones?", options: ["1", "2", "3", "12"], answer: 1 },
+          { q: "Ten and 6 more makes which number?", options: ["16", "60", "6", "10"], answer: 0 },
+          { q: "Which number is one ten and 8 ones?", options: ["80", "8", "18", "10"], answer: 2 },
+          { q: "In the number 14, how many tens are there?", options: ["4", "14", "0", "1"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+    ],
+  },
+  {
+    title: "Matemáticas (Grado 3): Multiplicación", subject: "Matemáticas", emoji: "✖️", grade: 3, gradeLabel: "Grade 3", lang: "es",
+    framework: "Common Core State Standards — Grade 3 Mathematics",
+    intro: "Vamos a aprender qué es la multiplicación. Verás que multiplicar es una forma rápida de sumar grupos iguales.",
+    outcome: "Puedo explicar la multiplicación como grupos iguales y resolver problemas sencillos.",
+    tags: ["matematicas", "multiplicacion", "grade 3", "common core"],
+    persona: { email: "sofia.k12@synops-demo.test", firstName: "Sofía", lastName: "Ramírez", grade: 3, gradeLabel: "Grade 3", learningStyle: "visual", accommodations: ["simplified_language", "concrete_examples", "scaffolded_questions", "positive_reinforcement", "chunked_content"], progressFraction: 0.1 },
+    modules: [
+      { title: "Grupos Iguales", outcome: "Puedo mostrar una multiplicación como grupos iguales de objetos.", hook: "¿Cómo puedes contar 3 cajas con 4 galletas cada una sin contar una por una?", minutes: 8, game: "choice",
+        standards: [{ code: "CCSS.MATH.CONTENT.3.OA.A.1", title: "Interpret products as equal groups" }],
+        points: ["Multiplicar es juntar grupos que tienen la misma cantidad.", "3 × 4 quiere decir 3 grupos de 4 cosas.", "Multiplicar es una suma rápida de grupos iguales."],
+        reading: "La **multiplicación** es una manera rápida de sumar **grupos iguales**. Un grupo igual es un grupo que tiene siempre la misma cantidad de cosas.\n\nImagina que tienes **3 platos**, y en cada plato hay **4 galletas**. Puedes contar de una en una: 1, 2, 3, 4... pero es lento.\n\nEs más fácil escribir **3 × 4**. Esto quiere decir \"**3 grupos de 4**\". El primer número dice **cuántos grupos** hay. El segundo número dice **cuántos hay en cada grupo**.\n\nPara resolverlo, puedes sumar los grupos: 4 + 4 + 4 = **12**. Entonces 3 × 4 = **12**. Hay 12 galletas en total.\n\nEl signo **×** significa \"veces\". Así que 3 × 4 se lee \"3 veces 4\". Buscar grupos iguales te ayuda a multiplicar rápido.",
+        quiz: [
+          { q: "¿Qué significa 3 × 4?", options: ["3 grupos de 4", "3 más 4", "4 menos 3", "3 grupos de 3"], answer: 0 },
+          { q: "Hay 2 cajas con 5 lápices cada una. ¿Cuántos lápices hay?", options: ["7", "25", "10", "12"], answer: 2 },
+          { q: "En 5 × 2, ¿qué nos dice el primer número (5)?", options: ["Cuántos hay en cada grupo", "El total", "Cuántos grupos hay", "Cuánto sobra"], answer: 2 },
+          { q: "¿Cuál suma es igual a 4 × 3?", options: ["4 + 3", "3 + 3 + 3 + 3", "4 + 4", "3 + 4 + 3"], answer: 1 },
+        ], caseContext: "", caseOpening: "" },
+      { title: "Problemas con Multiplicación", outcome: "Puedo resolver problemas de la vida real usando la multiplicación.", hook: "Si cada mesa tiene la misma cantidad de sillas, ¿cómo sabes cuántas sillas hay en total?", minutes: 8, game: "pair",
+        standards: [{ code: "CCSS.MATH.CONTENT.3.OA.A.3", title: "Use multiplication to solve word problems" }],
+        points: ["Busca grupos iguales dentro del problema.", "Multiplica el número de grupos por lo que hay en cada grupo.", "El resultado es el total de todas las cosas juntas."],
+        reading: "Muchos problemas de la vida real usan **grupos iguales**. Cuando veas grupos que tienen la misma cantidad, puedes usar la **multiplicación** para hallar el total.\n\nLee este problema: \"Ana tiene **4 bolsas**. En cada bolsa hay **6 manzanas**. ¿Cuántas manzanas tiene en total?\"\n\nPrimero, busca los grupos iguales. Hay **4 grupos** (las bolsas) y cada uno tiene **6 manzanas**. Entonces escribimos **4 × 6**.\n\nAhora resuélvelo: 6 + 6 + 6 + 6 = **24**. ¡Ana tiene **24 manzanas**!\n\nSigue estos pasos: (1) encuentra cuántos grupos hay, (2) encuentra cuántos hay en cada grupo, y (3) multiplica los dos números. La palabra \"**cada**\" te ayuda a ver que los grupos son iguales. Practicar estos pasos te ayudará a resolver muchos problemas.",
+        quiz: [
+          { q: "Hay 3 mesas con 5 sillas cada una. ¿Cuántas sillas hay?", options: ["8", "15", "35", "10"], answer: 1 },
+          { q: "¿Qué palabra te ayuda a saber que los grupos son iguales?", options: ["menos", "cada", "resta", "mitad"], answer: 1 },
+          { q: "Un problema dice: 5 cajas, 2 pelotas en cada caja. ¿Qué multiplicación usas?", options: ["5 + 2", "5 × 2", "2 − 5", "5 × 5"], answer: 1 },
+          { q: "¿Cuánto es 6 × 3?", options: ["9", "18", "12", "63"], answer: 1 },
+        ], caseContext: "", caseOpening: "" },
+    ],
+  },
+  {
+    title: "Science 4: Energy & Motion", subject: "Science", emoji: "⚡", grade: 4, gradeLabel: "Grade 4",
+    framework: "Next Generation Science Standards — Grade 4 Physical Science",
+    intro: "In this course you will learn about energy and how things move. We will go step by step, with clear examples you can picture.",
+    outcome: "I can explain how the speed of an object relates to its energy and describe how energy transfers.",
+    tags: ["science", "energy", "motion", "grade 4", "ngss"],
+    persona: { email: "aiden.k12@synops-demo.test", firstName: "Aiden", lastName: "Walsh", grade: 4, gradeLabel: "Grade 4", learningStyle: "kinesthetic", accommodations: ["predictable_structure", "chunked_content", "explicit_transitions", "positive_reinforcement", "literal_language", "extended_processing"], progressFraction: 0.4 },
+    modules: [
+      { title: "Speed and Energy of Motion", outcome: "I can explain that a faster object has more energy of motion.", hook: "Which hurts more if it bumps you: a slow rolling ball or a fast rolling ball?", minutes: 8, game: "choice",
+        standards: [{ code: "NGSS.4-PS3-1", title: "Relate the speed of an object to its energy" }],
+        points: ["Energy of motion is the energy a moving object has.", "A faster object has more energy of motion.", "A slower object has less energy of motion."],
+        reading: "**Energy** is the ability to make something happen or move. When an object is moving, it has a special kind of energy called **energy of motion**.\n\nHere is the main rule, step by step:\n\n1. A moving object has energy of motion.\n2. If the object moves **faster**, it has **more** energy of motion.\n3. If the object moves **slower**, it has **less** energy of motion.\n\nThink about a soccer ball. If you tap it gently, it rolls slowly. It has a little energy of motion. If you kick it hard, it rolls fast. Now it has a lot of energy of motion.\n\nWe can see this energy when the ball hits something. A fast ball can knock over many cups. A slow ball might knock over only one. More speed means more energy. Less speed means less energy. This rule is always true for moving objects.",
+        quiz: [
+          { q: "Which object has MORE energy of motion?", options: ["A ball rolling slowly", "A ball rolling fast", "A ball sitting still", "A ball in a box"], answer: 1 },
+          { q: "What is energy of motion?", options: ["The energy a moving object has", "The color of an object", "The size of an object", "The weight of a still object"], answer: 0 },
+          { q: "If a car slows down, its energy of motion...", options: ["gets bigger", "stays exactly the same", "gets smaller", "turns into light"], answer: 2 },
+          { q: "A fast ball knocks over more cups than a slow ball because it has...", options: ["less energy", "no energy", "the same energy", "more energy"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+      { title: "How Energy Moves From Place to Place", outcome: "I can name ways energy transfers, such as sound, light, heat, and collisions.", hook: "How does the heat from a stove get to your hands without touching the stove?", minutes: 8, game: "pair",
+        standards: [{ code: "NGSS.4-PS3-2", title: "Observe energy transferred from place to place" }],
+        points: ["Energy can move from one place to another. This is called a transfer.", "Energy transfers by sound, light, heat, and collisions.", "When objects bump, energy passes from one to the other."],
+        reading: "Energy does not stay in one spot. It can **transfer**, which means it moves from one place to another. There are several clear ways this happens.\n\n**Sound**: When you clap, energy moves through the air as sound. Your ears catch that energy so you can hear it.\n\n**Light**: The Sun sends energy to Earth as light. The light travels all the way through space to reach you.\n\n**Heat**: A warm cup of cocoa gives heat energy to your cold hands. The energy moves from the hot cup to your cooler hands.\n\n**Collisions**: When one marble rolls and bumps another, energy transfers from the first marble to the second. The second marble then starts to move.\n\nSo energy can travel by sound, light, heat, and collisions. In each case, energy leaves one place and arrives at another. Nothing disappears; the energy just moves.",
+        quiz: [
+          { q: "When one marble bumps another and makes it move, this is energy transfer by...", options: ["collision", "light", "sound", "smell"], answer: 0 },
+          { q: "How does energy from the Sun reach Earth?", options: ["By sound", "By touching", "By light", "By wind only"], answer: 2 },
+          { q: "What does the word \"transfer\" mean?", options: ["Energy disappears", "Energy moves from one place to another", "Energy gets colder", "Energy stops"], answer: 1 },
+          { q: "A warm cup warming your cold hands is an example of energy moving as...", options: ["sound", "light", "a collision", "heat"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+    ],
+  },
+  {
+    title: "Civics 6: How Government Works", subject: "Social Studies", emoji: "🏛️", grade: 6, gradeLabel: "Grade 6",
+    framework: "C3 Framework for Social Studies — Civics",
+    intro: "Government shapes daily life, from schools to roads. In this course you will learn how the U.S. government is organized and what it means to be an active citizen.",
+    outcome: "I can describe the three branches of government and explain the rights and responsibilities of citizens.",
+    tags: ["civics", "government", "citizenship", "grade 6", "c3"],
+    persona: { email: "maya.k12@synops-demo.test", firstName: "Maya", lastName: "Chen", grade: 6, gradeLabel: "Grade 6", learningStyle: "reading_writing", accommodations: [], progressFraction: 0.5 },
+    modules: [
+      { title: "The Three Branches of Government", outcome: "I can identify the three branches of government and the job of each one.", hook: "Why does one group get to make laws, another enforce them, and a third decide what they mean?", minutes: 9, game: "choice",
+        standards: [{ code: "C3.D2.CIV.1.6-8", title: "Distinguish the powers and responsibilities of citizens and institutions" }],
+        points: ["The government is split into three branches with different jobs.", "Legislative makes laws, executive enforces them, judicial interprets them.", "Separating power keeps any one branch from becoming too strong."],
+        reading: "The United States government is divided into **three branches**. Each branch has its own job, and together they run the country. This design keeps power balanced.\n\nThe **legislative branch** is Congress. Its job is to **make laws**. Congress is made up of the Senate and the House of Representatives, whose members are elected by citizens.\n\nThe **executive branch** is led by the President. Its job is to **carry out and enforce laws**. The President also leads the military and represents the nation to the world.\n\nThe **judicial branch** is the courts, including the Supreme Court. Its job is to **interpret laws** and decide what they mean when people disagree.\n\nWhy split the work this way? The framers of the Constitution worried that too much power in one place could lead to unfairness. By giving each branch a separate role, they created a system where the branches check one another, protecting people's freedom.",
+        quiz: [
+          { q: "Which branch makes the laws?", options: ["Executive", "Legislative", "Judicial", "Military"], answer: 1 },
+          { q: "What is the main job of the judicial branch?", options: ["To interpret laws and decide what they mean", "To elect the President", "To write new laws", "To collect taxes"], answer: 0 },
+          { q: "The President is the head of which branch?", options: ["Legislative", "Judicial", "Executive", "Congress"], answer: 2 },
+          { q: "Why did the framers split the government into three branches?", options: ["To make voting slower", "To copy other countries exactly", "To give the President all power", "To keep any one branch from becoming too strong"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+      { title: "The Roles of Citizens", outcome: "I can explain the rights and responsibilities citizens have in a democracy.", hook: "What does a democracy ask of you in return for your freedoms?", minutes: 9, game: "pair",
+        standards: [{ code: "C3.D2.CIV.2.6-8", title: "Explain the roles of citizens in a democracy" }],
+        points: ["Citizens have rights, such as free speech and the right to vote.", "Citizens also have responsibilities, like voting and jury duty.", "A democracy works best when citizens take part."],
+        reading: "In a **democracy**, the people hold the power. That power comes with both **rights** and **responsibilities**.\n\n**Rights** are freedoms that the government must protect. Citizens have the right to **free speech**, the right to practice their religion, and the right to **vote** for their leaders. These rights let people share ideas and help choose the direction of the country.\n\n**Responsibilities** are duties that citizens are expected to fulfill. **Voting** in elections is one of the most important. Serving on a **jury** helps make sure trials are fair. Citizens are also expected to obey laws, pay taxes, and stay informed about issues.\n\nRights and responsibilities work together. For example, you have the right to vote, and you also have the responsibility to learn about the candidates before you do. When citizens take these roles seriously, the government reflects the will of the people. A democracy is strongest when its citizens participate.",
+        quiz: [
+          { q: "Which of these is a responsibility of a citizen?", options: ["Serving on a jury", "Ignoring the news", "Refusing to obey any law", "Never voting"], answer: 0 },
+          { q: "Which of these is a right of a citizen?", options: ["Paying taxes", "Free speech", "Jury duty", "Obeying laws"], answer: 1 },
+          { q: "In a democracy, who holds the power?", options: ["Only the President", "Only judges", "The people", "Only Congress"], answer: 2 },
+          { q: "Why is voting called both a right and a responsibility?", options: ["It is only for leaders", "It costs money to do", "It happens once in a lifetime", "Citizens are free to vote and expected to take part"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+    ],
+  },
+  {
+    title: "World History 6: Early Civilizations", subject: "Social Studies", emoji: "🏺", grade: 6, gradeLabel: "Grade 6",
+    framework: "C3 Framework for Social Studies — History",
+    intro: "Long ago, the first cities and civilizations began. In this course you will learn where they started, why, and the amazing things they invented.",
+    outcome: "I can explain why early civilizations began near rivers and name key inventions they created.",
+    tags: ["history", "civilizations", "mesopotamia", "grade 6", "c3"],
+    persona: { email: "leo.k12@synops-demo.test", firstName: "Leo", lastName: "Rivera", grade: 6, gradeLabel: "Grade 6", learningStyle: "auditory", accommodations: ["simplified_language", "chunked_content", "scaffolded_questions", "extended_processing", "concrete_examples", "positive_reinforcement"], progressFraction: 0.35 },
+    modules: [
+      { title: "Why Civilizations Began Near Rivers", outcome: "I can explain why the first civilizations grew up next to rivers.", hook: "Why did people long ago choose to build their first cities right next to rivers?", minutes: 8, game: "choice",
+        standards: [{ code: "C3.D2.HIS.1.6-8", title: "Analyze connections among events and developments in broad historical contexts" }],
+        points: ["Rivers gave people water to drink and to grow food.", "Good farming near rivers meant extra food and bigger towns.", "Mesopotamia and Egypt both grew along great rivers."],
+        reading: "The first **civilizations** were large groups of people who lived together in cities with shared rules. Most of them began near **rivers**. Why?\n\nA river gives people **water**. They can drink it, and they can use it to water crops. Rivers also flood and leave behind rich, dark soil that is great for **farming**.\n\nWhen farming works well, people grow **extra food**. Extra food means not everyone has to farm. Some people can become builders, traders, or leaders. Towns grow into cities.\n\nOne early civilization was **Mesopotamia**, which grew between two rivers called the Tigris and the Euphrates. Another grew in **Egypt** along the **Nile River**. The Nile flooded each year and made the land good for crops.\n\nSo rivers gave water, food, and a way to travel by boat. These gifts helped the first civilizations begin and grow strong.",
+        quiz: [
+          { q: "Why did early civilizations begin near rivers?", options: ["Rivers gave water and good soil for farming", "Rivers were always cold", "Rivers had gold in them", "Rivers were easy to hide in"], answer: 0 },
+          { q: "Mesopotamia grew between which two rivers?", options: ["The Nile and the Amazon", "The Tigris and the Euphrates", "The Mississippi and the Ohio", "The Thames and the Seine"], answer: 1 },
+          { q: "Egypt's civilization grew along which river?", options: ["The Tigris", "The Euphrates", "The Nile", "The Amazon"], answer: 2 },
+          { q: "What happened when farming near rivers gave people extra food?", options: ["Everyone had to keep farming", "People left the cities", "Rivers dried up", "Some people could become builders, traders, or leaders"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+      { title: "Inventions of Early Civilizations", outcome: "I can name important inventions of early civilizations and why they mattered.", hook: "Which everyday things you use today were first invented thousands of years ago?", minutes: 8, game: "pair",
+        standards: [{ code: "C3.D2.HIS.2.6-8", title: "Classify series of historical events and developments as examples of change and/or continuity" }],
+        points: ["Early people invented writing to keep records.", "The wheel helped them move goods and travel.", "Written laws helped keep order in growing cities."],
+        reading: "As cities grew, early civilizations needed new tools and ideas. They created **inventions** that we still use today.\n\nOne big invention was **writing**. In Mesopotamia, people pressed marks into clay to keep track of trades and stories. Writing let people **save information** so it would not be forgotten.\n\nAnother invention was the **wheel**. With wheels, people could build carts to move heavy goods and travel farther. This made trade easier and faster.\n\nEarly civilizations also created **laws**. As more people lived close together, they needed rules to stay fair and safe. One famous set of written laws was the Code of Hammurabi. Written laws meant everyone could know the rules, and leaders could keep order.\n\nWriting, the wheel, and laws were huge steps forward. They helped cities grow, trade, and last a long time. Many modern ideas began with these early inventions.",
+        quiz: [
+          { q: "Why was writing an important invention?", options: ["It let people save information and keep records", "It made rivers flood", "It replaced farming", "It was used only for games"], answer: 0 },
+          { q: "How did the wheel help early civilizations?", options: ["It made writing faster", "It helped move goods and travel", "It grew more crops by itself", "It cooled the cities"], answer: 1 },
+          { q: "Why did growing cities need written laws?", options: ["To make farming harder", "To hide information", "To keep people fair and safe with rules everyone could know", "To stop the use of the wheel"], answer: 2 },
+          { q: "In Mesopotamia, early writing was made by...", options: ["painting on the sky", "carving into gold coins", "singing songs only", "pressing marks into clay"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+    ],
+  },
+  {
+    title: "U.S. History 8: The Constitution", subject: "Social Studies", emoji: "📜", grade: 8, gradeLabel: "Grade 8",
+    framework: "C3 Framework for Social Studies — Civics & History",
+    intro: "The U.S. Constitution is the plan for American government. In this course you will explore why it was written and how it protects people's freedoms.",
+    outcome: "I can explain why the Constitution was written and describe the Bill of Rights and separation of powers.",
+    tags: ["us history", "constitution", "government", "grade 8", "c3"],
+    persona: { email: "jordan.k12@synops-demo.test", firstName: "Jordan", lastName: "Bell", grade: 8, gradeLabel: "Grade 8", learningStyle: "auditory", accommodations: ["extended_processing", "scaffolded_questions", "chunked_content", "concrete_examples"], progressFraction: 0.3 },
+    modules: [
+      { title: "Why the Framers Wrote the Constitution", outcome: "I can explain why the Constitution was created and what separation of powers means.", hook: "What made America's first plan of government fail, and how did the framers fix it?", minutes: 9, game: "choice",
+        standards: [{ code: "C3.D2.CIV.4.6-8", title: "Explain the origins, functions, and structure of the Constitution" }],
+        points: ["The first government under the Articles of Confederation was too weak.", "The Constitution created a stronger national government.", "Separation of powers divides government into three branches."],
+        reading: "After winning independence, the United States needed a plan for government. Its first plan, the **Articles of Confederation**, made the national government very **weak**. It could not collect taxes or keep order well, and the country struggled.\n\nIn 1787, leaders called **framers** met at the Constitutional Convention to fix these problems. They wrote a new plan: the **Constitution**. It created a stronger national government that could tax, defend the country, and settle disputes between states.\n\nBut the framers also feared giving one person or group too much power. Their solution was **separation of powers**. This idea divides the government into three branches: the legislative branch makes laws, the executive branch enforces them, and the judicial branch interprets them.\n\nEach branch can also check the others, a system called checks and balances. By separating power, the framers hoped to protect freedom and prevent any leader from becoming a tyrant. The Constitution remains the foundation of American government today.",
+        quiz: [
+          { q: "What was a major problem with the Articles of Confederation?", options: ["The national government was too weak", "It gave the President total power", "It banned all state governments", "It created too many courts"], answer: 0 },
+          { q: "What does \"separation of powers\" mean?", options: ["One leader holds all power", "Government is divided into three branches with different jobs", "States cannot make any laws", "The military runs the country"], answer: 1 },
+          { q: "Where and when did the framers write the Constitution?", options: ["In 1776 during the Revolution", "In 1812 during a war", "At the Constitutional Convention in 1787", "In 1865 after the Civil War"], answer: 2 },
+          { q: "Why did the framers use checks and balances?", options: ["To make government slower for no reason", "To copy the Articles exactly", "To give Congress all the power", "To keep any one branch from becoming too powerful"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+      { title: "The Bill of Rights", outcome: "I can describe the Bill of Rights and identify key freedoms it protects.", hook: "Why did Americans demand a list of freedoms before they would accept the Constitution?", minutes: 9, game: "pair",
+        standards: [{ code: "C3.D2.CIV.8.6-8", title: "Analyze the purposes of rules and laws (the Bill of Rights)" }],
+        points: ["The Bill of Rights is the first ten amendments to the Constitution.", "It protects freedoms like speech, religion, and the press.", "It limits government power to protect individual rights."],
+        reading: "When the Constitution was first written, many Americans worried it did not clearly protect people's **freedoms**. To win their support, leaders promised to add a list of protected rights. This became the **Bill of Rights**, the first **ten amendments** to the Constitution.\n\nAn **amendment** is an addition or change to the Constitution. The Bill of Rights was ratified in 1791.\n\nThe **First Amendment** is one of the most famous. It protects freedom of **speech**, **religion**, the **press**, and the right to assemble and petition the government. These freedoms let people share ideas and criticize leaders without fear.\n\nOther amendments protect people too. For example, they guarantee fair trials and protect against unfair searches of homes.\n\nThe main purpose of the Bill of Rights is to **limit the power of government**. By listing rights the government cannot take away, it protects individual freedom. These protections still shape American life and law today.",
+        quiz: [
+          { q: "What is the Bill of Rights?", options: ["The first ten amendments to the Constitution", "A list of the Presidents", "The plan for the three branches", "A tax law"], answer: 0 },
+          { q: "Which freedom is protected by the First Amendment?", options: ["The right to own a business only", "Freedom of speech", "The right to skip taxes", "The right to be a judge"], answer: 1 },
+          { q: "What does the word \"amendment\" mean?", options: ["A new state", "A type of court", "An addition or change to the Constitution", "A national election"], answer: 2 },
+          { q: "What is the main purpose of the Bill of Rights?", options: ["To make the President stronger", "To create new taxes", "To add more states", "To limit government power and protect individual rights"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+    ],
+  },
+  {
+    title: "U.S. Government (Grade 11): Foundations of Democracy", subject: "Social Studies", emoji: "⚖️", grade: 11, gradeLabel: "Grade 11",
+    framework: "C3 Framework for Social Studies — Civics (High School)",
+    intro: "American democracy rests on how power is divided and how citizens shape policy. In this course you will analyze the constitutional structure and the lawmaking process.",
+    outcome: "I can explain how the Constitution distributes and limits power and evaluate how citizens influence policy.",
+    tags: ["government", "democracy", "federalism", "grade 11", "c3"],
+    persona: { email: "emma.k12@synops-demo.test", firstName: "Emma", lastName: "Novak", grade: 11, gradeLabel: "Grade 11", learningStyle: "visual", accommodations: ["concrete_examples", "extended_processing", "scaffolded_questions", "chunked_content"], progressFraction: 0.45 },
+    modules: [
+      { title: "Separation of Powers, Checks and Balances, and Federalism", outcome: "I can explain how the Constitution distributes and constrains political power.", hook: "How does a written document stop any single person or level of government from seizing total control?", minutes: 10, game: "choice",
+        standards: [{ code: "C3.D2.CIV.4.9-12", title: "Explain how constitutions distribute and constrain political power" }],
+        points: ["Separation of powers divides government into three branches.", "Checks and balances let each branch limit the others.", "Federalism divides power between national and state governments."],
+        reading: "The U.S. Constitution limits power through three connected principles that work together to protect liberty.\n\nFirst is **separation of powers**. Governing authority is divided among three branches: the **legislative** branch makes laws, the **executive** branch enforces them, and the **judicial** branch interprets them. No single branch holds all authority.\n\nSecond is **checks and balances**. Each branch can restrain the others. For example, Congress passes a bill, but the President can **veto** it; Congress can then override the veto with a two-thirds vote. Courts can rule laws unconstitutional. These overlapping powers force branches to cooperate.\n\nThird is **federalism**, which divides power between the **national government** and the **states**. Some powers, like coining money, belong to the national government. Others, like running schools, belong mostly to states. Some are shared.\n\nTogether, these principles spread power across branches and levels of government. This design makes it difficult for any person or group to gain unchecked control, safeguarding democratic government.",
+        quiz: [
+          { q: "What does federalism divide power between?", options: ["The national government and the states", "The Senate and the House only", "Two political parties", "The President and the Vice President"], answer: 0 },
+          { q: "Which is an example of checks and balances?", options: ["States running their own schools", "The President vetoing a bill from Congress", "Citizens voting in an election", "A city passing a parking rule"], answer: 1 },
+          { q: "Under separation of powers, which branch interprets laws?", options: ["Legislative", "Executive", "Judicial", "Federal"], answer: 2 },
+          { q: "Why do these three principles work together?", options: ["To give Congress unlimited power", "To eliminate state governments", "To speed up all decisions", "To keep any person or group from gaining unchecked control"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+      { title: "How a Bill Becomes a Law and How Citizens Influence Policy", outcome: "I can trace how a bill becomes a law and evaluate how citizens influence policy.", hook: "Between an idea and an official law, how many hurdles must an idea clear, and where can citizens push?", minutes: 10, game: "pair",
+        standards: [{ code: "C3.D2.CIV.8.9-12", title: "Evaluate social and political systems, citing evidence" }],
+        points: ["A bill must pass both houses of Congress and be signed by the President.", "Committees, debate, and votes shape a bill along the way.", "Citizens influence policy through voting, advocacy, and public opinion."],
+        reading: "Turning an idea into a **law** follows a clear process, and citizens can shape it at many points.\n\nFirst, a member of Congress introduces a **bill**. It goes to a **committee**, where lawmakers study, debate, and revise it. Many bills stop here. If the committee approves it, the full chamber debates and votes. To advance, a bill must pass **both** the House and the Senate, usually in matching form.\n\nNext, the bill goes to the **President**, who can **sign** it into law or **veto** it. Congress can override a veto with a two-thirds vote in both chambers.\n\nCitizens influence this process in several ways. They **vote** for representatives who share their views. They contact lawmakers, sign petitions, join interest groups, and shape **public opinion** through protests and media. Evidence shows that sustained public pressure can move lawmakers to act or to block a bill.\n\nBy understanding the steps and the pressure points, citizens can evaluate where their voices matter most and participate effectively in shaping policy.",
+        quiz: [
+          { q: "For a bill to advance to the President, it must first...", options: ["Pass both the House and the Senate", "Be approved by the Supreme Court", "Win a national election", "Be signed by a state governor"], answer: 0 },
+          { q: "What can Congress do if the President vetoes a bill?", options: ["Nothing; the bill is dead forever", "Override the veto with a two-thirds vote in both chambers", "Send it to the Supreme Court to sign", "Automatically make it law"], answer: 1 },
+          { q: "Where are bills often studied, debated, and revised early in the process?", options: ["The White House", "The Supreme Court", "A committee", "A voting booth"], answer: 2 },
+          { q: "Which is a way citizens influence policy, supported by evidence?", options: ["Ignoring elections", "Never contacting lawmakers", "Refusing to join any group", "Voting, contacting lawmakers, and shaping public opinion"], answer: 3 },
+        ], caseContext: "", caseOpening: "" },
+    ],
+  },
+];
+
+// Every course processed by the seed = each learner's primary subject + their second subject.
+const ALL_COURSES: K12Course[] = [...COURSES, ...SECOND_COURSES];
+
 // ── Interactive game engine (sandboxed HTML). DIFFERENT games so lessons don't repeat.
 //    Picture games (young readers): find (tap the picture) · match (picture↔word pairs) · memory (flip cards) · puzzle (spell).
 //    Text games (older readers): choice (multiple choice) · pair (word↔meaning, no pictures) · sort (drag cards into two groups). ──
@@ -546,9 +764,12 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   const facultyId = await upsertUser({ email: "faculty.k12@synops-demo.test", firstName: "Ms.", lastName: "Ramírez", role: "instructional_designer", partnerId: partner.id, organisationId: org.id });
 
   // 3. Courses (idempotent by title) + assign to partner + register on class.
+  // Each persona now has TWO courses (two subjects), so map persona → LIST of course ids, and also
+  // keep a title → id map for the per-course refresh / game / math-coach steps below.
   let standardsCount = 0;
-  const courseByPersona: Record<string, string> = {};
-  for (const c of COURSES) {
+  const coursesByPersona: Record<string, string[]> = {};
+  const courseIdByTitle: Record<string, string> = {};
+  for (const c of ALL_COURSES) {
     let existing = firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
     // Self-heal a PARTIAL course. A prior seed can abort mid-build (e.g. an insert error on one
     // module), leaving a course with fewer modules than it should have — which idempotent reuse
@@ -574,7 +795,8 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
       }
     }
     const courseId = existing ? existing.id : await createK12Course(c, org.id, facultyId);
-    courseByPersona[c.persona.email] = courseId;
+    (coursesByPersona[c.persona.email] ??= []).push(courseId);
+    courseIdByTitle[c.title] = courseId;
     standardsCount += c.modules.reduce((n, m) => n + m.standards.length, 0);
     // Idempotently ensure the grade tag on pre-existing courses.
     if (existing && !(existing.competencyTags ?? []).some((t) => /^\s*grade\s+\d+/i.test(t))) {
@@ -588,7 +810,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
 
   // 3b. K-12 has NO AI tutor / case studies. Courses reused from an earlier seed still carry the
   // old "Tutor:" cases on their modules, so delete every case scenario on these courses' modules.
-  const k12CourseIds = Object.values(courseByPersona);
+  const k12CourseIds = Object.values(courseIdByTitle);
   if (k12CourseIds.length) {
     const k12Mods = await db.select({ id: modulesTable.id }).from(modulesTable).where(inArray(modulesTable.courseId, k12CourseIds));
     const k12ModIds = k12Mods.map((m) => m.id);
@@ -597,8 +819,8 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
 
   // 3c. Refresh the quiz HTML AND the reading content + objectives on REUSED courses so content
   // edits actually propagate — existing courses are reused, not recreated, on reseed.
-  for (const c of COURSES) {
-    const cid = courseByPersona[c.persona.email];
+  for (const c of ALL_COURSES) {
+    const cid = courseIdByTitle[c.title];
     if (!cid) continue;
     const cmods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, cid)).orderBy(asc(modulesTable.order));
     for (let i = 0; i < cmods.length && i < c.modules.length; i++) {
@@ -633,8 +855,8 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   // bonus game must never displace the guided quiz. Idempotent: refreshed in place by title.
   // Each game's content is written to REVIEW that specific course — not generic trivia — so the game is
   // clearly relevant to the lesson it sits in.
-  const gamePlan: { email: string; key: string; band: Band; instructions: string; content: Record<string, unknown> }[] = [
-    { email: "maya.k12@synops-demo.test", key: "jeopardy", band: "68",
+  const gamePlan: { email: string; courseTitle: string; key: string; band: Band; instructions: string; content: Record<string, unknown> }[] = [
+    { email: "maya.k12@synops-demo.test", courseTitle: "Math 6: Ratios & Rates", key: "jeopardy", band: "68",
       instructions: "Pick a value, read the clue, work it out as a team, then reveal and score. All about ratios and rates!",
       content: { title: "Ratios & Rates Jeopardy", categories: [
         { name: "Ratios", clues: [
@@ -650,20 +872,20 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
           { value: 200, clue: "3 pens cost $1.50. How much for 5 pens?", answer: "$2.50" },
           { value: 300, clue: "Map scale 1 inch = 20 miles. How far is 3.5 inches?", answer: "70 miles" } ] },
       ] } },
-    { email: "leo.k12@synops-demo.test", key: "feud", band: "68",
+    { email: "leo.k12@synops-demo.test", courseTitle: "Science 6: Ecosystems", key: "feud", band: "68",
       instructions: "Read the survey question about ecosystems. Tap the answers you think are most popular — three misses ends the round.",
       content: { title: "Ecosystems Survey Feud", rounds: [
         { question: "Name a living or non-living part of an ecosystem.", answers: [{ text: "Plants", points: 32 }, { text: "Animals", points: 28 }, { text: "Water", points: 22 }, { text: "Sunlight", points: 18 }], distractors: ["Cars", "Buildings"] },
         { question: "Name a role an organism can play in a food chain.", answers: [{ text: "Producer", points: 38 }, { text: "Consumer", points: 34 }, { text: "Decomposer", points: 28 }], distractors: ["Spectator", "Referee"] },
       ] } },
-    { email: "jordan.k12@synops-demo.test", key: "escape", band: "68",
+    { email: "jordan.k12@synops-demo.test", courseTitle: "Writing & Argument (Grade 8)", key: "escape", band: "68",
       instructions: "You're drafting an argument essay. Unlock each step in order to finish it. Use a hint only if you're stuck.",
       content: { title: "Argument Writing Escape Room", intro: "Build a strong argument, one lock at a time, to finish your essay!", stages: [
         { prompt: "What do we call the position you are arguing for? (one word)", answer: "claim", hint: "It states plainly what you believe." },
         { prompt: "Which sentence is the STRONGEST evidence?", answer: "Studies show later start times raise attendance and grades.", choices: ["School is important.", "Studies show later start times raise attendance and grades.", "I think it's just better.", "Everyone already agrees."], hint: "Evidence is specific and factual, not an opinion." },
         { prompt: "What do we call fairly naming the other side's view and answering it? (one word)", answer: "counterargument", hint: "You bring up the objection yourself, then respond." },
       ] } },
-    { email: "emma.k12@synops-demo.test", key: "jeopardy", band: "912",
+    { email: "emma.k12@synops-demo.test", courseTitle: "Algebra I (Grade 11 support)", key: "jeopardy", band: "912",
       instructions: "Choose a value, solve as a team, then reveal and score. Straight from your Algebra I lessons.",
       content: { title: "Algebra I Jeopardy", categories: [
         { name: "Solving", clues: [
@@ -679,9 +901,55 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
           { value: 200, clue: "If f(x) = 2x + 1, find f(3)", answer: "7" },
           { value: 300, clue: "Is y = 3x + 1 linear or nonlinear?", answer: "Linear" } ] },
       ] } },
+    // Second-subject games (gamification for each learner's other class).
+    { email: "maya.k12@synops-demo.test", courseTitle: "Civics 6: How Government Works", key: "jeopardy", band: "68",
+      instructions: "Pick a value, read the clue about U.S. government, answer as a team, then reveal and score.",
+      content: { title: "How Government Works Jeopardy", categories: [
+        { name: "Branches", clues: [
+          { value: 100, clue: "This branch makes the laws", answer: "Legislative" },
+          { value: 200, clue: "This branch carries out and enforces the laws", answer: "Executive" },
+          { value: 300, clue: "This branch interprets laws and decides what they mean", answer: "Judicial" } ] },
+        { name: "Who Does It", clues: [
+          { value: 100, clue: "Congress is made up of the House and the…", answer: "Senate" },
+          { value: 200, clue: "This person leads the executive branch", answer: "The President" },
+          { value: 300, clue: "The highest court in the judicial branch", answer: "The Supreme Court" } ] },
+        { name: "Citizens", clues: [
+          { value: 100, clue: "A key right that lets you choose your leaders", answer: "The right to vote" },
+          { value: 200, clue: "Serving on this helps make trials fair", answer: "A jury" },
+          { value: 300, clue: "Splitting power so no branch gets too strong is called…", answer: "Separation of powers" } ] },
+      ] } },
+    { email: "leo.k12@synops-demo.test", courseTitle: "World History 6: Early Civilizations", key: "feud", band: "68",
+      instructions: "Read the survey question about early civilizations. Tap the answers you think are most popular — three misses ends the round.",
+      content: { title: "Early Civilizations Survey Feud", rounds: [
+        { question: "Name something a river gave to early people.", answers: [{ text: "Water", points: 40 }, { text: "Food/farming", points: 30 }, { text: "Travel by boat", points: 18 }, { text: "Rich soil", points: 12 }], distractors: ["Gold", "Ice"] },
+        { question: "Name an invention of early civilizations.", answers: [{ text: "Writing", points: 38 }, { text: "The wheel", points: 34 }, { text: "Written laws", points: 28 }], distractors: ["The internet", "Cars"] },
+      ] } },
+    { email: "jordan.k12@synops-demo.test", courseTitle: "U.S. History 8: The Constitution", key: "escape", band: "68",
+      instructions: "You're unlocking the story of the Constitution. Solve each step in order. Use a hint only if you're stuck.",
+      content: { title: "The Constitution Escape Room", intro: "Unlock the key ideas of the Constitution, one lock at a time!", stages: [
+        { prompt: "The first plan of government that was too weak was the Articles of…", answer: "confederation", hint: "It comes before the Constitution and starts with C." },
+        { prompt: "Which idea divides government into three branches?", answer: "Separation of powers", choices: ["Separation of powers", "Freedom of speech", "The Bill of Rights", "Federal taxes"], hint: "Each branch gets a separate job." },
+        { prompt: "The first ten amendments are called the Bill of…", answer: "rights", hint: "It protects freedoms like speech and religion." },
+      ] } },
+    { email: "emma.k12@synops-demo.test", courseTitle: "U.S. Government (Grade 11): Foundations of Democracy", key: "jeopardy", band: "912",
+      instructions: "Choose a value, answer as a team, then reveal and score. Straight from your U.S. Government lessons.",
+      content: { title: "Foundations of Democracy Jeopardy", categories: [
+        { name: "Power", clues: [
+          { value: 100, clue: "Dividing power among three branches is called…", answer: "Separation of powers" },
+          { value: 200, clue: "Dividing power between the nation and the states is called…", answer: "Federalism" },
+          { value: 300, clue: "The system that lets each branch limit the others", answer: "Checks and balances" } ] },
+        { name: "Lawmaking", clues: [
+          { value: 100, clue: "A proposed law is called a…", answer: "Bill" },
+          { value: 200, clue: "To advance, a bill must pass both the House and the…", answer: "Senate" },
+          { value: 300, clue: "The President rejecting a bill is called a…", answer: "Veto" } ] },
+        { name: "Citizens", clues: [
+          { value: 100, clue: "The most common way citizens choose representatives", answer: "Voting" },
+          { value: 200, clue: "Congress can override a veto with this fraction vote", answer: "Two-thirds" },
+          { value: 300, clue: "Groups that organize to influence policy are called interest…", answer: "Groups" } ] },
+      ] } },
   ];
   for (const g of gamePlan) {
-    const cid = courseByPersona[g.email];
+    const cid = courseIdByTitle[g.courseTitle];
     if (!cid) continue;
     const tpl = GAME_TEMPLATES.find((t) => t.key === g.key);
     if (!tpl) continue;
@@ -711,7 +979,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   // 3e. A coach-assisted "Math Coach" activity for the Grade-6 math class: interactive problems with a
   // draggable number line and a Socratic coach that hints (never gives the answer). Its own surface at
   // /math-coach/:id, so it is stored as kind "math-coach" with the problems as JSON.
-  const mcCourseId = courseByPersona["maya.k12@synops-demo.test"];
+  const mcCourseId = courseIdByTitle["Math 6: Ratios & Rates"];
   if (mcCourseId) {
     const [mcMod] = await db.select().from(modulesTable).where(eq(modulesTable.courseId, mcCourseId)).orderBy(asc(modulesTable.order)).limit(1);
     if (mcMod) {
@@ -741,7 +1009,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
 
   // 3f. A balance-scale Math Coach for the Grade-11 Algebra class: solve linear equations by keeping
   // the scale balanced (do the same to both sides), with Socratic coaching.
-  const algCourseId = courseByPersona["emma.k12@synops-demo.test"];
+  const algCourseId = courseIdByTitle["Algebra I (Grade 11 support)"];
   if (algCourseId) {
     const [algMod] = await db.select().from(modulesTable).where(eq(modulesTable.courseId, algCourseId)).orderBy(asc(modulesTable.order)).limit(1);
     if (algMod) {
@@ -774,32 +1042,57 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   const existingStaff = (await db.select().from(orgClassStaffTable).where(eq(orgClassStaffTable.classId, cls.id))).map((s) => s.staffId);
   if (!existingStaff.includes(adminId)) await db.insert(orgClassStaffTable).values({ classId: cls.id, staffId: adminId, role: "administrator" as const });
 
-  // 5. Personas: each enrolled ONLY in their course; reconcile away any stale enrolments.
-  const planEmails = COURSES.map((c) => c.persona.email);
-  for (const c of COURSES) {
-    const p = c.persona;
-    const learnerId = await upsertUser({ email: p.email, firstName: p.firstName, lastName: p.lastName, role: "learner", partnerId: partner.id, organisationId: org.id, learningStyle: p.learningStyle, accommodations: p.accommodations });
-    const myCourseId = courseByPersona[p.email];
+  // 5. Personas: each enrolled in BOTH of their courses (two subjects). Persona-level pass first
+  //    (user, roster, reconcile enrolments to exactly this learner's course set), then a course-level
+  //    pass for per-course progress, badges, and demo submissions.
+  const uniqueEmails = [...new Set(ALL_COURSES.map((c) => c.persona.email))];
+  const planEmails = uniqueEmails;
+  const learnerIdByEmail: Record<string, string> = {};
 
-    // Reconcile: remove enrolments/progress for any course NOT in this learner's plan (clean re-seed).
+  // 5a. Persona-level.
+  for (const email of uniqueEmails) {
+    const p = (ALL_COURSES.find((c) => c.persona.email === email) as K12Course).persona;
+    const learnerId = await upsertUser({ email: p.email, firstName: p.firstName, lastName: p.lastName, role: "learner", partnerId: partner.id, organisationId: org.id, learningStyle: p.learningStyle, accommodations: p.accommodations });
+    learnerIdByEmail[email] = learnerId;
+    const myCourseIds = coursesByPersona[email] ?? [];
+
+    // Reconcile: remove enrolments/progress for any course NOT in this learner's two-subject set.
     const enrolled = await db.select().from(enrolmentsTable).where(eq(enrolmentsTable.userId, learnerId));
-    const staleCourseIds = enrolled.map((e) => e.courseId).filter((id) => id !== myCourseId);
+    const staleCourseIds = enrolled.map((e) => e.courseId).filter((id) => !myCourseIds.includes(id));
     if (staleCourseIds.length) {
       await db.delete(enrolmentsTable).where(and(eq(enrolmentsTable.userId, learnerId), inArray(enrolmentsTable.courseId, staleCourseIds)));
       await db.delete(beatProgressTable).where(and(eq(beatProgressTable.userId, learnerId), inArray(beatProgressTable.courseId, staleCourseIds)));
       await db.delete(credentialsTable).where(eq(credentialsTable.userId, learnerId)); // clears badges from old courses
     }
-
-    // Enrol in their own course.
-    const already = enrolled.some((e) => e.courseId === myCourseId);
-    if (!already) await db.insert(enrolmentsTable).values({ userId: learnerId, courseId: myCourseId, status: "active" as const, enrolledAt: daysAgo(20) });
-
+    // Enrol in each of their courses.
+    const enrolledIds = new Set(enrolled.map((e) => e.courseId));
+    for (const cid of myCourseIds) {
+      if (!enrolledIds.has(cid)) await db.insert(enrolmentsTable).values({ userId: learnerId, courseId: cid, status: "active" as const, enrolledAt: daysAgo(20) });
+    }
     // Add the learner to the class roster so the Class Insights dashboard sees them.
     const inClass = await db.select().from(orgClassLearnersTable).where(and(eq(orgClassLearnersTable.classId, cls.id), eq(orgClassLearnersTable.learnerId, learnerId)));
     if (!inClass.length) await db.insert(orgClassLearnersTable).values({ classId: cls.id, learnerId });
+  }
 
-    // Pre-fill progress up to their fraction.
-    const mods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, myCourseId)).orderBy(asc(modulesTable.order));
+  // 5b. Course-level: pre-fill progress (each course to its own fraction), Maya's badge, and demo
+  //     submissions for EVERY learner across BOTH subjects (quizzes + games + Math Coach) so each
+  //     subject shows real assessed mastery on the accreditation/commendations report.
+  const subPlan: Record<string, { score: number; days: number }> = {
+    "mateo.k12@synops-demo.test": { score: 80, days: 4 },
+    "sofia.k12@synops-demo.test": { score: 78, days: 5 },
+    "aiden.k12@synops-demo.test": { score: 88, days: 2 },
+    "maya.k12@synops-demo.test": { score: 92, days: 1 },
+    "leo.k12@synops-demo.test": { score: 68, days: 3 },
+    "jordan.k12@synops-demo.test": { score: 54, days: 9 },
+    "emma.k12@synops-demo.test": { score: 85, days: 2 },
+  };
+  for (const c of ALL_COURSES) {
+    const p = c.persona;
+    const learnerId = learnerIdByEmail[p.email];
+    const cid = courseIdByTitle[c.title];
+    if (!learnerId || !cid) continue;
+
+    const mods = await db.select().from(modulesTable).where(eq(modulesTable.courseId, cid)).orderBy(asc(modulesTable.order));
     const beats: { beatId: string; moduleId: string }[] = [];
     for (const m of mods) {
       const bs = await db.select().from(beatsTable).where(eq(beatsTable.moduleId, m.id)).orderBy(asc(beatsTable.createdAt));
@@ -807,27 +1100,19 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     }
     const viewCount = Math.round(beats.length * p.progressFraction);
     if (viewCount > 0) {
-      const rows = beats.slice(0, viewCount).map((b, idx) => ({ userId: learnerId, beatId: b.beatId, moduleId: b.moduleId, courseId: myCourseId, secondsSpent: 40 + (idx % 4) * 15, firstViewedAt: daysAgo(14), lastViewedAt: daysAgo(2) }));
+      const rows = beats.slice(0, viewCount).map((b, idx) => ({ userId: learnerId, beatId: b.beatId, moduleId: b.moduleId, courseId: cid, secondsSpent: 40 + (idx % 4) * 15, firstViewedAt: daysAgo(14), lastViewedAt: daysAgo(2) }));
       try { await db.insert(beatProgressTable).values(rows).onConflictDoNothing(); } catch { /* cosmetic */ }
     }
-    // Maya (on-track) earns a badge for her first module.
-    if (p.email === "maya.k12@synops-demo.test" && mods[0]) {
+    // Maya (on-track) earns a badge for her first Math module.
+    if (c.title === "Math 6: Ratios & Rates" && mods[0]) {
       const has = await db.select().from(credentialsTable).where(and(eq(credentialsTable.userId, learnerId), eq(credentialsTable.moduleId, mods[0].id)));
       if (has.length === 0) await db.insert(credentialsTable).values({ userId: learnerId, moduleId: mods[0].id, moduleTitle: mods[0].title, partnerId: partner.id, partnerName: "Synops Academy", status: "valid", masteryScore: "0.9100", evidenceSummary: "Completed the lesson and passed the check.", decayDate: daysFromNow(365) });
     }
 
-    // Demo: pre-populate a few game / Math-Coach submissions for the older learners so the Class
-    // Insights dashboard shows real scores and a spread of on-track / at-risk / off-track out of the box.
-    const subPlan: Record<string, { score: number; days: number }> = {
-      "maya.k12@synops-demo.test": { score: 92, days: 1 },
-      "leo.k12@synops-demo.test": { score: 68, days: 3 },
-      "jordan.k12@synops-demo.test": { score: 54, days: 9 },
-      "emma.k12@synops-demo.test": { score: 85, days: 2 },
-    };
     const sp = subPlan[p.email];
     if (sp) {
       const gacts = await db.select({ id: interactiveActivitiesTable.id, kind: interactiveActivitiesTable.kind }).from(interactiveActivitiesTable)
-        .where(and(eq(interactiveActivitiesTable.courseId, myCourseId), inArray(interactiveActivitiesTable.kind, ["game", "math-coach"])));
+        .where(and(eq(interactiveActivitiesTable.courseId, cid), inArray(interactiveActivitiesTable.kind, ["quiz", "game", "math-coach"])));
       for (const a of gacts) {
         await db.delete(activitySubmissionsTable).where(and(eq(activitySubmissionsTable.userId, learnerId), eq(activitySubmissionsTable.activityId, a.id)));
         const score = a.kind === "math-coach" ? Math.max(40, sp.score - 8) : sp.score;
@@ -837,7 +1122,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   }
 
   return {
-    ok: true, partnerId: partner.id, courses: COURSES.length, learners: planEmails.length, standards: standardsCount,
-    message: `Synops Academy K-12 ready: ${COURSES.length} courses (grades 3-11), ${standardsCount} standards, ${planEmails.length} learner personas. Password ${DEMO_PASSWORD}.`,
+    ok: true, partnerId: partner.id, courses: ALL_COURSES.length, learners: planEmails.length, standards: standardsCount,
+    message: `Synops Academy K-12 ready: ${ALL_COURSES.length} courses (2 subjects × ${planEmails.length} learners), ${standardsCount} standards. Password ${DEMO_PASSWORD}.`,
   };
 }

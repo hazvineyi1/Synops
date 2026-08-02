@@ -59,6 +59,7 @@ import translationsRouter from "./translations";
 import partnerLandingRouter from "./partnerLanding";
 import documentTemplatesRouter from "./documentTemplates";
 import kidCutoutRouter from "./kidCutout";
+import k12PublicRouter from "./k12Public";
 import liveGamesRouter from "./liveGames";
 import gameStudioRouter from "./gameStudio";
 import mathCoachRouter from "./mathCoach";
@@ -67,6 +68,7 @@ import devRouter, { devRoutesEnabled } from "./dev";
 const router = Router();
 
 router.use(kidCutoutRouter);
+router.use(k12PublicRouter);
 router.use(liveGamesRouter);
 router.use(gameStudioRouter);
 router.use(mathCoachRouter);
