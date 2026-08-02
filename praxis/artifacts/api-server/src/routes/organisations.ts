@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { organisationsTable, usersTable } from "@workspace/db";
-import { eq, and, count, sql, desc } from "drizzle-orm";
+import { orgClassesTable, orgClassLearnersTable, orgClassCoursesTable, orgClassStaffTable } from "@workspace/db";
+import { eq, and, count, sql, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canAdministerOrg, canAccessOrg, canAssignRole, assignableRoles } from "../lib/roles";
 import { logAudit } from "../lib/audit";
@@ -100,6 +101,38 @@ router.patch("/organisations/:orgId", requireAuth, async (req, res) => {
     .where(eq(organisationsTable.id, req.params.orgId))
     .returning();
   res.json(toOrgResponse(updated));
+});
+
+// DELETE /organisations/:orgId — remove an EMPTY org (super admin only).
+// Guarded: refuses unless the org has zero members and none of its classes have learners, so a
+// populated tenant can never be deleted by mistake. Cascades only the org's own class scaffolding.
+router.delete("/organisations/:orgId", requireAuth, async (req, res) => {
+  const actor = req.dbUser!;
+  if (actor.role !== "super_admin") { res.status(403).json({ error: "Forbidden" }); return; }
+  const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, req.params.orgId) });
+  if (!org) { res.status(404).json({ error: "Not found" }); return; }
+
+  const memberCount = await orgMemberCount(org.id);
+  const classes = await db.select({ id: orgClassesTable.id }).from(orgClassesTable).where(eq(orgClassesTable.orgId, org.id));
+  const classIds = classes.map((c) => c.id);
+  const learnerRows = classIds.length
+    ? await db.select({ n: count() }).from(orgClassLearnersTable).where(inArray(orgClassLearnersTable.classId, classIds))
+    : [{ n: 0 }];
+  const learnerCount = Number(learnerRows[0]?.n ?? 0);
+  if (memberCount > 0 || learnerCount > 0) {
+    res.status(409).json({ error: "Organisation is not empty", memberCount, learnerCount });
+    return;
+  }
+
+  if (classIds.length) {
+    await db.delete(orgClassStaffTable).where(inArray(orgClassStaffTable.classId, classIds));
+    await db.delete(orgClassCoursesTable).where(inArray(orgClassCoursesTable.classId, classIds));
+    await db.delete(orgClassLearnersTable).where(inArray(orgClassLearnersTable.classId, classIds));
+    await db.delete(orgClassesTable).where(eq(orgClassesTable.orgId, org.id));
+  }
+  await db.delete(organisationsTable).where(eq(organisationsTable.id, org.id));
+  await logAudit(req, "organisation.delete", "organisation", org.id, { name: org.name, classesRemoved: classIds.length });
+  res.status(204).send();
 });
 
 // GET /organisations/:orgId/members
