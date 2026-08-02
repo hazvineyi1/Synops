@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { resolveVideo, VIDEO_PROVIDERS_HINT } from '@/lib/videoEmbed';
-import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 
 /** Render any provider's clip (YouTube, Khan, Vimeo, TikTok, Loom, Drive, file) inline — never a link out. */
 function VideoFrame({ url }: { url?: string | null }) {
@@ -454,7 +453,7 @@ function VideoBeat({ beat }: { beat: Beat }) {
     <div className="px-8 py-12 max-w-3xl mx-auto">
       <p className="text-muted-foreground mb-6 leading-relaxed">{toBeatText(beat.narration)}</p>
       {beat.videoUrl ? (
-        <InteractiveVideoPlayer beatId={beat.id} videoUrl={beat.videoUrl} />
+        <VideoFrame url={beat.videoUrl} />
       ) : slides && slides.length > 0 ? (
         <SlideLesson slides={slides} />
       ) : (
@@ -2498,7 +2497,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
         {step?.id === 'watch' && (
           <div className="rounded-3xl bg-white p-4 sm:p-6 shadow-sm">
             <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>🎬 {T('Watch the video, then tap Next!', '¡Mira el video y luego toca Siguiente!')}</p>
-            {videoBeat && <InteractiveVideoPlayer beatId={videoBeat.id as string} videoUrl={videoBeat.videoUrl as string} />}
+            {videoBeat && <VideoFrame url={videoBeat.videoUrl as string} />}
           </div>
         )}
         {step?.id === 'read' && (
@@ -3175,7 +3174,7 @@ function ModuleHubView({
                         : ' The lesson notes below cover the same material if you prefer to read.'}
                     </Instruction>
                     {b.videoUrl ? (
-                      <InteractiveVideoPlayer beatId={b.id} videoUrl={b.videoUrl} onComplete={() => markHubBeatViewed.mutate(b.id)} />
+                      <div onMouseEnter={() => markHubBeatViewed.mutate(b.id)}><VideoFrame url={b.videoUrl} /></div>
                     ) : (b.visualData?.slides && b.visualData.slides.length > 0) ? (
                       <SlideLesson slides={b.visualData.slides} onReachedEnd={() => markHubBeatViewed.mutate(b.id)} />
                     ) : (
