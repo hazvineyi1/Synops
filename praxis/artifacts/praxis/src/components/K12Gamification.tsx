@@ -18,7 +18,7 @@ interface CourseProg { courseId: string; title: string; percent: number; viewedB
 interface ProgressMe { courses: CourseProg[]; streak?: number }
 interface Credential { moduleTitle: string; masteryScore: string }
 
-export function K12Gamification() {
+export function K12Gamification({ compact = false }: { compact?: boolean } = {}) {
   const { user } = useSession();
   const persona = personaByEmail(user?.email);
   const { data: prog } = useQuery({ queryKey: ["progress", "me"], queryFn: () => apiFetch<ProgressMe>("/progress/me") });
@@ -51,6 +51,29 @@ export function K12Gamification() {
     { label: "All done!", icon: Star },
   ];
   const stepsDone = Math.min(schedule.length, Math.max(0, Math.round((pct / 100) * schedule.length)));
+
+  // Compact: a single slim status bar for the dashboard — level, XP, streak, badges + a thin
+  // progress bar. No quest dots or schedule (those live in the full view), so it never dwarfs the lessons.
+  if (compact) {
+    return (
+      <Card className="p-3.5 h-full" style={{ borderColor: `${accent}44`, background: `${accent}0A` }}>
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-white" style={{ background: accent }}>
+            <Trophy className="h-4 w-4" />
+          </div>
+          <p className="font-semibold text-sm leading-tight">{L("Level", "Nivel")} {level} · {xp.toLocaleString()} XP</p>
+          <div className="ml-auto flex items-center gap-2.5 text-xs">
+            <span className="inline-flex items-center gap-1 font-medium" style={{ color: accent }}><Star className="h-3.5 w-3.5" /> {badges}</span>
+            <span className="inline-flex items-center gap-1 font-medium text-amber-600"><Zap className="h-3.5 w-3.5" /> {streak}</span>
+          </div>
+        </div>
+        <div className="mt-2 h-2 w-full rounded-full bg-black/5 overflow-hidden">
+          <div className="h-full rounded-full transition-all" style={{ width: `${intoLevel}%`, background: accent }} />
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted-foreground">{L(`${100 - intoLevel} XP to Level ${level + 1}`, `${100 - intoLevel} XP para el Nivel ${level + 1}`)}</p>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">

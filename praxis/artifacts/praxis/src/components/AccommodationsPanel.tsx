@@ -47,7 +47,7 @@ function ensureEasyCss() {
   document.head.appendChild(s);
 }
 
-export function AccommodationsPanel() {
+export function AccommodationsPanel({ compact = false }: { compact?: boolean } = {}) {
   const { user } = useSession();
   const { data: profile } = useCoachProfile();
   const accommodations = profile?.accommodations ?? [];
@@ -86,6 +86,46 @@ export function AccommodationsPanel() {
   const hasExtraTime = accommodations.includes("extended_processing");
   const isDysgraphia = persona?.challenge === "Dysgraphia";
   const accent = persona?.accent ?? "#4F46E5";
+
+  // Compact: a slim supports summary for the dashboard — title, a single tidy row of chips, and the
+  // two operable controls. No long tutor paragraph, so it stays smaller than the lesson cards.
+  if (compact) {
+    return (
+      <Card className="p-3.5 h-full" style={{ borderColor: `${accent}44`, background: `${accent}0D` }}>
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-white" style={{ background: accent }}>
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <p className="font-semibold text-sm leading-tight">
+            {persona ? L(`How ${persona.first} learns`, `Los apoyos de ${persona.first}`) : L("Your learning supports", "Tus apoyos")}
+          </p>
+          <span className="ml-auto text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 shrink-0">{L("Active", "Activo")}</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
+          {accommodations.slice(0, 4).map((a) => (
+            <span key={a} className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-white dark:bg-white/5" style={{ border: `1px solid ${accent}33`, color: accent }}>
+              <Check className="h-3 w-3" />{(es ? FRIENDLY_ES[a] : FRIENDLY[a]) ?? a.replace(/_/g, " ")}
+            </span>
+          ))}
+          {accommodations.length > 4 && (
+            <span className="inline-flex items-center text-[11px] px-2 py-1 rounded-full text-muted-foreground">+{accommodations.length - 4}</span>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-2.5">
+          <button onClick={toggleEasy} aria-pressed={easy}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors"
+            style={easy ? { background: accent, color: "#fff", borderColor: accent } : { background: "transparent", color: accent, borderColor: `${accent}55` }}>
+            <Type className="h-3.5 w-3.5" /> {L("Easy-reading", "Lectura fácil")}: {easy ? L("On", "Sí") : L("Off", "No")}
+          </button>
+          <button onClick={speakSample}
+            className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border"
+            style={{ background: "transparent", color: accent, borderColor: `${accent}55` }}>
+            <Volume2 className="h-3.5 w-3.5" /> {persona?.defaultLang === "es" ? "Escuchar" : "Read aloud"}
+          </button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-4 sm:p-5" style={{ borderColor: `${accent}44`, background: `${accent}0D` }}>

@@ -247,7 +247,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
     <div className={cn("animate-in fade-in duration-500", isK12 ? "space-y-5" : "space-y-8")}>
       {/* Greeting */}
       <div>
-        <h1 className="text-3xl font-serif font-bold tracking-tight">
+        <h1 className={cn("font-serif font-bold tracking-tight", isK12 ? "text-2xl" : "text-3xl")}>
           {t(greetingKey())}{firstName ? `, ${firstName}` : ""} <span className="inline-block">👋</span>
         </h1>
         <p className="text-muted-foreground mt-1">
@@ -257,8 +257,14 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         </p>
       </div>
 
-      {/* Non-K-12 learners keep supports + gamification up top. For K-12, these move BELOW the courses
-          (rendered after the grid) so the first thing a child sees is where to start — their lessons. */}
+      {/* K-12: one slim status band (level/XP + supports) sits ABOVE the lessons but stays small, so the
+          lessons remain the hero. Non-K-12 learners keep the full supports + gamification panels. */}
+      {isK12 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <K12Gamification compact />
+          <AccommodationsPanel compact />
+        </div>
+      )}
       {!isK12 && <AccommodationsPanel />}
       {!isK12 && <K12Gamification />}
 
@@ -522,11 +528,6 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         </div>
         )}
       </div>
-
-      {/* K-12: supports + gamification live here, AFTER the courses, so the child lands on their
-          lessons first and the encouraging extras follow. */}
-      {isK12 && <K12Gamification />}
-      {isK12 && <AccommodationsPanel />}
     </div>
   );
 }
