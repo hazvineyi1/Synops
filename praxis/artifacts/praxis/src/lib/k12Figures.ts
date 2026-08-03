@@ -138,6 +138,18 @@ export const K12_FIGURES: Record<string, string> = {
     return g;
   })()),
 
+  // ── How a bill becomes a law: a left-to-right process flow ──────────────────
+  "bill-to-law": svg("0 0 360 120", (() => {
+    const steps: [string, string][] = [["📝", C.indigo], ["🏛️", C.violet], ["🗳️", C.teal], ["🖊️", C.orange], ["⚖️", C.emerald]];
+    let g = "";
+    steps.forEach(([e, col], i) => {
+      const x = 34 + i * 74;
+      g += `<circle cx="${x}" cy="46" r="24" fill="${col}22" stroke="${col}" stroke-width="3"/><text x="${x}" y="55" font-size="22" text-anchor="middle">${e}</text>`;
+      if (i < steps.length - 1) g += `<line x1="${x + 26}" y1="46" x2="${x + 48}" y2="46" stroke="${C.sub}" stroke-width="3" marker-end="url(#bl)"/>`;
+    });
+    return `<defs><marker id="bl" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="${C.sub}"/></marker></defs>` + g;
+  })()),
+
   // ── Balance scale for an equation a·x + b = c ───────────────────────────────
   "balance-scale": svg("0 0 360 160",
     `<line x1="60" y1="40" x2="300" y2="40" stroke="${C.ink}" stroke-width="5" stroke-linecap="round"/>` +
