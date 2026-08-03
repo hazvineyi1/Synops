@@ -6,7 +6,7 @@ import { useSession } from "@/context/SessionContext";
 import { personaByEmail } from "@/lib/k12Personas";
 
 /**
- * Visible "learning supports" panel for learners with accommodations — the demo's headline selling
+ * Visible "learning supports" panel for learners with accommodations, the demo's headline selling
  * point. It leads with the learner's challenge and why each support helps, then makes the supports
  * real and operable (easy-reading toggle, read-aloud). Renders only when the learner actually has
  * accommodations, so it never appears for the on-track learner or for other tenants.
@@ -88,7 +88,7 @@ export function AccommodationsPanel({ compact = false }: { compact?: boolean } =
   const accent = persona?.accent ?? "#4F46E5";
 
   // Compact: a quiet, single-line INFO strip (no card, no pills). Supports are reference information,
-  // so they read as a plain sentence with two small inline controls — never the focus of the page.
+  // so they read as a plain sentence with two small inline controls, never the focus of the page.
   if (compact) {
     const names = accommodations.map((a) => (es ? FRIENDLY_ES[a] : FRIENDLY[a]) ?? a.replace(/_/g, " "));
     names.push(L("captions on videos", "subtítulos en los videos"));
@@ -121,7 +121,7 @@ export function AccommodationsPanel({ compact = false }: { compact?: boolean } =
             {persona ? L(`How ${persona.first} learns`, `Los apoyos de ${persona.first}`) : L("Your learning supports", "Tus apoyos de aprendizaje")}
           </p>
           <p className="text-xs text-muted-foreground">
-            {L("Here's what's turned on to help — always active.", "Esto es lo que está activado para ayudarte — siempre activo.")}
+            {L("Here's what's turned on to help, always active.", "Esto es lo que está activado para ayudarte, siempre activo.")}
           </p>
         </div>
         <span className="ml-auto text-[11px] font-medium px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 shrink-0">{L("Active", "Activo")}</span>
@@ -163,7 +163,7 @@ export function AccommodationsPanel({ compact = false }: { compact?: boolean } =
           <Volume2 className="h-4 w-4" /> {persona?.defaultLang === "es" ? "Escuchar (leer en voz alta)" : "Hear read-aloud"}
         </button>
         <p className="text-xs text-muted-foreground basis-full sm:basis-auto sm:ml-1">
-          {L("The AI tutor also adapts automatically — shorter steps, simpler wording, and encouragement.", "El tutor de IA también se adapta solo: pasos más cortos, palabras sencillas y ánimo.")}
+          {L("The AI tutor also adapts automatically, shorter steps, simpler wording, and encouragement.", "El tutor de IA también se adapta solo: pasos más cortos, palabras sencillas y ánimo.")}
         </p>
       </div>
     </Card>

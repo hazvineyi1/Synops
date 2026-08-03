@@ -6,7 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { resolveVideo, VIDEO_PROVIDERS_HINT } from '@/lib/videoEmbed';
 
-/** Render any provider's clip (YouTube, Khan, Vimeo, TikTok, Loom, Drive, file) inline — never a link out. */
+/** Render any provider's clip (YouTube, Khan, Vimeo, TikTok, Loom, Drive, file) inline, never a link out. */
 function VideoFrame({ url }: { url?: string | null }) {
   const v = resolveVideo(url);
   if (v.kind === 'none') return null;
@@ -616,7 +616,7 @@ function QuizBeat({ beat, onCorrect }: { beat: Beat; onCorrect?: (answer: string
                   {isCorrect
                     ? <CheckCircle className="h-5 w-5" />
                     : <X className="h-5 w-5" />}
-                  {isCorrect ? 'Correct! Well done.' : "Not quite — here's why:"}
+                  {isCorrect ? 'Correct! Well done.' : "Not quite, here's why:"}
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">{quiz.explanation}</p>
               </motion.div>
@@ -708,7 +708,7 @@ function DragOrderActivity({ ia }: { ia: Interactive }) {
               >
                 {allCorrect
                   ? '✓ Perfect order! Well done.'
-                  : 'Not quite — review the highlighted items and try to recall the correct sequence.'}
+                  : 'Not quite, review the highlighted items and try to recall the correct sequence.'}
               </motion.div>
             )}
           </div>
@@ -840,7 +840,7 @@ function MatchPairsActivity({ ia }: { ia: Interactive }) {
                     : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 text-amber-700',
                 )}
               >
-                {isAllCorrect ? '✓ All pairs matched correctly!' : 'Some pairs are off — review the highlighted items.'}
+                {isAllCorrect ? '✓ All pairs matched correctly!' : 'Some pairs are off, review the highlighted items.'}
               </motion.div>
             )}
           </div>
@@ -927,7 +927,7 @@ function FillBlankActivity({ ia }: { ia: Interactive }) {
                       {word}
                     </motion.button>
                   ))}
-                  {bank.length === 0 && <span className="text-xs text-muted-foreground italic">All words placed — tap a blank to return it.</span>}
+                  {bank.length === 0 && <span className="text-xs text-muted-foreground italic">All words placed, tap a blank to return it.</span>}
                 </div>
               </div>
             )}
@@ -1065,12 +1065,12 @@ export function ModuleViewer() {
       : allBeats;
   const currentBeat = beats[currentIndex];
   // Scope the completed count to the beats CURRENTLY in view. In quiz/interactive mode `beats` is a
-  // filtered subset, but completedIds accumulates every viewed beat in the whole module — using its
+  // filtered subset, but completedIds accumulates every viewed beat in the whole module, using its
   // raw size against the 2 filtered quiz beats produced nonsense like "13/2".
   const completedCount = beats.filter(b => completedIds.has(b.id)).length;
   const pct = beats.length > 0 ? (completedCount / beats.length) * 100 : 0;
 
-  // Scroll to top whenever beat changes — must be before any early returns
+  // Scroll to top whenever beat changes, must be before any early returns
   useEffect(() => {
     if (modeParam) mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentIndex, modeParam]);
@@ -1086,7 +1086,7 @@ export function ModuleViewer() {
   const currentIsQuiz = !!currentBeat?.visualData?.quiz;
   useEffect(() => {
     if (!currentBeatId || !modeParam) return;
-    // Quiz beats are NOT marked on arrival — the server only counts them when the learner submits
+    // Quiz beats are NOT marked on arrival, the server only counts them when the learner submits
     // the CORRECT answer (see the onQuizCorrect handler). Marking on arrival would let a learner
     // complete a module without answering anything.
     if (currentIsQuiz) return;
@@ -2355,7 +2355,7 @@ function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBea
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="YouTube, Khan Academy, Vimeo, TikTok, Loom, Drive… or a file URL" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
       {(() => { const v = resolveVideo(url); return url.trim() ? (
         <p className="text-[11px] text-muted-foreground -mt-1">
-          {v.kind === 'none' ? "Couldn't recognise that link — paste a share URL or the provider's embed code." :
+          {v.kind === 'none' ? "Couldn't recognise that link, paste a share URL or the provider's embed code." :
             <>Plays inline as a <span className="capitalize font-medium text-foreground">{v.provider}</span> clip{v.start ? ` starting at ${v.start}s` : ''}.</>}
         </p>
       ) : <p className="text-[11px] text-muted-foreground -mt-1">{VIDEO_PROVIDERS_HINT}</p>; })()}
@@ -2446,7 +2446,7 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
 
 /**
  * Purpose-built lesson experience for the youngest learners (K-5 / early + elementary bands).
- * NOT the adult rail+panel hub: a big, colorful, LINEAR flow — Read → Practice → Talk to your tutor,
+ * NOT the adult rail+panel hub: a big, colorful, LINEAR flow, Read → Practice → Talk to your tutor,
  * with huge step buttons, giant arrows to what's next, a prominent Listen, kid language, and all the
  * jargon (standards codes, meta headers, objectives) stripped. Roomy, one idea at a time, one click.
  */
@@ -2466,7 +2466,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const readingId = readings?.[0]?.id ?? null;
   const { data: reader } = useQuery({ queryKey: ['reading', readingId], queryFn: () => apiFetch<ModuleReadingRow & { content: string }>(`/readings/${readingId}`), enabled: !!readingId });
   const { data: activities } = useQuery({ queryKey: ['module-activities', moduleId], queryFn: () => activitiesApi.list({ moduleId }), enabled: !!moduleId });
-  // Prefer a Math Coach (Socratic tutor) as the practice when a module has one — it's a richer game
+  // Prefer a Math Coach (Socratic tutor) as the practice when a module has one, it's a richer game
   // than the quiz; falls back to the first activity (the quiz) otherwise.
   const practiceActivity = (activities as { id: string; kind?: string }[] | undefined)?.find((a) => a?.kind === 'math-coach') ?? activities?.[0];
   const { data: cases } = useQuery({ queryKey: ['module-cases', moduleId], queryFn: () => apiFetch<{ id: string }[]>(`/modules/${moduleId}/cases`), enabled: !!moduleId });
@@ -2489,7 +2489,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   // Strip anything a young child shouldn't see (standards codes, meta "by the end" lines).
   const stripYoung = (md: string) => md.split('\n').filter((l) => !/aligned to|alineado con/i.test(l) && !/^\s*\*\*(by the end you can|al terminar podrás)/i.test(l)).join('\n');
   // Clean text for the read-aloud so it doesn't say "hashtag" / "asterisk" / emoji names and sounds
-  // less robotic — strip markdown symbols and emoji, keep the words.
+  // less robotic, strip markdown symbols and emoji, keep the words.
   const speechClean = (md: string) => stripYoung(md)
     .replace(/[#>*_`]/g, ' ')                                   // markdown symbols
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, ' ') // emoji/symbols
@@ -2515,7 +2515,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const [tText, setTText] = useState<string | null>(null);
   useEffect(() => { setTText(null); setLang(es ? 'es' : 'en'); }, [readingId, es]);
   // The stored reading is already written in the course's native language (Spanish for Sofía, English
-  // otherwise). So the native language shows the base text directly — no AI round-trip — and we only
+  // otherwise). So the native language shows the base text directly, no AI round-trip, and we only
   // translate when the learner picks the OTHER language.
   const native = es ? 'es' : 'en';
   const pickLang = async (code: string) => {
@@ -2555,7 +2555,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
             return (
               <div key={s.id} className="flex items-center gap-2">
                 <button onClick={() => {
-                    // Practice / tutor steps launch the activity directly — no extra "Start" card in between.
+                    // Practice / tutor steps launch the activity directly, no extra "Start" card in between.
                     if (s.id === 'practice' && practiceActivity) { navigate(`/activities/${practiceActivity.id}/play`); return; }
                     if (s.id === 'tutor' && cases?.[0]) { startCase.mutate(cases[0].id); return; }
                     setStepIdx(i);
@@ -2629,13 +2629,13 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
           </div>
         )}
 
-        {/* GIANT next arrow — hidden on launch steps (Practice/Tutor) so those have ONE clear action
+        {/* GIANT next arrow, hidden on launch steps (Practice/Tutor) so those have ONE clear action
             (Start). Forward navigation happens automatically after the child finishes the activity. */}
         {!(step?.id === 'practice' || step?.id === 'tutor') && (
         <div className="mt-7 flex flex-col items-center gap-2">
           {stepIdx < steps.length - 1 ? (
             <button onClick={() => {
-              // Launch practice/tutor straight from "Next" — no intermediate "Start" card.
+              // Launch practice/tutor straight from "Next", no intermediate "Start" card.
               const nx = steps[stepIdx + 1];
               if (nx.id === 'practice' && practiceActivity) { navigate(`/activities/${practiceActivity.id}/play`); return; }
               if (nx.id === 'tutor' && cases?.[0]) { startCase.mutate(cases[0].id); return; }
@@ -3298,7 +3298,7 @@ function ModuleHubView({
           </div>
         )}
 
-        {/* READINGS — in-module reading beats plus uploaded documents/links */}
+        {/* READINGS, in-module reading beats plus uploaded documents/links */}
         {tab === 'readings' && (
           <div className="space-y-4">
             {readingCount > 0 && (
@@ -3331,7 +3331,7 @@ function ModuleHubView({
           </div>
         )}
 
-        {/* COMPLETE — interactive practice + mastery */}
+        {/* COMPLETE, interactive practice + mastery */}
         {tab === 'complete' && (
           <div className="space-y-4">
             {isInstructor && <ModuleActivitiesAdmin courseId={courseId} moduleId={moduleId} navigate={navigate} />}

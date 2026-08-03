@@ -52,7 +52,7 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
   ];
   const stepsDone = Math.min(schedule.length, Math.max(0, Math.round((pct / 100) * schedule.length)));
 
-  // Compact: a single slim status bar for the dashboard — level, XP, streak, badges + a thin
+  // Compact: a single slim status bar for the dashboard, level, XP, streak, badges + a thin
   // progress bar. No quest dots or schedule (those live in the full view), so it never dwarfs the lessons.
   if (compact) {
     return (
@@ -81,7 +81,7 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
           </div>
           <div className="min-w-0">
             <p className="font-semibold leading-tight">{L("Level", "Nivel")} {level} · {xp.toLocaleString()} XP</p>
-            <p className="text-xs text-muted-foreground">{L(`Keep going — ${100 - intoLevel} XP to Level ${level + 1}.`, `¡Sigue así! — ${100 - intoLevel} XP para el Nivel ${level + 1}.`)}</p>
+            <p className="text-xs text-muted-foreground">{L(`Keep going, ${100 - intoLevel} XP to Level ${level + 1}.`, `¡Sigue así!, ${100 - intoLevel} XP para el Nivel ${level + 1}.`)}</p>
           </div>
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: accent }}><Star className="h-4 w-4" /> {badges} {es ? (badges === 1 ? "insignia" : "insignias") : `badge${badges === 1 ? "" : "s"}`}</span>
@@ -138,7 +138,7 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
             {Array.from({ length: 5 }).map((_, i) => (
               <Star key={i} className="h-7 w-7" style={{ color: i < stepsDone ? "#F59E0B" : "#e2ddea", fill: i < stepsDone ? "#F59E0B" : "transparent" }} />
             ))}
-            <span className="text-xs text-muted-foreground ml-1">{stepsDone === 5 ? "Amazing — all 5 stars! 🎉" : `${5 - stepsDone} more to a full board`}</span>
+            <span className="text-xs text-muted-foreground ml-1">{stepsDone === 5 ? "Amazing, all 5 stars! 🎉" : `${5 - stepsDone} more to a full board`}</span>
           </div>
         </Card>
       )}

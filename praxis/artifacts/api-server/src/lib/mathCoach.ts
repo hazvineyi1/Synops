@@ -2,7 +2,7 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 /**
  * Socratic math coach. The learner works a real problem (visually, on the frontend); when they're
- * stuck or wrong they can ask the coach. The coach NEVER gives or computes the answer — it responds
+ * stuck or wrong they can ask the coach. The coach NEVER gives or computes the answer, it responds
  * with one small guiding question grounded in what the learner just tried (the same "guide, don't
  * tell" discipline as the platform's Socratic engine, but tuned for K-12 math). After repeated
  * misses it offers a worked example of a SIMILAR problem (different numbers), so the method is modeled
@@ -27,12 +27,12 @@ export async function mathHint(input: MathHintInput): Promise<{ hint: string; of
 
 HARD RULES:
 - You NEVER state, compute, or even partially reveal the final answer (which is "${answer}"). Not the number, not "it's close to", nothing. If the learner begs "just tell me", gently decline and point to the next small step.
-- Respond with exactly ONE short, friendly guiding question or nudge — 1 to 2 sentences, plain kid-friendly words.
+- Respond with exactly ONE short, friendly guiding question or nudge, 1 to 2 sentences, plain kid-friendly words.
 - Ground it in what the learner just tried: if they made a specific slip, ask a question that helps them notice it themselves.
 - Encouraging, never shaming. No lists, no markdown, no preamble.${es ? "\n- IMPORTANT: write your ENTIRE reply in SPANISH (español), warm and kid-friendly." : ""}
 Return ONLY the hint sentence(s).`;
   const user = `Problem: ${input.problem}
-Correct answer (for YOUR reference only — never reveal): ${answer}
+Correct answer (for YOUR reference only, never reveal): ${answer}
 ${input.studentAnswer ? `The learner answered "${input.studentAnswer}", which is not correct.` : "The learner is stuck and hasn't answered yet."}
 This is attempt ${input.attempts}. Give ONE Socratic hint that moves them one small step forward.`;
 
@@ -45,7 +45,7 @@ This is attempt ${input.attempts}. Give ONE Socratic hint that moves them one sm
     }
     return { hint: text || (es ? "¿Qué sabes ya del problema? Empieza escribiendo solo el primer paso." : "What do you already know from the problem? Start by writing down just the first step."), offerWorkedExample: input.attempts >= 3 };
   } catch {
-    return { hint: es ? "Vamos paso a paso — ¿qué podrías hacer primero? Inténtalo y dime qué te sale." : "Take it one step at a time — what could you do first? Try that, then tell me what you get.", offerWorkedExample: input.attempts >= 3 };
+    return { hint: es ? "Vamos paso a paso, ¿qué podrías hacer primero? Inténtalo y dime qué te sale." : "Take it one step at a time, what could you do first? Try that, then tell me what you get.", offerWorkedExample: input.attempts >= 3 };
   }
 }
 
@@ -66,19 +66,19 @@ Rules:
   const user = `The learner's problem is: ${input.problem}. Show a worked example of a SIMILAR but different problem, then hand back to them.`;
 
   const fallback = es ? {
-    intro: "Este tipo de problema es difícil al principio — veamos uno parecido juntos.",
+    intro: "Este tipo de problema es difícil al principio, veamos uno parecido juntos.",
     steps: [
       { heading: "Léelo con calma", detail: "Busca qué te pide el problema y anota los números que ya conoces." },
       { heading: "Un paso a la vez", detail: "Haz un movimiento pequeño y revisa que tenga sentido antes del siguiente." },
     ],
-    tryAgain: "Ahora intenta el tuyo igual — paso a paso. ¡Tú puedes!",
+    tryAgain: "Ahora intenta el tuyo igual, paso a paso. ¡Tú puedes!",
   } : {
-    intro: "This kind of problem is tricky at first — let's look at one like it together.",
+    intro: "This kind of problem is tricky at first, let's look at one like it together.",
     steps: [
       { heading: "Read it carefully", detail: "Find what the problem is asking for and write down the numbers you know." },
       { heading: "Take one step", detail: "Do one small move at a time and check it makes sense before the next." },
     ],
-    tryAgain: "Now try yours the same way — one step at a time. You've got this!",
+    tryAgain: "Now try yours the same way, one step at a time. You've got this!",
   };
   try {
     const msg = await anthropic.messages.create({ model: MODEL, max_tokens: 700, system, messages: [{ role: "user", content: user }] });
@@ -102,8 +102,8 @@ Rules:
 export interface MathProblem {
   prompt: string; answer: string; kind: "number" | "text"; min?: number; max?: number; hint?: string;
   // Optional visual manipulative the learner works with:
-  //   "bar"     — a tape/bar model for ratios & part-whole. Provide `bars` (each with a label + unit count).
-  //   "balance" — a balance scale for linear equations a*x + b = c. Provide `eq`.
+  //   "bar", a tape/bar model for ratios & part-whole. Provide `bars` (each with a label + unit count).
+  //   "balance", a balance scale for linear equations a*x + b = c. Provide `eq`.
   //   default is a number line (for a single numeric answer).
   visual?: "numberline" | "bar" | "balance";
   bars?: { label: string; units: number }[];
@@ -165,10 +165,10 @@ Rules:
     })
     .slice(0, 8);
   if (!problems.length) throw new Error("The generated problems weren't in the right shape. Try again.");
-  return { title: (typeof parsed.title === "string" && parsed.title) || `${input.subject || "Math"} — Math Coach`, problems };
+  return { title: (typeof parsed.title === "string" && parsed.title) || `${input.subject || "Math"}, Math Coach`, problems };
 }
 
-/** Deterministic answer check — lenient about spacing, "x =" prefixes, and numeric equivalence. */
+/** Deterministic answer check, lenient about spacing, "x =" prefixes, and numeric equivalence. */
 export function checkMathAnswer(student: string, correct: string): boolean {
   const norm = (s: string) => String(s ?? "").toLowerCase().replace(/\s+/g, "").replace(/^[a-z]=/, "").replace(/[.,;]$/, "");
   const a = norm(student);

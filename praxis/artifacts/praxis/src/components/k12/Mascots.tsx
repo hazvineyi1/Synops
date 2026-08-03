@@ -1,7 +1,7 @@
 import React, { useEffect, useId } from "react";
 
 /**
- * Glossy cartoon mascots for the K-12 "Aventura" look — original characters (fish, star, book,
+ * Glossy cartoon mascots for the K-12 "Aventura" look, original characters (fish, star, book,
  * treasure chest) drawn as inline SVG with gradient shading, gloss highlights and dark outlines.
  * Crisp at any size, tiny, recolorable, and gently animated (a soft bob). Decorative only.
  */

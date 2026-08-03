@@ -16,7 +16,7 @@ interface MathProblem {
 }
 interface CoachMsg { text: string; kind: "hint" | "worked" }
 
-/** Lenient client-side check — mirrors the server's checkMathAnswer. */
+/** Lenient client-side check, mirrors the server's checkMathAnswer. */
 function check(student: string, correct: string): boolean {
   const norm = (s: string) => String(s ?? "").toLowerCase().replace(/\s+/g, "").replace(/^[a-z]=/, "").replace(/[.,;]$/, "");
   const a = norm(student), b = norm(correct);
@@ -96,7 +96,7 @@ function BarModel({ bars, onPick }: { bars: { label: string; units: number }[]; 
 }
 
 /** Balance scale for a linear equation a·x + b = c. The learner keeps it balanced by doing the same
- *  to both sides (clear the constant, then divide) until one x is left — the right pan then shows x. */
+ *  to both sides (clear the constant, then divide) until one x is left, the right pan then shows x. */
 function BalanceScale({ eq, onSolved }: { eq: { a: number; b: number; c: number }; onSolved: (x: number) => void }) {
   const [a, setA] = useState(eq.a);
   const [b, setB] = useState(eq.b);
@@ -136,7 +136,7 @@ function BalanceScale({ eq, onSolved }: { eq: { a: number; b: number; c: number 
 }
 
 /** Interactive, coach-assisted math practice. Renders each problem with a visual (number line) plus a
- *  typed input, checks the answer, and — when the learner is stuck — asks the Socratic coach for a
+ *  typed input, checks the answer, and, when the learner is stuck, asks the Socratic coach for a
  *  hint that never reveals the answer, escalating to a worked example. */
 export function MathCoach({ params }: { params: { activityId: string } }) {
   const id = params.activityId;
@@ -185,7 +185,7 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
       setTimeout(() => nextProblem(true), 900);
     } else {
       const n = attempts + 1; setAttempts(n);
-      setFeedback({ ok: false, msg: n >= 3 ? L("Not yet — want a worked example?", "Todavía no — ¿quieres ver un ejemplo resuelto?") : L("Not quite — try again, or ask the coach.", "Casi — intenta otra vez o pregúntale al tutor.") });
+      setFeedback({ ok: false, msg: n >= 3 ? L("Not yet, want a worked example?", "Todavía no, ¿quieres ver un ejemplo resuelto?") : L("Not quite, try again, or ask the coach.", "Casi, intenta otra vez o pregúntale al tutor.") });
       if (n >= 3) setOfferWorked(true);
     }
   };
@@ -197,7 +197,7 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
       const r = await apiFetch<{ hint: string; offerWorkedExample: boolean }>("/math-coach/hint", { method: "POST", body: JSON.stringify({ problem: p.prompt, answer: p.answer, studentAnswer: current || undefined, attempts: Math.max(1, attempts), grade, lang }) });
       setCoach((c) => [...c, { text: r.hint, kind: "hint" }]);
       if (r.offerWorkedExample) setOfferWorked(true);
-    } catch { setCoach((c) => [...c, { text: L("Take it one step at a time — what could you do first?", "Vamos paso a paso — ¿qué podrías hacer primero?"), kind: "hint" }]); }
+    } catch { setCoach((c) => [...c, { text: L("Take it one step at a time, what could you do first?", "Vamos paso a paso, ¿qué podrías hacer primero?"), kind: "hint" }]); }
     finally { setCoachBusy(false); }
   };
 
@@ -248,7 +248,7 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
 
                 {p.visual === "balance" && p.eq ? (
                   <div className="mt-4">
-                    <p className="text-xs text-muted-foreground mb-1">Keep it balanced — do the same to both sides until one x is left, then read its value.</p>
+                    <p className="text-xs text-muted-foreground mb-1">Keep it balanced, do the same to both sides until one x is left, then read its value.</p>
                     <BalanceScale eq={p.eq} onSolved={(x) => { setTyped(String(x)); setLineVal(null); }} />
                   </div>
                 ) : p.visual === "bar" && p.bars && p.bars.length ? (
@@ -290,7 +290,7 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
               <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 h-full">
                 <div className="flex items-center gap-2 font-bold text-amber-800 mb-2"><Lightbulb className="h-4 w-4" /> {L("Your coach", "Tu tutor")}</div>
                 {coach.length === 0 ? (
-                  <p className="text-sm text-amber-800/80">{L("Stuck? Tap Ask the coach. I'll help you figure it out with questions — I won't just give you the answer. 😊", "¿Atascado? Toca Pregúntale al tutor. Te ayudo con preguntas para que lo descubras — no te doy la respuesta directa. 😊")}</p>
+                  <p className="text-sm text-amber-800/80">{L("Stuck? Tap Ask the coach. I'll help you figure it out with questions, I won't just give you the answer. 😊", "¿Atascado? Toca Pregúntale al tutor. Te ayudo con preguntas para que lo descubras, no te doy la respuesta directa. 😊")}</p>
                 ) : (
                   <div className="space-y-2">
                     {coach.map((m, i) => (

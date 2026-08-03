@@ -153,7 +153,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
   const persona = personaByEmail(user?.email);
   const isK12 = !!persona;
   // The playful "Aventura" mascots now cover ALL K-12 learners, except the low-vision / high-contrast
-  // profile (Emma) — that one stays clean and distraction-free for accessibility. (Name kept as `young`.)
+  // profile (Emma), that one stays clean and distraction-free for accessibility. (Name kept as `young`.)
   const young = isK12 && !persona?.highContrast;
   const es = persona?.defaultLang === "es";
   const L = (en: string, esT: string) => (es ? esT : en);
@@ -235,7 +235,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
     .map((c) => ({ ...c, state: courseState(c) }))
     .sort((a, b) => STATE_META[a.state].rank - STATE_META[b.state].rank || b.percent - a.percent);
   const inProgress = myCourses.filter((c) => c.state === 'in_progress');
-  // "Next up": the single best next action for a K-12 learner — continue an in-progress course,
+  // "Next up": the single best next action for a K-12 learner, continue an in-progress course,
   // else start a new one, else (all done) review the first. Drives the hero card.
   const nextCourse = isK12
     ? (myCourses.find((c) => c.state === 'in_progress') ?? myCourses.find((c) => c.state === 'not_started') ?? myCourses[0])
@@ -293,7 +293,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                 {flagged.length > 1 ? ` +${flagged.length - 1} more` : ""}
               </p>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Your AI Coach has built a plan to help — work through it whenever you're ready.
+                Your AI Coach has built a plan to help, work through it whenever you're ready.
               </p>
             </div>
             <div className="shrink-0">
@@ -310,7 +310,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
               <CheckCircle2 className="h-6 w-6" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">You're on track — nice work.</p>
+              <p className="font-semibold">You're on track, nice work.</p>
               <p className="text-sm text-muted-foreground mt-0.5">
                 Nothing is overdue. Keep your streak going with what's next below.
               </p>
@@ -319,7 +319,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         </Card>
       ))}
 
-      {/* At-a-glance stat strip — hidden for K-12 (their gamification bar already shows streak/badges,
+      {/* At-a-glance stat strip, hidden for K-12 (their gamification bar already shows streak/badges,
           and it pushed the courses down the page). */}
       {!isK12 && (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -467,7 +467,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
           </section>
         </div>
 
-        {/* Right column — adult chrome (coach path, announcements, credentials) with English/generated
+        {/* Right column, adult chrome (coach path, announcements, credentials) with English/generated
             copy. Hidden for K-12 learners: it declutters their home and avoids non-localized text. */}
         {!isK12 && (
         <div className="space-y-6">

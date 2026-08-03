@@ -15,7 +15,7 @@ import { PRIVACY_POLICY_VERSION } from "../lib/popia";
 import { GAME_TEMPLATES, type Band } from "./gameTemplates";
 
 /**
- * Public K-12 demo tenant "Synops Academy" — the investor/prospect link at
+ * Public K-12 demo tenant "Synops Academy", the investor/prospect link at
  * praxis.synops-consulting.com/k12. It showcases inclusive, adaptive, US-standards learning across
  * grade levels with SIX learner personas, each with a real challenge + the accommodations that help:
  *   - Sofía  · Grade 3  · Spanish-speaking English learner   (bilingual, playful, big text)
@@ -82,7 +82,7 @@ const KID_PICS: Record<string, string> = {
   apple: CUT("apple"), ball: CUT("ball"), fish: CUT("fish"), tree: CUT("tree"),
 };
 
-// Real photos on a quiz ONLY where a photo is genuinely on-topic — currently the science modules,
+// Real photos on a quiz ONLY where a photo is genuinely on-topic, currently the science modules,
 // where the objects (fish, tree, sun, ball) actually illustrate the concept. Everything else carries
 // its visuals a better way: the young reading course has real picture-words, young math uses countable
 // emoji in the questions, and every class has a curated video clip + a themed game. This avoids the
@@ -94,12 +94,12 @@ const MODULE_IMAGES: Record<string, string[]> = {
   "How Energy Moves From Place to Place": ["sun", "ball"],
 };
 
-// Demo interactive checkpoints — a question that pops mid-clip on a few Khan videos so the clips are
+// Demo interactive checkpoints, a question that pops mid-clip on a few Khan videos so the clips are
 // active, not passive. Keyed by module title. (Teachers add their own via the module video panel.)
 const VIDEO_CHECKPOINTS: Record<string, { t: number; stem: string; options: string[]; correct: number; feedback: string }[]> = {
-  "Ratios and rates": [{ t: 45, stem: "A ratio compares two amounts. Which shows the ratio of 2 cats to 3 dogs?", options: ["2 to 3", "3 to 2", "2 + 3", "5"], correct: 0, feedback: "Right — a ratio compares the two amounts, in order." }],
-  "Why Civilizations Began Near Rivers": [{ t: 30, stem: "Why did the first cities grow up next to rivers?", options: ["For water and good farmland", "To hide from enemies", "To find gold", "Purely by chance"], correct: 0, feedback: "Exactly — rivers gave water and rich soil for farming." }],
-  "Food webs": [{ t: 40, stem: "In a food web, where does the energy start?", options: ["The sun and plants", "Top predators", "Decomposers only", "Rocks and soil"], correct: 0, feedback: "Yes — energy flows from the sun to plants, then onward." }],
+  "Ratios and rates": [{ t: 45, stem: "A ratio compares two amounts. Which shows the ratio of 2 cats to 3 dogs?", options: ["2 to 3", "3 to 2", "2 + 3", "5"], correct: 0, feedback: "Right, a ratio compares the two amounts, in order." }],
+  "Why Civilizations Began Near Rivers": [{ t: 30, stem: "Why did the first cities grow up next to rivers?", options: ["For water and good farmland", "To hide from enemies", "To find gold", "Purely by chance"], correct: 0, feedback: "Exactly, rivers gave water and rich soil for farming." }],
+  "Food webs": [{ t: 40, stem: "In a food web, where does the energy start?", options: ["The sun and plants", "Top predators", "Decomposers only", "Rocks and soil"], correct: 0, feedback: "Yes, energy flows from the sun to plants, then onward." }],
 };
 
 // ── COURSES (one per persona; two comprehensive lessons each) ────────────────
@@ -107,8 +107,8 @@ const COURSES: K12Course[] = [
   // 0) MATEO · Grade 1 · just starting out (K-2 band) ─────────────────────────
   {
     title: "Grade 1 Reading Adventure", subject: "English Language Arts", emoji: "🔤", grade: 1, gradeLabel: "Grade 1",
-    framework: "Common Core State Standards — Grade 1 Foundational Reading",
-    intro: "A five-part reading adventure! Find first letters, read picture words, then spell them in a puzzle — look, tap, and earn stars.",
+    framework: "Common Core State Standards, Grade 1 Foundational Reading",
+    intro: "A five-part reading adventure! Find first letters, read picture words, then spell them in a puzzle, look, tap, and earn stars.",
     outcome: "Recognize beginning letters, read common one-syllable words, and spell them.",
     tags: ["ela", "reading", "letters", "grade 1", "common core"],
     persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.15 },
@@ -146,7 +146,7 @@ const COURSES: K12Course[] = [
           { q: "Which word matches this picture?", img: KID_PICS.hat, options: ["hat", "ham", "hop", "cat"], answer: 0 },
         ],
         caseContext: "", caseOpening: "" },
-      { title: "Reading words: apple, ball, fish, tree", outcome: "Read more picture words.", hook: "Read even more words — you're a reading star!", minutes: 5, game: "find",
+      { title: "Reading words: apple, ball, fish, tree", outcome: "Read more picture words.", hook: "Read even more words, you're a reading star!", minutes: 5, game: "find",
         standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics and word analysis skills in decoding words" }],
         points: ["More picture words", "Look at the picture, then find the word", "You're a reading star!"],
         reading: "More words to read! An **apple**, a **ball**, a **fish**, a **tree**.\n\nLook at the picture, then tap the right word. You're a reading star! 🌟",
@@ -157,10 +157,10 @@ const COURSES: K12Course[] = [
           { q: "Which word matches this picture?", img: KID_PICS.tree, options: ["tree", "two", "toy", "top"], answer: 0 },
         ],
         caseContext: "", caseOpening: "" },
-      { title: "Word Puzzle", outcome: "Spell the words you learned.", hook: "Now for a puzzle — build the words letter by letter!", minutes: 5, game: "puzzle",
+      { title: "Word Puzzle", outcome: "Spell the words you learned.", hook: "Now for a puzzle, build the words letter by letter!", minutes: 5, game: "puzzle",
         standards: [{ code: "CCSS.ELA-LITERACY.RF.1.3", title: "Know and apply grade-level phonics and word analysis skills in decoding words" }],
         points: ["Look at the picture", "Tap the letters in the right order", "Spell the whole word!"],
-        reading: "Now for a puzzle! 🧩 Look at the picture, then tap the letters in the right order to spell the word. Take your time — you can do it! ⭐",
+        reading: "Now for a puzzle! 🧩 Look at the picture, then tap the letters in the right order to spell the word. Take your time, you can do it! ⭐",
         quiz: [
           { q: "Spell the word", img: KID_PICS.cat, options: ["cat"], answer: 0 },
           { q: "Spell the word", img: KID_PICS.dog, options: ["dog"], answer: 0 },
@@ -173,8 +173,8 @@ const COURSES: K12Course[] = [
   // 1) SOFÍA · Grade 3 · Spanish-speaking English learner ─────────────────────
   {
     title: "Aventura de Lectura (Grado 3)", subject: "Lectura", emoji: "📚", grade: 3, gradeLabel: "Grade 3", lang: "es",
-    framework: "Common Core State Standards — Grade 3 ELA/Literacy",
-    intro: "¡Una aventura de lectura en español! En cada lección lees un texto corto y juegas de una forma distinta — clasificas ideas, unes palabras con su significado y usas pistas del contexto para descubrir palabras nuevas. Todo en español (o en inglés si prefieres).",
+    framework: "Common Core State Standards, Grade 3 ELA/Literacy",
+    intro: "¡Una aventura de lectura en español! En cada lección lees un texto corto y juegas de una forma distinta, clasificas ideas, unes palabras con su significado y usas pistas del contexto para descubrir palabras nuevas. Todo en español (o en inglés si prefieres).",
     outcome: "Encontrar la idea principal, aprender vocabulario y usar pistas del contexto.",
     tags: ["lectura", "español", "grade 3", "common core"],
     persona: { email: "sofia.k12@synops-demo.test", firstName: "Sofía", lastName: "Ramírez", grade: 3, gradeLabel: "Grade 3", learningStyle: "visual", accommodations: ["simplified_language", "concrete_examples", "scaffolded_questions", "positive_reinforcement", "chunked_content"], progressFraction: 0.15 },
@@ -183,7 +183,7 @@ const COURSES: K12Course[] = [
         hook: "Un texto tiene UNA idea grande y muchos detalles pequeños. ¿Puedes separarlos?", minutes: 25, video: "https://www.youtube.com/watch?v=PyCTNOq8SmU", game: "sort",
         standards: [{ code: "CCSS.ELA-LITERACY.RI.3.2", title: "Determine the main idea; recount key details" }],
         points: ["La idea principal es de qué trata CASI todo el texto", "Los detalles son datos pequeños que apoyan la idea principal", "Un texto tiene una idea principal, pero muchos detalles"],
-        reading: "Cuando lees, tu cerebro busca la **idea principal**: de qué trata *casi todo* el texto. Lo demás son **detalles** — datos pequeños que dan más información sobre esa idea.\n\nLee esto: *Los delfines son mamíferos marinos muy inteligentes. Usan sonidos para hablar entre ellos, nadan muy rápido y salen a la superficie para respirar aire.* La **idea principal** es que *los delfines son mamíferos muy inteligentes*. Que usen sonidos o que respiren aire son **detalles**.\n\nAhora otro: *Un volcán es una montaña que puede expulsar lava caliente. La lava es roca derretida, y algunos volcanes están escondidos bajo el mar.* ¿Cuál es la idea grande? *Un volcán puede expulsar lava.* Lo demás son detalles.\n\n**Un truco para encontrarla:** pregúntate *\"¿de qué habla el texto una y otra vez?\"* Esa repetición te lleva a la idea principal. Muchas veces está en la **primera oración** del párrafo, pero no siempre — por eso hay que leer todo.\n\n**Un ejemplo más:** *\"Las abejas son insectos muy trabajadores. Vuelan de flor en flor todo el día, hacen miel y ayudan a que crezcan las plantas.\"* La idea principal es *las abejas son muy trabajadoras*. \"Hacen miel\" y \"ayudan a las plantas\" son detalles que lo demuestran.\n\n**Aplícalo en tu vida:** cuando le cuentas a alguien de qué se trató una película, dices la idea principal — no cada escena. Así funciona también con lo que lees, y hasta cuando le cuentas tu día a tu familia.\n\n**Para recordar:** (1) lee todo el texto, (2) pregúntate de qué trata *casi todo*, (3) esa es la idea principal, (4) lo demás son detalles que la apoyan.\n\n**Piensa:** ¿cuál fue la idea principal de tu cuento favorito? Ahora, en el juego, lee cada tarjeta y decide: ¿es la **idea principal** o un **detalle**? 🕵️",
+        reading: "Cuando lees, tu cerebro busca la **idea principal**: de qué trata *casi todo* el texto. Lo demás son **detalles**, datos pequeños que dan más información sobre esa idea.\n\nLee esto: *Los delfines son mamíferos marinos muy inteligentes. Usan sonidos para hablar entre ellos, nadan muy rápido y salen a la superficie para respirar aire.* La **idea principal** es que *los delfines son mamíferos muy inteligentes*. Que usen sonidos o que respiren aire son **detalles**.\n\nAhora otro: *Un volcán es una montaña que puede expulsar lava caliente. La lava es roca derretida, y algunos volcanes están escondidos bajo el mar.* ¿Cuál es la idea grande? *Un volcán puede expulsar lava.* Lo demás son detalles.\n\n**Un truco para encontrarla:** pregúntate *\"¿de qué habla el texto una y otra vez?\"* Esa repetición te lleva a la idea principal. Muchas veces está en la **primera oración** del párrafo, pero no siempre, por eso hay que leer todo.\n\n**Un ejemplo más:** *\"Las abejas son insectos muy trabajadores. Vuelan de flor en flor todo el día, hacen miel y ayudan a que crezcan las plantas.\"* La idea principal es *las abejas son muy trabajadoras*. \"Hacen miel\" y \"ayudan a las plantas\" son detalles que lo demuestran.\n\n**Aplícalo en tu vida:** cuando le cuentas a alguien de qué se trató una película, dices la idea principal, no cada escena. Así funciona también con lo que lees, y hasta cuando le cuentas tu día a tu familia.\n\n**Para recordar:** (1) lee todo el texto, (2) pregúntate de qué trata *casi todo*, (3) esa es la idea principal, (4) lo demás son detalles que la apoyan.\n\n**Piensa:** ¿cuál fue la idea principal de tu cuento favorito? Ahora, en el juego, lee cada tarjeta y decide: ¿es la **idea principal** o un **detalle**? 🕵️",
         quiz: [
           { q: "Los delfines son mamíferos marinos muy inteligentes.", options: ["Idea principal", "Detalle"], answer: 0 },
           { q: "Los delfines usan sonidos para hablar entre ellos.", options: ["Idea principal", "Detalle"], answer: 1 },
@@ -197,7 +197,7 @@ const COURSES: K12Course[] = [
         hook: "Palabras nuevas: veloz, enorme, frágil… ¿sabes qué significan?", minutes: 25, video: "https://www.youtube.com/watch?v=jWeVsB5n7qQ", game: "ememory",
         standards: [{ code: "CCSS.ELA-LITERACY.L.3.4", title: "Determine the meaning of words and phrases" }],
         points: ["Mientras más palabras conoces, mejor entiendes lo que lees", "Cada palabra tiene un significado exacto", "Une cada palabra con lo que significa"],
-        reading: "Los buenos lectores conocen muchas palabras. Mientras más palabras sabes, mejor entiendes lo que lees y mejor puedes contar tus ideas. A esto le llamamos tu **vocabulario**.\n\n**Palabras nuevas de tercer grado** — fíjate cómo se usan en una oración:\n\nUn guepardo es **veloz**: corre muy rápido. Una ballena es **enorme**: es muy grande. Un vaso de vidrio es **frágil**: se rompe con facilidad. Un bombero es **valiente**: no siente miedo cuando ayuda. El sol es **brillante**: da mucha luz. Y una biblioteca es **silenciosa**: casi no hace ruido.\n\n**Palabras que significan casi lo mismo (sinónimos):** a veces dos palabras significan algo parecido. *Veloz* es parecido a *rápido*. *Enorme* es parecido a *gigante*. *Contento* es parecido a *feliz*. Conocer sinónimos te ayuda a no repetir siempre la misma palabra cuando escribes.\n\n**Cómo aprender una palabra nueva:** (1) mírala en una oración, (2) piensa qué significa, (3) dilo con tus propias palabras, y (4) úsala tú en una oración. ¡Así se te queda!\n\n**Aplícalo:** hoy, cuando leas o escuches una palabra que no conoces, pregúntale a alguien o búscala. Cada palabra nueva es como una llave que abre más cuentos.\n\nEn el juego, une cada palabra con su significado. ¡Tú puedes! 📖⭐",
+        reading: "Los buenos lectores conocen muchas palabras. Mientras más palabras sabes, mejor entiendes lo que lees y mejor puedes contar tus ideas. A esto le llamamos tu **vocabulario**.\n\n**Palabras nuevas de tercer grado**, fíjate cómo se usan en una oración:\n\nUn guepardo es **veloz**: corre muy rápido. Una ballena es **enorme**: es muy grande. Un vaso de vidrio es **frágil**: se rompe con facilidad. Un bombero es **valiente**: no siente miedo cuando ayuda. El sol es **brillante**: da mucha luz. Y una biblioteca es **silenciosa**: casi no hace ruido.\n\n**Palabras que significan casi lo mismo (sinónimos):** a veces dos palabras significan algo parecido. *Veloz* es parecido a *rápido*. *Enorme* es parecido a *gigante*. *Contento* es parecido a *feliz*. Conocer sinónimos te ayuda a no repetir siempre la misma palabra cuando escribes.\n\n**Cómo aprender una palabra nueva:** (1) mírala en una oración, (2) piensa qué significa, (3) dilo con tus propias palabras, y (4) úsala tú en una oración. ¡Así se te queda!\n\n**Aplícalo:** hoy, cuando leas o escuches una palabra que no conoces, pregúntale a alguien o búscala. Cada palabra nueva es como una llave que abre más cuentos.\n\nEn el juego, une cada palabra con su significado. ¡Tú puedes! 📖⭐",
         quiz: [
           { q: "veloz", options: ["muy rápido"], answer: 0, emoji: "🐆" },
           { q: "enorme", options: ["muy grande"], answer: 0, emoji: "🐋" },
@@ -211,7 +211,7 @@ const COURSES: K12Course[] = [
         hook: "Lees una palabra que nunca has visto. ¿Te rindes? ¡Claro que no!", minutes: 25, video: "https://www.youtube.com/watch?v=MsbZzH1ghUQ", game: "ladder",
         standards: [{ code: "CCSS.ELA-LITERACY.L.3.4", title: "Determine the meaning of unknown words using context clues" }],
         points: ["Las pistas del contexto son las otras palabras cercanas", "Lee toda la oración, no solo la palabra difícil", "Adivina y luego revisa si tiene sentido"],
-        reading: "¿Qué haces cuando encuentras una palabra que no conoces? ¡Te vuelves **detective de palabras** y buscas **pistas del contexto** — las otras palabras cercanas que te dan pistas de lo que significa!\n\n**Ejemplo 1:** *\"El perrito era tan **tímido** que se escondió detrás del sofá cuando llegaron las visitas.\"* Aunque no conozcas la palabra **tímido**, las pistas ayudan: se *escondió* cuando llegó gente. ¡Entonces tímido significa *penoso o asustado*! Lo resolviste sin diccionario.\n\n**Ejemplo 2:** *\"La fruta estaba **madura** y dulce, lista para comer.\"* Las pistas *dulce* y *lista para comer* te dicen que **madura** significa *que ya está lista, en su punto*.\n\n**Ejemplo 3:** *\"Caminamos por un sendero **angosto**, donde solo cabía una persona a la vez.\"* Si solo cabe una persona, **angosto** significa *estrecho, no ancho*.\n\n**Tipos de pistas que puedes buscar:** a veces la oración da un *ejemplo*, a veces da lo *contrario* (\"no era grande, era diminuto\"), y a veces explica la palabra justo después.\n\n**Los 4 pasos del detective:** (1) lee toda la oración, (2) busca las pistas cercanas, (3) adivina el significado, (4) vuelve a leer para ver si tiene sentido.\n\n**Aplícalo:** la próxima vez que leas y encuentres una palabra difícil, no te saltes — ¡sé detective! En el juego, usa las pistas para descubrir cada palabra nueva. 🌟",
+        reading: "¿Qué haces cuando encuentras una palabra que no conoces? ¡Te vuelves **detective de palabras** y buscas **pistas del contexto**, las otras palabras cercanas que te dan pistas de lo que significa!\n\n**Ejemplo 1:** *\"El perrito era tan **tímido** que se escondió detrás del sofá cuando llegaron las visitas.\"* Aunque no conozcas la palabra **tímido**, las pistas ayudan: se *escondió* cuando llegó gente. ¡Entonces tímido significa *penoso o asustado*! Lo resolviste sin diccionario.\n\n**Ejemplo 2:** *\"La fruta estaba **madura** y dulce, lista para comer.\"* Las pistas *dulce* y *lista para comer* te dicen que **madura** significa *que ya está lista, en su punto*.\n\n**Ejemplo 3:** *\"Caminamos por un sendero **angosto**, donde solo cabía una persona a la vez.\"* Si solo cabe una persona, **angosto** significa *estrecho, no ancho*.\n\n**Tipos de pistas que puedes buscar:** a veces la oración da un *ejemplo*, a veces da lo *contrario* (\"no era grande, era diminuto\"), y a veces explica la palabra justo después.\n\n**Los 4 pasos del detective:** (1) lee toda la oración, (2) busca las pistas cercanas, (3) adivina el significado, (4) vuelve a leer para ver si tiene sentido.\n\n**Aplícalo:** la próxima vez que leas y encuentres una palabra difícil, no te saltes, ¡sé detective! En el juego, usa las pistas para descubrir cada palabra nueva. 🌟",
         quiz: [
           { q: "Las pistas del contexto son…", options: ["Las otras palabras cerca de la palabra difícil", "El número de página", "Solo los dibujos", "El título"], answer: 0 },
           { q: "\"La sopa estaba tan **sosa** que necesitaba sal.\" Sosa significa…", options: ["Muy picante", "Sin mucho sabor", "Muy caliente", "Congelada"], answer: 1 },
@@ -226,30 +226,30 @@ const COURSES: K12Course[] = [
   // 2) AIDEN · Grade 4 · autistic (gamified, predictable) ─────────────────────
   {
     title: "Number Quest (Grade 4)", subject: "Mathematics", emoji: "🎯", grade: 4, gradeLabel: "Grade 4",
-    framework: "Common Core State Standards — Grade 4 Mathematics",
-    intro: "Welcome to Number Quest! Every lesson is a level. You'll earn stars for each step, follow a clear map, and always know exactly what comes next. Ready, steady — let's begin.",
+    framework: "Common Core State Standards, Grade 4 Mathematics",
+    intro: "Welcome to Number Quest! Every lesson is a level. You'll earn stars for each step, follow a clear map, and always know exactly what comes next. Ready, steady, let's begin.",
     outcome: "Understand multiplication as equal groups and use arrays to find totals.",
     tags: ["math", "multiplication", "grade 4", "common core"],
     persona: { email: "aiden.k12@synops-demo.test", firstName: "Aiden", lastName: "Walsh", grade: 4, gradeLabel: "Grade 4", learningStyle: "kinesthetic", accommodations: ["predictable_structure", "chunked_content", "explicit_transitions", "positive_reinforcement", "literal_language", "extended_processing"], progressFraction: 0.5 },
     modules: [
       { title: "Level 1: Equal groups", outcome: "See multiplication as a number of equal groups.", video: "https://www.youtube.com/watch?v=RNxwasijbAo",
-        hook: "4 baskets. 3 apples in each. How many apples — WITHOUT counting one by one?", minutes: 7,
+        hook: "4 baskets. 3 apples in each. How many apples, WITHOUT counting one by one?", minutes: 7,
         standards: [{ code: "CCSS.MATH.CONTENT.4.OA.A.1", title: "Interpret a multiplication equation as a comparison / equal groups" }],
         points: ["Multiplication is a fast way to add equal groups", "4 × 3 means 4 groups of 3", "The answer is called the product"],
-        reading: "Multiplication is a superpower: it adds up **equal groups** fast.\n\nPicture **4 baskets**, and each basket has **3 apples**. You *could* count 1, 2, 3, 4, 5... but there's a faster way. That's **4 groups of 3**, which we write as **4 × 3**. It equals **12**. The answer has a name: the **product**.\n\nHere is the one rule to remember: the groups must be **equal** — the same size. 4 baskets of 3 apples works. 4 baskets with different amounts does NOT. \n\nStep 1: count the groups. Step 2: count how many in each group. Step 3: multiply. That's the whole quest for this level. You're ready. ⭐",
+        reading: "Multiplication is a superpower: it adds up **equal groups** fast.\n\nPicture **4 baskets**, and each basket has **3 apples**. You *could* count 1, 2, 3, 4, 5... but there's a faster way. That's **4 groups of 3**, which we write as **4 × 3**. It equals **12**. The answer has a name: the **product**.\n\nHere is the one rule to remember: the groups must be **equal**, the same size. 4 baskets of 3 apples works. 4 baskets with different amounts does NOT. \n\nStep 1: count the groups. Step 2: count how many in each group. Step 3: multiply. That's the whole quest for this level. You're ready. ⭐",
         quiz: [
           { q: "4 × 3 means…", options: ["4 plus 3", "4 groups of 3", "3 minus 4", "43"], answer: 1 },
           { q: "The answer to a multiplication problem is called the…", options: ["Sum", "Product", "Total groups", "Difference"], answer: 1 },
           { q: "5 bags with 2 marbles each is…", options: ["5 × 2 = 10", "5 + 2 = 7", "2 − 5", "52"], answer: 0 },
           { q: "For multiplication, the groups must be…", options: ["Different sizes", "Equal sizes", "Very big", "Empty"], answer: 1 },
         ],
-        caseContext: "Aiden sees 3 plates with 4 cookies on each. He starts counting cookies one at a time. Coach him — with short, clear, literal steps and lots of encouragement — to see it as 3 groups of 4, i.e. 3 × 4 = 12. Keep each message to one small step.",
+        caseContext: "Aiden sees 3 plates with 4 cookies on each. He starts counting cookies one at a time. Coach him, with short, clear, literal steps and lots of encouragement, to see it as 3 groups of 4, i.e. 3 × 4 = 12. Keep each message to one small step.",
         caseOpening: "Step 1: How many plates are there? Just tell me that number." },
       { title: "Level 2: Arrays", outcome: "Use a rectangle array of rows and columns to find a total.",
         hook: "Chairs in 5 rows, 4 in each row. How many chairs?", minutes: 7,
         standards: [{ code: "CCSS.MATH.CONTENT.3.MD.C.7", title: "Relate area to multiplication using arrays of rows and columns" }],
         points: ["An array is objects lined up in rows and columns", "Rows × columns = the total", "Arrays make multiplication easy to SEE"],
-        reading: "An **array** is a neat rectangle of things in **rows** and **columns**. It turns multiplication into a picture you can see.\n\nImagine a classroom with **5 rows** of chairs and **4 chairs in each row**. To find the total, multiply **rows × columns = 5 × 4 = 20** chairs. You don't have to count every chair — the array does the work.\n\nArrays are everywhere: eggs in a carton, windows on a building, tiles on a floor. Whenever things line up in even rows and columns, you can multiply. Step 1: count the rows. Step 2: count how many in each row. Step 3: multiply. Level complete! 🏆",
+        reading: "An **array** is a neat rectangle of things in **rows** and **columns**. It turns multiplication into a picture you can see.\n\nImagine a classroom with **5 rows** of chairs and **4 chairs in each row**. To find the total, multiply **rows × columns = 5 × 4 = 20** chairs. You don't have to count every chair, the array does the work.\n\nArrays are everywhere: eggs in a carton, windows on a building, tiles on a floor. Whenever things line up in even rows and columns, you can multiply. Step 1: count the rows. Step 2: count how many in each row. Step 3: multiply. Level complete! 🏆",
         quiz: [
           { q: "An array is…", options: ["A messy pile", "Objects in equal rows and columns", "One single object", "A number line"], answer: 1 },
           { q: "3 rows of 6 stickers is…", options: ["3 × 6 = 18", "3 + 6 = 9", "6 − 3", "36"], answer: 0 },
@@ -263,7 +263,7 @@ const COURSES: K12Course[] = [
   // 3) MAYA · Grade 6 · on-track ───────────────────────────────────────────────
   {
     title: "Math 6: Ratios & Rates", subject: "Mathematics", emoji: "➗", grade: 6, gradeLabel: "Grade 6",
-    framework: "Common Core State Standards — Grade 6 Mathematics",
+    framework: "Common Core State Standards, Grade 6 Mathematics",
     intro: "Sixth-grade math describes the real world: how fast, how much, how many for how many. In two lessons you'll master ratios and rates using playlists, recipes, and road trips.",
     outcome: "Use ratios and unit rates to solve real-world problems.",
     tags: ["math", "ratios", "rates", "grade 6", "common core"],
@@ -272,8 +272,8 @@ const COURSES: K12Course[] = [
       { title: "Ratios and rates", outcome: "Describe a relationship with a ratio and find a unit rate.", video: "https://www.youtube.com/watch?v=bIKmw0aTmYc",
         hook: "Your playlist plays 3 songs every 12 minutes. How long for 10 songs?", minutes: 25,
         standards: [{ code: "CCSS.MATH.CONTENT.6.RP.A.1", title: "Understand the concept of a ratio and use ratio language" }, { code: "CCSS.MATH.CONTENT.6.RP.A.2", title: "Understand unit rate and use rate language" }],
-        points: ["A ratio compares two amounts, written 3:12, 3/12, or '3 to 12' — order matters", "Equivalent ratios describe the same relationship at a different scale (3:12 = 1:4)", "A unit rate is the 'per one' amount — divide to find it", "Once you have the unit rate, scale up or down by multiplying", "Unit rates let you compare things that aren't the same size (the 'better buy')"],
-        reading: "When you say \"3 songs every 12 minutes,\" \"2 cups of flour for every 3 eggs,\" or \"$5 for 3 tacos,\" you are using a **ratio** — a comparison of two amounts. This lesson builds the one routine that solves them all.\n\n## What a ratio is\nA **ratio** compares two quantities. If a playlist plays **3 songs every 12 minutes**, the ratio of songs to minutes is **3 to 12**. You can write the same ratio three ways: in words (**3 to 12**), with a colon (**3 : 12**), or as a fraction (**3/12**).\n\n**Order matters.** \"Songs to minutes\" is 3 : 12, but \"minutes to songs\" is 12 : 3. Always read which quantity comes first.\n\n## Equivalent ratios\nJust like fractions, ratios can be **simplified**. Divide both numbers by the same amount: 3 : 12 → divide both by 3 → **1 : 4**. So \"3 songs to 12 minutes\" is the *same relationship* as \"1 song to 4 minutes.\" These are **equivalent ratios** — the same rate at a different scale.\n\nA **ratio table** lists equivalent ratios so you can read any answer straight off it: 1 song = 4 min, 2 songs = 8 min, 3 songs = 12 min, 5 songs = 20 min, 10 songs = **40 min**. Every pair keeps the same relationship.\n\n## Unit rate: \"per one\"\nA **unit rate** answers **\"how much for exactly one?\"** You find it by **dividing**: 12 minutes ÷ 3 songs = **4 minutes per song**. Once you know the unit rate, every question becomes a single multiplication: 10 songs → 10 × 4 = **40 minutes**; 7 songs → 7 × 4 = **28 minutes**.\n\n## Worked example — a recipe\nA recipe uses **2 cups of flour for 3 eggs**. How much flour for **9 eggs**?\n1. Relationship: flour : eggs = 2 : 3.\n2. 9 eggs is 3 × 3 eggs, so multiply the flour by 3 as well: 2 × 3 = **6 cups**.\nCheck with a unit rate: 2 ÷ 3 ≈ 0.67 cups per egg; 9 × 0.67 ≈ 6 cups. ✓\n\n## Worked example — the better buy\nRates help you make real decisions. A 12-ounce juice costs $3.00; a 20-ounce juice costs $4.40. Which is the better deal? Find the **price per ounce** (the unit rate): $3.00 ÷ 12 = **$0.25 per ounce**; $4.40 ÷ 20 = **$0.22 per ounce**. The 20-ounce bottle costs less per ounce, so it's the better buy. Unit rates let you compare things that aren't the same size.\n\n## Watch for this\nThe most common slip is dividing the wrong way. \"Minutes per song\" divides minutes by songs; \"songs per minute\" divides songs by minutes. Decide which \"per one\" you want **before** you divide.\n\n## The big idea\nSet up the ratio in the right order → find the unit rate by dividing → scale up or down by multiplying. That one routine — **ratio, divide, multiply** — solves rates everywhere: miles per hour, points per game, price per ounce.",
+        points: ["A ratio compares two amounts, written 3:12, 3/12, or '3 to 12', order matters", "Equivalent ratios describe the same relationship at a different scale (3:12 = 1:4)", "A unit rate is the 'per one' amount, divide to find it", "Once you have the unit rate, scale up or down by multiplying", "Unit rates let you compare things that aren't the same size (the 'better buy')"],
+        reading: "When you say \"3 songs every 12 minutes,\" \"2 cups of flour for every 3 eggs,\" or \"$5 for 3 tacos,\" you are using a **ratio**, a comparison of two amounts. This lesson builds the one routine that solves them all.\n\n## What a ratio is\nA **ratio** compares two quantities. If a playlist plays **3 songs every 12 minutes**, the ratio of songs to minutes is **3 to 12**. You can write the same ratio three ways: in words (**3 to 12**), with a colon (**3 : 12**), or as a fraction (**3/12**).\n\n**Order matters.** \"Songs to minutes\" is 3 : 12, but \"minutes to songs\" is 12 : 3. Always read which quantity comes first.\n\n## Equivalent ratios\nJust like fractions, ratios can be **simplified**. Divide both numbers by the same amount: 3 : 12 → divide both by 3 → **1 : 4**. So \"3 songs to 12 minutes\" is the *same relationship* as \"1 song to 4 minutes.\" These are **equivalent ratios**, the same rate at a different scale.\n\nA **ratio table** lists equivalent ratios so you can read any answer straight off it: 1 song = 4 min, 2 songs = 8 min, 3 songs = 12 min, 5 songs = 20 min, 10 songs = **40 min**. Every pair keeps the same relationship.\n\n## Unit rate: \"per one\"\nA **unit rate** answers **\"how much for exactly one?\"** You find it by **dividing**: 12 minutes ÷ 3 songs = **4 minutes per song**. Once you know the unit rate, every question becomes a single multiplication: 10 songs → 10 × 4 = **40 minutes**; 7 songs → 7 × 4 = **28 minutes**.\n\n## Worked example, a recipe\nA recipe uses **2 cups of flour for 3 eggs**. How much flour for **9 eggs**?\n1. Relationship: flour : eggs = 2 : 3.\n2. 9 eggs is 3 × 3 eggs, so multiply the flour by 3 as well: 2 × 3 = **6 cups**.\nCheck with a unit rate: 2 ÷ 3 ≈ 0.67 cups per egg; 9 × 0.67 ≈ 6 cups. ✓\n\n## Worked example, the better buy\nRates help you make real decisions. A 12-ounce juice costs $3.00; a 20-ounce juice costs $4.40. Which is the better deal? Find the **price per ounce** (the unit rate): $3.00 ÷ 12 = **$0.25 per ounce**; $4.40 ÷ 20 = **$0.22 per ounce**. The 20-ounce bottle costs less per ounce, so it's the better buy. Unit rates let you compare things that aren't the same size.\n\n## Watch for this\nThe most common slip is dividing the wrong way. \"Minutes per song\" divides minutes by songs; \"songs per minute\" divides songs by minutes. Decide which \"per one\" you want **before** you divide.\n\n## The big idea\nSet up the ratio in the right order → find the unit rate by dividing → scale up or down by multiplying. That one routine, **ratio, divide, multiply**, solves rates everywhere: miles per hour, points per game, price per ounce.",
         quiz: [
           { q: "A recipe uses 2 cups flour for 3 eggs. The ratio of flour to eggs is…", options: ["3:2", "2:3", "2:5", "6:1"], answer: 1 },
           { q: "Simplify the ratio 6:9 to its simplest form.", options: ["3:2", "2:3", "6:9", "1:2"], answer: 1 },
@@ -285,12 +285,12 @@ const COURSES: K12Course[] = [
           { q: "Which is the better buy (lower price per ounce)?", options: ["$4 for 8 oz", "$5 for 20 oz", "They cost the same", "You can't tell"], answer: 1 },
         ],
         caseContext: "A food truck sells 3 tacos for $5. A classmate says 9 tacos should be $15 and 12 tacos $20. Walk Maya through checking this with a unit rate and a ratio table, and where the reasoning could slip.",
-        caseOpening: "Before we calculate — what stays the same no matter how many tacos you buy?" },
+        caseOpening: "Before we calculate, what stays the same no matter how many tacos you buy?" },
       { title: "Solving rate problems", outcome: "Use a ratio table or unit rate to solve a multi-step problem.",
         hook: "Which is the better buy: 12 oz for $3, or 20 oz for $4.60?", minutes: 9,
         standards: [{ code: "CCSS.MATH.CONTENT.6.RP.A.3", title: "Use ratio and rate reasoning to solve real-world problems" }],
-        points: ["A ratio table scales both numbers together", "Compare unit rates to find the better deal", "Watch the units — dollars per ounce vs ounces per dollar"],
-        reading: "Real problems reward organized thinking. A **ratio table** keeps two quantities in step: whatever you multiply the top by, you multiply the bottom by too.\n\nFor 'better buy' problems, find the **unit rate** for each option and compare. Option A: 12 oz for $3 → $3 ÷ 12 = **$0.25 per ounce**. Option B: 20 oz for $4.60 → $4.60 ÷ 20 = **$0.23 per ounce**. Option B is cheaper per ounce, so it's the better buy — even though it costs more total.\n\nThe key habit is watching your **units**. 'Dollars per ounce' and 'ounces per dollar' answer different questions. Decide which one you want, compute it for each choice, then compare.",
+        points: ["A ratio table scales both numbers together", "Compare unit rates to find the better deal", "Watch the units, dollars per ounce vs ounces per dollar"],
+        reading: "Real problems reward organized thinking. A **ratio table** keeps two quantities in step: whatever you multiply the top by, you multiply the bottom by too.\n\nFor 'better buy' problems, find the **unit rate** for each option and compare. Option A: 12 oz for $3 → $3 ÷ 12 = **$0.25 per ounce**. Option B: 20 oz for $4.60 → $4.60 ÷ 20 = **$0.23 per ounce**. Option B is cheaper per ounce, so it's the better buy, even though it costs more total.\n\nThe key habit is watching your **units**. 'Dollars per ounce' and 'ounces per dollar' answer different questions. Decide which one you want, compute it for each choice, then compare.",
         quiz: [
           { q: "In a ratio table, if you double the top you must…", options: ["Halve the bottom", "Double the bottom", "Leave the bottom", "Add 2 to the bottom"], answer: 1 },
           { q: "12 oz for $3 is a unit price of…", options: ["$0.25/oz", "$4/oz", "$0.12/oz", "$3/oz"], answer: 0 },
@@ -304,7 +304,7 @@ const COURSES: K12Course[] = [
   // 4) LEO · Grade 6 · dyslexia + ADHD ─────────────────────────────────────────
   {
     title: "Science 6: Ecosystems", subject: "Science", emoji: "🌿", grade: 6, gradeLabel: "Grade 6",
-    framework: "Next Generation Science Standards — Middle School Life Science",
+    framework: "Next Generation Science Standards, Middle School Life Science",
     intro: "Every living thing is connected. In two short lessons you'll map how energy flows through a food web and see why changing one thing changes everything.",
     outcome: "Model how energy flows through an ecosystem and predict the effect of a change.",
     tags: ["science", "ecosystems", "food web", "grade 6", "ngss"],
@@ -314,20 +314,20 @@ const COURSES: K12Course[] = [
         hook: "Grass never chases anything. So where does a hawk's energy really come from?", minutes: 8,
         standards: [{ code: "NGSS.MS-LS2-3", title: "Develop a model to describe the cycling of matter and flow of energy" }],
         points: ["Producers (plants) capture the sun's energy", "Energy flows: producers → herbivores → predators", "A food web links many food chains together"],
-        reading: "Every ecosystem runs on energy that starts with the **sun**.\n\n**Producers** — plants and algae — catch sunlight and make food. They are the base of everything. **Consumers** eat to get energy: herbivores (like mice) eat plants; predators (like snakes and hawks) eat other animals.\n\nSo a hawk's energy really came from the sun → grass → mouse → snake → hawk. Energy **flows one way** along the chain. A **food web** is just lots of these chains linked together, because most animals eat more than one thing.\n\nOne big idea: everything is connected. Follow the arrows and you can trace any animal's energy all the way back to the sun.",
+        reading: "Every ecosystem runs on energy that starts with the **sun**.\n\n**Producers**, plants and algae, catch sunlight and make food. They are the base of everything. **Consumers** eat to get energy: herbivores (like mice) eat plants; predators (like snakes and hawks) eat other animals.\n\nSo a hawk's energy really came from the sun → grass → mouse → snake → hawk. Energy **flows one way** along the chain. A **food web** is just lots of these chains linked together, because most animals eat more than one thing.\n\nOne big idea: everything is connected. Follow the arrows and you can trace any animal's energy all the way back to the sun.",
         quiz: [
           { q: "Producers get their energy from…", options: ["Eating animals", "The sun", "The soil only", "Other producers"], answer: 1 },
           { q: "Energy in a food chain flows…", options: ["In a circle", "One way, from producers to consumers", "From predators to plants", "Randomly"], answer: 1 },
           { q: "A mouse that eats seeds is a…", options: ["Producer", "Herbivore (consumer)", "Predator only", "The sun"], answer: 1 },
           { q: "A food web is…", options: ["One single chain", "Many food chains linked together", "A spider's home", "A list of plants"], answer: 1 },
         ],
-        caseContext: "In a meadow web, hawks eat snakes, snakes eat mice, mice eat grass. Leo thinks removing the hawks changes nothing. Coach him — in short, simple steps with concrete examples and extra thinking time — to trace what happens to snakes, then mice, then grass.",
-        caseOpening: "Take your time. If the hawks are gone, which animal is suddenly safer — snakes or mice?" },
+        caseContext: "In a meadow web, hawks eat snakes, snakes eat mice, mice eat grass. Leo thinks removing the hawks changes nothing. Coach him, in short, simple steps with concrete examples and extra thinking time, to trace what happens to snakes, then mice, then grass.",
+        caseOpening: "Take your time. If the hawks are gone, which animal is suddenly safer, snakes or mice?" },
       { title: "Energy flow", outcome: "Explain why there are fewer predators than prey.",
         hook: "Why are there tons of grasshoppers but only a few hawks?", minutes: 8,
         standards: [{ code: "NGSS.MS-LS2-1", title: "Analyze data for the effects of resource availability on organisms" }],
         points: ["Energy is lost as heat at every step", "Only some energy passes to the next level", "So each level up has fewer living things"],
-        reading: "Here's a puzzle: in a field there are thousands of grasshoppers, hundreds of frogs, but only a few hawks. Why?\n\nThe answer is **energy loss**. At every step of a food chain, a lot of energy is used up for living — moving, breathing, staying warm — and lost as heat. Only a small part of the energy gets passed to the next animal.\n\nSo plants have the most energy. Herbivores get less. Predators get even less. That's why the top of a food chain can only support a **few** animals — there simply isn't enough energy left for many. Scientists draw this as an **energy pyramid**: wide at the bottom, narrow at the top.",
+        reading: "Here's a puzzle: in a field there are thousands of grasshoppers, hundreds of frogs, but only a few hawks. Why?\n\nThe answer is **energy loss**. At every step of a food chain, a lot of energy is used up for living, moving, breathing, staying warm, and lost as heat. Only a small part of the energy gets passed to the next animal.\n\nSo plants have the most energy. Herbivores get less. Predators get even less. That's why the top of a food chain can only support a **few** animals, there simply isn't enough energy left for many. Scientists draw this as an **energy pyramid**: wide at the bottom, narrow at the top.",
         quiz: [
           { q: "At each step of a food chain, energy is…", options: ["Created", "Mostly lost as heat", "Doubled", "Frozen"], answer: 1 },
           { q: "There are fewer predators than prey because…", options: ["Predators are lazy", "Less energy reaches the top", "Prey hide", "Predators sleep"], answer: 1 },
@@ -335,14 +335,14 @@ const COURSES: K12Course[] = [
           { q: "An energy pyramid is…", options: ["Narrow at bottom", "Wide at bottom, narrow at top", "A perfect square", "Upside down"], answer: 1 },
         ],
         caseContext: "Leo wonders why a lake can feed millions of tiny algae but only a few big fish. Coach him gently, in small steps, to connect it to energy being lost at each level.",
-        caseOpening: "Let's go slow. Where does the energy in the lake start — with the algae or the fish?" },
+        caseOpening: "Let's go slow. Where does the energy in the lake start, with the algae or the fish?" },
     ],
   },
   // 5) JORDAN · Grade 8 · dysgraphia / slow processing ─────────────────────────
   {
     title: "Writing & Argument (Grade 8)", subject: "English Language Arts", emoji: "✍️", grade: 8, gradeLabel: "Grade 8",
-    framework: "Common Core State Standards — Grade 8 ELA/Literacy",
-    intro: "A strong argument can change minds. Over two lessons you'll build a clear claim backed by evidence, then learn to answer the other side — the move that makes writing persuasive.",
+    framework: "Common Core State Standards, Grade 8 ELA/Literacy",
+    intro: "A strong argument can change minds. Over two lessons you'll build a clear claim backed by evidence, then learn to answer the other side, the move that makes writing persuasive.",
     outcome: "Write an argument with a clear claim, evidence, and a counterargument.",
     tags: ["ela", "writing", "argument", "grade 8", "common core"],
     persona: { email: "jordan.k12@synops-demo.test", firstName: "Jordan", lastName: "Bell", grade: 8, gradeLabel: "Grade 8", learningStyle: "auditory", accommodations: ["extended_processing", "scaffolded_questions", "chunked_content", "concrete_examples"], progressFraction: 0.35 },
@@ -350,15 +350,15 @@ const COURSES: K12Course[] = [
       { title: "Claim and evidence", outcome: "State a clear claim and support it with specific evidence.",
         hook: "You say later school start times are better. A skeptic says 'prove it.' What now?", minutes: 9,
         standards: [{ code: "CCSS.ELA-LITERACY.W.8.1", title: "Write arguments to support claims with clear reasons and relevant evidence" }],
-        points: ["A claim is the position you're arguing", "Evidence is specific proof — facts, data, examples", "Always explain HOW the evidence supports the claim"],
-        reading: "An **argument** is a clear case for what you believe, built so a reasonable person might agree. It starts with a **claim** — your position, stated plainly: *\"Schools should start later.\"*\n\nA claim alone convinces no one. You need **evidence**: specific facts, data, or examples. *\"Studies show teens who start school later have better attendance and higher grades.\"* Good evidence is concrete and relevant — not just \"it's better,\" but *why*, with proof.\n\nThe step writers skip is the **link**: after your evidence, explain how it supports the claim. \"Better attendance and grades show later start times help students succeed.\" Claim → evidence → explanation. Master that chain and you can argue anything.",
+        points: ["A claim is the position you're arguing", "Evidence is specific proof, facts, data, examples", "Always explain HOW the evidence supports the claim"],
+        reading: "An **argument** is a clear case for what you believe, built so a reasonable person might agree. It starts with a **claim**, your position, stated plainly: *\"Schools should start later.\"*\n\nA claim alone convinces no one. You need **evidence**: specific facts, data, or examples. *\"Studies show teens who start school later have better attendance and higher grades.\"* Good evidence is concrete and relevant, not just \"it's better,\" but *why*, with proof.\n\nThe step writers skip is the **link**: after your evidence, explain how it supports the claim. \"Better attendance and grades show later start times help students succeed.\" Claim → evidence → explanation. Master that chain and you can argue anything.",
         quiz: [
           { q: "A claim is…", options: ["A random fact", "The position you're arguing", "A question", "The title"], answer: 1 },
           { q: "The best evidence is…", options: ["Vague and general", "Specific and relevant", "Only your opinion", "Off-topic"], answer: 1 },
           { q: "After giving evidence, a strong writer…", options: ["Stops immediately", "Explains how it supports the claim", "Changes the subject", "Repeats the claim only"], answer: 1 },
           { q: "Which is a claim?", options: ["Schools exist.", "Schools should start later.", "What time is school?", "Buses are yellow."], answer: 1 },
         ],
-        caseContext: "Jordan wants to argue that his town needs a new skate park but only writes 'it would be fun.' Coach him — with extended thinking time and small scaffolded steps — to turn that into a claim plus one specific piece of evidence.",
+        caseContext: "Jordan wants to argue that his town needs a new skate park but only writes 'it would be fun.' Coach him, with extended thinking time and small scaffolded steps, to turn that into a claim plus one specific piece of evidence.",
         caseOpening: "No rush. 'It would be fun' is a start. WHO would it help, and how? Let's find one specific reason." },
       { title: "Answering the other side", outcome: "Name an objection and respond to it (counterargument).",
         hook: "The best way to win an argument? Bring up the OTHER side yourself.", minutes: 9,
@@ -372,36 +372,36 @@ const COURSES: K12Course[] = [
           { q: "After naming a counterargument, you should…", options: ["Ignore it", "Respond with reasons", "Agree and quit", "Change topics"], answer: 1 },
         ],
         caseContext: "Jordan argues the school day should be shorter, but ignores the obvious objection (less learning time). Coach him to name that objection fairly and craft a reasonable response.",
-        caseOpening: "Someone WILL say 'a shorter day means less learning.' Let's not dodge it — how could you answer that fairly?" },
+        caseOpening: "Someone WILL say 'a shorter day means less learning.' Let's not dodge it, how could you answer that fairly?" },
     ],
   },
   // 6) EMMA · Grade 11 · low vision + dyscalculia ──────────────────────────────
   {
     title: "Algebra I (Grade 11 support)", subject: "Mathematics", emoji: "📐", grade: 11, gradeLabel: "Grade 11",
-    framework: "Common Core State Standards — High School Algebra",
-    intro: "Algebra is the language of patterns and change. In two lessons you'll solve linear equations step by step and read slope as a real rate of change — with every step shown clearly.",
+    framework: "Common Core State Standards, High School Algebra",
+    intro: "Algebra is the language of patterns and change. In two lessons you'll solve linear equations step by step and read slope as a real rate of change, with every step shown clearly.",
     outcome: "Solve one-variable linear equations and interpret slope as a rate of change.",
     tags: ["math", "algebra", "linear equations", "grade 11", "common core"],
     persona: { email: "emma.k12@synops-demo.test", firstName: "Emma", lastName: "Novak", grade: 11, gradeLabel: "Grade 11", learningStyle: "visual", accommodations: ["concrete_examples", "extended_processing", "scaffolded_questions", "chunked_content"], progressFraction: 0.55 },
     modules: [
       { title: "Solving linear equations", outcome: "Solve a one-variable equation by keeping it balanced.", video: "https://www.youtube.com/watch?v=f15zA0PhSek",
-        hook: "3x + 4 = 19. What is x — and how do you know you're right?", minutes: 10,
+        hook: "3x + 4 = 19. What is x, and how do you know you're right?", minutes: 10,
         standards: [{ code: "CCSS.MATH.CONTENT.HSA.REI.B.3", title: "Solve linear equations in one variable" }],
         points: ["An equation is a balance: do the same to both sides", "Undo operations in reverse order", "Check by substituting your answer back in"],
-        reading: "An **equation** is a balance scale: the two sides are equal, and whatever you do to one side you must do to the other to keep it balanced.\n\nTo solve **3x + 4 = 19**, undo the operations in reverse. First subtract 4 from both sides: 3x = 15. Then divide both sides by 3: **x = 5**.\n\nThe order matters — you undo addition/subtraction before multiplication/division, the reverse of how you'd build the expression. \n\nFinally, **check**: put x = 5 back in. 3(5) + 4 = 15 + 4 = 19. ✓ It balances, so the answer is correct. Checking isn't optional — it's how you *know* you're right, every time.",
+        reading: "An **equation** is a balance scale: the two sides are equal, and whatever you do to one side you must do to the other to keep it balanced.\n\nTo solve **3x + 4 = 19**, undo the operations in reverse. First subtract 4 from both sides: 3x = 15. Then divide both sides by 3: **x = 5**.\n\nThe order matters, you undo addition/subtraction before multiplication/division, the reverse of how you'd build the expression. \n\nFinally, **check**: put x = 5 back in. 3(5) + 4 = 15 + 4 = 19. ✓ It balances, so the answer is correct. Checking isn't optional, it's how you *know* you're right, every time.",
         quiz: [
           { q: "Solving 2x + 3 = 11, first you…", options: ["Divide by 2", "Subtract 3 from both sides", "Add 3", "Multiply by 2"], answer: 1 },
           { q: "In x/4 = 5, x equals…", options: ["20", "9", "1.25", "45"], answer: 0 },
           { q: "To keep an equation true, you must…", options: ["Change only one side", "Do the same to both sides", "Ignore the equals sign", "Add anything"], answer: 1 },
           { q: "The best way to know your answer is right is to…", options: ["Guess", "Substitute it back and check", "Ask a friend", "Move on"], answer: 1 },
         ],
-        caseContext: "Emma solves 5x − 2 = 18 and gets x = 4. Coach her to check her work by substituting, discover it doesn't balance, and find x = 4 correctly (5·4−2 = 18 ✓ — actually correct). Use clear, concrete steps.",
+        caseContext: "Emma solves 5x − 2 = 18 and gets x = 4. Coach her to check her work by substituting, discover it doesn't balance, and find x = 4 correctly (5·4−2 = 18 ✓, actually correct). Use clear, concrete steps.",
         caseOpening: "Let's verify. Put x = 4 back into 5x − 2. What do you get?" },
       { title: "Slope as rate of change", outcome: "Read slope as how much y changes per unit of x.",
-        hook: "A phone plan charges $30 plus $10 per gig. What's the 'slope' — and what does it mean?", minutes: 9,
+        hook: "A phone plan charges $30 plus $10 per gig. What's the 'slope', and what does it mean?", minutes: 9,
         standards: [{ code: "CCSS.MATH.CONTENT.HSF.IF.B.6", title: "Calculate and interpret the average rate of change" }],
         points: ["Slope = rise over run = change in y ÷ change in x", "Slope is a rate: how fast y changes as x grows", "In y = mx + b, m is the slope"],
-        reading: "**Slope** measures how steeply a line rises — and more usefully, it's a **rate of change**: how much *y* changes for each step in *x*.\n\nYou compute it as **rise over run**: the change in y divided by the change in x. On a phone plan that costs $30 plus $10 per gigabyte, every extra gig adds $10, so the **slope is 10** — 10 dollars per gig. The $30 is the starting point (the **y-intercept**).\n\nIn the equation **y = mx + b**, the **m** is the slope and **b** is where the line starts. Reading slope as a rate turns abstract lines into real meaning: dollars per gig, miles per hour, degrees per minute. Same idea, everywhere.",
+        reading: "**Slope** measures how steeply a line rises, and more usefully, it's a **rate of change**: how much *y* changes for each step in *x*.\n\nYou compute it as **rise over run**: the change in y divided by the change in x. On a phone plan that costs $30 plus $10 per gigabyte, every extra gig adds $10, so the **slope is 10**, 10 dollars per gig. The $30 is the starting point (the **y-intercept**).\n\nIn the equation **y = mx + b**, the **m** is the slope and **b** is where the line starts. Reading slope as a rate turns abstract lines into real meaning: dollars per gig, miles per hour, degrees per minute. Same idea, everywhere.",
         quiz: [
           { q: "Slope is…", options: ["Change in y ÷ change in x", "x times y", "The y-intercept", "Always 1"], answer: 0 },
           { q: "In y = mx + b, the slope is…", options: ["b", "m", "x", "y"], answer: 1 },
@@ -409,7 +409,7 @@ const COURSES: K12Course[] = [
           { q: "Slope as a rate of change tells you…", options: ["The starting value", "How fast y changes as x grows", "The color of the line", "Nothing useful"], answer: 1 },
         ],
         caseContext: "Emma sees the line y = 15 + 8x for a gym (a $15 join fee plus $8 per visit) and isn't sure what 8 means. Coach her, with a concrete real-world framing, to read 8 as the cost per visit (the rate of change).",
-        caseOpening: "In y = 15 + 8x, the 8 is attached to x — the number of visits. So what does 8 cost you each time?" },
+        caseOpening: "In y = 15 + 8x, the 8 is attached to x, the number of visits. So what does 8 cost you each time?" },
     ],
   },
 ];
@@ -419,37 +419,37 @@ const COURSES: K12Course[] = [
 const SECOND_COURSES: K12Course[] = [
   {
     title: "Grade 1 Math: Counting & Adding", subject: "Mathematics", emoji: "🔢", grade: 1, gradeLabel: "Grade 1",
-    framework: "Common Core State Standards — Grade 1 Operations & Algebraic Thinking",
+    framework: "Common Core State Standards, Grade 1 Operations & Algebraic Thinking",
     intro: "Let's learn to count and add small numbers. We will use our fingers, toys, and pictures to see how numbers grow.",
     outcome: "I can count on from a number and add two numbers within 10.",
     tags: ["math", "counting", "addition", "grade 1", "common core"],
     persona: { email: "mateo.k12@synops-demo.test", firstName: "Mateo", lastName: "Flores", grade: 1, gradeLabel: "Grade 1", learningStyle: "kinesthetic", accommodations: ["simplified_language", "concrete_examples", "chunked_content", "positive_reinforcement"], progressFraction: 0.1 },
     modules: [
-      { title: "Count and Add", outcome: "I can count the pictures and add to 10.", hook: "🍎🍎 and 🍎🍎🍎 — how many apples?", minutes: 6, game: "choice",
+      { title: "Count and Add", outcome: "I can count the pictures and add to 10.", hook: "🍎🍎 and 🍎🍎🍎, how many apples?", minutes: 6, game: "choice",
         standards: [{ code: "CCSS.MATH.CONTENT.1.OA.C.6", title: "Add and subtract within 20" }],
         points: ["Adding puts two groups together.", "Count them ALL to find how many.", "The last number you say is the answer."],
         reading: "Adding means we put things together and count them all! 🎉\n\n🍎🍎 and 🍎 makes 🍎🍎🍎. Count them: 1, 2, 3. That is **3**!\n\nPoint to each one and count out loud. The last number you say is the answer. You can do it! ⭐",
         quiz: [
-          { q: "🍎🍎 and 🍎🍎🍎 — how many?", options: ["4", "5", "6", "3"], answer: 1 },
-          { q: "🐟🐟🐟🐟 and 🐟 — how many?", options: ["5", "4", "6", "3"], answer: 0 },
-          { q: "⭐⭐⭐ and ⭐⭐⭐ — how many?", options: ["7", "5", "6", "4"], answer: 2 },
-          { q: "🎈🎈 and 🎈🎈 — how many?", options: ["3", "5", "2", "4"], answer: 3 },
+          { q: "🍎🍎 and 🍎🍎🍎, how many?", options: ["4", "5", "6", "3"], answer: 1 },
+          { q: "🐟🐟🐟🐟 and 🐟, how many?", options: ["5", "4", "6", "3"], answer: 0 },
+          { q: "⭐⭐⭐ and ⭐⭐⭐, how many?", options: ["7", "5", "6", "4"], answer: 2 },
+          { q: "🎈🎈 and 🎈🎈, how many?", options: ["3", "5", "2", "4"], answer: 3 },
         ], caseContext: "", caseOpening: "" },
-      { title: "Ten and Some More", outcome: "I can make a teen number as ten and some more.", hook: "🔟 and 🍎🍎 — what number?", minutes: 6, game: "choice",
+      { title: "Ten and Some More", outcome: "I can make a teen number as ten and some more.", hook: "🔟 and 🍎🍎, what number?", minutes: 6, game: "choice",
         standards: [{ code: "CCSS.MATH.CONTENT.1.NBT.B.2", title: "Understand place value: tens and ones" }],
         points: ["A teen number is ten and some more.", "Ten and 1 more is 11. Ten and 2 more is 12.", "Start at ten, then count on!"],
         reading: "Big-kid numbers! A teen number is **ten and some more**. 🎉\n\n🔟 and 🍎 is **eleven (11)**.\n🔟 and 🍎🍎 is **twelve (12)**.\n\nStart at ten, then keep counting: 11, 12, 13… You are a number star! ⭐",
         quiz: [
-          { q: "🔟 and 🍎🍎 — what number?", options: ["2", "12", "20", "10"], answer: 1 },
-          { q: "Ten and 4 more — what number?", options: ["14", "40", "4", "11"], answer: 0 },
-          { q: "🔟 and 🍎🍎🍎🍎🍎 — what number?", options: ["50", "5", "15", "16"], answer: 2 },
-          { q: "Ten and 1 more — what number?", options: ["10", "1", "12", "11"], answer: 3 },
+          { q: "🔟 and 🍎🍎, what number?", options: ["2", "12", "20", "10"], answer: 1 },
+          { q: "Ten and 4 more, what number?", options: ["14", "40", "4", "11"], answer: 0 },
+          { q: "🔟 and 🍎🍎🍎🍎🍎, what number?", options: ["50", "5", "15", "16"], answer: 2 },
+          { q: "Ten and 1 more, what number?", options: ["10", "1", "12", "11"], answer: 3 },
         ], caseContext: "", caseOpening: "" },
     ],
   },
   {
     title: "Matemáticas (Grado 3): Multiplicación", subject: "Matemáticas", emoji: "✖️", grade: 3, gradeLabel: "Grade 3", lang: "es",
-    framework: "Common Core State Standards — Grade 3 Mathematics",
+    framework: "Common Core State Standards, Grade 3 Mathematics",
     intro: "Vamos a aprender qué es la multiplicación. Verás que multiplicar es una forma rápida de sumar grupos iguales.",
     outcome: "Puedo explicar la multiplicación como grupos iguales y resolver problemas sencillos.",
     tags: ["matematicas", "multiplicacion", "grade 3", "common core"],
@@ -470,7 +470,7 @@ const SECOND_COURSES: K12Course[] = [
       { title: "Problemas con Multiplicación", outcome: "Puedo resolver problemas de la vida real usando la multiplicación.", video: "https://www.youtube.com/watch?v=lgPs3UxM2kU", hook: "Si cada mesa tiene la misma cantidad de sillas, ¿cómo sabes cuántas sillas hay en total?", minutes: 25, game: "pair",
         standards: [{ code: "CCSS.MATH.CONTENT.3.OA.A.3", title: "Use multiplication to solve word problems" }],
         points: ["Busca grupos iguales dentro del problema.", "Multiplica el número de grupos por lo que hay en cada grupo.", "El resultado es el total de todas las cosas juntas."],
-        reading: "Muchos problemas de la vida real usan **grupos iguales**. Cuando veas grupos que tienen la misma cantidad, puedes usar la **multiplicación** para hallar el total.\n\n**Problema 1:** \"Ana tiene **4 bolsas**. En cada bolsa hay **6 manzanas**🍎. ¿Cuántas manzanas tiene en total?\"\nBusca los grupos iguales: hay **4 grupos** (las bolsas) y cada uno tiene **6 manzanas**. Escribimos **4 × 6**. Resuélvelo: 6 + 6 + 6 + 6 = **24**. ¡Ana tiene **24 manzanas**!\n\n**Problema 2:** \"En el salón hay **5 mesas** y en **cada** mesa hay **3 sillas**. ¿Cuántas sillas hay?\"\n5 grupos de 3 → **5 × 3** = 15. Hay **15 sillas**.\n\n**La palabra mágica: \"cada\".** Cuando un problema dice \"cada\", casi siempre puedes multiplicar, porque los grupos son iguales. Búscala: *cada* bolsa, *cada* mesa, *cada* caja…\n\n**Los 3 pasos para resolver:** (1) ¿cuántos grupos hay?, (2) ¿cuántos hay en cada grupo?, (3) multiplica los dos números.\n\n**Cuidado:** si los grupos NO son iguales (una bolsa con 6 y otra con 2), no puedes multiplicar directo — tendrías que sumar. Por eso primero revisa que sean iguales.\n\n**Aplícalo:** mira a tu alrededor — huevos en un cartón, ruedas en los carros, dedos en las manos… ¡hay grupos iguales por todas partes! En el juego, une cada problema con su total. 🧮",
+        reading: "Muchos problemas de la vida real usan **grupos iguales**. Cuando veas grupos que tienen la misma cantidad, puedes usar la **multiplicación** para hallar el total.\n\n**Problema 1:** \"Ana tiene **4 bolsas**. En cada bolsa hay **6 manzanas**🍎. ¿Cuántas manzanas tiene en total?\"\nBusca los grupos iguales: hay **4 grupos** (las bolsas) y cada uno tiene **6 manzanas**. Escribimos **4 × 6**. Resuélvelo: 6 + 6 + 6 + 6 = **24**. ¡Ana tiene **24 manzanas**!\n\n**Problema 2:** \"En el salón hay **5 mesas** y en **cada** mesa hay **3 sillas**. ¿Cuántas sillas hay?\"\n5 grupos de 3 → **5 × 3** = 15. Hay **15 sillas**.\n\n**La palabra mágica: \"cada\".** Cuando un problema dice \"cada\", casi siempre puedes multiplicar, porque los grupos son iguales. Búscala: *cada* bolsa, *cada* mesa, *cada* caja…\n\n**Los 3 pasos para resolver:** (1) ¿cuántos grupos hay?, (2) ¿cuántos hay en cada grupo?, (3) multiplica los dos números.\n\n**Cuidado:** si los grupos NO son iguales (una bolsa con 6 y otra con 2), no puedes multiplicar directo, tendrías que sumar. Por eso primero revisa que sean iguales.\n\n**Aplícalo:** mira a tu alrededor, huevos en un cartón, ruedas en los carros, dedos en las manos… ¡hay grupos iguales por todas partes! En el juego, une cada problema con su total. 🧮",
         quiz: [
           { q: "Hay 3 mesas con 5 sillas cada una. ¿Cuántas sillas hay?", options: ["8", "15", "35", "10"], answer: 1 },
           { q: "¿Qué palabra te ayuda a saber que los grupos son iguales?", options: ["menos", "cada", "resta", "mitad"], answer: 1 },
@@ -483,7 +483,7 @@ const SECOND_COURSES: K12Course[] = [
   },
   {
     title: "Science 4: Energy & Motion", subject: "Science", emoji: "⚡", grade: 4, gradeLabel: "Grade 4",
-    framework: "Next Generation Science Standards — Grade 4 Physical Science",
+    framework: "Next Generation Science Standards, Grade 4 Physical Science",
     intro: "In this course you will learn about energy and how things move. We will go step by step, with clear examples you can picture.",
     outcome: "I can explain how the speed of an object relates to its energy and describe how energy transfers.",
     tags: ["science", "energy", "motion", "grade 4", "ngss"],
@@ -513,7 +513,7 @@ const SECOND_COURSES: K12Course[] = [
   },
   {
     title: "Civics 6: How Government Works", subject: "Social Studies", emoji: "🏛️", grade: 6, gradeLabel: "Grade 6",
-    framework: "C3 Framework for Social Studies — Civics",
+    framework: "C3 Framework for Social Studies, Civics",
     intro: "Government shapes daily life, from schools to roads. In this course you will learn how the U.S. government is organized and what it means to be an active citizen.",
     outcome: "I can describe the three branches of government and explain the rights and responsibilities of citizens.",
     tags: ["civics", "government", "citizenship", "grade 6", "c3"],
@@ -543,7 +543,7 @@ const SECOND_COURSES: K12Course[] = [
   },
   {
     title: "World History 6: Early Civilizations", subject: "Social Studies", emoji: "🏺", grade: 6, gradeLabel: "Grade 6",
-    framework: "C3 Framework for Social Studies — History",
+    framework: "C3 Framework for Social Studies, History",
     intro: "Long ago, the first cities and civilizations began. In this course you will learn where they started, why, and the amazing things they invented.",
     outcome: "I can explain why early civilizations began near rivers and name key inventions they created.",
     tags: ["history", "civilizations", "mesopotamia", "grade 6", "c3"],
@@ -573,7 +573,7 @@ const SECOND_COURSES: K12Course[] = [
   },
   {
     title: "U.S. History 8: The Constitution", subject: "Social Studies", emoji: "📜", grade: 8, gradeLabel: "Grade 8",
-    framework: "C3 Framework for Social Studies — Civics & History",
+    framework: "C3 Framework for Social Studies, Civics & History",
     intro: "The U.S. Constitution is the plan for American government. In this course you will explore why it was written and how it protects people's freedoms.",
     outcome: "I can explain why the Constitution was written and describe the Bill of Rights and separation of powers.",
     tags: ["us history", "constitution", "government", "grade 8", "c3"],
@@ -603,7 +603,7 @@ const SECOND_COURSES: K12Course[] = [
   },
   {
     title: "U.S. Government (Grade 11): Foundations of Democracy", subject: "Social Studies", emoji: "⚖️", grade: 11, gradeLabel: "Grade 11",
-    framework: "C3 Framework for Social Studies — Civics (High School)",
+    framework: "C3 Framework for Social Studies, Civics (High School)",
     intro: "American democracy rests on how power is divided and how citizens shape policy. In this course you will analyze the constitutional structure and the lawmaking process.",
     outcome: "I can explain how the Constitution distributes and limits power and evaluate how citizens influence policy.",
     tags: ["government", "democracy", "federalism", "grade 11", "c3"],
@@ -661,7 +661,7 @@ function renderEmemory(){var pe=items.filter(function(x){return x.emoji;});total
 function firstOrNull<T>(rows: T[]): T | null { return rows.length ? rows[0]! : null; }
 
 // Localise a string by course language so a Spanish course reads Spanish end-to-end (headers, beat
-// titles, narration) — not just the game instructions.
+// titles, narration), not just the game instructions.
 function TL(lang: string | undefined, en: string, es: string): string { return lang === "es" ? es : en; }
 
 // The reading-step body for a module, with its section headers in the course language. Shared by the
@@ -674,19 +674,18 @@ function readingBody(m: K12Module, lang?: string): string {
   return `# ${m.title}\n\n**${think}** ${m.hook}\n\n**${byEnd}** ${m.outcome}\n\n${m.reading}\n\n## ${bigIdeas}\n\n${m.points.map((p) => `- ${p}`).join("\n")}\n\n**${aligned}** ${m.standards.map((s) => s.code).join(", ")}`;
 }
 
-// A quiz activity's title + instructions, in the course language and stating the learning objective —
-// so EVERY activity has clear, localized instructions and a stated objective (not a bare English label).
+// A quiz activity's title + instructions, in the course language and stating the learning objective, // so EVERY activity has clear, localized instructions and a stated objective (not a bare English label).
 function quizTitle(m: K12Module, lang?: string): string {
   return TL(lang, `${m.title}: practice check`, `${m.title}: repaso`);
 }
 function quizInstructions(m: K12Module, lang?: string): string {
   return TL(lang,
-    `Objective: ${m.outcome} Answer each question and check your work — you can retry as many times as you like.`,
-    `Objetivo: ${m.outcome} Responde cada pregunta y revisa tu trabajo — puedes intentarlo las veces que quieras.`);
+    `Objective: ${m.outcome} Answer each question and check your work, you can retry as many times as you like.`,
+    `Objetivo: ${m.outcome} Responde cada pregunta y revisa tu trabajo, puedes intentarlo las veces que quieras.`);
 }
 
 // Give every quiz question a relevant background-removed photograph (served cut-out via /api/kid-cutout),
-// so EVERY class shows real photos — not only the reading courses. Keyed by module title → the cut-out
+// so EVERY class shows real photos, not only the reading courses. Keyed by module title → the cut-out
 // keys to cycle through its questions; falls back to no image if a module isn't mapped (e.g. the picture
 // reading courses already carry their own per-item images).
 function withImages(m: K12Module): K12Module["quiz"] {
@@ -746,8 +745,8 @@ async function createK12Course(c: K12Course, orgId: string, facultyId: string): 
     await db.insert(beatsTable).values([
       { moduleId: mod.id, type: "title_card", order: 0, title: m.title, narration: TL(lang, `${m.hook}  By the end of this lesson you'll be able to: ${m.outcome}`, `${m.hook}  Al terminar esta lección podrás: ${m.outcome}`) },
       { moduleId: mod.id, type: "points", order: 1, title: TL(lang, "Big ideas", "Ideas importantes"), narration: TL(lang, `Keep the question in mind: ${m.hook}`, `Ten presente la pregunta: ${m.hook}`), bulletPoints: m.points },
-      { moduleId: mod.id, type: "close", order: 2, title: TL(lang, "You've got this", "¡Tú puedes!"), narration: TL(lang, `Nice work — you can now ${m.outcome.toLowerCase()} Try the practice, then move on.`, `¡Buen trabajo! Ya puedes ${m.outcome.toLowerCase()} Haz la práctica y sigue adelante.`) },
-      // Optional teaching video (YouTube) — surfaced as a "Watch" step in the young lesson view.
+      { moduleId: mod.id, type: "close", order: 2, title: TL(lang, "You've got this", "¡Tú puedes!"), narration: TL(lang, `Nice work, you can now ${m.outcome.toLowerCase()} Try the practice, then move on.`, `¡Buen trabajo! Ya puedes ${m.outcome.toLowerCase()} Haz la práctica y sigue adelante.`) },
+      // Optional teaching video (YouTube), surfaced as a "Watch" step in the young lesson view.
       ...(m.video ? [{ moduleId: mod.id, type: "video" as const, order: 3, title: TL(lang, "Watch", "Ver"), narration: TL(lang, `Watch this short video, then keep going: ${m.hook}`, `Mira este video corto y luego continúa: ${m.hook}`), videoUrl: m.video }] : []),
     ]);
     await db.update(modulesTable).set({ beatCount: m.video ? 4 : 3 }).where(eq(modulesTable.id, mod.id));
@@ -828,7 +827,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   for (const c of ALL_COURSES) {
     let existing = firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
     // Self-heal a PARTIAL course. A prior seed can abort mid-build (e.g. an insert error on one
-    // module), leaving a course with fewer modules than it should have — which idempotent reuse
+    // module), leaving a course with fewer modules than it should have, which idempotent reuse
     // would then keep forever. If the existing course is short on modules, tear it and its
     // dependents down completely so it rebuilds clean below.
     if (existing) {
@@ -865,7 +864,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   }
 
   // 3a2. Reconcile the class roster of COURSES: drop stale attachments left by earlier seeds (old
-  // duplicate courses like "Reading Lab") so the class — and the public commendations page — shows
+  // duplicate courses like "Reading Lab") so the class, and the public commendations page, shows
   // exactly the current two-subjects-per-learner set, nothing orphaned.
   {
     const planCourseIds = Object.values(courseIdByTitle);
@@ -884,7 +883,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   }
 
   // 3c. Refresh the quiz HTML AND the reading content + objectives on REUSED courses so content
-  // edits actually propagate — existing courses are reused, not recreated, on reseed.
+  // edits actually propagate, existing courses are reused, not recreated, on reseed.
   for (const c of ALL_COURSES) {
     const cid = courseIdByTitle[c.title];
     if (!cid) continue;
@@ -907,7 +906,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
       // has a video, add it if it gained one).
       await db.update(beatsTable).set({ title: m.title, narration: TL(lang, `${m.hook}  By the end of this lesson you'll be able to: ${m.outcome}`, `${m.hook}  Al terminar esta lección podrás: ${m.outcome}`) }).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.order, 0)));
       await db.update(beatsTable).set({ title: TL(lang, "Big ideas", "Ideas importantes"), narration: TL(lang, `Keep the question in mind: ${m.hook}`, `Ten presente la pregunta: ${m.hook}`), bulletPoints: m.points }).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.order, 1)));
-      await db.update(beatsTable).set({ title: TL(lang, "You've got this", "¡Tú puedes!"), narration: TL(lang, `Nice work — you can now ${m.outcome.toLowerCase()} Try the practice, then move on.`, `¡Buen trabajo! Ya puedes ${m.outcome.toLowerCase()} Haz la práctica y sigue adelante.`) }).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.order, 2)));
+      await db.update(beatsTable).set({ title: TL(lang, "You've got this", "¡Tú puedes!"), narration: TL(lang, `Nice work, you can now ${m.outcome.toLowerCase()} Try the practice, then move on.`, `¡Buen trabajo! Ya puedes ${m.outcome.toLowerCase()} Haz la práctica y sigue adelante.`) }).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.order, 2)));
       const vbeats = await db.select().from(beatsTable).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.type, "video")));
       if (!m.video && vbeats.length) {
         await db.delete(beatsTable).where(and(eq(beatsTable.moduleId, modId), eq(beatsTable.type, "video")));
@@ -938,7 +937,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
   // classes out of the box (no teacher action needed). Young early/elementary courses (Mateo, Sofía,
   // Aiden) are skipped on purpose: their lesson view auto-launches the module's first activity, so a
   // bonus game must never displace the guided quiz. Idempotent: refreshed in place by title.
-  // Each game's content is written to REVIEW that specific course — not generic trivia — so the game is
+  // Each game's content is written to REVIEW that specific course, not generic trivia, so the game is
   // clearly relevant to the lesson it sits in.
   const gamePlan: { email: string; courseTitle: string; key: string; band: Band; instructions: string; content: Record<string, unknown> }[] = [
     { email: "maya.k12@synops-demo.test", courseTitle: "Math 6: Ratios & Rates", key: "jeopardy", band: "68",
@@ -958,7 +957,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
           { value: 300, clue: "Map scale 1 inch = 20 miles. How far is 3.5 inches?", answer: "70 miles" } ] },
       ] } },
     { email: "leo.k12@synops-demo.test", courseTitle: "Science 6: Ecosystems", key: "feud", band: "68",
-      instructions: "Read the survey question about ecosystems. Tap the answers you think are most popular — three misses ends the round.",
+      instructions: "Read the survey question about ecosystems. Tap the answers you think are most popular, three misses ends the round.",
       content: { title: "Ecosystems Survey Feud", rounds: [
         { question: "Name a living or non-living part of an ecosystem.", answers: [{ text: "Plants", points: 32 }, { text: "Animals", points: 28 }, { text: "Water", points: 22 }, { text: "Sunlight", points: 18 }], distractors: ["Cars", "Buildings"] },
         { question: "Name a role an organism can play in a food chain.", answers: [{ text: "Producer", points: 38 }, { text: "Consumer", points: 34 }, { text: "Decomposer", points: 28 }], distractors: ["Spectator", "Referee"] },
@@ -1004,7 +1003,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
           { value: 300, clue: "Splitting power so no branch gets too strong is called…", answer: "Separation of powers" } ] },
       ] } },
     { email: "leo.k12@synops-demo.test", courseTitle: "World History 6: Early Civilizations", key: "feud", band: "68",
-      instructions: "Read the survey question about early civilizations. Tap the answers you think are most popular — three misses ends the round.",
+      instructions: "Read the survey question about early civilizations. Tap the answers you think are most popular, three misses ends the round.",
       content: { title: "Early Civilizations Survey Feud", rounds: [
         { question: "Name something a river gave to early people.", answers: [{ text: "Water", points: 40 }, { text: "Food/farming", points: 30 }, { text: "Travel by boat", points: 18 }, { text: "Rich soil", points: 12 }], distractors: ["Gold", "Ice"] },
         { question: "Name an invention of early civilizations.", answers: [{ text: "Writing", points: 38 }, { text: "The wheel", points: 34 }, { text: "Written laws", points: 28 }], distractors: ["The internet", "Cars"] },
@@ -1084,7 +1083,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
       } else {
         await db.insert(interactiveActivitiesTable).values({
           organisationId: org.id, courseId: mcCourseId, moduleId: mcMod.id, title,
-          instructions: "Solve each problem. Drag the dot on the number line or type your answer. Stuck? Ask the coach — it helps you with hints, never the answer!",
+          instructions: "Solve each problem. Drag the dot on the number line or type your answer. Stuck? Ask the coach, it helps you with hints, never the answer!",
           html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "intermediate",
           isLibrary: false, tags: ["math-coach", "game:mathcoach", "band:68", "subject:Math"], published: true, createdByUserId: facultyId,
         });
@@ -1099,7 +1098,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     const [algMod] = await db.select().from(modulesTable).where(eq(modulesTable.courseId, algCourseId)).orderBy(asc(modulesTable.order)).limit(1);
     if (algMod) {
       const problems = { problems: [
-        { prompt: "Solve for x:  2x + 3 = 11", answer: "4", kind: "number", min: 0, max: 12, visual: "balance", eq: { a: 2, b: 3, c: 11 }, hint: "First get the x-boxes by themselves — clear the +3." },
+        { prompt: "Solve for x:  2x + 3 = 11", answer: "4", kind: "number", min: 0, max: 12, visual: "balance", eq: { a: 2, b: 3, c: 11 }, hint: "First get the x-boxes by themselves, clear the +3." },
         { prompt: "Solve for x:  4x = 20", answer: "5", kind: "number", min: 0, max: 12, visual: "balance", eq: { a: 4, b: 0, c: 20 }, hint: "Divide both sides by 4." },
         { prompt: "Solve for x:  3x − 6 = 9", answer: "5", kind: "number", min: 0, max: 12, visual: "balance", eq: { a: 3, b: -6, c: 9 }, hint: "Add 6 to both sides first, then divide." },
         { prompt: "Solve for x:  2x − 4 = 10", answer: "7", kind: "number", min: 0, max: 15, visual: "balance", eq: { a: 2, b: -4, c: 10 }, hint: "Add 4 to both sides, then divide by 2." },
@@ -1114,7 +1113,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
       } else {
         await db.insert(interactiveActivitiesTable).values({
           organisationId: org.id, courseId: algCourseId, moduleId: algMod.id, title,
-          instructions: "Solve each equation by keeping the scale balanced — do the same to both sides until one x is left. Stuck? Ask the coach for a hint.",
+          instructions: "Solve each equation by keeping the scale balanced, do the same to both sides until one x is left. Stuck? Ask the coach for a hint.",
           html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "advanced",
           isLibrary: false, tags: ["math-coach", "game:mathcoach", "band:912", "subject:Math"], published: true, createdByUserId: facultyId,
         });
@@ -1122,7 +1121,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     }
   }
 
-  // 3g. A Spanish Socratic "Tutor de Mates" for Sofía's Grade-3 multiplication course — a number-line
+  // 3g. A Spanish Socratic "Tutor de Mates" for Sofía's Grade-3 multiplication course, a number-line
   // problem set with a coach that hints in Spanish (never the answer). Adds a genuinely different game
   // type (guided problem-solving) to her class, fully in Spanish.
   const sofiaMathId = courseIdByTitle["Matemáticas (Grado 3): Multiplicación"];
@@ -1145,7 +1144,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
       } else {
         await db.insert(interactiveActivitiesTable).values({
           organisationId: org.id, courseId: sofiaMathId, moduleId: smMod.id, title,
-          instructions: "Resuelve cada problema. Arrastra el punto en la recta numérica o escribe tu respuesta. ¿Atascado? Pregúntale al tutor — te ayuda con pistas, ¡nunca con la respuesta!",
+          instructions: "Resuelve cada problema. Arrastra el punto en la recta numérica o escribe tu respuesta. ¿Atascado? Pregúntale al tutor, te ayuda con pistas, ¡nunca con la respuesta!",
           html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "beginner",
           isLibrary: false, tags: ["math-coach", "game:mathcoach", "band:35", "subject:Math", "lang:es"], published: true, createdByUserId: facultyId,
         });

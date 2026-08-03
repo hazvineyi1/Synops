@@ -295,7 +295,7 @@ function AddLearner({ courseId }: { courseId: string }) {
           <SelectContent>
             {(candidates ?? []).map((u) => (
               <SelectItem key={u.id} value={u.id}>
-                {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.id}{u.role ? ` — ${u.role}` : ''}
+                {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.id}{u.role ? `, ${u.role}` : ''}
               </SelectItem>
             ))}
           </SelectContent>
@@ -727,7 +727,7 @@ function parseMarkdown(md: string): string {
 }
 
 function formatDate(d?: string) {
-  if (!d) return '—';
+  if (!d) return ', ';
   return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
@@ -953,7 +953,7 @@ function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
     setLevels((p) => (p.includes(l) ? p.filter((x) => x !== l) : [...p, l]));
   const generate = () => {
     // Rules-based Bloom's engine: one measurable objective per chosen cognitive level,
-    // seeded from the course title/description. Appended to the draft for review — the ID
+    // seeded from the course title/description. Appended to the draft for review, the ID
     // edits and Saves; nothing is written until Save objectives.
     const gen = generateObjectives(title, description ?? '', BLOOM_LEVELS.filter((l) => levels.includes(l)));
     const existing = new Set(clean.map((s) => s.toLowerCase()));
@@ -1081,7 +1081,7 @@ export function CourseDetail() {
   const { data: user } = useGetMe();
   const role = user?.role ?? 'learner';
   const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(role);
-  // Youngest learners (K-5) get a stripped, jargon-free course page: just "Start here" — no
+  // Youngest learners (K-5) get a stripped, jargon-free course page: just "Start here", no
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
   const isYoungBand = !!youngPersona && (youngPersona.band === 'early' || youngPersona.band === 'elementary');
@@ -1116,7 +1116,7 @@ export function CourseDetail() {
   // catalog visitors keep the tabbed course-management shell. Declared AFTER the enrolment
   // query (it reads enrolment) to avoid a temporal-dead-zone reference.
   const isLearnerView = !isInstructor && !!enrolment;
-  // Behavioural density recommendation (Focus vs Full view) — sets the DEFAULT only;
+  // Behavioural density recommendation (Focus vs Full view), sets the DEFAULT only;
   // the learner's explicit toggle choice always wins. Learners only.
   const { data: densityRec } = useQuery({
     queryKey: ['learn', 'density'],
@@ -1187,7 +1187,7 @@ export function CourseDetail() {
           <p className="text-muted-foreground mt-1 text-sm max-w-2xl">{course.description}</p>
           <div className="flex flex-wrap gap-2 mt-3">
             {courseLevelLabel(course) && <Badge variant="outline">{es ? courseLevelLabel(course)!.replace(/^Grade /, 'Grado ') : courseLevelLabel(course)}</Badge>}
-            {/* Standards/skill tags are jargon for K-12 learners — hidden so the page stays short. */}
+            {/* Standards/skill tags are jargon for K-12 learners, hidden so the page stays short. */}
             {!isK12Learner && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
           </div>
         </div>
@@ -1234,7 +1234,7 @@ export function CourseDetail() {
                   key={m.moduleId}
                   title={
                     m.certified && !m.complete
-                      ? `${m.title}: Mastered — review the material`
+                      ? `${m.title}: Mastered, review the material`
                       : `${m.title}: ${m.viewedBeats}/${m.totalBeats}`
                   }
                   className={cn(
@@ -1291,7 +1291,7 @@ export function CourseDetail() {
           <div className={isYoungBand ? '' : 'lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-8'}>
             {/* Main column: the single learning flow */}
             <div className="space-y-10 min-w-0">
-              {/* 1. Course overview — hidden for all K-12 learners (already in the header; keeps modules high) */}
+              {/* 1. Course overview, hidden for all K-12 learners (already in the header; keeps modules high) */}
               {course.description && !isK12Learner && (
                 <section>
                   <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course overview</h2>
@@ -1299,7 +1299,7 @@ export function CourseDetail() {
                 </section>
               )}
 
-              {/* 2-4. Objectives, structure, skills — hidden for all K-12 learners to minimize scrolling to lessons */}
+              {/* 2-4. Objectives, structure, skills, hidden for all K-12 learners to minimize scrolling to lessons */}
               {!isK12Learner && (<>
               <section>
                 <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course learning objectives</h2>
@@ -1397,7 +1397,7 @@ export function CourseDetail() {
               </section>
             </div>
 
-            {/* Side column: Calendar + Announcements — hidden for the youngest (too much) */}
+            {/* Side column: Calendar + Announcements, hidden for the youngest (too much) */}
             {!isYoungBand && (
             <aside className="mt-10 lg:mt-0 space-y-6 lg:sticky lg:top-20 lg:self-start">
               <div className="rounded-2xl border border-border bg-card p-4">
@@ -1671,7 +1671,7 @@ export function CourseDetail() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">My Grades</h2>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-foreground">{myGrades.overallPercent?.toFixed(1) ?? '—'}%</div>
+                    <div className="text-2xl font-bold text-foreground">{myGrades.overallPercent?.toFixed(1) ?? ', '}%</div>
                     <div className="text-xs text-muted-foreground">Overall ({myGrades.totalEarned} / {myGrades.totalPossible} pts)</div>
                   </div>
                 </div>
@@ -1693,10 +1693,10 @@ export function CourseDetail() {
                             {g.dueDate && <div className="text-xs text-muted-foreground">{formatDate(g.dueDate)}</div>}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono">
-                            {g.score !== null ? `${g.score} / ${g.pointsPossible}` : '—'}
+                            {g.score !== null ? `${g.score} / ${g.pointsPossible}` : ', '}
                           </td>
                           <td className="py-2.5 px-3 text-right">
-                            {g.letterGrade ? <Badge variant="outline">{g.letterGrade}</Badge> : '—'}
+                            {g.letterGrade ? <Badge variant="outline">{g.letterGrade}</Badge> : ', '}
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             {g.missing && <Badge variant="destructive" className="text-xs">Missing</Badge>}
@@ -1826,7 +1826,7 @@ export function CourseDetail() {
                       {roster.map((r) => (
                         <tr key={r.enrolmentId} className="border-b border-border/50 hover:bg-muted/30">
                           <td className="py-2.5 px-3 font-medium">{r.user?.firstName} {r.user?.lastName}</td>
-                          {isInstructor && <td className="py-2.5 px-3 text-muted-foreground">{r.user?.email ?? '—'}</td>}
+                          {isInstructor && <td className="py-2.5 px-3 text-muted-foreground">{r.user?.email ?? ', '}</td>}
                           <td className="py-2.5 px-3 text-muted-foreground capitalize">{r.user?.role === 'learner' ? 'Learner' : (r.user?.role?.replace('_', ' ') ?? 'Learner')}</td>
                           <td className="py-2.5 px-3">
                             <Badge variant={r.enrolmentStatus === 'completed' ? 'default' : r.enrolmentStatus === 'active' ? 'secondary' : 'outline'} className="text-xs">
