@@ -1377,7 +1377,7 @@ export function CourseDetail() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium truncate">{m.title}</span>
-                              {recommended && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">Start here</Badge>}
+                              {recommended && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">{L('Start here', 'Empieza aquí')}</Badge>}
                             </div>
                             <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
                               <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{m.estimatedMinutes ?? 0} min</span>

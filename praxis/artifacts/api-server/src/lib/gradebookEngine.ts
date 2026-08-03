@@ -15,6 +15,7 @@ import {
   beatProgressTable,
   beatsTable,
   credentialsTable,
+  modulesTable,
   type GradebookItem,
   type LetterBand,
 } from "@workspace/db";
@@ -561,6 +562,88 @@ export function computeLearner(
   const letterGrade = settings?.lettersEnabled ? letterFor(overall, settings.letterBands) : null;
 
   return { overallPercent: overall, band, letterGrade, trend: trendOf(summativeSeries), cells };
+}
+
+/**
+ * Fallback gradebook derived from interactive-activity mastery — the SAME source the Credentials
+ * page and the public commendations report read (best submission per quiz / game / Math-Coach).
+ *
+ * Used ONLY when a learner's real gradebook produced no scored summative column, e.g. the K-12 demo
+ * courses: their quizzes and games ARE the assessment, but they were never registered as
+ * `gradebook_items` rows (no one ran POST /gradebook/sync), so the normal engine sees no columns and
+ * My Grades shows "—" / "Not enough data" even though the learner has real, verified mastery.
+ *
+ * Each scored activity becomes a summative, graded column so the overall %, breakdown rows and trend
+ * reflect the learner's true mastery, consistent with their Credentials %. Returns null when there is
+ * nothing to derive, so a genuinely empty gradebook stays empty and a real graded course is untouched
+ * (this only runs when overallPercent was already null).
+ */
+export async function deriveActivityGradebook(
+  courseId: string,
+  userId: string,
+  settings?: GradebookSettings,
+): Promise<{ columns: GradebookColumn[]; computed: LearnerComputed } | null> {
+  const acts = await db
+    .select({
+      id: interactiveActivitiesTable.id,
+      moduleId: interactiveActivitiesTable.moduleId,
+      title: interactiveActivitiesTable.title,
+      maxScore: interactiveActivitiesTable.maxScore,
+    })
+    .from(interactiveActivitiesTable)
+    .where(and(eq(interactiveActivitiesTable.courseId, courseId), inArray(interactiveActivitiesTable.kind, ["quiz", "game", "math-coach"])));
+  if (acts.length === 0) return null;
+
+  const actIds = acts.map((a) => a.id);
+  const subs = await db
+    .select({ activityId: activitySubmissionsTable.activityId, score: activitySubmissionsTable.score })
+    .from(activitySubmissionsTable)
+    .where(and(eq(activitySubmissionsTable.userId, userId), inArray(activitySubmissionsTable.activityId, actIds)));
+  if (subs.length === 0) return null;
+
+  const maxById = new Map(acts.map((a) => [a.id, Number(a.maxScore) || 100]));
+  const bestByAct = new Map<string, number>(); // activityId -> best fraction 0..1
+  for (const s of subs) {
+    const raw = Number(s.score);
+    if (!Number.isFinite(raw)) continue;
+    const max = maxById.get(s.activityId) || 100;
+    const frac = Math.max(0, Math.min(1, max > 0 ? raw / max : raw / 100));
+    if (frac > (bestByAct.get(s.activityId) ?? -1)) bestByAct.set(s.activityId, frac);
+  }
+  if (bestByAct.size === 0) return null;
+
+  // Order by module sequence, then title, for a stable, readable breakdown.
+  const mods = await db
+    .select({ id: modulesTable.id, title: modulesTable.title, order: modulesTable.order })
+    .from(modulesTable)
+    .where(eq(modulesTable.courseId, courseId));
+  const modById = new Map(mods.map((m) => [m.id, m]));
+  const scored = acts.filter((a) => bestByAct.has(a.id));
+  scored.sort(
+    (a, b) =>
+      (modById.get(a.moduleId ?? "")?.order ?? 0) - (modById.get(b.moduleId ?? "")?.order ?? 0) ||
+      (a.title ?? "").localeCompare(b.title ?? ""),
+  );
+
+  const columns: GradebookColumn[] = scored.map((a, i) => ({
+    key: `activity:${a.id}`,
+    itemId: null,
+    sourceType: "activity",
+    sourceId: a.id,
+    title: a.title || "Practice mastery",
+    category: (a.moduleId && modById.get(a.moduleId)?.title) || "Practice mastery",
+    itemType: "summative",
+    gradeType: "points",
+    pointsPossible: 100,
+    dueDate: null,
+    includeInGrade: true,
+    editable: false,
+    position: i,
+  }));
+  const fractions = new Map<string, number>();
+  for (const c of columns) fractions.set(c.key, bestByAct.get(c.sourceId!)!);
+  const computed = computeLearner(columns, fractions, undefined, false, settings);
+  return { columns, computed };
 }
 
 function trendOf(series: number[]): LearnerComputed["trend"] {

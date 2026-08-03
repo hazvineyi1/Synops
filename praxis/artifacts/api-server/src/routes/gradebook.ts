@@ -28,6 +28,7 @@ import {
   getCourseColumns,
   getScoreData,
   computeLearner,
+  deriveActivityGradebook,
   getGradebookSettings,
   invalidateGradebookCaches,
   DEFAULT_BANDS,
@@ -441,10 +442,17 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
   await reconcileAssignmentEntries(courseId);
   // Apply this learner's organisation overrides on top of the course default.
   const learnerOrgId = (req.dbUser as { organisationId?: string | null } | undefined)?.organisationId ?? null;
-  const columns = await getCourseColumns(courseId, learnerOrgId);
+  let columns = await getCourseColumns(courseId, learnerOrgId);
   const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
-  const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
+  let computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
+  // When the gradebook has no scored summative column (e.g. K-12 demo courses whose quizzes/games
+  // were never registered as gradebook_items), surface the learner's real interactive-activity
+  // mastery — the same source as Credentials — instead of "—" / "Not enough data".
+  if (computed.overallPercent == null) {
+    const fb = await deriveActivityGradebook(courseId, userId, settings);
+    if (fb) { columns = fb.columns; computed = fb.computed; }
+  }
 
   const alert = await db.query.gradebookAlertsTable.findFirst({
     where: and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)),
@@ -552,10 +560,14 @@ router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (r
   }
   // Resolve against the target learner's organisation overrides.
   const target = await db.query.usersTable.findFirst({ where: eq(usersTable.id, userId) });
-  const columns = await getCourseColumns(courseId, target?.organisationId ?? null);
+  let columns = await getCourseColumns(courseId, target?.organisationId ?? null);
   const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
-  const computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
+  let computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
+  if (computed.overallPercent == null) {
+    const fb = await deriveActivityGradebook(courseId, userId, settings);
+    if (fb) { columns = fb.columns; computed = fb.computed; }
+  }
 
   const alert = await db.query.gradebookAlertsTable.findFirst({
     where: and(eq(gradebookAlertsTable.courseId, courseId), eq(gradebookAlertsTable.userId, userId)),
@@ -611,7 +623,11 @@ router.get("/gradebook/mine", requireAuth, async (req, res) => {
     await reconcileAssignmentEntries(cid);
     const columns = await getCourseColumns(cid);
     const sd = await getScoreData(columns, [userId]);
-    const computed = computeLearner(columns, sd.fractions.get(userId), sd.notes.get(userId), false);
+    let computed = computeLearner(columns, sd.fractions.get(userId), sd.notes.get(userId), false);
+    if (computed.overallPercent == null) {
+      const fb = await deriveActivityGradebook(cid, userId);
+      if (fb) computed = fb.computed;
+    }
     const alert = alertByCourse.get(cid);
     return {
       courseId: cid,
