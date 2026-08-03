@@ -68,6 +68,16 @@ export const K12_FIGURES: Record<string, string> = {
     return `<defs><marker id="cc" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="${C.teal}"/></marker></defs>` + g;
   })()),
 
+  // ── Ten-frame: ten and some more (place value), numeric/neutral ─────────────
+  "ten-frame": svg("0 0 360 120", (() => {
+    let g = ""; const x0 = 34, y0 = 26, s = 30;
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) { g += `<rect x="${x0 + c * s}" y="${y0 + r * s}" width="26" height="26" rx="6" fill="#fff" stroke="${C.indigo}" stroke-width="2"/><circle cx="${x0 + c * s + 13}" cy="${y0 + r * s + 13}" r="9" fill="${C.indigo}"/>`; }
+    g += `<text x="204" y="58" font-size="26" font-weight="800" fill="${C.ink}">+</text>`;
+    [0, 1].forEach((i) => { g += `<circle cx="${242 + i * 34}" cy="52" r="12" fill="${C.orange}"/>`; });
+    g += `<text x="300" y="60" font-size="20" font-weight="800" fill="${C.indigo}">= 12</text>`;
+    return g;
+  })()),
+
   // ── Vocabulary: a new word is a key that unlocks meaning (emoji only) ────────
   "word-key": svg("0 0 360 110",
     `<rect x="24" y="38" width="150" height="36" rx="10" fill="${C.teal}22" stroke="${C.teal}" stroke-width="3"/>` +
@@ -110,6 +120,22 @@ export const K12_FIGURES: Record<string, string> = {
     let g = ""; const y = 50;
     nodes.forEach((n, i) => { const x = 40 + i * 90; g += `<circle cx="${x}" cy="${y}" r="26" fill="${n[2]}22" stroke="${n[2]}" stroke-width="3"/><text x="${x}" y="${y + 7}" font-size="22" text-anchor="middle">${n[0]}</text><text x="${x}" y="${y + 44}" font-size="12" font-weight="700" fill="${n[2] as string}" text-anchor="middle">${n[1]}</text>`; if (i < 3) g += `<line x1="${x + 28}" y1="${y}" x2="${x + 62}" y2="${y}" stroke="${C.sub}" stroke-width="3" marker-end="url(#ar)"/>`; });
     return `<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="${C.sub}"/></marker></defs>` + g;
+  })()),
+
+  // ── Energy of motion: slow vs fast (bigger bar = more energy) ────────────────
+  "speed-energy": svg("0 0 360 120",
+    `<line x1="26" y1="46" x2="46" y2="46" stroke="${C.line}" stroke-width="3" stroke-linecap="round"/>` +
+    `<circle cx="72" cy="46" r="22" fill="${C.teal}"/>` +
+    `<rect x="40" y="84" width="60" height="16" rx="5" fill="${C.teal}" opacity="0.55"/>` +
+    [0, 1, 2].map((i) => `<line x1="${196 + i * 10}" y1="${34 + i * 12}" x2="${224 + i * 10}" y2="${34 + i * 12}" stroke="${C.line}" stroke-width="3" stroke-linecap="round"/>`).join("") +
+    `<circle cx="278" cy="46" r="22" fill="${C.orange}"/>` +
+    `<rect x="214" y="84" width="128" height="16" rx="5" fill="${C.orange}"/>`),
+
+  // ── Ways energy transfers: sound, light, heat, collision (emoji, neutral) ────
+  "energy-transfer": svg("0 0 360 96", (() => {
+    const items: [string, string][] = [["🔊", C.violet], ["☀️", C.amber], ["🔥", C.rose], ["🎱", C.teal]];
+    let g = ""; items.forEach(([e, col], i) => { const x = 48 + i * 88; g += `<circle cx="${x}" cy="48" r="28" fill="${col}22" stroke="${col}" stroke-width="3"/><text x="${x}" y="57" font-size="26" text-anchor="middle">${e}</text>`; });
+    return g;
   })()),
 
   // ── Balance scale for an equation a·x + b = c ───────────────────────────────
