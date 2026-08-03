@@ -20,6 +20,12 @@ COPY . .
 # Install all workspace dependencies (lockfile may lag behind package.json).
 RUN pnpm install --no-frozen-lockfile
 
+# Cache-bust: bump this string to force a clean frontend rebuild when Railway's
+# Docker layer cache serves a STALE bundle (symptom: byte-identical index-*.js on
+# www.synops-consulting.com despite a real source change). Change the value below
+# and push — it invalidates every build layer after it.
+RUN echo "frontend-build cachebust 2026-08-03-1"
+
 # Build the three frontends. Each vite.config requires PORT and BASE_PATH at build
 # time. The base path must match where the API serves each app:
 #   marketing -> "/", Coach -> "/study/", teacher -> "/app/", builder -> "/builder/".
