@@ -246,17 +246,35 @@ function ProductExplorer() {
   const [active, setActive] = useState<string>(PRODUCTS[0]!.slug);
 
   useEffect(() => {
-    const applyHash = () => {
+    let raf = 0;
+    const timers: number[] = [];
+    const scrollToExplore = (smooth: boolean) => {
+      document.getElementById("explore")?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+    };
+    const applyHash = (smooth: boolean) => {
       const slug = window.location.hash.replace("#", "").toLowerCase();
       if (!PRODUCTS.some((p) => p.slug === slug)) return;
       setActive(slug);
-      window.requestAnimationFrame(() => {
-        document.getElementById("explore")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Re-assert the scroll after layout settles. A single rAF fires before the hero/fonts/images
+      // above "explore" have their final height, so the first scroll lands mid-page; the follow-up
+      // instant scrolls correct the offset once the page has settled.
+      raf = window.requestAnimationFrame(() => {
+        scrollToExplore(smooth);
+        timers.push(window.setTimeout(() => scrollToExplore(false), 200));
+        timers.push(window.setTimeout(() => scrollToExplore(false), 600));
       });
     };
-    applyHash();
-    window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
+    applyHash(false);
+    const onHash = () => applyHash(true);
+    const onLoad = () => applyHash(false);
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener("load", onLoad);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("load", onLoad);
+      cancelAnimationFrame(raf);
+      timers.forEach((t) => clearTimeout(t));
+    };
   }, []);
 
   const p = PRODUCTS.find((x) => x.slug === active) ?? PRODUCTS[0]!;
