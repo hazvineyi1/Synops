@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Lightbulb, GraduationCap, RefreshCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Lightbulb, GraduationCap, RefreshCw, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { activitiesApi } from "@/lib/activitiesApi";
 import { apiFetch } from "@/lib/api";
@@ -166,10 +166,17 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
   const p = problems[idx];
   const current = p?.kind === "number" && lineVal != null ? String(lineVal) : typed;
 
+  useEffect(() => {
+    if (typeof document === "undefined" || document.getElementById("mc-arrow-css")) return;
+    const s = document.createElement("style"); s.id = "mc-arrow-css";
+    s.textContent = "@keyframes mc-nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(10px)}}@keyframes mc-pop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}";
+    document.head.appendChild(s);
+  }, []);
+
   const resetForNext = () => { setTyped(""); setLineVal(null); setAttempts(0); setCoach([]); setOfferWorked(false); setFeedback(null); };
 
   const nextProblem = (wasCorrect: boolean) => {
-    const flags = solvedFlags.slice(); flags[idx] = wasCorrect; setSolvedFlags(flags);
+    const flags = solvedFlags.slice(); flags[idx] = wasCorrect || flags[idx]; setSolvedFlags(flags);
     if (idx + 1 >= problems.length) {
       const correct = flags.filter(Boolean).length;
       const score = Math.round((correct / problems.length) * 100);
@@ -178,15 +185,22 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
     } else { setIdx(idx + 1); resetForNext(); }
   };
 
+  const prevProblem = () => { if (idx > 0) { setIdx(idx - 1); resetForNext(); } };
+
   const submit = () => {
     if (!p || !current) { setFeedback({ ok: false, msg: L("Enter an answer first.", "Escribe una respuesta primero.") }); return; }
     if (check(current, p.answer)) {
-      setFeedback({ ok: true, msg: L("Correct! 🎉", "¡Correcto! 🎉") });
-      setTimeout(() => nextProblem(true), 900);
+      const flags = solvedFlags.slice(); flags[idx] = true; setSolvedFlags(flags);
+      setFeedback({ ok: true, msg: L("Correct! 🎉 Tap the arrow to keep going.", "¡Correcto! 🎉 Toca la flecha para seguir.") });
     } else {
       const n = attempts + 1; setAttempts(n);
-      setFeedback({ ok: false, msg: n >= 3 ? L("Not yet, want a worked example?", "Todavía no, ¿quieres ver un ejemplo resuelto?") : L("Not quite, try again, or ask the coach.", "Casi, intenta otra vez o pregúntale al tutor.") });
-      if (n >= 3) setOfferWorked(true);
+      const left = 3 - n;
+      if (n >= 3) {
+        setFeedback({ ok: false, msg: L(`The answer is ${p.answer}. Great effort, tap the arrow to keep going.`, `La respuesta es ${p.answer}. ¡Buen intento! Toca la flecha para seguir.`) });
+        setOfferWorked(true);
+      } else {
+        setFeedback({ ok: false, msg: L(`Not quite, ${left} ${left === 1 ? "try" : "tries"} left. Try again or ask the coach.`, `Casi. ${left === 1 ? "Te queda" : "Te quedan"} ${left} intento${left === 1 ? "" : "s"}. Intenta otra vez o pregúntale al tutor.`) });
+      }
     }
   };
 
@@ -220,6 +234,9 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
   );
 
   const solvedCount = solvedFlags.filter(Boolean).length;
+  const chancesLeft = Math.max(0, 3 - attempts);
+  const canAdvance = !!feedback?.ok || attempts >= 3;
+  const isLast = idx + 1 >= problems.length;
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-indigo-50 to-white">
@@ -266,12 +283,22 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <input value={typed} onChange={(e) => { setTyped(e.target.value); const n = Number(e.target.value); setLineVal(Number.isFinite(n) && e.target.value.trim() !== "" ? n : null); }}
                     onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder={L("Your answer", "Tu respuesta")} className="rounded-xl border-2 border-indigo-200 px-3 py-2 text-lg w-40 focus:border-indigo-500 outline-none" />
-                  <Button onClick={submit}>{L("Check", "Comprobar")}</Button>
+                  <Button onClick={submit} disabled={canAdvance && !!feedback?.ok}>{L("Check", "Comprobar")}</Button>
+                  {!feedback?.ok && (
+                    <span className="inline-flex items-center gap-1" title={L("Chances", "Oportunidades")} aria-label={L(`${chancesLeft} chances left`, `${chancesLeft} oportunidades`)}>
+                      {[0, 1, 2].map((i) => (
+                        <Heart key={i} className="h-4 w-4" style={{ color: i < chancesLeft ? "#f97316" : "#e5e7eb", fill: i < chancesLeft ? "#f97316" : "transparent" }} />
+                      ))}
+                    </span>
+                  )}
                   {feedback && <span className={`text-sm font-semibold ${feedback.ok ? "text-emerald-700" : "text-amber-700"}`}>{feedback.msg}</span>}
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {idx > 0 && (
+                  <Button variant="ghost" size="sm" className="gap-1" onClick={prevProblem}><ArrowLeft className="h-3.5 w-3.5" /> {L("Previous", "Anterior")}</Button>
+                )}
                 <Button variant="outline" className="gap-1.5 border-amber-400/50 text-amber-700" disabled={coachBusy} onClick={askCoach}>
                   {coachBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />} {L("Ask the coach", "Pregúntale al tutor")}
                 </Button>
@@ -280,10 +307,24 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
                     <GraduationCap className="h-4 w-4" /> {L("Show a worked example", "Ver un ejemplo resuelto")}
                   </Button>
                 )}
-                {attempts > 0 && !feedback?.ok && (
+                {attempts > 0 && !feedback?.ok && attempts < 3 && (
                   <Button variant="ghost" size="sm" className="gap-1" onClick={() => { setTyped(""); setLineVal(null); setFeedback(null); }}><RefreshCw className="h-3.5 w-3.5" /> {L("Clear", "Borrar")}</Button>
                 )}
               </div>
+
+              {/* Big animated orange arrow: appears once solved or after 3 chances, so the learner is never stuck. */}
+              {canAdvance && (
+                <div className="flex flex-col items-center pt-1" style={{ animation: "mc-pop .3s ease-out" }}>
+                  <button onClick={() => nextProblem(!!feedback?.ok)}
+                    className="inline-flex items-center gap-3 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-extrabold text-xl px-9 py-4 rounded-2xl shadow-lg shadow-orange-500/30 transition-colors">
+                    {isLast ? L("Finish", "Terminar") : L("Continue", "Continuar")}
+                    <ArrowRight className="h-8 w-8" style={{ animation: "mc-nudge .8s ease-in-out infinite" }} />
+                  </button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {isLast ? L("Tap to finish this practice.", "Toca para terminar esta práctica.") : L("Tap the arrow to go to the next problem.", "Toca la flecha para ir al siguiente problema.")}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="md:col-span-2">
