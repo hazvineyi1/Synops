@@ -40,6 +40,7 @@ import { useReadAloud } from '@/lib/speech';
 import { useSession } from '@/context/SessionContext';
 import { isK12DemoEmail, personaByEmail, type K12Persona } from '@/lib/k12Personas';
 import { picturesInText } from '@/lib/kidPictures';
+import { figureSvg } from '@/lib/k12Figures';
 
 // Interactive checkpoint questions shown right under a lesson video, so watching is ACTIVE: the
 // learner answers about what they saw and gets instant feedback. Keyed by module title (Sofía's
@@ -2031,6 +2032,20 @@ function MarkdownView({ text }: { text: string }) {
   const flush = () => { if (list.length) { out.push(<ul key={'ul' + k++} className="list-disc pl-6 space-y-2 my-4 marker:text-primary">{list}</ul>); list = []; } };
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, '');
+    const figM = line.match(/^\s*\[\[fig:([a-z0-9-]+)(?:\|([^\]]+))?\]\]\s*$/i);
+    if (figM) {
+      const fs = figureSvg(figM[1]);
+      if (fs) {
+        flush();
+        out.push(
+          <figure key={k++} className="my-5 flex flex-col items-center">
+            <div className="w-full max-w-md rounded-2xl border border-border bg-white p-3 shadow-sm" dangerouslySetInnerHTML={{ __html: fs }} />
+            {figM[2] && <figcaption className="text-xs text-muted-foreground mt-2 text-center">{figM[2]}</figcaption>}
+          </figure>
+        );
+      }
+      continue;
+    }
     if (/^###\s+/.test(line)) { flush(); out.push(<h4 key={k++} className="font-serif font-semibold text-base mt-6 mb-2">{mdInline(line.replace(/^###\s+/, ''), 'h' + k)}</h4>); }
     else if (/^##\s+/.test(line)) { flush(); out.push(<h3 key={k++} className="font-serif font-bold text-lg mt-7 mb-2.5 pb-1 border-b border-border/60">{mdInline(line.replace(/^##\s+/, ''), 'h' + k)}</h3>); }
     else if (/^#\s+/.test(line)) { flush(); out.push(<h2 key={k++} className="font-serif font-bold text-2xl mt-3 mb-4">{mdInline(line.replace(/^#\s+/, ''), 'h' + k)}</h2>); }
@@ -2491,6 +2506,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   // Clean text for the read-aloud so it doesn't say "hashtag" / "asterisk" / emoji names and sounds
   // less robotic, strip markdown symbols and emoji, keep the words.
   const speechClean = (md: string) => stripYoung(md)
+    .replace(/\[\[fig:[^\]]*\]\]/g, ' ')                         // figure markers (not read aloud)
     .replace(/[#>*_`]/g, ' ')                                   // markdown symbols
     .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}️]/gu, ' ') // emoji/symbols
     .replace(/\s+/g, ' ').trim();
