@@ -16,6 +16,7 @@ import {
   ChevronDown, ChevronUp, Star, Sparkles, Trophy, Award, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { VoiceInputButton } from '@/components/VoiceInputButton';
 
 function formatDate(d?: string) {
   if (!d) return '—';
@@ -612,8 +613,11 @@ function WrittenSubmission({ value, onChange, file, onFileChange, minWords, plac
         className="min-h-[340px] text-sm leading-relaxed resize-y"
       />
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-        <span className={cn('text-muted-foreground', short && 'text-amber-600')}>
-          {wc} words{minWords ? ` · ${minWords} word minimum` : ''}
+        <span className="flex items-center gap-2">
+          <VoiceInputButton onTranscript={(t) => onChange(value ? `${value} ${t}` : t)} />
+          <span className={cn('text-muted-foreground', short && 'text-amber-600')}>
+            {wc} words{minWords ? ` · ${minWords} word minimum` : ''}
+          </span>
         </span>
         <span className="text-muted-foreground">Type, paste, or attach a document below.</span>
       </div>

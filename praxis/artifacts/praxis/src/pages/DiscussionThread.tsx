@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ChevronRight, MessageSquare, Sparkles, Languages, CheckCircle, Settings } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { VoiceInputButton } from '@/components/VoiceInputButton';
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -321,15 +322,18 @@ export function DiscussionThread() {
                 className="min-h-[140px] text-sm resize-none"
               />
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <span className={cn('text-xs tabular-nums',
-                  words === 0 ? 'text-muted-foreground'
-                    : okToPost ? 'text-emerald-600'
-                    : 'text-amber-600')}>
-                  {words} {words === 1 ? 'word' : 'words'}
-                  {isInitial
-                    ? words > maxW ? ` — ${words - maxW} over the limit`
-                      : words < minW ? ` — ${minW - words} to go` : ' — good to post'
-                    : words < minW ? ` — ${minW - words} to go` : ' — good to post'}
+                <span className="flex items-center gap-2">
+                  <VoiceInputButton onTranscript={(t) => { setReplyText((prev) => (prev ? `${prev} ${t}` : t)); setError(null); }} />
+                  <span className={cn('text-xs tabular-nums',
+                    words === 0 ? 'text-muted-foreground'
+                      : okToPost ? 'text-emerald-600'
+                      : 'text-amber-600')}>
+                    {words} {words === 1 ? 'word' : 'words'}
+                    {isInitial
+                      ? words > maxW ? ` — ${words - maxW} over the limit`
+                        : words < minW ? ` — ${minW - words} to go` : ' — good to post'
+                      : words < minW ? ` — ${minW - words} to go` : ' — good to post'}
+                  </span>
                 </span>
                 <Button
                   onClick={() => replyMutation.mutate()}

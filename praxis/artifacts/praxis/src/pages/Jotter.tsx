@@ -3,6 +3,7 @@ import { useGetMe } from '@workspace/api-client-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { VoiceInputButton } from '@/components/VoiceInputButton';
 import {
   NotebookPen, StickyNote, Pencil, Eraser, Trash2, Plus, X, Check,
   ListTodo, Bell, CalendarRange, Palette, Undo2,
@@ -273,6 +274,7 @@ export function Jotter() {
                 {NOTE_COLORS.map((c) => (
                   <button key={c} onClick={() => updateNote(n.id, { color: c })} className={cn('h-3.5 w-3.5 rounded-full border', n.color === c ? 'border-black/50' : 'border-black/10')} style={{ backgroundColor: c }} />
                 ))}
+                <VoiceInputButton className="ml-auto h-6 w-6" onTranscript={(t) => updateNote(n.id, { text: n.text ? `${n.text} ${t}` : t })} />
               </div>
             </div>
           ))}

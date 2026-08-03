@@ -95,6 +95,34 @@ async function reconcileAssignmentEntries(courseId: string): Promise<void> {
   }
 }
 
+/**
+ * Should a learner-detail response fall back to interactive-activity mastery?
+ *
+ * The normal gradebook produces a "real" grade only when the learner has at least one genuinely
+ * scored SUMMATIVE column (an actual mark, not a value auto-filled from course completion). K-12 demo
+ * courses register their quizzes/games as the assessment but were never added as `gradebook_items`,
+ * so the engine sees only the ungraded course assignment: overall is either null, or a placeholder
+ * auto-filled from completion %. In both cases the page shows "—" / "Not enough data" even though the
+ * learner has real, verified quiz/game mastery.
+ *
+ * Fires when there is NO real graded summative, i.e. overall is null OR every summative cell is
+ * empty/auto-filled. A truly graded course (real assignment/case marks) keeps its own grade and is
+ * never overwritten; deriveActivityGradebook also returns null when there are no scored quiz/game/
+ * math-coach submissions, so this is a safe no-op outside the K-12 demo shape.
+ */
+function needsActivityFallback(
+  columns: { key: string; includeInGrade: boolean; itemType: "formative" | "summative" }[],
+  computed: { overallPercent: number | null; cells: Record<string, { fraction: number | null; auto?: boolean }> },
+): boolean {
+  if (computed.overallPercent == null) return true;
+  const hasRealGradedSummative = columns.some((c) => {
+    if (!c.includeInGrade || c.itemType !== "summative") return false;
+    const cell = computed.cells[c.key];
+    return !!cell && cell.fraction !== null && cell.auto !== true;
+  });
+  return !hasRealGradedSummative;
+}
+
 // ── Unified staff matrix ──────────────────────────────────────────────────────────
 // GET /courses/:courseId/gradebook?groupId=
 router.get("/courses/:courseId/gradebook", requireAuth, async (req, res) => {
@@ -446,10 +474,11 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
   const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
   let computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
-  // When the gradebook has no scored summative column (e.g. K-12 demo courses whose quizzes/games
-  // were never registered as gradebook_items), surface the learner's real interactive-activity
-  // mastery — the same source as Credentials — instead of "—" / "Not enough data".
-  if (computed.overallPercent == null) {
+  // When the gradebook has no REAL scored summative column (e.g. K-12 demo courses whose quizzes/games
+  // were never registered as gradebook_items, so overall is null or only auto-filled from completion),
+  // surface the learner's real interactive-activity mastery — the same source as Credentials and the
+  // /gradebook/mine summary — instead of "—" / "Not enough data".
+  if (needsActivityFallback(columns, computed)) {
     const fb = await deriveActivityGradebook(courseId, userId, settings);
     if (fb) { columns = fb.columns; computed = fb.computed; }
   }
@@ -564,7 +593,7 @@ router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (r
   const settings = await getGradebookSettings(courseId);
   const scoreData = await getScoreData(columns, [userId]);
   let computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
-  if (computed.overallPercent == null) {
+  if (needsActivityFallback(columns, computed)) {
     const fb = await deriveActivityGradebook(courseId, userId, settings);
     if (fb) { columns = fb.columns; computed = fb.computed; }
   }
@@ -624,7 +653,7 @@ router.get("/gradebook/mine", requireAuth, async (req, res) => {
     const columns = await getCourseColumns(cid);
     const sd = await getScoreData(columns, [userId]);
     let computed = computeLearner(columns, sd.fractions.get(userId), sd.notes.get(userId), false);
-    if (computed.overallPercent == null) {
+    if (needsActivityFallback(columns, computed)) {
       const fb = await deriveActivityGradebook(cid, userId);
       if (fb) computed = fb.computed;
     }

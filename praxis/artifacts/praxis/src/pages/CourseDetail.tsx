@@ -1671,7 +1671,7 @@ export function CourseDetail() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">My Grades</h2>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-foreground">{myGrades.overallPercent?.toFixed(1) ?? ', '}%</div>
+                    <div className="text-2xl font-bold text-foreground">{myGrades.overallPercent != null ? `${myGrades.overallPercent.toFixed(1)}%` : '—'}</div>
                     <div className="text-xs text-muted-foreground">Overall ({myGrades.totalEarned} / {myGrades.totalPossible} pts)</div>
                   </div>
                 </div>
@@ -1693,10 +1693,10 @@ export function CourseDetail() {
                             {g.dueDate && <div className="text-xs text-muted-foreground">{formatDate(g.dueDate)}</div>}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono">
-                            {g.score !== null ? `${g.score} / ${g.pointsPossible}` : ', '}
+                            {g.score !== null ? `${g.score} / ${g.pointsPossible}` : '—'}
                           </td>
                           <td className="py-2.5 px-3 text-right">
-                            {g.letterGrade ? <Badge variant="outline">{g.letterGrade}</Badge> : ', '}
+                            {g.letterGrade ? <Badge variant="outline">{g.letterGrade}</Badge> : '—'}
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             {g.missing && <Badge variant="destructive" className="text-xs">Missing</Badge>}
@@ -1826,7 +1826,7 @@ export function CourseDetail() {
                       {roster.map((r) => (
                         <tr key={r.enrolmentId} className="border-b border-border/50 hover:bg-muted/30">
                           <td className="py-2.5 px-3 font-medium">{r.user?.firstName} {r.user?.lastName}</td>
-                          {isInstructor && <td className="py-2.5 px-3 text-muted-foreground">{r.user?.email ?? ', '}</td>}
+                          {isInstructor && <td className="py-2.5 px-3 text-muted-foreground">{r.user?.email ?? '—'}</td>}
                           <td className="py-2.5 px-3 text-muted-foreground capitalize">{r.user?.role === 'learner' ? 'Learner' : (r.user?.role?.replace('_', ' ') ?? 'Learner')}</td>
                           <td className="py-2.5 px-3">
                             <Badge variant={r.enrolmentStatus === 'completed' ? 'default' : r.enrolmentStatus === 'active' ? 'secondary' : 'outline'} className="text-xs">

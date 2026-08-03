@@ -15,9 +15,17 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from "@/context/SessionContext";
+import { personaByEmail } from "@/lib/k12Personas";
 import {
   supportApi, type Ticket, type TicketStatus, type TicketPriority,
 } from "@/lib/supportApi";
+
+/** Spanish-first K-12 learners (e.g. Sofía) see this whole surface in Spanish; everyone else in English. */
+function useEs() {
+  const { user } = useSession();
+  return personaByEmail(user?.email)?.defaultLang === "es";
+}
+const mkL = (es: boolean) => (en: string, esT: string) => (es ? esT : en);
 
 const STAFF_ROLES = ["coach", "org_admin", "partner_admin", "super_admin"];
 const STATUSES: TicketStatus[] = ["open", "pending", "resolved", "closed"];
@@ -40,60 +48,67 @@ function StatusBadge({ status }: { status: TicketStatus }) {
   return <span className={`text-xs px-2 py-0.5 rounded-full border ${statusStyle[status]}`}>{status}</span>;
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, es = false): string {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  return `${Math.floor(s / 86400)}d ago`;
+  if (s < 60) return es ? "ahora mismo" : "just now";
+  if (s < 3600) return es ? `hace ${Math.floor(s / 60)} min` : `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return es ? `hace ${Math.floor(s / 3600)} h` : `${Math.floor(s / 3600)}h ago`;
+  return es ? `hace ${Math.floor(s / 86400)} d` : `${Math.floor(s / 86400)}d ago`;
 }
 
 /* ── New ticket dialog ── */
 function NewTicket({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (t: Ticket) => void }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const es = useEs();
+  const L = mkL(es);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [priority, setPriority] = useState<TicketPriority>("normal");
 
+  // Spanish labels for the priority enum (values sent to the API stay the canonical English keys).
+  const PRIORITY_LABEL: Record<TicketPriority, string> = {
+    low: L("low", "baja"), normal: L("normal", "normal"), high: L("high", "alta"), urgent: L("urgent", "urgente"),
+  };
+
   const create = useMutation({
     mutationFn: () => supportApi.create({ subject, body, priority }),
     onSuccess: (t) => {
-      toast({ title: "Ticket opened" });
+      toast({ title: L("Ticket opened", "Ticket creado") });
       qc.invalidateQueries({ queryKey: ["tickets"] });
       setSubject(""); setBody(""); setPriority("normal");
       onCreated(t); onClose();
     },
-    onError: (e) => toast({ title: "Could not open ticket", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+    onError: (e) => toast({ title: L("Could not open ticket", "No se pudo crear el ticket"), description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>New support ticket</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{L("New support ticket", "Nuevo ticket de ayuda")}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label className="text-sm">Subject</Label>
-            <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Short summary" />
+            <Label className="text-sm">{L("Subject", "Asunto")}</Label>
+            <Input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={L("Short summary", "Resumen breve")} />
           </div>
           <div>
-            <Label className="text-sm">Describe the issue</Label>
-            <Textarea value={body} onChange={(e) => setBody(e.target.value)} className="h-32" placeholder="What's going on?" />
+            <Label className="text-sm">{L("Describe the issue", "Describe el problema")}</Label>
+            <Textarea value={body} onChange={(e) => setBody(e.target.value)} className="h-32" placeholder={L("What's going on?", "¿Qué está pasando?")} />
           </div>
           <div>
-            <Label className="text-sm">Priority</Label>
+            <Label className="text-sm">{L("Priority", "Prioridad")}</Label>
             <Select value={priority} onValueChange={(v) => setPriority(v as TicketPriority)}>
               <SelectTrigger className="w-40 capitalize"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {PRIORITIES.map((p) => <SelectItem key={p} value={p} className="capitalize">{p}</SelectItem>)}
+                {PRIORITIES.map((p) => <SelectItem key={p} value={p} className="capitalize">{PRIORITY_LABEL[p]}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>{L("Cancel", "Cancelar")}</Button>
           <Button onClick={() => create.mutate()} disabled={!subject.trim() || create.isPending}>
-            {create.isPending ? "Opening…" : "Open ticket"}
+            {create.isPending ? L("Opening…", "Creando…") : L("Open ticket", "Crear ticket")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -105,6 +120,8 @@ function NewTicket({ open, onClose, onCreated }: { open: boolean; onClose: () =>
 function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; meId: string }) {
   const qc = useQueryClient();
   const { toast } = useToast();
+  const es = useEs();
+  const L = mkL(es);
   const [reply, setReply] = useState("");
   const [internal, setInternal] = useState(false);
 
@@ -123,7 +140,7 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
   const send = useMutation({
     mutationFn: () => supportApi.reply(ticketId, reply, internal),
     onSuccess: () => { setReply(""); setInternal(false); invalidate(); },
-    onError: (e) => toast({ title: "Could not send", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+    onError: (e) => toast({ title: L("Could not send", "No se pudo enviar"), description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
   const patch = useMutation({
@@ -133,10 +150,10 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
   });
 
   if (isLoading) {
-    return <div className="flex items-center gap-2 text-muted-foreground py-16 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>;
+    return <div className="flex items-center gap-2 text-muted-foreground py-16 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> {L("Loading…", "Cargando…")}</div>;
   }
   if (isError || !data) {
-    return <div className="text-center text-muted-foreground py-16">This ticket could not be loaded. It may have been closed or you may not have access.</div>;
+    return <div className="text-center text-muted-foreground py-16">{L("This ticket could not be loaded. It may have been closed or you may not have access.", "No se pudo cargar este ticket. Puede que se haya cerrado o que no tengas acceso.")}</div>;
   }
 
   const { ticket, messages } = data;
@@ -149,7 +166,7 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
           <div>
             <h2 className="text-lg font-semibold">{ticket.subject}</h2>
             <div className="text-xs text-muted-foreground mt-0.5">
-              {ticket.requesterName ?? "You"} · opened {timeAgo(ticket.createdAt)} · <span className={priorityStyle[ticket.priority]}>{ticket.priority}</span>
+              {ticket.requesterName ?? L("You", "Tú")} · {L("opened", "abierto")} {timeAgo(ticket.createdAt, es)} · <span className={priorityStyle[ticket.priority]}>{ticket.priority}</span>
             </div>
           </div>
           {staff ? (
@@ -172,7 +189,7 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
       {/* Messages */}
       <div className="flex-1 overflow-y-auto space-y-3 pr-1">
         {/* Opening message */}
-        <Bubble name={ticket.requesterName ?? "You"} mine={ticket.requesterId === meId} body={ticket.body} when={ticket.createdAt} />
+        <Bubble name={ticket.requesterName ?? L("You", "Tú")} mine={ticket.requesterId === meId} body={ticket.body} when={ticket.createdAt} />
         {messages.map((m) => (
           <Bubble
             key={m.id}
@@ -185,7 +202,7 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
           />
         ))}
         {messages.length === 0 && ticket.status === "open" && (
-          <p className="text-center text-xs text-muted-foreground py-4">Waiting on a first response.</p>
+          <p className="text-center text-xs text-muted-foreground py-4">{L("Waiting on a first response.", "Esperando una primera respuesta.")}</p>
         )}
       </div>
 
@@ -194,18 +211,18 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
         <Textarea
           value={reply}
           onChange={(e) => setReply(e.target.value)}
-          placeholder={internal ? "Internal note (staff only)…" : "Write a reply…"}
+          placeholder={internal ? L("Internal note (staff only)…", "Nota interna (solo equipo)…") : L("Write a reply…", "Escribe una respuesta…")}
           className="h-20"
         />
         <div className="flex items-center justify-between">
           {staff ? (
             <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
               <Switch checked={internal} onCheckedChange={setInternal} />
-              <Lock className="h-3 w-3" /> Internal note
+              <Lock className="h-3 w-3" /> {L("Internal note", "Nota interna")}
             </label>
           ) : <span />}
           <Button size="sm" onClick={() => send.mutate()} disabled={!reply.trim() || send.isPending}>
-            {send.isPending ? "Sending…" : internal ? "Add note" : "Send reply"}
+            {send.isPending ? L("Sending…", "Enviando…") : internal ? L("Add note", "Añadir nota") : L("Send reply", "Enviar respuesta")}
           </Button>
         </div>
       </div>
@@ -216,6 +233,8 @@ function Thread({ ticketId, staff, meId }: { ticketId: string; staff: boolean; m
 function Bubble({ name, mine, staff, internal, body, when }: {
   name: string; mine?: boolean; staff?: boolean; internal?: boolean; body: string; when: string;
 }) {
+  const es = useEs();
+  const L = mkL(es);
   return (
     <div className={`rounded-lg p-3 text-sm border ${
       internal ? "bg-amber-500/5 border-amber-500/30"
@@ -224,9 +243,9 @@ function Bubble({ name, mine, staff, internal, body, when }: {
     }`}>
       <div className="flex items-center gap-2 mb-1">
         <span className="font-medium text-xs">{name}</span>
-        {staff && <span className="text-[10px] text-indigo-600 border border-indigo-500/30 rounded-full px-1.5">staff</span>}
-        {internal && <span className="text-[10px] text-amber-600 border border-amber-500/30 rounded-full px-1.5">internal note</span>}
-        <span className="text-[10px] text-muted-foreground ml-auto">{timeAgo(when)}</span>
+        {staff && <span className="text-[10px] text-indigo-600 border border-indigo-500/30 rounded-full px-1.5">{L("staff", "equipo")}</span>}
+        {internal && <span className="text-[10px] text-amber-600 border border-amber-500/30 rounded-full px-1.5">{L("internal note", "nota interna")}</span>}
+        <span className="text-[10px] text-muted-foreground ml-auto">{timeAgo(when, es)}</span>
       </div>
       <p className="whitespace-pre-wrap">{body}</p>
     </div>
@@ -237,6 +256,8 @@ function Bubble({ name, mine, staff, internal, body, when }: {
 export function Support({ params }: { params?: { ticketId?: string } }) {
   const { user } = useSession();
   const staff = !!user && STAFF_ROLES.includes(user.role);
+  const es = personaByEmail(user?.email)?.defaultLang === "es";
+  const L = mkL(es);
   const [filter, setFilter] = useState<TicketStatus | "all">("all");
   // Honour a deep link (e.g. from a notification: /support/:ticketId).
   const [selectedId, setSelectedId] = useState<string | null>(params?.ticketId ?? null);
@@ -258,13 +279,13 @@ export function Support({ params }: { params?: { ticketId?: string } }) {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-serif font-bold tracking-tight flex items-center gap-2">
-            <LifeBuoy className="h-7 w-7 text-primary" /> {staff ? "Support Desk" : "Help & Support"}
+            <LifeBuoy className="h-7 w-7 text-primary" /> {staff ? "Support Desk" : L("Help & Support", "Ayuda y soporte")}
           </h1>
           <p className="text-muted-foreground">
-            {staff ? "Work the ticket queue for your learners and teams." : "Open a ticket and our team will help you out."}
+            {staff ? "Work the ticket queue for your learners and teams." : L("Open a ticket and our team will help you out.", "Abre un ticket y nuestro equipo te ayudará.")}
           </p>
         </div>
-        <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New ticket</Button>
+        <Button onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> {L("New ticket", "Nuevo ticket")}</Button>
       </div>
 
       {staff && overview && (
@@ -287,10 +308,10 @@ export function Support({ params }: { params?: { ticketId?: string } }) {
         {/* List */}
         <Card className="p-2 overflow-y-auto">
           {isLoading ? (
-            <div className="p-4 text-sm text-muted-foreground">Loading…</div>
+            <div className="p-4 text-sm text-muted-foreground">{L("Loading…", "Cargando…")}</div>
           ) : !tickets || tickets.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center">
-              {staff ? "No tickets in this view." : "You have no tickets yet. Open one to get help."}
+              {staff ? "No tickets in this view." : L("You have no tickets yet. Open one to get help.", "Aún no tienes tickets. Abre uno para recibir ayuda.")}
             </div>
           ) : (
             <div className="space-y-1">
@@ -309,7 +330,7 @@ export function Support({ params }: { params?: { ticketId?: string } }) {
                   <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                     {staff && <span className="truncate">{t.requesterName} ·</span>}
                     <span className={priorityStyle[t.priority]}>{t.priority}</span>
-                    <span>· {timeAgo(t.lastMessageAt)}</span>
+                    <span>· {timeAgo(t.lastMessageAt, es)}</span>
                   </div>
                 </button>
               ))}
@@ -323,7 +344,7 @@ export function Support({ params }: { params?: { ticketId?: string } }) {
             <Thread ticketId={selectedId} staff={staff} meId={user.id} />
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              Select a ticket to view the conversation.
+              {L("Select a ticket to view the conversation.", "Selecciona un ticket para ver la conversación.")}
             </div>
           )}
         </Card>

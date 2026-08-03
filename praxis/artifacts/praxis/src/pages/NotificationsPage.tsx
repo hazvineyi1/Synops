@@ -7,15 +7,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Bell, CheckSquare, MessageSquare, Award, Megaphone, ClipboardList } from 'lucide-react';
+import { useSession } from '@/context/SessionContext';
+import { personaByEmail } from '@/lib/k12Personas';
 
-function formatDate(d: string) {
+function formatDate(d: string, es = false) {
   const date = new Date(d);
   const now = new Date();
   const diff = now.getTime() - date.getTime();
-  if (diff < 60000) return 'Just now';
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-  return date.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
+  if (diff < 60000) return es ? 'Ahora mismo' : 'Just now';
+  if (diff < 3600000) return es ? `hace ${Math.floor(diff / 60000)} min` : `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return es ? `hace ${Math.floor(diff / 3600000)} h` : `${Math.floor(diff / 3600000)}h ago`;
+  return date.toLocaleDateString(es ? 'es-ES' : 'en-ZA', { day: 'numeric', month: 'short' });
 }
 
 const ICONS: Record<string, React.ComponentType<any>> = {
@@ -30,6 +32,9 @@ const ICONS: Record<string, React.ComponentType<any>> = {
 export function NotificationsPage() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
+  const { user } = useSession();
+  const es = personaByEmail(user?.email)?.defaultLang === 'es';
+  const L = (en: string, esT: string) => (es ? esT : en);
 
   const { data: notifications, isLoading } = useQuery({
     queryKey: ['notifications'],
@@ -57,10 +62,10 @@ export function NotificationsPage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Notifications</h1>
+        <h1 className="text-2xl font-bold text-foreground">{L('Notifications', 'Notificaciones')}</h1>
         {notifications?.some(n => !n.read) && (
           <Button variant="outline" size="sm" onClick={() => readAllMutation.mutate()} disabled={readAllMutation.isPending}>
-            Mark all read
+            {L('Mark all read', 'Marcar todo como leído')}
           </Button>
         )}
       </div>
@@ -70,8 +75,8 @@ export function NotificationsPage() {
       {notifications?.length === 0 && (
         <div className="text-center py-16">
           <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground text-lg">You're all caught up! 🎉</p>
-          <p className="text-muted-foreground text-sm mt-1">No new notifications.</p>
+          <p className="text-muted-foreground text-lg">{L("You're all caught up! 🎉", '¡Estás al día! 🎉')}</p>
+          <p className="text-muted-foreground text-sm mt-1">{L('No new notifications.', 'No tienes notificaciones nuevas.')}</p>
         </div>
       )}
 
@@ -97,7 +102,7 @@ export function NotificationsPage() {
                 </div>
                 {n.body && <p className="text-xs text-muted-foreground mt-0.5 truncate">{n.body}</p>}
               </div>
-              <span className="text-xs text-muted-foreground flex-shrink-0">{formatDate(n.createdAt)}</span>
+              <span className="text-xs text-muted-foreground flex-shrink-0">{formatDate(n.createdAt, es)}</span>
             </div>
           );
         })}
