@@ -174,6 +174,58 @@ export const K12_FIGURES: Record<string, string> = {
     `<line x1="118" y1="60" x2="132" y2="60" stroke="${C.sub}" stroke-width="3" marker-end="url(#a2)"/>` +
     `<defs><marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="${C.sub}"/></marker></defs>` +
     `<text x="250" y="65" font-size="16" font-weight="800" fill="${C.ink}" text-anchor="middle">/a/ says "ah"</text>`),
+
+  // ── Why early cities grew by rivers: a river through farmland with a small city ─
+  "river-civ": svg("0 0 360 150", (() => {
+    let g = `<rect x="0" y="72" width="360" height="78" fill="${C.emerald}18"/>`;
+    // crop rows on the near bank
+    for (let i = 0; i < 6; i++) { g += `<line x1="${22 + i * 17}" y1="98" x2="${22 + i * 17}" y2="122" stroke="${C.emerald}" stroke-width="3" stroke-linecap="round"/>`; }
+    // the river: a wavy band across the scene
+    g += `<path d="M0 42 Q90 32 180 46 T360 42 L360 68 Q270 60 180 72 T0 64 Z" fill="${C.sky}" opacity="0.85"/>`;
+    // sun
+    g += `<circle cx="322" cy="26" r="14" fill="${C.amber}"/>`;
+    // a small city on the far bank
+    const bx = 248;
+    g += `<rect x="${bx}" y="86" width="20" height="40" rx="2" fill="${C.indigo}"/>`;
+    g += `<rect x="${bx + 24}" y="74" width="22" height="52" rx="2" fill="${C.violet}"/>`;
+    g += `<rect x="${bx + 50}" y="94" width="18" height="32" rx="2" fill="${C.indigo}"/>`;
+    // labels
+    g += `<text x="96" y="34" font-size="13" font-weight="800" fill="${C.sky}" text-anchor="middle">River</text>`;
+    g += `<text x="72" y="142" font-size="12" font-weight="700" fill="${C.emerald}" text-anchor="middle">Farmland</text>`;
+    g += `<text x="286" y="142" font-size="12" font-weight="700" fill="${C.indigo}" text-anchor="middle">City</text>`;
+    return g;
+  })()),
+
+  // ── Bill of Rights: a parchment scroll with the first ten amendments ──────────
+  "bill-of-rights": svg("0 0 360 160", (() => {
+    const x = 70, w = 220, y = 28, h = 100;
+    let g = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${C.amber}22" stroke="${C.amber}" stroke-width="3"/>`;
+    // rolled top and bottom
+    g += `<rect x="${x - 12}" y="${y - 12}" width="${w + 24}" height="16" rx="8" fill="${C.amber}" opacity="0.9"/>`;
+    g += `<rect x="${x - 12}" y="${y + h - 4}" width="${w + 24}" height="16" rx="8" fill="${C.amber}" opacity="0.9"/>`;
+    // title
+    g += `<text x="180" y="${y + 26}" font-size="15" font-weight="800" fill="${C.ink}" text-anchor="middle">Bill of Rights</text>`;
+    // lines of "text"
+    for (let i = 0; i < 3; i++) { g += `<line x1="${x + 24}" y1="${y + 44 + i * 15}" x2="${x + w - 24}" y2="${y + 44 + i * 15}" stroke="${C.line}" stroke-width="4" stroke-linecap="round"/>`; }
+    g += `<text x="180" y="${y + h - 12}" font-size="11" font-weight="700" fill="${C.sub}" text-anchor="middle">First 10 amendments</text>`;
+    return g;
+  })()),
+
+  // ── Separation of powers: three branches that each check the others ───────────
+  "separation-powers": svg("0 0 360 186", (() => {
+    const R = 32;
+    const edge = (ax: number, ay: number, bx: number, by: number) => {
+      const dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy), ux = dx / d, uy = dy / d;
+      const x1 = ax + ux * (R + 4), y1 = ay + uy * (R + 4), x2 = bx - ux * (R + 4), y2 = by - uy * (R + 4);
+      return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${C.sub}" stroke-width="3" marker-start="url(#sp)" marker-end="url(#sp)"/>`;
+    };
+    const nodes: [number, number, string, string][] = [[180, 42, "Legislative", C.indigo], [68, 148, "Executive", C.orange], [292, 148, "Judicial", C.teal]];
+    let g = `<defs><marker id="sp" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="${C.sub}"/></marker></defs>`;
+    g += edge(180, 42, 68, 148) + edge(180, 42, 292, 148) + edge(68, 148, 292, 148);
+    nodes.forEach((n) => { g += `<circle cx="${n[0]}" cy="${n[1]}" r="${R}" fill="${n[3]}22" stroke="${n[3]}" stroke-width="3"/><text x="${n[0]}" y="${(n[1] as number) + 4}" font-size="10.5" font-weight="800" fill="${n[3] as string}" text-anchor="middle">${n[2]}</text>`; });
+    g += `<text x="180" y="102" font-size="11" font-weight="700" fill="${C.sub}" text-anchor="middle">checks &amp; balances</text>`;
+    return g;
+  })()),
 };
 
 export function figureSvg(key: string): string | null {

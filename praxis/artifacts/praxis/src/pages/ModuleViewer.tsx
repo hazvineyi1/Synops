@@ -66,6 +66,10 @@ const LESSON_VIDEO_CHECKS: Record<string, { q: [string, string]; options: [strin
     { q: ["La palabra 'cada' te dice que…", "The word 'each' tells you that…"], options: [["Los grupos son iguales", "The groups are equal"], ["Hay que restar", "You should subtract"]], answer: 0 },
     { q: ["5 mesas con 3 sillas cada una son…", "5 tables with 3 chairs each is…"], options: [["15 sillas", "15 chairs"], ["8 sillas", "8 chairs"]], answer: 0 },
   ],
+  "Level 1: Equal groups": [
+    { q: ["¿Qué significa 4 × 3?", "What does 4 × 3 mean?"], options: [["4 grupos de 3", "4 groups of 3"], ["4 más 3", "4 plus 3"], ["3 menos 4", "3 minus 4"]], answer: 0 },
+    { q: ["El resultado de una multiplicación se llama…", "The answer to a multiplication is called the…"], options: [["producto", "product"], ["suma", "sum"], ["diferencia", "difference"]], answer: 0 },
+  ],
 };
 
 function VideoChecks({ title, es }: { title?: string; es: boolean }) {
@@ -2044,6 +2048,16 @@ function MarkdownView({ text }: { text: string }) {
           </figure>
         );
       }
+      continue;
+    }
+    const headMatch = line.match(/^(#{1,3})\s+(.*)$/);
+    if (headMatch && /^\d+\.\s/.test(headMatch[2])) {
+      // A "heading" whose text starts with an ordinal like "4. " is never a real section
+      // heading — it's a quiz/review question that leaked into the reading markdown (e.g. a
+      // civics "check understanding" item). Render it as an ordinary numbered question so it
+      // can never appear as a mis-numbered underlined H2/H3 heading. (Issue 1)
+      flush();
+      out.push(<p key={k++} className="my-3 leading-[1.75] text-[15px] font-medium text-foreground/90">{mdInline(headMatch[2], 'q' + k)}</p>);
       continue;
     }
     if (/^###\s+/.test(line)) { flush(); out.push(<h4 key={k++} className="font-serif font-semibold text-base mt-6 mb-2">{mdInline(line.replace(/^###\s+/, ''), 'h' + k)}</h4>); }
