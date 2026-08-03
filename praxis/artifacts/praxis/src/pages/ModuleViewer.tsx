@@ -41,6 +41,74 @@ import { useSession } from '@/context/SessionContext';
 import { isK12DemoEmail, personaByEmail, type K12Persona } from '@/lib/k12Personas';
 import { picturesInText } from '@/lib/kidPictures';
 
+// Interactive checkpoint questions shown right under a lesson video, so watching is ACTIVE: the
+// learner answers about what they saw and gets instant feedback. Keyed by module title (Sofía's
+// exemplar set). Bilingual: [Spanish, English].
+const LESSON_VIDEO_CHECKS: Record<string, { q: [string, string]; options: [string, string][]; answer: number }[]> = {
+  "La idea principal": [
+    { q: ["¿Qué es la idea principal de un texto?", "What is the main idea of a text?"], options: [["De qué trata casi todo el texto", "What almost all the text is about"], ["El primer dibujo", "The first picture"], ["Solo el título", "Just the title"]], answer: 0 },
+    { q: ["Los detalles son…", "Details are…"], options: [["Datos pequeños que apoyan la idea principal", "Small facts that support the main idea"], ["La idea más grande del texto", "The biggest idea in the text"]], answer: 0 },
+  ],
+  "Vocabulario en contexto": [
+    { q: ["Los sinónimos son palabras que…", "Synonyms are words that…"], options: [["Significan casi lo mismo", "Mean almost the same thing"], ["Se escriben igual", "Are spelled the same"], ["Siempre riman", "Always rhyme"]], answer: 0 },
+    { q: ["Si algo es 'veloz', es…", "If something is 'veloz', it is…"], options: [["Muy rápido", "Very fast"], ["Muy grande", "Very big"]], answer: 0 },
+  ],
+  "Pistas del contexto": [
+    { q: ["Las pistas del contexto son…", "Context clues are…"], options: [["Las palabras cercanas que dan pistas", "Nearby words that give hints"], ["El número de página", "The page number"]], answer: 0 },
+    { q: ["Si un sendero es 'angosto', es…", "If a path is 'angosto', it is…"], options: [["Estrecho, cabe poca gente", "Narrow, few people fit"], ["Muy ancho", "Very wide"]], answer: 0 },
+  ],
+  "Grupos Iguales": [
+    { q: ["¿Qué significa 3 × 4?", "What does 3 × 4 mean?"], options: [["3 grupos de 4", "3 groups of 4"], ["3 más 4", "3 plus 4"]], answer: 0 },
+    { q: ["Multiplicar es una suma rápida de…", "Multiplying is fast addition of…"], options: [["Grupos iguales", "Equal groups"], ["Números distintos", "Different numbers"]], answer: 0 },
+  ],
+  "Problemas con Multiplicación": [
+    { q: ["La palabra 'cada' te dice que…", "The word 'each' tells you that…"], options: [["Los grupos son iguales", "The groups are equal"], ["Hay que restar", "You should subtract"]], answer: 0 },
+    { q: ["5 mesas con 3 sillas cada una son…", "5 tables with 3 chairs each is…"], options: [["15 sillas", "15 chairs"], ["8 sillas", "8 chairs"]], answer: 0 },
+  ],
+};
+
+function VideoChecks({ title, es }: { title?: string; es: boolean }) {
+  const items = LESSON_VIDEO_CHECKS[title ?? ''] ?? [];
+  const [picked, setPicked] = useState<Record<number, number>>({});
+  if (!items.length) return null;
+  const L = (esT: string, enT: string) => (es ? esT : enT);
+  return (
+    <div className="mt-5 border-t pt-4" style={{ borderColor: 'rgba(0,0,0,0.08)' }}>
+      <p className="text-sm font-bold mb-3">{L('Preguntas del video 🎯', 'Video questions 🎯')}</p>
+      <div className="space-y-4">
+        {items.map((it, qi) => {
+          const chosen = picked[qi];
+          return (
+            <div key={qi}>
+              <p className="text-sm font-medium mb-2">{es ? it.q[0] : it.q[1]}</p>
+              <div className="flex flex-wrap gap-2">
+                {it.options.map((op, oi) => {
+                  const isChosen = chosen === oi;
+                  const correct = oi === it.answer;
+                  const show = chosen != null;
+                  const bg = show && isChosen ? (correct ? '#DCFCE7' : '#FEE2E2') : show && correct ? '#DCFCE7' : '#fff';
+                  const bd = show && (isChosen || correct) ? (correct ? '#16A34A' : '#DC2626') : '#D1D5DB';
+                  return (
+                    <button key={oi} onClick={() => setPicked((p) => ({ ...p, [qi]: oi }))}
+                      className="text-sm px-3 py-2 rounded-md border text-left" style={{ background: bg, borderColor: bd }}>
+                      {(es ? op[0] : op[1]) + (show && correct ? ' ✓' : show && isChosen && !correct ? ' ✗' : '')}
+                    </button>
+                  );
+                })}
+              </div>
+              {chosen != null && (
+                <p className="text-xs mt-1" style={{ color: chosen === it.answer ? '#16A34A' : '#B45309' }}>
+                  {chosen === it.answer ? L('¡Correcto! 🌟', 'Correct! 🌟') : L('Casi… mira otra vez y prueba.', 'Almost… look again and try.')}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface QuizOption { id: string; text: string; }
@@ -2502,8 +2570,9 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
         {/* Active step */}
         {step?.id === 'watch' && (
           <div className="rounded-lg bg-white p-4 sm:p-6 shadow-sm">
-            <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>🎬 {T('Watch the video, then tap Next!', '¡Mira el video y luego toca Siguiente!')}</p>
+            <p className="text-center text-base font-bold mb-3" style={{ color: accent }}>🎬 {T('Watch the video, then answer!', '¡Mira el video y luego responde!')}</p>
             {videoBeat && <VideoFrame url={videoBeat.videoUrl as string} />}
+            <VideoChecks title={mod?.title} es={es} />
           </div>
         )}
         {step?.id === 'read' && (
