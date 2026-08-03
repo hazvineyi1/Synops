@@ -2466,6 +2466,9 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const readingId = readings?.[0]?.id ?? null;
   const { data: reader } = useQuery({ queryKey: ['reading', readingId], queryFn: () => apiFetch<ModuleReadingRow & { content: string }>(`/readings/${readingId}`), enabled: !!readingId });
   const { data: activities } = useQuery({ queryKey: ['module-activities', moduleId], queryFn: () => activitiesApi.list({ moduleId }), enabled: !!moduleId });
+  // Prefer a Math Coach (Socratic tutor) as the practice when a module has one — it's a richer game
+  // than the quiz; falls back to the first activity (the quiz) otherwise.
+  const practiceActivity = (activities as { id: string; kind?: string }[] | undefined)?.find((a) => a?.kind === 'math-coach') ?? activities?.[0];
   const { data: cases } = useQuery({ queryKey: ['module-cases', moduleId], queryFn: () => apiFetch<{ id: string }[]>(`/modules/${moduleId}/cases`), enabled: !!moduleId });
   const { data: courseModules } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<{ id: string; order: number }[]>(`/courses/${courseId}/modules`), enabled: !!courseId });
   const startCase = useMutation({ mutationFn: (cid: string) => apiFetch<{ id: string }>(`/cases/${cid}/sessions`, { method: 'POST', body: JSON.stringify({}) }), onSuccess: (s) => navigate(`/case-run/${s.id}`) });
@@ -2528,7 +2531,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const nextMod = curIdx >= 0 ? orderedMods[curIdx + 1] : undefined;
 
   const launch = () => {
-    if (step?.id === 'practice' && activities?.[0]) navigate(`/activities/${activities[0].id}/play`);
+    if (step?.id === 'practice' && practiceActivity) navigate(`/activities/${practiceActivity.id}/play`);
     else if (step?.id === 'tutor' && cases?.[0]) startCase.mutate(cases[0].id);
   };
 
@@ -2553,7 +2556,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
               <div key={s.id} className="flex items-center gap-2">
                 <button onClick={() => {
                     // Practice / tutor steps launch the activity directly — no extra "Start" card in between.
-                    if (s.id === 'practice' && activities?.[0]) { navigate(`/activities/${activities[0].id}/play`); return; }
+                    if (s.id === 'practice' && practiceActivity) { navigate(`/activities/${practiceActivity.id}/play`); return; }
                     if (s.id === 'tutor' && cases?.[0]) { startCase.mutate(cases[0].id); return; }
                     setStepIdx(i);
                   }}
@@ -2634,7 +2637,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
             <button onClick={() => {
               // Launch practice/tutor straight from "Next" — no intermediate "Start" card.
               const nx = steps[stepIdx + 1];
-              if (nx.id === 'practice' && activities?.[0]) { navigate(`/activities/${activities[0].id}/play`); return; }
+              if (nx.id === 'practice' && practiceActivity) { navigate(`/activities/${practiceActivity.id}/play`); return; }
               if (nx.id === 'tutor' && cases?.[0]) { startCase.mutate(cases[0].id); return; }
               setStepIdx(stepIdx + 1);
             }} className={bigBtn} style={{ background: accent }}>

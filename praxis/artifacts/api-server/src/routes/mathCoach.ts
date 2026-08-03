@@ -21,6 +21,7 @@ router.post("/math-coach/hint", requireAuth, async (req, res) => {
   const out = await mathHint({
     problem, answer: String(b.answer ?? ""), studentAnswer: b.studentAnswer ? String(b.studentAnswer) : undefined,
     attempts: Number(b.attempts) || 1, grade: b.grade ? String(b.grade) : undefined,
+    lang: b.lang === "es" ? "es" : "en",
   });
   res.json(out);
 });
@@ -29,7 +30,7 @@ router.post("/math-coach/worked-example", requireAuth, async (req, res) => {
   const b = req.body ?? {};
   const problem = String(b.problem ?? "").trim();
   if (!problem) { res.status(400).json({ error: "A problem is required." }); return; }
-  const out = await mathWorkedExample({ problem, answer: String(b.answer ?? ""), grade: b.grade ? String(b.grade) : undefined });
+  const out = await mathWorkedExample({ problem, answer: String(b.answer ?? ""), grade: b.grade ? String(b.grade) : undefined, lang: b.lang === "es" ? "es" : "en" });
   res.json(out);
 });
 

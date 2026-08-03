@@ -16,18 +16,20 @@ export interface MathHintInput {
   studentAnswer?: string;
   attempts: number;
   grade?: string;
+  lang?: "es" | "en";
 }
 
 export async function mathHint(input: MathHintInput): Promise<{ hint: string; offerWorkedExample: boolean }> {
   const grade = input.grade || "a middle-school";
   const answer = String(input.answer ?? "");
+  const es = input.lang === "es";
   const system = `You are a warm, encouraging math coach for ${grade} student. You use the SOCRATIC method.
 
 HARD RULES:
 - You NEVER state, compute, or even partially reveal the final answer (which is "${answer}"). Not the number, not "it's close to", nothing. If the learner begs "just tell me", gently decline and point to the next small step.
 - Respond with exactly ONE short, friendly guiding question or nudge — 1 to 2 sentences, plain kid-friendly words.
 - Ground it in what the learner just tried: if they made a specific slip, ask a question that helps them notice it themselves.
-- Encouraging, never shaming. No lists, no markdown, no preamble.
+- Encouraging, never shaming. No lists, no markdown, no preamble.${es ? "\n- IMPORTANT: write your ENTIRE reply in SPANISH (español), warm and kid-friendly." : ""}
 Return ONLY the hint sentence(s).`;
   const user = `Problem: ${input.problem}
 Correct answer (for YOUR reference only — never reveal): ${answer}
@@ -39,19 +41,20 @@ This is attempt ${input.attempts}. Give ONE Socratic hint that moves them one sm
     let text = (msg.content as { type: string; text?: string }[]).map((b) => (b.type === "text" ? b.text ?? "" : "")).join("").trim();
     // Guardrail: if the model slipped and echoed the exact answer, fall back to a safe nudge.
     if (text && answer && text.replace(/\s+/g, "").toLowerCase().includes(answer.replace(/\s+/g, "").toLowerCase()) && answer.length >= 2) {
-      text = "What is the very first step you could take here? Try naming just one thing you could do to the problem.";
+      text = es ? "¿Cuál es el primer paso que podrías dar? Nombra solo una cosa que puedes hacer con el problema." : "What is the very first step you could take here? Try naming just one thing you could do to the problem.";
     }
-    return { hint: text || "What do you already know from the problem? Start by writing down just the first step.", offerWorkedExample: input.attempts >= 3 };
+    return { hint: text || (es ? "¿Qué sabes ya del problema? Empieza escribiendo solo el primer paso." : "What do you already know from the problem? Start by writing down just the first step."), offerWorkedExample: input.attempts >= 3 };
   } catch {
-    return { hint: "Take it one step at a time — what could you do first? Try that, then tell me what you get.", offerWorkedExample: input.attempts >= 3 };
+    return { hint: es ? "Vamos paso a paso — ¿qué podrías hacer primero? Inténtalo y dime qué te sale." : "Take it one step at a time — what could you do first? Try that, then tell me what you get.", offerWorkedExample: input.attempts >= 3 };
   }
 }
 
 export interface WorkedStep { heading: string; detail: string }
 
-export async function mathWorkedExample(input: { problem: string; answer: string; grade?: string }): Promise<{ intro: string; steps: WorkedStep[]; tryAgain: string }> {
+export async function mathWorkedExample(input: { problem: string; answer: string; grade?: string; lang?: "es" | "en" }): Promise<{ intro: string; steps: WorkedStep[]; tryAgain: string }> {
   const grade = input.grade || "a middle-school";
   const answer = String(input.answer ?? "");
+  const es = input.lang === "es";
   const system = `You are a patient math coach for ${grade} student who has tried a problem a few times.
 Give a short worked example of a SIMILAR problem with DIFFERENT numbers (never the same as the learner's problem), fully solved, so they see the METHOD. Then invite them to apply the method to their own problem.
 Return ONLY JSON of exactly this shape: {"intro": string, "steps": [{"heading": string, "detail": string}], "tryAgain": string}
@@ -59,10 +62,17 @@ Rules:
 - Use DIFFERENT numbers from the learner's problem so you never reveal their answer "${answer}".
 - 2 to 4 steps; each heading 2-5 words; each detail 1-2 short kid-friendly sentences showing the thinking.
 - intro: one warm sentence. tryAgain: one line inviting them to try their own problem now.
-- Plain text only, no markdown.`;
+- Plain text only, no markdown.${es ? "\n- IMPORTANT: write ALL text (intro, headings, details, tryAgain) in SPANISH (español), warm and kid-friendly." : ""}`;
   const user = `The learner's problem is: ${input.problem}. Show a worked example of a SIMILAR but different problem, then hand back to them.`;
 
-  const fallback = {
+  const fallback = es ? {
+    intro: "Este tipo de problema es difícil al principio — veamos uno parecido juntos.",
+    steps: [
+      { heading: "Léelo con calma", detail: "Busca qué te pide el problema y anota los números que ya conoces." },
+      { heading: "Un paso a la vez", detail: "Haz un movimiento pequeño y revisa que tenga sentido antes del siguiente." },
+    ],
+    tryAgain: "Ahora intenta el tuyo igual — paso a paso. ¡Tú puedes!",
+  } : {
     intro: "This kind of problem is tricky at first — let's look at one like it together.",
     steps: [
       { heading: "Read it carefully", detail: "Find what the problem is asking for and write down the numbers you know." },

@@ -5,6 +5,8 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Lightbulb, GraduationCap,
 import { Button } from "@/components/ui/button";
 import { activitiesApi } from "@/lib/activitiesApi";
 import { apiFetch } from "@/lib/api";
+import { useSession } from "@/context/SessionContext";
+import { personaByEmail } from "@/lib/k12Personas";
 
 interface MathProblem {
   prompt: string; answer: string; kind: "number" | "text"; min?: number; max?: number; hint?: string;
@@ -139,6 +141,10 @@ function BalanceScale({ eq, onSolved }: { eq: { a: number; b: number; c: number 
 export function MathCoach({ params }: { params: { activityId: string } }) {
   const id = params.activityId;
   const [, setLocation] = useLocation();
+  const { user } = useSession();
+  const es = personaByEmail(user?.email)?.defaultLang === "es";
+  const L = (en: string, esT: string) => (es ? esT : en);
+  const lang = es ? "es" : "en";
   const { data: activity, isLoading, error } = useQuery({ queryKey: ["activity", id], queryFn: () => activitiesApi.get(id) });
 
   const problems: MathProblem[] = useMemo(() => {
@@ -173,13 +179,13 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
   };
 
   const submit = () => {
-    if (!p || !current) { setFeedback({ ok: false, msg: "Enter an answer first." }); return; }
+    if (!p || !current) { setFeedback({ ok: false, msg: L("Enter an answer first.", "Escribe una respuesta primero.") }); return; }
     if (check(current, p.answer)) {
-      setFeedback({ ok: true, msg: "Correct! 🎉" });
+      setFeedback({ ok: true, msg: L("Correct! 🎉", "¡Correcto! 🎉") });
       setTimeout(() => nextProblem(true), 900);
     } else {
       const n = attempts + 1; setAttempts(n);
-      setFeedback({ ok: false, msg: n >= 3 ? "Not yet — want a worked example?" : "Not quite — try again, or ask the coach." });
+      setFeedback({ ok: false, msg: n >= 3 ? L("Not yet — want a worked example?", "Todavía no — ¿quieres ver un ejemplo resuelto?") : L("Not quite — try again, or ask the coach.", "Casi — intenta otra vez o pregúntale al tutor.") });
       if (n >= 3) setOfferWorked(true);
     }
   };
@@ -188,10 +194,10 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
     if (!p) return;
     setCoachBusy(true);
     try {
-      const r = await apiFetch<{ hint: string; offerWorkedExample: boolean }>("/math-coach/hint", { method: "POST", body: JSON.stringify({ problem: p.prompt, answer: p.answer, studentAnswer: current || undefined, attempts: Math.max(1, attempts), grade }) });
+      const r = await apiFetch<{ hint: string; offerWorkedExample: boolean }>("/math-coach/hint", { method: "POST", body: JSON.stringify({ problem: p.prompt, answer: p.answer, studentAnswer: current || undefined, attempts: Math.max(1, attempts), grade, lang }) });
       setCoach((c) => [...c, { text: r.hint, kind: "hint" }]);
       if (r.offerWorkedExample) setOfferWorked(true);
-    } catch { setCoach((c) => [...c, { text: "Take it one step at a time — what could you do first?", kind: "hint" }]); }
+    } catch { setCoach((c) => [...c, { text: L("Take it one step at a time — what could you do first?", "Vamos paso a paso — ¿qué podrías hacer primero?"), kind: "hint" }]); }
     finally { setCoachBusy(false); }
   };
 
@@ -199,17 +205,17 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
     if (!p) return;
     setCoachBusy(true); setOfferWorked(false);
     try {
-      const r = await apiFetch<{ intro: string; steps: { heading: string; detail: string }[]; tryAgain: string }>("/math-coach/worked-example", { method: "POST", body: JSON.stringify({ problem: p.prompt, answer: p.answer, grade }) });
+      const r = await apiFetch<{ intro: string; steps: { heading: string; detail: string }[]; tryAgain: string }>("/math-coach/worked-example", { method: "POST", body: JSON.stringify({ problem: p.prompt, answer: p.answer, grade, lang }) });
       const body = r.intro + "\n" + r.steps.map((s) => `• ${s.heading}: ${s.detail}`).join("\n") + "\n" + r.tryAgain;
       setCoach((c) => [...c, { text: body, kind: "worked" }]);
-    } catch { setCoach((c) => [...c, { text: "Let's break it into small steps and try again together.", kind: "worked" }]); }
+    } catch { setCoach((c) => [...c, { text: L("Let's break it into small steps and try again together.", "Vamos a dividirlo en pasos pequeños y lo intentamos juntos."), kind: "worked" }]); }
     finally { setCoachBusy(false); }
   };
 
   if (isLoading) return <div className="min-h-[100dvh] grid place-items-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (error || !activity || problems.length === 0) return (
     <div className="min-h-[100dvh] grid place-items-center p-6 text-center">
-      <div><p className="text-red-600 mb-3">This math activity could not be loaded.</p><Button onClick={() => setLocation("/dashboard")}>Back</Button></div>
+      <div><p className="text-red-600 mb-3">{L("This math activity could not be loaded.", "No se pudo cargar esta actividad de matemáticas.")}</p><Button onClick={() => setLocation("/dashboard")}>{L("Back", "Atrás")}</Button></div>
     </div>
   );
 
@@ -219,7 +225,7 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
     <div className="min-h-[100dvh] bg-gradient-to-b from-indigo-50 to-white">
       <header className="sticky top-0 z-10 border-b bg-white/90 backdrop-blur">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => history.length > 1 ? history.back() : setLocation("/dashboard")}><ArrowLeft className="h-4 w-4 mr-1" /> Back</Button>
+          <Button variant="ghost" size="sm" onClick={() => history.length > 1 ? history.back() : setLocation("/dashboard")}><ArrowLeft className="h-4 w-4 mr-1" /> {L("Back", "Atrás")}</Button>
           <span className="font-medium truncate">{activity.title}</span>
           <span className="ml-auto text-sm text-muted-foreground">{finished ? problems.length : idx + 1}/{problems.length}</span>
         </div>
@@ -229,15 +235,15 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
         {finished ? (
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-8 text-center">
             <CheckCircle2 className="h-10 w-10 text-emerald-600 mx-auto mb-3" />
-            <h2 className="text-2xl font-bold mb-1">Nice work!</h2>
-            <p className="text-muted-foreground">You solved <strong>{solvedCount}</strong> of {problems.length}. The coach is proud of you! 🎉</p>
-            <Button className="mt-5" onClick={() => setLocation("/dashboard")}>Done <ArrowRight className="h-4 w-4 ml-1" /></Button>
+            <h2 className="text-2xl font-bold mb-1">{L("Nice work!", "¡Buen trabajo!")}</h2>
+            <p className="text-muted-foreground">{L("You solved", "Resolviste")} <strong>{solvedCount}</strong> {L("of", "de")} {problems.length}. {L("The coach is proud of you! 🎉", "¡Tu tutor está orgulloso de ti! 🎉")}</p>
+            <Button className="mt-5" onClick={() => setLocation("/dashboard")}>{L("Done", "Listo")} <ArrowRight className="h-4 w-4 ml-1" /></Button>
           </div>
         ) : (
           <div className="grid md:grid-cols-5 gap-4">
             <div className="md:col-span-3 space-y-4">
               <div className="rounded-2xl bg-white border shadow-sm p-5">
-                <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Problem {idx + 1}</div>
+                <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">{L("Problem", "Problema")} {idx + 1}</div>
                 <p className="text-xl font-semibold">{p.prompt}</p>
 
                 {p.visual === "balance" && p.eq ? (
@@ -247,44 +253,44 @@ export function MathCoach({ params }: { params: { activityId: string } }) {
                   </div>
                 ) : p.visual === "bar" && p.bars && p.bars.length ? (
                   <div className="mt-4">
-                    <p className="text-xs text-muted-foreground mb-1">Use the bar model to reason it out, then tap a total or type your answer.</p>
+                    <p className="text-xs text-muted-foreground mb-1">{L("Use the bar model to reason it out, then tap a total or type your answer.", "Usa el modelo de barras para razonarlo, luego toca un total o escribe tu respuesta.")}</p>
                     <BarModel bars={p.bars} onPick={(v) => { setTyped(String(v)); setLineVal(null); }} />
                   </div>
                 ) : p.kind === "number" && typeof p.min === "number" && typeof p.max === "number" ? (
                   <div className="mt-4">
-                    <p className="text-xs text-muted-foreground mb-1">Drag the dot to your answer, or type it below.</p>
+                    <p className="text-xs text-muted-foreground mb-1">{L("Drag the dot to your answer, or type it below.", "Arrastra el punto a tu respuesta, o escríbela abajo.")}</p>
                     <NumberLine min={p.min} max={p.max} value={lineVal} onChange={(v) => { setLineVal(v); setTyped(String(v)); }} />
                   </div>
                 ) : null}
 
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <input value={typed} onChange={(e) => { setTyped(e.target.value); const n = Number(e.target.value); setLineVal(Number.isFinite(n) && e.target.value.trim() !== "" ? n : null); }}
-                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder="Your answer" className="rounded-xl border-2 border-indigo-200 px-3 py-2 text-lg w-40 focus:border-indigo-500 outline-none" />
-                  <Button onClick={submit}>Check</Button>
+                    onKeyDown={(e) => { if (e.key === "Enter") submit(); }} placeholder={L("Your answer", "Tu respuesta")} className="rounded-xl border-2 border-indigo-200 px-3 py-2 text-lg w-40 focus:border-indigo-500 outline-none" />
+                  <Button onClick={submit}>{L("Check", "Comprobar")}</Button>
                   {feedback && <span className={`text-sm font-semibold ${feedback.ok ? "text-emerald-700" : "text-amber-700"}`}>{feedback.msg}</span>}
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <Button variant="outline" className="gap-1.5 border-amber-400/50 text-amber-700" disabled={coachBusy} onClick={askCoach}>
-                  {coachBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />} Ask the coach
+                  {coachBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Lightbulb className="h-4 w-4" />} {L("Ask the coach", "Pregúntale al tutor")}
                 </Button>
                 {offerWorked && (
                   <Button variant="outline" className="gap-1.5 border-indigo-400/50 text-indigo-700" disabled={coachBusy} onClick={showWorked}>
-                    <GraduationCap className="h-4 w-4" /> Show a worked example
+                    <GraduationCap className="h-4 w-4" /> {L("Show a worked example", "Ver un ejemplo resuelto")}
                   </Button>
                 )}
                 {attempts > 0 && !feedback?.ok && (
-                  <Button variant="ghost" size="sm" className="gap-1" onClick={() => { setTyped(""); setLineVal(null); setFeedback(null); }}><RefreshCw className="h-3.5 w-3.5" /> Clear</Button>
+                  <Button variant="ghost" size="sm" className="gap-1" onClick={() => { setTyped(""); setLineVal(null); setFeedback(null); }}><RefreshCw className="h-3.5 w-3.5" /> {L("Clear", "Borrar")}</Button>
                 )}
               </div>
             </div>
 
             <div className="md:col-span-2">
               <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 h-full">
-                <div className="flex items-center gap-2 font-bold text-amber-800 mb-2"><Lightbulb className="h-4 w-4" /> Your coach</div>
+                <div className="flex items-center gap-2 font-bold text-amber-800 mb-2"><Lightbulb className="h-4 w-4" /> {L("Your coach", "Tu tutor")}</div>
                 {coach.length === 0 ? (
-                  <p className="text-sm text-amber-800/80">Stuck? Tap <b>Ask the coach</b>. I'll help you figure it out with questions — I won't just give you the answer. 😊</p>
+                  <p className="text-sm text-amber-800/80">{L("Stuck? Tap Ask the coach. I'll help you figure it out with questions — I won't just give you the answer. 😊", "¿Atascado? Toca Pregúntale al tutor. Te ayudo con preguntas para que lo descubras — no te doy la respuesta directa. 😊")}</p>
                 ) : (
                   <div className="space-y-2">
                     {coach.map((m, i) => (

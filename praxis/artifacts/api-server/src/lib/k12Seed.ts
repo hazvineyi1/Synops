@@ -1120,6 +1120,37 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
     }
   }
 
+  // 3g. A Spanish Socratic "Tutor de Mates" for Sofía's Grade-3 multiplication course — a number-line
+  // problem set with a coach that hints in Spanish (never the answer). Adds a genuinely different game
+  // type (guided problem-solving) to her class, fully in Spanish.
+  const sofiaMathId = courseIdByTitle["Matemáticas (Grado 3): Multiplicación"];
+  if (sofiaMathId) {
+    const [smMod] = await db.select().from(modulesTable).where(eq(modulesTable.courseId, sofiaMathId)).orderBy(asc(modulesTable.order)).limit(1);
+    if (smMod) {
+      const problems = { problems: [
+        { prompt: "Hay 3 platos y en cada plato hay 4 galletas. ¿Cuántas galletas hay en total?", answer: "12", kind: "number", min: 0, max: 30, hint: "Cuenta cuántos grupos (platos) hay y cuántas galletas en cada uno; luego multiplica." },
+        { prompt: "Ana tiene 4 bolsas. En cada bolsa hay 6 manzanas. ¿Cuántas manzanas tiene en total?", answer: "24", kind: "number", min: 0, max: 40, hint: "Son 4 grupos de 6. Puedes sumar 6 cuatro veces." },
+        { prompt: "Hay 5 mesas y en cada mesa hay 3 sillas. ¿Cuántas sillas hay?", answer: "15", kind: "number", min: 0, max: 30, hint: "5 grupos de 3. La palabra 'cada' te dice que los grupos son iguales." },
+        { prompt: "2 cajas y en cada caja hay 5 lápices. ¿Cuántos lápices hay?", answer: "10", kind: "number", min: 0, max: 20, hint: "2 grupos de 5." },
+        { prompt: "¿Cuánto es 6 × 3?", answer: "18", kind: "number", min: 0, max: 30, hint: "6 × 3 son 6 grupos de 3: suma 3 seis veces." },
+        { prompt: "Hay 3 filas y en cada fila hay 4 estrellas. ¿Cuántas estrellas hay?", answer: "12", kind: "number", min: 0, max: 24, hint: "3 filas de 4 es lo mismo que 3 × 4." },
+      ] };
+      const title = "🧮 Tutor de Mates: Multiplicación";
+      const html = JSON.stringify(problems);
+      const existing = await db.select().from(interactiveActivitiesTable).where(and(eq(interactiveActivitiesTable.moduleId, smMod.id), eq(interactiveActivitiesTable.title, title)));
+      if (existing[0]) {
+        await db.update(interactiveActivitiesTable).set({ html, updatedAt: new Date() }).where(eq(interactiveActivitiesTable.id, existing[0].id));
+      } else {
+        await db.insert(interactiveActivitiesTable).values({
+          organisationId: org.id, courseId: sofiaMathId, moduleId: smMod.id, title,
+          instructions: "Resuelve cada problema. Arrastra el punto en la recta numérica o escribe tu respuesta. ¿Atascado? Pregúntale al tutor — te ayuda con pistas, ¡nunca con la respuesta!",
+          html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "beginner",
+          isLibrary: false, tags: ["math-coach", "game:mathcoach", "band:35", "subject:Math", "lang:es"], published: true, createdByUserId: facultyId,
+        });
+      }
+    }
+  }
+
   // 4. Teacher (admin) + class staff.
   const adminId = await upsertUser({ email: K12_ADMIN_EMAIL, firstName: "Ms.", lastName: "Ramírez", role: "partner_admin", partnerId: partner.id, organisationId: null });
   const existingStaff = (await db.select().from(orgClassStaffTable).where(eq(orgClassStaffTable.classId, cls.id))).map((s) => s.staffId);
