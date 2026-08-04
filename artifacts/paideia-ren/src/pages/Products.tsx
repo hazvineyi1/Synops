@@ -246,22 +246,29 @@ function ProductExplorer() {
   const [active, setActive] = useState<string>(PRODUCTS[0]!.slug);
 
   useEffect(() => {
+    // Stop the browser from restoring scroll to the top after load, which was silently undoing our
+    // deep-link scroll (scrollIntoView appeared to no-op because the page snapped back to 0).
+    try { if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual"; } catch { /* ok */ }
     let raf = 0;
     const timers: number[] = [];
+    const NAV_OFFSET = 80; // sticky header height
+    // Use an explicit window.scrollTo with a computed absolute offset (proven reliable here) rather
+    // than scrollIntoView, which the browser was ignoring during initial paint.
     const scrollToExplore = (smooth: boolean) => {
-      document.getElementById("explore")?.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+      const el = document.getElementById("explore");
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY - NAV_OFFSET;
+      window.scrollTo({ top: top > 0 ? top : 0, behavior: smooth ? "smooth" : "auto" });
     };
     const applyHash = (smooth: boolean) => {
       const slug = window.location.hash.replace("#", "").toLowerCase();
       if (!PRODUCTS.some((p) => p.slug === slug)) return;
       setActive(slug);
-      // Re-assert the scroll after layout settles. A single rAF fires before the hero/fonts/images
-      // above "explore" have their final height, so the first scroll lands mid-page; the follow-up
-      // instant scrolls correct the offset once the page has settled.
+      // Re-assert repeatedly: the hero/fonts/images above "explore" settle over a few hundred ms,
+      // and the browser may still reset scroll around the load event, so we re-apply until it sticks.
       raf = window.requestAnimationFrame(() => {
         scrollToExplore(smooth);
-        timers.push(window.setTimeout(() => scrollToExplore(false), 200));
-        timers.push(window.setTimeout(() => scrollToExplore(false), 600));
+        [80, 200, 400, 700, 1100].forEach((d) => timers.push(window.setTimeout(() => scrollToExplore(false), d)));
       });
     };
     applyHash(false);
