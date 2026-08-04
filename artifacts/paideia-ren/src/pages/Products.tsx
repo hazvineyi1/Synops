@@ -252,28 +252,29 @@ function ProductExplorer() {
     let raf = 0;
     const timers: number[] = [];
     const NAV_OFFSET = 80; // sticky header height
-    // Use an explicit window.scrollTo with a computed absolute offset (proven reliable here) rather
-    // than scrollIntoView, which the browser was ignoring during initial paint.
-    const scrollToExplore = (smooth: boolean) => {
-      const el = document.getElementById("explore");
-      if (!el) return;
-      const top = el.getBoundingClientRect().top + window.scrollY - NAV_OFFSET;
-      window.scrollTo({ top: top > 0 ? top : 0, behavior: smooth ? "smooth" : "auto" });
-    };
-    const applyHash = (smooth: boolean) => {
+    // Poll-and-correct: on a fresh load the page is often too SHORT early (images/content below
+    // "explore" haven't loaded), so scrollTo clamps to ~0. We keep re-applying to explore's LIVE
+    // position every 130ms for up to ~3s, and stop the instant we land — so we never fight a user
+    // who scrolls away. Explicit window.scrollTo (not scrollIntoView, which the browser ignored).
+    const applyHash = () => {
       const slug = window.location.hash.replace("#", "").toLowerCase();
       if (!PRODUCTS.some((p) => p.slug === slug)) return;
       setActive(slug);
-      // Re-assert repeatedly: the hero/fonts/images above "explore" settle over a few hundred ms,
-      // and the browser may still reset scroll around the load event, so we re-apply until it sticks.
-      raf = window.requestAnimationFrame(() => {
-        scrollToExplore(smooth);
-        [80, 200, 400, 700, 1100].forEach((d) => timers.push(window.setTimeout(() => scrollToExplore(false), d)));
-      });
+      let tries = 0;
+      const settle = () => {
+        const el = document.getElementById("explore");
+        if (el) {
+          const target = Math.max(0, el.getBoundingClientRect().top + window.scrollY - NAV_OFFSET);
+          if (Math.abs(window.scrollY - target) <= 4) return; // landed — stop
+          window.scrollTo({ top: target });
+        }
+        if (tries++ < 24) timers.push(window.setTimeout(settle, 130));
+      };
+      raf = window.requestAnimationFrame(settle);
     };
-    applyHash(false);
-    const onHash = () => applyHash(true);
-    const onLoad = () => applyHash(false);
+    applyHash();
+    const onHash = () => applyHash();
+    const onLoad = () => applyHash();
     window.addEventListener("hashchange", onHash);
     window.addEventListener("load", onLoad);
     return () => {
