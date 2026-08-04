@@ -28,7 +28,7 @@ export const articles: Article[] = [
     title: "Reducing provider-dispute resolution time: a process-redesign approach.",
     summary:
       "How redesigning escalation frameworks can save millions in high-dollar claim remediation and reduce dispute times by 40%.",
-    author: "Bertha D. Musoni",
+    author: "Synops Consulting",
     authorRole: "Founder & Principal Consultant",
     date: "Mar 15, 2024",
     readingTime: "6 min read",
@@ -69,7 +69,7 @@ export const articles: Article[] = [
     title: "Designing accessible online courses that actually meet WCAG 2.1 AA.",
     summary:
       "Moving beyond automated checkers to build truly inclusive learning experiences that support all students.",
-    author: "Belinda H. Musoni",
+    author: "Synops Consulting",
     authorRole: "Principal, Learning & AI",
     date: "Apr 2, 2024",
     readingTime: "7 min read",
@@ -110,7 +110,7 @@ export const articles: Article[] = [
     title: "Where AI helps (and where it doesn't) in adaptive learning.",
     summary:
       "Navigating the hype: a pragmatic look at applying large language models to educational technology.",
-    author: "Belinda H. Musoni",
+    author: "Synops Consulting",
     authorRole: "Principal, Learning & AI",
     date: "Apr 20, 2024",
     readingTime: "8 min read",

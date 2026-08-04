@@ -11,6 +11,7 @@ import { Footer } from "@/components/layout/Footer";
 
 import Home from "@/pages/Home";
 import About from "@/pages/About";
+import Capabilities from "@/pages/Capabilities";
 import Healthcare from "@/pages/Healthcare";
 import Learning from "@/pages/Learning";
 import Products from "@/pages/Products";
@@ -52,6 +53,7 @@ function Router() {
           {/* Marketing site routes. Platforms merged into Products. */}
           <Route path="/" component={Home} />
           <Route path="/about" component={About} />
+          <Route path="/capabilities" component={Capabilities} />
           <Route path="/healthcare" component={Healthcare} />
           <Route path="/learning" component={Learning} />
           {/* Platforms merged into Products; keep the path as a redirect so old links resolve. */}

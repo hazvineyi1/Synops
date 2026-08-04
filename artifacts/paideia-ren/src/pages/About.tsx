@@ -8,7 +8,7 @@ export default function About() {
     <div className="min-h-screen pt-[88px]">
       <section className="bg-primary-hero pt-24 pb-24 px-6 text-center border-b border-primary/20">
         <div className="max-w-[800px] mx-auto">
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
             className="text-white text-5xl md:text-[64px] font-bold leading-[1.1] tracking-tight mb-8"
           >
@@ -19,48 +19,97 @@ export default function About() {
             className="text-[20px] text-white/80 leading-relaxed max-w-3xl mx-auto space-y-6"
           >
             <p>
-              An education technology and AI company, grounded in two decades of operational and healthcare rigor, serving institutions across the United States.
+              An operations, delivery, and AI consultancy. We design, build, and run the systems that make organizations work — programs, data, learning, and AI — for clients across the public sector, education, and finance.
             </p>
             <p>
-              We build the platforms that teach, coach, design curriculum, and deliver it to learners, and we advise where deep operational experience is needed. Fully remote, so we bring exactly the right expertise to your challenge. We don't just write reports. We build the curricula, ship the platforms, and stay until your team can run them.
+              We don't hand over a slide deck and wish you luck. We build the workflow, ship the course, stand up the platform, and stay until your team can run it without us. Certified project leadership, real operational depth, production results.
             </p>
           </motion.div>
         </div>
       </section>
 
       <section className="py-24 px-6 bg-white">
-        <div className="max-w-[1200px] mx-auto space-y-16">
-          {/* Bertha */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
-            <div className="md:col-span-4">
-              <h2 className="text-3xl font-bold text-foreground tracking-tight mb-2">Bertha D. Musoni</h2>
-              <p className="text-primary font-semibold text-[16px] mb-4 uppercase tracking-wide">Founder & Principal Consultant</p>
-              <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
-                <span>MPH</span><span>·</span><span>MBA</span><span>·</span><span>PMP</span><span>·</span><span>DBA(c)</span>
+        <div className="max-w-[1200px] mx-auto">
+          <div className="max-w-3xl mb-16">
+            <h2 className="text-4xl font-bold text-primary tracking-tight mb-6">Leadership & capabilities</h2>
+            <p className="text-[20px] text-muted-foreground leading-relaxed">
+              We read as an established capability, not three individuals. Our people are presented by role and credential — the same way our capability statement lists key personnel for public-sector solicitations.
+            </p>
+          </div>
+
+          <div className="space-y-16">
+            {/* Principal Consultant — Operations & Programs */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
+              <div className="md:col-span-4">
+                <h3 className="text-2xl font-bold text-foreground tracking-tight mb-2">Principal Consultant</h3>
+                <p className="text-primary font-semibold text-[16px] mb-4 uppercase tracking-wide">Operations & Programs</p>
+                <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
+                  <span>MPH</span><span>·</span><span>MBA</span><span>·</span><span>PMP</span><span>·</span><span>DBA(c)</span>
+                </div>
+              </div>
+              <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
+                <p>
+                  20+ years in managed care, Medicaid program operations, provider-network management, and organizational change. Oversight of provider relationships up to $1B in annual spend, leading Joint Operation Committees and enterprise process redesign at one of the nation's largest MCOs. Direction of vendor and offshore teams of up to 300 agents, running NCQA-aligned quality and health-risk-assessment programs.
+                </p>
               </div>
             </div>
-            <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
-              <p>
-                20+ years in managed care, Medicaid program operations, provider network management, and organizational change. Bertha provides oversight of provider relationships up to $1B in annual spend and has led Joint Operation Committees and enterprise process redesign at one of the nation's largest MCOs. She has directed vendor and offshore teams of up to 300 agents, leading NCQA-aligned quality and health-risk-assessment programs.
-              </p>
+
+            <div className="h-px w-full bg-border"></div>
+
+            {/* Principal — Learning Experience & AI Product */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
+              <div className="md:col-span-4">
+                <h3 className="text-2xl font-bold text-foreground tracking-tight mb-2">Principal</h3>
+                <p className="text-primary font-semibold text-[16px] mb-4 uppercase tracking-wide">Learning Experience & AI Product</p>
+                <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
+                  <span>M.Ed</span><span>·</span><span>Ph.D. Machine Learning (in progress)</span><span>·</span><span>Quality Matters</span>
+                </div>
+              </div>
+              <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
+                <p>
+                  A learning scientist and instructional-design leader with 15+ years designing and quality-assuring education across legal, higher-ed, and K-12 domains. As lead instructional designer and senior QA specialist, shipped 40+ courses and curricula. Led an AI-integration initiative that trained designers in generative-AI evaluation and prompt engineering, and built custom GPT models. Administers major LMS platforms, applies learning analytics to lift engagement, and enforces Quality Matters, Section 508 and WCAG 2.1 AA standards.
+                </p>
+              </div>
+            </div>
+
+            <div className="h-px w-full bg-border"></div>
+
+            {/* Consultant — Data, Analytics & Finance Operations */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
+              <div className="md:col-span-4">
+                <h3 className="text-2xl font-bold text-foreground tracking-tight mb-2">Consultant</h3>
+                <p className="text-primary font-semibold text-[16px] mb-4 uppercase tracking-wide">Data, Analytics & Finance Operations</p>
+                <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
+                  <span>Master of Accountancy</span><span>·</span><span>PSM I</span><span>·</span><span>CompTIA CySA+</span><span>·</span><span>Dell Boomi</span><span>·</span><span>QuickBooks ProAdvisor</span>
+                </div>
+              </div>
+              <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
+                <p>
+                  Enterprise data and BI, finance and tax operations, systems integration, Agile delivery, and cybersecurity. Builds dashboards and reporting, designs KPIs, integrates systems with Dell Boomi, and modernizes accounting and revenue-cycle workflows — with easy-to-prove ROI in close-cycle time and days-sales-outstanding. Engaged per project.
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="h-px w-full bg-border"></div>
-
-          {/* Belinda */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
-            <div className="md:col-span-4">
-              <h2 className="text-3xl font-bold text-foreground tracking-tight mb-2">Belinda H. Musoni</h2>
-              <p className="text-primary font-semibold text-[16px] mb-4 uppercase tracking-wide">Principal, Learning & AI</p>
-              <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
-                <span>M.Ed</span><span>·</span><span>PhD(c) Machine Learning</span><span>·</span><span>Quality Matters</span>
-              </div>
-            </div>
-            <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
-              <p>
-                A learning scientist and instructional-design leader with 15+ years designing and quality-assuring education across legal, higher-ed, and K-12 domains. As Lead Instructional Designer & Senior QA Specialist she shipped 40+ courses and curricula. Belinda led an AI-integration initiative that trained designers in generative-AI evaluation and prompt engineering, and built custom GPT models. She administers major LMS platforms, applies learning analytics to lift engagement, and enforces Quality Matters, Section 508 and WCAG 2.1 AA standards.
-              </p>
+          {/* Trust strip */}
+          <div className="mt-20 pt-10 border-t border-border">
+            <p className="text-center text-[13px] font-bold uppercase tracking-widest text-muted-foreground mb-6">
+              Credentials the firm holds
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-[15px] font-semibold text-primary/80">
+              {[
+                "SWaM Certified (Women/Minority-Owned)",
+                "eVA & SAM Registered",
+                "PMP",
+                "Professional Scrum Master",
+                "Quality Matters",
+                "WCAG 2.1 / Section 508",
+              ].map((t, i) => (
+                <React.Fragment key={t}>
+                  {i > 0 && <span className="text-border">•</span>}
+                  <span>{t}</span>
+                </React.Fragment>
+              ))}
             </div>
           </div>
         </div>

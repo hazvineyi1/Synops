@@ -8,22 +8,27 @@ export default function Healthcare() {
       <section className="bg-primary-hero pt-24 pb-24 px-6 border-b border-primary/20">
         <div className="max-w-[1200px] mx-auto">
           <div className="max-w-3xl">
-            <span className="block text-[13px] font-bold uppercase tracking-widest text-accent mb-5">The Operational Backbone</span>
+            <span className="block text-[13px] font-bold uppercase tracking-widest text-accent mb-5">Proof area · Public Sector & Program Delivery</span>
             <h1 className="text-white text-5xl md:text-[64px] font-bold leading-[1.1] tracking-tight mb-6">
-              Healthcare & Operations
+              Managed care & regulated operations
             </h1>
             <p className="text-[22px] text-white/80 leading-relaxed mb-6">
-              The compliance, managed-care, and change-management rigor that grounds how Synops builds and runs its learning platforms, and that holds up in tightly regulated settings.
+              One proof of how we run complex, regulated programs. The compliance, managed-care, and change-management rigor here is the same discipline we bring to any operations, data, or program-delivery engagement.
             </p>
             <p className="text-[17px] text-white/70 leading-relaxed mb-8">
-              Led by Bertha D. Musoni, with 20+ years in managed care, Medicaid operations, and provider-network management. That same discipline is also available as a standalone advisory engagement.
+              20+ years in managed care, Medicaid operations, and provider-network management — available as a standalone advisory engagement, or as evidence that our program and operations capability holds up under scrutiny.
             </p>
-            <Link 
-              href="/contact?area=healthcare" 
+            <Link
+              href="/contact?area=healthcare"
               className="inline-block bg-accent hover:bg-accent/90 text-white px-8 py-4 font-bold text-[16px] transition-colors rounded-[6px]"
             >
               Request a consultation
             </Link>
+            <p className="mt-8 text-[15px] text-white/70">
+              <Link href="/capabilities" className="font-bold text-white hover:text-accent transition-colors underline underline-offset-4">
+                See all five capabilities →
+              </Link>
+            </p>
           </div>
         </div>
       </section>
@@ -75,7 +80,7 @@ export default function Healthcare() {
 
       <CTASection
         heading="Ready to strengthen your operations?"
-        subtext="Talk to Bertha about provider networks, managed-care programs, and high-dollar claim remediation."
+        subtext="Talk to us about provider networks, managed-care programs, and high-dollar claim remediation."
         buttonLabel="Request a consultation"
         href="/contact?area=healthcare"
       />

@@ -12,7 +12,7 @@ export default function Learning() {
               Learning, EdTech & AI
             </h1>
             <p className="text-[22px] text-white/80 leading-relaxed mb-8">
-              Led by Belinda H. Musoni, we offer deep, end-to-end expertise across the learning lifecycle, from curriculum design to AI integration.
+              Led by a Ph.D.-track learning experience &amp; AI principal, we offer deep, end-to-end expertise across the learning lifecycle, from curriculum design to AI integration.
             </p>
             <Link 
               href="/contact?area=learning" 

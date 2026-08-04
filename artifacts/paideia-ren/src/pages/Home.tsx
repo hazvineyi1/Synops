@@ -18,34 +18,34 @@ export default function Home() {
               transition={{ duration: 0.6 }}
             >
               <div className="inline-block px-3 py-1 bg-accent/20 border border-accent/40 text-white text-sm font-bold tracking-wide uppercase mb-6 rounded-[4px]">
-                Education Technology & AI
+                Operations · Delivery · AI
               </div>
               <h1 className="text-white text-5xl lg:text-[64px] font-bold leading-[1.1] tracking-tight mb-6">
-                AI platforms that teach, coach, and certify.
+                Operations, delivery, and AI — built, not just advised.
               </h1>
               <p className="text-[20px] lg:text-[24px] text-white/90 leading-relaxed mb-6 font-medium">
-                Synops builds the software behind modern learning, for the people who teach, the people who learn, and the teams who design and deliver the curriculum.
+                Synops designs, builds, and runs the systems that make organizations work — programs, data, learning, and AI.
               </p>
               <p className="text-[18px] text-white/80 leading-relaxed mb-10 max-w-2xl">
-                Our platforms are live with real institutions today, built on rigorous instructional design and a proven record of shipping, with more on the way.
+                Certified project leadership, real operational depth, and production results — not slideware. Live platforms and delivered engagements prove we build what we recommend.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
-                  href="/products"
-                  className="bg-accent hover:bg-accent/90 text-white px-8 py-4 font-bold text-[16px] text-center transition-colors rounded-[6px]"
-                >
-                  Explore the platforms
-                </Link>
-                <Link
                   href="/contact"
-                  className="bg-white/10 hover:bg-white/20 border border-white/30 text-white px-8 py-4 font-bold text-[16px] text-center transition-colors rounded-[6px]"
+                  className="bg-accent hover:bg-accent/90 text-white px-8 py-4 font-bold text-[16px] text-center transition-colors rounded-[6px]"
                 >
                   Book a consultation
                 </Link>
+                <Link
+                  href="/capabilities"
+                  className="bg-white/10 hover:bg-white/20 border border-white/30 text-white px-8 py-4 font-bold text-[16px] text-center transition-colors rounded-[6px]"
+                >
+                  See our capabilities
+                </Link>
               </div>
               <p className="text-[14px] text-white/60 mt-6">
-                See the products in action, or talk to us about a pilot. No sales script.
+                Tell us the system that isn't working. No sales script.
               </p>
             </motion.div>
           </div>
@@ -74,82 +74,63 @@ export default function Home() {
       <section className="bg-white py-14 px-6 border-b border-border">
         <div className="max-w-[1200px] mx-auto">
           <p className="text-center text-[13px] font-bold uppercase tracking-widest text-muted-foreground mb-8">
-            Built for regulated, outcomes-driven education
+            Built for regulated, outcomes-driven organizations
           </p>
           <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-[16px] font-semibold text-primary/70">
-            <span>Universities</span>
+            <span>Public Sector</span>
             <span className="text-border">•</span>
-            <span>K-12 Districts</span>
+            <span>Universities & K-12</span>
             <span className="text-border">•</span>
             <span>EdTech Teams</span>
             <span className="text-border">•</span>
-            <span>Training Providers</span>
+            <span>Finance & Data Operations</span>
             <span className="text-border">•</span>
             <span>Health Plans</span>
           </div>
         </div>
       </section>
 
-      {/* Practices */}
+      {/* Capability pillars */}
       <section className="py-24 lg:py-32 px-6 bg-white">
         <div className="max-w-[1200px] mx-auto">
           <div className="max-w-3xl mb-16">
             <h2 className="text-4xl lg:text-[48px] font-bold text-primary tracking-tight mb-6">
-              One company, built around learning
+              We build and run the systems, not just advise
             </h2>
             <p className="text-[20px] text-muted-foreground leading-relaxed">
-              We are an education technology and AI company, backed by two decades of experience running complex healthcare and operations. That experience is why our software is dependable, meets strict compliance requirements, and holds up in tightly regulated settings like schools and health systems.
+              Five capabilities, unified by one operating method: disciplined program management and AI-enabled automation, applied across programs, data, learning, and delivery. Two decades of running complex, regulated operations is why the work holds up.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="border-2 border-accent/30 bg-background p-10 flex flex-col h-full rounded-none">
-              <span className="text-[12px] font-bold uppercase tracking-widest text-accent mb-4">Core practice</span>
-              <h3 className="text-2xl font-bold text-foreground mb-4">Learning, EdTech & AI</h3>
-              <p className="text-[16px] text-muted-foreground mb-8">
-                Rigorous instructional design, adaptive systems, and AI-integrated learning, from the classroom to the platform.
-              </p>
-              <ul className="space-y-4 mb-10 flex-1">
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="text-accent mt-0.5 shrink-0" size={20} />
-                  <span className="text-[15px] text-foreground font-medium leading-relaxed">AI Platforms: Teacher, Coach, Curriculum Builder & Praxis</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="text-accent mt-0.5 shrink-0" size={20} />
-                  <span className="text-[15px] text-foreground font-medium leading-relaxed">Instructional Design & Curriculum Development</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="text-accent mt-0.5 shrink-0" size={20} />
-                  <span className="text-[15px] text-foreground font-medium leading-relaxed">Adaptive & Intelligent Tutoring Systems</span>
-                </li>
-              </ul>
-              <Link href="/learning" className="text-accent font-bold text-[16px] flex items-center gap-2 hover:text-primary transition-colors group">
-                Explore Learning & AI <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              { title: "Project & Program Management", desc: "Stand up the PMO, govern the delivery, manage the change." },
+              { title: "Operations & Process Improvement", desc: "Redesign the workflow, fix the root cause, hold the quality line." },
+              { title: "Data, Analytics & Automation", desc: "Turn scattered data into dashboards and manual work into pipelines." },
+              { title: "AI Adoption & Product Build", desc: "Ship working AI, responsibly — from strategy to production." },
+              { title: "Learning & Workforce Enablement", desc: "Design the learning, train the people, prove the outcomes." },
+            ].map((p) => (
+              <Link
+                key={p.title}
+                href="/capabilities"
+                className="group border border-border bg-background p-8 flex flex-col rounded-none hover:border-accent/40 transition-colors"
+              >
+                <h3 className="text-[20px] font-bold text-foreground mb-3 leading-snug">{p.title}</h3>
+                <p className="text-[15px] text-muted-foreground leading-relaxed flex-1 mb-6">{p.desc}</p>
+                <span className="text-accent font-bold text-[14px] flex items-center gap-2">
+                  Explore <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </span>
               </Link>
-            </div>
-
-            <div className="border border-border bg-background p-10 flex flex-col h-full rounded-none">
-              <span className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground mb-4">Operational backbone</span>
-              <h3 className="text-2xl font-bold text-foreground mb-4">Healthcare & Operations</h3>
-              <p className="text-[16px] text-muted-foreground mb-8">
-                The compliance, managed-care, and change-management experience that grounds how we build and deliver.
-              </p>
-              <ul className="space-y-4 mb-10 flex-1">
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="text-primary mt-0.5 shrink-0" size={20} />
-                  <span className="text-[15px] text-foreground font-medium leading-relaxed">Provider Relations & Network Management</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="text-primary mt-0.5 shrink-0" size={20} />
-                  <span className="text-[15px] text-foreground font-medium leading-relaxed">Managed Care Program Support</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <CheckCircle2 className="text-primary mt-0.5 shrink-0" size={20} />
-                  <span className="text-[15px] text-foreground font-medium leading-relaxed">Organizational Change & Workforce Transition</span>
-                </li>
-              </ul>
-              <Link href="/healthcare" className="text-primary font-bold text-[16px] flex items-center gap-2 hover:text-accent transition-colors group">
-                Explore Healthcare & Operations <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            ))}
+            <div className="border-2 border-accent/30 bg-primary-hero text-white p-8 flex flex-col rounded-none justify-between">
+              <div>
+                <h3 className="text-[20px] font-bold mb-3 leading-snug">Certified & set-aside eligible</h3>
+                <p className="text-[15px] text-white/80 leading-relaxed">
+                  SWaM Certified · eVA & SAM Registered · PMP · Professional Scrum Master · Quality Matters · WCAG 2.1 / 508.
+                </p>
+              </div>
+              <Link href="/capabilities" className="text-white font-bold text-[14px] flex items-center gap-2 mt-6 group">
+                See all capabilities <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
           </div>
@@ -198,11 +179,11 @@ export default function Home() {
             "We don't hand over a slide deck and wish you luck. We build the workflow, ship the course, stand up the platform, and stay until your team can run it without us."
           </blockquote>
           <div className="text-[15px] mb-8">
-            <span className="font-bold text-foreground">Bertha D. Musoni</span>
-            <span className="text-muted-foreground"> · Founder & Principal Consultant</span>
+            <span className="font-bold text-foreground">The Synops Principals</span>
+            <span className="text-muted-foreground"> · Operations, Learning & AI</span>
           </div>
           <Link href="/about" className="text-primary font-bold text-[16px] inline-flex items-center gap-2 hover:text-accent transition-colors group">
-            Meet the team <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            About the firm <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
       </section>
