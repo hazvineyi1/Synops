@@ -21,13 +21,13 @@ export default function Home() {
                 Operations · Delivery · AI
               </div>
               <h1 className="text-white text-5xl lg:text-[64px] font-bold leading-[1.1] tracking-tight mb-6">
-                Operations, delivery, and AI — built, not just advised.
+                Operations, delivery, and AI. Built, not just advised.
               </h1>
               <p className="text-[20px] lg:text-[24px] text-white/90 leading-relaxed mb-6 font-medium">
-                Synops designs, builds, and runs the systems that make organizations work — programs, data, learning, and AI.
+                Synops designs, builds, and runs the systems that make organizations work: programs, data, learning, and AI.
               </p>
               <p className="text-[18px] text-white/80 leading-relaxed mb-10 max-w-2xl">
-                Certified project leadership, real operational depth, and production results — not slideware. Live platforms and delivered engagements prove we build what we recommend.
+                Certified project leadership, real operational depth, and production results, not slideware. Live platforms and delivered engagements prove we build what we recommend.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4">
@@ -107,7 +107,7 @@ export default function Home() {
               { title: "Project & Program Management", desc: "Stand up the PMO, govern the delivery, manage the change." },
               { title: "Operations & Process Improvement", desc: "Redesign the workflow, fix the root cause, hold the quality line." },
               { title: "Data, Analytics & Automation", desc: "Turn scattered data into dashboards and manual work into pipelines." },
-              { title: "AI Adoption & Product Build", desc: "Ship working AI, responsibly — from strategy to production." },
+              { title: "AI Adoption & Product Build", desc: "Ship working AI, responsibly, from strategy to production." },
               { title: "Learning & Workforce Enablement", desc: "Design the learning, train the people, prove the outcomes." },
             ].map((p) => (
               <Link

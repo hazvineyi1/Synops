@@ -16,7 +16,7 @@ export default function Healthcare() {
               One proof of how we run complex, regulated programs. The compliance, managed-care, and change-management rigor here is the same discipline we bring to any operations, data, or program-delivery engagement.
             </p>
             <p className="text-[17px] text-white/70 leading-relaxed mb-8">
-              20+ years in managed care, Medicaid operations, and provider-network management — available as a standalone advisory engagement, or as evidence that our program and operations capability holds up under scrutiny.
+              More than 20 years in managed care, Medicaid operations, and provider-network management, available as a standalone advisory engagement, or as evidence that our program and operations capability holds up under scrutiny.
             </p>
             <Link
               href="/contact?area=healthcare"

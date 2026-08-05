@@ -50,7 +50,7 @@ const pillars = [
   },
   {
     title: "AI Adoption & Product Build",
-    promise: "Ship working AI, responsibly — from strategy to production.",
+    promise: "Ship working AI, responsibly, from strategy to production.",
     skills: [
       "AI adoption strategy",
       "Multi-agent systems & custom GPTs",
@@ -96,25 +96,22 @@ const trust = [
   "eVA & SAM Registered",
   "PMP",
   "Professional Scrum Master",
+  "CompTIA CySA+",
+  "Dell Boomi",
   "Quality Matters",
   "WCAG 2.1 / Section 508",
 ];
 
 const leadership = [
   {
-    role: "Principal Consultant — Operations & Programs",
+    role: "Founder, Operations & Programs",
     creds: "MPH • MBA • PMP • DBA candidate",
-    note: "20+ yrs managed-care / Medicaid operations",
+    note: "More than 20 years in managed-care and Medicaid program operations, provider-network management, and organizational change.",
   },
   {
-    role: "Principal — Learning Experience & AI Product",
+    role: "Co-Founder, Learning Experience & AI Product",
     creds: "M.Ed • Ph.D. Machine Learning (in progress)",
-    note: "Learning science, instructional design & AI product",
-  },
-  {
-    role: "Consultant — Data, Analytics & Finance Operations",
-    creds: "Master of Accountancy • PSM I • CompTIA CySA+ • Dell Boomi • QuickBooks ProAdvisor",
-    note: "Engaged per project",
+    note: "Learning science, instructional design, and AI product development.",
   },
 ];
 
@@ -134,10 +131,10 @@ export default function Capabilities() {
                 Capabilities
               </span>
               <h1 className="text-white text-5xl lg:text-[64px] font-bold leading-[1.1] tracking-tight mb-6">
-                Operations, delivery, and AI — built, not just advised.
+                Operations, delivery, and AI. Built, not just advised.
               </h1>
               <p className="text-[20px] lg:text-[22px] text-white/85 leading-relaxed mb-10 max-w-2xl">
-                Synops designs, builds, and runs the systems that make organizations work — programs, data, learning, and AI. Certified project leadership, real operational depth, production results.
+                Synops designs, builds, and runs the systems that make organizations work: programs, data, learning, and AI. Certified project leadership, real operational depth, and production results.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link
@@ -178,7 +175,7 @@ export default function Capabilities() {
               Five capabilities, one operating method
             </h2>
             <p className="text-[20px] text-muted-foreground leading-relaxed">
-              We build and run the systems, not just advise. Every engagement runs on the same spine — disciplined program management and AI-enabled automation — applied across whatever the domain demands.
+              We build and run the systems, not just advise. Every engagement runs on the same spine of disciplined program management and AI-enabled automation, applied across whatever the domain demands.
             </p>
           </div>
 
@@ -213,7 +210,7 @@ export default function Capabilities() {
         </div>
       </section>
 
-      {/* Practice lenses — how it shows up */}
+      {/* Practice lenses: how it shows up */}
       <section className="py-24 lg:py-32 px-6 bg-primary-hero text-white">
         <div className="max-w-[1200px] mx-auto">
           <div className="max-w-3xl mb-16">
@@ -238,18 +235,18 @@ export default function Capabilities() {
         </div>
       </section>
 
-      {/* Leadership & Capabilities — name-free, role + credential only */}
+      {/* Leadership: founder and co-founder, plus the folded-in delivery package */}
       <section className="py-24 lg:py-32 px-6 bg-white border-t border-border">
         <div className="max-w-[1200px] mx-auto">
           <div className="max-w-3xl mb-16">
             <h2 className="text-4xl lg:text-[48px] font-bold text-primary tracking-tight mb-6">
-              Leadership & capabilities
+              Leadership
             </h2>
             <p className="text-[20px] text-muted-foreground leading-relaxed">
-              An established capability, not a headcount. We present our people by role and credential — the same way our capability statement lists key personnel for public-sector solicitations.
+              Synops is led by its founder and co-founder. Our delivery package also covers data and business intelligence, finance and accounting operations, systems integration, and cybersecurity, brought in as each engagement requires.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {leadership.map((m) => (
               <div key={m.role} className="bg-background border border-border p-10 flex flex-col rounded-none">
                 <h3 className="text-[20px] font-bold text-foreground mb-4 leading-snug">{m.role}</h3>
@@ -263,7 +260,7 @@ export default function Capabilities() {
 
       <CTASection
         heading="Bring us the system that isn't working"
-        subtext="Programs, data, learning, or AI — we build and run it, not just advise. Tell us what needs to work, and we'll show you how we'd deliver it."
+        subtext="Programs, data, learning, or AI: we build and run it, not just advise. Tell us what needs to work, and we'll show you how we'd deliver it."
         buttonLabel="Book a consultation"
         href="/contact"
       />

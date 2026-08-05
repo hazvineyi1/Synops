@@ -19,10 +19,10 @@ export default function About() {
             className="text-[20px] text-white/80 leading-relaxed max-w-3xl mx-auto space-y-6"
           >
             <p>
-              An operations, delivery, and AI consultancy. We design, build, and run the systems that make organizations work — programs, data, learning, and AI — for clients across the public sector, education, and finance.
+              An operations, delivery, and AI consultancy. We design, build, and run the systems that make organizations work, including programs, data, learning, and AI, for clients across the public sector, education, and finance.
             </p>
             <p>
-              We don't hand over a slide deck and wish you luck. We build the workflow, ship the course, stand up the platform, and stay until your team can run it without us. Certified project leadership, real operational depth, production results.
+              We don't hand over a slide deck and wish you luck. We build the workflow, ship the course, stand up the platform, and stay until your team can run it without us. Certified project leadership, real operational depth, and production results.
             </p>
           </motion.div>
         </div>
@@ -31,88 +31,43 @@ export default function About() {
       <section className="py-24 px-6 bg-white">
         <div className="max-w-[1200px] mx-auto">
           <div className="max-w-3xl mb-16">
-            <h2 className="text-4xl font-bold text-primary tracking-tight mb-6">Leadership & capabilities</h2>
+            <h2 className="text-4xl font-bold text-primary tracking-tight mb-6">Leadership</h2>
             <p className="text-[20px] text-muted-foreground leading-relaxed">
-              We read as an established capability, not three individuals. Our people are presented by role and credential — the same way our capability statement lists key personnel for public-sector solicitations.
+              Synops is led by its founder and co-founder, who bring together operations, program management, learning design, and AI. Our delivery package also covers data and business intelligence, finance and accounting operations, systems integration, and cybersecurity, brought in as each engagement requires.
             </p>
           </div>
 
           <div className="space-y-16">
-            {/* Principal Consultant — Operations & Programs */}
+            {/* Founder: Operations & Programs */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
               <div className="md:col-span-4">
-                <h3 className="text-2xl font-bold text-foreground tracking-tight mb-2">Principal Consultant</h3>
+                <h3 className="text-2xl font-bold text-foreground tracking-tight mb-2">Founder</h3>
                 <p className="text-primary font-semibold text-[16px] mb-4 uppercase tracking-wide">Operations & Programs</p>
                 <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
                   <span>MPH</span><span>·</span><span>MBA</span><span>·</span><span>PMP</span><span>·</span><span>DBA(c)</span>
                 </div>
-                <a
-                  href="https://www.linkedin.com/in/berthadmusoni/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-primary/70 hover:text-accent transition-colors"
-                >
-                  LinkedIn profile
-                  <span aria-hidden="true">↗</span>
-                </a>
               </div>
               <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
                 <p>
-                  20+ years in managed care, Medicaid program operations, provider-network management, and organizational change. Oversight of provider relationships up to $1B in annual spend, leading Joint Operation Committees and enterprise process redesign at one of the nation's largest MCOs. Direction of vendor and offshore teams of up to 300 agents, running NCQA-aligned quality and health-risk-assessment programs.
+                  More than 20 years in managed care, Medicaid program operations, provider-network management, and organizational change. Oversight of provider relationships up to $1B in annual spend, leading Joint Operation Committees and enterprise process redesign at one of the nation's largest managed-care organizations. Direction of vendor and offshore teams of up to 300 agents, running NCQA-aligned quality and health-risk-assessment programs.
                 </p>
               </div>
             </div>
 
             <div className="h-px w-full bg-border"></div>
 
-            {/* Principal — Learning Experience & AI Product */}
+            {/* Co-Founder: Learning Experience & AI Product */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
               <div className="md:col-span-4">
-                <h3 className="text-2xl font-bold text-foreground tracking-tight mb-2">Principal</h3>
+                <h3 className="text-2xl font-bold text-foreground tracking-tight mb-2">Co-Founder</h3>
                 <p className="text-primary font-semibold text-[16px] mb-4 uppercase tracking-wide">Learning Experience & AI Product</p>
                 <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
                   <span>M.Ed</span><span>·</span><span>Ph.D. Machine Learning (in progress)</span><span>·</span><span>Quality Matters</span>
                 </div>
-                <a
-                  href="https://www.linkedin.com/in/belindamusoni/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-primary/70 hover:text-accent transition-colors"
-                >
-                  LinkedIn profile
-                  <span aria-hidden="true">↗</span>
-                </a>
               </div>
               <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
                 <p>
-                  A learning scientist and instructional-design leader with 15+ years designing and quality-assuring education across legal, higher-ed, and K-12 domains. As lead instructional designer and senior QA specialist, shipped 40+ courses and curricula. Led an AI-integration initiative that trained designers in generative-AI evaluation and prompt engineering, and built custom GPT models. Administers major LMS platforms, applies learning analytics to lift engagement, and enforces Quality Matters, Section 508 and WCAG 2.1 AA standards.
-                </p>
-              </div>
-            </div>
-
-            <div className="h-px w-full bg-border"></div>
-
-            {/* Consultant — Data, Analytics & Finance Operations */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
-              <div className="md:col-span-4">
-                <h3 className="text-2xl font-bold text-foreground tracking-tight mb-2">Consultant</h3>
-                <p className="text-primary font-semibold text-[16px] mb-4 uppercase tracking-wide">Data, Analytics & Finance Operations</p>
-                <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
-                  <span>Master of Accountancy</span><span>·</span><span>PSM I</span><span>·</span><span>CompTIA CySA+</span><span>·</span><span>Dell Boomi</span><span>·</span><span>QuickBooks ProAdvisor</span>
-                </div>
-                <a
-                  href="https://www.linkedin.com/in/primo-makore/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-primary/70 hover:text-accent transition-colors"
-                >
-                  LinkedIn profile
-                  <span aria-hidden="true">↗</span>
-                </a>
-              </div>
-              <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
-                <p>
-                  Enterprise data and BI, finance and tax operations, systems integration, Agile delivery, and cybersecurity. Builds dashboards and reporting, designs KPIs, integrates systems with Dell Boomi, and modernizes accounting and revenue-cycle workflows — with easy-to-prove ROI in close-cycle time and days-sales-outstanding. Engaged per project.
+                  A learning scientist and instructional-design leader with more than 15 years designing and quality-assuring education across legal, higher-ed, and K-12 domains. As lead instructional designer and senior QA specialist, shipped over 40 courses and curricula. Led an AI-integration initiative that trained designers in generative-AI evaluation and prompt engineering, and built custom GPT models. Administers major LMS platforms, applies learning analytics to lift engagement, and enforces Quality Matters, Section 508, and WCAG 2.1 AA standards.
                 </p>
               </div>
             </div>
@@ -129,6 +84,8 @@ export default function About() {
                 "eVA & SAM Registered",
                 "PMP",
                 "Professional Scrum Master",
+                "CompTIA CySA+",
+                "Dell Boomi",
                 "Quality Matters",
                 "WCAG 2.1 / Section 508",
               ].map((t, i) => (

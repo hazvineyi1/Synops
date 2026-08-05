@@ -253,9 +253,9 @@ function ProductExplorer() {
     const NAV_OFFSET = 80; // sticky header height
     // Deep-link scroll. The hard part on a FRESH load: "explore" starts near the top of the page
     // (the hero and content ABOVE it stream in a beat later), so an early scrollTo lands at ~0 and
-    // any "stop when landed" check quits prematurely — leaving the user at the top. Fix: keep
+    // any "stop when landed" check quits prematurely, leaving the user at the top. Fix: keep
     // re-measuring explore's LIVE position and only stop once that position has STABILIZED (same
-    // spot across a few consecutive ticks) — i.e. layout has settled — and we're sitting on it.
+    // spot across a few consecutive ticks, i.e. layout has settled) and we're sitting on it.
     // Bail immediately if the user scrolls, so we never fight them.
     // Scroll to a target element id, waiting for the layout to stabilize (see note above).
     const scrollToId = (id: string) => {
@@ -281,7 +281,7 @@ function ProductExplorer() {
           const targetStable = Math.abs(target - lastTarget) <= 2;
           lastTarget = target;
           if (Math.abs(window.scrollY - target) > 2) {
-            window.scrollTo({ top: target }); // not there yet — snap to the live position
+            window.scrollTo({ top: target }); // not there yet, snap to the live position
             stableHits = 0;
           } else if (targetStable) {
             // On target AND the target hasn't moved since last tick => layout settled. Land twice
