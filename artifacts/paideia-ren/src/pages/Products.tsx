@@ -257,10 +257,8 @@ function ProductExplorer() {
     // re-measuring explore's LIVE position and only stop once that position has STABILIZED (same
     // spot across a few consecutive ticks) — i.e. layout has settled — and we're sitting on it.
     // Bail immediately if the user scrolls, so we never fight them.
-    const applyHash = () => {
-      const slug = window.location.hash.replace("#", "").toLowerCase();
-      if (!PRODUCTS.some((p) => p.slug === slug)) return;
-      setActive(slug);
+    // Scroll to a target element id, waiting for the layout to stabilize (see note above).
+    const scrollToId = (id: string) => {
       let tries = 0;
       let lastTarget = -1;
       let stableHits = 0;
@@ -277,7 +275,7 @@ function ProductExplorer() {
       };
       const settle = () => {
         if (userScrolled) { cleanupScroll(); return; }
-        const el = document.getElementById("explore");
+        const el = document.getElementById(id);
         if (el) {
           const target = Math.max(0, el.getBoundingClientRect().top + window.scrollY - NAV_OFFSET);
           const targetStable = Math.abs(target - lastTarget) <= 2;
@@ -295,15 +293,50 @@ function ProductExplorer() {
       };
       timers.push(window.setTimeout(settle, 0));
     };
+
+    const applyHash = () => {
+      const hash = window.location.hash.replace("#", "").toLowerCase();
+      if (!hash) return;
+      if (PRODUCTS.some((p) => p.slug === hash)) {
+        setActive(hash);        // switch the tab
+        scrollToId("explore");  // and bring the product row under the header
+      } else if (hash === "register-interest") {
+        scrollToId("register-interest"); // "Request access" jumps to the form
+      }
+    };
+
+    // Patch history so SPA hash-only navigations notify us. Wouter's <Link href="/products#slug">
+    // uses history.pushState; when we're ALREADY on /products that neither remounts this component
+    // NOR fires a native 'hashchange', so without this the tab never switches and nothing scrolls.
+    type Hist = History & { [k: string]: unknown };
+    const patch = (name: "pushState" | "replaceState") => {
+      const h = window.history as Hist;
+      const orig = h[name] as (...a: unknown[]) => unknown;
+      if ((orig as { __synopsPatched?: boolean }).__synopsPatched) return;
+      const wrapped = function (this: History, ...args: unknown[]) {
+        const r = orig.apply(this, args);
+        window.dispatchEvent(new Event("synops:navigation"));
+        return r;
+      } as ((...a: unknown[]) => unknown) & { __synopsPatched?: boolean };
+      wrapped.__synopsPatched = true;
+      h[name] = wrapped;
+    };
+    patch("pushState");
+    patch("replaceState");
+
+    const onNav = () => applyHash();
     applyHash();
-    const onHash = () => applyHash();
-    const onLoad = () => applyHash();
-    window.addEventListener("hashchange", onHash);
-    window.addEventListener("load", onLoad);
+    window.addEventListener("hashchange", onNav);
+    window.addEventListener("popstate", onNav);
+    window.addEventListener("synops:navigation", onNav);
+    window.addEventListener("load", onNav);
     return () => {
-      window.removeEventListener("hashchange", onHash);
-      window.removeEventListener("load", onLoad);
+      window.removeEventListener("hashchange", onNav);
+      window.removeEventListener("popstate", onNav);
+      window.removeEventListener("synops:navigation", onNav);
+      window.removeEventListener("load", onNav);
       timers.forEach((t) => clearTimeout(t));
+      // history stays patched (guarded by __synopsPatched); the wrapper is harmless when unused.
     };
   }, []);
 
