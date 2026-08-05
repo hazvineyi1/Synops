@@ -46,6 +46,15 @@ export default function About() {
                 <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
                   <span>MPH</span><span>·</span><span>MBA</span><span>·</span><span>PMP</span><span>·</span><span>DBA(c)</span>
                 </div>
+                <a
+                  href="https://www.linkedin.com/in/berthadmusoni/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-primary/70 hover:text-accent transition-colors"
+                >
+                  LinkedIn profile
+                  <span aria-hidden="true">↗</span>
+                </a>
               </div>
               <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
                 <p>
@@ -64,6 +73,15 @@ export default function About() {
                 <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
                   <span>M.Ed</span><span>·</span><span>Ph.D. Machine Learning (in progress)</span><span>·</span><span>Quality Matters</span>
                 </div>
+                <a
+                  href="https://www.linkedin.com/in/belindamusoni/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-primary/70 hover:text-accent transition-colors"
+                >
+                  LinkedIn profile
+                  <span aria-hidden="true">↗</span>
+                </a>
               </div>
               <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
                 <p>
@@ -82,6 +100,15 @@ export default function About() {
                 <div className="text-[13px] font-semibold text-muted-foreground tracking-widest uppercase flex flex-wrap gap-x-3 gap-y-2">
                   <span>Master of Accountancy</span><span>·</span><span>PSM I</span><span>·</span><span>CompTIA CySA+</span><span>·</span><span>Dell Boomi</span><span>·</span><span>QuickBooks ProAdvisor</span>
                 </div>
+                <a
+                  href="https://www.linkedin.com/in/primo-makore/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-1.5 text-[14px] font-semibold text-primary/70 hover:text-accent transition-colors"
+                >
+                  LinkedIn profile
+                  <span aria-hidden="true">↗</span>
+                </a>
               </div>
               <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
                 <p>
