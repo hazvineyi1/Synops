@@ -249,28 +249,51 @@ function ProductExplorer() {
     // Stop the browser from restoring scroll to the top after load, which was silently undoing our
     // deep-link scroll (scrollIntoView appeared to no-op because the page snapped back to 0).
     try { if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual"; } catch { /* ok */ }
-    let raf = 0;
     const timers: number[] = [];
     const NAV_OFFSET = 80; // sticky header height
-    // Poll-and-correct: on a fresh load the page is often too SHORT early (images/content below
-    // "explore" haven't loaded), so scrollTo clamps to ~0. We keep re-applying to explore's LIVE
-    // position every 130ms for up to ~3s, and stop the instant we land — so we never fight a user
-    // who scrolls away. Explicit window.scrollTo (not scrollIntoView, which the browser ignored).
+    // Deep-link scroll. The hard part on a FRESH load: "explore" starts near the top of the page
+    // (the hero and content ABOVE it stream in a beat later), so an early scrollTo lands at ~0 and
+    // any "stop when landed" check quits prematurely — leaving the user at the top. Fix: keep
+    // re-measuring explore's LIVE position and only stop once that position has STABILIZED (same
+    // spot across a few consecutive ticks) — i.e. layout has settled — and we're sitting on it.
+    // Bail immediately if the user scrolls, so we never fight them.
     const applyHash = () => {
       const slug = window.location.hash.replace("#", "").toLowerCase();
       if (!PRODUCTS.some((p) => p.slug === slug)) return;
       setActive(slug);
       let tries = 0;
+      let lastTarget = -1;
+      let stableHits = 0;
+      let userScrolled = false;
+      const onUserScroll = () => { userScrolled = true; };
+      // Only treat *user* input as a bail signal (wheel/touch/keys), not our own scrollTo.
+      window.addEventListener("wheel", onUserScroll, { passive: true });
+      window.addEventListener("touchmove", onUserScroll, { passive: true });
+      window.addEventListener("keydown", onUserScroll, { passive: true });
+      const cleanupScroll = () => {
+        window.removeEventListener("wheel", onUserScroll);
+        window.removeEventListener("touchmove", onUserScroll);
+        window.removeEventListener("keydown", onUserScroll);
+      };
       const settle = () => {
+        if (userScrolled) { cleanupScroll(); return; }
         const el = document.getElementById("explore");
         if (el) {
           const target = Math.max(0, el.getBoundingClientRect().top + window.scrollY - NAV_OFFSET);
-          if (Math.abs(window.scrollY - target) <= 4) return; // landed — stop
-          window.scrollTo({ top: target });
+          const targetStable = Math.abs(target - lastTarget) <= 2;
+          lastTarget = target;
+          if (Math.abs(window.scrollY - target) > 2) {
+            window.scrollTo({ top: target }); // not there yet — snap to the live position
+            stableHits = 0;
+          } else if (targetStable) {
+            // On target AND the target hasn't moved since last tick => layout settled. Land twice
+            // in a row before we trust it, so a transient short-page reading can't end us early.
+            if (++stableHits >= 2) { cleanupScroll(); return; }
+          }
         }
-        if (tries++ < 24) timers.push(window.setTimeout(settle, 130));
+        if (tries++ < 30) { timers.push(window.setTimeout(settle, 100)); } else { cleanupScroll(); }
       };
-      raf = window.requestAnimationFrame(settle);
+      timers.push(window.setTimeout(settle, 0));
     };
     applyHash();
     const onHash = () => applyHash();
@@ -280,7 +303,6 @@ function ProductExplorer() {
     return () => {
       window.removeEventListener("hashchange", onHash);
       window.removeEventListener("load", onLoad);
-      cancelAnimationFrame(raf);
       timers.forEach((t) => clearTimeout(t));
     };
   }, []);
