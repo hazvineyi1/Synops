@@ -34,7 +34,7 @@ const CSS = ":root{--indigo:#4F46E5;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;-
   + ".tile.used{opacity:.35;pointer-events:none}.bcell{aspect-ratio:1;border:2px solid #e6e0d0;background:#fff;border-radius:12px;font-weight:800;font-size:1.05rem;display:flex;align-items:center;justify-content:center;text-align:center;padding:4px}"
   + ".bcell.mark{background:#e9f7ee;border-color:var(--ok);color:var(--ok)}.bcell.free{background:#eef0fb;border-color:var(--indigo);color:var(--indigo)}.blank{display:inline-block;min-width:22px;border-bottom:3px solid var(--ink);margin:0 2px;text-align:center;font-weight:800;font-size:1.4rem}"
   // ── Themed stages: a game-show / adventure look per game, with white cards kept readable on top. ──
-  + ".stage{min-height:100vh;padding:16px;margin:-16px}.banner{text-align:center;padding:12px 10px;margin:-16px -16px 12px;font-weight:900;letter-spacing:1px;font-size:1.15rem}"
+  + ".stage{min-height:340px;padding:16px;margin:-16px}.banner{text-align:center;padding:12px 10px;margin:-16px -16px 12px;font-weight:900;letter-spacing:1px;font-size:1.15rem}"
   + ".t-jeopardy{background:linear-gradient(160deg,#0a1a63,#1a2f9c)}.t-jeopardy>h2,.t-jeopardy>#stars{color:#fff}.t-jeopardy .banner{background:linear-gradient(90deg,#f59e0b,#fbbf24);color:#0a1a63}"
   + ".t-feud{background:linear-gradient(160deg,#0b3a6b,#12508c)}.t-feud>h2,.t-feud>#stars{color:#fff}.t-feud .banner{background:linear-gradient(90deg,#22d3ee,#0891b2);color:#04263f}"
   + ".t-escape{background:linear-gradient(160deg,#23262d,#33373f)}.t-escape>h2,.t-escape>#stars{color:#f8fafc}.t-escape .banner{background:linear-gradient(90deg,#b45309,#f59e0b);color:#2b1a02}"
