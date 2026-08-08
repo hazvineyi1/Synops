@@ -27,22 +27,19 @@ export default function Onboarding() {
     set(list.includes(val) ? list.filter((x) => x !== val) : [...list, val]);
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Always call the API so the server marks the teacher onboarded (sets onboardedAt).
+  // Navigating to /dashboard WITHOUT this leaves onboardedAt null, and the Protected
+  // guard immediately bounces the teacher back here — which looks like a dead button.
+  const complete = async (payload: {
+    country: string;
+    schoolName: string;
+    subjects: string[];
+    yearGroups: string[];
+  }) => {
     setError(null);
-    // All fields are optional; skip to dashboard if user wants.
-    if (!country.trim() && !schoolName.trim() && subjects.length === 0 && yearGroups.length === 0) {
-      setLoc("/dashboard");
-      return;
-    }
     setBusy(true);
     try {
-      const res = await api.post<{ teacher: Teacher }>("/auth/complete-onboarding", {
-        country: country.trim(),
-        schoolName: schoolName.trim(),
-        subjects,
-        yearGroups,
-      });
+      const res = await api.post<{ teacher: Teacher }>("/auth/complete-onboarding", payload);
       setTeacher(res.teacher);
       setLoc("/dashboard");
     } catch (err) {
@@ -51,6 +48,13 @@ export default function Onboarding() {
       setBusy(false);
     }
   };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await complete({ country: country.trim(), schoolName: schoolName.trim(), subjects, yearGroups });
+  };
+
+  const skip = () => complete({ country: "", schoolName: "", subjects: [], yearGroups: [] });
 
   return (
     <AuthShell title="Tell us about your class (optional)" subtitle="You can skip this and fill it in later when you generate your first resource.">
@@ -96,7 +100,7 @@ export default function Onboarding() {
           <Button type="submit" className="w-full" disabled={busy} data-track="onboarding_submit">
             {busy ? <InlineSpinner /> : "Save and continue"}
           </Button>
-          <Button type="button" variant="ghost" className="w-full text-muted-foreground" onClick={() => setLoc("/dashboard")}>
+          <Button type="button" variant="ghost" className="w-full text-muted-foreground" disabled={busy} onClick={skip}>
             Skip for now
           </Button>
         </div>
