@@ -396,6 +396,14 @@ export interface FeedbackItem {
   aiComment?: string;
   aiScore?: number;
   aiMax?: number;
+  misconception?: string;
+  bloom?: string;
+}
+
+export interface StudyStep {
+  focus: string;
+  strategy: string;
+  steps: string[];
 }
 
 export interface AiSubmissionSummary {
@@ -403,6 +411,19 @@ export interface AiSubmissionSummary {
   strengths: string[];
   gaps: string[];
   recommendations: string[];
+  misconceptions?: Array<{ skill: string; whatWentWrong: string; correctIdea: string; bloomLevel: string }>;
+  studyPlan?: StudyStep[];
+  nextChallenge?: string;
+  masteryLevel?: "emerging" | "developing" | "secure" | "extending";
+}
+
+export interface ClassGapReport {
+  overview: string;
+  classMastery: string;
+  topMisconceptions: Array<{ skill: string; misconception: string; correctIdea: string; shareOfClass: string; reteach: string; bloom: string }>;
+  questionsToRevisit: Array<{ number: number; skill: string; accuracy: string; why: string }>;
+  grouping: Array<{ band: string; whoAndWhy: string; action: string }>;
+  wholeClassNextStep: string;
 }
 
 export interface Submission {

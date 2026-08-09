@@ -42,6 +42,32 @@ interface WorksheetContent {
   [k: string]: unknown;
 }
 
+/** Coerce raw model output into the strict worksheet shape (renumber, null options unless MCQ,
+ * fill defaults) so every stored worksheet is gradable + interactive. Validated before storing. */
+function normalizeWorksheetContent(raw: WorksheetContent) {
+  const r = raw as Record<string, unknown>;
+  const qRaw = Array.isArray(r["questions"]) ? (r["questions"] as Array<Record<string, unknown>>) : [];
+  const questions = qRaw.map((q, i) => {
+    const rawType = String(q["type"] ?? "short");
+    const type = ["short", "multiple_choice", "long", "calculation"].includes(rawType) ? rawType : "short";
+    const opts = Array.isArray(q["options"]) ? (q["options"] as unknown[]).map((o) => String(o)).filter((s) => s.trim()) : [];
+    return {
+      number: i + 1,
+      prompt: String(q["prompt"] ?? ""),
+      type,
+      options: type === "multiple_choice" ? opts : null,
+      answer: String(q["answer"] ?? ""),
+      workingOrRubric: String(q["workingOrRubric"] ?? ""),
+    };
+  });
+  return {
+    title: String(raw.title ?? ""),
+    instructions: String(r["instructions"] ?? ""),
+    questions,
+    teacherNotes: String(r["teacherNotes"] ?? ""),
+  };
+}
+
 router.post("/", requireQuota, async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -54,13 +80,19 @@ router.post("/", requireQuota, async (req, res) => {
       classLearningProfile = await fetchClassLearningProfile(parsed.data.classId, req.teacher!.id);
     }
     const prompt = worksheetPrompt({ ...parsed.data, classLearningProfile });
-    const content = await generateJSON<WorksheetContent>(prompt.system, prompt.user, {
+    const raw = await generateJSON<WorksheetContent>(prompt.system, prompt.user, {
       teacherId: req.teacher!.id,
       kind: "worksheet",
     });
-    const title =
-      (typeof content.title === "string" && content.title) ||
-      `${parsed.data.subject} worksheet: ${parsed.data.topic}`;
+    // Guarantee the stored worksheet is gradable + interactive: normalise, then validate.
+    const check = worksheetContentSchema.safeParse(normalizeWorksheetContent(raw));
+    if (!check.success) {
+      req.log?.warn({ issues: check.error.issues }, "worksheet failed schema validation after generation");
+      res.status(502).json({ error: "The generated worksheet was not well formed. Please try again." });
+      return;
+    }
+    const content = check.data;
+    const title = content.title || `${parsed.data.subject} worksheet: ${parsed.data.topic}`;
     const [worksheet] = await db
       .insert(worksheetsTable)
       .values({

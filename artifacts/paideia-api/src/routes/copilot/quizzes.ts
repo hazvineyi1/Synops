@@ -44,6 +44,37 @@ interface QuizContent {
   [k: string]: unknown;
 }
 
+/**
+ * Coerce raw model output into the strict quiz shape so every generated quiz is guaranteed
+ * gradable + interactive: items renumbered 1..n, options null unless multiple choice, defaults
+ * filled. The result is then validated against quizContentSchema before it is stored.
+ */
+function normalizeQuizContent(raw: QuizContent, fallbackFormat: string) {
+  const r = raw as Record<string, unknown>;
+  const itemsRaw = Array.isArray(r["items"]) ? (r["items"] as Array<Record<string, unknown>>) : [];
+  const items = itemsRaw.map((it, i) => {
+    const rawType = String(it["type"] ?? "short_answer");
+    const type = rawType === "multiple_choice" || rawType === "true_false" || rawType === "short_answer" ? rawType : "short_answer";
+    const opts = Array.isArray(it["options"]) ? (it["options"] as unknown[]).map((o) => String(o)).filter((s) => s.trim()) : [];
+    const difficulty = ["easy", "medium", "hard"].includes(String(it["difficulty"])) ? String(it["difficulty"]) : "medium";
+    return {
+      number: i + 1,
+      prompt: String(it["prompt"] ?? ""),
+      type,
+      options: type === "multiple_choice" ? opts : null,
+      correctAnswer: String(it["correctAnswer"] ?? ""),
+      difficulty,
+      skillAssessed: String(it["skillAssessed"] ?? ""),
+    };
+  });
+  return {
+    title: String(raw.title ?? ""),
+    format: String(r["format"] ?? fallbackFormat),
+    instructions: String(r["instructions"] ?? ""),
+    items,
+  };
+}
+
 router.post("/", requireQuota, async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -56,13 +87,19 @@ router.post("/", requireQuota, async (req, res) => {
       classLearningProfile = await fetchClassLearningProfile(parsed.data.classId, req.teacher!.id);
     }
     const prompt = quizPrompt({ ...parsed.data, classLearningProfile });
-    const content = await generateJSON<QuizContent>(prompt.system, prompt.user, {
+    const raw = await generateJSON<QuizContent>(prompt.system, prompt.user, {
       teacherId: req.teacher!.id,
       kind: "quiz",
     });
-    const title =
-      (typeof content.title === "string" && content.title) ||
-      `${parsed.data.subject} ${parsed.data.format}: ${parsed.data.topic}`;
+    // Guarantee the stored quiz is gradable + interactive: normalise, then validate the structure.
+    const check = quizContentSchema.safeParse(normalizeQuizContent(raw, parsed.data.format));
+    if (!check.success) {
+      req.log?.warn({ issues: check.error.issues }, "quiz failed schema validation after generation");
+      res.status(502).json({ error: "The generated quiz was not well formed. Please try again." });
+      return;
+    }
+    const content = check.data;
+    const title = content.title || `${parsed.data.subject} ${parsed.data.format}: ${parsed.data.topic}`;
     const [quiz] = await db
       .insert(quizzesTable)
       .values({

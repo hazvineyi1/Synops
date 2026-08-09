@@ -35,6 +35,15 @@ interface FeedbackItem {
   aiComment?: string;
   aiScore?: number;
   aiMax?: number;
+  // Learning-science diagnostics (present on incorrect / partial items).
+  misconception?: string; // the faulty mental model behind the error, not just "wrong"
+  bloom?: string; // Bloom's level where understanding breaks: Remember|Understand|Apply|Analyze|Evaluate|Create
+}
+
+interface StudyStep {
+  focus: string; // the skill or idea to work on
+  strategy: string; // the evidence-based technique (retrieval practice, spacing, worked example, etc.)
+  steps: string[]; // concrete things the student does
 }
 
 interface AiSummary {
@@ -42,6 +51,11 @@ interface AiSummary {
   strengths: string[];
   gaps: string[];
   recommendations: string[];
+  // Learning-science extensions. Additive and optional so older readers stay valid.
+  misconceptions?: Array<{ skill: string; whatWentWrong: string; correctIdea: string; bloomLevel: string }>;
+  studyPlan?: StudyStep[]; // how this student closes the gaps
+  nextChallenge?: string; // a just-right next step in the student's zone of proximal development
+  masteryLevel?: "emerging" | "developing" | "secure" | "extending";
 }
 
 interface AiResponse {
@@ -51,28 +65,45 @@ interface AiResponse {
     max: number;
     state: "correct" | "incorrect" | "partial";
     comment: string;
+    misconception?: string;
+    bloom?: string;
   }>;
   summary: AiSummary;
 }
 
-const SYSTEM_PROMPT = `You are a supportive secondary-school teacher in an African classroom marking a student's work.
+const SYSTEM_PROMPT = `You are both a supportive teacher and a learning scientist marking one student's work. You mark fairly and you diagnose HOW the student thinks, so your feedback actually moves learning forward.
 
-You will receive a worksheet or quiz, the marking key, and one student's answers. Your job:
-1. Score each question fairly. For free-response items, award partial credit when the reasoning is sound. For multiple choice / true-false, you will see the result of automated marking; copy the score and add a brief comment that helps the student learn.
-2. Comment in plain, encouraging language a learner can understand. One or two short sentences per question. Address the student directly ("you").
-3. Produce a short overall summary for the teacher: strengths, gaps, and two or three concrete next-step recommendations.
+You will receive a worksheet or quiz, the marking key, and one student's answers. Do three things:
+
+1. SCORE each question fairly. For free-response items, award partial credit when the reasoning is sound. For multiple choice and true/false you will see the automated mark: copy that score and add a short learning comment. Address the student directly ("you") in plain, encouraging language, one or two sentences.
+
+2. DIAGNOSE every incorrect or partial answer. Do not just say it is wrong. Name the likely MISCONCEPTION: the specific faulty mental model or reasoning slip that produced the answer (for example "treats sunlight as a raw material that is consumed rather than an energy source"). State the CORRECT IDEA plainly. Tag the Bloom's level where understanding breaks down: Remember, Understand, Apply, Analyze, Evaluate, or Create.
+
+3. SUMMARISE for the teacher and build a study plan for the student, grounded in evidence-based learning science:
+   - strengths and gaps, citing question numbers or skills.
+   - a per-student studyPlan that closes the gaps using named techniques: retrieval practice (self-testing from memory), spaced repetition (revisit after a day, then a few days), worked examples then fading, elaboration (explain why), and interleaving related skills. Each plan step gives concrete actions the student can do alone.
+   - a nextChallenge pitched to the student's zone of proximal development: just beyond what they can already do unaided, not a repeat of what they have mastered and not far above them.
+   - a masteryLevel for the whole assessment: emerging, developing, secure, or extending.
 
 Rules:
-- Never invent facts. If you are unsure whether an answer is correct, mark it partial and explain.
+- Never invent facts. If unsure whether an answer is correct, mark it partial and explain.
+- Ground every recommendation in the student's actual errors, not generic advice.
 - No em dashes anywhere. Use full stops and short sentences.
-- No outbound contact, no email addresses, no links.
-- Keep comments brief and respectful. Avoid sarcasm.
-- For the teacher summary, be specific (cite question numbers or skills) and actionable.
+- No outbound contact, no email addresses, no links. Keep it respectful, never sarcastic.
 
 Return strict JSON matching this TypeScript type:
 {
-  items: Array<{ number: number; score: number; max: number; state: "correct" | "incorrect" | "partial"; comment: string }>;
-  summary: { overall: string; strengths: string[]; gaps: string[]; recommendations: string[] };
+  items: Array<{ number: number; score: number; max: number; state: "correct" | "incorrect" | "partial"; comment: string; misconception?: string; bloom?: string }>;
+  summary: {
+    overall: string;
+    strengths: string[];
+    gaps: string[];
+    recommendations: string[];
+    misconceptions: Array<{ skill: string; whatWentWrong: string; correctIdea: string; bloomLevel: string }>;
+    studyPlan: Array<{ focus: string; strategy: string; steps: string[] }>;
+    nextChallenge: string;
+    masteryLevel: "emerging" | "developing" | "secure" | "extending";
+  };
 }`;
 
 function buildUserPrompt(
@@ -250,6 +281,11 @@ export async function gradeSubmissionWithAi(submissionId: string): Promise<void>
       };
       if (q.skill) merged.skill = q.skill;
       if (aiItem?.comment) merged.aiComment = aiItem.comment;
+      // Attach misconception + Bloom diagnostics on anything not fully correct.
+      if (state !== "correct") {
+        if (aiItem?.misconception) merged.misconception = aiItem.misconception;
+        if (aiItem?.bloom) merged.bloom = aiItem.bloom;
+      }
       return merged;
     });
 

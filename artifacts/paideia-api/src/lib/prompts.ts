@@ -380,3 +380,70 @@ Produce exactly ${input.questionCount} items. Spread difficulty across easy, med
 
   return { system, user };
 }
+
+// ── Class-level gap report ──────────────────────────────────────────────────
+export interface ClassGapReportInput {
+  title: string;
+  kind: "quiz" | "worksheet";
+  submissionCount: number;
+  questions: Array<{
+    number: number;
+    prompt: string;
+    skill?: string;
+    type: string;
+    correct: number;
+    partial: number;
+    incorrect: number;
+    total: number;
+    wrongSamples: string[];
+    misconceptions: string[];
+  }>;
+  masteryTally: Record<string, number>;
+}
+
+export function classGapReportPrompt(input: ClassGapReportInput): { system: string; user: string } {
+  const system = `${HOUSE_RULES}
+
+You are a learning scientist writing a class-level diagnostic report for a teacher, based on how a whole class performed on one assessment. Turn raw per-question results into an actionable picture of what the class understands and what to re-teach, grounded in evidence-based pedagogy.
+
+Focus on:
+- shared misconceptions (faulty mental models several students hold), with the share of the class affected and the correct idea.
+- which questions or skills to revisit, ranked by weakness, with the Bloom's level where understanding breaks (Remember, Understand, Apply, Analyze, Evaluate, Create).
+- concrete re-teaching moves grounded in learning science: worked examples then fading, retrieval practice, targeted questioning, addressing the misconception head on, spaced review.
+- a grouping for differentiated support (who needs re-teaching versus extension), described by mastery band only, never naming students.
+- one whole-class next step.
+
+Never invent facts beyond the data given. If the data is thin, say so briefly. No em dashes.
+
+Return strict JSON:
+{
+  "overview": string,
+  "classMastery": string,
+  "topMisconceptions": Array<{ "skill": string, "misconception": string, "correctIdea": string, "shareOfClass": string, "reteach": string, "bloom": string }>,
+  "questionsToRevisit": Array<{ "number": number, "skill": string, "accuracy": string, "why": string }>,
+  "grouping": Array<{ "band": string, "whoAndWhy": string, "action": string }>,
+  "wholeClassNextStep": string
+}`;
+
+  const lines: string[] = [];
+  lines.push(`Assessment: ${input.title} (${input.kind})`);
+  lines.push(`Students who submitted: ${input.submissionCount}`);
+  const mastery = Object.entries(input.masteryTally)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => `${k}: ${n}`)
+    .join(", ");
+  if (mastery) lines.push(`Mastery bands from per-student grading: ${mastery}`);
+  lines.push("");
+  lines.push("Per-question results across the class:");
+  for (const q of input.questions) {
+    lines.push("");
+    lines.push(`Q${q.number} (${q.type}${q.skill ? `, skill: ${q.skill}` : ""})`);
+    lines.push(`Prompt: ${q.prompt}`);
+    lines.push(`Correct ${q.correct}/${q.total}, partial ${q.partial}, incorrect ${q.incorrect}`);
+    if (q.wrongSamples.length) lines.push(`Common wrong answers: ${q.wrongSamples.slice(0, 4).join(" | ")}`);
+    if (q.misconceptions.length) lines.push(`Misconceptions already noted: ${q.misconceptions.slice(0, 4).join(" | ")}`);
+  }
+  lines.push("");
+  lines.push("Write the class report as strict JSON in the shape above.");
+  return { system, user: lines.join("\n") };
+}

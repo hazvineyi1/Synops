@@ -1,4 +1,64 @@
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import type { LessonPlanContent, WorksheetContent, ParentDraftContent, QuizContent } from "@/lib/types";
+
+/**
+ * The interactive answer control shown in "Student view". It mirrors exactly what a student
+ * sees on the real take page (PublicTake): radios for multiple choice and true/false, a text
+ * box for short answers, a textarea for long ones. Local state only: this is a live preview,
+ * real submission and auto-grading happen once the resource is assigned to a class.
+ */
+function InteractiveAnswer({
+  type,
+  options,
+  value,
+  name,
+  onChange,
+}: {
+  type: string;
+  options?: string[] | null;
+  value: string;
+  name: string;
+  onChange: (v: string) => void;
+}) {
+  if (type === "multiple_choice" && options && options.length > 0) {
+    return (
+      <div className="space-y-2 mt-1">
+        {options.map((opt, i) => (
+          <label key={i} className="flex items-center gap-2 cursor-pointer p-2 rounded border hover:bg-secondary/40">
+            <input type="radio" name={name} value={opt} checked={value === opt} onChange={() => onChange(opt)} />
+            <span>{opt}</span>
+          </label>
+        ))}
+      </div>
+    );
+  }
+  if (type === "true_false") {
+    return (
+      <div className="flex gap-3 mt-1">
+        {["True", "False"].map((v) => (
+          <label key={v} className="flex items-center gap-2 cursor-pointer p-2 rounded border flex-1 justify-center hover:bg-secondary/40">
+            <input type="radio" name={name} value={v} checked={value === v} onChange={() => onChange(v)} />
+            {v}
+          </label>
+        ))}
+      </div>
+    );
+  }
+  if (type === "long") {
+    return <Textarea className="mt-1" rows={4} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Your answer" />;
+  }
+  return <Input className="mt-1" value={value} onChange={(e) => onChange(e.target.value)} placeholder="Your answer" />;
+}
+
+function PreviewHint() {
+  return (
+    <p className="mb-4 text-xs text-muted-foreground bg-secondary/40 border rounded px-3 py-2">
+      Interactive preview. Students get this exact experience when you assign it to a class, and their answers are then auto-graded.
+    </p>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -80,8 +140,11 @@ export function LessonPlanView({ c, studentView = false }: { c: LessonPlanConten
 }
 
 export function WorksheetView({ c, studentView = false }: { c: WorksheetContent; studentView?: boolean }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const set = (n: number, v: string) => setAnswers((a) => ({ ...a, [String(n)]: v }));
   return (
     <div>
+      {studentView && <PreviewHint />}
       {c.instructions && (
         <div className="bg-secondary/50 border rounded-md p-4 mb-6">
           <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">Instructions</div>
@@ -95,23 +158,29 @@ export function WorksheetView({ c, studentView = false }: { c: WorksheetContent;
               <span className="font-serif text-lg text-primary">Q{q.number}.</span>
               <span className="font-medium">{q.prompt}</span>
             </div>
-            {q.type === "multiple_choice" && q.options && (
-              <ul className="ml-4 mb-2 space-y-1 text-sm">
-                {q.options.map((opt, i) => <li key={i}>· {opt}</li>)}
-              </ul>
-            )}
             {studentView ? (
-              <div className="mt-3 border-t border-dashed border-muted-foreground/30 pt-3 min-h-[3rem]">
-                <span className="text-xs uppercase tracking-wider text-muted-foreground">Your answer</span>
-              </div>
+              <InteractiveAnswer
+                type={q.type}
+                options={q.options}
+                name={`ws-${q.number}`}
+                value={answers[String(q.number)] ?? ""}
+                onChange={(v) => set(q.number, v)}
+              />
             ) : (
-              <details className="mt-2 text-sm">
-                <summary className="cursor-pointer text-primary">Show answer</summary>
-                <div className="mt-2 pl-3 border-l border-accent">
-                  <p className="font-medium">Answer: {q.answer}</p>
-                  {q.workingOrRubric && <p className="text-muted-foreground mt-1">{q.workingOrRubric}</p>}
-                </div>
-              </details>
+              <>
+                {q.type === "multiple_choice" && q.options && (
+                  <ul className="ml-4 mb-2 space-y-1 text-sm">
+                    {q.options.map((opt, i) => <li key={i}>· {opt}</li>)}
+                  </ul>
+                )}
+                <details className="mt-2 text-sm">
+                  <summary className="cursor-pointer text-primary">Show answer</summary>
+                  <div className="mt-2 pl-3 border-l border-accent">
+                    <p className="font-medium">Answer: {q.answer}</p>
+                    {q.workingOrRubric && <p className="text-muted-foreground mt-1">{q.workingOrRubric}</p>}
+                  </div>
+                </details>
+              </>
             )}
           </li>
         ))}
@@ -140,9 +209,12 @@ export function ParentDraftView({ c }: { c: ParentDraftContent }) {
 }
 
 export function QuizView({ c, studentView = false }: { c: QuizContent; studentView?: boolean }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const set = (n: number, v: string) => setAnswers((a) => ({ ...a, [String(n)]: v }));
   return (
     <div>
       <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">{c.format}</div>
+      {studentView && <PreviewHint />}
       {c.instructions && (
         <div className="bg-secondary/50 border rounded-md p-4 mb-6">
           <p>{c.instructions}</p>
@@ -158,25 +230,29 @@ export function QuizView({ c, studentView = false }: { c: QuizContent; studentVi
                 <span className="ml-auto text-xs uppercase tracking-wider text-muted-foreground">{q.difficulty}</span>
               )}
             </div>
-            {q.type === "multiple_choice" && q.options && (
-              <ul className="ml-4 mb-2 space-y-1 text-sm">
-                {q.options.map((opt, i) => <li key={i}>· {opt}</li>)}
-              </ul>
-            )}
             {studentView ? (
-              q.type === "multiple_choice" ? null : (
-                <div className="mt-3 border-t border-dashed border-muted-foreground/30 pt-3 min-h-[2.5rem]">
-                  <span className="text-xs uppercase tracking-wider text-muted-foreground">Your answer</span>
-                </div>
-              )
+              <InteractiveAnswer
+                type={q.type}
+                options={q.options}
+                name={`qz-${q.number}`}
+                value={answers[String(q.number)] ?? ""}
+                onChange={(v) => set(q.number, v)}
+              />
             ) : (
-              <details className="mt-2 text-sm">
-                <summary className="cursor-pointer text-primary">Show answer</summary>
-                <div className="mt-2 pl-3 border-l border-accent">
-                  <p className="font-medium">Correct: {q.correctAnswer}</p>
-                  <p className="text-muted-foreground mt-1 text-xs">Skill: {q.skillAssessed}</p>
-                </div>
-              </details>
+              <>
+                {q.type === "multiple_choice" && q.options && (
+                  <ul className="ml-4 mb-2 space-y-1 text-sm">
+                    {q.options.map((opt, i) => <li key={i}>· {opt}</li>)}
+                  </ul>
+                )}
+                <details className="mt-2 text-sm">
+                  <summary className="cursor-pointer text-primary">Show answer</summary>
+                  <div className="mt-2 pl-3 border-l border-accent">
+                    <p className="font-medium">Correct: {q.correctAnswer}</p>
+                    <p className="text-muted-foreground mt-1 text-xs">Skill: {q.skillAssessed}</p>
+                  </div>
+                </details>
+              </>
             )}
           </li>
         ))}
