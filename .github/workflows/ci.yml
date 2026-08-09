@@ -58,14 +58,14 @@ jobs:
           PORT=8080 BASE_PATH=/builder/ pnpm --filter @workspace/compass-web   run build
           pnpm --filter @workspace/paideia-api run build
 
-  # DB-backed integration suites for the main workspace. compass-api and kanon-api carry the
-  # tenant-isolation, billing-authz, impersonation-safety, and evidence-packet tests — the logic
-  # that keeps one tenant's data unreachable from another and gates every paid feature. They need a
-  # real Postgres (the db package refuses to import without DATABASE_URL), so this job stands up a
-  # throwaway server, pushes each schema into its own database, and runs the suites. A regression
-  # here is a security or billing hole, so it must fail CI before it reaches Railway.
+  # DB-backed integration suites for the main workspace. compass-api carries the tenant-isolation,
+  # billing-authz, impersonation-safety, and evidence-packet tests — the logic that keeps one
+  # tenant's data unreachable from another and gates every paid feature. It needs a real Postgres
+  # (the db package refuses to import without DATABASE_URL), so this job stands up a throwaway
+  # server, pushes the schema into its own database, and runs the suites. A regression here is a
+  # security or billing hole, so it must fail CI before it reaches Railway.
   test:
-    name: integration tests (compass + kanon + engine)
+    name: integration tests (compass + engine)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -105,7 +105,6 @@ jobs:
       - name: Create databases
         run: |
           psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE compass_test;"
-          psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE kanon_test;"
 
       - name: Curriculum engine unit tests (no DB)
         run: pnpm --filter @workspace/compass-curriculum-engine run test
@@ -117,32 +116,6 @@ jobs:
           pnpm --filter @workspace/compass-db run push-force
           pnpm --filter @workspace/compass-api run test
 
-      - name: Kanon API integration tests
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kanon_test
-        run: |
-          pnpm --filter @workspace/kanon-db run push-force
-          pnpm --filter @workspace/kanon-api run test
-
-      # SLO gate: boot a real service and load its DB-backed readiness endpoint
-      # under concurrency, asserting the objectives (scripts/loadtest.mjs exits
-      # non-zero on a breach). This turns SLA validation into a continuous check
-      # instead of a manual pre-launch step, so a pool/query/rate-limit
-      # regression that tanks latency or leaks 5xx fails CI. The p99 threshold is
-      # lenient because shared CI runners are slower than production; the hard
-      # guarantee enforced here is zero errors and zero 5xx under load.
-      - name: SLO load gate (readiness under concurrency)
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kanon_test
-        run: |
-          pnpm --filter @workspace/kanon-api run build
-          PORT=5099 NODE_ENV=production node artifacts/kanon-api/dist/index.mjs &
-          SRV=$!
-          for i in $(seq 1 30); do curl -sf http://127.0.0.1:5099/api/readyz >/dev/null 2>&1 && break; sleep 1; done
-          node scripts/loadtest.mjs http://127.0.0.1:5099/api/readyz -r 1000 -c 50 --max-p99 1500 --max-error-rate 1
-          RESULT=$?
-          kill $SRV 2>/dev/null || true
-          exit $RESULT
 
   # Praxis LMS is a SELF-CONTAINED pnpm workspace under praxis/ with its own lockfile, deployed as
   # its own Railway service (Dockerfile.praxis). The Coach job above never builds it, so a Praxis-

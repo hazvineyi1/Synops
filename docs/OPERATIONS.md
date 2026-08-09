@@ -1,15 +1,14 @@
 # Operations Runbook
 
-Operational reference for running the four Synops services in production. Pairs
-with the deploy guides (`DEPLOY.md`, `DEPLOY-KANON.md`) and the env references
-(`.env.example`, `.env.paideia.example`, `praxis/.env.example`).
+Operational reference for running the Synops services in production. Pairs with
+the deploy guide (`DEPLOY.md`) and the env references (`.env.example`,
+`.env.paideia.example`, `praxis/.env.example`).
 
 ## Services and deploy targets
 
 | Service | Image | Railway config | Healthcheck | What it serves |
 |---|---|---|---|---|
 | Coach | `Dockerfile` | `railway.json` | `/api/healthz` | api-server + arete SPA |
-| Kanon | `Dockerfile.kanon` | `railway.kanon.json` | `/api/healthz` | kanon-api + kanon SPA |
 | Paideia | `Dockerfile.paideia` | `railway.paideia.json` | `/api/healthz` | paideia-api + marketing/study/app + Compass builder |
 | Praxis | `Dockerfile.praxis` | `railway.praxis.json` | `/api/readyz` | praxis api-server + praxis SPA |
 
@@ -199,9 +198,9 @@ reproducible with the committed harness.
 |---|---|---|
 | Clerk (auth) | Coach | required to boot |
 | Anthropic | Coach, Praxis | Coach requires the key; Praxis AI features degrade |
-| OpenAI-compatible | Paideia, Kanon/Compass | Paideia requires both AI vars to boot |
-| Stripe | Coach, Kanon, Paideia | billing/Pro upgrades disabled |
+| OpenAI-compatible | Paideia, Compass | Paideia requires both AI vars to boot |
+| Stripe | Coach, Paideia | billing/Pro upgrades disabled |
 | Flutterwave / Paynow | Coach, Paideia | those payment rails disabled |
 | Supabase Storage | Praxis | upload endpoints return a clear 4xx |
-| Resend (email) | Kanon, Paideia, Praxis | email disabled; actions still succeed |
+| Resend (email) | Paideia, Praxis | email disabled; actions still succeed |
 | Twilio (WhatsApp/SMS) | Paideia, Praxis | notifications skipped |

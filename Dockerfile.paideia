@@ -2,8 +2,8 @@
 # teacher app + the shared API. Builds all three SPAs into the marketing app's
 # dist/public (Coach at /study/, teacher at /app/), bundles the API, then runs the
 # API which serves the assembled static site same-origin and the API under /api.
-# A second/third Railway service can reuse this image (Arete -> railway.json,
-# Kanon -> railway.kanon.json); this is railway.paideia.json.
+# Another Railway service can reuse this image (Arete -> railway.json); this is
+# railway.paideia.json.
 FROM node:24-slim
 
 # Build tools for any native modules.
