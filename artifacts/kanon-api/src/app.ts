@@ -7,6 +7,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "@workspace/kanon-db";
 import router from "./routes";
+import { ssoConsume } from "./routes/sso";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "./lib/logger";
@@ -161,6 +162,9 @@ const sameOriginGuard: RequestHandler = (req, res, next) => {
 app.use(sameOriginGuard);
 
 app.use("/api", router);
+
+// Cross-product admin SSO landing (root origin, needs the session middleware above; before SPA).
+app.get("/sso", ssoConsume);
 
 if (process.env.NODE_ENV === "production") {
     const here = path.dirname(fileURLToPath(import.meta.url));

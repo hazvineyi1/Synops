@@ -49,6 +49,8 @@ export function Footer() {
             <span className="hidden md:inline text-border">|</span>
             <Link href="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
+            <span className="hidden md:inline text-border">|</span>
+            <a href="/app/portal" className="hover:text-foreground transition-colors">Admin sign in</a>
           </div>
         </div>
       </div>

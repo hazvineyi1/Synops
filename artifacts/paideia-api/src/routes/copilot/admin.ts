@@ -21,6 +21,7 @@ import { mintPasswordReset, serialiseTeacher } from "./auth.js";
 import { SESSION_COOKIE, STUDENT_SESSION_COOKIE, SESSION_TTL_DAYS } from "../../lib/auth.js";
 import { sql, desc, eq, asc } from "drizzle-orm";
 import { requireAuth } from "../../middlewares/auth.js";
+import { mintSsoToken, ssoProducts } from "../../lib/sso.js";
 
 function cookieOpts() {
   return {
@@ -55,6 +56,34 @@ const requireAdmin: RequestHandler = (req, res, next) => {
   }
   next();
 };
+
+// ── Cross-product SSO (issuer) ──────────────────────────────────────────────
+// List products for the admin hub, so the hub is extensible without a frontend redeploy.
+router.get("/sso/products", requireAuth, requireAdmin, (_req, res) => {
+  res.json({ products: ssoProducts().map((p) => ({ key: p.key, label: p.label })) });
+});
+
+// Mint a short-lived SSO token for one product and redirect the admin there, already signed in.
+// This is a full-page browser navigation, so failures redirect back to the hub rather than JSON.
+router.get("/sso/:product", requireAuth, (req, res) => {
+  const real = req.impersonator ?? req.teacher;
+  if (!real || !adminEmails().has(real.email.toLowerCase())) {
+    res.redirect("/app/portal?sso=denied");
+    return;
+  }
+  const secret = process.env["SSO_SHARED_SECRET"];
+  if (!secret) {
+    res.redirect("/app/portal?sso=unconfigured");
+    return;
+  }
+  const product = ssoProducts().find((p) => p.key === req.params["product"]);
+  if (!product) {
+    res.redirect("/app/portal?sso=unknown");
+    return;
+  }
+  const token = mintSsoToken(real.email, real.name ?? undefined, product.aud, secret);
+  res.redirect(`${product.baseUrl}/sso?token=${encodeURIComponent(token)}&next=${encodeURIComponent(product.landing)}`);
+});
 
 // ── Impersonation routes ────────────────────────────
 router.post("/impersonate/teacher/:id", requireAuth, requireAdmin, async (req, res) => {

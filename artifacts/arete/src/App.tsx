@@ -8,6 +8,7 @@ import { queryClient } from "./lib/queryClient";
 
 import Landing from "./pages/landing";
 import { SignInPage, SignUpPage } from "./pages/auth";
+import { SsoRedeemPage } from "./pages/sso-redeem";
 import Assessment from "./pages/assessment";
 import Coach from "./pages/coach";
 import Material from "./pages/material";
@@ -246,6 +247,7 @@ function ClerkProviderWithRoutes() {
 
           <Route path="/sign-in/*?" component={SignInPage} />
           <Route path="/sign-up/*?" component={SignUpPage} />
+          <Route path="/sso-redeem" component={SsoRedeemPage} />
 
           {/* Public legal + developer pages — accessible signed in or out. */}
           <Route path="/legal/privacy" component={Privacy} />

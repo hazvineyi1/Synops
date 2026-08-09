@@ -8,6 +8,7 @@ import { existsSync } from "fs";
 import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
+import { ssoConsume } from "./routes/sso";
 import healthRouter from "./routes/health";
 import { logger } from "./lib/logger";
 import { getAllowedOrigins, isProduction } from "./lib/config";
@@ -115,6 +116,9 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Cross-product admin SSO landing (root origin, before the SPA fallback).
+app.get("/sso", ssoConsume);
 
 // Any /api request that fell through the router is a genuine 404 — return JSON
 // rather than the SPA's index.html.

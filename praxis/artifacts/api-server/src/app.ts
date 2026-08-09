@@ -9,6 +9,7 @@ import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import router from "./routes";
+import { ssoConsume } from "./routes/sso";
 import { maintenanceMode } from "./middlewares/maintenanceMode";
 import { recordRequest } from "./lib/healthMetrics";
 import { registerPwa } from "./pwa";
@@ -156,6 +157,9 @@ app.use("/api", (_req, res, next) => {
 app.use("/api", maintenanceMode);
 
 app.use("/api", router);
+
+// Cross-product admin SSO landing (root origin, before the SPA catch-all).
+app.get("/sso", ssoConsume);
 
 // Branded PWA manifest + icon, resolved by hostname. Registered before the SPA catch-all so the
 // browser's /manifest.webmanifest and /pwa-icon.svg requests reach these, not index.html.
