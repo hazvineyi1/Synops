@@ -40,7 +40,11 @@ export default function Login() {
   const [showPicker, setShowPicker] = useState(false);
 
   const pickable = [...methods, ...(hasBackup ? ["backup"] : [])];
-  const done = (t: Teacher) => { setTeacher(t); setLoc("/dashboard"); };
+  // Honour a ?next= return path (e.g. the admin portal sends admins to /login?next=/portal),
+  // but only allow same-app absolute paths to avoid open-redirects.
+  const nextParam = new URLSearchParams(window.location.search).get("next");
+  const returnTo = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/dashboard";
+  const done = (t: Teacher) => { setTeacher(t); setLoc(returnTo); };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

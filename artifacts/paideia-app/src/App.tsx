@@ -118,7 +118,7 @@ function AppRoutes() {
       <Route path="/assignments/:id">{() => <Protected component={AssignmentView} />}</Route>
       <Route path="/settings">{() => <Protected component={Settings} />}</Route>
       <Route path="/admin">{() => <Protected component={Admin} />}</Route>
-      <Route path="/portal">{() => <Protected component={Portal} />}</Route>
+      <Route path="/portal" component={Portal} />
       <Route path="/library">{() => <Protected component={Library} />}</Route>
       <Route path="/shared">{() => <Protected component={Shared} />}</Route>
       <Route path="/upgrade">{() => <Protected component={Upgrade} />}</Route>
