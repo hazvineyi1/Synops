@@ -7,18 +7,19 @@ import { getStripeSync } from "./lib/stripeClient";
 import { recoverStuckSubmissions } from "./lib/gradingQueue";
 import { ensurePopiaSchema } from "./lib/popiaSchema";
 import { ensureMfaSchema } from "./lib/mfaSchema";
-import { seedSamplesIfEmpty } from "./lib/samplesSeed";
+import { ensureSamplesSeed } from "./lib/samplesSeed";
 
 // POPIA: ensure the consent + deletion-request tables/columns exist at boot
 // (paideia has no migration runner; this heals ahead of an explicit push).
 void ensurePopiaSchema();
 // MFA: ensure the multi-factor tables exist at boot, same reasoning.
 void ensureMfaSchema();
-// Samples library: seed the built-in grade-level samples if the table is empty,
-// so every region and grade level has worksheet + quiz examples out of the box.
-void seedSamplesIfEmpty()
+// Samples library: reconcile the built-in grade-level samples (lesson plan +
+// worksheet + quiz for every region and grade) so the library stays populated
+// and updates when the seed set changes.
+void ensureSamplesSeed()
   .then((r) => {
-    if (r.seeded) logger.info({ count: r.count }, "Seeded samples library");
+    if (r.changed) logger.info({ count: r.count }, "Reconciled samples library");
   })
   .catch((err) => logger.error({ err }, "Sample seed failed"));
 

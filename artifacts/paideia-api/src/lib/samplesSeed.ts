@@ -1130,10 +1130,70 @@ function gradeLabel(region: string, yg: string): string {
 
 type SampleRow = typeof samplesTable.$inferInsert;
 
+// Derive a coherent, grade-specific lesson plan from a grade's spec. The topic,
+// skills, worksheet and quiz are grade-specific; the structure is a standard
+// ~40-minute backward-designed lesson with differentiation and an exit ticket.
+function lessonPlanContent(g: Spec, label: string) {
+  const skills = Array.from(new Set(g.qz.map((q) => q[5])));
+  const first = g.qz[0]!;
+  const mid = g.qz[1] ?? first;
+  const last = g.qz[g.qz.length - 1]!;
+  const t = g.topic.toLowerCase();
+  return {
+    title: `${g.topic} — Lesson Plan`,
+    summary: `A ~40-minute ${g.subject} lesson for ${label} that introduces and practises ${t}. Backward-designed from clear objectives, with differentiation, a mini-plenary check, and an exit ticket.`,
+    learningObjectives: [
+      `Understand the key ideas of ${t}.`,
+      ...skills.slice(0, 3).map((s) => `Apply ${s.toLowerCase()} accurately.`),
+    ],
+    successCriteria: [
+      `I can explain ${t} in my own words.`,
+      `I can answer ${t} questions correctly on my own.`,
+      `I can spot and correct a common mistake in ${t}.`,
+    ],
+    starter: {
+      activity: `Warm-up (whole class): "${first[1]}" Take answers on mini-whiteboards to activate prior knowledge and see where students are starting from.`,
+      durationMinutes: 5,
+    },
+    mainTask: {
+      core: `Model ${t} with two or three worked examples, thinking aloud. Students then work through the "${g.topic} — Practice Worksheet" independently or in pairs.`,
+      support: `Give a completed worked example and a scaffold (number frame / sentence starter). Focus on the first two questions and check in after each.`,
+      stretch: `Students explain their reasoning in full sentences and write one new question of their own for a partner to solve.`,
+      durationMinutes: 25,
+    },
+    miniPlenary: {
+      activity: `Mid-lesson check: "${mid[1]}" Use thumbs up/down or hands-up to gauge understanding, then address the most common error together.`,
+      durationMinutes: 5,
+    },
+    exitTicket: {
+      prompt: last[1],
+      expectedResponse: last[3],
+    },
+    resourcesNeeded: [
+      `"${g.topic} — Practice Worksheet" (in the Samples library)`,
+      `"${g.topic} — Quick Check" quiz (for the starter, mini-plenary and exit ticket)`,
+      "Mini-whiteboards and pens",
+      "Board or projector for modelling",
+    ],
+    commonMisconceptions: [g.wsNotes],
+    homeworkSuggestion: `Finish any remaining questions on the "${g.topic} — Practice Worksheet" and be ready to explain one answer next lesson.`,
+  };
+}
+
 export function buildSampleRows(): SampleRow[] {
   const rows: SampleRow[] = [];
   for (const g of ALL_SPECS) {
     const label = gradeLabel(g.region, g.yg);
+    // Lesson plan
+    rows.push({
+      kind: "lesson_plan",
+      region: g.region,
+      subject: g.subject,
+      yearGroup: g.yg,
+      title: `${g.topic} — Lesson Plan`,
+      description: `A ready-to-teach ${g.subject} lesson plan on ${g.topic.toLowerCase()} for ${label}, with objectives, differentiation, a mini-plenary and an exit ticket.`,
+      content: lessonPlanContent(g, label),
+    });
     // Worksheet
     rows.push({
       kind: "worksheet",
@@ -1183,16 +1243,22 @@ export function buildSampleRows(): SampleRow[] {
   return rows;
 }
 
-/** Insert the full sample set only if the samples table is currently empty. */
-export async function seedSamplesIfEmpty(): Promise<{ seeded: boolean; count: number }> {
+/**
+ * Reconcile the samples table with the built-in seed set. The table holds only
+ * curated library content (teachers COPY from it into their own worksheets/
+ * quizzes, which live elsewhere), so it is safe to refresh to the canonical set
+ * whenever the count differs — e.g. after new samples are added to the seed.
+ */
+export async function ensureSamplesSeed(): Promise<{ changed: boolean; count: number }> {
+  const rows = buildSampleRows();
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(samplesTable);
   const existing = row?.count ?? 0;
-  if (existing > 0) return { seeded: false, count: existing };
-  const rows = buildSampleRows();
+  if (existing === rows.length) return { changed: false, count: existing };
+  await db.delete(samplesTable);
   await db.insert(samplesTable).values(rows);
-  return { seeded: true, count: rows.length };
+  return { changed: true, count: rows.length };
 }
 
 /** Force a full refresh: delete every sample and re-insert the seed set. */
