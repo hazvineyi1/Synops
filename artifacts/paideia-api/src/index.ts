@@ -7,12 +7,20 @@ import { getStripeSync } from "./lib/stripeClient";
 import { recoverStuckSubmissions } from "./lib/gradingQueue";
 import { ensurePopiaSchema } from "./lib/popiaSchema";
 import { ensureMfaSchema } from "./lib/mfaSchema";
+import { seedSamplesIfEmpty } from "./lib/samplesSeed";
 
 // POPIA: ensure the consent + deletion-request tables/columns exist at boot
 // (paideia has no migration runner; this heals ahead of an explicit push).
 void ensurePopiaSchema();
 // MFA: ensure the multi-factor tables exist at boot, same reasoning.
 void ensureMfaSchema();
+// Samples library: seed the built-in grade-level samples if the table is empty,
+// so every region and grade level has worksheet + quiz examples out of the box.
+void seedSamplesIfEmpty()
+  .then((r) => {
+    if (r.seeded) logger.info({ count: r.count }, "Seeded samples library");
+  })
+  .catch((err) => logger.error({ err }, "Sample seed failed"));
 
 async function initStripe(): Promise<void> {
   const databaseUrl = process.env["DATABASE_URL"];

@@ -4,8 +4,29 @@ import { and, desc, eq } from "drizzle-orm";
 import { requireAuth, requireActiveTeacher } from "../../middlewares/auth.js";
 import { requireQuota } from "../../middlewares/quota.js";
 import { logEvent } from "../../lib/eventLog.js";
+import { reseedSamples } from "../../lib/samplesSeed.js";
 
 const router: IRouter = Router();
+
+function isSampleAdmin(req: { teacher?: { email?: string }; impersonator?: { email?: string } }): boolean {
+  const raw = process.env["ADMIN_EMAILS"] ?? "";
+  const set = new Set(
+    raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+  );
+  const email = (req.impersonator?.email ?? req.teacher?.email ?? "").toLowerCase();
+  return !!email && set.has(email);
+}
+
+// Admin-only: wipe and re-insert the built-in grade-level sample set. Useful to
+// refresh the library after the seed content changes (boot only seeds if empty).
+router.post("/_seed", requireAuth, requireActiveTeacher, async (req, res) => {
+  if (!isSampleAdmin(req as never)) {
+    res.status(403).json({ error: "Admins only" });
+    return;
+  }
+  const result = await reseedSamples();
+  res.json({ ok: true, inserted: result.count });
+});
 
 async function listSamples(region: string | null, kind: string | null) {
   const conditions = [] as ReturnType<typeof eq>[];
