@@ -15,6 +15,7 @@ import Capabilities from "@/pages/Capabilities";
 import Healthcare from "@/pages/Healthcare";
 import Learning from "@/pages/Learning";
 import Products from "@/pages/Products";
+import TryDemo from "@/pages/TryDemo";
 import Insights from "@/pages/Insights";
 import Article from "@/pages/Article";
 import Contact from "@/pages/Contact";
@@ -59,6 +60,7 @@ function Router() {
           {/* Platforms merged into Products; keep the path as a redirect so old links resolve. */}
           <Route path="/platforms"><Redirect to="/products" /></Route>
           <Route path="/products" component={Products} />
+          <Route path="/demo" component={TryDemo} />
           <Route path="/insights" component={Insights} />
           <Route path="/insights/:slug" component={Article} />
           <Route path="/contact" component={Contact} />

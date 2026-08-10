@@ -9,6 +9,7 @@ import { initAnalytics, track } from "@/lib/analytics";
 
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
+import DemoEntry from "@/pages/DemoEntry";
 import Signup from "@/pages/Signup";
 import Dashboard from "@/pages/Dashboard";
 import PlanNew from "@/pages/PlanNew";
@@ -96,6 +97,7 @@ function AppRoutes() {
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/login" component={Login} />
+      <Route path="/demo" component={DemoEntry} />
       <Route path="/signup" component={Signup} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/onboarding">{() => <Protected component={Onboarding} allowUnonboarded />}</Route>

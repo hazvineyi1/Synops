@@ -1,9 +1,12 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
 import { personaByEmail } from "@/lib/k12Personas";
 import { Card } from "@/components/ui/card";
-import { Star, Trophy, Zap, CheckCircle2, Circle, Lock, ListChecks } from "lucide-react";
+import { Star, Trophy, Zap, CheckCircle2, Circle, Lock, ListChecks, Flame, Crown, Users, Swords } from "lucide-react";
+import { StarMascot, ChestMascot, FishMascot, BookMascot } from "@/components/k12/Mascots";
 
 /**
  * Gamification suite for K-12 demo learners (persona.gamified). Turns real progress into game feel:
@@ -13,6 +16,11 @@ import { Star, Trophy, Zap, CheckCircle2, Circle, Lock, ListChecks } from "lucid
  * and, for the autistic learner (persona.autismMode), an autism-friendly VISUAL SCHEDULE (predictable
  * "what happens today") plus a STAR / TOKEN BOARD that fills as the plan is completed. All derived from
  * the learner's own progress + credentials, so nothing new is stored. Renders nothing for others.
+ *
+ * For the Grade-6 "everything on" showcase (persona.maxGamified — Maya) we ADD, on top of the base
+ * suite, a streak flame stat, a friendly class leaderboard (the learner + synthetic classmates),
+ * glossy mascots decorating the quest map + a badge board, and a confetti burst on mount / level-up.
+ * All of it is guarded behind persona.maxGamified so every other persona's suite is unchanged.
  */
 interface CourseProg { courseId: string; title: string; percent: number; viewedBeats: number; totalBeats: number; status: string }
 interface ProgressMe { courses: CourseProg[]; streak?: number }
@@ -42,6 +50,10 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
   const lessons = Math.max(2, Math.round((course?.totalBeats ?? 6) / 3));
   const doneLessons = Math.round((pct / 100) * lessons);
 
+  // Max-gamification showcase (Maya): a friendly class leaderboard derived from the learner's own XP.
+  // Synthetic classmates for the demo — the learner sits a strong 2nd (winning-ish, not #1 by a mile).
+  const board = persona.maxGamified ? buildLeaderboard(persona.first, xp) : null;
+
   // Autism visual schedule + star board (predictable steps for today).
   const schedule = [
     { label: "Warm-up", icon: Zap },
@@ -67,6 +79,12 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
         <p className="mt-1 text-[11px] text-muted-foreground">
           {L(`${100 - intoLevel} XP to Level ${level + 1}`, `${100 - intoLevel} XP para el Nivel ${level + 1}`)}
         </p>
+        {persona.maxGamified && board && (
+          <div className="mt-1.5 flex items-center gap-3 text-[11px] font-medium">
+            <span className="inline-flex items-center gap-1 text-orange-600"><Flame className="h-3.5 w-3.5" /> {streak} day streak</span>
+            <span className="inline-flex items-center gap-1" style={{ color: accent }}><Crown className="h-3.5 w-3.5" /> #{board.rank} in class</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -74,7 +92,9 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
   return (
     <div className="space-y-4">
       {/* XP + level */}
-      <Card className="p-4 sm:p-5" style={{ borderColor: `${accent}44`, background: `${accent}0A` }}>
+      <Card className={"p-4 sm:p-5" + (persona.maxGamified ? " relative" : "")} style={{ borderColor: `${accent}44`, background: `${accent}0A` }}>
+        {/* Confetti burst: fires on mount and replays whenever the level increases (re-keyed on level). */}
+        {persona.maxGamified && <ConfettiBurst key={level} />}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="h-11 w-11 rounded-xl flex items-center justify-center text-white font-bold shadow-sm" style={{ background: accent }}>
             <Trophy className="h-5 w-5" />
@@ -86,6 +106,7 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
           <div className="ml-auto flex items-center gap-3 text-sm">
             <span className="inline-flex items-center gap-1.5 font-medium" style={{ color: accent }}><Star className="h-4 w-4" /> {badges} {es ? (badges === 1 ? "insignia" : "insignias") : `badge${badges === 1 ? "" : "s"}`}</span>
             <span className="inline-flex items-center gap-1.5 font-medium text-amber-600"><Zap className="h-4 w-4" /> {L(`${streak} day streak`, `racha de ${streak} día${streak === 1 ? "" : "s"}`)}</span>
+            {persona.maxGamified && <StarMascot size={38} className="hidden sm:block -my-1" />}
           </div>
         </div>
         <div className="mt-3 h-3 w-full rounded-full bg-black/5 overflow-hidden">
@@ -107,9 +128,68 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
               </div>
             );
           })}
+          {persona.maxGamified && <ChestMascot size={34} className="ml-1.5 shrink-0" />}
         </div>
         <p className="mt-1.5 text-[11px] text-muted-foreground">{L(`Your quest: ${doneLessons} of ${lessons} lessons complete`, `Tu misión: ${doneLessons} de ${lessons} lecciones completadas`)}</p>
       </Card>
+
+      {/* ===== Max-gamification showcase (Maya only): streak flame + class leaderboard, and a mascot-decorated badge board ===== */}
+      {persona.maxGamified && board && (
+        <>
+          <Card className="p-4 sm:p-5" style={{ borderColor: `${accent}44`, background: `${accent}0A` }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="font-semibold leading-tight flex items-center gap-2"><Users className="h-4 w-4" style={{ color: accent }} /> Class leaderboard</p>
+              <span className="ml-auto inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-semibold text-orange-600" style={{ background: "#FB923C1A" }}>
+                <Flame className="h-4 w-4" /> {streak} day streak
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-3">You&rsquo;re near the top of Room 6B this week — keep your streak alive to climb.</p>
+            <div className="space-y-1.5">
+              {board.rows.map((r, i) => {
+                const me = !!r.me;
+                return (
+                  <div key={r.name + i} className="flex items-center gap-3 rounded-xl px-3 py-2"
+                    style={{ background: me ? `${accent}14` : "#f7f5fb", border: me ? `2px solid ${accent}` : "1px solid #ece7f2" }}>
+                    <span className="h-6 w-6 shrink-0 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
+                      style={{ background: i === 0 ? "#F59E0B" : me ? accent : "#c7c1d4" }}>{i + 1}</span>
+                    <span className="text-sm font-medium truncate" style={{ color: me ? accent : "#2b2833" }}>
+                      {i === 0 && <Crown className="h-3.5 w-3.5 inline mr-1 -mt-0.5 text-amber-500" />}
+                      {me ? `${r.name} (you)` : r.name}
+                    </span>
+                    <span className="ml-auto text-xs font-semibold tabular-nums" style={{ color: me ? accent : "#6b6577" }}>{r.xp.toLocaleString()} XP</span>
+                    {me && <FishMascot size={30} className="shrink-0 -my-1 hidden sm:block" />}
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+
+          <Card className="p-4 sm:p-5" style={{ borderColor: `${accent}44`, background: `${accent}0A` }}>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold leading-tight flex items-center gap-2"><Trophy className="h-4 w-4" style={{ color: accent }} /> Badge board</p>
+              <span className="ml-auto text-xs text-muted-foreground">{badges} earned</span>
+              <BookMascot size={34} className="hidden sm:block -my-1" />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {(creds ?? []).slice(0, 8).map((c, i) => (
+                <span key={c.moduleTitle + i} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-white shadow-sm" style={{ background: accent }}>
+                  <Star className="h-3.5 w-3.5" style={{ fill: "#fff" }} /> {c.moduleTitle}
+                </span>
+              ))}
+              {/* Next-to-earn placeholders keep the board looking like a collection to complete. */}
+              {Array.from({ length: Math.max(0, 3 - badges) }).map((_, i) => (
+                <span key={`next-${i}`} className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium" style={{ background: "#f4f2f8", color: "#a8a2b4", border: "1px dashed #d9d3e4" }}>
+                  <Lock className="h-3.5 w-3.5" /> Next badge
+                </span>
+              ))}
+            </div>
+            <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2 text-xs" style={{ background: `${accent}0A` }}>
+              <Swords className="h-4 w-4 shrink-0" style={{ color: accent }} />
+              <span className="text-muted-foreground">Feeling sharp? Challenge the AI to a game-show battle to earn bonus XP.</span>
+            </div>
+          </Card>
+        </>
+      )}
 
       {/* Autism-friendly: visual schedule + star/token board */}
       {persona.autismMode && (
@@ -142,6 +222,55 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
           </div>
         </Card>
       )}
+    </div>
+  );
+}
+
+/**
+ * Synthetic class leaderboard for the max-gamification demo. The signed-in learner is dropped in with
+ * their real XP; classmates are generated from that XP so the learner always sits a strong 2nd (one
+ * classmate ahead, the rest below). Returns the rows sorted high→low plus the learner's 1-based rank.
+ */
+function buildLeaderboard(me: string, xp: number) {
+  const rows: { name: string; xp: number; me?: boolean }[] = [
+    { name: "Ava R.", xp: xp + 145 },
+    { name: me, xp, me: true },
+    { name: "Noah P.", xp: Math.round(xp * 0.86) },
+    { name: "Liam T.", xp: Math.round(xp * 0.72) },
+    { name: "Zoe M.", xp: Math.round(xp * 0.58) },
+    { name: "Kai D.", xp: Math.round(xp * 0.44) },
+  ];
+  rows.sort((a, b) => b.xp - a.xp);
+  const rank = rows.findIndex((r) => r.me) + 1;
+  return { rows, rank };
+}
+
+/**
+ * Dependency-free confetti burst — the same technique as LearnSession.tsx's Confetti (framer-motion
+ * spans fanning out and fading). Re-keyed on level by the caller so it replays on each level-up.
+ */
+function ConfettiBurst() {
+  const [pieces] = useState(() =>
+    Array.from({ length: 26 }, (_, i) => ({
+      id: i,
+      x: (Math.random() * 2 - 1) * 240,
+      y: 120 + Math.random() * 150,
+      rot: Math.random() * 540 - 270,
+      delay: Math.random() * 0.15,
+      color: ["#4F46E5", "#22c55e", "#3b82f6", "#f59e0b", "#ec4899"][i % 5],
+    }))
+  );
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-center z-10">
+      {pieces.map((p) => (
+        <motion.span
+          key={p.id}
+          initial={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
+          animate={{ opacity: 0, x: p.x, y: p.y, rotate: p.rot }}
+          transition={{ duration: 1.5, delay: p.delay, ease: "easeOut" }}
+          style={{ position: "absolute", top: 8, width: 8, height: 8, borderRadius: 2, background: p.color }}
+        />
+      ))}
     </div>
   );
 }

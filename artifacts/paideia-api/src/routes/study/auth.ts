@@ -22,6 +22,7 @@ import { rateLimit } from "../../middlewares/rateLimit.js";
 import { sendEmail, isEmailConfigured, passwordResetEmail, coachBaseUrl } from "../../lib/email.js";
 import { verifyEntryToken } from "../../lib/learnerEntry.js";
 import { PRIVACY_POLICY_VERSION, consentRequired } from "../../lib/popia.js";
+import { ensureCoachDemoSeed, DEMO_COACH_EMAIL } from "../../lib/demoCoachSeed.js";
 
 const RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -417,5 +418,43 @@ router.post(
     res.json({ ok: true, message: "Password updated. You can now sign in." });
   },
 );
+
+// ── One-click demo sign-in ───────────────────────────────────────────────────
+// Password-free entry into the fixed Synops Coach demo learner, for "try it live" on the
+// marketing site. Narrow by design: only ever the single demo learner, only on an allow-listed
+// host. Off with ENABLE_DEMO_LOGIN=0.
+const DEMO_DEFAULT_HOSTS = [
+  "www.synops-consulting.com", "synops-consulting.com",
+  "synopscoach.com", "www.synopscoach.com",
+  "localhost", "127.0.0.1",
+];
+function demoHostAllowed(host: string): boolean {
+  const configured = (process.env.DEMO_LOGIN_HOSTS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const allow = configured.length ? configured : DEMO_DEFAULT_HOSTS;
+  return allow.includes(host);
+}
+
+router.post("/demo-login", rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }), async (req, res) => {
+  if (process.env.ENABLE_DEMO_LOGIN === "0") { res.status(404).json({ error: "Not found." }); return; }
+  const host = String(req.headers.host || "").toLowerCase().split(":")[0];
+  if (!demoHostAllowed(host)) { res.status(404).json({ error: "Not found." }); return; }
+
+  try { await ensureCoachDemoSeed(); } catch { /* self-healing; try to sign in anyway */ }
+
+  const [user] = await db.select().from(studyUsersTable).where(eq(studyUsersTable.email, DEMO_COACH_EMAIL)).limit(1);
+  if (!user) { res.status(503).json({ error: "Demo is warming up. Please try again in a moment." }); return; }
+
+  const token = newSessionToken();
+  await db.insert(studySessionsTable).values({ token, userId: user.id, expiresAt: studySessionExpiry() });
+  res.cookie(STUDY_SESSION_COOKIE, token, cookieOptions());
+  res.json({
+    user: {
+      id: user.id, email: user.email, name: user.name,
+      subscriptionStatus: user.subscriptionStatus,
+      subscriptionCurrentPeriodEnd: user.subscriptionCurrentPeriodEnd?.toISOString() ?? null,
+      createdAt: user.createdAt.toISOString(),
+    },
+  });
+});
 
 export default router;

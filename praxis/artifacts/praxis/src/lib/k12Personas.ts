@@ -24,6 +24,9 @@ export interface K12Persona {
   highContrast: boolean;    // low-vision: crisp dark-on-white, thicker focus
   calm: boolean;            // autism: muted, predictable, low-stimulation accents
   gamified: boolean;        // show the gamification suite
+  maxGamified?: boolean;    // "everything on" showcase (Grade-6 Maya): adds a streak flame, a class
+                            // leaderboard, mascots on the quest map + badge board, and confetti bursts.
+                            // Purely additive on top of `gamified`; derived from real progress, no schema change.
   autismMode: boolean;      // extra: token board + visual schedule
   defaultLang?: string;     // e.g. "es" for the Spanish-speaking learner
   supports: string;         // what's turned on, in plain words
@@ -90,10 +93,10 @@ export const K12_PERSONAS: K12Persona[] = [
   {
     key: "maya", email: "maya.k12@synops-demo.test", first: "Maya", name: "Maya Chen",
     grade: 6, gradeLabel: "Grade 6", band: "middle", subject: "Math", subjectEmoji: "➗",
-    challenge: "On-track", challengeLong: "A confident, on-track student — the baseline experience.",
+    challenge: "Full gamification", challengeLong: "A confident 6th-grader on the fully gamified track — XP, levels and a class leaderboard, badges and daily streaks, mascots along a quest map, game-show battles against an AI opponent, and confetti celebrations.",
     learningStyleLabel: "Reading/writing learner",
-    accent: "#4F46E5", avatarBg: "#4F46E5", rootPx: 16, highContrast: false, calm: false, gamified: true, autismMode: false,
-    supports: "The standard middle-school experience: balanced pacing, quizzes with instant feedback, and earned badges.",
+    accent: "#4F46E5", avatarBg: "#4F46E5", rootPx: 16, highContrast: false, calm: false, gamified: true, maxGamified: true, autismMode: false,
+    supports: "Everything on: XP and level-ups, a badge board, a daily streak flame, a class leaderboard, mascots along your quest map, AI game-show battles, and confetti when you level up.",
   },
   {
     key: "leo", email: "leo.k12@synops-demo.test", first: "Leo", name: "Leo Rivera",

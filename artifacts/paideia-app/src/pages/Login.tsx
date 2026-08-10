@@ -146,6 +146,13 @@ export default function Login() {
 
         {!mfa && (
           <>
+            <div className="relative py-1">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+              <div className="relative flex justify-center"><span className="bg-card px-2 text-xs text-muted-foreground">or</span></div>
+            </div>
+            <Button type="button" variant="outline" className="w-full" onClick={() => setLoc("/demo")}>
+              Try the live demo — no sign-up
+            </Button>
             <p className="text-sm text-center text-muted-foreground">
               No account yet? <Link href="/signup" className="text-primary underline">Create one</Link>
             </p>

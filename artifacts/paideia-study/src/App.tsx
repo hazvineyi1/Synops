@@ -55,6 +55,8 @@ const StudyAdminCoupons = lazy(() => import("@/pages/StudyAdminCoupons"));
 const StudyAmbassador = lazy(() => import("@/pages/StudyAmbassador"));
 const StudyAdminAmbassadors = lazy(() => import("@/pages/StudyAdminAmbassadors"));
 const StudyAdminConsole = lazy(() => import("@/pages/StudyAdminConsole"));
+// Public one-click demo entry (no sign-up): logs into a pre-seeded demo learner.
+const StudyDemoEntry = lazy(() => import("@/pages/StudyDemoEntry"));
 
 const queryClient = new QueryClient();
 
@@ -184,6 +186,7 @@ function Router() {
       <Route path="/login" component={StudyLogin} />
       <Route path="/signup" component={StudySignup} />
       <Route path="/enter" component={EnterFromLink} />
+      <Route path="/demo" component={StudyDemoEntry} />
       <Route path="/forgot-password" component={StudyForgotPassword} />
       <Route path="/reset-password" component={StudyResetPassword} />
       <Route path="/privacy" component={StudyPrivacy} />

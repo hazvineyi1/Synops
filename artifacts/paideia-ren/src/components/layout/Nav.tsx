@@ -21,6 +21,7 @@ export function Nav() {
   // Insights lives in the footer.
   const navLinks = [
     { href: "/products", label: "Products" },
+    { href: "/demo", label: "Try a demo" },
     { href: "/capabilities", label: "Capabilities" },
     { href: "/learning", label: "Learning & AI" },
     { href: "/about", label: "About" },

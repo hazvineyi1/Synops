@@ -619,12 +619,20 @@ export default function Products() {
             Four platforms so good pedagogy can scale without being diluted, running today with real
             institutions. Open one below to see it in action.
           </p>
-          <a
-            href="#register-interest"
-            className="inline-block bg-white text-primary px-8 py-4 font-bold rounded-[6px] hover:bg-white/90 transition-colors"
-          >
-            Register your interest
-          </a>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <a
+              href="#register-interest"
+              className="inline-block bg-white text-primary px-8 py-4 font-bold rounded-[6px] hover:bg-white/90 transition-colors"
+            >
+              Register your interest
+            </a>
+            <Link
+              href="/demo"
+              className="inline-block bg-white/10 hover:bg-white/20 border border-white/30 text-white px-8 py-4 font-bold rounded-[6px] transition-colors"
+            >
+              Try a live demo
+            </Link>
+          </div>
         </div>
       </section>
 

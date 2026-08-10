@@ -24,6 +24,7 @@ import { REGION_IDS } from "../../lib/catalog.js";
 import { requireAuth } from "../../middlewares/auth.js";
 import { rateLimit } from "../../middlewares/rateLimit.js";
 import { logEvent } from "../../lib/eventLog.js";
+import { ensureTeacherDemoSeed, DEMO_TEACHER_EMAIL } from "../../lib/demoTeacherSeed.js";
 
 const router: IRouter = Router();
 
@@ -453,6 +454,40 @@ export function adminEmails(): Set<string> {
       .filter(Boolean),
   );
 }
+
+// ── One-click demo sign-in ───────────────────────────────────────────────────
+// Password-free entry into the fixed Synops Teacher demo account, for "try it live" on the
+// marketing site. DELIBERATELY NARROW: it can only ever mint a session for the single demo
+// teacher, never an arbitrary email, and only on an allow-listed host. Off with ENABLE_DEMO_LOGIN=0.
+const DEMO_DEFAULT_HOSTS = [
+  "www.synops-consulting.com", "synops-consulting.com",
+  "synopscoach.com", "www.synopscoach.com",
+  "localhost", "127.0.0.1",
+];
+function demoHostAllowed(host: string): boolean {
+  const configured = (process.env.DEMO_LOGIN_HOSTS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const allow = configured.length ? configured : DEMO_DEFAULT_HOSTS;
+  return allow.includes(host);
+}
+
+router.post("/demo-login", rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }), async (req, res) => {
+  if (process.env.ENABLE_DEMO_LOGIN === "0") { res.status(404).json({ error: "Not found." }); return; }
+  const host = String(req.headers.host || "").toLowerCase().split(":")[0];
+  if (!demoHostAllowed(host)) { res.status(404).json({ error: "Not found." }); return; }
+
+  // Make sure the demo account + its content exist (idempotent), then sign in.
+  try { await ensureTeacherDemoSeed(); } catch { /* seed is self-healing; fall through and try to sign in */ }
+
+  const [teacher] = await db.select().from(teachersTable).where(eq(teachersTable.email, DEMO_TEACHER_EMAIL)).limit(1);
+  if (!teacher) { res.status(503).json({ error: "Demo is warming up. Please try again in a moment." }); return; }
+
+  const token = newSessionToken();
+  await db.insert(sessionsTable).values({ token, teacherId: teacher.id, expiresAt: sessionExpiry() });
+  res.cookie(SESSION_COOKIE, token, cookieOptions());
+  req.teacher = teacher;
+  void logEvent(req, "teacher_demo_login", {}, { surface: "app" });
+  res.json({ teacher: serialiseTeacher(teacher) });
+});
 
 export function serialiseTeacher(t: typeof teachersTable.$inferSelect) {
   const { passwordHash: _ignored, ...rest } = t;
