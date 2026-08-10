@@ -702,8 +702,8 @@ function ProductTab({ data }: { data: AdminProduct }) {
 function TopList({ title, items }: { title: string; items: { label: string; surface: string | null; count: number; uniqueUsers: number }[] }) {
   const max = Math.max(1, ...items.map((i) => i.count));
   return (
-    <div>
-      <h2 className="font-serif text-xl text-primary mb-3">{title}</h2>
+    <details>
+      <summary className="font-serif text-xl text-primary mb-3 cursor-pointer select-none">{title} ({items.length})</summary>
       <div className="border rounded-lg bg-card p-4 space-y-1">
         {items.length === 0 ? <div className="text-sm text-muted-foreground">No data yet.</div> : null}
         {items.map((i, idx) => (
@@ -717,7 +717,7 @@ function TopList({ title, items }: { title: string; items: { label: string; surf
           </div>
         ))}
       </div>
-    </div>
+    </details>
   );
 }
 
