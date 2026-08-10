@@ -127,6 +127,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const demoSignIn = useCallback(async (role: "student" | "student_alt" | "admin", tenant?: string, persona?: string) => {
+    // Remember that this visitor arrived from the marketing site, so the app can offer a
+    // one-tap route back to Synops home from anywhere in the demo.
+    try { window.localStorage.setItem("synops_from_marketing", "1"); } catch { /* ignore */ }
     const res = await fetch(`${API}/auth/demo-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

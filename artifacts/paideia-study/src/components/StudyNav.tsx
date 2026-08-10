@@ -3,7 +3,7 @@ import { useStudyAuth } from "@/hooks/use-study-auth";
 import {
   LayoutDashboard, BookOpen, TrendingUp,
   LogOut, User, ChevronDown, RotateCcw,
-  MessageCircle, Gift, Target, FileText, ShieldCheck,
+  MessageCircle, Gift, Target, FileText, ShieldCheck, Home,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -33,6 +33,7 @@ export default function StudyNav() {
   };
 
   const initials = (user?.name || user?.email || "?").slice(0, 1).toUpperCase();
+  const fromMarketing = typeof window !== "undefined" && window.localStorage.getItem("synops_from_marketing") === "1";
 
   return (
     <nav className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur-sm">
@@ -63,7 +64,17 @@ export default function StudyNav() {
             );
           })}
         </div>
-        <div className="ml-auto shrink-0">
+        {fromMarketing && (
+          <a
+            href="/"
+            title="Back to Synops home"
+            className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium text-muted-foreground hover:text-primary hover:bg-muted/60 transition-colors"
+          >
+            <Home className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Synops home</span>
+          </a>
+        )}
+        <div className={`${fromMarketing ? "" : "ml-auto "}shrink-0`}>
           <DropdownMenu>
             <DropdownMenuTrigger className="inline-flex items-center gap-1.5 h-8 px-2 rounded-md text-xs font-medium hover:bg-muted/60">
               <span className="h-6 w-6 rounded-full bg-primary/15 text-primary inline-flex items-center justify-center text-[11px] font-semibold">

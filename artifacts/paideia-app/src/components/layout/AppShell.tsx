@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUsage } from "@/hooks/use-usage";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
-import { LayoutDashboard, FileText, ClipboardList, MessageSquare, HelpCircle, Users, Settings, LogOut, BarChart3, FolderOpen, Inbox, Sparkles } from "lucide-react";
+import { LayoutDashboard, FileText, ClipboardList, MessageSquare, HelpCircle, Users, Settings, LogOut, BarChart3, FolderOpen, Inbox, Sparkles, Home } from "lucide-react";
 
 const NAV = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -62,6 +62,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     window.location.reload();
   };
 
+  const fromMarketing = typeof window !== "undefined" && window.localStorage.getItem("synops_from_marketing") === "1";
+
   return (
     <div className="min-h-screen flex bg-background">
       <aside className="w-64 shrink-0 border-r bg-card flex flex-col no-print">
@@ -70,6 +72,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="font-serif text-2xl text-primary leading-tight">Synops</div>
             <div className="text-xs tracking-wider uppercase text-muted-foreground mt-1">Teacher</div>
           </Link>
+          {fromMarketing && (
+            <a
+              href="/"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition"
+            >
+              <Home className="h-3.5 w-3.5" />
+              Synops home
+            </a>
+          )}
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {[...NAV, ...(teacher?.isAdmin ? [ADMIN_NAV] : [])].map((item) => {

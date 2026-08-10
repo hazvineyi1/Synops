@@ -42,6 +42,7 @@ import {
   Search,
   RotateCcw,
   ChevronDown,
+  Home,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
@@ -162,6 +163,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // show e.g. a partner's logo like "Enza Global"). Inside a partner, keep that partner's brand so
   // it stays clear which tenant you are in.
   const brandName = isSuperPlatform ? 'Synops' : tenantBrandName;
+  // Demo visitors who arrived from the marketing site get a one-tap route back to Synops home.
+  const fromMarketing = typeof window !== 'undefined' && window.localStorage.getItem('synops_from_marketing') === '1';
   const brandLogo = isSuperPlatform ? null : tenantBrandLogo;
 
   const getNavGroups = (): NavGroup[] => {
@@ -499,6 +502,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <ArrowLeft className="h-4 w-4" />
           </button>
         </div>
+
+        {fromMarketing && (
+          <a
+            href="https://synops-consulting.com/"
+            title="Back to Synops home"
+            className="mx-3 mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Home className="h-4 w-4" />
+            Synops home
+          </a>
+        )}
 
         {role === 'super_admin' && (
           <div className="px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide"

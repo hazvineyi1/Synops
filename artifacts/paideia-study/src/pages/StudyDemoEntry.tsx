@@ -13,6 +13,9 @@ export default function StudyDemoEntry() {
 
   const startDemo = useCallback(async () => {
     setError(null);
+    // Remember that this visitor arrived from the marketing site, so the app can offer a
+    // one-tap route back to Synops home from anywhere in the demo.
+    try { window.localStorage.setItem("synops_from_marketing", "1"); } catch { /* ignore */ }
     try {
       const res = await fetch("/api/study/auth/demo-login", {
         method: "POST",
