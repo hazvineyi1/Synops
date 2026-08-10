@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowRight, Sparkles, Award, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Sparkles, Award, CheckCircle2, ChevronDown } from 'lucide-react';
 import { useSession } from '@/context/SessionContext';
 import { K12_PERSONAS } from '@/lib/k12Personas';
 
@@ -147,10 +147,12 @@ function CommendationsSection({ data }: { data: CommendationsReport }) {
 
   return (
     <section className="mt-12">
-      <div className="flex items-center gap-2">
+      <details className="group">
+      <summary className="flex items-center gap-2 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
         <Award className="h-5 w-5" style={{ color: AMBER }} />
         <h2 className="text-[22px] md:text-[26px] font-bold tracking-tight" style={{ color: INK }}>Why Synops Academy earns its commendations</h2>
-      </div>
+        <ChevronDown className="h-5 w-5 shrink-0 transition-transform group-open:rotate-180" style={{ color: '#8a8797' }} />
+      </summary>
       <p className="mt-2 max-w-2xl text-[14px] leading-relaxed" style={{ color: '#5a5766' }}>
         A commendation is a standard the program can prove it meets. Every class below aligns to a real
         accreditation framework, and each standard is assessed by interactive quizzes, games, and the
@@ -201,6 +203,7 @@ function CommendationsSection({ data }: { data: CommendationsReport }) {
           </div>
         ))}
       </div>
+      </details>
     </section>
   );
 }
