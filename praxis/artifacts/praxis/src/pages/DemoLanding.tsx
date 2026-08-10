@@ -10,8 +10,8 @@ import { useSession } from '@/context/SessionContext';
  */
 // Deep teal + warm amber on a warm off-white. The teal matches the Synops investor deck/memo
 // (TEAL #133C43), so the demo reads as one brand alongside the pitch materials.
-const INK = '#17211F';      // near-black, teal-tinted — headlines and body
-const TEAL = '#133C43';     // primary — logo, primary button
+const INK = '#17211F';      // near-black, teal-tinted, for headlines and body
+const TEAL = '#133C43';     // primary: logo, primary button
 const AMBER = '#C2601C';    // warm burnt-amber accent
 const GREIGE = '#F3F1EC';   // warm off-white page surface
 

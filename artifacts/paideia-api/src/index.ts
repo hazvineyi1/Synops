@@ -8,8 +8,8 @@ import { recoverStuckSubmissions } from "./lib/gradingQueue";
 import { ensurePopiaSchema } from "./lib/popiaSchema";
 import { ensureMfaSchema } from "./lib/mfaSchema";
 import { ensureSamplesSeed } from "./lib/samplesSeed";
-import { ensureTeacherDemoSeed } from "./lib/demoTeacherSeed";
-import { ensureCoachDemoSeed } from "./lib/demoCoachSeed";
+import { reseedTeacherDemo } from "./lib/demoTeacherSeed";
+import { reseedCoachDemo } from "./lib/demoCoachSeed";
 
 // POPIA: ensure the consent + deletion-request tables/columns exist at boot
 // (paideia has no migration runner; this heals ahead of an explicit push).
@@ -26,11 +26,13 @@ void ensureSamplesSeed()
   .catch((err) => logger.error({ err }, "Sample seed failed"));
 // One-click demo accounts (Synops Teacher + Synops Coach). Idempotent: seeds the fixed
 // demo identities and their content once, so "try it live" always lands in a populated app.
-void ensureTeacherDemoSeed()
-  .then((r) => { if (r.created) logger.info("Seeded Synops Teacher demo account"); })
+// Reseed (delete + recreate) on boot so content edits ship on deploy. The demo-login routes still
+// lazily ensure the account exists between boots without wiping it.
+void reseedTeacherDemo()
+  .then(() => logger.info("Reseeded Synops Teacher demo account"))
   .catch((err) => logger.error({ err }, "Teacher demo seed failed"));
-void ensureCoachDemoSeed()
-  .then((r) => { if (r.created) logger.info("Seeded Synops Coach demo account"); })
+void reseedCoachDemo()
+  .then(() => logger.info("Reseeded Synops Coach demo account"))
   .catch((err) => logger.error({ err }, "Coach demo seed failed"));
 
 async function initStripe(): Promise<void> {

@@ -92,12 +92,12 @@ function buildPlans() {
         "Cells: structure and function",
         "Plant and animal cells",
         ["Students will be able to label the main parts of plant and animal cells", "Students will be able to describe the function of each organelle", "Students will be able to explain two differences between plant and animal cells"],
-        "Two unlabeled micrographs on the board — one plant, one animal. Ask students to spot three differences with a partner.",
+        "Two unlabeled micrographs on the board, one plant and one animal. Ask students to spot three differences with a partner.",
         "Students annotate a plant and an animal cell diagram, then complete a function-matching table for six organelles.",
         "A cut-and-stick organelle card set reduces the writing load while keeping the science.",
         "Students argue, in three sentences, why a plant cell needs a cell wall and chloroplasts but an animal cell does not.",
         "Name one structure found only in plant cells and state its job.",
-        "Cell wall (support/structure) or chloroplast (photosynthesis) — either, with the correct function.",
+        "Cell wall (support/structure) or chloroplast (photosynthesis); either is correct with the right function.",
         ["Thinking animal cells have a cell wall", "Confusing the cell membrane with the cell wall", "Believing only plant cells have a nucleus"],
         "Draw and label a plant cell from memory, then check it against your notes and correct in a different colour.",
       ),
@@ -121,8 +121,8 @@ function buildWorksheets() {
     { number: 5, prompt: "Why do leaf cells contain many chloroplasts?", type: "long", options: null, answer: "Chloroplasts carry out photosynthesis, and leaves are the main site of photosynthesis, so they need many to capture light.", workingOrRubric: "Link chloroplast → photosynthesis → light capture." },
   ];
   return [
-    { title: "Ratios & unit rates — practice", subject: "Mathematics", yearGroup: "Grade 6", topic: "Ratios and unit rates", difficulty: "core", content: { title: "Ratios & unit rates — practice", instructions: "Show your working for every calculation. Simplify all ratios.", questions: ratioQs, teacherNotes: "Q3 is the key discriminator — watch for students comparing totals instead of unit prices." } },
-    { title: "Cell structure — labelling & function", subject: "Science", yearGroup: "Grade 7", topic: "Plant and animal cells", difficulty: "core", content: { title: "Cell structure — labelling & function", instructions: "Answer in full sentences where asked. Use the word bank if you need it.", questions: cellsQs, teacherNotes: "Q1 and Q4 surface the most common misconceptions; review as a class." } },
+    { title: "Ratios and unit rates practice", subject: "Mathematics", yearGroup: "Grade 6", topic: "Ratios and unit rates", difficulty: "core", content: { title: "Ratios and unit rates practice", instructions: "Show your working for every calculation. Simplify all ratios.", questions: ratioQs, teacherNotes: "Q3 is the key discriminator, so watch for students comparing totals instead of unit prices." } },
+    { title: "Cell structure: labelling and function", subject: "Science", yearGroup: "Grade 7", topic: "Plant and animal cells", difficulty: "core", content: { title: "Cell structure: labelling and function", instructions: "Answer in full sentences where asked. Use the word bank if you need it.", questions: cellsQs, teacherNotes: "Q1 and Q4 surface the most common misconceptions; review as a class." } },
   ];
 }
 
@@ -135,7 +135,7 @@ function buildQuizzes() {
     { number: 5, prompt: "A recipe uses flour to sugar in the ratio 3:2. For 9 cups of flour, how many cups of sugar are needed?", type: "short_answer", options: null, correctAnswer: "6", difficulty: "hard", skillAssessed: "Scaling ratios" },
   ];
   return [
-    { title: "Ratios & rates — exit quiz", subject: "Mathematics", yearGroup: "Grade 6", topic: "Ratios and unit rates", format: "mixed", content: { title: "Ratios & rates — exit quiz", format: "mixed", instructions: "Five questions. No calculator needed.", items: ratioItems } },
+    { title: "Ratios and rates exit quiz", subject: "Mathematics", yearGroup: "Grade 6", topic: "Ratios and unit rates", format: "mixed", content: { title: "Ratios and rates exit quiz", format: "mixed", instructions: "Five questions. No calculator needed.", items: ratioItems } },
   ];
 }
 
@@ -148,10 +148,7 @@ const STUDENTS = [
   { firstName: "Noah", lastInitial: "P" },
 ];
 
-export async function ensureTeacherDemoSeed(): Promise<{ created: boolean }> {
-  const [existing] = await db.select().from(teachersTable).where(eq(teachersTable.email, DEMO_TEACHER_EMAIL)).limit(1);
-  if (existing) return { created: false };
-
+async function createTeacherDemo(): Promise<void> {
   const passwordHash = hashPassword(randomBytes(24).toString("hex"));
   const [teacher] = await db.insert(teachersTable).values({
     email: DEMO_TEACHER_EMAIL,
@@ -171,7 +168,7 @@ export async function ensureTeacherDemoSeed(): Promise<{ created: boolean }> {
     // Class + students
     const [cls] = await db.insert(classesTable).values({
       teacherId: teacher!.id,
-      name: "Period 3 — Grade 6 Math",
+      name: "Period 3: Grade 6 Math",
       subject: "Mathematics",
       yearGroup: "Grade 6",
       region: REGION,
@@ -239,7 +236,7 @@ export async function ensureTeacherDemoSeed(): Promise<{ created: boolean }> {
       classId: cls!.id,
       resourceKind: "quiz",
       quizId: quizIds[0]!,
-      title: "Ratios & rates — exit quiz",
+      title: "Ratios and rates exit quiz",
       deliveryMode: "accounts",
       shareCode: generateShortCode(7),
     }).returning();
@@ -276,7 +273,7 @@ export async function ensureTeacherDemoSeed(): Promise<{ created: boolean }> {
         aiSummary: {
           overall: pct >= 80
             ? `${st.firstName} has a secure grasp of ratios and unit rates, scoring ${auto}/5.`
-            : `${st.firstName} scored ${auto}/5 — the core idea is there but a specific step is slipping.`,
+            : `${st.firstName} scored ${auto}/5; the core idea is there but a specific step is slipping.`,
           strengths: auto >= 4 ? ["Simplifying ratios", "Finding unit rates"] : ["Finding simple unit rates"],
           gaps: pct >= 100 ? [] : [auto <= 3 ? "Ordering the parts of a ratio correctly" : "Comparing rates to judge the better value"],
           recommendations: pct >= 100
@@ -285,11 +282,25 @@ export async function ensureTeacherDemoSeed(): Promise<{ created: boolean }> {
         },
       });
     }
-    return { created: true };
   } catch (err) {
     // Roll the teacher back so a partial seed doesn't wedge the demo; next boot retries.
     logger.error({ err }, "demo teacher seed failed; rolling back teacher row");
     await db.delete(teachersTable).where(eq(teachersTable.id, teacher!.id)).catch(() => {});
     throw err;
   }
+}
+
+export async function ensureTeacherDemoSeed(): Promise<{ created: boolean }> {
+  const [existing] = await db.select().from(teachersTable).where(eq(teachersTable.email, DEMO_TEACHER_EMAIL)).limit(1);
+  if (existing) return { created: false };
+  await createTeacherDemo();
+  return { created: true };
+}
+
+/** Force the demo account to the latest seed content (delete + recreate). Boot-time only. */
+export async function reseedTeacherDemo(): Promise<{ created: boolean }> {
+  const [existing] = await db.select().from(teachersTable).where(eq(teachersTable.email, DEMO_TEACHER_EMAIL)).limit(1);
+  if (existing) await db.delete(teachersTable).where(eq(teachersTable.id, existing.id));
+  await createTeacherDemo();
+  return { created: true };
 }

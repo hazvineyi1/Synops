@@ -20,7 +20,7 @@ import { logger } from "./logger.js";
 /**
  * One-click demo learner for Synops Coach. A single fixed identity with a completed diagnostic
  * (so the intake gate is skipped), an active learning path, a study material with concepts and
- * spaced-repetition flashcards, a small knowledge map and a coaching conversation — so a visitor
+ * spaced-repetition flashcards, a small knowledge map and a coaching conversation, so a visitor
  * sees a working daily session immediately. Entered ONLY through the host-gated /auth/demo-login
  * button (random, unusable password). Idempotent: seeds once, rolls the user back on partial failure.
  */
@@ -51,7 +51,7 @@ const CONCEPTS = [
   {
     title: "Mitosis and the cell cycle",
     difficulty: "medium",
-    explanation: "Mitosis produces two genetically identical daughter cells for growth and repair. The stages — prophase, metaphase, anaphase, telophase — are best remembered by what the chromosomes are doing, not just the names.",
+    explanation: "Mitosis produces two genetically identical daughter cells for growth and repair. The four stages (prophase, metaphase, anaphase, telophase) are best remembered by what the chromosomes are doing, not just the names.",
     keyTerms: ["mitosis", "chromosome", "prophase", "metaphase", "anaphase", "telophase"],
     mastery: 0.4,
   },
@@ -62,12 +62,12 @@ const FLASHCARDS = [
   { c: 0, front: "What does active transport need that diffusion does not?", back: "Energy from ATP, because it moves substances against the gradient.", hint: null, due: 2 },
   { c: 1, front: "Which organelle releases energy through respiration?", back: "The mitochondrion.", hint: "The 'powerhouse'.", due: -1 },
   { c: 1, front: "Where in the cell are proteins made?", back: "At the ribosomes.", hint: null, due: 4 },
-  { c: 2, front: "Define osmosis.", back: "The net movement of water across a partially permeable membrane from high to low water potential.", hint: "It's diffusion — but of water.", due: -1 },
-  { c: 2, front: "A plant cell in pure water becomes…?", back: "Turgid — it gains water and the vacuole pushes on the cell wall.", hint: null, due: 1 },
+  { c: 2, front: "Define osmosis.", back: "The net movement of water across a partially permeable membrane from high to low water potential.", hint: "It's diffusion, but of water.", due: -1 },
+  { c: 2, front: "A plant cell in pure water becomes…?", back: "Turgid: it gains water and the vacuole pushes on the cell wall.", hint: null, due: 1 },
   { c: 3, front: "What does mitosis produce?", back: "Two genetically identical diploid daughter cells.", hint: "Identical, not halved.", due: -2 },
 ];
 
-const MATERIAL_TEXT = `Cell Biology — Unit 2
+const MATERIAL_TEXT = `Cell Biology: Unit 2
 
 Cells are the basic unit of life. This unit covers cell structure, transport across membranes, and cell division.
 
@@ -79,10 +79,7 @@ Cells are the basic unit of life. This unit covers cell structure, transport acr
 
 4. Cell division. Mitosis produces two identical cells for growth and repair, passing through prophase, metaphase, anaphase and telophase.`;
 
-export async function ensureCoachDemoSeed(): Promise<{ created: boolean }> {
-  const [existing] = await db.select().from(studyUsersTable).where(eq(studyUsersTable.email, DEMO_COACH_EMAIL)).limit(1);
-  if (existing) return { created: false };
-
+async function createCoachDemo(): Promise<void> {
   const passwordHash = hashPassword(randomBytes(24).toString("hex"));
   const [user] = await db.insert(studyUsersTable).values({
     email: DEMO_COACH_EMAIL,
@@ -120,7 +117,7 @@ export async function ensureCoachDemoSeed(): Promise<{ created: boolean }> {
     // Material + concepts
     const [material] = await db.insert(studyMaterialsTable).values({
       userId: user!.id,
-      title: "Cell Biology — Unit 2 Notes",
+      title: "Cell Biology: Unit 2 Notes",
       sourceType: "paste",
       contentText: MATERIAL_TEXT,
       strategy: {
@@ -189,7 +186,7 @@ export async function ensureCoachDemoSeed(): Promise<{ created: boolean }> {
     // Active learning path + steps (mix of completed / in-progress / available / locked)
     const [path] = await db.insert(studyLearningPathsTable).values({
       userId: user!.id,
-      title: "IGCSE Biology — Cells sprint",
+      title: "IGCSE Biology: Cells sprint",
       description: "A guided path through Unit 2, weighted toward your weaker areas.",
       goal: "Master cell transport and division before the mock exam.",
       status: "active",
@@ -199,7 +196,7 @@ export async function ensureCoachDemoSeed(): Promise<{ created: boolean }> {
     }).returning();
 
     const steps: Array<{ stepType: string; title: string; description: string; est: number; status: string; node: number; mastery: number | null }> = [
-      { stepType: "read_material", title: "Read: organelles & functions", description: "Section 1 — link each structure to its job.", est: 8, status: "completed", node: 1, mastery: 0.9 },
+      { stepType: "read_material", title: "Read: organelles & functions", description: "Section 1: link each structure to its job.", est: 8, status: "completed", node: 1, mastery: 0.9 },
       { stepType: "flashcard_review", title: "Review: organelle flashcards", description: "Clear today's due cards for organelles.", est: 6, status: "completed", node: 1, mastery: 0.88 },
       { stepType: "practice_questions", title: "Practice: membrane transport", description: "Six questions on diffusion, osmosis and active transport.", est: 12, status: "in_progress", node: 0, mastery: null },
       { stepType: "tutor_session", title: "Coach: osmosis & water potential", description: "Work through the water-potential rule with the coach.", est: 15, status: "available", node: 2, mastery: null },
@@ -227,21 +224,34 @@ export async function ensureCoachDemoSeed(): Promise<{ created: boolean }> {
     // A coaching conversation so the Coach page isn't empty
     const [conv] = await db.insert(studyTutorConversationsTable).values({
       userId: user!.id,
-      title: "Osmosis — why does the potato strip shrink?",
+      title: "Osmosis: why does the potato strip shrink?",
       socraticMode: true,
       scope: "all_material",
     }).returning();
     await db.insert(studyTutorMessagesTable).values([
       { conversationId: conv!.id, role: "user", content: "Why does a potato strip in salty water get smaller and floppy?" },
-      { conversationId: conv!.id, role: "assistant", content: "Good question — let's reason it out. Compared with the potato cells, does the salty water have more or less water potential?", usedPersonalization: true, citations: [{ type: "concept", title: "Osmosis and water potential" }] },
+      { conversationId: conv!.id, role: "assistant", content: "Good question. Let's reason it out: compared with the potato cells, does the salty water have more or less water potential?", usedPersonalization: true, citations: [{ type: "concept", title: "Osmosis and water potential" }] },
       { conversationId: conv!.id, role: "user", content: "Less water potential, because it's concentrated." },
-      { conversationId: conv!.id, role: "assistant", content: "Exactly. So which way does water move across the membrane — into the cells or out of them — and what does that do to the strip?", usedPersonalization: true, citations: [{ type: "concept", title: "Osmosis and water potential" }] },
+      { conversationId: conv!.id, role: "assistant", content: "Exactly. So which way does water move across the membrane, into the cells or out of them, and what does that do to the strip?", usedPersonalization: true, citations: [{ type: "concept", title: "Osmosis and water potential" }] },
     ]);
-
-    return { created: true };
   } catch (err) {
     logger.error({ err }, "demo coach seed failed; rolling back user row");
     await db.delete(studyUsersTable).where(eq(studyUsersTable.id, user!.id)).catch(() => {});
     throw err;
   }
+}
+
+export async function ensureCoachDemoSeed(): Promise<{ created: boolean }> {
+  const [existing] = await db.select().from(studyUsersTable).where(eq(studyUsersTable.email, DEMO_COACH_EMAIL)).limit(1);
+  if (existing) return { created: false };
+  await createCoachDemo();
+  return { created: true };
+}
+
+/** Force the demo learner to the latest seed content (delete + recreate). Boot-time only. */
+export async function reseedCoachDemo(): Promise<{ created: boolean }> {
+  const [existing] = await db.select().from(studyUsersTable).where(eq(studyUsersTable.email, DEMO_COACH_EMAIL)).limit(1);
+  if (existing) await db.delete(studyUsersTable).where(eq(studyUsersTable.id, existing.id));
+  await createCoachDemo();
+  return { created: true };
 }

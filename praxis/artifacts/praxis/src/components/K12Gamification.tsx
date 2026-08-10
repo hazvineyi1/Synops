@@ -17,7 +17,7 @@ import { StarMascot, ChestMascot, FishMascot, BookMascot } from "@/components/k1
  * "what happens today") plus a STAR / TOKEN BOARD that fills as the plan is completed. All derived from
  * the learner's own progress + credentials, so nothing new is stored. Renders nothing for others.
  *
- * For the Grade-6 "everything on" showcase (persona.maxGamified — Maya) we ADD, on top of the base
+ * For the Grade-6 "everything on" showcase (persona.maxGamified, Maya) we ADD, on top of the base
  * suite, a streak flame stat, a friendly class leaderboard (the learner + synthetic classmates),
  * glossy mascots decorating the quest map + a badge board, and a confetti burst on mount / level-up.
  * All of it is guarded behind persona.maxGamified so every other persona's suite is unchanged.
@@ -51,7 +51,7 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
   const doneLessons = Math.round((pct / 100) * lessons);
 
   // Max-gamification showcase (Maya): a friendly class leaderboard derived from the learner's own XP.
-  // Synthetic classmates for the demo — the learner sits a strong 2nd (winning-ish, not #1 by a mile).
+  // Synthetic classmates for the demo; the learner sits a strong 2nd (winning-ish, not #1 by a mile).
   const board = persona.maxGamified ? buildLeaderboard(persona.first, xp) : null;
 
   // Autism visual schedule + star board (predictable steps for today).
@@ -143,7 +143,7 @@ export function K12Gamification({ compact = false }: { compact?: boolean } = {})
                 <Flame className="h-4 w-4" /> {streak} day streak
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5 mb-3">You&rsquo;re near the top of Room 6B this week — keep your streak alive to climb.</p>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-3">You&rsquo;re near the top of Room 6B this week. Keep your streak alive to climb.</p>
             <div className="space-y-1.5">
               {board.rows.map((r, i) => {
                 const me = !!r.me;
@@ -246,7 +246,7 @@ function buildLeaderboard(me: string, xp: number) {
 }
 
 /**
- * Dependency-free confetti burst — the same technique as LearnSession.tsx's Confetti (framer-motion
+ * Dependency-free confetti burst, the same technique as LearnSession.tsx's Confetti (framer-motion
  * spans fanning out and fading). Re-keyed on level by the caller so it replays on each level-up.
  */
 function ConfettiBurst() {

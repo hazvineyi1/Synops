@@ -77,7 +77,7 @@ export const K12_PERSONAS: K12Persona[] = [
   {
     key: "sofia", email: "sofia.k12@synops-demo.test", first: "Sofía", name: "Sofía Ramírez",
     grade: 3, gradeLabel: "Grade 3", band: "early", subject: "Lectura y Matemáticas", subjectEmoji: "📚",
-    challenge: "Spanish-first learner", challengeLong: "A Spanish-speaking student who learns entirely in Spanish — interface, lessons, games, and read-aloud.",
+    challenge: "Spanish-first learner", challengeLong: "A Spanish-speaking student who learns entirely in Spanish: interface, lessons, games, and read-aloud.",
     learningStyleLabel: "Visual learner",
     accent: "#0D9488", avatarBg: "#0D9488", rootPx: 16.5, highContrast: false, calm: false, gamified: true, autismMode: false, defaultLang: "es",
     supports: "Spanish interface + bilingual read-aloud, simpler wording, big friendly text, and one idea at a time.",
@@ -93,7 +93,7 @@ export const K12_PERSONAS: K12Persona[] = [
   {
     key: "maya", email: "maya.k12@synops-demo.test", first: "Maya", name: "Maya Chen",
     grade: 6, gradeLabel: "Grade 6", band: "middle", subject: "Math", subjectEmoji: "➗",
-    challenge: "Full gamification", challengeLong: "A confident 6th-grader on the fully gamified track — XP, levels and a class leaderboard, badges and daily streaks, mascots along a quest map, game-show battles against an AI opponent, and confetti celebrations.",
+    challenge: "Full gamification", challengeLong: "A confident 6th-grader on the fully gamified track: XP, levels and a class leaderboard, badges and daily streaks, mascots along a quest map, game-show battles against an AI opponent, and confetti celebrations.",
     learningStyleLabel: "Reading/writing learner",
     accent: "#4F46E5", avatarBg: "#4F46E5", rootPx: 16, highContrast: false, calm: false, gamified: true, maxGamified: true, autismMode: false,
     supports: "Everything on: XP and level-ups, a badge board, a daily streak flame, a class leaderboard, mascots along your quest map, AI game-show battles, and confetti when you level up.",

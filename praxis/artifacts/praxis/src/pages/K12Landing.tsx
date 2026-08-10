@@ -9,7 +9,7 @@ interface CommendationsReport { academy: string; totals: { subjects: number; sta
 
 /**
  * Public K-12 demo landing for praxis.synops-consulting.com/k12.
- * Bright and playful, with a card per learner persona (grades 3–11) — each showing a real learning
+ * Bright and playful, with a card per learner persona (grades 3 to 11), each showing a real learning
  * challenge and the accommodations that help, then a one-click entry into the live product as that
  * student. This is the "inclusive, adaptive, across grades" story. No sign-up.
  */
@@ -72,7 +72,7 @@ export default function K12Landing() {
             <span style={{ background: `linear-gradient(90deg,${INDIGO},#7C3AED,${AMBER})`, WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>every kind of learner</span>.
           </h1>
           <p className="mt-4 text-[15px] md:text-base leading-relaxed" style={{ color: '#5a5766' }}>
-            Meet seven students from Grade 1 to Grade 11 — each with a different learning style or
+            Meet seven students from Grade 1 to Grade 11, each with a different learning style or
             challenge, and the accommodations that help them thrive. Every student studies
             <span className="font-semibold" style={{ color: INK }}> two subjects</span>, fully built
             and gamified. Step into any of their days. Real lessons, aligned to US standards. No sign-up.
@@ -134,7 +134,7 @@ export default function K12Landing() {
 }
 
 /**
- * "Commendations" section — the standards each class meets, with the mastery evidence behind them,
+ * "Commendations" section: the standards each class meets, with the mastery evidence behind them,
  * pulled live from /api/k12/commendations (which mirrors the internal accreditation engine).
  */
 function CommendationsSection({ data }: { data: CommendationsReport }) {
@@ -156,7 +156,7 @@ function CommendationsSection({ data }: { data: CommendationsReport }) {
       <p className="mt-2 max-w-2xl text-[14px] leading-relaxed" style={{ color: '#5a5766' }}>
         A commendation is a standard the program can prove it meets. Every class below aligns to a real
         accreditation framework, and each standard is assessed by interactive quizzes, games, and the
-        Math Coach — so alignment isn&rsquo;t a claim, it&rsquo;s evidence drawn from actual learner work.
+        Math Coach, so alignment isn&rsquo;t a claim, it&rsquo;s evidence drawn from actual learner work.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2.5">
