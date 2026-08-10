@@ -8,6 +8,7 @@ import { REGION_IDS } from "../../lib/catalog.js";
 import { generateJSON } from "../../lib/openai.js";
 import { logEvent } from "../../lib/eventLog.js";
 import { quizPrompt, aggregateClassLearningProfile, type LearningProfile } from "../../lib/prompts.js";
+import { gradeAnswersPreview } from "../../lib/aiGrading.js";
 
 async function fetchClassLearningProfile(classId: string, teacherId: string): Promise<LearningProfile | undefined> {
   const [cls] = await db
@@ -238,6 +239,24 @@ router.delete("/:id", async (req, res) => {
       and(eq(quizzesTable.id, id), eq(quizzesTable.teacherId, req.teacher!.id)),
     );
   res.json({ ok: true });
+});
+
+// Interactive-preview grading (no persistence) so the "Student view" preview reproduces the
+// full submit experience for the teacher.
+router.post("/:id/preview", async (req, res) => {
+  const id = req.params.id;
+  const [q] = await db
+    .select()
+    .from(quizzesTable)
+    .where(and(eq(quizzesTable.id, id), eq(quizzesTable.teacherId, req.teacher!.id)))
+    .limit(1);
+  if (!q) { res.status(404).json({ error: "Quiz not found" }); return; }
+  const answers = (req.body?.answers ?? {}) as Record<string, string>;
+  const result = await gradeAnswersPreview({
+    kind: "quiz", title: q.title, content: q.content, answers,
+    studentName: "Preview student", teacherId: req.teacher!.id,
+  });
+  res.json(result);
 });
 
 export default router;

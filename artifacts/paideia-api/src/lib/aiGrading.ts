@@ -7,6 +7,7 @@ import {
 } from "@workspace/paideia-db";
 import { and, eq, inArray } from "drizzle-orm";
 import { generateJSON } from "./openai.js";
+import { gradeQuiz, gradeWorksheet } from "./grading.js";
 
 interface QuizItem {
   number: number;
@@ -307,6 +308,107 @@ export async function gradeSubmissionWithAi(submissionId: string): Promise<void>
       .update(submissionsTable)
       .set({ gradingStatus: "failed" })
       .where(eq(submissionsTable.id, submissionId));
+  }
+}
+
+export interface PreviewGradeResult {
+  autoScore: number;
+  maxAutoScore: number;
+  needsReviewCount: number;
+  feedback: FeedbackItem[];
+  aiSummary: AiSummary;
+}
+
+/**
+ * Grade a set of answers against a worksheet/quiz WITHOUT persisting anything. Runs the exact
+ * same pipeline a real submission does (rule-based auto-mark for objective items, then the AI
+ * marker for reasoning, misconceptions, a study plan and a summary), so the teacher's interactive
+ * preview reproduces precisely what a student sees and what the teacher receives. Never throws:
+ * on an AI failure it falls back to the deterministic auto-grade plus a plain summary.
+ */
+export async function gradeAnswersPreview(params: {
+  kind: "quiz" | "worksheet";
+  title: string;
+  content: unknown;
+  answers: Record<string, string>;
+  studentName: string;
+  teacherId: string;
+}): Promise<PreviewGradeResult> {
+  const { kind, title, content, answers, studentName, teacherId } = params;
+  const c = (content ?? {}) as Record<string, unknown>;
+
+  const base =
+    kind === "quiz"
+      ? gradeQuiz((c["items"] as QuizItem[] | undefined) ?? [], answers)
+      : gradeWorksheet((c["questions"] as WorksheetQuestion[] | undefined) ?? [], answers);
+  const autoByNum = new Map(base.feedback.map((f) => [f.number, f]));
+
+  const questions: Array<{
+    number: number; prompt: string; type: string; correct: string;
+    rubric?: string; skill?: string; given: string; autoState?: "correct" | "incorrect" | null;
+  }> = [];
+
+  if (kind === "quiz") {
+    for (const q of ((c["items"] as QuizItem[] | undefined) ?? [])) {
+      const given = (answers[String(q.number)] ?? "").trim();
+      const objective = q.type === "multiple_choice" || q.type === "true_false";
+      const entry: typeof questions[number] = { number: q.number, prompt: q.prompt, type: q.type, correct: q.correctAnswer, given };
+      if (q.skillAssessed) entry.skill = q.skillAssessed;
+      if (objective) entry.autoState = autoByNum.get(q.number)?.state === "correct" ? "correct" : "incorrect";
+      questions.push(entry);
+    }
+  } else {
+    for (const q of ((c["questions"] as WorksheetQuestion[] | undefined) ?? [])) {
+      const given = (answers[String(q.number)] ?? "").trim();
+      const objective = q.type === "multiple_choice";
+      const entry: typeof questions[number] = { number: q.number, prompt: q.prompt, type: q.type, correct: q.answer, given };
+      if (q.workingOrRubric) entry.rubric = q.workingOrRubric;
+      if (objective) entry.autoState = autoByNum.get(q.number)?.state === "correct" ? "correct" : "incorrect";
+      questions.push(entry);
+    }
+  }
+
+  try {
+    const ai = await generateJSON<AiResponse>(SYSTEM_PROMPT, buildUserPrompt(title, kind, questions, studentName), {
+      teacherId,
+      kind: "grade_submission",
+    });
+    const aiByNum = new Map(ai.items.map((i) => [i.number, i]));
+    let totalScore = 0;
+    let totalMax = 0;
+    const feedback: FeedbackItem[] = questions.map((q) => {
+      const aiItem = aiByNum.get(q.number);
+      const isObjective = q.autoState != null;
+      let max: number, score: number, state: FeedbackItem["state"];
+      if (isObjective) {
+        max = 1; score = q.autoState === "correct" ? 1 : 0; state = q.autoState === "correct" ? "correct" : "incorrect";
+      } else if (aiItem) {
+        max = Math.max(1, Math.round(aiItem.max)); score = Math.max(0, Math.min(max, Math.round(aiItem.score))); state = aiItem.state;
+      } else {
+        max = 1; score = 0; state = "needs_review";
+      }
+      totalScore += score; totalMax += max;
+      const merged: FeedbackItem = { number: q.number, given: q.given, correct: q.correct || null, state, aiScore: score, aiMax: max };
+      if (q.skill) merged.skill = q.skill;
+      if (aiItem?.comment) merged.aiComment = aiItem.comment;
+      if (state !== "correct") {
+        if (aiItem?.misconception) merged.misconception = aiItem.misconception;
+        if (aiItem?.bloom) merged.bloom = aiItem.bloom;
+      }
+      return merged;
+    });
+    return { autoScore: totalScore, maxAutoScore: totalMax, needsReviewCount: 0, feedback, aiSummary: ai.summary };
+  } catch (err) {
+    console.error("[aiGrading] preview grade failed, returning auto-grade only", err);
+    const feedback: FeedbackItem[] = base.feedback.map((f) => ({
+      number: f.number, given: f.given, correct: f.correct, state: f.state,
+      ...(f.skill ? { skill: f.skill } : {}),
+    }));
+    const summary: AiSummary = {
+      overall: `Auto-marked ${base.autoScore} of ${base.maxAutoScore} objective questions. The written answers would be marked by the AI when a student submits for real.`,
+      strengths: [], gaps: [], recommendations: [],
+    };
+    return { autoScore: base.autoScore, maxAutoScore: base.maxAutoScore, needsReviewCount: base.needsReviewCount, feedback, aiSummary: summary };
   }
 }
 

@@ -8,6 +8,7 @@ import { REGION_IDS } from "../../lib/catalog.js";
 import { generateJSON } from "../../lib/openai.js";
 import { logEvent } from "../../lib/eventLog.js";
 import { worksheetPrompt, aggregateClassLearningProfile, type LearningProfile } from "../../lib/prompts.js";
+import { gradeAnswersPreview } from "../../lib/aiGrading.js";
 
 async function fetchClassLearningProfile(classId: string, teacherId: string): Promise<LearningProfile | undefined> {
   const [cls] = await db
@@ -228,6 +229,24 @@ router.delete("/:id", async (req, res) => {
       and(eq(worksheetsTable.id, id), eq(worksheetsTable.teacherId, req.teacher!.id)),
     );
   res.json({ ok: true });
+});
+
+// Interactive-preview grading: grade the teacher's own answers against their worksheet without
+// persisting anything, so the "Student view" preview can reproduce the full submit experience.
+router.post("/:id/preview", async (req, res) => {
+  const id = req.params.id;
+  const [w] = await db
+    .select()
+    .from(worksheetsTable)
+    .where(and(eq(worksheetsTable.id, id), eq(worksheetsTable.teacherId, req.teacher!.id)))
+    .limit(1);
+  if (!w) { res.status(404).json({ error: "Worksheet not found" }); return; }
+  const answers = (req.body?.answers ?? {}) as Record<string, string>;
+  const result = await gradeAnswersPreview({
+    kind: "worksheet", title: w.title, content: w.content, answers,
+    studentName: "Preview student", teacherId: req.teacher!.id,
+  });
+  res.json(result);
 });
 
 export default router;

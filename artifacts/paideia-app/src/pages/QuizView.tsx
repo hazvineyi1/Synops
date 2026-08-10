@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Quiz, QuizContent } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { QuizView as Renderer } from "@/components/Renderers";
+import { InteractivePreview } from "@/components/InteractivePreview";
 import { QuizEditor } from "@/components/QuizEditor";
 import { AssignDialog } from "@/components/AssignDialog";
 import { Pencil, Printer, Trash2, Share2, Send, Eye, EyeOff } from "lucide-react";
@@ -88,6 +89,8 @@ export default function QuizView() {
       <div className="bg-card border rounded-lg p-8 print-page">
         {editing ? (
           <QuizEditor initial={q.content} saving={saving} onSave={onSave} onCancel={() => setEditing(false)} />
+        ) : studentView ? (
+          <InteractivePreview kind="quiz" id={q.id} content={q.content} title={q.title} />
         ) : (
           <Renderer c={q.content} studentView={studentView} />
         )}

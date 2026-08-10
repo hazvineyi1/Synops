@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import type { Worksheet, WorksheetContent } from "@/lib/types";
 import { useAuth } from "@/hooks/use-auth";
 import { WorksheetView as Renderer } from "@/components/Renderers";
+import { InteractivePreview } from "@/components/InteractivePreview";
 import { WorksheetEditor } from "@/components/WorksheetEditor";
 import { AssignDialog } from "@/components/AssignDialog";
 import { Pencil, Printer, Trash2, Share2, Eye, EyeOff } from "lucide-react";
@@ -88,6 +89,8 @@ export default function WorksheetView() {
       <div className="bg-card border rounded-lg p-8 print-page">
         {editing ? (
           <WorksheetEditor initial={w.content} saving={saving} onSave={onSave} onCancel={() => setEditing(false)} />
+        ) : studentView ? (
+          <InteractivePreview kind="worksheet" id={w.id} content={w.content} title={w.title} />
         ) : (
           <Renderer c={w.content} studentView={studentView} />
         )}
