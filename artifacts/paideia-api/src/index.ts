@@ -7,6 +7,7 @@ import { getStripeSync } from "./lib/stripeClient";
 import { recoverStuckSubmissions } from "./lib/gradingQueue";
 import { ensurePopiaSchema } from "./lib/popiaSchema";
 import { ensureMfaSchema } from "./lib/mfaSchema";
+import { ensureMaterialsSchema } from "./lib/materialsSchema";
 import { ensureSamplesSeed } from "./lib/samplesSeed";
 import { reseedTeacherDemo } from "./lib/demoTeacherSeed";
 import { reseedCoachDemo } from "./lib/demoCoachSeed";
@@ -24,16 +25,18 @@ void ensureSamplesSeed()
     if (r.changed) logger.info({ count: r.count }, "Reconciled samples library");
   })
   .catch((err) => logger.error({ err }, "Sample seed failed"));
-// One-click demo accounts (Synops Teacher + Synops Coach). Idempotent: seeds the fixed
-// demo identities and their content once, so "try it live" always lands in a populated app.
-// Reseed (delete + recreate) on boot so content edits ship on deploy. The demo-login routes still
-// lazily ensure the account exists between boots without wiping it.
-void reseedTeacherDemo()
-  .then(() => logger.info("Reseeded Synops Teacher demo account"))
-  .catch((err) => logger.error({ err }, "Teacher demo seed failed"));
-void reseedCoachDemo()
-  .then(() => logger.info("Reseeded Synops Coach demo account"))
-  .catch((err) => logger.error({ err }, "Coach demo seed failed"));
+// One-click demo accounts (Synops Teacher + Synops Coach). Reseed (delete + recreate) on boot so
+// content edits ship on deploy. Demo teacher seeds example materials, so the materials table must
+// exist first — chain the reseeds after ensureMaterialsSchema. The demo-login routes still lazily
+// ensure the account exists between boots without wiping it.
+void ensureMaterialsSchema().then(() => {
+  void reseedTeacherDemo()
+    .then(() => logger.info("Reseeded Synops Teacher demo account"))
+    .catch((err) => logger.error({ err }, "Teacher demo seed failed"));
+  void reseedCoachDemo()
+    .then(() => logger.info("Reseeded Synops Coach demo account"))
+    .catch((err) => logger.error({ err }, "Coach demo seed failed"));
+});
 
 async function initStripe(): Promise<void> {
   const databaseUrl = process.env["DATABASE_URL"];

@@ -136,6 +136,27 @@ export const samplesTable = pgTable("copilot_samples", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Teacher-uploaded source material. The extracted plain text (contentText) grounds AI generation
+// so lesson plans / worksheets / quizzes align to what the teacher actually teaches from.
+export const materialsTable = pgTable("copilot_materials", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  teacherId: uuid("teacher_id")
+    .notNull()
+    .references(() => teachersTable.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  sourceType: text("source_type").notNull(), // paste | file | url
+  sourceMeta: text("source_meta"), // e.g. original filename or url
+  contentText: text("content_text").notNull().default(""),
+  status: text("status").notNull().default("ready"), // ready | processing | failed
+  errorMessage: text("error_message"),
+  charCount: integer("char_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  teacherIdx: index("copilot_materials_teacher_idx").on(t.teacherId),
+}));
+
+export type Material = typeof materialsTable.$inferSelect;
+
 export const classesTable = pgTable("copilot_classes", {
   id: uuid("id").primaryKey().defaultRandom(),
   teacherId: uuid("teacher_id")

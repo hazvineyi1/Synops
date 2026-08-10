@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { AppShell } from "@/components/layout/AppShell";
 import { WorkflowForm } from "@/components/WorkflowForm";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { api, ApiError } from "@/lib/api";
 import type { LessonPlan } from "@/lib/types";
 import { Sparkles } from "lucide-react";
 import { ClassProfileSelector } from "@/components/ClassProfileSelector";
+import { MaterialPicker } from "@/components/MaterialPicker";
+import { demoGenRemaining, incrementDemoGen } from "@/lib/demoLimit";
 
 export default function PlanNew() {
   const { teacher } = useAuth();
@@ -29,11 +31,17 @@ export default function PlanNew() {
   const [duration, setDuration] = useState(50);
   const [priorKnowledge, setPriorKnowledge] = useState("");
   const [groupContext, setGroupContext] = useState("");
+  const [materialId, setMaterialId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isDemo = teacher?.isDemo === true;
+  const remaining = demoGenRemaining();
+  const demoBlocked = isDemo && remaining <= 0;
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (demoBlocked) return;
     setBusy(true);
     setError(null);
     try {
@@ -46,7 +54,9 @@ export default function PlanNew() {
         priorKnowledge: priorKnowledge || undefined,
         groupContext: groupContext || undefined,
         studentId: prefill.studentId,
+        materialId: materialId || undefined,
       });
+      if (isDemo) incrementDemoGen();
       setLoc(`/plans/${res.plan.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Generation failed");
@@ -73,6 +83,7 @@ export default function PlanNew() {
             setYearGroup(p.yearGroup);
             if (p.notes) setGroupContext(p.notes);
           }} />
+          <MaterialPicker value={materialId} onChange={setMaterialId} />
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Subject</Label>
@@ -110,7 +121,17 @@ export default function PlanNew() {
             <Textarea id="group" value={groupContext} onChange={(e) => setGroupContext(e.target.value)} placeholder="Class size, EAL learners, particular needs, anything else useful." rows={2} />
           </div>
           {error && <div className="text-sm text-destructive">{error}</div>}
-          <Button type="submit" disabled={!subject || !yearGroup || !topic} className="w-full">Generate lesson plan</Button>
+          {demoBlocked && (
+            <div className="text-sm text-destructive">
+              You've reached the demo limit of 3 generations.{" "}
+              <Link href="/signup" className="underline underline-offset-2">Create a free account</Link>{" "}
+              to keep creating.
+            </div>
+          )}
+          <Button type="submit" disabled={!subject || !yearGroup || !topic || demoBlocked} className="w-full">Generate lesson plan</Button>
+          {isDemo && !demoBlocked && (
+            <p className="text-xs text-muted-foreground text-center">{remaining} demo generations left</p>
+          )}
         </form>
       </WorkflowForm>
     </AppShell>

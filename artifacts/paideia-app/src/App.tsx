@@ -38,6 +38,7 @@ import TutorChat from "@/pages/student/TutorChat";
 import Admin from "@/pages/Admin";
 import Portal from "@/pages/Portal";
 import Library from "@/pages/Library";
+import Materials from "@/pages/Materials";
 import Shared from "@/pages/Shared";
 import Onboarding from "@/pages/Onboarding";
 import ResetPassword from "@/pages/ResetPassword";
@@ -130,6 +131,7 @@ function AppRoutes() {
       <Route path="/admin">{() => <Protected component={Admin} />}</Route>
       <Route path="/portal" component={Portal} />
       <Route path="/library">{() => <Protected component={Library} />}</Route>
+      <Route path="/materials">{() => <Protected component={Materials} />}</Route>
       <Route path="/shared">{() => <Protected component={Shared} />}</Route>
       <Route path="/upgrade">{() => <Protected component={Upgrade} />}</Route>
       <Route component={NotFound} />

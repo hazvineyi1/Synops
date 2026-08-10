@@ -172,6 +172,13 @@ ${confidenceCaveat}
 ${audienceTail}`;
 }
 
+// When the teacher grounds generation in their own uploaded material, append the source verbatim
+// (the caller truncates before passing it in) so the model stays faithful to what they teach from.
+function sourceMaterialBlock(sourceMaterial?: string): string {
+  if (!sourceMaterial || !sourceMaterial.trim()) return "";
+  return `\n\nBASE THIS ON THE TEACHER'S OWN MATERIAL. Draw the topic, facts, vocabulary and examples from the material below. Stay faithful to it and do not contradict it; you may add scaffolding and questions, but ground everything in this source.\n\n--- MATERIAL START ---\n${sourceMaterial}\n--- MATERIAL END ---\n`;
+}
+
 export interface LessonPlanInput {
   region: string;
   subject: string;
@@ -182,6 +189,7 @@ export interface LessonPlanInput {
   groupContext?: string;
   studentProfile?: StudentProfileSummary;
   classLearningProfile?: LearningProfile;
+  sourceMaterial?: string;
 }
 
 export function lessonPlanPrompt(input: LessonPlanInput): {
@@ -232,7 +240,7 @@ Year group: ${input.yearGroup}
 Topic: ${input.topic}
 Lesson duration: ${input.durationMinutes} minutes
 ${input.priorKnowledge ? `Prior knowledge: ${input.priorKnowledge}` : ""}
-${input.groupContext ? `About this class: ${input.groupContext}` : ""}${studentBlock}${formatLearningProfileBlock(input.classLearningProfile, "lesson")}
+${input.groupContext ? `About this class: ${input.groupContext}` : ""}${studentBlock}${formatLearningProfileBlock(input.classLearningProfile, "lesson")}${sourceMaterialBlock(input.sourceMaterial)}
 
 Plan one focused lesson. The starter, main task, mini-plenary and exit ticket durations should sum to roughly the lesson duration. The main task must offer three tiers: support, core, and stretch. Misconceptions should be specific to this topic.`;
 
@@ -248,6 +256,7 @@ export interface WorksheetInput {
   questionCount: number;
   notes?: string;
   classLearningProfile?: LearningProfile;
+  sourceMaterial?: string;
 }
 
 export function worksheetPrompt(input: WorksheetInput): {
@@ -282,7 +291,7 @@ Year group: ${input.yearGroup}
 Topic: ${input.topic}
 Difficulty: ${input.difficulty}
 Number of questions: ${input.questionCount}
-${input.notes ? `Additional notes: ${input.notes}` : ""}${formatLearningProfileBlock(input.classLearningProfile, "worksheet")}
+${input.notes ? `Additional notes: ${input.notes}` : ""}${formatLearningProfileBlock(input.classLearningProfile, "worksheet")}${sourceMaterialBlock(input.sourceMaterial)}
 
 Produce exactly ${input.questionCount} questions, numbered sequentially. Mix question types where appropriate. Each question must include a worked answer or rubric. The instructions should be one or two sentences a student can read.`;
 
@@ -339,6 +348,7 @@ export interface QuizInput {
   questionCount: number;
   notes?: string;
   classLearningProfile?: LearningProfile;
+  sourceMaterial?: string;
 }
 
 export function quizPrompt(input: QuizInput): {
@@ -374,7 +384,7 @@ Year group: ${input.yearGroup}
 Topic: ${input.topic}
 Format: ${input.format}
 Number of items: ${input.questionCount}
-${input.notes ? `Additional notes: ${input.notes}` : ""}${formatLearningProfileBlock(input.classLearningProfile, "quiz")}
+${input.notes ? `Additional notes: ${input.notes}` : ""}${formatLearningProfileBlock(input.classLearningProfile, "quiz")}${sourceMaterialBlock(input.sourceMaterial)}
 
 Produce exactly ${input.questionCount} items. Spread difficulty across easy, medium, and hard. Each item must name the specific skill or concept it assesses.`;
 

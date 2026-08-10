@@ -9,6 +9,7 @@ import {
   quizzesTable,
   assignmentsTable,
   submissionsTable,
+  materialsTable,
 } from "@workspace/paideia-db";
 import { eq } from "drizzle-orm";
 import { hashPassword, generateShortCode } from "./auth.js";
@@ -188,6 +189,29 @@ async function createTeacherDemo(): Promise<void> {
         joinCode: generateShortCode(6),
       })),
     ).returning();
+
+    // Example uploaded materials, so the demo shows the "base resources on your own material"
+    // feature (uploading is disabled in the demo; these illustrate what it looks like).
+    await db.insert(materialsTable).values([
+      {
+        teacherId: teacher!.id,
+        title: "Shopping smart: unit prices (reading)",
+        sourceType: "paste",
+        sourceMeta: null,
+        status: "ready",
+        contentText: "Shopping smart with unit prices.\n\nA unit price tells you the cost of one unit of something, like the price per ounce or per litre. To find it, divide the total price by the number of units. Comparing unit prices helps you decide which package is the better value, even when the sizes are different. For example, a 12 ounce bottle for $3.00 costs 25 cents per ounce, while a 20 ounce bottle for $4.60 costs 23 cents per ounce, so the larger bottle is the better buy. Unit rates are ratios where the second quantity is one, and they appear everywhere from grocery shopping to comparing speeds.",
+        charCount: 620,
+      },
+      {
+        teacherId: teacher!.id,
+        title: "Cells: Unit 2 class notes",
+        sourceType: "file",
+        sourceMeta: "cells-unit-2-notes.pdf",
+        status: "ready",
+        contentText: "Cell biology, Unit 2. Cells are the basic unit of life. Animal and plant cells share a nucleus, cytoplasm, cell membrane, mitochondria and ribosomes. Plant cells also have a cell wall, a permanent vacuole and chloroplasts. Substances cross the selectively permeable membrane by diffusion, osmosis and active transport. Mitosis produces two identical cells for growth and repair.",
+        charCount: 380,
+      },
+    ]);
 
     // Lesson plans
     for (const p of buildPlans()) {

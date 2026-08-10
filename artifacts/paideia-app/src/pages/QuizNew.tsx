@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { AppShell } from "@/components/layout/AppShell";
 import { WorkflowForm } from "@/components/WorkflowForm";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { api, ApiError } from "@/lib/api";
 import type { Quiz } from "@/lib/types";
 import { FileText } from "lucide-react";
 import { ClassProfileSelector } from "@/components/ClassProfileSelector";
+import { MaterialPicker } from "@/components/MaterialPicker";
+import { demoGenRemaining, incrementDemoGen } from "@/lib/demoLimit";
 
 const FORMATS = ["exit ticket", "starter quiz", "mid-unit check", "end-of-unit assessment"];
 
@@ -31,17 +33,25 @@ export default function QuizNew() {
   const [format, setFormat] = useState(FORMATS[0]);
   const [questionCount, setQuestionCount] = useState(5);
   const [notes, setNotes] = useState("");
+  const [materialId, setMaterialId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isDemo = teacher?.isDemo === true;
+  const remaining = demoGenRemaining();
+  const demoBlocked = isDemo && remaining <= 0;
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (demoBlocked) return;
     setBusy(true); setError(null);
     try {
       const res = await api.post<{ quiz: Quiz }>("/quizzes", {
         region: teacher?.region, subject, yearGroup, topic, format, questionCount,
         notes: notes || undefined,
+        materialId: materialId || undefined,
       });
+      if (isDemo) incrementDemoGen();
       setLoc(`/quizzes/${res.quiz.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Generation failed");
@@ -68,6 +78,7 @@ export default function QuizNew() {
             setYearGroup(p.yearGroup);
             if (p.notes) setNotes(p.notes);
           }} />
+          <MaterialPicker value={materialId} onChange={setMaterialId} />
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Subject</Label>
@@ -106,7 +117,17 @@ export default function QuizNew() {
             <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
           </div>
           {error && <div className="text-sm text-destructive">{error}</div>}
-          <Button type="submit" disabled={!subject || !yearGroup || !topic} className="w-full">Generate</Button>
+          {demoBlocked && (
+            <div className="text-sm text-destructive">
+              You've reached the demo limit of 3 generations.{" "}
+              <Link href="/signup" className="underline underline-offset-2">Create a free account</Link>{" "}
+              to keep creating.
+            </div>
+          )}
+          <Button type="submit" disabled={!subject || !yearGroup || !topic || demoBlocked} className="w-full">Generate</Button>
+          {isDemo && !demoBlocked && (
+            <p className="text-xs text-muted-foreground text-center">{remaining} demo generations left</p>
+          )}
         </form>
       </WorkflowForm>
     </AppShell>

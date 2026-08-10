@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { AppShell } from "@/components/layout/AppShell";
 import { WorkflowForm } from "@/components/WorkflowForm";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { GeneratingSpinner } from "@/components/Loading";
 import { api, ApiError } from "@/lib/api";
 import type { ParentDraft } from "@/lib/types";
 import { ClassProfileSelector } from "@/components/ClassProfileSelector";
+import { demoGenRemaining, incrementDemoGen } from "@/lib/demoLimit";
 
 const TONES = ["warm and positive", "gently concerned", "factual and brief", "celebratory"];
 
@@ -29,8 +30,13 @@ export default function ParentDraftNew() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isDemo = teacher?.isDemo === true;
+  const remaining = demoGenRemaining();
+  const demoBlocked = isDemo && remaining <= 0;
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (demoBlocked) return;
     setBusy(true); setError(null);
     try {
       const res = await api.post<{ draft: ParentDraft }>("/parent-drafts", {
@@ -40,6 +46,7 @@ export default function ParentDraftNew() {
         tone,
         keyPoints,
       });
+      if (isDemo) incrementDemoGen();
       setLoc(`/parent-drafts/${res.draft.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Generation failed");
@@ -81,7 +88,17 @@ export default function ParentDraftNew() {
             <Textarea id="points" value={keyPoints} onChange={(e) => setKeyPoints(e.target.value)} rows={6} placeholder="Bullet points are fine. Be specific. The draft will only use what you write here." required />
           </div>
           {error && <div className="text-sm text-destructive">{error}</div>}
-          <Button type="submit" disabled={!studentName || !keyPoints} className="w-full">Draft the message</Button>
+          {demoBlocked && (
+            <div className="text-sm text-destructive">
+              You've reached the demo limit of 3 generations.{" "}
+              <Link href="/signup" className="underline underline-offset-2">Create a free account</Link>{" "}
+              to keep creating.
+            </div>
+          )}
+          <Button type="submit" disabled={!studentName || !keyPoints || demoBlocked} className="w-full">Draft the message</Button>
+          {isDemo && !demoBlocked && (
+            <p className="text-xs text-muted-foreground text-center">{remaining} demo generations left</p>
+          )}
         </form>
       </WorkflowForm>
     </AppShell>

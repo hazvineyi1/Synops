@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUsage } from "@/hooks/use-usage";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
-import { LayoutDashboard, FileText, ClipboardList, MessageSquare, HelpCircle, Users, Settings, LogOut, BarChart3, FolderOpen, Inbox, Sparkles, Home } from "lucide-react";
+import { LayoutDashboard, FileText, ClipboardList, MessageSquare, HelpCircle, Users, Settings, LogOut, BarChart3, FolderOpen, FolderInput, Inbox, Sparkles, Home } from "lucide-react";
 
 const NAV = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -12,6 +12,7 @@ const NAV = [
   { path: "/parent-drafts/new", label: "Parent update", icon: MessageSquare },
   { path: "/quizzes/new", label: "Quiz and exit tickets", icon: HelpCircle },
   { path: "/library", label: "Library", icon: FolderOpen },
+  { path: "/materials", label: "Materials", icon: FolderInput },
   { path: "/shared", label: "Shared with me", icon: Inbox },
   { path: "/classes", label: "Classes and students", icon: Users },
   { path: "/settings", label: "Settings", icon: Settings },

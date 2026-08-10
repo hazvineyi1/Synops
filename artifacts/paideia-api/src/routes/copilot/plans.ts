@@ -7,6 +7,7 @@ import {
   submissionsTable,
   assignmentsTable,
   classesTable,
+  materialsTable,
 } from "@workspace/paideia-db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth, requireActiveTeacher } from "../../middlewares/auth.js";
@@ -43,6 +44,7 @@ const createSchema = z.object({
   groupContext: z.string().max(1000).optional(),
   studentId: z.string().uuid().optional(),
   classId: z.string().uuid().optional(),
+  materialId: z.string().uuid().optional(),
 });
 
 interface FeedbackItem { state: string; skill?: string }
@@ -108,7 +110,7 @@ router.post("/", requireQuota, async (req, res) => {
     return;
   }
   try {
-    const { studentId, classId, ...rest } = parsed.data;
+    const { studentId, classId, materialId, ...rest } = parsed.data;
     let studentProfile: StudentProfileSummary | undefined;
     if (studentId) {
       const profile = await buildStudentProfile(req.teacher!.id, studentId);
@@ -124,6 +126,14 @@ router.post("/", requireQuota, async (req, res) => {
     const promptInput = rest;
     if (studentProfile) (promptInput as any).studentProfile = studentProfile;
     if (classLearningProfile) (promptInput as any).classLearningProfile = classLearningProfile;
+    if (materialId) {
+      const [material] = await db
+        .select()
+        .from(materialsTable)
+        .where(and(eq(materialsTable.id, materialId), eq(materialsTable.teacherId, req.teacher!.id)))
+        .limit(1);
+      if (material) (promptInput as any).sourceMaterial = material.contentText.slice(0, 12000);
+    }
     const prompt = lessonPlanPrompt(promptInput);
     const content = await generateJSON<LessonPlanContent>(prompt.system, prompt.user, {
       teacherId: req.teacher!.id,

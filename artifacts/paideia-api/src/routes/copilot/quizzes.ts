@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { z } from "zod";
-import { db, quizzesTable, classesTable, studentsTable } from "@workspace/paideia-db";
+import { db, quizzesTable, classesTable, studentsTable, materialsTable } from "@workspace/paideia-db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth, requireActiveTeacher } from "../../middlewares/auth.js";
 import { requireQuota } from "../../middlewares/quota.js";
@@ -38,6 +38,7 @@ const createSchema = z.object({
   questionCount: z.number().int().min(3).max(20).default(5),
   notes: z.string().max(1000).optional(),
   classId: z.string().uuid().optional(),
+  materialId: z.string().uuid().optional(),
 });
 
 interface QuizContent {
@@ -87,7 +88,16 @@ router.post("/", requireQuota, async (req, res) => {
     if (parsed.data.classId) {
       classLearningProfile = await fetchClassLearningProfile(parsed.data.classId, req.teacher!.id);
     }
-    const prompt = quizPrompt({ ...parsed.data, classLearningProfile });
+    let sourceMaterial: string | undefined;
+    if (parsed.data.materialId) {
+      const [material] = await db
+        .select()
+        .from(materialsTable)
+        .where(and(eq(materialsTable.id, parsed.data.materialId), eq(materialsTable.teacherId, req.teacher!.id)))
+        .limit(1);
+      if (material) sourceMaterial = material.contentText.slice(0, 12000);
+    }
+    const prompt = quizPrompt({ ...parsed.data, classLearningProfile, sourceMaterial });
     const raw = await generateJSON<QuizContent>(prompt.system, prompt.user, {
       teacherId: req.teacher!.id,
       kind: "quiz",
