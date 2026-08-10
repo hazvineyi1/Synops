@@ -547,8 +547,8 @@ function OverviewTab({ stats }: { stats: AdminStats }) {
         </div>
       </div>
 
-      <div>
-        <h2 className="font-serif text-xl text-primary mb-3">Recent signups</h2>
+      <details>
+        <summary className="font-serif text-xl text-primary mb-3 cursor-pointer select-none">Recent signups ({stats.recentSignups.length})</summary>
         <div className="border rounded-lg bg-card overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50"><tr><th className="text-left p-3">Name</th><th className="text-left p-3">School</th><th className="text-left p-3">Region</th><th className="text-left p-3">When</th></tr></thead>
@@ -564,7 +564,7 @@ function OverviewTab({ stats }: { stats: AdminStats }) {
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
     </div>
   );
 }
@@ -579,8 +579,8 @@ function EngagementTab({ data, onImpersonate }: { data: AdminEngagement; onImper
   const [busyId, setBusyId] = useState<string | null>(null);
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="font-serif text-xl text-primary mb-3">Weekly retention cohorts</h2>
+      <details>
+        <summary className="font-serif text-xl text-primary mb-3 cursor-pointer select-none">Weekly retention cohorts ({data.retentionCohorts.length})</summary>
         <div className="border rounded-lg bg-card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
@@ -613,10 +613,10 @@ function EngagementTab({ data, onImpersonate }: { data: AdminEngagement; onImper
           </table>
         </div>
         <p className="text-xs text-muted-foreground mt-2">W0 is the cohort week. WN is the % of that cohort active in week N.</p>
-      </div>
+      </details>
 
-      <div>
-        <h2 className="font-serif text-xl text-primary mb-3">Feature usage</h2>
+      <details>
+        <summary className="font-serif text-xl text-primary mb-3 cursor-pointer select-none">Feature usage ({data.featureUsage.length})</summary>
         <div className="border rounded-lg bg-card p-4 space-y-2">
           {data.featureUsage.map((f) => (
             <div key={f.feature} className="flex items-center gap-3 text-sm">
@@ -626,10 +626,10 @@ function EngagementTab({ data, onImpersonate }: { data: AdminEngagement; onImper
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
-      <div>
-        <h2 className="font-serif text-xl text-primary mb-3">Teacher leaderboard</h2>
+      <details>
+        <summary className="font-serif text-xl text-primary mb-3 cursor-pointer select-none">Teacher leaderboard ({data.teacherLeaderboard.length})</summary>
         <div className="border rounded-lg bg-card overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
@@ -676,7 +676,7 @@ function EngagementTab({ data, onImpersonate }: { data: AdminEngagement; onImper
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
     </div>
   );
 }
@@ -732,8 +732,8 @@ function AiTab({ data }: { data: AdminAiUsage }) {
         <Stat label="Avg latency" value={`${data.totals.avgLatencyMs} ms`} />
       </div>
 
-      <div>
-        <h2 className="font-serif text-xl text-primary mb-3">Daily AI spend (last 30 days)</h2>
+      <details>
+        <summary className="font-serif text-xl text-primary mb-3 cursor-pointer select-none">Daily AI spend (last 30 days) ({data.daily.length})</summary>
         <div className="border rounded-lg bg-card p-4 space-y-1">
           {data.daily.map((d) => (
             <div key={d.day} className="flex items-center gap-3 text-xs">
@@ -744,7 +744,7 @@ function AiTab({ data }: { data: AdminAiUsage }) {
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
       <div>
         <h2 className="font-serif text-xl text-primary mb-3">By feature</h2>
@@ -765,8 +765,8 @@ function AiTab({ data }: { data: AdminAiUsage }) {
         </div>
       </div>
 
-      <div>
-        <h2 className="font-serif text-xl text-primary mb-3">Top teachers by AI spend</h2>
+      <details>
+        <summary className="font-serif text-xl text-primary mb-3 cursor-pointer select-none">Top teachers by AI spend ({data.byTeacher.length})</summary>
         <div className="border rounded-lg bg-card overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50"><tr><th className="text-left p-3">Teacher</th><th className="text-right p-3">Calls</th><th className="text-right p-3">Tokens</th><th className="text-right p-3">Cost</th></tr></thead>
@@ -785,7 +785,7 @@ function AiTab({ data }: { data: AdminAiUsage }) {
             </tbody>
           </table>
         </div>
-      </div>
+      </details>
     </div>
   );
 }
