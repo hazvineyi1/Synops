@@ -903,6 +903,20 @@ router.post("/teachers/:id/reset-link", async (req, res) => {
 });
 
 // Pilot pipeline: pilots grouped by status, with status counts
+// Website inquiries arrive in one shared table for the whole platform. Each is
+// tagged in its message with the product it is about ("[Product: X]") or, for
+// generic contact-form submissions, an area ("[Area: X]"). We derive a single
+// `product` label so the founder admin can track each product's messages
+// separately rather than seeing the entire platform's inbox at once.
+function deriveProduct(message: string | null): string {
+  const m = (message ?? "").trim();
+  const prod = m.match(/^\[Product:\s*([^\]]+)\]/i);
+  if (prod && prod[1]) return prod[1].trim();
+  const area = m.match(/^\[Area:\s*([^\]]+)\]/i);
+  if (area && area[1]) return `General enquiry (${area[1].trim()})`;
+  return "General enquiry";
+}
+
 router.get("/pilots", async (req, res) => {
   const statusFilter = typeof req.query["status"] === "string" ? req.query["status"] : null;
   const counts = await db.execute(sql`
@@ -916,31 +930,54 @@ router.get("/pilots", async (req, res) => {
         .orderBy(desc(pilotRequestsTable.createdAt))
         .limit(200)
     : db.select().from(pilotRequestsTable).orderBy(desc(pilotRequestsTable.createdAt)).limit(200));
+  const pilots = list.map((p) => ({
+    id: p.id,
+    source: p.source,
+    schoolName: p.schoolName,
+    country: p.country,
+    organization: p.organization,
+    contactName: p.contactName,
+    contactEmail: p.contactEmail,
+    gradeLevels: p.gradeLevels,
+    message: p.message,
+    product: deriveProduct(p.message),
+    status: p.status,
+    notes: p.notes,
+    contactedAt: p.contactedAt ? p.contactedAt.toISOString() : null,
+    sourcePath: p.sourcePath,
+    sourceReferrer: p.sourceReferrer,
+    sourceUtm: p.sourceUtm,
+    createdAt: p.createdAt.toISOString(),
+    updatedAt: p.updatedAt.toISOString(),
+  }));
+  // Product counts across the whole table (not just the current status page), so
+  // the product filter shows every product even when a status filter is applied.
+  const allForCounts = statusFilter
+    ? await db.select({ message: pilotRequestsTable.message }).from(pilotRequestsTable)
+    : list.map((p) => ({ message: p.message }));
+  const productMap = new Map<string, number>();
+  for (const r of allForCounts) {
+    const key = deriveProduct(r.message);
+    productMap.set(key, (productMap.get(key) ?? 0) + 1);
+  }
   res.json({
     statusCounts: (counts.rows as Row[]).map((r) => ({
       status: r["status"] as string,
       count: Number(r["c"] ?? 0),
     })),
-    pilots: list.map((p) => ({
-      id: p.id,
-      source: p.source,
-      schoolName: p.schoolName,
-      country: p.country,
-      organization: p.organization,
-      contactName: p.contactName,
-      contactEmail: p.contactEmail,
-      gradeLevels: p.gradeLevels,
-      message: p.message,
-      status: p.status,
-      notes: p.notes,
-      contactedAt: p.contactedAt ? p.contactedAt.toISOString() : null,
-      sourcePath: p.sourcePath,
-      sourceReferrer: p.sourceReferrer,
-      sourceUtm: p.sourceUtm,
-      createdAt: p.createdAt.toISOString(),
-      updatedAt: p.updatedAt.toISOString(),
-    })),
+    productCounts: [...productMap.entries()]
+      .map(([product, count]) => ({ product, count }))
+      .sort((a, b) => b.count - a.count),
+    pilots,
   });
+});
+
+// Delete an inquiry permanently. Admin-only (this whole router is admin-gated).
+router.delete("/pilots/:id", async (req, res) => {
+  const id = req.params["id"];
+  if (!id) { res.status(400).json({ error: "Missing id" }); return; }
+  await db.delete(pilotRequestsTable).where(eq(pilotRequestsTable.id, id));
+  res.json({ ok: true });
 });
 
 const pilotUpdateSchema = z.object({

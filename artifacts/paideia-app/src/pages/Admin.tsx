@@ -77,6 +77,7 @@ export default function Admin() {
   const [aiUsage, setAiUsage] = useState<AdminAiUsage | null>(null);
   const [pilots, setPilots] = useState<AdminPilots | null>(null);
   const [pilotFilter, setPilotFilter] = useState<string>("all");
+  const [productFilter, setProductFilter] = useState<string>("all");
   const [pending, setPending] = useState<PendingTeacher[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -128,6 +129,11 @@ export default function Admin() {
 
   async function updatePilot(id: string, patch: { status?: PilotStatus; notes?: string | null }) {
     await api.patch(`/admin/pilots/${id}`, patch);
+    await reloadPilots(pilotFilter);
+  }
+
+  async function deletePilot(id: string) {
+    await api.del(`/admin/pilots/${id}`);
     await reloadPilots(pilotFilter);
   }
 
@@ -269,7 +275,10 @@ export default function Admin() {
                     setPilotFilter(v);
                     void reloadPilots(v);
                   }}
+                  productFilter={productFilter}
+                  onProductFilter={setProductFilter}
                   onUpdate={updatePilot}
+                  onDelete={deletePilot}
                 />
               ) : null}
             </TabsContent>
@@ -501,8 +510,10 @@ function OverviewTab({ stats }: { stats: AdminStats }) {
         </div>
       </div>
 
-      <div>
-        <h2 className="font-serif text-xl text-primary mb-3">Daily active teachers (last 30 days)</h2>
+      <details>
+        <summary className="font-serif text-xl text-primary mb-3 cursor-pointer select-none">
+          Daily active teachers (last 30 days)
+        </summary>
         <div className="border rounded-lg bg-card p-4 space-y-1">
           {stats.dailyActivity.map((d) => (
             <div key={d.day} className="flex items-center gap-3 text-xs">
@@ -512,7 +523,7 @@ function OverviewTab({ stats }: { stats: AdminStats }) {
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
       <div>
         <h2 className="font-serif text-xl text-primary mb-3">Weekly activity (last 4 weeks)</h2>
@@ -783,18 +794,36 @@ function PilotsTab({
   data,
   filter,
   onFilter,
+  productFilter,
+  onProductFilter,
   onUpdate,
+  onDelete,
 }: {
   data: AdminPilots;
   filter: string;
   onFilter: (v: string) => void;
+  productFilter: string;
+  onProductFilter: (v: string) => void;
   onUpdate: (id: string, patch: { status?: PilotStatus; notes?: string | null }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of data.statusCounts) m.set(s.status, s.count);
     return m;
   }, [data.statusCounts]);
+
+  const products = useMemo(() => {
+    if (data.productCounts && data.productCounts.length) return data.productCounts;
+    const m = new Map<string, number>();
+    for (const p of data.pilots) m.set(p.product, (m.get(p.product) ?? 0) + 1);
+    return [...m.entries()].map(([product, count]) => ({ product, count })).sort((a, b) => b.count - a.count);
+  }, [data.productCounts, data.pilots]);
+
+  const visible = useMemo(
+    () => (productFilter === "all" ? data.pilots : data.pilots.filter((p) => p.product === productFilter)),
+    [data.pilots, productFilter],
+  );
 
   return (
     <div className="space-y-6">
@@ -813,18 +842,30 @@ function PilotsTab({
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 flex-wrap">
         <Button variant={filter === "all" ? "default" : "outline"} size="sm" onClick={() => onFilter("all")} data-track="admin_pilot_filter" data-track-status="all">
-          All ({data.pilots.length})
+          All statuses
         </Button>
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">Product</span>
+          <Select value={productFilter} onValueChange={onProductFilter}>
+            <SelectTrigger className="w-72"><SelectValue placeholder="All products" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All products ({data.pilots.length})</SelectItem>
+              {products.map((p) => (
+                <SelectItem key={p.product} value={p.product}>{p.product} ({p.count})</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="space-y-3">
-        {data.pilots.length === 0 ? (
-          <div className="border rounded-lg bg-card p-6 text-muted-foreground">No pilot requests match this filter.</div>
+        {visible.length === 0 ? (
+          <div className="border rounded-lg bg-card p-6 text-muted-foreground">No inquiries match this filter.</div>
         ) : null}
-        {data.pilots.map((p) => (
-          <PilotCard key={p.id} pilot={p} onUpdate={onUpdate} />
+        {visible.map((p) => (
+          <PilotCard key={p.id} pilot={p} onUpdate={onUpdate} onDelete={onDelete} />
         ))}
       </div>
     </div>
@@ -936,12 +977,15 @@ function ApprovalRow({
 function PilotCard({
   pilot,
   onUpdate,
+  onDelete,
 }: {
   pilot: AdminPilot;
   onUpdate: (id: string, patch: { status?: PilotStatus; notes?: string | null }) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   const [notes, setNotes] = useState(pilot.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   async function setStatus(s: PilotStatus) {
     setSaving(true);
@@ -953,6 +997,12 @@ function PilotCard({
     try { await onUpdate(pilot.id, { notes: notes || null }); } finally { setSaving(false); }
   }
 
+  async function doDelete() {
+    if (!window.confirm(`Delete this inquiry from ${pilot.contactName}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try { await onDelete(pilot.id); } finally { setDeleting(false); }
+  }
+
   return (
     <div className="border rounded-lg bg-card p-5">
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -960,6 +1010,7 @@ function PilotCard({
           <div className="flex items-center gap-2 flex-wrap">
             <div className="font-medium text-lg">{pilot.contactName}</div>
             <Badge className={statusColor(pilot.status)}>{pilot.status.replace(/_/g, " ")}</Badge>
+            <span className="text-[11px] px-2 py-0.5 rounded-full border border-primary/30 bg-primary/5 text-primary">{pilot.product}</span>
             <span className="text-xs text-muted-foreground">source: {pilot.source}</span>
           </div>
           <div className="text-sm text-muted-foreground mt-1">
@@ -998,7 +1049,17 @@ function PilotCard({
       <div className="mt-3">
         <label className="text-xs uppercase tracking-wider text-muted-foreground">Founder notes</label>
         <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Add notes about this lead (next step, decision-maker, timing)." className="mt-1" />
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-between items-center mt-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={() => void doDelete()}
+            disabled={deleting}
+            data-track="admin_pilot_delete"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </Button>
           <Button size="sm" onClick={() => void saveNotes()} disabled={saving} data-track="admin_pilot_save_notes">Save notes</Button>
         </div>
       </div>

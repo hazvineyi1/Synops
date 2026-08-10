@@ -173,6 +173,7 @@ export interface AdminPilot {
   contactEmail: string;
   gradeLevels: string | null;
   message: string | null;
+  product: string;
   status: PilotStatus;
   notes: string | null;
   contactedAt: string | null;
@@ -185,6 +186,7 @@ export interface AdminPilot {
 
 export interface AdminPilots {
   statusCounts: { status: string; count: number }[];
+  productCounts?: { product: string; count: number }[];
   pilots: AdminPilot[];
 }
 
