@@ -19,7 +19,7 @@ import ParentDraftNew from "@/pages/ParentDraftNew";
 import ParentDraftView from "@/pages/ParentDraftView";
 import QuizNew from "@/pages/QuizNew";
 import QuizView from "@/pages/QuizView";
-import { SamplesList, SampleViewer } from "@/pages/Samples";
+import { SampleViewer } from "@/pages/Samples";
 import { PublicSamplesList, PublicSampleViewer } from "@/pages/PublicSamples";
 import Settings from "@/pages/Settings";
 import Classes from "@/pages/Classes";
@@ -83,6 +83,14 @@ function AnalyticsTracker() {
   return null;
 }
 
+function RedirectTo({ to }: { to: string }) {
+  const [, setLoc] = useLocation();
+  useEffect(() => {
+    setLoc(to);
+  }, [to, setLoc]);
+  return null;
+}
+
 function AppRoutes() {
   return (
     <Switch>
@@ -111,7 +119,7 @@ function AppRoutes() {
       <Route path="/quizzes/new">{() => <Protected component={QuizNew} />}</Route>
       <Route path="/quizzes/:id">{() => <Protected component={QuizView} />}</Route>
       <Route path="/samples/:id">{() => <Protected component={SampleViewer} />}</Route>
-      <Route path="/samples">{() => <Protected component={SamplesList} />}</Route>
+      <Route path="/samples">{() => <RedirectTo to="/library" />}</Route>
       <Route path="/classes/:id/students/:studentId">{() => <Protected component={StudentProfile} />}</Route>
       <Route path="/classes/:id">{() => <Protected component={ClassView} />}</Route>
       <Route path="/classes">{() => <Protected component={Classes} />}</Route>

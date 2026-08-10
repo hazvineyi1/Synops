@@ -121,7 +121,7 @@ export function SampleViewer() {
 
   return (
     <AppShell>
-      <Link href="/samples" className="inline-flex items-center text-sm text-primary mb-6"><ArrowLeft className="h-4 w-4 mr-1" />All samples</Link>
+      <Link href="/library" className="inline-flex items-center text-sm text-primary mb-6"><ArrowLeft className="h-4 w-4 mr-1" />Back to Library</Link>
       <header className="mb-8">
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
           Sample · {KIND_LABEL[s.kind] ?? s.kind} · {s.subject} · {s.yearGroup}

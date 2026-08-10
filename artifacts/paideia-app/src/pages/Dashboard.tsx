@@ -146,7 +146,7 @@ export default function Dashboard() {
           <div className="text-sm text-muted-foreground flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Loading.</div>
         ) : recent.length === 0 ? (
           <div className="bg-card border rounded-lg p-8 text-center text-muted-foreground">
-            <p>You have not generated anything yet. Pick a tool above to get started, or browse the samples library.</p>
+            <p>You have not generated anything yet. Pick a tool above to get started, or browse the templates in your Library.</p>
           </div>
         ) : (
           <div className="divide-y border rounded-lg bg-card">
@@ -179,10 +179,10 @@ export default function Dashboard() {
         <section>
           <div className="flex items-end justify-between mb-4">
             <div>
-              <h2 className="font-serif text-2xl text-primary">Samples for your region</h2>
-              <p className="text-sm text-muted-foreground">Real examples to spark your own.</p>
+              <h2 className="font-serif text-2xl text-primary">Templates for your region</h2>
+              <p className="text-sm text-muted-foreground">Ready-made lessons to copy and edit.</p>
             </div>
-            <Link href="/samples" className="text-sm text-primary underline">See all</Link>
+            <Link href="/library" className="text-sm text-primary underline">See all</Link>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {samples.map((s) => (
