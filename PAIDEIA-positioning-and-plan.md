@@ -3,7 +3,7 @@
 Paideia (pronounced *pie-DAY-uh*) is the **K-12 pillar** of the Synops learning family.
 This doc has two parts: (1) positioning + ready-to-use marketing copy for the Synops
 site, and (2) the plan to bring `Paideia-Ren` into the monorepo and off its non-profit
-branding — the same playbook used to turn "Compass" into Kanon.
+branding — the same integration playbook used for the other Synops products.
 
 ---
 
@@ -11,15 +11,14 @@ branding — the same playbook used to turn "Compass" into Kanon.
 
 ### The family (how Paideia fits)
 
-> **Synops** builds learning tools for every stage. **Kanon** helps institutions design
-> accredited curriculum. **Arete** coaches adults through professional and entrance exams.
-> **Paideia** is for K-12 — an AI study tutor that meets younger learners where they are.
+> **Synops** builds learning tools for every stage. **Arete** coaches adults through
+> professional and entrance exams. **Paideia** is for K-12 — an AI study tutor that meets
+> younger learners where they are.
 
-Three products, three clearly separate lanes — no overlap:
+Two products, two clearly separate lanes — no overlap:
 
 | Product | Audience | Job |
 |---|---|---|
-| Kanon | Colleges, schools, instructional designers | Build & accredit curriculum |
 | Paideia | **K-12 students, teachers, parents** | **Tutor & support day-to-day learning** |
 | Arete | Adults, exam candidates | Prep for high-stakes exams |
 
@@ -41,7 +40,7 @@ family." The equity story becomes a **feature and value** of a Synops product, n
 charitable disclaimer. Practically: remove 501(c)(3)/non-profit/donation language, "Study
 Tutor" placeholder naming, and old standalone branding; adopt Synops/Paideia identity.
 
-### Homepage card copy (drop-in, matches the Arete/Kanon cards)
+### Homepage card copy (drop-in, matches the Arete card)
 
 ```
 PAIDEIA  ·  K-12 Learning
@@ -57,11 +56,11 @@ Short nav/footer label: **Paideia — K-12**
 
 ---
 
-## 2. Integration + Rebrand Plan (Compass→Kanon playbook)
+## 2. Integration + Rebrand Plan (Arete integration playbook)
 
 `Paideia-Ren` is a Replit-based monorepo with the same shape as Synops:
 `artifacts/` (api-server, paideia-app, paideia-ren, paideia-study, mockup-sandbox) + `lib/`.
-That structural similarity means the same sequence we used for Kanon applies cleanly.
+That structural similarity means the same sequence we used for Arete applies cleanly.
 
 **Prerequisite (currently blocked):** get the code into the workspace. The repo-add tool is
 returning backend 404s and the sandbox can't clone a private repo without credentials — retry
@@ -71,12 +70,12 @@ add_repo shortly, or grant access; everything below waits on that.
 as `artifacts/paideia*` (e.g. `artifacts/paideia`, `artifacts/paideia-api`) and `lib/*` as
 `lib/paideia-*` scoped packages (`@workspace/paideia-*`). Reuse the shared `@workspace/identity`
 and `@workspace/billing` libs rather than duplicating. Wire workspace package names + tsconfig
-references like Kanon.
+references like Arete.
 
 **M2 — Decouple from Replit.** Remove `@replit/*` runtime deps and the Replit connectors
 (email/object-storage), the `.replit` config, and Replit-only Vite plugins from the production
-build — exactly what we did for Arete and what's still pending for Kanon. Add a `Dockerfile.paideia`
-+ `railway.paideia.json` (mirror `Dockerfile.kanon`).
+build — exactly what we did for Arete. Add a `Dockerfile.paideia`
++ `railway.paideia.json` (mirror the Arete `Dockerfile` / `railway.json`).
 
 **M3 — Rebrand off non-profit / "Study Tutor".** Audit and swap visible brand elements:
 - Names: "Study Tutor" / old non-profit name → **Paideia**.
@@ -85,7 +84,7 @@ build — exactly what we did for Arete and what's still pending for Kanon. Add 
 - Add the pronunciation touchpoint (*pie-DAY-uh*) where the other products surface theirs.
 - Keep the diversity/representation content — reframe it as a Paideia feature.
 
-**M4 — Deploy.** Stand it up like Kanon: its own Supabase project (note the **2-active-project
+**M4 — Deploy.** Stand it up like Arete: its own Supabase project (note the **2-active-project
 free cap per account** — you'd need to free a slot or go Pro for a 3rd live DB), push schema,
 Railway service via `railway.paideia.json`, env vars, domain `paideia.synops-consulting.com`.
 
