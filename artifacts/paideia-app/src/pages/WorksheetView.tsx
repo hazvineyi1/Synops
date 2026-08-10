@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { api, ApiError } from "@/lib/api";
 import type { Worksheet, WorksheetContent } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { WorksheetView as Renderer } from "@/components/Renderers";
 import { WorksheetEditor } from "@/components/WorksheetEditor";
 import { AssignDialog } from "@/components/AssignDialog";
@@ -13,6 +14,7 @@ import { ShareResourceDialog } from "@/components/ShareResourceDialog";
 export default function WorksheetView() {
   const [, params] = useRoute<{ id: string }>("/worksheets/:id");
   const [, setLoc] = useLocation();
+  const { teacher } = useAuth();
   const [w, setW] = useState<Worksheet | null>(null);
   const [loading, setLoading] = useState(true);
   const [assignOpen, setAssignOpen] = useState(false);
@@ -77,7 +79,9 @@ export default function WorksheetView() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Print</Button>
             <Button variant="outline" size="sm" onClick={() => setShareOpen(true)}><Share2 className="h-4 w-4 mr-1" />Share</Button>
+            {!teacher?.isDemo && (
             <Button variant="ghost" size="sm" onClick={onDelete}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+          )}
           </div>
         )}
       </header>

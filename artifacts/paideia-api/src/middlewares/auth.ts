@@ -176,6 +176,19 @@ export async function loadTeacher(
   next();
 }
 
+// The shared demo accounts are read-only for deletion: visitors must never be able to remove
+// the preloaded material (it's a single shared account, so a delete would wipe it for everyone).
+const DEMO_ACCOUNT_EMAILS = new Set(["demo.teacher@synops-demo.test", "demo.learner@synops-coach.test"]);
+function blockDemoDelete(req: Request, res: Response): boolean {
+  if (req.method !== "DELETE") return false;
+  const email = (req.teacher?.email || req.studyUser?.email || "").toLowerCase();
+  if (email && DEMO_ACCOUNT_EMAILS.has(email)) {
+    res.status(403).json({ error: "This is demo content and can't be deleted." });
+    return true;
+  }
+  return false;
+}
+
 export function requireAuth(
   req: Request,
   res: Response,
@@ -185,6 +198,7 @@ export function requireAuth(
     res.status(401).json({ error: "Not signed in" });
     return;
   }
+  if (blockDemoDelete(req, res)) return;
   next();
 }
 
@@ -201,6 +215,7 @@ export function requireActiveTeacher(
     res.status(403).json({ error: "Your account has been suspended. Please contact the founder." });
     return;
   }
+  if (blockDemoDelete(req, res)) return;
   next();
 }
 
@@ -225,6 +240,7 @@ export function requireStudyUser(
     res.status(401).json({ error: "Not signed in" });
     return;
   }
+  if (blockDemoDelete(req, res)) return;
   next();
 }
 

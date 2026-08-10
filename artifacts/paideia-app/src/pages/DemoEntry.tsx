@@ -65,8 +65,8 @@ export default function DemoEntry() {
               <p className="text-muted-foreground mb-8">{error}</p>
               <div className="flex flex-col gap-3">
                 <Button className="w-full" onClick={retry}>Try again</Button>
-                <Button variant="outline" className="w-full" onClick={() => setLoc("/login")}>
-                  Go to sign in
+                <Button variant="outline" className="w-full" onClick={() => setLoc("/signup")}>
+                  Create a free account
                 </Button>
               </div>
             </>

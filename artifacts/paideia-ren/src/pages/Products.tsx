@@ -392,7 +392,7 @@ function ProductExplorer() {
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 mb-7">
                 {p.bullets.map((t) => (
                   <li key={t} className="flex gap-2 text-[14px] text-foreground font-semibold leading-snug">
-                    <span className="text-accent font-extrabold mt-px shrink-0">&rarr;</span>
+                    <span className="text-accent font-extrabold mt-px shrink-0" aria-hidden="true">&bull;</span>
                     <span>{t}</span>
                   </li>
                 ))}

@@ -14,10 +14,12 @@ interface AssignmentWithCounts extends Assignment {
   pendingCount: number;
 }
 import { Plus, Trash2, ArrowUpRight, Link as LinkIcon, Users, Copy, Check } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function ClassView() {
   const [, params] = useRoute<{ id: string }>("/classes/:id");
   const [, setLoc] = useLocation();
+  const { teacher } = useAuth();
   const id = params?.id;
   const [cls, setCls] = useState<ClassRow | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
@@ -81,7 +83,9 @@ export default function ClassView() {
           <h1 className="font-serif text-4xl text-primary mt-1">{cls.name}</h1>
           <p className="text-muted-foreground">{cls.yearGroup}{cls.subject ? ` · ${cls.subject}` : ""}</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={deleteClass}><Trash2 className="h-4 w-4 mr-1" />Delete class</Button>
+        {!teacher?.isDemo && (
+          <Button variant="ghost" size="sm" onClick={deleteClass}><Trash2 className="h-4 w-4 mr-1" />Delete class</Button>
+        )}
       </header>
 
       <section className="mb-12">
@@ -107,7 +111,9 @@ export default function ClassView() {
                   <Link href={`/classes/${id}/students/${s.id}`}>
                     <Button variant="ghost" size="sm"><ArrowUpRight className="h-4 w-4" /></Button>
                   </Link>
-                  <Button variant="ghost" size="sm" onClick={() => removeStudent(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                  {!teacher?.isDemo && (
+                    <Button variant="ghost" size="sm" onClick={() => removeStudent(s.id)}><Trash2 className="h-4 w-4" /></Button>
+                  )}
                 </div>
               </div>
             ))}

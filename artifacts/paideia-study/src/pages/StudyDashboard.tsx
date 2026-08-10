@@ -338,14 +338,18 @@ export default function StudyDashboard() {
                 >
                   Add another material
                 </button>
-                <span className="text-muted-foreground/50">·</span>
-                <button
-                  className="text-muted-foreground hover:text-rose-600 underline-offset-2 hover:underline disabled:opacity-50"
-                  disabled={clearingHistory}
-                  onClick={clearStaleHistory}
-                >
-                  Clear old practice history
-                </button>
+                {!user?.isDemo && (
+                  <>
+                    <span className="text-muted-foreground/50">·</span>
+                    <button
+                      className="text-muted-foreground hover:text-rose-600 underline-offset-2 hover:underline disabled:opacity-50"
+                      disabled={clearingHistory}
+                      onClick={clearStaleHistory}
+                    >
+                      Clear old practice history
+                    </button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

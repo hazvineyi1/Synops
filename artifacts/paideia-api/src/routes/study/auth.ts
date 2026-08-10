@@ -255,6 +255,7 @@ router.get("/me", async (req, res) => {
     subscriptionStatus: u.subscriptionStatus,
     subscriptionTier: u.subscriptionTier,
     isAdmin: u.isAdmin,
+    isDemo: u.email.toLowerCase() === DEMO_COACH_EMAIL,
     impersonating: !!(req.cookies as Record<string, string> | undefined)?.[STUDY_IMPERSONATOR_COOKIE],
     subscriptionCurrentPeriodEnd: u.subscriptionCurrentPeriodEnd?.toISOString() ?? null,
     createdAt: u.createdAt.toISOString(),

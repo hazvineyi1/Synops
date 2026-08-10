@@ -8,6 +8,7 @@ export interface Teacher {
   subjects: string[];
   yearGroups: string[];
   isAdmin: boolean;
+  isDemo?: boolean;
   status: "pending" | "active" | "suspended";
   onboardedAt: string | null;
   approvedAt: string | null;

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, LayoutDashboard, TrendingUp, ArrowRight } from 'lucide-react';
+import { GraduationCap, LayoutDashboard, TrendingUp } from 'lucide-react';
 import { useSession } from '@/context/SessionContext';
 
 /**
@@ -46,7 +46,7 @@ export default function DemoLanding() {
             <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-full" style={{ background: '#FBEEDC', color: AMBER, border: '1px solid #ecdcc2' }}>
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: AMBER }} /> Live product, no sign-up
             </span>
-            <a href="/sign-in" className="inline-flex items-center rounded-lg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm" style={{ background: TEAL }}>Sign in</a>
+            <a href="https://synops-consulting.com/contact" className="inline-flex items-center rounded-lg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm" style={{ background: TEAL }}>Request access</a>
           </div>
         </div>
 
@@ -112,7 +112,6 @@ export default function DemoLanding() {
 
         <div className="mt-8 pt-4 flex items-center gap-1.5 text-[11px]" style={{ borderTop: '1px solid #e2ddd4', color: '#8f8b83' }}>
           Synops · Confidential demo · <a href="https://synops-consulting.com" style={{ color: AMBER }}>synops-consulting.com</a>
-          <ArrowRight className="h-3 w-3" />
         </div>
       </div>
     </div>

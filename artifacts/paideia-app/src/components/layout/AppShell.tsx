@@ -73,13 +73,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="text-xs tracking-wider uppercase text-muted-foreground mt-1">Teacher</div>
           </Link>
           {fromMarketing && (
-            <a
-              href="/"
-              className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition"
-            >
-              <Home className="h-3.5 w-3.5" />
-              Synops home
-            </a>
+            <div className="mt-3">
+              <a href="/" className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Back to Synops home">
+                <Home className="h-3.5 w-3.5" />
+                Synops home
+              </a>
+            </div>
           )}
         </div>
         <nav className="flex-1 p-3 space-y-1">

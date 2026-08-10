@@ -65,14 +65,12 @@ export default function StudyNav() {
           })}
         </div>
         {fromMarketing && (
-          <a
-            href="/"
-            title="Back to Synops home"
-            className="ml-auto shrink-0 inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium text-muted-foreground hover:text-primary hover:bg-muted/60 transition-colors"
-          >
-            <Home className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Synops home</span>
-          </a>
+          <span className="ml-auto shrink-0">
+            <a href="/" className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Back to Synops home">
+              <Home className="h-3.5 w-3.5" />
+              Synops home
+            </a>
+          </span>
         )}
         <div className={`${fromMarketing ? "" : "ml-auto "}shrink-0`}>
           <DropdownMenu>

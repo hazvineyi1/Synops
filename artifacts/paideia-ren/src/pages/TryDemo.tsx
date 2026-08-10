@@ -113,7 +113,7 @@ export default function TryDemo() {
                 {...(d.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 className="inline-block self-start bg-accent text-white px-6 py-2.5 text-[14px] font-bold rounded-[6px] hover:bg-accent/90 transition-colors"
               >
-                Launch demo &rarr;
+                Launch demo
               </a>
             </div>
           ))}

@@ -7,6 +7,11 @@ import {
 } from "@workspace/paideia-api-client";
 import type { StudyUser } from "@workspace/paideia-api-client";
 
+// The backend /auth/me and login/signup responses include an isDemo flag on the
+// user for shared preloaded demo accounts. The generated StudyUser type does not
+// yet model it, so we extend it locally.
+type StudyUserWithDemo = StudyUser & { isDemo?: boolean };
+
 interface SignupExtra {
   ref?: string;
   dateOfBirth?: string;
@@ -15,7 +20,7 @@ interface SignupExtra {
 }
 
 interface AuthContextType {
-  user: StudyUser | null;
+  user: StudyUserWithDemo | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string, extra?: SignupExtra) => Promise<void>;
@@ -25,7 +30,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function StudyAuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<StudyUser | null>(null);
+  const [user, setUser] = useState<StudyUserWithDemo | null>(null);
   const [loading, setLoading] = useState(true);
 
   const meQuery = useStudyGetMe();

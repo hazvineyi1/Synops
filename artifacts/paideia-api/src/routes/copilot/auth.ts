@@ -494,6 +494,7 @@ export function serialiseTeacher(t: typeof teachersTable.$inferSelect) {
   return {
     ...rest,
     isAdmin: adminEmails().has(t.email.toLowerCase()),
+    isDemo: t.email.toLowerCase() === DEMO_TEACHER_EMAIL,
     onboardedAt: t.onboardedAt ? t.onboardedAt.toISOString() : null,
     approvedAt: t.approvedAt ? t.approvedAt.toISOString() : null,
     subscriptionCurrentPeriodEnd: t.subscriptionCurrentPeriodEnd ? t.subscriptionCurrentPeriodEnd.toISOString() : null,

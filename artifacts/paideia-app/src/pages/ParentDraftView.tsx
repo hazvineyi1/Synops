@@ -4,6 +4,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import type { ParentDraft } from "@/lib/types";
+import { useAuth } from "@/hooks/use-auth";
 import { ParentDraftView as Renderer } from "@/components/Renderers";
 import { Copy, Trash2, Printer, Check, Share2 } from "lucide-react";
 import { ShareResourceDialog } from "@/components/ShareResourceDialog";
@@ -11,6 +12,7 @@ import { ShareResourceDialog } from "@/components/ShareResourceDialog";
 export default function ParentDraftView() {
   const [, params] = useRoute<{ id: string }>("/parent-drafts/:id");
   const [, setLoc] = useLocation();
+  const { teacher } = useAuth();
   const [d, setD] = useState<ParentDraft | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -63,7 +65,9 @@ export default function ParentDraftView() {
           <Button variant="outline" size="sm" onClick={onCopy}>{copied ? <><Check className="h-4 w-4 mr-1" />Copied</> : <><Copy className="h-4 w-4 mr-1" />Copy</>}</Button>
           <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-1" />Print</Button>
           <Button variant="outline" size="sm" onClick={() => setShareOpen(true)}><Share2 className="h-4 w-4 mr-1" />Share</Button>
-          <Button variant="ghost" size="sm" onClick={onDelete}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+          {!teacher?.isDemo && (
+            <Button variant="ghost" size="sm" onClick={onDelete}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+          )}
         </div>
       </header>
       <Renderer c={d.content} />

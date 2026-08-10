@@ -13,9 +13,11 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2, BookOpen, FileText, Layers, Sparkles, Network, ChevronRight } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
+import { useStudyAuth } from "@/hooks/use-study-auth";
 
 export default function StudyMaterials() {
   const [, setLoc] = useLocation();
+  const { user } = useStudyAuth();
   const { data: materials, isLoading } = useListStudyMaterials();
   const deleteMutation = useDeleteStudyMaterial();
   const queryClient = useQueryClient();
@@ -144,7 +146,7 @@ export default function StudyMaterials() {
                           <div className="mt-2">
                             <div className="flex items-center justify-between text-[10px] mb-1">
                               <span className="text-muted-foreground">Study Progress</span>
-                              <span className="font-medium">{Math.round(((m.flashcardCount ?? 0) / (m.conceptCount * 0.7)) * 100)}%</span>
+                              <span className="font-medium">{Math.min(100, Math.round(((m.flashcardCount ?? 0) / (m.conceptCount * 0.7)) * 100))}%</span>
                             </div>
                             <Progress value={Math.min(100, ((m.flashcardCount ?? 0) / (m.conceptCount * 0.7)) * 100)} className="h-1" />
                           </div>
@@ -175,16 +177,18 @@ export default function StudyMaterials() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Delete ${m.title}`}
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
-                        disabled={deleteMutation.isPending}
-                        onClick={(e) => handleDelete(e, m.id, m.title)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!user?.isDemo && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Delete ${m.title}`}
+                          className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          disabled={deleteMutation.isPending}
+                          onClick={(e) => handleDelete(e, m.id, m.title)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>

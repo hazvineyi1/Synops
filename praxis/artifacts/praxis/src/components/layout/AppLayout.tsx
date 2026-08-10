@@ -504,14 +504,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {fromMarketing && (
-          <a
-            href="https://synops-consulting.com/"
-            title="Back to Synops home"
-            className="mx-3 mt-3 inline-flex items-center gap-1.5 px-3 py-2 rounded-md text-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <Home className="h-4 w-4" />
-            Synops home
-          </a>
+          <div className="mx-3 mt-3">
+            <a href="https://synops-consulting.com/" title="Back to Synops home" className="inline-flex items-center gap-1.5 rounded-md border border-white/20 px-2.5 py-1 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"><Home className="h-3.5 w-3.5" />Synops home</a>
+          </div>
         )}
 
         {role === 'super_admin' && (

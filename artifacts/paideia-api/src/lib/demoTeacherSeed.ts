@@ -22,7 +22,9 @@ import { logger } from "./logger.js";
  * account missing; a partial failure rolls the teacher row back so the next boot retries cleanly.
  */
 export const DEMO_TEACHER_EMAIL = "demo.teacher@synops-demo.test";
-const REGION = "US";
+// Catalog region ids are lowercase ("us"), so the teacher.region must match for the
+// subject / year-group pickers to populate.
+const REGION = "us";
 
 type WQ = { number: number; prompt: string; type: "short" | "multiple_choice" | "long" | "calculation"; options: string[] | null; answer: string; workingOrRubric: string };
 type QI = { number: number; prompt: string; type: "multiple_choice" | "short_answer" | "true_false"; options: string[] | null; correctAnswer: string; difficulty: "easy" | "medium" | "hard"; skillAssessed: string };
@@ -160,6 +162,9 @@ async function createTeacherDemo(): Promise<void> {
     subjects: ["Mathematics", "Science"],
     yearGroups: ["Grade 6", "Grade 7"],
     status: "active",
+    // Unlimited generations for the shared demo, so visitors are never blocked by the free
+    // quota and the seeded resources don't count against it.
+    subscriptionStatus: "active",
     onboardedAt: new Date(),
     approvedAt: new Date(),
   }).returning();
