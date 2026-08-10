@@ -8,7 +8,7 @@ import { ExternalLink, ShieldCheck, ArrowUpRight } from "lucide-react";
  * Cross-product admin hub. Standalone page (NOT wrapped in the Teacher app shell): the admin
  * signs in and lands here to pick a product. This app's admin session is the identity anchor.
  * Same-origin products (Teacher, Coach, Builder) share this session, so their tiles link directly.
- * Separate products (Praxis, Arete, and any added later) are reached through the SSO issuer,
+ * Separate products (Praxis, and any added later) are reached through the SSO issuer,
  * which mints a short-lived signed token and hands the admin off already authenticated.
  */
 

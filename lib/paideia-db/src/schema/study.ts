@@ -843,7 +843,7 @@ export type StudyPayout = typeof studyPayoutsTable.$inferSelect;
 export type StudyAmbassadorSettings = typeof studyAmbassadorSettingsTable.$inferSelect;
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Admin & analytics (ported from the Arete admin so Coach has the same operator
+// Admin & analytics (so Coach has full operator
 // visibility): usage/session telemetry, audit trail, announcements, pricing +
 // payment-method catalogs. Powers the admin console and upgrade targeting.
 // ═════════════════════════════════════════════════════════════════════════════

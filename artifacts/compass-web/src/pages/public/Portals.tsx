@@ -3,7 +3,6 @@ import { usePageMeta } from "@/lib/seo";
 import { PRODUCTS, type Product, type ProductVertical } from "@/lib/products";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { GraduationCap } from "lucide-react";
 
 const VERTICALS: ProductVertical[] = [
   "Education",
@@ -93,46 +92,6 @@ export default function Portals() {
           );
         })}
 
-        <section aria-labelledby="vertical-test-prep">
-          <h2
-            id="vertical-test-prep"
-            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
-          >
-            Test Prep
-          </h2>
-          <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <Card className="flex flex-col">
-              <CardHeader className="space-y-3">
-                <div className="flex items-center">
-                  <span
-                    className="flex h-10 w-10 items-center justify-center rounded-md text-white"
-                    style={{ backgroundColor: "#7c3aed" }}
-                  >
-                    <GraduationCap className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold tracking-tight">
-                    Arete{" "}
-                    <span className="text-xs font-normal text-muted-foreground">/AR-uh-tay/</span>
-                  </h3>
-                  <p className="text-sm text-muted-foreground">Exam &amp; Credential Coach</p>
-                </div>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col justify-between gap-4">
-                <p className="text-sm text-muted-foreground">
-                  An AI study coach for high-stakes exams — the bar, MCAT, GRE, and professional
-                  certifications. Daily plans, taught through dialogue, adapted to your exam date.
-                </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button asChild>
-                    <a href="https://arete.synops-consulting.com">Open Arete</a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
       </div>
     </div>
   );

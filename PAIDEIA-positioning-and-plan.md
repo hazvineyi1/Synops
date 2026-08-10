@@ -11,16 +11,12 @@ branding — the same integration playbook used for the other Synops products.
 
 ### The family (how Paideia fits)
 
-> **Synops** builds learning tools for every stage. **Arete** coaches adults through
-> professional and entrance exams. **Paideia** is for K-12 — an AI study tutor that meets
-> younger learners where they are.
-
-Two products, two clearly separate lanes — no overlap:
+> **Synops** builds learning tools for every stage. **Paideia** is the K-12 member — an
+> AI study tutor that meets younger learners where they are.
 
 | Product | Audience | Job |
 |---|---|---|
 | Paideia | **K-12 students, teachers, parents** | **Tutor & support day-to-day learning** |
-| Arete | Adults, exam candidates | Prep for high-stakes exams |
 
 ### Positioning paragraph (for an About / Platforms section)
 
@@ -40,7 +36,7 @@ family." The equity story becomes a **feature and value** of a Synops product, n
 charitable disclaimer. Practically: remove 501(c)(3)/non-profit/donation language, "Study
 Tutor" placeholder naming, and old standalone branding; adopt Synops/Paideia identity.
 
-### Homepage card copy (drop-in, matches the Arete card)
+### Homepage card copy (drop-in)
 
 ```
 PAIDEIA  ·  K-12 Learning
@@ -56,11 +52,11 @@ Short nav/footer label: **Paideia — K-12**
 
 ---
 
-## 2. Integration + Rebrand Plan (Arete integration playbook)
+## 2. Integration + Rebrand Plan
 
 `Paideia-Ren` is a Replit-based monorepo with the same shape as Synops:
 `artifacts/` (api-server, paideia-app, paideia-ren, paideia-study, mockup-sandbox) + `lib/`.
-That structural similarity means the same sequence we used for Arete applies cleanly.
+That structural similarity means the standard monorepo integration sequence applies cleanly.
 
 **Prerequisite (currently blocked):** get the code into the workspace. The repo-add tool is
 returning backend 404s and the sandbox can't clone a private repo without credentials — retry
@@ -70,12 +66,12 @@ add_repo shortly, or grant access; everything below waits on that.
 as `artifacts/paideia*` (e.g. `artifacts/paideia`, `artifacts/paideia-api`) and `lib/*` as
 `lib/paideia-*` scoped packages (`@workspace/paideia-*`). Reuse the shared `@workspace/identity`
 and `@workspace/billing` libs rather than duplicating. Wire workspace package names + tsconfig
-references like Arete.
+references to match the existing workspace conventions.
 
 **M2 — Decouple from Replit.** Remove `@replit/*` runtime deps and the Replit connectors
 (email/object-storage), the `.replit` config, and Replit-only Vite plugins from the production
-build — exactly what we did for Arete. Add a `Dockerfile.paideia`
-+ `railway.paideia.json` (mirror the Arete `Dockerfile` / `railway.json`).
+build. Add a `Dockerfile.paideia` + `railway.paideia.json` following the existing
+Railway service pattern.
 
 **M3 — Rebrand off non-profit / "Study Tutor".** Audit and swap visible brand elements:
 - Names: "Study Tutor" / old non-profit name → **Paideia**.
@@ -84,7 +80,7 @@ build — exactly what we did for Arete. Add a `Dockerfile.paideia`
 - Add the pronunciation touchpoint (*pie-DAY-uh*) where the other products surface theirs.
 - Keep the diversity/representation content — reframe it as a Paideia feature.
 
-**M4 — Deploy.** Stand it up like Arete: its own Supabase project (note the **2-active-project
+**M4 — Deploy.** Stand it up as its own service: its own Supabase project (note the **2-active-project
 free cap per account** — you'd need to free a slot or go Pro for a 3rd live DB), push schema,
 Railway service via `railway.paideia.json`, env vars, domain `paideia.synops-consulting.com`.
 

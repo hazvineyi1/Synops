@@ -1,18 +1,16 @@
 # Operations Runbook
 
 Operational reference for running the Synops services in production. Pairs with
-the deploy guide (`DEPLOY.md`) and the env references (`.env.example`,
-`.env.paideia.example`, `praxis/.env.example`).
+the env references (`.env.paideia.example`, `praxis/.env.example`).
 
 ## Services and deploy targets
 
 | Service | Image | Railway config | Healthcheck | What it serves |
 |---|---|---|---|---|
-| Coach | `Dockerfile` | `railway.json` | `/api/healthz` | api-server + arete SPA |
 | Paideia | `Dockerfile.paideia` | `railway.paideia.json` | `/api/healthz` | paideia-api + marketing/study/app + Compass builder |
 | Praxis | `Dockerfile.praxis` | `railway.praxis.json` | `/api/readyz` | praxis api-server + praxis SPA |
 
-All four images pin `NODE_ENV=production`, run as the non-root `node` user, and
+Both images pin `NODE_ENV=production`, run as the non-root `node` user, and
 fail fast at boot when a required env var is missing (see each env example).
 
 ## Health, readiness, and version endpoints
@@ -67,7 +65,7 @@ config, a bad build is caught quickly.
 ## Backups and recovery
 
 - **Automated backup**: `.github/workflows/db-backup.yml` runs `pg_dump` nightly
-  (02:00 UTC) against the Coach Postgres and stores a compressed custom-format
+  (02:00 UTC) against the Paideia Postgres and stores a compressed custom-format
   dump as a GitHub Actions artifact (retained 90 days). Requires the
   `DATABASE_PUBLIC_URL` repo secret (Railway's public Postgres URL). It can also
   be run on demand via "Run workflow". A companion job backs up the Praxis DB.
@@ -89,7 +87,7 @@ config, a bad build is caught quickly.
 ## Capacity and scaling notes
 
 - **Stateless app tier**: the API/SPA containers hold no local state (uploads go
-  to object storage, sessions to Postgres or Clerk), so they scale horizontally.
+  to object storage, sessions to Postgres), so they scale horizontally.
 - **Rate limiting is per-instance**: the built-in limiters use in-memory counters,
   so under multiple instances each enforces its own window (an intentional
   baseline, not exact global limits). For exact cross-instance limits, move the
@@ -196,11 +194,10 @@ reproducible with the committed harness.
 
 | Integration | Used by | Behaviour when unconfigured |
 |---|---|---|
-| Clerk (auth) | Coach | required to boot |
-| Anthropic | Coach, Praxis | Coach requires the key; Praxis AI features degrade |
+| Anthropic | Paideia, Praxis | Paideia requires the key; Praxis AI features degrade |
 | OpenAI-compatible | Paideia, Compass | Paideia requires both AI vars to boot |
-| Stripe | Coach, Paideia | billing/Pro upgrades disabled |
-| Flutterwave / Paynow | Coach, Paideia | those payment rails disabled |
+| Stripe | Paideia | billing/Pro upgrades disabled |
+| Flutterwave / Paynow | Paideia | those payment rails disabled |
 | Supabase Storage | Praxis | upload endpoints return a clear 4xx |
 | Resend (email) | Paideia, Praxis | email disabled; actions still succeed |
 | Twilio (WhatsApp/SMS) | Paideia, Praxis | notifications skipped |

@@ -1,6 +1,6 @@
 // Admin analytics, usage telemetry read-outs, announcements, pricing/payment
-// catalogs, audit log, and user management for Coach. Ported from the Arete admin
-// and adapted to Coach's study_* schema. Mounted at /admin alongside admin.ts, so
+// catalogs, audit log, and user management for Coach, on Coach's study_* schema.
+// Mounted at /admin alongside admin.ts, so
 // it shares the requireStudyAdmin gate. Cross-table analytics use raw SQL because
 // the column set is fixed and known; the simple CRUD uses the query builder.
 import { Router, type IRouter, type Request, type Response } from "express";

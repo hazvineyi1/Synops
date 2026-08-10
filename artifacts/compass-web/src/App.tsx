@@ -47,16 +47,6 @@ function PublicSite() {
         <Route path="/insights/:slug" component={InsightArticle} />
         <Route path="/contact" component={Contact} />
         <Route path="/portals" component={Portals} />
-        <Route path="/arete">
-          {() => {
-            // Arete is a separate deployment; /arete is a clean entry point
-            // that sends visitors to the live app.
-            if (typeof window !== "undefined") {
-              window.location.replace("https://arete.synops-consulting.com");
-            }
-            return null;
-          }}
-        </Route>
         <Route component={NotFound} />
       </Switch>
     </PublicLayout>

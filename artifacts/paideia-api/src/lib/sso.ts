@@ -86,6 +86,5 @@ export interface SsoProduct {
 export function ssoProducts(): SsoProduct[] {
   return [
     { key: "praxis", label: "Synops Praxis", aud: "praxis", baseUrl: process.env["SSO_PRAXIS_URL"] ?? "https://praxis.synops-consulting.com", landing: "/platform" },
-    { key: "arete", label: "Synops Arete", aud: "arete", baseUrl: process.env["SSO_ARETE_URL"] ?? "https://arete.synops-consulting.com", landing: "/admin" },
   ];
 }
