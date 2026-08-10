@@ -95,7 +95,7 @@ export default function Login() {
   const choose = (m: string) => { setChosen(m); setShowPicker(false); setOtpSent(null); setCode(""); setError(null); };
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to Synops Teacher.">
+    <AuthShell title="Welcome back" subtitle="Sign in to Synops.">
       <form onSubmit={submit} className="space-y-5">
         {!mfa && (
           <>
