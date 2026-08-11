@@ -29,6 +29,14 @@ export function MaterialPicker({
   const [materials, setMaterials] = useState<TeacherMaterial[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  // Preselect when arriving from a material's "Create from this" link (/plans/new?material=<id>).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const pre = new URLSearchParams(window.location.search).get("material");
+    if (pre && !value) onChange(pre);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     let active = true;
     api

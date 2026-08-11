@@ -364,6 +364,12 @@ function MaterialsList({
               {m.preview ? (
                 <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{m.preview}</div>
               ) : null}
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className="text-muted-foreground">Create from this:</span>
+                <Link href={`/plans/new?material=${m.id}`} className="text-primary underline underline-offset-2">Lesson plan</Link>
+                <Link href={`/worksheets/new?material=${m.id}`} className="text-primary underline underline-offset-2">Worksheet</Link>
+                <Link href={`/quizzes/new?material=${m.id}`} className="text-primary underline underline-offset-2">Quiz</Link>
+              </div>
             </div>
             <div className="flex gap-1 shrink-0">
               <Button size="sm" variant="ghost" onClick={() => view(m)}>View</Button>

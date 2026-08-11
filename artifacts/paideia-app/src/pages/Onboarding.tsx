@@ -41,7 +41,9 @@ export default function Onboarding() {
     try {
       const res = await api.post<{ teacher: Teacher }>("/auth/complete-onboarding", payload);
       setTeacher(res.teacher);
-      setLoc("/dashboard");
+      // Material-first: a new teacher starts by adding what they teach from, since the material
+      // is what grounds every lesson plan, worksheet and quiz they generate.
+      setLoc("/materials");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not save your profile");
     } finally {

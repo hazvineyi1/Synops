@@ -4,11 +4,12 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import { FileText, ClipboardList, HelpCircle, BookOpen, ArrowUpRight, Send, Users, Loader2 } from "lucide-react";
+import { FileText, ClipboardList, HelpCircle, BookOpen, ArrowUpRight, Send, Users, Loader2, FolderInput } from "lucide-react";
 import type { LessonPlan, Worksheet, Quiz, Sample, Assignment } from "@/lib/types";
 import { AssignDialog } from "@/components/AssignDialog";
 
 const CARDS = [
+  { path: "/materials", label: "Add your material", icon: FolderInput, blurb: "Upload what you teach from. It grounds every plan, worksheet and quiz you make." },
   { path: "/plans/new", label: "New lesson plan", icon: FileText, blurb: "Differentiated, with starters and exit tickets." },
   { path: "/worksheets/new", label: "New worksheet", icon: ClipboardList, blurb: "Practice questions with full answer keys." },
   { path: "/quizzes/new", label: "New quiz or exit ticket", icon: HelpCircle, blurb: "Multiple choice, short answer, true or false." },
