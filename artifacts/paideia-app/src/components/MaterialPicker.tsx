@@ -73,7 +73,13 @@ export function MaterialPicker({
         value={value ?? NONE}
         onValueChange={(v) => onChange(v === NONE ? null : v)}
       >
-        <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+        <SelectTrigger>
+          {/* Render the label ourselves so a preselected value (set before the dropdown is ever
+              opened) still shows its title — Radix only auto-registers an item's text once mounted. */}
+          <SelectValue placeholder="None">
+            {value && value !== NONE ? (materials.find((m) => m.id === value)?.title ?? "Selected material") : "None"}
+          </SelectValue>
+        </SelectTrigger>
         <SelectContent>
           <SelectItem value={NONE}>None</SelectItem>
           {materials.map((m) => (
