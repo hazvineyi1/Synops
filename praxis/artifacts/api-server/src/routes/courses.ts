@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { coursesTable, modulesTable, beatsTable, assignmentsTable, interactiveActivitiesTable, coursePartnerAssignmentsTable } from "@workspace/db";
+import { coursesTable, modulesTable, beatsTable, assignmentsTable, interactiveActivitiesTable, coursePartnerAssignmentsTable, moduleReadingsTable, discussionsTable, enrolmentsTable, beatProgressTable, caseScenariosTable } from "@workspace/db";
 import { eq, ne, desc, and, inArray, sql, count, ilike } from "drizzle-orm";
 import { requireAuth, requireRole, requireHub } from "../middlewares/requireAuth";
 import { canParticipateInCourse, canStaffActOnCourse, canViewCourseCatalog } from "../lib/scope";
@@ -302,12 +302,32 @@ router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "part
 
 // DELETE /courses/:courseId
 router.delete("/courses/:courseId", requireAuth, async (req, res) => {
+  const courseId = req.params.courseId;
   // Deleting an entire course had no authorization check whatsoever.
-  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {
+  if (!(await canStaffActOnCourse(req.dbUser!, courseId))) {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  await db.delete(coursesTable).where(eq(coursesTable.id, req.params.courseId));
+  // This schema has no FK cascades, so a bare course delete would orphan its modules, beats,
+  // progress, enrolments, etc. Clean the course's children explicitly (best-effort; order-safe
+  // since there are no constraints) so deleting a half-built course leaves nothing behind.
+  try {
+    const mods = await db.select({ id: modulesTable.id }).from(modulesTable).where(eq(modulesTable.courseId, courseId));
+    const modIds = mods.map((m) => m.id);
+    if (modIds.length) {
+      await db.delete(beatsTable).where(inArray(beatsTable.moduleId, modIds)).catch(() => {});
+      await db.delete(caseScenariosTable).where(inArray(caseScenariosTable.moduleId, modIds)).catch(() => {});
+    }
+    await db.delete(beatProgressTable).where(eq(beatProgressTable.courseId, courseId)).catch(() => {});
+    await db.delete(moduleReadingsTable).where(eq(moduleReadingsTable.courseId, courseId)).catch(() => {});
+    await db.delete(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.courseId, courseId)).catch(() => {});
+    await db.delete(discussionsTable).where(eq(discussionsTable.courseId, courseId)).catch(() => {});
+    await db.delete(assignmentsTable).where(eq(assignmentsTable.courseId, courseId)).catch(() => {});
+    await db.delete(enrolmentsTable).where(eq(enrolmentsTable.courseId, courseId)).catch(() => {});
+    await db.delete(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.courseId, courseId)).catch(() => {});
+    await db.delete(modulesTable).where(eq(modulesTable.courseId, courseId)).catch(() => {});
+  } catch { /* best-effort cleanup */ }
+  await db.delete(coursesTable).where(eq(coursesTable.id, courseId));
   res.status(204).send();
 });
 

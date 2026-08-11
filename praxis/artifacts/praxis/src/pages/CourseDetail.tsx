@@ -1020,18 +1020,27 @@ const LESSON_TYPE_META: Record<string, { icon: React.ElementType; label: string;
   quiz:     { icon: ClipboardList, label: 'Quiz',       color: 'text-amber-600'  },
 };
 
-function ModuleRow({ mod }: { mod: Module }) {
+function ModuleRow({ mod, canEdit = false }: { mod: Module; canEdit?: boolean }) {
   const [, navigate] = useLocation();
+  const qc = useQueryClient();
   const isEmpty = mod.beatCount === 0;
+  // Instructors can open a module even when it has no content yet, so they can go add some.
+  const canOpen = !isEmpty || canEdit;
+
+  const del = useMutation({
+    mutationFn: () => apiFetch(`/modules/${mod.id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['modules', mod.courseId] }),
+    onError: (e) => alert(e instanceof Error ? e.message : 'Could not delete that module.'),
+  });
 
   return (
     <Card
       className={cn(
         'transition-shadow',
-        !isEmpty && 'hover:shadow-md cursor-pointer',
+        canOpen && 'hover:shadow-md cursor-pointer',
         isEmpty && 'opacity-60',
       )}
-      onClick={() => !isEmpty && navigate(`/courses/${mod.courseId}/modules/${mod.id}`)}
+      onClick={() => canOpen && navigate(`/courses/${mod.courseId}/modules/${mod.id}`)}
     >
       <CardHeader>
         <div className="flex items-center gap-4">
@@ -1057,10 +1066,73 @@ function ModuleRow({ mod }: { mod: Module }) {
             <Badge variant={mod.status === 'published' ? 'default' : 'secondary'} className="text-xs">
               {mod.status}
             </Badge>
-            {!isEmpty && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            {canEdit && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-muted-foreground hover:text-rose-600"
+                disabled={del.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm(`Delete the module "${mod.title}"? This cannot be undone.`)) del.mutate();
+                }}
+                title="Delete module"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+            {canOpen && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
           </div>
         </div>
       </CardHeader>
+    </Card>
+  );
+}
+
+/** Lay out a bare module (title only) so an author can build the course incrementally. */
+function NewModule({ courseId, nextOrder }: { courseId: string; nextOrder: number }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [minutes, setMinutes] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const m = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}/modules`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: title.trim(),
+        estimatedMinutes: minutes.trim() ? Number(minutes) : undefined,
+        order: nextOrder,
+      }),
+    }),
+    onSuccess: () => { setTitle(''); setMinutes(''); setError(null); qc.invalidateQueries({ queryKey: ['modules', courseId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not add that module.'),
+  });
+  return (
+    <Card className="border-dashed border-primary/30">
+      <CardContent className="py-4 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Plus className="h-4 w-4 text-primary flex-shrink-0" />
+          <input
+            className={cn(fieldCls, 'flex-1 min-w-[200px]')}
+            placeholder="Module title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && title.trim() && !m.isPending) m.mutate(); }}
+          />
+          <input
+            type="number"
+            min={0}
+            className={cn(fieldCls, 'w-24')}
+            placeholder="Minutes"
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+          />
+          <Button size="sm" className="gap-1.5" disabled={!title.trim() || m.isPending} onClick={() => m.mutate()}>
+            <Plus className="h-3.5 w-3.5" /> {m.isPending ? 'Adding...' : 'Add module'}
+          </Button>
+        </div>
+        {error && <p className="text-xs text-rose-600">{error}</p>}
+      </CardContent>
     </Card>
   );
 }
@@ -1127,6 +1199,13 @@ export function CourseDetail() {
   const enrolMutation = useMutation({
     mutationFn: () => apiFetch(`/courses/${courseId}/enrol`, { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['enrolment', courseId] }),
+  });
+
+  // Instructor-only: delete the whole course (and everything under it).
+  const deleteCourseMutation = useMutation({
+    mutationFn: () => apiFetch(`/courses/${courseId}`, { method: 'DELETE' }),
+    onSuccess: () => navigate('/courses'),
+    onError: (e) => alert(e instanceof Error ? e.message : 'Could not delete this course.'),
   });
 
   const joinGroupMutation = useMutation({
@@ -1196,7 +1275,22 @@ export function CourseDetail() {
             Enrolment is managed by your organisation. Ask your admin to assign this course to you.
           </div>
         )}
-        {enrolment && <Badge variant="outline" className="text-green-600 border-green-600">{L('Enrolled', 'Inscrito')}</Badge>}
+        <div className="flex items-center gap-2 shrink-0">
+          {enrolment && <Badge variant="outline" className="text-green-600 border-green-600">{L('Enrolled', 'Inscrito')}</Badge>}
+          {isInstructor && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="gap-1.5 text-muted-foreground hover:text-rose-600"
+              disabled={deleteCourseMutation.isPending}
+              onClick={() => {
+                if (window.confirm('Delete this course and everything in it? This cannot be undone.')) deleteCourseMutation.mutate();
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> {deleteCourseMutation.isPending ? 'Deleting...' : 'Delete course'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Real completion, from beats actually viewed. Only shown to enrolled learners:
@@ -1550,6 +1644,7 @@ export function CourseDetail() {
                 </CardContent>
               </Card>
             )}
+            {isInstructor && <NewModule courseId={courseId} nextOrder={modules?.length ?? 0} />}
             {modulesLoading && <div className="space-y-3">{[1,2,3].map(i => <Skeleton key={i} className="h-24" />)}</div>}
             {modulesError && !modulesLoading && (
               <div className="text-center text-muted-foreground py-12">
@@ -1558,7 +1653,7 @@ export function CourseDetail() {
             )}
             {!modulesError && modules?.length === 0 && <div className="text-center text-muted-foreground py-12">No modules yet. Use "Author a module" above to add one.</div>}
             {modules?.map((mod) => (
-              <ModuleRow key={mod.id} mod={mod} />
+              <ModuleRow key={mod.id} mod={mod} canEdit={isInstructor} />
             ))}
           </div>
         )}

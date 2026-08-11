@@ -7,7 +7,7 @@ import {
   beatProgressTable, submissionsTable, gradebookAlertsTable, coachMessagesTable,
   deliverySessionsTable, attendanceRecordsTable, notificationsTable,
 } from "@workspace/db";
-import { eq, and, asc, sql } from "drizzle-orm";
+import { eq, and, asc, sql, notInArray } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../lib/auth";
 import { recomputeLearnerAlert } from "../lib/gradebookEngine";
 
@@ -137,10 +137,17 @@ async function ensureTestLearners(partnerId: string, orgId: string): Promise<str
   for (let i = 0; i < PERSONAS.length; i++) {
     const p = PERSONAS[i];
     const learnerId = learnerIds[i];
+    const myCourses = courseIds.slice(0, p.courseCount);
+    // Remove stale enrolments in courses no longer assigned to Enza, so trimming the catalogue
+    // really shrinks each learner's course list, then top up to the assigned set.
+    try {
+      if (courseIds.length) {
+        await db.delete(enrolmentsTable).where(and(eq(enrolmentsTable.userId, learnerId), notInArray(enrolmentsTable.courseId, courseIds)));
+      }
+    } catch { /* ignore */ }
     let already = 0;
     try { already = (await db.select({ id: enrolmentsTable.id }).from(enrolmentsTable).where(eq(enrolmentsTable.userId, learnerId))).length; } catch { /* ignore */ }
-    if (already > 0 || courseIds.length === 0) continue;
-    const myCourses = courseIds.slice(0, p.courseCount);
+    if (already >= myCourses.length || courseIds.length === 0) continue;
     for (let ci = 0; ci < myCourses.length; ci++) {
       const courseId = myCourses[ci];
       const completed = ci < p.completedCount;
