@@ -33,7 +33,10 @@ export default function QuizNew() {
   const [format, setFormat] = useState(FORMATS[0]);
   const [questionCount, setQuestionCount] = useState(5);
   const [notes, setNotes] = useState("");
-  const [materialId, setMaterialId] = useState<string | null>(null);
+  // Preselect a material when arriving from its "Create from this" link (/quizzes/new?material=<id>).
+  const [materialId, setMaterialId] = useState<string | null>(
+    () => (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("material") : null),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

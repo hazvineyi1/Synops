@@ -31,7 +31,10 @@ export default function PlanNew() {
   const [duration, setDuration] = useState(50);
   const [priorKnowledge, setPriorKnowledge] = useState("");
   const [groupContext, setGroupContext] = useState("");
-  const [materialId, setMaterialId] = useState<string | null>(null);
+  // Preselect a material when arriving from its "Create from this" link (/plans/new?material=<id>).
+  const [materialId, setMaterialId] = useState<string | null>(
+    () => (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("material") : null),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

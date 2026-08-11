@@ -31,7 +31,10 @@ export default function WorksheetNew() {
   const [difficulty, setDifficulty] = useState("core");
   const [questionCount, setQuestionCount] = useState(10);
   const [notes, setNotes] = useState("");
-  const [materialId, setMaterialId] = useState<string | null>(null);
+  // Preselect a material when arriving from its "Create from this" link (/worksheets/new?material=<id>).
+  const [materialId, setMaterialId] = useState<string | null>(
+    () => (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("material") : null),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
