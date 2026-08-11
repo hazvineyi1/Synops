@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
-  CheckCircle, Clock, AlertCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers
+  CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -705,6 +705,7 @@ const TABS = [
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'gradebook', label: 'Gradebook', icon: BarChart2 },
+  { id: 'alignment', label: 'Alignment', icon: Target },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'pages', label: 'Pages', icon: FileText },
   { id: 'people', label: 'People', icon: Users },
@@ -1183,6 +1184,16 @@ export function CourseDetail() {
   const { data: pages, isLoading: pagesLoading } = useQuery({ queryKey: ['pages', courseId], queryFn: () => apiFetch<Page[]>(`/courses/${courseId}/pages`), enabled: activeTab === 'pages', retry: false });
   const { data: roster, isLoading: rosterLoading } = useQuery({ queryKey: ['roster', courseId], queryFn: () => apiFetch<RosterEntry[]>(`/courses/${courseId}/roster`), enabled: activeTab === 'people', retry: false });
   const { data: groups, isLoading: groupsLoading } = useQuery({ queryKey: ['groups', courseId], queryFn: () => apiFetch<Group[]>(`/courses/${courseId}/groups`), enabled: activeTab === 'groups', retry: false });
+  const { data: alignment, isLoading: alignmentLoading, isError: alignmentError } = useQuery({
+    queryKey: ['alignment', courseId],
+    queryFn: () => apiFetch<{
+      objectiveCount: number; covered: number; assessed: number; moduleCount: number; assessmentCount: number;
+      alignment: Array<{ objective: string; modules: string[]; assessments: string[]; covered: boolean; assessed: boolean; note: string }>;
+      wcag: Array<{ id: string; label: string; status: 'pass' | 'warn' | 'fail'; detail: string }>;
+    }>(`/courses/${courseId}/alignment`),
+    enabled: activeTab === 'alignment',
+    retry: false,
+  });
   const { data: enrolment } = useQuery({ queryKey: ['enrolment', courseId, 'me'], queryFn: () => apiFetch<Enrolment | null>(`/courses/${courseId}/my-enrolment`) });
   // Enrolled learners get the clean single-flow course page (no tab rail). Instructors and
   // catalog visitors keep the tabbed course-management shell. Declared AFTER the enrolment
@@ -1356,7 +1367,7 @@ export function CourseDetail() {
         {!isLearnerView && (
           <nav className="mb-6">
             <div className="flex flex-wrap gap-2 border-b border-border pb-4">
-              {TABS.map((tab) => (
+              {TABS.filter((tab) => tab.id !== 'alignment' || isInstructor).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setTab(tab.id)}
@@ -1812,6 +1823,91 @@ export function CourseDetail() {
                 <div className="text-muted-foreground">Full gradebook with all learner scores</div>
                 <Button onClick={() => navigate(`/courses/${courseId}/gradebook`)}>View Full Gradebook</Button>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ALIGNMENT (staff-only): objective coverage + assessment + WCAG accessibility */}
+        {activeTab === 'alignment' && isInstructor && (
+          <div className="space-y-6">
+            {alignmentLoading && (
+              <div className="space-y-4">
+                <div className="text-sm text-muted-foreground">Running the alignment pass. This can take a few seconds.</div>
+                {[1,2,3].map(i => <Skeleton key={i} className="h-28" />)}
+              </div>
+            )}
+            {alignmentError && !alignmentLoading && (
+              <div className="text-center text-muted-foreground py-12">Could not run the alignment check. Please refresh.</div>
+            )}
+            {alignment && !alignmentLoading && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {alignment.covered} of {alignment.objectiveCount} objectives are addressed by a module, {alignment.assessed} of {alignment.objectiveCount} are assessed.
+                </p>
+
+                {/* Objective coverage + assessment */}
+                <div className="space-y-3">
+                  <h2 className="text-lg font-serif font-semibold tracking-tight">Objective alignment</h2>
+                  {alignment.alignment.length === 0 && (
+                    <div className="text-center text-muted-foreground py-8">No objectives on this course yet. Add objectives to check alignment.</div>
+                  )}
+                  {alignment.alignment.map((row, i) => (
+                    <Card key={i}>
+                      <CardContent className="py-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="font-medium text-foreground min-w-0">{row.objective}</div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {row.covered
+                              ? <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-200"><CheckCircle className="h-3.5 w-3.5" /> Taught</Badge>
+                              : <Badge variant="outline" className="gap-1 text-rose-600 border-rose-200"><XCircle className="h-3.5 w-3.5" /> Not taught</Badge>}
+                            {row.assessed
+                              ? <Badge variant="outline" className="gap-1 text-emerald-600 border-emerald-200"><CheckCircle className="h-3.5 w-3.5" /> Assessed</Badge>
+                              : <Badge variant="outline" className="gap-1 text-amber-600 border-amber-200"><AlertTriangle className="h-3.5 w-3.5" /> Not assessed</Badge>}
+                          </div>
+                        </div>
+                        <div className="text-sm space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-muted-foreground">Taught in:</span>
+                            {row.modules.length > 0
+                              ? row.modules.map((m, j) => <Badge key={j} variant="secondary" className="text-xs">{m}</Badge>)
+                              : <span className="text-rose-600">No module addresses this yet</span>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-muted-foreground">Assessed by:</span>
+                            {row.assessments.length > 0
+                              ? row.assessments.map((a, j) => <Badge key={j} variant="secondary" className="text-xs">{a}</Badge>)
+                              : <span className="text-amber-600">No assessment checks this yet</span>}
+                          </div>
+                        </div>
+                        {row.note && <p className="text-sm text-muted-foreground">{row.note}</p>}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Accessibility checklist (WCAG) */}
+                <div className="space-y-3">
+                  <h2 className="text-lg font-serif font-semibold tracking-tight">Accessibility (WCAG)</h2>
+                  <Card>
+                    <CardContent className="py-2 divide-y divide-border">
+                      {alignment.wcag.length === 0 && (
+                        <div className="text-center text-muted-foreground py-6">No accessibility checks returned.</div>
+                      )}
+                      {alignment.wcag.map((w) => (
+                        <div key={w.id} className="flex items-start gap-3 py-3">
+                          {w.status === 'pass' && <CheckCircle className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />}
+                          {w.status === 'warn' && <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />}
+                          {w.status === 'fail' && <XCircle className="h-4 w-4 text-rose-600 mt-0.5 flex-shrink-0" />}
+                          <div className="min-w-0">
+                            <div className="font-medium text-foreground">{w.label}</div>
+                            <div className="text-sm text-muted-foreground">{w.detail}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
             )}
           </div>
         )}

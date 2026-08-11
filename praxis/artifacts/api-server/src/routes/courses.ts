@@ -19,6 +19,25 @@ const canSeeIncomplete = (role?: string | null) => !!role && AUTHOR_ROLES.has(ro
 
 const router = Router();
 
+// --- Reading-level (Flesch-Kincaid grade) for the accessibility checks ---
+function countSyllables(word: string): number {
+  const w = word.toLowerCase().replace(/[^a-z]/g, "");
+  if (!w) return 0;
+  const groups = w.match(/[aeiouy]+/g);
+  let n = groups ? groups.length : 1;
+  if (w.endsWith("e")) n = Math.max(1, n - 1);
+  return Math.max(1, n);
+}
+function fleschKincaidGrade(text: string): number {
+  const sentences = Math.max(1, (text.match(/[.!?]+/g) || []).length);
+  const words = text.match(/[A-Za-z]+/g) || [];
+  const wordCount = Math.max(1, words.length);
+  const syllables = words.reduce((s, w) => s + countSyllables(w), 0);
+  const grade = 0.39 * (wordCount / sentences) + 11.8 * (syllables / wordCount) - 15.59;
+  return Math.max(0, Math.round(grade * 10) / 10);
+}
+const ACTION_VERB = /^\s*(describe|explain|apply|analyse|analyze|evaluate|create|identify|demonstrate|compare|design|calculate|use|write|build|assess|interpret|list|define|solve|plan|select|produce|develop|construct|classify|summarise|summarize|justify|recommend|perform)/i;
+
 // Attaches the completeness verdict (complete + the per-module reasons it is not) when known. Callers
 // that have not computed completeness pass nothing and the course reads as not-yet-evaluated.
 function toCourseResponse(c: typeof coursesTable.$inferSelect, completeness?: CourseCompleteness) {
@@ -159,6 +178,97 @@ router.post("/courses", requireAuth, requireRole("super_admin", "partner_admin",
     })
     .returning();
   res.status(201).json(toCourseResponse(course));
+});
+
+// GET /courses/:courseId/alignment -- an alignment + accessibility (WCAG) report for a course.
+// Alignment: which modules address and which assessments assess each course objective (AI-inferred,
+// since module->objective mapping is not stored). Accessibility: deterministic WCAG checks.
+router.get("/courses/:courseId/alignment", requireAuth, async (req, res) => {
+  const courseId = req.params.courseId;
+  if (!(await canStaffActOnCourse(req.dbUser!, courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const [course] = await db.select().from(coursesTable).where(eq(coursesTable.id, courseId)).limit(1);
+  if (!course) { res.status(404).json({ error: "Not found" }); return; }
+
+  const modules = await db.select({ id: modulesTable.id, title: modulesTable.title, objectives: modulesTable.objectives })
+    .from(modulesTable).where(eq(modulesTable.courseId, courseId));
+  const modIds = modules.map((m) => m.id);
+  const assessments = await db.select({ title: assignmentsTable.title }).from(assignmentsTable).where(eq(assignmentsTable.courseId, courseId));
+  let beats: Array<{ videoUrl: string | null; transcript: string | null; narration: string }> = [];
+  if (modIds.length) {
+    beats = await db.select({ videoUrl: beatsTable.videoUrl, transcript: beatsTable.transcript, narration: beatsTable.narration })
+      .from(beatsTable).where(inArray(beatsTable.moduleId, modIds));
+  }
+
+  const courseObjectives = (course.objectives ?? []).filter(Boolean);
+
+  // Alignment (AI-inferred).
+  type Row = { objective: string; modules: string[]; assessments: string[]; covered: boolean; assessed: boolean; note: string };
+  let alignment: Row[] = courseObjectives.map((o) => ({ objective: o, modules: [], assessments: [], covered: false, assessed: false, note: "" }));
+  if (courseObjectives.length && (modules.length || assessments.length)) {
+    try {
+      const input = {
+        courseObjectives,
+        modules: modules.map((m) => ({ title: m.title, objectives: m.objectives ?? [] })),
+        assessments: assessments.map((a) => a.title),
+      };
+      const message = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2000,
+        messages: [{
+          role: "user",
+          content: `You are a curriculum alignment reviewer. For each course objective, decide which modules ADDRESS it (teach toward it) and which assessments ASSESS it, judging from the titles and module objectives. Be strict: include a module or assessment only if it clearly relates.
+
+Data (JSON):
+${JSON.stringify(input)}
+
+Return ONLY JSON, no markdown: { "alignment": [ { "objective": "<verbatim course objective>", "modules": ["<module title>"], "assessments": ["<assessment title>"], "note": "<one short sentence on how well it is covered and assessed, or what is missing>" } ] }`,
+        }],
+      });
+      const content = message.content[0];
+      if (content && content.type === "text") {
+        let parsed: { alignment?: Array<{ objective?: string; modules?: unknown; assessments?: unknown; note?: unknown }> } | null;
+        try { parsed = JSON.parse(content.text); } catch { const m = content.text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : null; }
+        if (parsed?.alignment) {
+          alignment = courseObjectives.map((o) => {
+            const row = parsed!.alignment!.find((a) => a.objective === o) ?? {};
+            const mods = Array.isArray(row.modules) ? row.modules.map(String) : [];
+            const asmts = Array.isArray(row.assessments) ? row.assessments.map(String) : [];
+            return { objective: o, modules: mods, assessments: asmts, covered: mods.length > 0, assessed: asmts.length > 0, note: String(row.note ?? "") };
+          });
+        }
+      }
+    } catch { /* keep the empty mapping on failure */ }
+  }
+
+  // Accessibility (WCAG) checks, computed deterministically.
+  const wcag: Array<{ id: string; label: string; status: "pass" | "warn" | "fail"; detail: string }> = [];
+  if (course.thumbnailUrl) {
+    wcag.push({ id: "banner-alt", label: "Banner alternative text", status: "warn", detail: "Give the course banner descriptive alt text so screen-reader users get the same information (WCAG 1.1.1)." });
+  }
+  const videos = beats.filter((b) => b.videoUrl);
+  const videosNoTranscript = videos.filter((b) => !b.transcript || !b.transcript.trim());
+  if (videos.length) {
+    wcag.push({ id: "video-captions", label: "Video captions and transcript", status: videosNoTranscript.length ? "fail" : "pass", detail: videosNoTranscript.length ? `${videosNoTranscript.length} of ${videos.length} videos have no transcript or captions (WCAG 1.2.2).` : "Every video has a transcript." });
+  }
+  const readingText = [course.description ?? "", ...beats.map((b) => b.narration)].join(" ");
+  if (readingText.trim().length > 200) {
+    const grade = fleschKincaidGrade(readingText);
+    wcag.push({ id: "reading-level", label: "Reading level", status: grade > 12 ? "warn" : "pass", detail: `Approximate reading grade ${grade}. ${grade > 12 ? "Consider simpler wording so more learners can read it comfortably." : "Within a broadly accessible range."}` });
+  }
+  if (courseObjectives.length) {
+    const weak = courseObjectives.filter((o) => !ACTION_VERB.test(o));
+    wcag.push({ id: "objectives-measurable", label: "Measurable objectives", status: weak.length ? "warn" : "pass", detail: weak.length ? `${weak.length} objective(s) do not start with a measurable action verb.` : "All objectives start with a measurable action verb." });
+  }
+
+  res.json({
+    objectiveCount: courseObjectives.length,
+    covered: alignment.filter((a) => a.covered).length,
+    assessed: alignment.filter((a) => a.assessed).length,
+    moduleCount: modules.length,
+    assessmentCount: assessments.length,
+    alignment,
+    wcag,
+  });
 });
 
 // POST /courses/generate-banner -- generate a photorealistic course banner from the description
