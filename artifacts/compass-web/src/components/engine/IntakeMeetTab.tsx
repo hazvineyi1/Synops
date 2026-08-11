@@ -21,7 +21,6 @@ import {
   CheckCircle2,
   Trash2,
   Clock,
-  Sparkles,
   FileText,
   ChevronDown,
   ChevronRight,
@@ -1610,10 +1609,8 @@ function CurrentAgendaView({
               disabled={generateAgendaPending}
               aria-label="Generate suggested agenda"
             >
-              {generateAgendaPending ? (
+              {generateAgendaPending && (
                 <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
               )}
               Suggest
             </Button>
@@ -1884,10 +1881,8 @@ function CurrentAgendaView({
                             onClick={() => onTranscribe(r.id)}
                             disabled={isTranscribing || aiUnavailable}
                           >
-                            {isTranscribing ? (
+                            {isTranscribing && (
                               <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" />
-                            ) : (
-                              <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
                             )}
                             {isTranscribing ? "Transcribing..." : "Transcribe"}
                           </Button>

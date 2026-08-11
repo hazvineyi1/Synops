@@ -52,7 +52,7 @@ export function Accreditation() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground"><ShieldCheck className="h-6 w-6 text-primary" /> Accreditation Readiness</h1>
-          <p className="text-sm text-muted-foreground">Every unit standard your organisation delivers, with coverage and learner-outcome evidence — one-click self-study export.</p>
+          <p className="text-sm text-muted-foreground">Every unit standard your organisation delivers, with coverage and learner-outcome evidence, one-click self-study export.</p>
         </div>
         <div className="flex items-center gap-2">
           {orgs.data && orgs.data.length > 1 && (
@@ -71,10 +71,10 @@ export function Accreditation() {
       {report.data && (
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Kpi label="Standards in scope" value={String(report.data.summary.standardsInScope)} sub={report.data.frameworks.map((f) => f.toUpperCase()).join(" · ") || "—"} />
+            <Kpi label="Standards in scope" value={String(report.data.summary.standardsInScope)} sub={report.data.frameworks.map((f) => f.toUpperCase()).join(" · ") || ", "} />
             <Kpi label="Covered" value={`${report.data.summary.coveragePct}%`} sub={`${report.data.summary.standardsCovered} of ${report.data.summary.standardsInScope}`} tone={report.data.summary.coveragePct >= 80 ? "good" : "warn"} />
             <Kpi label="Assessed with outcomes" value={`${report.data.summary.assessedPct}%`} sub={`${report.data.summary.standardsAssessed} standards`} tone={report.data.summary.assessedPct >= 60 ? "good" : "warn"} />
-            <Kpi label="Overall mastery" value={report.data.summary.overallMasteryPct === null ? "—" : `${report.data.summary.overallMasteryPct}%`} sub={`${report.data.summary.learnersEvaluated} learners evaluated`} tone={(report.data.summary.overallMasteryPct ?? 0) >= 70 ? "good" : "warn"} />
+            <Kpi label="Overall mastery" value={report.data.summary.overallMasteryPct === null ? ", " : `${report.data.summary.overallMasteryPct}%`} sub={`${report.data.summary.learnersEvaluated} learners evaluated`} tone={(report.data.summary.overallMasteryPct ?? 0) >= 70 ? "good" : "warn"} />
           </div>
 
           {(report.data.gaps.noEvidence.length > 0 || report.data.gaps.unmappedCourses.length > 0) && (
@@ -110,8 +110,8 @@ export function Accreditation() {
                       <div className="text-xs text-muted-foreground">{r.framework.toUpperCase()}{r.nqfLevel !== null ? ` · NQF ${r.nqfLevel}` : ""}{r.credits !== null ? ` · ${r.credits} cr` : ""} · {r.deliverables.length} deliverable{r.deliverables.length === 1 ? "" : "s"}</div>
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{r.coverageLevel}</td>
-                    <td className="px-3 py-2 text-center font-mono">{r.masteryPct === null ? "—" : `${r.masteryPct}%`}</td>
-                    <td className="px-3 py-2 text-center font-mono">{r.passRatePct === null ? "—" : `${r.passRatePct}%`}</td>
+                    <td className="px-3 py-2 text-center font-mono">{r.masteryPct === null ? ", " : `${r.masteryPct}%`}</td>
+                    <td className="px-3 py-2 text-center font-mono">{r.passRatePct === null ? ", " : `${r.passRatePct}%`}</td>
                     <td className="px-3 py-2 text-center">{r.learnersAssessed}</td>
                     <td className="px-3 py-2 text-center">{r.evidenceCount}</td>
                     <td className="px-3 py-2"><span className={cn("rounded px-2 py-0.5 text-xs font-medium uppercase", statusChip(r.status))}>{r.status}</span></td>

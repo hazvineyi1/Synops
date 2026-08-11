@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Loader2, Palette, Globe, CheckCircle2, Clock, Sparkles, Upload, Wand2 } from 'lucide-react';
+import { Save, Loader2, Palette, Globe, CheckCircle2, Clock, Upload } from 'lucide-react';
 
 type Form = Partial<BrandTheme>;
 
@@ -96,7 +96,7 @@ export function PartnerTheme() {
         primaryColor: r.primaryColor, secondaryColor: r.secondaryColor, accentColor: r.accentColor,
         fontFamily: r.fontFamily || form.fontFamily, credentialTitle: r.credentialTitle || form.credentialTitle,
       });
-      toast({ title: 'Brand generated', description: r.tagline ? `"${r.tagline}" — review and Save to apply.` : 'Review and Save to apply.' });
+      toast({ title: 'Brand generated', description: r.tagline ? `"${r.tagline}", review and Save to apply.` : 'Review and Save to apply.' });
     },
     onError: (e: any) => toast({ title: 'Could not generate', description: e?.message ?? 'Try again', variant: 'destructive' }),
   });
@@ -114,7 +114,7 @@ export function PartnerTheme() {
         <div className="space-y-6">
           <Card className="border-primary/30">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> AI brand kit</CardTitle>
+              <CardTitle className="flex items-center gap-2">AI brand kit</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">Upload the partner's logo (and optionally a business card and website). AI reads the logo and generates the colours, font and personalization. Review below, then Save.</p>
@@ -143,7 +143,7 @@ export function PartnerTheme() {
               </div>
 
               <Button onClick={() => gen.mutate()} disabled={(!logoParts && !form.logoUrl) || gen.isPending} className="w-full gap-1.5">
-                {gen.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : <><Wand2 className="h-4 w-4" /> Generate brand with AI</>}
+                {gen.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</> : <>Generate brand with AI</>}
               </Button>
               <p className="text-xs text-muted-foreground">The logo is stored with the brand. Needs AI to be configured on the server; if not, set the colours manually below.</p>
             </CardContent>

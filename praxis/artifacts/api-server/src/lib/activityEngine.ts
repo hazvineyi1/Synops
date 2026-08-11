@@ -4,7 +4,7 @@ import { anthropic } from "@workspace/integrations-anthropic-ai";
  * AI activity generator. Given raw course content, produce a MENU of interactive activities.
  *
  * Design: the model returns a small STRUCTURED SPEC per activity (a few questions / cards /
- * pairs / steps / buckets) — NOT raw HTML. The frontend renders the spec through the shared
+ * pairs / steps / buckets), NOT raw HTML. The frontend renders the spec through the shared
  * activityTemplates engine, exactly like the no-code builder and the library. Returning a
  * compact JSON spec (instead of a whole escaped HTML document) is far more reliable and lets
  * the AI produce every interaction type, not just quizzes.

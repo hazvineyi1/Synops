@@ -16,7 +16,7 @@ import {
   ArrowRight,
   RefreshCw,
   RotateCcw,
-  Sparkles,
+  Compass,
   Flame,
   Target,
   BrainCircuit,
@@ -31,7 +31,7 @@ const KIND_META: Record<
 > = {
   review: { label: "Review", icon: RotateCcw, className: "text-amber-600 bg-amber-500/10 ring-amber-500/20" },
   weak: { label: "Shore up", icon: Target, className: "text-rose-600 bg-rose-500/10 ring-rose-500/20" },
-  new: { label: "New ground", icon: Sparkles, className: "text-sky-600 bg-sky-500/10 ring-sky-500/20" },
+  new: { label: "New ground", icon: Compass, className: "text-sky-600 bg-sky-500/10 ring-sky-500/20" },
 };
 
 export function CoachHome({ firstName }: { firstName?: string | null }) {
@@ -68,7 +68,7 @@ export function CoachHome({ firstName }: { firstName?: string | null }) {
 
   return (
     <div className="space-y-8">
-      {/* Coach greeting — the coach leads, no blank dashboard */}
+      {/* Coach greeting, the coach leads, no blank dashboard */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -115,7 +115,7 @@ export function CoachHome({ firstName }: { firstName?: string | null }) {
         <StatPill icon={BrainCircuit} label="Mastered" value={masteredCount} tone="text-emerald-500" />
       </div>
 
-      {/* Today's path — the spine */}
+      {/* Today's path, the spine */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -209,7 +209,7 @@ function CoachOrb() {
         transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
       />
       <div className="absolute inset-0 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-lg">
-        <Sparkles className="h-6 w-6" />
+        <BrainCircuit className="h-6 w-6" />
       </div>
     </div>
   );

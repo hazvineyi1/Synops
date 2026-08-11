@@ -33,7 +33,7 @@ function figureResponse(f: TutorFigure) {
   return { id: f.id, name: f.name, image: f.image, gender: f.gender, organisationId: f.organisationId, createdAt: f.createdAt.toISOString() };
 }
 
-// GET /tutor-figures — platform figures + the user's own tenant figures.
+// GET /tutor-figures, platform figures + the user's own tenant figures.
 router.get("/tutor-figures", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   let rows: TutorFigure[];
@@ -48,7 +48,7 @@ router.get("/tutor-figures", requireAuth, async (req, res) => {
   res.json(rows.map(figureResponse));
 });
 
-// POST /tutor-figures — save a new figure.
+// POST /tutor-figures, save a new figure.
 router.post("/tutor-figures", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   if (!canAuthor(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }

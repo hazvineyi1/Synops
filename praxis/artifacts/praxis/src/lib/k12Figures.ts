@@ -38,7 +38,7 @@ export const K12_FIGURES: Record<string, string> = {
     `<text x="216" y="70" font-size="30" font-weight="800" fill="${C.ink}" text-anchor="middle">+</text>` +
     `<text x="180" y="122" font-size="17" font-weight="800" fill="${C.indigo}" text-anchor="middle">3 × 4 = 12</text>`),
 
-  // ── Multiplication as an array (rows × columns) — numeric only, language-neutral ─
+  // ── Multiplication as an array (rows × columns), numeric only, language-neutral ─
   "array": svg("0 0 360 150", (() => {
     const rows = 3, cols = 4; let g = ""; const x0 = 90, y0 = 20, s = 30;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++)
@@ -47,7 +47,7 @@ export const K12_FIGURES: Record<string, string> = {
     return g;
   })()),
 
-  // ── Reading: main idea holds up the supporting details — word-free (caption carries language) ─
+  // ── Reading: main idea holds up the supporting details, word-free (caption carries language) ─
   "main-idea": svg("0 0 360 170",
     `<rect x="120" y="14" width="120" height="46" rx="12" fill="${C.indigo}" />` +
     `<text x="180" y="45" font-size="26" text-anchor="middle">💡</text>` +
@@ -56,7 +56,7 @@ export const K12_FIGURES: Record<string, string> = {
     `<line x1="180" y1="60" x2="290" y2="90" stroke="${C.line}" stroke-width="3"/>` +
     [40, 150, 260].map((x) => `<rect x="${x}" y="90" width="60" height="56" rx="10" fill="${C.teal}22" stroke="${C.teal}" stroke-width="3"/><circle cx="${x + 30}" cy="118" r="9" fill="${C.teal}"/>`).join("")),
 
-  // ── Reading: context clues — abstract "words" as bars, magnifier on the mystery word ─
+  // ── Reading: context clues, abstract "words" as bars, magnifier on the mystery word ─
   "context-clues": svg("0 0 360 130", (() => {
     let g = `<rect x="20" y="30" width="320" height="76" rx="12" fill="#f8fafc" stroke="${C.line}" stroke-width="2"/>`;
     const bars = [[36, 44], [90, 30], [128, 52], [232, 40]];

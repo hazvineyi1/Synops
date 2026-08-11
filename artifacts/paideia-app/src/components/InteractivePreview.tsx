@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { api, ApiError } from "@/lib/api";
 import type { FeedbackItem, AiSubmissionSummary, WorksheetContent, QuizContent } from "@/lib/types";
-import { Check, X, HelpCircle, Loader2, Sparkles, GraduationCap, ClipboardCheck, RotateCcw } from "lucide-react";
+import { Check, X, HelpCircle, Loader2, GraduationCap, ClipboardCheck, RotateCcw } from "lucide-react";
 
 interface PreviewResult {
   autoScore: number;
@@ -213,14 +213,14 @@ function ResultsView({
     <div>
       <div className="flex items-center justify-between gap-3 mb-6">
         <p className="text-xs text-muted-foreground bg-secondary/40 border rounded px-3 py-2 flex-1">
-          Preview only — nothing is saved. This is the real auto-marking and AI feedback for this {kind}.
+          Preview only, nothing is saved. This is the real auto-marking and AI feedback for this {kind}.
         </p>
         <Button variant="ghost" size="sm" onClick={onReset}>
           <RotateCcw className="h-3.5 w-3.5 mr-1" />Reset and try again
         </Button>
       </div>
 
-      {/* SECTION A — the student's experience */}
+      {/* SECTION A, the student's experience */}
       <section>
         <div className="flex items-center gap-2 text-primary mb-1">
           <GraduationCap className="h-5 w-5" />
@@ -254,7 +254,7 @@ function ResultsView({
           <div className="mt-8 bg-card border rounded-lg p-6">
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                <Sparkles className="h-4 w-4" />Your feedback
+                Your feedback
               </div>
               {summary.masteryLevel && (
                 <Badge variant="secondary" className="capitalize">{summary.masteryLevel}</Badge>
@@ -294,7 +294,7 @@ function ResultsView({
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      {/* SECTION B — what the teacher receives */}
+      {/* SECTION B, what the teacher receives */}
       <section>
         <div className="flex items-center gap-2 text-primary mb-1">
           <ClipboardCheck className="h-5 w-5" />
@@ -333,7 +333,7 @@ function ResultsView({
               <div className="bg-card border rounded-md p-4">
                 <div className="flex items-center justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                    <Sparkles className="h-4 w-4" />Student analysis
+                    Student analysis
                   </div>
                   {summary.masteryLevel && (
                     <Badge variant="secondary" className="capitalize">{summary.masteryLevel}</Badge>

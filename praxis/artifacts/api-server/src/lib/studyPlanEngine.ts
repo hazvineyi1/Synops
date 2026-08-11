@@ -17,7 +17,7 @@ import { getCourseColumns, getScoreData, computeLearner, type GradebookColumn } 
  * SPECIFIC categories they are weak in, pulling matching cases + interactive activities that
  * already exist in Praxis (course content, the learner's assigned content, or the shared
  * library). The plan is built deterministically; an AI pass only writes the encouraging
- * rationale + per-item "why". If AI fails, heuristic copy is used — this never throws.
+ * rationale + per-item "why". If AI fails, heuristic copy is used, this never throws.
  */
 
 const MODEL = "claude-sonnet-4-6";
@@ -180,13 +180,13 @@ export async function generateStudyPlan(opts: {
           done: false,
         });
       } else {
-        // No matching content — a coach-led review step for that category.
+        // No matching content, a coach-led review step for that category.
         items.push({
           kind: "review",
           refType: null,
           refId: null,
           title: `Review: ${category}`,
-          why: `Revisit ${category} with your coach or the course materials — no matching practice activity was found.`,
+          why: `Revisit ${category} with your coach or the course materials, no matching practice activity was found.`,
           category,
           done: false,
         });
@@ -229,7 +229,7 @@ async function writeRationale(
   items: StudyPlanItem[],
 ): Promise<string> {
   const fallback =
-    `You're close. Recent work shows you're finding ${weakCategories.slice(0, 3).join(", ")} tricky — that's exactly what this short plan rebuilds. ` +
+    `You're close. Recent work shows you're finding ${weakCategories.slice(0, 3).join(", ")} tricky, that's exactly what this short plan rebuilds. ` +
     `Work through these ${items.length} step${items.length === 1 ? "" : "s"} in order; each one targets a specific gap, and finishing them should lift your mastery back on track.`;
   try {
     const system =

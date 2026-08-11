@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
-import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Sparkles, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Wand2, Rocket, Upload, ArrowLeft, BookOpenCheck } from "lucide-react";
+import { Plus, Eye, Pencil, Inbox, Trash2, ExternalLink, Loader2, Code2, Share2, Link2, Copy, Check, CalendarClock, Clock, CheckCircle2, Play, Rocket, Upload, ArrowLeft, BookOpenCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -177,14 +177,14 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
             <div>
               <Label className="text-sm">Bloom's level</Label>
               <select value={bloom} onChange={(e) => setBloom(e.target.value)} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm">
-                <option value="">—</option>
+                <option value="">, </option>
                 {BLOOMS.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
             <div>
               <Label className="text-sm">Difficulty</Label>
               <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm capitalize">
-                <option value="">—</option>
+                <option value="">, </option>
                 {DIFFS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
@@ -255,7 +255,7 @@ function AIGenerateDialog({ onClose, onUse }: { onClose: () => void; onUse: (g: 
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-3xl max-h-[88vh] overflow-auto rounded-xl bg-white shadow-xl border">
         <div className="sticky top-0 bg-white border-b px-5 py-3.5 flex items-center justify-between">
-          <h2 className="font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4" /> Generate activities from course content</h2>
+          <h2 className="font-semibold flex items-center gap-2">Generate activities from course content</h2>
           <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground">✕</button>
         </div>
         <div className="p-5 space-y-4">
@@ -289,15 +289,15 @@ function AIGenerateDialog({ onClose, onUse }: { onClose: () => void; onUse: (g: 
               {[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
             </select>
             <Button size="sm" onClick={() => gen.mutate()} disabled={content.trim().length < 40 || gen.isPending} className="ml-auto">
-              {gen.isPending ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Generating…</> : <><Wand2 className="h-4 w-4 mr-1.5" /> Generate</>}
+              {gen.isPending ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Generating…</> : <>Generate</>}
             </Button>
           </div>
 
-          {gen.isPending && <p className="text-xs text-muted-foreground">The generator is designing gamified activities and assigning each a Bloom's level — this can take a moment.</p>}
+          {gen.isPending && <p className="text-xs text-muted-foreground">The generator is designing gamified activities and assigning each a Bloom's level, this can take a moment.</p>}
 
           {drafts.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-medium">{drafts.length} activities — preview, then use the ones you want.</p>
+              <p className="text-sm font-medium">{drafts.length} activities, preview, then use the ones you want.</p>
               {drafts.map((d, i) => (
                 <div key={i} className="rounded-lg border">
                   <div className="flex items-center justify-between gap-2 px-3 py-2 border-b bg-muted/30">
@@ -421,7 +421,7 @@ function Submissions({ activityId }: { activityId: string }) {
             <tr key={s.id} className="border-b border-border/50 align-top">
               <td className="px-3 py-2"><div className="font-medium">{s.learnerName}</div><div className="text-xs text-muted-foreground">{new Date(s.submittedAt).toLocaleString()}</div></td>
               <td className="px-3 py-2 max-w-[22rem]"><code className="text-xs text-muted-foreground break-all">{payloadPreview(s.payload)}</code></td>
-              <td className="px-3 py-2">{s.score ?? "—"}</td>
+              <td className="px-3 py-2">{s.score ?? ", "}</td>
               <td className="px-3 py-2"><Badge variant={s.status === "approved" ? "default" : "secondary"}>{s.status}</Badge></td>
               <td className="px-3 py-2 text-right whitespace-nowrap">
                 {s.status !== "approved" && <Button size="sm" variant="ghost" onClick={() => review.mutate({ id: s.id, status: "approved" })}>Approve</Button>}
@@ -456,7 +456,7 @@ function LearnerActivities() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <PageHeader title="Activities" icon={Sparkles} subtitle="Interactive activities assigned to you." />
+      <PageHeader title="Activities" icon={BookOpenCheck} subtitle="Interactive activities assigned to you." />
       {isLoading ? <Skeletons /> : rows.length === 0 ? (
         <Card className="p-10 text-center text-muted-foreground">Nothing assigned yet. Check back soon.</Card>
       ) : (
@@ -510,7 +510,7 @@ function AddActivityToCourseDialog({ activity, onClose }: { activity: Activity; 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <Card className="w-full max-w-md p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
         <div className="font-semibold text-sm">{isClone ? "Add" : "Add"} &quot;{activity.title}&quot; to a {isClone ? "class" : "course"}</div>
-        {isClone && <p className="text-xs text-muted-foreground">Pick the course your class is taking and a module. A copy of this game is placed there for your learners — the library original stays put.</p>}
+        {isClone && <p className="text-xs text-muted-foreground">Pick the course your class is taking and a module. A copy of this game is placed there for your learners, the library original stays put.</p>}
         <div>
           <Label className="text-sm">Course</Label>
           <select value={courseId} onChange={(e) => { setCourseId(e.target.value); setModuleId(""); }} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm">
@@ -535,7 +535,7 @@ function AddActivityToCourseDialog({ activity, onClose }: { activity: Activity; 
 }
 
 /**
- * Game Studio — generate a playable game from lesson content with AI, preview and edit it, then save
+ * Game Studio, generate a playable game from lesson content with AI, preview and edit it, then save
  * it to the library. Admin picks the game type, subject, grade band and rigor, and either pastes
  * content or pulls a module's reading. The result is grounded in that content and organized by tags.
  */
@@ -545,7 +545,7 @@ function GameStudioDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
   const { user } = useSession();
   const isHub = !!user && ["super_admin", "instructional_designer"].includes(user.role);
   const { data: meta } = useQuery({ queryKey: ["game-templates"], queryFn: () => apiFetch<GameMeta>("/game-templates") });
-  const templates = [...(meta?.templates ?? []), { key: "mathcoach", name: "🧮 Math Coach", blurb: "Interactive problems with a Socratic coach that hints without giving the answer — great for visual, step-by-step math.", bands: ["k2", "35", "68", "912"] }];
+  const templates = [...(meta?.templates ?? []), { key: "mathcoach", name: "🧮 Math Coach", blurb: "Interactive problems with a Socratic coach that hints without giving the answer, great for visual, step-by-step math.", bands: ["k2", "35", "68", "912"] }];
   const bands = meta?.bands ?? [{ key: "k2", label: "K–2" }, { key: "35", label: "Grades 3–5" }, { key: "68", label: "Grades 6–8" }, { key: "912", label: "Grades 9–12" }];
   const rigorLevels = meta?.rigor ?? ["foundational", "intermediate", "advanced"];
 
@@ -670,7 +670,7 @@ function GameStudioDialog({ onClose, onSaved }: { onClose: () => void; onSaved: 
             <div className="flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
               <Button size="sm" disabled={!canGenerate || generate.isPending} onClick={() => generate.mutate()}>
-                {generate.isPending ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Generating…</> : <><Sparkles className="h-4 w-4 mr-1.5" /> Generate</>}
+                {generate.isPending ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Generating…</> : <>Generate</>}
               </Button>
             </div>
           </div>
@@ -771,13 +771,13 @@ export function ActivitiesAdmin() {
 
   const setPublish = useMutation({
     mutationFn: (v: { id: string; published: boolean }) => activitiesApi.update(v.id, { published: v.published }),
-    onSuccess: (a) => { toast({ title: a.published ? "Published — now shareable and assignable" : "Unpublished" }); qc.invalidateQueries({ queryKey: ["activities"] }); },
+    onSuccess: (a) => { toast({ title: a.published ? "Published, now shareable and assignable" : "Unpublished" }); qc.invalidateQueries({ queryKey: ["activities"] }); },
     onError: (e) => toast({ title: "Could not update", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
   const startNew = (mode: NewMode) => { setSeed(preCourseId ? { courseId: preCourseId } : null); setNewMode(mode); setCreating(true); setSelectedId(null); setRightTab("edit"); setNewMenu(false); };
 
-  // Library filters — make games easy to locate by type and grade band.
+  // Library filters, make games easy to locate by type and grade band.
   const GAME_TYPES: { key: string; label: string }[] = [
     { key: "jeopardy", label: "Jeopardy" }, { key: "feud", label: "Family Feud" }, { key: "bingo", label: "Bingo" },
     { key: "password", label: "Password" }, { key: "wheel", label: "Wheel" }, { key: "escape", label: "Escape Room" },
@@ -803,7 +803,7 @@ export function ActivitiesAdmin() {
       {aiOpen && <AIGenerateDialog onClose={() => setAiOpen(false)} onUse={(g) => { setSeed({ title: g.title, instructions: g.instructions, html: renderActivity(g.type as InteractionType, g.spec as ActivitySpec), kind: g.type, bloomsLevel: g.bloomsLevel, difficulty: g.difficulty as Activity["difficulty"], source: "ai", ...(preCourseId ? { courseId: preCourseId } : {}) }); setNewMode("html"); setCreating(true); setSelectedId(null); setRightTab("edit"); setAiOpen(false); }} />}
       {preCourseId && !detailActive && (
         <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" /> New activities you create here will be linked to the course you came from.
+          New activities you create here will be linked to the course you came from.
         </div>
       )}
       {builderOpen && <ActivityBuilder onClose={() => setBuilderOpen(false)} onCreated={(a) => { setBuilderOpen(false); setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} />}
@@ -814,19 +814,19 @@ export function ActivitiesAdmin() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-serif font-bold tracking-tight">Interactive Activities</h1>
-          <p className="text-muted-foreground">Build or embed activities, or let AI generate gamified ones from your content — then publish and assign.</p>
+          <p className="text-muted-foreground">Build or embed activities, or let AI generate gamified ones from your content, then publish and assign.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" className="border-indigo-500/40 text-indigo-700" onClick={() => setGameStudioOpen(true)}><Play className="h-4 w-4 mr-1.5" /> Generate a game</Button>
-          <Button variant="outline" onClick={() => setAiOpen(true)}><Sparkles className="h-4 w-4 mr-1.5" /> Generate with AI</Button>
+          <Button variant="outline" onClick={() => setAiOpen(true)}>Generate with AI</Button>
           <div className="relative">
             <Button onClick={() => setNewMenu((o) => !o)}><Plus className="h-4 w-4 mr-1" /> New activity</Button>
             {newMenu && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setNewMenu(false)} />
                 <div className="absolute right-0 top-11 z-20 w-60 rounded-lg border bg-white shadow-lg p-1 text-sm">
-                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => { setNewMenu(false); setBuilderOpen(true); }}><Wand2 className="h-4 w-4" /> Build interactive <span className="ml-auto text-[10px] text-muted-foreground">quiz, cards, sort…</span></button>
-                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => { setNewMenu(false); setAiOpen(true); }}><Sparkles className="h-4 w-4" /> Generate with AI</button>
+                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => { setNewMenu(false); setBuilderOpen(true); }}>Build interactive <span className="ml-auto text-[10px] text-muted-foreground">quiz, cards, sort…</span></button>
+                  <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => { setNewMenu(false); setAiOpen(true); }}>Generate with AI</button>
                   <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2" onClick={() => startNew("embed")}><Link2 className="h-4 w-4" /> Paste embed code</button>
                   <div className="my-1 border-t" />
                   <button className="w-full text-left px-3 py-2 rounded-md hover:bg-muted flex items-center gap-2 text-muted-foreground" onClick={() => startNew("html")}><Code2 className="h-4 w-4" /> Advanced (raw HTML)</button>
@@ -886,7 +886,7 @@ export function ActivitiesAdmin() {
                 <div className="space-y-2">
                   {selected.instructions && <p className="text-sm text-muted-foreground">{selected.instructions}</p>}
                   <ActivityPlayer html={selected.html} embedUrl={selected.embedUrl} disabled />
-                  <p className="text-xs text-muted-foreground">Preview — submissions here are not recorded.</p>
+                  <p className="text-xs text-muted-foreground">Preview, submissions here are not recorded.</p>
                 </div>
               ) : rightTab === "edit" ? (
                 <Editor activity={selected} newMode={null} seed={null} onSaved={(a) => { setSelectedId(a.id); setRightTab("preview"); }} />
@@ -901,7 +901,7 @@ export function ActivitiesAdmin() {
       ) : isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <Card key={i} className="h-32" />)}</div>
       ) : !activities || activities.length === 0 ? (
-        <Card className="p-12 text-center text-muted-foreground">No activities yet — use “New activity”, “Generate a game”, or “Generate with AI” to make one.</Card>
+        <Card className="p-12 text-center text-muted-foreground">No activities yet, use “New activity”, “Generate a game”, or “Generate with AI” to make one.</Card>
       ) : (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 p-2">

@@ -1,7 +1,7 @@
 import { pgTable, text, integer, timestamp } from "drizzle-orm/pg-core";
 
 /**
- * Partner broadcast announcements — the sent history for the Partner Communications page. Records
+ * Partner broadcast announcements, the sent history for the Partner Communications page. Records
  * what was sent, to which audience, on which channel, and the recipient count at send time. Actual
  * in-app / email delivery is a separate messaging step; this persists the record + audit trail.
  */

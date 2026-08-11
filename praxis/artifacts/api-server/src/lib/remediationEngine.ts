@@ -12,8 +12,8 @@ import { eq, and, inArray, asc, desc } from "drizzle-orm";
 
 /**
  * Adaptive, multi-modal remediation. For a learner's gap (a gradebook category on their
- * active off-track plan) we generate ONCE — grounded in that learner's OWN course content
- * (module beats) — a set of flashcards + knowledge questions, then persist them so the
+ * active off-track plan) we generate ONCE, grounded in that learner's OWN course content
+ * (module beats), a set of flashcards + knowledge questions, then persist them so the
  * learner works spaced repetition + quizzing over their real class material. Personalised:
  * the coach copy addresses the learner by name. Deterministic fallback so it never blocks.
  */

@@ -52,9 +52,9 @@ describe("generateSessionAnalysis (end-of-session report + recommendation)", () 
   });
 
   it("sanitises markdown and dashes out of every field", async () => {
-    create.mockResolvedValue({ content: [{ type: "text", text: JSON.stringify({ summary: "You did **well** here — really.", strengths: ["*Clear* reasoning"], focusAreas: ["Edge – cases"], recommendation: "Keep going — you are close." }) }] });
+    create.mockResolvedValue({ content: [{ type: "text", text: JSON.stringify({ summary: "You did **well** here, really.", strengths: ["*Clear* reasoning"], focusAreas: ["Edge – cases"], recommendation: "Keep going, you are close." }) }] });
     const a = await generateSessionAnalysis({ ctx, history, finalMastery: 0.5, interactions: 4, reachedLimit: true, mastered: false });
     const joined = [a.summary, ...a.strengths, ...a.focusAreas, a.recommendation].join(" ");
-    expect(joined).not.toMatch(/[*—–]/); // no asterisks, em or en dashes
+    expect(joined).not.toMatch(/[*, –]/); // no asterisks, em or en dashes
   });
 });

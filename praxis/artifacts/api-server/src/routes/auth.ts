@@ -113,7 +113,7 @@ router.post("/auth/login", async (req, res) => {
 
   // Second factor. DORMANT for everyone who hasn't enrolled: mfaEnabled mirrors "has a verified
   // factor", so this block is skipped and login behaves exactly as before for non-MFA users. Any
-  // ONE verified factor satisfies the challenge — the client picks a method and re-POSTs here.
+  // ONE verified factor satisfies the challenge, the client picks a method and re-POSTs here.
   if (user.mfaEnabled) {
     const method = String(req.body?.method ?? "").trim();
     const code = String(req.body?.code ?? req.body?.mfaCode ?? "").trim();
@@ -184,7 +184,7 @@ router.post("/auth/login", async (req, res) => {
 // unauthenticated caller) and then either sends an OTP or returns WebAuthn options for the chosen
 // method, ready for the client to complete on /auth/login.
 
-/** POST /auth/mfa/challenge { email, password, method } — issue an OTP or passkey challenge at login. */
+/** POST /auth/mfa/challenge { email, password, method }, issue an OTP or passkey challenge at login. */
 router.post("/auth/mfa/challenge", async (req, res) => {
   const email = String(req.body?.email ?? "").toLowerCase().trim();
   const password = String(req.body?.password ?? "");
@@ -276,12 +276,12 @@ async function verifyPasskeyAssertion(userId: string, assertion: unknown, req: {
  *
  * One-click, password-free sign-in for sales/demo use on the Enza site. DELIBERATELY
  * NARROW: it can only ever produce a session for one of two fixed demo identities, chosen
- * by an allow-listed keyword — never an arbitrary user id or email from the request. So it
+ * by an allow-listed keyword, never an arbitrary user id or email from the request. So it
  * cannot be turned into "log me in as anyone".
  *
  *   student -> enza@student1.test  (an existing seeded demo learner)
  *   admin   -> demo.admin@enzaglobalmedia.co.za  (a dedicated demo partner_admin, lazily
- *              created against the Enza partner; it holds no secret — its password is random
+ *              created against the Enza partner; it holds no secret, its password is random
  *              and unusable, the only way in is this button)
  *
  * Guarded by ENABLE_DEMO_LOGIN: set it to "0" to switch the whole feature off without a
@@ -324,7 +324,7 @@ router.post("/auth/demo-login", async (req, res) => {
     return;
   }
   // Defence in depth: the one-click demo only works on an allow-listed host (defaulting to the Enza
-  // demo site) and is invisible everywhere else — so it can never be used to enter another tenant.
+  // demo site) and is invisible everywhere else, so it can never be used to enter another tenant.
   // Off entirely with ENABLE_DEMO_LOGIN=0.
   const configured = (process.env.DEMO_LOGIN_HOSTS || "")
     .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -428,7 +428,7 @@ router.post("/auth/demo-login", async (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
-/** POST /auth/logout — revokes THIS session only. */
+/** POST /auth/logout, revokes THIS session only. */
 router.post("/auth/logout", async (req, res) => {
   const token = req.cookies?.[SESSION_COOKIE];
   if (token) {
@@ -445,7 +445,7 @@ router.post("/auth/logout", async (req, res) => {
  * Heal a facilitator-tier account that is missing its partnerId. A partner_admin/org_admin
  * created through some provisioning paths ended up with organisationId set but partnerId
  * null. The dashboard keys the partner-stats query off partnerId, and the generated hook
- * DISABLES the query when partnerId is null/undefined — so the Overview hung on an infinite
+ * DISABLES the query when partnerId is null/undefined, so the Overview hung on an infinite
  * loading skeleton. Backfill partnerId from the owning organisation (and persist it so the
  * repair is permanent), then the query enables and real numbers render.
  */
@@ -562,7 +562,7 @@ router.post("/auth/reset-password", async (req, res) => {
   res.json({ ok: true, message: "Password updated. You can now sign in." });
 });
 
-/** POST /auth/change-password — for a signed-in user. */
+/** POST /auth/change-password, for a signed-in user. */
 router.post("/auth/change-password", requireAuth, async (req, res) => {
   const current = String(req.body?.currentPassword ?? "");
   const next = String(req.body?.newPassword ?? "");

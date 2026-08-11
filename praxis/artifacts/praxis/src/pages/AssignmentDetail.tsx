@@ -13,13 +13,13 @@ import { Progress } from '@/components/ui/progress';
 import {
   ChevronRight, CheckCircle, Clock, AlertCircle, BookOpen,
   FileText, MessageCircle, Layers, HelpCircle, X, Upload,
-  ChevronDown, ChevronUp, Star, Sparkles, Trophy, Award, Zap,
+  ChevronDown, ChevronUp, Star, Trophy, Award, Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { VoiceInputButton } from '@/components/VoiceInputButton';
 
 function formatDate(d?: string) {
-  if (!d) return '—';
+  if (!d) return ', ';
   return new Date(d).toLocaleDateString('en-ZA', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
@@ -235,10 +235,10 @@ function QuizForm({ questions, passingScore = 70, value, onChange, submitted, on
           <div className="text-4xl font-black">{score}%</div>
           <div className="text-sm font-bold mt-0.5">{tier.label} · {correctCount} of {questions.length} correct</div>
           <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-semibold">
-            <Sparkles className="h-4 w-4" /> +{xp} XP earned
+            +{xp} XP earned
           </div>
           <div className="mt-2 text-xs text-muted-foreground">
-            {passed ? 'Passed! Submit to record your grade.' : `${passingScore}% to pass — you can review below and resubmit to improve.`}
+            {passed ? 'Passed! Submit to record your grade.' : `${passingScore}% to pass, you can review below and resubmit to improve.`}
           </div>
           <Progress value={score} className="mt-4 h-2" />
         </div>
@@ -256,7 +256,7 @@ function QuizForm({ questions, passingScore = 70, value, onChange, submitted, on
                   <span className="font-medium">{i + 1}. {q.text}</span>
                 </div>
                 <div className="ml-6 space-y-1 text-xs text-muted-foreground">
-                  <div>Your answer: <span className={correct ? 'text-emerald-700' : 'text-rose-700 line-through'}>{q.options[chosen ?? -1] ?? '—'}</span></div>
+                  <div>Your answer: <span className={correct ? 'text-emerald-700' : 'text-rose-700 line-through'}>{q.options[chosen ?? -1] ?? ', '}</span></div>
                   {!correct && <div>Correct: <span className="text-emerald-700">{q.options[q.correct]}</span></div>}
                 </div>
               </div>
@@ -376,9 +376,9 @@ function GameResult({ correct, total, passingScore = 60 }: { correct: number; to
       <div className="text-4xl font-black">{score}%</div>
       <div className="text-sm font-bold mt-0.5">{tier.label} · {correct} of {total} correct</div>
       <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-3 py-1 text-sm font-semibold">
-        <Sparkles className="h-4 w-4" /> +{xp} XP earned
+        +{xp} XP earned
       </div>
-      <div className="mt-2 text-xs text-muted-foreground">{passed ? 'Passed! Submit to record your grade.' : `${passingScore}% to pass — you can play again to improve.`}</div>
+      <div className="mt-2 text-xs text-muted-foreground">{passed ? 'Passed! Submit to record your grade.' : `${passingScore}% to pass, you can play again to improve.`}</div>
       <Progress value={score} className="mt-4 h-2" />
     </div>
   );
@@ -439,7 +439,7 @@ function MatchGame({ pairs, submitted, onChange, onSubmit }: {
     <div className="space-y-2">{pairs.map(p => { const ok = matches[p.left] === p.right; return (
       <div key={p.left} className={cn('rounded-xl border p-3 text-sm', ok ? 'border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20' : 'border-rose-200 bg-rose-50/50 dark:bg-rose-950/20')}>
         <div className="flex items-center gap-2 font-medium">{ok ? <CheckCircle className="h-4 w-4 text-emerald-600" /> : <X className="h-4 w-4 text-rose-600" />}{p.left}</div>
-        <div className="ml-6 text-xs text-muted-foreground mt-0.5">You matched: {matches[p.left] ?? '—'}{!ok && <> · Correct: <span className="text-emerald-700">{p.right}</span></>}</div></div>); })}</div></div>;
+        <div className="ml-6 text-xs text-muted-foreground mt-0.5">You matched: {matches[p.left] ?? ', '}{!ok && <> · Correct: <span className="text-emerald-700">{p.right}</span></>}</div></div>); })}</div></div>;
   return (
     <div className="space-y-3">
       {pairs.map(p => (
@@ -489,7 +489,7 @@ function JeopardyGame({ categories, submitted, onChange, onSubmit }: {
       </div>
       {activeTile && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-4">
-          <div className="text-sm font-semibold mb-3">{activeTile.value} — {activeTile.question}</div>
+          <div className="text-sm font-semibold mb-3">{activeTile.value}, {activeTile.question}</div>
           <div className="space-y-2">
             {activeTile.options.map((o, oi) => (
               <button key={oi} type="button" onClick={() => answer(activeTile.id, oi)} className="w-full text-left text-sm rounded-lg border border-border hover:bg-muted/50 p-3">{o}</button>
@@ -552,7 +552,7 @@ async function readFileToBase64(f: File): Promise<{ filename: string; dataBase64
 
 /**
  * A compact "attach a document instead" row. Lets a written submission (essay, etc.) carry
- * an uploaded file without the big drop-zone dominating the form — the primary path stays
+ * an uploaded file without the big drop-zone dominating the form, the primary path stays
  * typing/pasting into the editor, the attachment is the alternative.
  */
 function AttachFile({ file, onFileChange }: {
@@ -592,7 +592,7 @@ function AttachFile({ file, onFileChange }: {
 /**
  * The written-submission editor for essays and open responses. A large editor is the point:
  * the previous layout crammed this into a one-third sidebar column where a long essay was
- * unreadable as you wrote it. Type, paste, or attach a document — all three are first-class.
+ * unreadable as you wrote it. Type, paste, or attach a document, all three are first-class.
  */
 function WrittenSubmission({ value, onChange, file, onFileChange, minWords, placeholder }: {
   value: string;
@@ -677,7 +677,7 @@ function FileUploadForm({ text, onTextChange, file, onFileChange }: {
         )}
       </div>
       {error && <p className="text-xs text-red-500 text-center">{error}</p>}
-      <div className="text-xs text-muted-foreground text-center">— or add written notes below —</div>
+      <div className="text-xs text-muted-foreground text-center">, or add written notes below, </div>
       <Textarea
         placeholder="Optional: add any written notes or context…"
         value={text}
@@ -790,7 +790,7 @@ function StaffGradingPanel({ assignmentId, pointsPossible }: { assignmentId: str
                       {s.aiRubricAssessment.map((c: any) => (
                         <div key={c.criterion} className="text-xs mb-1">
                           <span className="font-medium">{c.criterion}</span>
-                          <span className="text-muted-foreground"> — {c.points} / {c.maxPoints}</span>
+                          <span className="text-muted-foreground">, {c.points} / {c.maxPoints}</span>
                           {c.note && <p className="text-muted-foreground leading-relaxed">{c.note}</p>}
                         </div>
                       ))}
@@ -1065,7 +1065,7 @@ export function AssignmentDetail() {
                 )}
                 {submission.body && (() => {
                   // Game/quiz submissions store a JSON payload ({type, answers, score, passed}).
-                  // Never dump raw JSON at the learner — render a readable summary instead.
+                  // Never dump raw JSON at the learner, render a readable summary instead.
                   let parsed: any = null;
                   try { parsed = JSON.parse(submission.body); } catch { /* plain text */ }
                   if (parsed && typeof parsed === 'object' && (parsed.type || parsed.answers || parsed.score !== undefined)) {
@@ -1132,11 +1132,10 @@ export function AssignmentDetail() {
             <Card className="border-amber-200 bg-amber-50/40 dark:bg-amber-950/20">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-600" />
                   Early feedback
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Automated, and not your grade. Your facilitator marks this work — use this to start improving now.
+                  Automated, and not your grade. Your facilitator marks this work, use this to start improving now.
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -1252,12 +1251,12 @@ export function AssignmentDetail() {
                   <FileUploadForm text={essay} onTextChange={setEssay} file={upload} onFileChange={setUpload} />
                 )}
 
-                {/* ── Essay (default) — type, paste, or attach a document ── */}
+                {/* ── Essay (default), type, paste, or attach a document ── */}
                 {(subType === 'essay' || !['reflection','case_study','quiz','order','match','jeopardy','discussion','file_upload'].includes(subType)) && (
                   <WrittenSubmission value={essay} onChange={setEssay} file={upload} onFileChange={setUpload} minWords={assignment.minWords} />
                 )}
 
-                {/* Submit button — not shown for quiz (handled inside QuizForm) */}
+                {/* Submit button, not shown for quiz (handled inside QuizForm) */}
                 {subType !== 'quiz' && (
                   <Button
                     className="w-full"

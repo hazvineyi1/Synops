@@ -30,7 +30,7 @@ import { eq, inArray, and, or } from "drizzle-orm";
  *    case_sessions.rubricScores join back by criterion NAME, giving per-standard mastery.
  *  - Learner outcomes (completion): PraxisMark credentials + evidence_records for mapped modules.
  *
- * Nothing is invented — every number is derived from the tables above. Standards are global
+ * Nothing is invented, every number is derived from the tables above. Standards are global
  * (not org-owned); a standard is "in scope" for the org iff something the org delivers maps to
  * it. Org scope = courses whose tenantId is the org OR its parent partner (courses are often
  * shared at partner level).
@@ -96,7 +96,7 @@ export async function buildAccreditationReport(orgId: string): Promise<Accredita
   const tenantIds = [orgId, ...(org?.partnerId ? [org.partnerId] : [])];
 
   // ── Org scope ──────────────────────────────────────────────────────────────
-  // Courses OWNED by the org/partner, PLUS courses DELIVERED to the org — attached to its classes
+  // Courses OWNED by the org/partner, PLUS courses DELIVERED to the org, attached to its classes
   // or that its members are enrolled in. K-12 (and adopted) courses are platform-owned, so a
   // tenant-only scope would miss them entirely.
   const [ownedCourses, orgMembers, orgClasses] = await Promise.all([
@@ -174,7 +174,7 @@ export async function buildAccreditationReport(orgId: string): Promise<Accredita
 
   // ── Interactive activities (games, Math Coach, quizzes) as assessed outcomes ──
   // Any scored activity attached to a mapped module/course contributes its learners' best scores as
-  // per-standard mastery — so accreditation reflects the real activity data, not just cases.
+  // per-standard mastery, so accreditation reflects the real activity data, not just cases.
   const actConds = [];
   if (moduleIds.length) actConds.push(inArray(interactiveActivitiesTable.moduleId, moduleIds));
   if (courseIds.length) actConds.push(inArray(interactiveActivitiesTable.courseId, courseIds));

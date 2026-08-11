@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Users, Layers, BookOpen, CheckCircle2, Check, Search, UserPlus, ArrowRight, ArrowLeft, Loader2, PartyPopper } from 'lucide-react';
 
 /**
- * Guided "Assign learners" wizard: walks the full allocation pipeline in one place —
+ * Guided "Assign learners" wizard: walks the full allocation pipeline in one place, 
  * Learners (pick org learners / add a new one to the org)  ->  Class (choose or create)
  * ->  Courses (assign to the class)  ->  Review & enrol. Every write MERGES into the class's
  * existing roster/courses (never replaces), then materialises real enrolments. Launchable
@@ -119,7 +119,7 @@ export function AssignWizard({
         {result ? (
           <div className="py-6 text-center space-y-3">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"><PartyPopper className="h-6 w-6" /></div>
-            <div className="text-lg font-semibold">Done — learners are enrolled</div>
+            <div className="text-lg font-semibold">Done, learners are enrolled</div>
             <p className="text-sm text-muted-foreground">
               {result.learners} learner{result.learners === 1 ? '' : 's'} added to <span className="font-medium text-foreground">{result.className}</span> and enrolled in {result.courses} course{result.courses === 1 ? '' : 's'} ({result.enrolled} new place{result.enrolled === 1 ? '' : 's'}).
             </p>
@@ -147,7 +147,7 @@ export function AssignWizard({
               })}
             </div>
 
-            {/* STEP 1 — LEARNERS (+ add to org) */}
+            {/* STEP 1, LEARNERS (+ add to org) */}
             {step === 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -164,7 +164,7 @@ export function AssignWizard({
                       </button>
                     );
                   })}
-                  {filteredLearners.length === 0 && <div className="text-sm text-muted-foreground py-4 text-center sm:col-span-2">{learners.length === 0 ? 'No learners in this organisation yet — add one below.' : 'No learners match your search.'}</div>}
+                  {filteredLearners.length === 0 && <div className="text-sm text-muted-foreground py-4 text-center sm:col-span-2">{learners.length === 0 ? 'No learners in this organisation yet, add one below.' : 'No learners match your search.'}</div>}
                 </div>
                 <div className="rounded-lg border border-dashed border-border p-3">
                   <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><UserPlus className="h-3.5 w-3.5" /> Add a new learner to this organisation</div>
@@ -179,7 +179,7 @@ export function AssignWizard({
               </div>
             )}
 
-            {/* STEP 2 — CLASS */}
+            {/* STEP 2, CLASS */}
             {step === 1 && (
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold">Which class do these learners go into?</h3>
@@ -193,7 +193,7 @@ export function AssignWizard({
                       </button>
                     );
                   })}
-                  {classes.length === 0 && <div className="text-sm text-muted-foreground py-2 sm:col-span-2">No classes yet — create the first one below.</div>}
+                  {classes.length === 0 && <div className="text-sm text-muted-foreground py-2 sm:col-span-2">No classes yet, create the first one below.</div>}
                 </div>
                 <div className={cn('rounded-lg border p-3', classMode === 'new' ? 'border-primary bg-primary/5' : 'border-dashed border-border')}>
                   <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5"><Layers className="h-3.5 w-3.5" /> Or create a new class</div>
@@ -202,7 +202,7 @@ export function AssignWizard({
               </div>
             )}
 
-            {/* STEP 3 — COURSES */}
+            {/* STEP 3, COURSES */}
             {step === 2 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -225,7 +225,7 @@ export function AssignWizard({
               </div>
             )}
 
-            {/* STEP 4 — REVIEW */}
+            {/* STEP 4, REVIEW */}
             {step === 3 && (
               <div className="space-y-3">
                 <h3 className="text-sm font-semibold">Review &amp; confirm</h3>
@@ -234,7 +234,7 @@ export function AssignWizard({
                   <div className="flex items-center gap-3 p-3"><Layers className="h-4 w-4 text-primary shrink-0" /><div><div className="font-medium">{chosenClassName}</div><div className="text-xs text-muted-foreground">{classMode === 'new' ? 'New class will be created' : 'Existing class'}</div></div></div>
                   <div className="flex items-center gap-3 p-3"><BookOpen className="h-4 w-4 text-primary shrink-0" /><div><div className="font-medium">{selCourses.size} course{selCourses.size === 1 ? '' : 's'}</div><div className="text-xs text-muted-foreground truncate">{[...selCourses].map((id) => courses.find((c) => c.id === id)?.title).filter(Boolean).slice(0, 3).join(', ')}{selCourses.size > 3 ? ` +${selCourses.size - 3} more` : ''}</div></div></div>
                 </div>
-                <p className="text-xs text-muted-foreground">This will add the learners and courses to the class (keeping anything already there) and enrol every selected learner in every selected course — up to {selLearners.size * selCourses.size} enrolment{selLearners.size * selCourses.size === 1 ? '' : 's'}.</p>
+                <p className="text-xs text-muted-foreground">This will add the learners and courses to the class (keeping anything already there) and enrol every selected learner in every selected course, up to {selLearners.size * selCourses.size} enrolment{selLearners.size * selCourses.size === 1 ? '' : 's'}.</p>
                 {finalize.isError && <div className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{(finalize.error as Error)?.message ?? 'Something went wrong. Please try again.'}</div>}
               </div>
             )}

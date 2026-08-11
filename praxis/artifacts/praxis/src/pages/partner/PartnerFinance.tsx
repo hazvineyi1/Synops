@@ -41,7 +41,7 @@ function NumInput({ value, onChange, onCommit, prefix, suffix, width = 'w-28' }:
 }
 
 /**
- * Financial Hub (spec §3) — now backed by real billing tables. Subscriptions and invoices persist
+ * Financial Hub (spec §3), now backed by real billing tables. Subscriptions and invoices persist
  * via /partners/:id/billing. Funder disbursement is derived from the real funding agreements.
  * VAT is derived from real invoices. No payment gateway: "Mark paid" sets the invoice status.
  */
@@ -144,7 +144,7 @@ export function PartnerFinance() {
                 {isLoading && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">Loading…</td></tr>}
                 {subs.map((s) => (
                   <tr key={s.id}>
-                    <td className="p-3 font-medium">{s.orgName ? orgLabel(s.orgName) : '—'}</td>
+                    <td className="p-3 font-medium">{s.orgName ? orgLabel(s.orgName) : ', '}</td>
                     <td className="p-3">
                       <select value={s.planName} onChange={(e) => { const p = PLANS.find((x) => x.name === e.target.value); setLocalSub(s.id, { planName: e.target.value, ...(p ? { pricePerSeat: p.price } : {}) }); subPatch.mutate({ id: s.id, patch: { planName: e.target.value, ...(p ? { pricePerSeat: p.price } : {}) } }); }}
                         className="h-7 rounded border border-input bg-background px-1 text-xs">
@@ -167,7 +167,7 @@ export function PartnerFinance() {
           </Card>
         </TabsContent>
 
-        {/* Seat licensing — pooled-seat reconciliation from real usage, and per-org invoice generation */}
+        {/* Seat licensing, pooled-seat reconciliation from real usage, and per-org invoice generation */}
         <TabsContent value="seats" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
             <StatCard icon={Wallet} label="Licensed (pool + orgs)" value={String(seatUsage?.totalLicensed ?? 0)} tint="bg-muted text-muted-foreground" />
@@ -226,8 +226,8 @@ export function PartnerFinance() {
                 {invoices.map((i) => (
                   <tr key={i.id}>
                     <td className="p-3 font-mono text-xs">{i.number}</td>
-                    <td className="p-3">{i.orgName ? orgLabel(i.orgName) : '—'}</td>
-                    <td className="p-3 text-muted-foreground">{i.period ?? '—'}</td>
+                    <td className="p-3">{i.orgName ? orgLabel(i.orgName) : ', '}</td>
+                    <td className="p-3 text-muted-foreground">{i.period ?? ', '}</td>
                     <td className="p-3 text-right">{i.status === 'paid' ? <span className="tabular-nums">{ZAR(i.net)}</span> : <NumInput value={i.net} onChange={(n) => setLocalInv(i.id, { net: n })} onCommit={() => commitInvNet(i.id)} prefix="R" />}</td>
                     <td className="p-3 text-right tabular-nums text-muted-foreground">{ZAR(i.net * vatFrac)}</td>
                     <td className="p-3 text-right tabular-nums font-medium">{ZAR(i.net * (1 + vatFrac))}</td>
@@ -242,10 +242,10 @@ export function PartnerFinance() {
               </tbody>
             </table>
           </Card>
-          <p className="mt-2 text-xs text-muted-foreground">Payment gateway integration is not yet wired — "Mark paid" records the payment status. Card capture and multi-currency come with the gateway.</p>
+          <p className="mt-2 text-xs text-muted-foreground">Payment gateway integration is not yet wired, "Mark paid" records the payment status. Card capture and multi-currency come with the gateway.</p>
         </TabsContent>
 
-        {/* Funder Disbursement — derived from real funding agreements */}
+        {/* Funder Disbursement, derived from real funding agreements */}
         <TabsContent value="disb" className="mt-4">
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
@@ -269,7 +269,7 @@ export function PartnerFinance() {
           <p className="mt-2 text-xs text-muted-foreground">Disbursements are drawn from the real funding agreements in the Funders Hub.</p>
         </TabsContent>
 
-        {/* Tax / VAT — derived from real invoices */}
+        {/* Tax / VAT, derived from real invoices */}
         <TabsContent value="vat" className="mt-4 space-y-4">
           <div className="grid sm:grid-cols-3 gap-3">
             <StatCard icon={Percent} label="VAT collected (paid invoices)" value={ZAR2(vat.collected)} tint="bg-emerald-500/10 text-emerald-600" />

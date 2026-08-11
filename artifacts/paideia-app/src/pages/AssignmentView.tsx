@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 import type { Assignment, Submission, Student, ClassRow, FeedbackItem, ClassGapReport } from "@/lib/types";
-import { Copy, Check, X, HelpCircle, Link as LinkIcon, ChevronDown, ChevronUp, Loader2, Sparkles, BarChart3 } from "lucide-react";
+import { Copy, Check, X, HelpCircle, Link as LinkIcon, ChevronDown, ChevronUp, Loader2, BarChart3 } from "lucide-react";
 
 interface Resp {
   assignment: Assignment;
@@ -186,7 +186,7 @@ function SubmissionDetail({ submission }: { submission: Submission }) {
         <div className="bg-card border rounded-md p-4">
           <div className="flex items-center justify-between gap-2 mb-2">
             <div className="flex items-center gap-2 text-sm font-medium text-primary">
-              <Sparkles className="h-4 w-4" />Student analysis
+              Student analysis
             </div>
             {submission.aiSummary.masteryLevel && (
               <Badge variant="secondary" className="capitalize">{submission.aiSummary.masteryLevel}</Badge>

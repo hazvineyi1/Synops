@@ -9,7 +9,7 @@ import { useStudyKnowledgeGraph } from "@/hooks/use-study-api";
 import { useListStudyMaterials } from "@workspace/paideia-api-client";
 import {
   TrendingUp, Target, AlertCircle, Award, CheckCircle2,
-  Sparkles, BookOpen, GraduationCap, Loader2, Flame,
+  BookOpen, GraduationCap, Loader2, Flame,
   ChevronRight, Network, Brain,
 } from "lucide-react";
 
@@ -181,7 +181,7 @@ export default function StudyProgress() {
                     <Target className="h-4 w-4 text-primary" />
                     <h2 className="font-semibold text-sm">Your plan for today</h2>
                     <Badge className="text-[10px] h-4 px-1.5 bg-primary/15 text-primary border-0 hover:bg-primary/15">
-                      <Sparkles className="h-2.5 w-2.5 mr-0.5" /> AI-picked
+                      AI-picked
                     </Badge>
                   </div>
                   <div className="flex gap-1.5">

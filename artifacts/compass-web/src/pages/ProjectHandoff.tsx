@@ -34,7 +34,6 @@ import {
   FileText,
   FileType2,
   ShieldCheck,
-  Sparkles,
   GitCompare,
   Plus,
   User,
@@ -92,7 +91,7 @@ const SECTIONS: SectionConfig[] = [
     key: "ai",
     reportKey: "aiDisclosure",
     entryType: "ai_disclosure",
-    icon: Sparkles,
+    icon: FileText,
     accent: "text-purple-600",
     addLabel: "Disclose AI use",
     addTitle: "Disclose AI-assisted content",
@@ -183,7 +182,6 @@ function EntryRow({ entry }: { entry: LedgerEntry }) {
         <span>{formatDate(entry.createdAt)}</span>
         {entry.aiGenerated && (
           <Badge variant="outline" className="gap-1 border-purple-200 bg-purple-50 text-purple-800">
-            <Sparkles className="h-3 w-3" aria-hidden="true" />
             AI assisted
           </Badge>
         )}

@@ -132,7 +132,7 @@ export const activitiesApi = {
       body: JSON.stringify(input),
     }),
 
-  // AI generation — returns a menu of spec-based drafts (not persisted).
+  // AI generation, returns a menu of spec-based drafts (not persisted).
   generate: (body: { content: string; count?: number; types?: string[]; targetBloom?: string | null; targetDifficulty?: string | null }) =>
     req<{ activities: GeneratedActivity[] }>(`/activities/generate`, { method: "POST", body: JSON.stringify(body) }),
   // Extract text from an uploaded document (base64) or a URL, for the generator.

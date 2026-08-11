@@ -26,7 +26,7 @@ const TEXT_EXTS = ["txt", "md", "markdown", "csv", "tsv", "json", "rtf", "log"];
 
 async function pdfToText(buf: Buffer): Promise<string> {
   // unpdf (maintained pdf.js build) replaces pdf-parse, which is unmaintained since 2018 and bundles
-  // an old pdf.js — a risk on this attacker-controlled upload path.
+  // an old pdf.js, a risk on this attacker-controlled upload path.
   const mod: any = await import("unpdf");
   const pdf = await mod.getDocumentProxy(new Uint8Array(buf));
   const { text } = await mod.extractText(pdf, { mergePages: true });

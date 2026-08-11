@@ -38,7 +38,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
   Plus,
-  Sparkles,
   Trash2,
   Pencil,
   ListChecks,
@@ -2305,10 +2304,8 @@ function MeetingCard({
               </Select>
             </div>
             <Button size="sm" onClick={() => onGenerate(nextType)} disabled={isProcessing || !hasNotes}>
-              {isProcessing ? (
+              {isProcessing && (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
               )}
               Generate next agenda
             </Button>

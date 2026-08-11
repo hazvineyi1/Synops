@@ -27,7 +27,7 @@ function Bar({ pct, color = "bg-indigo-500" }: { pct: number; color?: string }) 
   return <div className="h-2 rounded-full bg-muted overflow-hidden w-full"><div className={`h-full ${color}`} style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} /></div>;
 }
 function ago(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return ", ";
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
   return d <= 0 ? "today" : d === 1 ? "yesterday" : `${d}d ago`;
 }
@@ -45,7 +45,7 @@ export function ClassInsights() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-serif font-bold tracking-tight">Class insights</h1>
-          <p className="text-muted-foreground">How your learners are doing across their lessons and games — at a glance, with who needs a nudge.</p>
+          <p className="text-muted-foreground">How your learners are doing across their lessons and games, at a glance, with who needs a nudge.</p>
         </div>
         {(classes?.length ?? 0) > 0 && (
           <select value={classId} onChange={(e) => setClassId(e.target.value)} className="rounded-md border border-input bg-background px-3 py-2 text-sm">
@@ -76,7 +76,7 @@ export function ClassInsights() {
             </Card>
             <Card className="p-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground"><GraduationCap className="h-4 w-4" /> Avg game score</div>
-              <div className="text-3xl font-bold mt-1">{data.summary.avgScore == null ? "—" : `${data.summary.avgScore}%`}</div>
+              <div className="text-3xl font-bold mt-1">{data.summary.avgScore == null ? ", " : `${data.summary.avgScore}%`}</div>
               <div className="text-xs text-muted-foreground mt-1">{data.summary.activitiesCompleted} activities completed</div>
             </Card>
             <Card className="p-4">
@@ -135,7 +135,7 @@ export function ClassInsights() {
                       <tr key={l.userId} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="px-4 py-2.5"><div className="font-medium">{l.name}</div><div className="text-[11px] text-muted-foreground">{l.email}</div></td>
                         <td className="px-3 py-2.5"><div className="flex items-center gap-2"><Bar pct={l.progressPct} /><span className="text-xs tabular-nums w-9 text-right">{l.progressPct}%</span></div></td>
-                        <td className="px-3 py-2.5 tabular-nums">{l.avgScore == null ? "—" : `${l.avgScore}%`}</td>
+                        <td className="px-3 py-2.5 tabular-nums">{l.avgScore == null ? ", " : `${l.avgScore}%`}</td>
                         <td className="px-3 py-2.5 tabular-nums">{l.activitiesDone}</td>
                         <td className="px-3 py-2.5 text-muted-foreground">{ago(l.lastActiveAt)}</td>
                         <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${STATUS[l.status].cls}`}><span className={`h-1.5 w-1.5 rounded-full ${STATUS[l.status].dot}`} />{STATUS[l.status].label}</span></td>

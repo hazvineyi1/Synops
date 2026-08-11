@@ -19,7 +19,7 @@ import { logAudit } from "../lib/audit";
  * Funder / sponsor endpoints (decision doc §10.2).
  *
  * Strictly read-only and strictly AGGREGATE. A funder sees counts and rates for the
- * organizations they finance — never an individual learner's account, identity, or
+ * organizations they finance, never an individual learner's account, identity, or
  * personal data. The role is excluded from every delivery/Hub predicate, so it can reach
  * nothing else; these two endpoints are its entire surface.
  */
@@ -29,7 +29,7 @@ function requireFunder(role: string): boolean {
   return isFunder(role) || isSuperAdmin(role);
 }
 
-// GET /funder/scope — which organisations (and optional programs) this funder may see.
+// GET /funder/scope, which organisations (and optional programs) this funder may see.
 router.get("/funder/scope", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   if (!requireFunder(user.role)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -51,7 +51,7 @@ router.get("/funder/scope", requireAuth, async (req, res) => {
   );
 });
 
-// GET /funder/report — aggregate outcomes for the funder's scoped organisations. Returns
+// GET /funder/report, aggregate outcomes for the funder's scoped organisations. Returns
 // per-org counts (learners, completions, credentials) plus totals. No individual rows.
 // A Super Admin may target a specific org via ?orgId= for support/QA.
 router.get("/funder/report", requireAuth, async (req, res) => {
@@ -134,7 +134,7 @@ router.get("/funder/report", requireAuth, async (req, res) => {
 // Funders are not org members, so they are created and scoped here rather than through
 // the org member routes.
 
-// GET /funders — list funder accounts with their scope count.
+// GET /funders, list funder accounts with their scope count.
 router.get("/funders", requireAuth, requireSuperAdmin, async (_req, res) => {
   const funders = await db.select().from(usersTable).where(eq(usersTable.role, "funder"));
   const scopes = await db.select().from(funderScopesTable);
@@ -152,7 +152,7 @@ router.get("/funders", requireAuth, requireSuperAdmin, async (_req, res) => {
   );
 });
 
-// POST /funders — create a funder account (invited; sets a password via reset later).
+// POST /funders, create a funder account (invited; sets a password via reset later).
 router.post("/funders", requireAuth, requireSuperAdmin, async (req, res) => {
   const { email, firstName, lastName } = req.body;
   if (!email) { res.status(400).json({ error: "email is required" }); return; }
@@ -166,7 +166,7 @@ router.post("/funders", requireAuth, requireSuperAdmin, async (req, res) => {
   res.status(201).json({ id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName, status: u.status, scopeCount: 0 });
 });
 
-// GET /funders/:id/scopes — a funder's assigned organisations.
+// GET /funders/:id/scopes, a funder's assigned organisations.
 router.get("/funders/:id/scopes", requireAuth, requireSuperAdmin, async (req, res) => {
   const scopes = await db.select().from(funderScopesTable).where(eq(funderScopesTable.funderId, req.params.id));
   const orgIds = [...new Set(scopes.map((s) => s.organisationId))];
@@ -181,7 +181,7 @@ router.get("/funders/:id/scopes", requireAuth, requireSuperAdmin, async (req, re
   })));
 });
 
-// POST /funders/:id/scopes — grant a funder visibility into an organisation.
+// POST /funders/:id/scopes, grant a funder visibility into an organisation.
 router.post("/funders/:id/scopes", requireAuth, requireSuperAdmin, async (req, res) => {
   const { organisationId, courseId, label } = req.body;
   if (!organisationId) { res.status(400).json({ error: "organisationId is required" }); return; }
@@ -193,7 +193,7 @@ router.post("/funders/:id/scopes", requireAuth, requireSuperAdmin, async (req, r
   res.status(201).json(s);
 });
 
-// DELETE /funder-scopes/:scopeId — revoke a scope.
+// DELETE /funder-scopes/:scopeId, revoke a scope.
 router.delete("/funder-scopes/:scopeId", requireAuth, requireSuperAdmin, async (req, res) => {
   await db.delete(funderScopesTable).where(eq(funderScopesTable.id, req.params.scopeId));
   await logAudit(req, "funder.scope_revoke", "funder_scope", req.params.scopeId);
@@ -231,7 +231,7 @@ function canManagePartner(user: { role: string; partnerId?: string | null }, par
 const cleanConditions = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((c): c is string => typeof c === "string" && c.trim().length > 0).map((c) => c.trim()) : [];
 
-// GET /partners/:partnerId/funding — list a partner's funding agreements.
+// GET /partners/:partnerId/funding, list a partner's funding agreements.
 router.get("/partners/:partnerId/funding", requireAuth, async (req, res) => {
   const { partnerId } = req.params;
   if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -247,7 +247,7 @@ router.get("/partners/:partnerId/funding", requireAuth, async (req, res) => {
   }
 });
 
-// POST /partners/:partnerId/funding — create an agreement.
+// POST /partners/:partnerId/funding, create an agreement.
 router.post("/partners/:partnerId/funding", requireAuth, async (req, res) => {
   const { partnerId } = req.params;
   const user = req.dbUser!;
@@ -276,7 +276,7 @@ router.post("/partners/:partnerId/funding", requireAuth, async (req, res) => {
   res.status(201).json(row);
 });
 
-// PATCH /partners/:partnerId/funding/:id — edit an agreement.
+// PATCH /partners/:partnerId/funding/:id, edit an agreement.
 router.patch("/partners/:partnerId/funding/:id", requireAuth, async (req, res) => {
   const { partnerId, id } = req.params;
   if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -301,7 +301,7 @@ router.patch("/partners/:partnerId/funding/:id", requireAuth, async (req, res) =
   res.json(row);
 });
 
-// DELETE /partners/:partnerId/funding/:id — remove an agreement.
+// DELETE /partners/:partnerId/funding/:id, remove an agreement.
 router.delete("/partners/:partnerId/funding/:id", requireAuth, async (req, res) => {
   const { partnerId, id } = req.params;
   if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -324,7 +324,7 @@ async function ensureSeatsTable() {
     )`);
 }
 
-// GET /partners/:partnerId/funding-usage — { agreementId: usedSeatCount } for the partner.
+// GET /partners/:partnerId/funding-usage, { agreementId: usedSeatCount } for the partner.
 router.get("/partners/:partnerId/funding-usage", requireAuth, async (req, res) => {
   const { partnerId } = req.params;
   if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -339,7 +339,7 @@ router.get("/partners/:partnerId/funding-usage", requireAuth, async (req, res) =
   }
 });
 
-// GET /partners/:partnerId/funding/:agreementId/seats — learners assigned to an agreement.
+// GET /partners/:partnerId/funding/:agreementId/seats, learners assigned to an agreement.
 router.get("/partners/:partnerId/funding/:agreementId/seats", requireAuth, async (req, res) => {
   const { partnerId, agreementId } = req.params;
   if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -353,7 +353,7 @@ router.get("/partners/:partnerId/funding/:agreementId/seats", requireAuth, async
   }
 });
 
-// POST /partners/:partnerId/funding/:agreementId/seats — assign a learner (capacity + dup guarded).
+// POST /partners/:partnerId/funding/:agreementId/seats, assign a learner (capacity + dup guarded).
 router.post("/partners/:partnerId/funding/:agreementId/seats", requireAuth, async (req, res) => {
   const { partnerId, agreementId } = req.params;
   const user = req.dbUser!;
@@ -386,7 +386,7 @@ router.post("/partners/:partnerId/funding/:agreementId/seats", requireAuth, asyn
   res.status(201).json(outcome.row);
 });
 
-// DELETE /partners/:partnerId/funding/:agreementId/seats/:id — unassign.
+// DELETE /partners/:partnerId/funding/:agreementId/seats/:id, unassign.
 router.delete("/partners/:partnerId/funding/:agreementId/seats/:id", requireAuth, async (req, res) => {
   const { partnerId, agreementId, id } = req.params;
   if (!canManagePartner(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }

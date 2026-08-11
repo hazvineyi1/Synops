@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * Top-level error boundary. Without this, any thrown render error (an unexpected data shape, a
  * null deref on a slow/low-end device) produces a blank white screen in production. This catches
- * it and shows a calm, branded recovery state with a reload — critical for the low-end-Android
+ * it and shows a calm, branded recovery state with a reload, critical for the low-end-Android
  * audience where unexpected data shapes are more likely.
  */
 interface State { hasError: boolean; }

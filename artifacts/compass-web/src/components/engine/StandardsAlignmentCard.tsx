@@ -117,7 +117,7 @@ export function StandardsAlignmentCard({
               <SelectContent>
                 {(frameworks ?? []).map((f) => (
                   <SelectItem key={f.id} value={String(f.id)}>
-                    {f.acronym ? `${f.acronym} — ${f.name}` : f.name}
+                    {f.acronym ? `${f.acronym}, ${f.name}` : f.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -185,7 +185,7 @@ export function StandardsAlignmentCard({
                         <SelectContent>
                           {available.map((c) => (
                             <SelectItem key={c.id} value={String(c.id)}>
-                              {c.code} {c.description ? `— ${c.description.slice(0, 64)}` : ""}
+                              {c.code} {c.description ? `, ${c.description.slice(0, 64)}` : ""}
                             </SelectItem>
                           ))}
                         </SelectContent>

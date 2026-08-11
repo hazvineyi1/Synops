@@ -161,7 +161,7 @@ async function getOrCreatePlan(user: typeof usersTable.$inferSelect, force = fal
 
 /**
  * The learner's active off-track remedial plans (source='gradebook_alert') mapped into coach-plan
- * items, so the AI coach can lead with catch-up work. Read-time only — never persisted into the
+ * items, so the AI coach can lead with catch-up work. Read-time only, never persisted into the
  * daily source='coach' row, keeping the two sources cleanly separated in storage.
  */
 async function getRemedialCatchUp(userId: string) {
@@ -203,7 +203,7 @@ async function getRemedialCatchUp(userId: string) {
   return { items, rationale, courseTitle: rows[0].courseTitle ?? null, coachUrl };
 }
 
-// GET /learn/plan — today's coach-led plan (the spine), with any off-track catch-up work led first.
+// GET /learn/plan, today's coach-led plan (the spine), with any off-track catch-up work led first.
 router.get("/learn/plan", requireAuth, async (req, res) => {
   const plan = await getOrCreatePlan(req.dbUser!);
   const remedial = await getRemedialCatchUp(req.dbUser!.id);
@@ -217,13 +217,13 @@ router.get("/learn/plan", requireAuth, async (req, res) => {
   });
 });
 
-// POST /learn/plan/regenerate — negotiate / rebuild today's plan
+// POST /learn/plan/regenerate, negotiate / rebuild today's plan
 router.post("/learn/plan/regenerate", requireAuth, async (req, res) => {
   const plan = await getOrCreatePlan(req.dbUser!, true);
   res.json(plan);
 });
 
-// PATCH /learn/plan/item — mark a plan item done
+// PATCH /learn/plan/item, mark a plan item done
 router.patch("/learn/plan/item", requireAuth, async (req, res) => {
   const { moduleId, done } = req.body as { moduleId: string; done: boolean };
   const plan = await getOrCreatePlan(req.dbUser!);
@@ -239,7 +239,7 @@ router.patch("/learn/plan/item", requireAuth, async (req, res) => {
   res.json(updated);
 });
 
-// GET /learn/mastery — concept mastery map (learner-facing progress)
+// GET /learn/mastery, concept mastery map (learner-facing progress)
 router.get("/learn/mastery", requireAuth, async (req, res) => {
   const rows = await db
     .select()
@@ -262,7 +262,7 @@ router.get("/learn/mastery", requireAuth, async (req, res) => {
 });
 
 /**
- * GET /learn/density — recommends Focus vs Full-view interface density from REAL
+ * GET /learn/density, recommends Focus vs Full-view interface density from REAL
  * behavioural signals (how many sessions the learner has had, and how many of their
  * studied concepts currently sit below mastery), never from a self-reported label.
  *
@@ -305,7 +305,7 @@ router.get("/learn/density", requireAuth, async (req, res) => {
   });
 });
 
-// GET /learn/profile — coach personalisation
+// GET /learn/profile, coach personalisation
 router.get("/learn/profile", requireAuth, async (req, res) => {
   const u = req.dbUser!;
   res.json({
@@ -317,7 +317,7 @@ router.get("/learn/profile", requireAuth, async (req, res) => {
   });
 });
 
-// PATCH /learn/profile — update coach personality, VARK, accommodations, WhatsApp
+// PATCH /learn/profile, update coach personality, VARK, accommodations, WhatsApp
 router.patch("/learn/profile", requireAuth, async (req, res) => {
   const { coachPersonality, learningStyle, accommodations, phone, whatsappOptIn } = req.body;
   const patch: Record<string, unknown> = { updatedAt: new Date() };
@@ -344,11 +344,11 @@ router.patch("/learn/profile", requireAuth, async (req, res) => {
 });
 
 /**
- * POST /learn/demo-reset — reset the signed-in learner's OWN progress so a demo can be re-run.
+ * POST /learn/demo-reset, reset the signed-in learner's OWN progress so a demo can be re-run.
  * DEMO ONLY: allowed exclusively for synthetic demo accounts (@synops-demo.test); any real learner
  * gets 403. Body: { moduleId } resets one module, { courseId } resets a whole course, neither resets
  * everything. Clears beat progress, badges/credentials, activity submissions and mastery, and puts the
- * enrolment back to active. Non-destructive to content — only this learner's progress rows.
+ * enrolment back to active. Non-destructive to content, only this learner's progress rows.
  */
 router.post("/learn/demo-reset", requireAuth, async (req, res) => {
   const user = req.dbUser!;

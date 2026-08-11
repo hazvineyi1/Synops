@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { notifyError } from "@/lib/notify";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, ArrowRight, CheckCircle2, Compass, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Compass } from "lucide-react";
 import {
   useStudyProfile,
   useUpdateStudyProfile,
@@ -260,7 +260,7 @@ export default function StudyIntake() {
             {step === "review" && (
               <div>
                 <div className="flex items-center gap-2 text-primary font-semibold mb-3">
-                  <Sparkles className="w-5 h-5" /> Ready when you are
+                  Ready when you are
                 </div>
                 <p className="text-sm text-muted-foreground mb-4">
                   Here's what your coach will start with:

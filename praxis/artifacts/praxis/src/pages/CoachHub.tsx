@@ -10,7 +10,7 @@ import { useCoachProfile, useUpdateCoachProfile, useWhatsappStatus } from "@/lib
 import { cn } from "@/lib/utils";
 import {
   LifeBuoy, BookOpen, MessageSquare, TrendingUp, ArrowRight, ArrowLeft,
-  Sparkles, CheckCircle2, Circle, Target, Layers, Play, GraduationCap, Clock,
+  CheckCircle2, Circle, Target, Layers, Play, GraduationCap, Clock,
   Flame, Zap, Brain, RotateCcw, Check, X, Dumbbell, Trophy,
   Upload, Link2, FileText, Plus, Loader2, Music, Video,
 } from "lucide-react";
@@ -60,7 +60,7 @@ interface Progress {
 
 const typeMeta: Record<string, { label: string; icon: any }> = {
   case: { label: "Case study", icon: Layers },
-  activity: { label: "Activity", icon: Sparkles },
+  activity: { label: "Activity", icon: Zap },
   module: { label: "Lesson", icon: BookOpen },
   review: { label: "Review", icon: Target },
 };
@@ -115,7 +115,7 @@ export function CoachHub() {
     if (it.refType === "activity" && it.refId) return navigate(`/activities/${it.refId}/play`);
     if (it.refType === "module" && it.refId) return startSession.mutate({ moduleId: it.refId, remedialFocus: it.category || it.title });
     // A ref-less "review" step: start a coaching session on the module the learner is weakest on,
-    // or — before any concept mastery exists — on the course's first published module (tutorModuleId).
+    // or, before any concept mastery exists, on the course's first published module (tutorModuleId).
     const moduleId = weakestModule?.moduleId ?? overview.data?.tutorModuleId ?? null;
     if (moduleId) return startSession.mutate({ moduleId, remedialFocus: it.category || it.title });
   }
@@ -134,10 +134,10 @@ export function CoachHub() {
   if (!data?.active) {
     return (
       <div className="mx-auto max-w-3xl space-y-6">
-        <PageHeader title="Coach" icon={LifeBuoy} subtitle="Your remedial coach — the materials, tutor and progress to bridge your gaps." />
+        <PageHeader title="Coach" icon={LifeBuoy} subtitle="Your remedial coach, the materials, tutor and progress to bridge your gaps." />
         <div className="rounded-2xl border border-border bg-background p-10 text-center">
           <GraduationCap className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-          <h2 className="text-lg font-semibold text-foreground">You're on track — nothing to catch up on</h2>
+          <h2 className="text-lg font-semibold text-foreground">You're on track, nothing to catch up on</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
             When you fall behind in a course, your coach builds a personalised catch-up plan here: the exact materials to review, a tutor to work through them, and your progress as you close the gap.
           </p>
@@ -159,16 +159,15 @@ export function CoachHub() {
 
   const name = data.learnerName || "there";
   const whyReferred = primaryPlan?.rationale
-    || `You've been finding ${data.gaps.join(", ") || "a few things"} tricky lately, so your coach has pulled together everything you need to catch up. Nothing here counts against you — it's just support to get you back on track.`;
+    || `You've been finding ${data.gaps.join(", ") || "a few things"} tricky lately, so your coach has pulled together everything you need to catch up. Nothing here counts against you, it's just support to get you back on track.`;
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
-      {/* First-visit onboarding — how the four paths interlock. Dismissible, shown once. */}
+      {/* First-visit onboarding, how the four paths interlock. Dismissible, shown once. */}
       {showIntro && (
         <section className="rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2">
-              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
               <div>
                 <p className="font-semibold text-foreground">New here? Here's how your Coach works</p>
                 <p className="mt-1 text-sm text-muted-foreground">
@@ -197,7 +196,7 @@ export function CoachHub() {
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Why you're here</p>
           <p className="mt-2 leading-relaxed text-foreground">{whyReferred}</p>
         </div>
-        <p className="mt-4 text-sm text-muted-foreground">Pick one of the four ways below to get started — a session takes about 10 minutes, and your progress saves as you go.</p>
+        <p className="mt-4 text-sm text-muted-foreground">Pick one of the four ways below to get started, a session takes about 10 minutes, and your progress saves as you go.</p>
       </section>
 
       {/* At-a-glance stats */}
@@ -213,10 +212,10 @@ export function CoachHub() {
         <StatCard icon={Target} tone="text-red-600" label={data.gapCount === 1 ? "Gap to close" : "Gaps to close"} value={data.gapCount} />
       </section>
 
-      {/* Ways to close your gap — the instructions ARE the actions */}
+      {/* Ways to close your gap, the instructions ARE the actions */}
       <section>
         <h2 className="text-lg font-semibold text-foreground">What would you like to do?</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Four ways to close your gap. Practice is the quickest win — but any of these helps.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Four ways to close your gap. Practice is the quickest win, but any of these helps.</p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <ActionCard icon={Dumbbell} primary title="Practice" cta="Start practising"
             text="Flashcards and quick quizzes built from your own class content. Flip a card and rate how well you knew it, then answer questions to lock the ideas in. You earn points and build a daily streak as you go."
@@ -226,7 +225,7 @@ export function CoachHub() {
             text="Start a one-on-one coaching session right now. Your coach asks guiding questions and works through the tricky parts with you, step by step, focused only on what you're catching up on."
             onClick={startTutor} disabled={startCoachTutor.isPending} />
           <ActionCard icon={Upload} title="Materials" cta="Add & practise your content"
-            text="Bring in your own study material — a PDF, Word or PowerPoint file, notes, or a link — and the coach turns it into flashcards and a quiz you can practise straight away."
+            text="Bring in your own study material, a PDF, Word or PowerPoint file, notes, or a link, and the coach turns it into flashcards and a quiz you can practise straight away."
             onClick={() => showSection("materials")} />
           <ActionCard icon={TrendingUp} title="Progress" cta="See my progress"
             text="Watch your understanding grow - see how well you know each concept and which gaps are still open, so you always know what to do next."
@@ -249,7 +248,7 @@ export function CoachHub() {
         )}
       </section>
 
-      {/* Coach on WhatsApp — opt in/out right here, no separate settings page. */}
+      {/* Coach on WhatsApp, opt in/out right here, no separate settings page. */}
       {coachProfile.data && (
         <div className="flex items-center gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/60 p-4 dark:bg-emerald-950/15">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600"><MessageSquare className="h-5 w-5" /></span>
@@ -271,7 +270,7 @@ export function CoachHub() {
         </div>
       )}
 
-      {/* The chosen section renders here — no separate tab bar, the cards above are the nav */}
+      {/* The chosen section renders here, no separate tab bar, the cards above are the nav */}
       {section && (
         <div ref={sectionRef} className="scroll-mt-4">
           {section === "materials" && (
@@ -295,7 +294,7 @@ export function CoachHub() {
                 <div className="rounded-xl border border-border bg-background p-10 text-center">
                   <TrendingUp className="mx-auto mb-3 h-9 w-9 text-muted-foreground" />
                   <h3 className="text-base font-semibold text-foreground">Your progress will build here</h3>
-                  <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">As you work through the practice and coaching sessions, which gaps are closed — and how much of each is done — shows up here.</p>
+                  <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">As you work through the practice and coaching sessions, which gaps are closed, and how much of each is done, shows up here.</p>
                 </div>
               ) : (
                 <ProgressPanel
@@ -333,7 +332,7 @@ function MaterialReader({ item, onBack, onLaunch, launching, onPractice }: { ite
         {item.category && <p className="mt-1 text-xs text-amber-600">Targets: {item.category}</p>}
 
         {!item.refId ? (
-          <p className="mt-4 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">This is a coach-led review topic — start a coaching session and work through it together.</p>
+          <p className="mt-4 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">This is a coach-led review topic, start a coaching session and work through it together.</p>
         ) : detail.isLoading ? (
           <div className="mt-4 space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-5/6" /></div>
         ) : (
@@ -465,7 +464,7 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
         </div>
       </div>
 
-      {/* Mode switch — a clear segmented control so it reads as tappable tabs */}
+      {/* Mode switch, a clear segmented control so it reads as tappable tabs */}
       <div>
         <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Choose an activity</p>
         <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-muted/40 p-1">
@@ -477,7 +476,7 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
         </div>
       </div>
 
-      {/* How this mode works — numbered so it's obvious how to navigate */}
+      {/* How this mode works, numbered so it's obvious how to navigate */}
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <p className="text-sm font-semibold text-foreground">How this works</p>
         <ol className="mt-2 space-y-1 text-sm text-muted-foreground">
@@ -485,7 +484,7 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
             <>
               <li><span className="font-medium text-foreground">1.</span> Read the question on the card.</li>
               <li><span className="font-medium text-foreground">2.</span> Tap the card (or the <span className="font-medium text-foreground">Show answer</span> button) to reveal the answer.</li>
-              <li><span className="font-medium text-foreground">3.</span> Rate how well you knew it — that schedules when the card comes back, and earns you points.</li>
+              <li><span className="font-medium text-foreground">3.</span> Rate how well you knew it, that schedules when the card comes back, and earns you points.</li>
             </>
           ) : mode === "quiz" ? (
             <>
@@ -502,7 +501,7 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
       {/* Flashcards */}
       {mode === "flashcards" && (
         cards.length === 0 ? (
-          <Empty text="No flashcards for this gap yet — try the Quiz or work through it with your coach." />
+          <Empty text="No flashcards for this gap yet, try the Quiz or work through it with your coach." />
         ) : fIdx >= cards.length ? (
           <Done text={`Nice work, ${d.learnerName}! You've been through all ${cards.length} cards.`} onRestart={() => { setFIdx(0); setFlipped(false); }} />
         ) : (
@@ -518,13 +517,13 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
               </div>
             </div>
 
-            {/* The card — clearly interactive: dashed accent border, hover lift, a 'tap to flip' pill */}
+            {/* The card, clearly interactive: dashed accent border, hover lift, a 'tap to flip' pill */}
             <button
               onClick={() => setFlipped((f) => !f)}
               className="group relative flex min-h-[240px] w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-primary/25 bg-background p-8 text-center shadow-sm transition hover:border-primary/50 hover:shadow-md"
             >
               <span className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-primary">
-                <RotateCcw className="h-3 w-3" /> {flipped ? "Answer — tap for question" : "Tap to flip"}
+                <RotateCcw className="h-3 w-3" /> {flipped ? "Answer, tap for question" : "Tap to flip"}
               </span>
               {!flipped ? (
                 <>
@@ -565,7 +564,7 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
       {/* Quiz */}
       {mode === "quiz" && (
         questions.length === 0 ? (
-          <Empty text="No knowledge questions for this gap yet — try the Flashcards or your coach." />
+          <Empty text="No knowledge questions for this gap yet, try the Flashcards or your coach." />
         ) : qIdx >= questions.length ? (
           <Done text={`Done, ${d.learnerName}! You got ${correctCount} of ${questions.length} right. Every attempt builds mastery.`} onRestart={() => { setQIdx(0); setChoice(null); setRevealed(null); setCorrectCount(0); }} />
         ) : (
@@ -600,7 +599,7 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
             {revealed ? (
               <div className="mt-5 rounded-xl border border-border bg-muted/40 p-4">
                 <p className={cn("text-sm font-semibold", revealed.correct ? "text-green-600" : "text-red-600")}>
-                  {revealed.correct ? "Correct!" : "Not quite — here's why."}
+                  {revealed.correct ? "Correct!" : "Not quite, here's why."}
                 </p>
                 {revealed.explanation && <p className="mt-1 text-sm text-muted-foreground">{revealed.explanation}</p>}
                 <Button className="mt-3 w-full sm:w-auto" size="lg" onClick={nextQuestion}>
@@ -617,12 +616,12 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
       {/* Methods */}
       {mode === "methods" && (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Case studies and activities from your course that target this gap — tap any one to open it:</p>
+          <p className="text-sm text-muted-foreground">Case studies and activities from your course that target this gap, tap any one to open it:</p>
           {d.methods.map((m, i) => (
             <button key={i} onClick={() => onNavigate(m.path)}
               className="flex w-full items-center gap-3 rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary/40">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                {m.type === "case" ? <Layers className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+                {m.type === "case" ? <Layers className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium text-foreground">{m.title}</div>
@@ -631,7 +630,7 @@ function CoachPractice({ target, onBack, onNavigate, onGame }: { target: Practic
               <Play className="h-4 w-4 text-primary" />
             </button>
           ))}
-          {d.methods.length === 0 && <Empty text="No extra activities matched this gap — your flashcards, quiz and coach have you covered." />}
+          {d.methods.length === 0 && <Empty text="No extra activities matched this gap, your flashcards, quiz and coach have you covered." />}
         </div>
       )}
     </div>
@@ -728,7 +727,7 @@ function MaterialsPanel({ data, loading, onRefetch, onPractise }: { data: Upload
         if (!url.trim()) { setError("Paste a link first."); setBusy(false); return; }
         body = { url: url.trim() };
       } else {
-        if (text.trim().length < 40) { setError("Paste a bit more text — at least a paragraph."); setBusy(false); return; }
+        if (text.trim().length < 40) { setError("Paste a bit more text, at least a paragraph."); setBusy(false); return; }
         body = { text: text.trim() };
       }
       const r = await apiFetch<{ setId: string; title: string; flashcards: number; questions: number }>(
@@ -748,7 +747,7 @@ function MaterialsPanel({ data, loading, onRefetch, onPractise }: { data: Upload
         <h2 className="text-lg font-semibold text-foreground">Add your own study material</h2>
       </div>
       <p className="text-sm text-muted-foreground">
-        Bring in anything you're studying — a document, a link, or your own notes — and your coach turns it
+        Bring in anything you're studying, a document, a link, or your own notes, and your coach turns it
         into flashcards and a quiz you can practise straight away. Nothing is shared; it's just for you.
       </p>
 
@@ -766,7 +765,7 @@ function MaterialsPanel({ data, loading, onRefetch, onPractise }: { data: Upload
               <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 px-4 py-8 text-center transition hover:border-primary/50">
                 <Upload className="mb-2 h-6 w-6 text-primary" />
                 <span className="text-sm font-medium text-foreground">{file ? file.name : "Choose a file to upload"}</span>
-                <span className="mt-1 text-xs text-muted-foreground">PDF, Word, PowerPoint, Excel, ODT, or text — up to 20MB</span>
+                <span className="mt-1 text-xs text-muted-foreground">PDF, Word, PowerPoint, Excel, ODT, or text, up to 20MB</span>
                 <input type="file" accept={ACCEPT} className="hidden" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); setAdded(null); }} />
               </label>
             </div>
@@ -793,7 +792,7 @@ function MaterialsPanel({ data, loading, onRefetch, onPractise }: { data: Upload
         {added && (
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-green-300/60 bg-green-50/60 p-3 dark:bg-green-950/15 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-foreground">
-              <span className="font-medium">“{added.title}”</span> is ready — {added.flashcards} flashcards and {added.questions} questions.
+              <span className="font-medium">“{added.title}”</span> is ready, {added.flashcards} flashcards and {added.questions} questions.
             </p>
             <Button size="sm" className="self-start sm:self-auto" onClick={() => onPractise(added.setId)}>
               <Dumbbell className="mr-1.5 h-4 w-4" /> Practise it now
@@ -802,14 +801,14 @@ function MaterialsPanel({ data, loading, onRefetch, onPractise }: { data: Upload
         )}
 
         <Button className="mt-4" onClick={submit} disabled={busy}>
-          {busy ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Building your practice…</> : <><Sparkles className="mr-1.5 h-4 w-4" /> Turn it into practice</>}
+          {busy ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Building your practice…</> : <>Turn it into practice</>}
         </Button>
       </div>
 
-      {/* Audio & video — flagged as coming next so expectations are clear */}
+      {/* Audio & video, flagged as coming next so expectations are clear */}
       <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/20 p-4">
         <div className="flex gap-1.5 text-muted-foreground"><Music className="h-5 w-5" /><Video className="h-5 w-5" /></div>
-        <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Audio & video</span> — lecture recordings and clips are coming soon. For now, documents, links and notes are supported.</p>
+        <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Audio & video</span>, lecture recordings and clips are coming soon. For now, documents, links and notes are supported.</p>
       </div>
 
       {/* Previously added materials */}
@@ -818,7 +817,7 @@ function MaterialsPanel({ data, loading, onRefetch, onPractise }: { data: Upload
         {loading ? (
           <Skeleton className="h-20" />
         ) : data.length === 0 ? (
-          <p className="rounded-xl border border-border bg-background p-6 text-center text-sm text-muted-foreground">Nothing yet — add a document, link or notes above to build your first practice set.</p>
+          <p className="rounded-xl border border-border bg-background p-6 text-center text-sm text-muted-foreground">Nothing yet, add a document, link or notes above to build your first practice set.</p>
         ) : (
           <div className="space-y-2">
             {data.map((m) => (

@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import {
   BookOpen, Zap, Target, MessageCircle, ArrowRight, LogOut, Flame,
   Brain, Clock, ChevronRight, CheckCircle2, RotateCcw, Award,
-  Sparkles, Compass,
+  Compass,
 } from "lucide-react";
 
 const stepTypeConfig: Record<string, { icon: typeof Brain; label: string; color: string; bg: string }> = {
@@ -201,7 +201,6 @@ export default function StudyDashboard() {
                 {coachingMessage && (
                   <div className="bg-muted/50 rounded-lg p-3 mb-4 border-l-2 border-primary/40">
                     <div className="flex items-start gap-2">
-                      <Sparkles className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
                       <p className="text-xs text-muted-foreground leading-relaxed">{coachingMessage}</p>
                     </div>
                   </div>
@@ -295,9 +294,6 @@ export default function StudyDashboard() {
           // Materials exist but no active path, let the AI build one
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="py-8 px-5 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="h-7 w-7 text-primary" />
-              </div>
               <h2 className="text-lg font-bold mb-1">Let the AI lead your study plan</h2>
               <p className="text-sm text-muted-foreground mb-5 max-w-sm mx-auto">
                 Pick a material and your coach will sequence every concept into a guided path: read → recall → practice → mastery check. You just follow the next step.

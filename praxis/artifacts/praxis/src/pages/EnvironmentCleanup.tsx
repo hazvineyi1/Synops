@@ -10,7 +10,7 @@ import {
   AlertDialogFooter, AlertDialogTitle, AlertDialogDescription, AlertDialogAction, AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Trash2, Sparkles } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 interface Candidate { id: string; label: string; detail: string; reason: string }
 
@@ -100,7 +100,6 @@ export default function EnvironmentCleanup() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-8">
       <div className="flex items-center gap-3">
-        <Sparkles className="h-6 w-6 text-primary" />
         <h1 className="font-serif text-3xl font-bold text-foreground">Environment cleanup</h1>
       </div>
       <p className="text-sm text-muted-foreground">

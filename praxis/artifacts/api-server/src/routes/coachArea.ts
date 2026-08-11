@@ -25,7 +25,7 @@ import { ensureLearnerCoachPlans } from "../lib/gradebookAlerts";
 
 /**
  * The in-LMS "Coach" area for off-track learners: a native, remedial-scoped surface
- * that composes what Praxis already has — the off-track study plan (Materials), the
+ * that composes what Praxis already has, the off-track study plan (Materials), the
  * concept-mastery map (Progress), and the Socratic session engine (Tutor). Everything
  * here is scoped to the signed-in learner's ACTIVE gradebook-alert (remedial) plans, so
  * it only ever shows the gap the learner is bridging. All routes are userId-scoped.
@@ -54,7 +54,7 @@ function planItems(p: typeof coachPlansTable.$inferSelect): StudyPlanItem[] {
   return (Array.isArray(p.items) ? p.items : []) as StudyPlanItem[];
 }
 
-// GET /learn/coach/overview — the remedial context that powers the Coach landing +
+// GET /learn/coach/overview, the remedial context that powers the Coach landing +
 // Materials list + Tutor's recent sessions. Active = the learner has remedial work.
 router.get("/learn/coach/overview", requireAuth, async (req, res) => {
   const userId = req.userId!;
@@ -146,7 +146,7 @@ router.get("/learn/coach/overview", requireAuth, async (req, res) => {
   });
 });
 
-// GET /learn/coach/material?refType=&refId= — read one remedial material's content as a
+// GET /learn/coach/material?refType=&refId=, read one remedial material's content as a
 // lesson. Ownership is enforced: the ref must appear in one of the learner's active
 // remedial plans, so a learner can only read their own catch-up content.
 router.get("/learn/coach/material", requireAuth, async (req, res) => {
@@ -236,7 +236,7 @@ router.get("/learn/coach/material", requireAuth, async (req, res) => {
   });
 });
 
-// GET /learn/coach/progress — concept (module) mastery for the remedial course(s) plus
+// GET /learn/coach/progress, concept (module) mastery for the remedial course(s) plus
 // the gap categories being bridged, so the learner sees where they are and what's left.
 router.get("/learn/coach/progress", requireAuth, async (req, res) => {
   const userId = req.userId!;
@@ -346,7 +346,7 @@ router.get("/learn/coach/practice", requireAuth, async (req, res) => {
 
   const gamification = await getGamification(userId);
   const intro = status === "empty"
-    ? `${name}, this one's a little thin — try a coaching session or add more content.`
+    ? `${name}, this one's a little thin, try a coaching session or add more content.`
     : `${name}, here's your practice for ${displayCategory}. Flip through the cards, test yourself, and watch your streak grow.`;
 
   res.json({ setId, status, category: displayCategory, courseTitle: "", learnerName: name, intro, flashcards, questions, methods, gamification });
@@ -403,12 +403,12 @@ router.post("/learn/coach/materials/add", requireAuth, async (req, res) => {
   }
 });
 
-// GET /learn/coach/materials/list — the practice sets the learner built from their own uploads.
+// GET /learn/coach/materials/list, the practice sets the learner built from their own uploads.
 router.get("/learn/coach/materials/list", requireAuth, async (req, res) => {
   res.json({ materials: await getUploadSets(req.userId!) });
 });
 
-// POST /learn/coach/tutor { moduleId?, remedialFocus? } — start a one-on-one coaching session for
+// POST /learn/coach/tutor { moduleId?, remedialFocus? }, start a one-on-one coaching session for
 // the remedial learner. Because they are on an ACTIVE off-track plan for the course, they are
 // entitled to coach on it even without a standard course enrolment row (the generic POST /sessions
 // gate would otherwise 403 with "Not enrolled"). Defaults to the remedial course's first published
@@ -446,13 +446,13 @@ router.post("/learn/coach/tutor", requireAuth, async (req, res) => {
     }
   }
   if (!module) {
-    res.status(422).json({ error: "There's no coachable content published for your course yet — try Practice instead." });
+    res.status(422).json({ error: "There's no coachable content published for your course yet, try Practice instead." });
     return;
   }
 
   const [firstBeat] = await db.select().from(beatsTable).where(eq(beatsTable.moduleId, module.id)).orderBy(asc(beatsTable.order)).limit(1);
   if (!firstBeat) {
-    res.status(422).json({ error: "There's no coachable content published for your course yet — try Practice instead." });
+    res.status(422).json({ error: "There's no coachable content published for your course yet, try Practice instead." });
     return;
   }
 
@@ -489,7 +489,7 @@ router.post("/learn/coach/tutor", requireAuth, async (req, res) => {
   res.status(201).json({ id: session.id });
 });
 
-// POST /learn/coach/flashcard/:id/review { grade: 0-3 } — grade a flashcard, advance its SM-2
+// POST /learn/coach/flashcard/:id/review { grade: 0-3 }, grade a flashcard, advance its SM-2
 // schedule, award XP + streak. The learner experiences this as Again/Hard/Good/Easy.
 router.post("/learn/coach/flashcard/:id/review", requireAuth, async (req, res) => {
   const userId = req.userId!;
@@ -512,7 +512,7 @@ router.post("/learn/coach/flashcard/:id/review", requireAuth, async (req, res) =
   res.json({ mastery: next.mastery, due: next.dueDate, gamification });
 });
 
-// POST /learn/coach/question/:id/answer { choice } — check a knowledge question, reveal the
+// POST /learn/coach/question/:id/answer { choice }, check a knowledge question, reveal the
 // answer + explanation, award XP + streak.
 router.post("/learn/coach/question/:id/answer", requireAuth, async (req, res) => {
   const userId = req.userId!;
@@ -535,7 +535,7 @@ router.post("/learn/coach/question/:id/answer", requireAuth, async (req, res) =>
   res.json({ correct, correctIndex: q.correctIndex, explanation: q.explanation, gamification });
 });
 
-// GET /learn/coach/gamification — the learner's XP + streak for the Coach header.
+// GET /learn/coach/gamification, the learner's XP + streak for the Coach header.
 router.get("/learn/coach/gamification", requireAuth, async (req, res) => {
   res.json(await getGamification(req.userId!));
 });

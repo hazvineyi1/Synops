@@ -9,14 +9,14 @@ import {
 import { eq, sql } from "drizzle-orm";
 
 /**
- * Public, UNAUTHENTICATED activity runner via a signed embed token — the "publish" side of
+ * Public, UNAUTHENTICATED activity runner via a signed embed token, the "publish" side of
  * the Google-Sites-style flow. Anyone with the opaque token can open and play a published
  * activity (paste it into an LMS/site with an <iframe>). Gated only by the token, its active
  * flag and expiry. Every open bumps the link's counter.
  *
  * SECURITY: no auth by design; the token IS the credential. The activity HTML is still
  * rendered client-side in the same sandboxed player. Anonymous plays are NOT persisted as
- * submissions (activity_submissions requires a user) — tracked completion is the authenticated
+ * submissions (activity_submissions requires a user), tracked completion is the authenticated
  * assignment flow. This route only ever exposes the single activity the token points at.
  */
 const router = Router();
@@ -30,7 +30,7 @@ async function resolveLink(token: string): Promise<{ link: ActivityEmbedLink; ac
   return { link, activity };
 }
 
-// GET /activity-embed/:token — public activity payload for the sandbox player.
+// GET /activity-embed/:token, public activity payload for the sandbox player.
 router.get("/activity-embed/:token", async (req, res) => {
   const resolved = await resolveLink(req.params.token);
   if (!resolved) { res.status(404).json({ error: "This link is not available." }); return; }

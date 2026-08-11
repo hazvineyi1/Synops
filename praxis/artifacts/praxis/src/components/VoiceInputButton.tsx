@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
  * A microphone button that sits next to any text-entry area. Clicking it toggles the browser's
  * Web Speech API dictation; recognised speech is appended to the field via `onTranscript`. It
  * self-gates: it renders NOTHING unless (a) the signed-in learner actually has the accommodation
- * and (b) the browser exposes SpeechRecognition — so it never appears for other learners or in
+ * and (b) the browser exposes SpeechRecognition, so it never appears for other learners or in
  * unsupported browsers. Recognition language follows the learner's locale (es-ES for the
  * Spanish-first persona, else en-US).
  */
@@ -36,7 +36,7 @@ function getRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
 /**
  * Whether the signed-in learner has the speak-to-write accommodation, and which recognition
  * locale to use. Detection mirrors AccommodationsPanel's "Speak-to-write" chip: the dysgraphia
- * persona, OR any voice/dictation accommodation on the coach profile (future-proofing — the demo
+ * persona, OR any voice/dictation accommodation on the coach profile (future-proofing, the demo
  * data drives this off the persona challenge today).
  */
 export function useSpeakToWrite(): { enabled: boolean; lang: string; es: boolean } {

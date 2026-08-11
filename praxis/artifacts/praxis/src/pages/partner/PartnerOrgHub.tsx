@@ -18,7 +18,6 @@ import {
   UserPlus, KeyRound, Ban, RotateCcw, Settings2, Layers, Check, Send, LifeBuoy,
   Phone, MapPin, Mail, Smartphone, Link2, Plus,
   Calendar, User, Fingerprint, Globe, Languages, Briefcase, Accessibility, Heart, Clock, Trash2, Eye, Lock,
-  Sparkles,
 } from 'lucide-react';
 import { startImpersonation } from '@/lib/impersonationStore';
 import { renameOrg, useOrgOverrides } from '@/lib/orgOverridesStore';
@@ -203,7 +202,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   // Look up the full learner record for the People detail drawer (org-level personal info).
   const selectedLearner = selected?.role === 'learner' ? seededLearners.find((l) => l.id === selected.id) : undefined;
 
-  // ── Documents, invoices, funding, subscription — REAL, scoped to this org ──
+  // ── Documents, invoices, funding, subscription, REAL, scoped to this org ──
   // Resolve the org's real partner (super admin browsing has no partnerId of their own), then read
   // the same partner-scoped billing/funding/documents endpoints the Financial/Funders/Documents
   // hubs use, filtered to this organisation. Replaces the old client-side mock (h.invoices etc.).
@@ -272,7 +271,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
   };
 
   // Resolve the org identity from REAL data. A real org id isn't in the client mock, so orgDetail's
-  // d.org would be undefined and the page would 404 "not found" even though the org exists — which
+  // d.org would be undefined and the page would 404 "not found" even though the org exists, which
   // now happens because the Organisations overview lists real orgs. Fall back to the mock only for
   // legacy/demo org ids.
   const orgObj = d.org ?? (realOrg ? { id: orgId, name: realOrg.name } : null);
@@ -436,7 +435,6 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
           {assignedCourses.length > 0 && (
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-semibold">Assigned from the Learning Hub</h3>
                 <Badge variant="secondary" className="ml-auto">{assignedCourses.length}</Badge>
               </div>
@@ -465,7 +463,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                   return (
                     <tr key={c.id}>
                       <td className="p-3 font-medium">{c.title}</td>
-                      <td className="p-3 text-muted-foreground">{c.modality || '—'}</td>
+                      <td className="p-3 text-muted-foreground">{c.modality || ', '}</td>
                       <td className="p-3 text-right tabular-nums">{c.enrolled}</td>
                       <td className="p-3">{inClasses.length === 0 ? <span className="text-xs text-muted-foreground">-</span> : <div className="flex flex-wrap gap-1">{inClasses.map((cl) => <span key={cl.id} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{cl.name}</span>)}</div>}</td>
                       <td className="p-3"><Badge variant={c.status === 'active' ? 'secondary' : 'outline'} className="capitalize">{c.status}</Badge></td>

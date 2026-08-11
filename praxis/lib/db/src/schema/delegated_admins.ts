@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp, jsonb } from "drizzle-orm/pg-core";
 
 /**
- * Delegated organisation admins — a junior admin a partner scopes to ONE organisation with only the
+ * Delegated organisation admins, a junior admin a partner scopes to ONE organisation with only the
  * powers granted. This table is the persistent register (who is delegated, to which org, with which
  * powers). Enforcement of the granular powers in the delivery routes is a separate authz step.
  */

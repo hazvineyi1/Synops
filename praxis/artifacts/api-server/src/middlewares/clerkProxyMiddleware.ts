@@ -1,5 +1,5 @@
 /**
- * DEAD FILE — Clerk has been removed.
+ * DEAD FILE, Clerk has been removed.
  *
  * Identity is first-party now (see ./requireAuth and ../routes/auth). The platform
  * console needs to impersonate any user, issue master password resets, force sign-out

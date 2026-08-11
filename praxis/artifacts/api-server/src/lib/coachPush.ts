@@ -44,7 +44,7 @@ export async function pushCatchUpToCoach(
       console.warn(`[coachPush] The Coach responded ${res.status}: ${body.slice(0, 300)}`);
       return { ok: false, status: res.status, error: body.slice(0, 300) };
     }
-    // The Coach returns { ok, coachUrl, ... } — the magic link the learner opens to work the plan.
+    // The Coach returns { ok, coachUrl, ... }, the magic link the learner opens to work the plan.
     const data = (await res.json().catch(() => ({}))) as { coachUrl?: string };
     return { ok: true, status: res.status, coachUrl: typeof data?.coachUrl === "string" ? data.coachUrl : null };
   } catch (e) {

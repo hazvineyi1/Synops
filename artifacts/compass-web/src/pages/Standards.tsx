@@ -210,7 +210,7 @@ export default function Standards() {
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-base leading-snug">
-                  {framework.acronym ? `${framework.acronym} — ` : ''}{framework.name}
+                  {framework.acronym ? `${framework.acronym}, ` : ''}{framework.name}
                 </CardTitle>
                 <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
               </div>
@@ -309,7 +309,7 @@ function ManageCompetenciesDialog({
         <DialogHeader>
           <DialogTitle>
             {framework
-              ? `${framework.acronym ? `${framework.acronym} — ` : ""}${framework.name}`
+              ? `${framework.acronym ? `${framework.acronym}, ` : ""}${framework.name}`
               : "Framework"}
           </DialogTitle>
         </DialogHeader>

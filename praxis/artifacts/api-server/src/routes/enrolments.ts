@@ -47,7 +47,7 @@ router.get("/courses/:courseId/roster", requireAuth, async (req, res) => {
   }));
 });
 
-// POST /courses/:courseId/enrol — STAFF ONLY. Self-enrolment is disabled: a learner is added to a
+// POST /courses/:courseId/enrol, STAFF ONLY. Self-enrolment is disabled: a learner is added to a
 // course only by an org admin (assign flow) or an admin-issued join link, never by enrolling
 // themselves. Enrolment drives progress, gradebooks and credentials, so it is not self-service.
 router.post("/courses/:courseId/enrol", requireAuth, async (req, res) => {
@@ -68,9 +68,9 @@ router.post("/courses/:courseId/enrol", requireAuth, async (req, res) => {
   res.status(201).json(enrolment);
 });
 
-// POST /courses/:courseId/roster — admin enrols a user
+// POST /courses/:courseId/roster, admin enrols a user
 /**
- * GET /courses/:courseId/enrolment-candidates — who could be enrolled on this course.
+ * GET /courses/:courseId/enrolment-candidates, who could be enrolled on this course.
  *
  * Derived from the COURSE's organisation, not the caller's. Sourcing candidates from the
  * caller's own org is wrong twice over: a super admin has no organisationId and so would
@@ -111,7 +111,7 @@ router.get("/courses/:courseId/enrolment-candidates", requireAuth, async (req, r
 });
 
 /**
- * POST /courses/:courseId/roster — enrol a learner.
+ * POST /courses/:courseId/roster, enrol a learner.
  *
  * STAFF ONLY. This previously had no authorisation check beyond being logged in, which
  * meant any authenticated user could enrol ANY user into ANY course on the platform --
@@ -138,7 +138,7 @@ router.post("/courses/:courseId/roster", requireAuth, async (req, res) => {
   res.status(201).json(enrolment);
 });
 
-// DELETE /courses/:courseId/roster/:userId — staff only, for the same reason as above.
+// DELETE /courses/:courseId/roster/:userId, staff only, for the same reason as above.
 // Un-enrolling someone destroys their access to the course; it was previously open to
 // any authenticated caller.
 router.delete("/courses/:courseId/roster/:userId", requireAuth, async (req, res) => {

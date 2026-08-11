@@ -167,7 +167,7 @@ router.patch("/partners/:partnerId", requireAuth, async (req, res) => {
   res.json(toPartnerResponse(updated));
 });
 
-// DELETE /partners/:partnerId — super admin only. Hard-deletes the partner and all its data.
+// DELETE /partners/:partnerId, super admin only. Hard-deletes the partner and all its data.
 router.delete("/partners/:partnerId", requireAuth, requireRole("super_admin"), async (req, res) => {
   const { partnerId } = req.params;
   const partner = await db.query.partnersTable.findFirst({ where: eq(partnersTable.id, partnerId) });
@@ -199,7 +199,7 @@ router.get("/partners/:partnerId/stats", requireAuth, async (req, res) => {
   });
 });
 
-// GET /partners/:partnerId/members — the real staff/learner accounts belonging to a partner
+// GET /partners/:partnerId/members, the real staff/learner accounts belonging to a partner
 // (super admin sees any partner; a partner_admin sees their own). Powers the Accounts & Roles page.
 router.get("/partners/:partnerId/members", requireAuth, async (req, res) => {
   const { partnerId } = req.params;
@@ -256,7 +256,7 @@ router.get("/partners/:partnerId/members", requireAuth, async (req, res) => {
   );
 });
 
-// GET /partners/:partnerId/audit — the real, append-only audit trail scoped to this partner (the
+// GET /partners/:partnerId/audit, the real, append-only audit trail scoped to this partner (the
 // events its own staff generated). Super admin sees any partner; a facilitator sees their own.
 router.get("/partners/:partnerId/audit", requireAuth, async (req, res) => {
   const { partnerId } = req.params;

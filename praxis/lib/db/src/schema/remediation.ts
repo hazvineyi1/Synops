@@ -1,7 +1,7 @@
 import { pgTable, text, integer, real, boolean, date, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 
 /**
- * Adaptive remediation content — the multi-modal "close the gap" material the in-LMS Coach
+ * Adaptive remediation content, the multi-modal "close the gap" material the in-LMS Coach
  * generates for an off-track learner. For each gap (a gradebook category on the learner's
  * active remedial plan) we generate, ONCE, a set of flashcards + knowledge questions grounded
  * in that learner's actual course content, then track their spaced-repetition + quiz progress.

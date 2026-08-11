@@ -234,7 +234,7 @@ export async function issueCredential(
         eq(credentialsTable.status, "valid")
       ),
     });
-    if (existingCredential) return; // idempotent — already certified
+    if (existingCredential) return; // idempotent, already certified
 
     const decayDate = new Date();
     decayDate.setMonth(decayDate.getMonth() + 12); // 12-month validity

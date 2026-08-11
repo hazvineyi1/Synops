@@ -53,7 +53,7 @@ export interface CaseContext {
   /** Approved per-org tutoring-voice overlay (house style). Null = platform default voice. */
   orgPromptOverlay?: string | null;
   promptLimit?: number | null;
-  // Learner personalisation — present for authenticated sessions, absent for embed.
+  // Learner personalisation, present for authenticated sessions, absent for embed.
   learnerName?: string | null;
   personality?: string | null;
   learningStyle?: string | null;
@@ -87,7 +87,7 @@ export function buildCaseSystemPrompt(c: CaseContext, isOpening: boolean): strin
   let prompt = buildSocraticSystemPrompt(toSocraticContext(c), isOpening);
   const extra: string[] = [];
 
-  // Language override — takes precedence over the base rule's "South African English".
+  // Language override, takes precedence over the base rule's "South African English".
   const lang = c.language ?? "en";
   if (lang !== "en") {
     const name = languageName(lang);
@@ -97,7 +97,7 @@ export function buildCaseSystemPrompt(c: CaseContext, isOpening: boolean): strin
     );
   }
 
-  // Domain-expert identity — set FIRST so every question comes from the right professional
+  // Domain-expert identity, set FIRST so every question comes from the right professional
   // lens (finance, sales, ops, marketing, law, etc.), while the Socratic rules above still
   // bind. Content-agnostic: whatever the author supplies, or a neutral mentor by default.
   const persona = c.aiPersona?.trim() || DEFAULT_PERSONA;
@@ -173,8 +173,8 @@ function transcriptText(messages: CaseMessage[]): string {
 
 /**
  * End-of-session analysis. Scores demonstrated reasoning (never writing quality), names
- * concepts the learner engaged, their reasoning strengths and development areas, and — if a
- * rubric is supplied — awards points per criterion. Returns strict JSON.
+ * concepts the learner engaged, their reasoning strengths and development areas, and, if a
+ * rubric is supplied, awards points per criterion. Returns strict JSON.
  */
 export async function generateCaseAnalysis(
   c: { title: string; learningObjective?: string | null; contextBlock: string; focusAreas?: string[] | null; language?: string | null },
@@ -186,7 +186,7 @@ export async function generateCaseAnalysis(
     : "";
   const rubricBlock =
     rubric?.criteria?.length
-      ? `\n\nRUBRIC — award points per criterion (0..maxPoints) based ONLY on evidence in the transcript:\n` +
+      ? `\n\nRUBRIC, award points per criterion (0..maxPoints) based ONLY on evidence in the transcript:\n` +
         rubric.criteria.map((cr) => `- "${cr.name}" (max ${cr.maxPoints})`).join("\n")
       : "";
 
@@ -198,7 +198,7 @@ export async function generateCaseAnalysis(
 Learning objective: ${c.learningObjective ?? "(not specified)"}.
 Case facts: ${c.contextBlock}
 ${c.focusAreas?.length ? "Focus areas the case targets: " + c.focusAreas.join("; ") + "." : ""}
-Assess ONLY the learner's demonstrated reasoning across the whole dialogue — not writing length, tone or confidence.
+Assess ONLY the learner's demonstrated reasoning across the whole dialogue, not writing length, tone or confidence.
 Return a SINGLE strict JSON object, no prose around it:
 {
   "engagementNarrative": "2-3 sentences on how the learner reasoned through the case",
@@ -351,7 +351,7 @@ export async function translateCaseFacts(
 export async function translateTexts(texts: string[], langCode: string): Promise<string[]> {
   if (!texts.length) return [];
   const name = languageName(langCode);
-  const system = `You are a professional translator. Translate EACH string in the given JSON array into natural, fluent ${name}. Keep people's names, numbers and currency amounts (e.g. R80,000) exactly as they are. These are a Socratic coach's questions — keep the questioning tone. Preserve the array order and length EXACTLY (one translation per input, same index). Return ONLY a strict JSON array of the translated strings and nothing else.${glossaryPromptBlock(langCode)}`;
+  const system = `You are a professional translator. Translate EACH string in the given JSON array into natural, fluent ${name}. Keep people's names, numbers and currency amounts (e.g. R80,000) exactly as they are. These are a Socratic coach's questions, keep the questioning tone. Preserve the array order and length EXACTLY (one translation per input, same index). Return ONLY a strict JSON array of the translated strings and nothing else.${glossaryPromptBlock(langCode)}`;
   try {
     const msg = await anthropic.messages.create({
       model: MODEL,

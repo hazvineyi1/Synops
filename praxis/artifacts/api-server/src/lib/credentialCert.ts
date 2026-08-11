@@ -116,7 +116,7 @@ export async function buildCredentialPdf(data: CredentialCertData): Promise<Buff
   doc.moveTo(cx - 150, 366).lineTo(cx + 150, 366).lineWidth(0.8).strokeColor(line).stroke();
 
   // Dates row.
-  const fmt = (d: Date | null) => (d ? d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "—");
+  const fmt = (d: Date | null) => (d ? d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : ", ");
   const colW = 220;
   const issuedX = cx - colW - 20;
   const validX = cx + 20;

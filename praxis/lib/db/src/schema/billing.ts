@@ -1,10 +1,10 @@
 import { pgTable, text, integer, timestamp } from "drizzle-orm/pg-core";
 
 /**
- * Partner billing — subscriptions and invoices. Backs the Partner Financial Hub, replacing the
+ * Partner billing, subscriptions and invoices. Backs the Partner Financial Hub, replacing the
  * seeded demo. Deliberately simple: a partner owns subscriptions (one per organisation, with a
  * plan name, per-seat price and seat counts) and invoices (net amount, period, status). VAT and
- * monthly totals are derived in the UI, not stored. No payment gateway — status is set manually.
+ * monthly totals are derived in the UI, not stored. No payment gateway, status is set manually.
  */
 export const billingSubscriptionsTable = pgTable("billing_subscriptions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),

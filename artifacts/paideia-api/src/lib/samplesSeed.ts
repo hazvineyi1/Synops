@@ -1,6 +1,6 @@
 // Samples library seed: a grade-appropriate worksheet + quiz for every school
 // grade in each region (US, UK, Europe, Africa, Asia). Undergraduate / postgraduate
-// / adult / vocational levels are intentionally excluded — this covers the school
+// / adult / vocational levels are intentionally excluded, this covers the school
 // grade ladder so the Samples library has coverage for every grade level.
 //
 // Content matches the WorksheetContent / QuizContent shapes the app renders.
@@ -65,9 +65,9 @@ const US: Spec[] = [
   S("us", "1", "English Language Arts", "Short Vowel Sounds and Simple Sentences",
     "Read each word out loud. Fill in the missing short-vowel letter, then use the word in a short sentence.",
     [
-      ["short", "c _ t (a small pet that says meow)", null, "a", "The word is 'cat' — short /a/ sound."],
-      ["short", "b _ d (where you sleep)", null, "e", "The word is 'bed' — short /e/ sound."],
-      ["short", "p _ g (a farm animal)", null, "i", "The word is 'pig' — short /i/ sound."],
+      ["short", "c _ t (a small pet that says meow)", null, "a", "The word is 'cat', short /a/ sound."],
+      ["short", "b _ d (where you sleep)", null, "e", "The word is 'bed', short /e/ sound."],
+      ["short", "p _ g (a farm animal)", null, "i", "The word is 'pig', short /i/ sound."],
       ["long", "Write a sentence using the word 'sun'.", null, "Answers vary, e.g. 'The sun is hot.'", "Rubric: capital letter at the start, the word 'sun' used correctly, a period at the end."],
     ],
     "Model blending sounds slowly. Accept phonetic spelling in the sentence as long as the target word is correct.",
@@ -193,7 +193,7 @@ const US: Spec[] = [
   S("us", "9", "English Language Arts", "Analyzing Theme in a Short Story",
     "Answer using evidence. A theme is a message about life the story explores.",
     [
-      ["long", "State one theme of a story in which a character learns that honesty repairs a broken friendship. Support it with a detail.", null, "Answers vary: Theme — honesty can rebuild trust. Detail — the character admits the lie and the friend forgives them.", "Rubric: a theme stated as a full idea (not one word), plus one relevant textual detail."],
+      ["long", "State one theme of a story in which a character learns that honesty repairs a broken friendship. Support it with a detail.", null, "Answers vary: Theme, honesty can rebuild trust. Detail, the character admits the lie and the friend forgives them.", "Rubric: a theme stated as a full idea (not one word), plus one relevant textual detail."],
       ["multiple_choice", "A theme is best described as…", ["a message about life", "the setting", "a character's name"], "a message about life", "Theme = the underlying message."],
       ["short", "How is a theme different from a topic?", null, "A topic is what the story is about (e.g. 'friendship'); a theme is what it says about that topic (e.g. 'true friends forgive').", "Topic = subject; theme = the claim/insight."],
       ["long", "Explain how a character's change can reveal a story's theme.", null, "Answers vary: as the character grows or learns a lesson, the author shows the message they want readers to take away.", "Rubric: links character change to the message; uses reasoning."],
@@ -1256,7 +1256,7 @@ const US2: Spec[] = [
       ["multiple_choice", "An object at rest stays at rest unless acted on by a force. This is Newton's…", ["First Law", "Third Law"], "First Law", "The law of inertia."],
       ["short", "State Newton's Second Law in words or symbols.", null, "Force = mass × acceleration (F = ma)", "F = ma."],
       ["long", "Give an example of Newton's Third Law (action–reaction).", null, "Answers vary: a swimmer pushes water back and is pushed forward; a rocket pushes gas down and rises.", "Rubric: clear paired action and reaction forces."],
-      ["short", "Why do passengers lurch forward when a car stops suddenly?", null, "Inertia — their bodies keep moving until a force stops them.", "First Law."],
+      ["short", "Why do passengers lurch forward when a car stops suddenly?", null, "Inertia, their bodies keep moving until a force stops them.", "First Law."],
     ],
     "Link inertia to seatbelts. Common misconception: a moving object needs a constant force to keep moving.",
     "Quick check", "Choose or answer.",
@@ -1417,7 +1417,7 @@ const UK2: Spec[] = [
     "Read between the lines and justify with evidence.",
     [
       ["short", "What is an inference?", null, "A conclusion you work out using clues, not stated directly.", "Read between the lines."],
-      ["long", "'She slammed the door and folded her arms.' What can you infer about how she feels? Justify.", null, "Answers vary: she is angry/upset — the slamming and folded arms are clues.", "Rubric: reasonable inference + textual clue."],
+      ["long", "'She slammed the door and folded her arms.' What can you infer about how she feels? Justify.", null, "Answers vary: she is angry/upset, the slamming and folded arms are clues.", "Rubric: reasonable inference + textual clue."],
       ["multiple_choice", "Inference uses…", ["clues in the text", "only the title"], "clues in the text", "Clues support inferences."],
       ["short", "How do you support an inference?", null, "With evidence (a quotation or detail) from the text.", "Point and prove."],
     ],
@@ -2215,7 +2215,7 @@ function lessonPlanContent(g: Spec, label: string) {
   const last = g.qz[g.qz.length - 1]!;
   const t = g.topic.toLowerCase();
   return {
-    title: `${g.topic} — Lesson Plan`,
+    title: `${g.topic}, Lesson Plan`,
     summary: `A ~40-minute ${g.subject} lesson for ${label} that introduces and practises ${t}. Backward-designed from clear objectives, with differentiation, a mini-plenary check, and an exit ticket.`,
     learningObjectives: [
       `Understand the key ideas of ${t}.`,
@@ -2231,7 +2231,7 @@ function lessonPlanContent(g: Spec, label: string) {
       durationMinutes: 5,
     },
     mainTask: {
-      core: `Model ${t} with two or three worked examples, thinking aloud. Students then work through the "${g.topic} — Practice Worksheet" independently or in pairs.`,
+      core: `Model ${t} with two or three worked examples, thinking aloud. Students then work through the "${g.topic}, Practice Worksheet" independently or in pairs.`,
       support: `Give a completed worked example and a scaffold (number frame / sentence starter). Focus on the first two questions and check in after each.`,
       stretch: `Students explain their reasoning in full sentences and write one new question of their own for a partner to solve.`,
       durationMinutes: 25,
@@ -2245,13 +2245,13 @@ function lessonPlanContent(g: Spec, label: string) {
       expectedResponse: last[3],
     },
     resourcesNeeded: [
-      `"${g.topic} — Practice Worksheet" (in the Samples library)`,
-      `"${g.topic} — Quick Check" quiz (for the starter, mini-plenary and exit ticket)`,
+      `"${g.topic}, Practice Worksheet" (in the Samples library)`,
+      `"${g.topic}, Quick Check" quiz (for the starter, mini-plenary and exit ticket)`,
       "Mini-whiteboards and pens",
       "Board or projector for modelling",
     ],
     commonMisconceptions: [g.wsNotes],
-    homeworkSuggestion: `Finish any remaining questions on the "${g.topic} — Practice Worksheet" and be ready to explain one answer next lesson.`,
+    homeworkSuggestion: `Finish any remaining questions on the "${g.topic}, Practice Worksheet" and be ready to explain one answer next lesson.`,
   };
 }
 
@@ -2265,7 +2265,7 @@ export function buildSampleRows(): SampleRow[] {
       region: g.region,
       subject: g.subject,
       yearGroup: g.yg,
-      title: `${g.topic} — Lesson Plan`,
+      title: `${g.topic}, Lesson Plan`,
       description: `A ready-to-teach ${g.subject} lesson plan on ${g.topic.toLowerCase()} for ${label}, with objectives, differentiation, a mini-plenary and an exit ticket.`,
       content: lessonPlanContent(g, label),
     });
@@ -2275,10 +2275,10 @@ export function buildSampleRows(): SampleRow[] {
       region: g.region,
       subject: g.subject,
       yearGroup: g.yg,
-      title: `${g.topic} — Practice Worksheet`,
+      title: `${g.topic}, Practice Worksheet`,
       description: `A ready-to-use ${g.subject} worksheet on ${g.topic.toLowerCase()} for ${label}. Copy it to your library to adapt and assign.`,
       content: {
-        title: `${g.topic} — Practice Worksheet`,
+        title: `${g.topic}, Practice Worksheet`,
         instructions: g.wsInstr,
         questions: g.ws.map((q, i) => ({
           number: i + 1,
@@ -2297,10 +2297,10 @@ export function buildSampleRows(): SampleRow[] {
       region: g.region,
       subject: g.subject,
       yearGroup: g.yg,
-      title: `${g.topic} — Quick Check`,
+      title: `${g.topic}, Quick Check`,
       description: `A short ${g.subject} quiz on ${g.topic.toLowerCase()} for ${label}. Copy it to your library to adapt and assign.`,
       content: {
-        title: `${g.topic} — Quick Check`,
+        title: `${g.topic}, Quick Check`,
         format: g.qzFormat,
         instructions: g.qzInstr,
         items: g.qz.map((q, i) => ({
@@ -2322,7 +2322,7 @@ export function buildSampleRows(): SampleRow[] {
  * Reconcile the samples table with the built-in seed set. The table holds only
  * curated library content (teachers COPY from it into their own worksheets/
  * quizzes, which live elsewhere), so it is safe to refresh to the canonical set
- * whenever the count differs — e.g. after new samples are added to the seed.
+ * whenever the count differs, e.g. after new samples are added to the seed.
  */
 export async function ensureSamplesSeed(): Promise<{ changed: boolean; count: number }> {
   const rows = buildSampleRows();

@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { api, ApiError } from "@/lib/api";
 import { useUsage } from "@/hooks/use-usage";
 import { useAuth } from "@/hooks/use-auth";
-import { Check, Sparkles, MailCheck } from "lucide-react";
+import { Check, MailCheck } from "lucide-react";
 
 export default function Upgrade() {
   const { usage, refresh } = useUsage();
@@ -76,7 +76,6 @@ export default function Upgrade() {
   return (
     <AppShell>
       <header className="mb-8 flex items-start gap-3">
-        <Sparkles className="h-7 w-7 text-accent mt-1" />
         <div>
           <h1 className="font-serif text-4xl text-primary mb-2">
             {paidOpen ? "Upgrade Synops Teacher" : "Unlimited is coming soon"}

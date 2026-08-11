@@ -1,5 +1,5 @@
 /**
- * Canonical role & permission model — the single source of truth that maps the stored
+ * Canonical role & permission model, the single source of truth that maps the stored
  * `user_role` enum onto the five-tier model from the Praxis Role & Permission decision
  * doc. The enum values are kept as-is (no breaking rename); the TIER semantics live here.
  *
@@ -32,22 +32,22 @@ export interface ScopedUser {
 
 // ── Tier predicates ────────────────────────────────────────────────────────────
 export const isSuperAdmin = (r: string): boolean => r === ROLE.SUPER_ADMIN;
-/** Org/Facilitator tier — partner_admin is folded in (decision §6). */
+/** Org/Facilitator tier, partner_admin is folded in (decision §6). */
 export const isFacilitator = (r: string): boolean => r === ROLE.ORG_ADMIN || r === ROLE.PARTNER_ADMIN;
 export const isCoFacilitator = (r: string): boolean => r === ROLE.COACH;
 export const isInstructionalDesigner = (r: string): boolean => r === ROLE.INSTRUCTIONAL_DESIGNER;
 export const isLearner = (r: string): boolean => r === ROLE.LEARNER;
 /**
  * Funder / sponsor tier (decision doc §10.2). Deliberately excluded from every delivery
- * and Hub predicate above — a funder gets read-only aggregate reporting via its own
+ * and Hub predicate above, a funder gets read-only aggregate reporting via its own
  * scoped endpoints and nothing else. It sits ALONGSIDE the hierarchy, not inside it.
  */
 export const isFunder = (r: string): boolean => r === ROLE.FUNDER;
 
-/** Facilitator or above — may administer an organization's delivery layer. */
+/** Facilitator or above, may administer an organization's delivery layer. */
 export const canAdministerOrg = (r: string): boolean => isSuperAdmin(r) || isFacilitator(r);
 
-/** Hub access — Instructional Designers plus Super Admin (decision §4.5). */
+/** Hub access, Instructional Designers plus Super Admin (decision §4.5). */
 export const hasHubAccess = (r: string): boolean => isSuperAdmin(r) || isInstructionalDesigner(r);
 
 // Enum groups for `requireRole(...)` guards.
@@ -98,7 +98,7 @@ export function canAccessOrg(
 
 /**
  * Scope against a course. A course's `tenantId` may be either an organisation OR a
- * partner — courses are frequently owned at the partner level and shared across that
+ * partner, courses are frequently owned at the partner level and shared across that
  * partner's organisations. So a user is in scope if EITHER their org or their partner
  * matches the course's tenant.
  */

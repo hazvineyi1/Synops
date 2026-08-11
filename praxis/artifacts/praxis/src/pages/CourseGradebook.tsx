@@ -82,7 +82,7 @@ export function CourseGradebook() {
         r.sent
           ? `Test email sent to ${r.to}. Check your inbox.`
           : r.configured
-            ? "Email is configured but the send failed — check the Resend key and the EMAIL_FROM sender domain."
+            ? "Email is configured but the send failed, check the Resend key and the EMAIL_FROM sender domain."
             : "Email isn't configured yet. Set RESEND_API_KEY and EMAIL_FROM in Railway, then try again.",
       ),
     onError: (e: any) => window.alert(e?.message ?? "Test failed"),
@@ -176,7 +176,7 @@ export function CourseGradebook() {
         </div>
         <div className="text-right">
           <div className={cn("text-3xl font-bold", classAvg == null ? "text-muted-foreground" : classAvg >= 70 ? "text-green-600" : "text-amber-600")}>
-            {classAvg == null ? "—" : `${classAvg}%`}
+            {classAvg == null ? ", " : `${classAvg}%`}
           </div>
           <div className="text-xs text-muted-foreground">{includeFormative ? "Class average (practice + mastery)" : "Class mastery average"}</div>
         </div>
@@ -307,7 +307,7 @@ export function CourseGradebook() {
                       const display = f == null ? "" : String(Math.round((f * c.pointsPossible) * 10) / 10);
                       // Format the read-only cell per its grade type: Pass/Fail, %, or points.
                       const gt = ((c as { gradeType?: string }).gradeType) ?? "points";
-                      const label = f == null ? "—" : gt === "pass_fail" ? (f >= 0.5 ? "Pass" : "Fail") : gt === "completion" ? `${Math.round(f * 100)}%` : display;
+                      const label = f == null ? ", " : gt === "pass_fail" ? (f >= 0.5 ? "Pass" : "Fail") : gt === "completion" ? `${Math.round(f * 100)}%` : display;
                       const auto = !!(cell as { auto?: boolean } | undefined)?.auto;
                       return (
                         <td key={c.key} className="px-2 py-1.5 text-center">
@@ -316,7 +316,7 @@ export function CourseGradebook() {
                               <input
                                 defaultValue={display}
                                 key={display}
-                                placeholder="—"
+                                placeholder=", "
                                 onBlur={(e) => { if (e.target.value !== display) editScore(l, c, e.target.value); }}
                                 className={cn("h-8 w-[62px] rounded-md text-center font-mono text-[13px] outline-none focus:ring-2 focus:ring-ring", bandCell(f), c.itemType === "formative" && "opacity-60")}
                               />
@@ -338,7 +338,7 @@ export function CourseGradebook() {
                     })}
                     <td className="border-l border-border px-3 py-2 text-center">
                       <span className={cn("rounded px-2 py-0.5 text-sm font-bold", pillBand(ov.band))}>
-                        {ov.pct == null ? "—" : `${Math.round(ov.pct)}%`}
+                        {ov.pct == null ? ", " : `${Math.round(ov.pct)}%`}
                       </span>
                       {ov.letter && <div className="mt-0.5 text-xs font-bold text-foreground">{ov.letter}</div>}
                     </td>
@@ -360,7 +360,7 @@ export function CourseGradebook() {
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-green-500" /> Mastery (90%+)</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Approaching (70–89%)</span>
         <span className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Needs support (below 70%)</span>
-        <span className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-red-600" /> Off track — a study plan has been generated and the learner + coach notified</span>
+        <span className="flex items-center gap-1.5"><AlertTriangle className="h-3.5 w-3.5 text-red-600" /> Off track, a study plan has been generated and the learner + coach notified</span>
       </div>
 
       <GradebookLearnerDialog courseId={courseId} userId={drillUser} onClose={() => setDrillUser(null)} />

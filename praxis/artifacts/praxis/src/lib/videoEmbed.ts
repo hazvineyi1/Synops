@@ -2,7 +2,7 @@
  * Universal video embed resolver.
  *
  * Turns any pasted video share link (or <iframe> snippet) into a single, chrome-free INLINE embed so a
- * short clip plays right inside the lesson — never a link that navigates the learner away ("not a dead
+ * short clip plays right inside the lesson, never a link that navigates the learner away ("not a dead
  * end"). Supports the big education sources: YouTube (+ Shorts), Khan Academy, Vimeo, TikTok, Loom,
  * Wistia, Google Drive, and direct video files. Where the provider allows it, we honour a start (and
  * end) time so teachers can trim to the 30–90s that actually matters instead of a 12-minute lecture.
@@ -101,11 +101,11 @@ export function resolveVideo(raw?: string | null): ResolvedVideo {
   const drive = input.match(/drive\.google\.com\/file\/d\/([^/]+)/);
   if (drive) return { kind: "iframe", src: `https://drive.google.com/file/d/${drive[1]}/preview`, provider: "drive" };
 
-  // Already an embeddable player URL, or unknown provider — embed as-is (best effort).
+  // Already an embeddable player URL, or unknown provider, embed as-is (best effort).
   if (/^https?:\/\//i.test(input)) return { kind: "iframe", src: input, provider: "generic" };
   return NONE;
 }
 
 export const VIDEO_PROVIDERS_HINT =
-  "Paste a link from YouTube, Khan Academy, Vimeo, TikTok, Loom, Wistia or Google Drive — or a video file. " +
+  "Paste a link from YouTube, Khan Academy, Vimeo, TikTok, Loom, Wistia or Google Drive, or a video file. " +
   "Add a start time (e.g. ?t=90 or &start=90 on a YouTube link) to jump straight to the useful part and keep the clip short.";

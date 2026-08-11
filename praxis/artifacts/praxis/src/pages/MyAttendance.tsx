@@ -44,7 +44,7 @@ export function MyAttendance() {
       <PageHeader
         title="My sessions"
         icon={CalendarDays}
-        subtitle={`Your in-person, virtual and mentoring sessions${totalHours > 0 ? ` — ${totalHours} coaching hours so far` : ''}.`}
+        subtitle={`Your in-person, virtual and mentoring sessions${totalHours > 0 ? `, ${totalHours} coaching hours so far` : ''}.`}
       />
 
       {isLoading ? (

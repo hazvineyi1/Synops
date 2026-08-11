@@ -95,7 +95,7 @@ async function upsertTheme(tenantId: string, tenantType: TenantType, body: any) 
   return created;
 }
 
-// GET /brand/public — PUBLIC branding for a hostname (custom domains). No auth: this powers the
+// GET /brand/public, PUBLIC branding for a hostname (custom domains). No auth: this powers the
 // pre-auth/login page theming on a partner's custom domain. Uses the Host header, or an explicit
 // ?host= override (useful for previews). Returns the platform default for the app's own domains.
 router.get("/brand/public", async (req, res) => {
@@ -104,7 +104,7 @@ router.get("/brand/public", async (req, res) => {
   res.json(brand);
 });
 
-// GET /brand/theme — the caller's own tenant theme (any authenticated user; used to render branding).
+// GET /brand/theme, the caller's own tenant theme (any authenticated user; used to render branding).
 router.get("/brand/theme", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   const tenantId = user.partnerId ?? "platform";
@@ -122,7 +122,7 @@ router.get("/brand/theme", requireAuth, async (req, res) => {
   res.json({ ...toThemeResponse(theme), slug });
 });
 
-// PUT /brand/theme — edit the caller's own tenant theme. White-label control is top-tier only.
+// PUT /brand/theme, edit the caller's own tenant theme. White-label control is top-tier only.
 router.put("/brand/theme", requireAuth, requireRole("super_admin", "partner_admin"), async (req, res) => {
   const user = req.dbUser!;
   const tenantId = user.partnerId ?? "platform";
@@ -130,20 +130,20 @@ router.put("/brand/theme", requireAuth, requireRole("super_admin", "partner_admi
   res.json(toThemeResponse(theme));
 });
 
-// GET /brand/partner/:partnerId — a specific partner's theme (super_admin manages any partner).
+// GET /brand/partner/:partnerId, a specific partner's theme (super_admin manages any partner).
 router.get("/brand/partner/:partnerId", requireAuth, requireRole("super_admin"), async (req, res) => {
   const theme = await getOrCreateTheme(req.params.partnerId, "partner");
   res.json(toThemeResponse(theme));
 });
 
-// PUT /brand/partner/:partnerId — edit a specific partner's theme (super_admin only).
+// PUT /brand/partner/:partnerId, edit a specific partner's theme (super_admin only).
 router.put("/brand/partner/:partnerId", requireAuth, requireRole("super_admin"), async (req, res) => {
   const theme = await upsertTheme(req.params.partnerId, "partner", req.body);
   res.json(toThemeResponse(theme));
 });
 
 /**
- * POST /brand/ai-generate — derive a white-label brand kit from a logo (and optional business card
+ * POST /brand/ai-generate, derive a white-label brand kit from a logo (and optional business card
  * + website + name) using Claude vision. Returns colours + personalization; it does NOT save -- the
  * client previews and then applies via PUT /brand/theme. Top-tier only.
  */

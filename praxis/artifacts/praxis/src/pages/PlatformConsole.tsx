@@ -212,7 +212,7 @@ function UsersTab({ onOpen }: { onOpen: (u: PlatformUserRow) => void }) {
       setCreatedLink(r.link);
       setCreatedEmailed(!!r.emailed);
       qc.invalidateQueries({ queryKey: ["platform", "users"] });
-      toast({ title: "User created", description: r.emailed ? `Set-password link emailed to ${r.email}.` : `${r.email} — send them the set-password link below.` });
+      toast({ title: "User created", description: r.emailed ? `Set-password link emailed to ${r.email}.` : `${r.email}, send them the set-password link below.` });
     },
     onError: (e: unknown) => toast({ title: "Could not create user", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
@@ -307,7 +307,7 @@ function UsersTab({ onOpen }: { onOpen: (u: PlatformUserRow) => void }) {
                     onClick={() => onOpen(u)}
                   >
                     <td className="px-4 py-3">
-                      <div className="font-medium">{[u.firstName, u.lastName].filter(Boolean).join(" ") || "—"}</div>
+                      <div className="font-medium">{[u.firstName, u.lastName].filter(Boolean).join(" ") || ", "}</div>
                       <div className="text-xs text-muted-foreground">{u.email}</div>
                     </td>
                     <td className="px-4 py-3 capitalize">{roleLabel(u.role)}</td>
@@ -458,7 +458,7 @@ function UserDialog({
                 {detail.logins.slice(0, 6).map((l) => (
                   <div key={l.id} className="flex items-center justify-between text-xs">
                     <OutcomeBadge outcome={l.outcome} />
-                    <span className="text-muted-foreground">{l.ipAddress ?? "—"} · {timeAgo(l.createdAt)}</span>
+                    <span className="text-muted-foreground">{l.ipAddress ?? ", "} · {timeAgo(l.createdAt)}</span>
                   </div>
                 ))}
               </div>
@@ -539,9 +539,9 @@ function ActivityTab() {
             ) : (
               data.map((l) => (
                 <tr key={l.id} className="border-b border-border/50">
-                  <td className="px-4 py-3">{l.email ?? "—"}</td>
+                  <td className="px-4 py-3">{l.email ?? ", "}</td>
                   <td className="px-4 py-3"><OutcomeBadge outcome={l.outcome} /></td>
-                  <td className="px-4 py-3 text-muted-foreground">{l.ipAddress ?? "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{l.ipAddress ?? ", "}</td>
                   <td className="px-4 py-3 text-muted-foreground">{timeAgo(l.createdAt)}</td>
                 </tr>
               ))
@@ -614,7 +614,7 @@ function PromptTemplatesTab() {
             <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
             <Input placeholder="Category (optional)" value={category} onChange={(e) => setCategory(e.target.value)} />
             <textarea
-              placeholder="Prompt text — a reusable Socratic system-prompt snippet for this organisation"
+              placeholder="Prompt text, a reusable Socratic system-prompt snippet for this organisation"
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
               rows={4}
@@ -697,7 +697,7 @@ function AccessRequestsTab() {
                   <span className="text-muted-foreground font-normal"> · {r.email}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  {r.organisationName ?? "—"} · wants {roleLabel(r.requestedRole)} · {timeAgo(r.createdAt)}
+                  {r.organisationName ?? ", "} · wants {roleLabel(r.requestedRole)} · {timeAgo(r.createdAt)}
                 </p>
                 {r.message && <p className="text-sm mt-1">{r.message}</p>}
               </div>
@@ -776,7 +776,7 @@ function AuditTab() {
                 <tr key={a.id} className="border-b border-border/50">
                   <td className="px-4 py-3"><Badge variant="secondary" className="font-mono text-xs">{a.action}</Badge></td>
                   <td className="px-4 py-3 text-muted-foreground">{a.resourceType}{a.resourceId ? ` · ${a.resourceId.slice(0, 8)}` : ""}</td>
-                  <td className="px-4 py-3 text-muted-foreground capitalize">{a.actorRole ? roleLabel(a.actorRole) : "—"}</td>
+                  <td className="px-4 py-3 text-muted-foreground capitalize">{a.actorRole ? roleLabel(a.actorRole) : ", "}</td>
                   <td className="px-4 py-3 text-muted-foreground">{timeAgo(a.createdAt)}</td>
                 </tr>
               ))
@@ -829,7 +829,7 @@ function ApiKeysTab() {
 
       {newKey && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 max-w-2xl">
-          <div className="text-xs font-medium text-emerald-600 mb-1">Copy this key now — it is shown only once.</div>
+          <div className="text-xs font-medium text-emerald-600 mb-1">Copy this key now, it is shown only once.</div>
           <div className="flex items-center gap-2">
             <code className="flex-1 truncate text-xs bg-background rounded px-2 py-1 border">{newKey}</code>
             <Button size="sm" variant="outline" onClick={copyKey}>{copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}</Button>
@@ -915,7 +915,7 @@ export function PlatformConsole() {
         <p className="text-sm mt-1" style={{ color: "hsl(43 10% 45%)" }}>{SECTION_SUBTITLE[tab]}</p>
       </div>
 
-      {/* Section nav — kept as a tab bar so the console lives inside the one app shell. */}
+      {/* Section nav, kept as a tab bar so the console lives inside the one app shell. */}
       <div className="flex gap-1 border-b" style={{ borderColor: "hsl(43 15% 88%)" }}>
         {TABS.map((tItem) => (
           <button

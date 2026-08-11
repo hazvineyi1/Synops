@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Plus, Palette, Settings2, Upload, Sparkles, Mail, BookOpen, Check, Copy, Loader2, Trash2, Wrench, AlertTriangle } from 'lucide-react';
+import { Building, Plus, Palette, Settings2, Upload, Mail, BookOpen, Check, Copy, Loader2, Trash2, Wrench, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Partner {
@@ -60,7 +60,7 @@ function CreatePartnerDialog({ onClose, onCreated }: { onClose: () => void; onCr
   const [courseIds, setCourseIds] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<{ partnerName: string; adminLink?: string; adminEmail?: string; emailed?: boolean } | null>(null);
 
-  // Once the user edits the slug, ALWAYS show exactly what they typed (even empty) — the old
+  // Once the user edits the slug, ALWAYS show exactly what they typed (even empty), the old
   // `form.slugTouched && form.slug` fell back to the name-derived slug whenever the field was
   // cleared, so deletions were ignored and new keystrokes appended to the name-derived value
   // ("test-partner-inc" + "hello" = "test-partner-inchello"). Before they touch it, auto-derive.
@@ -218,7 +218,7 @@ function CreatePartnerDialog({ onClose, onCreated }: { onClose: () => void; onCr
               <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => onLogo(e.target.files?.[0])} />
             </label>
             <Button size="sm" variant="outline" className="gap-1.5" disabled={!logo || aiGen.isPending} onClick={() => aiGen.mutate()}>
-              {aiGen.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />} Generate colours from logo
+              {aiGen.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Generate colours from logo
             </Button>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -243,7 +243,7 @@ function CreatePartnerDialog({ onClose, onCreated }: { onClose: () => void; onCr
 
         {/* First admin */}
         <section className="space-y-3">
-          <div className="flex items-center gap-2 text-sm font-semibold"><Mail className="h-4 w-4 text-primary" /> First partner admin <span className="text-muted-foreground font-normal text-xs">(optional — emailed a set-password link)</span></div>
+          <div className="flex items-center gap-2 text-sm font-semibold"><Mail className="h-4 w-4 text-primary" /> First partner admin <span className="text-muted-foreground font-normal text-xs">(optional, emailed a set-password link)</span></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5"><Label>First name</Label><Input value={admin.firstName} onChange={(e) => setAdmin((a) => ({ ...a, firstName: e.target.value }))} /></div>
             <div className="space-y-1.5"><Label>Last name</Label><Input value={admin.lastName} onChange={(e) => setAdmin((a) => ({ ...a, lastName: e.target.value }))} /></div>
@@ -367,7 +367,7 @@ function PartnerDetailDialog({ partner, onClose }: { partner: Partner | null; on
           <div className="space-y-2">
             <Label>Tenant Slug</Label>
             <Input value={partner.slug} readOnly className="font-mono text-sm bg-muted" />
-            <p className="text-xs text-muted-foreground">URL prefix — contact platform support to change.</p>
+            <p className="text-xs text-muted-foreground">URL prefix, contact platform support to change.</p>
           </div>
           <div className="space-y-2">
             <Label>Status</Label>

@@ -16,7 +16,7 @@ import StudyNav from "@/components/StudyNav";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   RotateCcw, Eye, EyeOff, Flame, BrainCircuit,
-  TrendingUp, Target, Clock, ChevronRight, Zap, Sparkles,
+  TrendingUp, Target, Clock, ChevronRight, Zap,
   Lightbulb, Loader2, BookOpen
 } from "lucide-react";
 import type { StudyFlashcard } from "@workspace/paideia-api-client";
@@ -75,7 +75,6 @@ export default function StudyFlashcards() {
           {materials && materials.length > 0 ? (
             <div className="space-y-2">
               <Button onClick={() => setLoc("/materials/new")} className="w-full gap-1.5">
-                <Sparkles className="h-4 w-4" />
                 Add New Material
               </Button>
               <Button variant="outline" onClick={() => setLoc("/knowledge-map")} className="w-full gap-1.5">
@@ -85,7 +84,6 @@ export default function StudyFlashcards() {
             </div>
           ) : (
             <Button onClick={() => setLoc("/materials/new")} className="gap-1.5">
-              <Sparkles className="h-4 w-4" />
               Add Your First Material
             </Button>
           )}

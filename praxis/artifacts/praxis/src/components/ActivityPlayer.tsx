@@ -27,7 +27,7 @@ interface Props {
   html: string;
   /**
    * External embed URL (source="embed"). When set, we render a normal cross-origin iframe to
-   * that URL instead of the sandboxed srcdoc — third-party embeds (Genially, Google Forms,
+   * that URL instead of the sandboxed srcdoc, third-party embeds (Genially, Google Forms,
    * YouTube, H5P) need to run on their OWN origin. There is no results bridge for these.
    */
   embedUrl?: string | null;
@@ -44,11 +44,11 @@ const BRIDGE = `
 (function(){
   function post(msg){ try { parent.postMessage(Object.assign({__synops:true}, msg), '*'); } catch(e){} }
   window.SynopsActivity = {
-    // submit(payload, score?) — hand the result in.
+    // submit(payload, score?), hand the result in.
     submit: function(payload, score){
       post({ type:'submit', payload: (payload==null?{}:payload), score: (score==null?null:Number(score)) });
     },
-    // resize(px) — optional; ask the host to fit the iframe to the content.
+    // resize(px), optional; ask the host to fit the iframe to the content.
     resize: function(px){ post({ type:'resize', height: Number(px)||0 }); }
   };
   window.addEventListener('load', function(){

@@ -7,7 +7,7 @@ import { isSuperAdmin } from "../lib/roles";
 import { logAudit } from "../lib/audit";
 
 /**
- * Partner Communications backend — the persistent sent-history for partner broadcast announcements.
+ * Partner Communications backend, the persistent sent-history for partner broadcast announcements.
  * Super admin manages any partner; a partner_admin manages their own. Self-creates the table.
  * Records the announcement; actual in-app/email delivery is a later messaging step.
  */
@@ -46,7 +46,7 @@ router.get("/partners/:partnerId/announcements", requireAuth, async (req, res) =
   }
 });
 
-// POST /partners/:partnerId/announcements — record a broadcast.
+// POST /partners/:partnerId/announcements, record a broadcast.
 router.post("/partners/:partnerId/announcements", requireAuth, async (req, res) => {
   const { partnerId } = req.params;
   const user = req.dbUser!;

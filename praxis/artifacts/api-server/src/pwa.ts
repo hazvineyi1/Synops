@@ -4,7 +4,7 @@ import { resolvePublicBrandByHost } from "./lib/brandResolve";
 /**
  * Branded PWA: a dynamic web manifest + app icon resolved from the request hostname, so installing
  * the app ("Add to Home Screen") on a partner's custom domain uses that partner's name, colour and
- * icon — not "Synops Praxis". These live at the site root (not under /api) because the browser
+ * icon, not "Synops Praxis". These live at the site root (not under /api) because the browser
  * fetches /manifest.webmanifest and the icon from the page origin, and must be registered before
  * the SPA catch-all so they aren't swallowed by index.html.
  */
@@ -49,7 +49,7 @@ export function registerPwa(app: Express) {
     const manifest = {
       name,
       short_name: shortName,
-      description: `${name} — learning platform`,
+      description: `${name}, learning platform`,
       start_url: "/dashboard",
       scope: "/",
       display: "standalone",

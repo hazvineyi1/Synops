@@ -7,10 +7,10 @@
  * canonical host.
  *
  * Only navigational GET/HEAD requests are redirected. Deliberately excluded:
- *  - `/api/*` — includes Railway's `/api/readyz` health check (a 301 there would fail deploys) and
+ *  - `/api/*`, includes Railway's `/api/readyz` health check (a 301 there would fail deploys) and
  *    all API mutations, which must never be bounced or have their body dropped.
- *  - `/c/*` and `/a/*` — token embeds designed to render inside external sites; leave their host alone.
- *  - the canonical host itself — it does not end with `.up.railway.app`, so no redirect loop.
+ *  - `/c/*` and `/a/*`, token embeds designed to render inside external sites; leave their host alone.
+ *  - the canonical host itself, it does not end with `.up.railway.app`, so no redirect loop.
  * Set `canonicalHost` to "" (via the CANONICAL_HOST env) to disable entirely.
  */
 export function shouldRedirectToCanonical(

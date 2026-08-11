@@ -23,7 +23,7 @@ router.get("/courses/:courseId/pages", requireAuth, async (req, res) => {
 });
 
 // POST /courses/:courseId/pages
-// POST /courses/:courseId/pages — STAFF ONLY. Course pages are instructional content
+// POST /courses/:courseId/pages, STAFF ONLY. Course pages are instructional content
 // shown to every learner; this previously accepted any authenticated caller.
 router.post("/courses/:courseId/pages", requireAuth, async (req, res) => {
   if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) {

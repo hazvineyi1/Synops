@@ -4,7 +4,7 @@ import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
  * Funder / sponsor scope (decision doc §10.2).
  *
  * A funder finances one or more organizations' programs and needs read-only visibility
- * into AGGREGATE outcomes for exactly those — nothing else. Each row grants a funder
+ * into AGGREGATE outcomes for exactly those, nothing else. Each row grants a funder
  * (users.id, role = 'funder') visibility into one organization, optionally narrowed to a
  * single funded program (courseId). No row here ever exposes individual learner data;
  * it only defines which orgs' aggregate numbers a funder may see.

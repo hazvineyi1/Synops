@@ -13,7 +13,6 @@ import { usePrefill } from "@/hooks/use-prefill";
 import { GeneratingSpinner } from "@/components/Loading";
 import { api, ApiError } from "@/lib/api";
 import type { LessonPlan } from "@/lib/types";
-import { Sparkles } from "lucide-react";
 import { ClassProfileSelector } from "@/components/ClassProfileSelector";
 import { MaterialPicker } from "@/components/MaterialPicker";
 import { demoGenRemaining, incrementDemoGen } from "@/lib/demoLimit";
@@ -74,7 +73,6 @@ export default function PlanNew() {
       <WorkflowForm title="New lesson plan" subtitle="A single, focused lesson with three tiers of differentiation.">
         {prefill.studentId && (
           <div className="mb-5 flex items-start gap-3 bg-accent/10 border border-accent/40 rounded-md p-4 text-sm">
-            <Sparkles className="h-4 w-4 text-accent mt-0.5 shrink-0" />
             <div>
               Personalising for <span className="font-medium">{prefill.studentName ?? "this student"}</span>. The plan will use their grade history to target weak skills and build on strengths.
             </div>

@@ -20,7 +20,7 @@ import { coachBaseUrl } from "../lib/email.js";
 /**
  * The public, API-key-authenticated integration surface (guarded by requireApiKey).
  * Unlike the learner-facing /api/study routes, these ACT ON A PUSHED LEARNER supplied
- * in the body — the API key is the integration's credential, not the learner's identity.
+ * in the body, the API key is the integration's credential, not the learner's identity.
  */
 const router: IRouter = Router();
 

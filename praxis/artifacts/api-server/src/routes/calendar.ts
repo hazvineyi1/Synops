@@ -7,7 +7,7 @@ import { canParticipateInCourse, canStaffActOnCourse } from "../lib/scope";
 
 const router = Router();
 
-// GET /calendar — all events for current user across enrolled courses + personal
+// GET /calendar, all events for current user across enrolled courses + personal
 router.get("/calendar", requireAuth, async (req, res) => {
   const { start, end } = req.query;
   const startDate = start ? new Date(start as string) : (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d; })();

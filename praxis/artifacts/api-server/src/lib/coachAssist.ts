@@ -3,7 +3,7 @@ import type { CoachAssist } from "@workspace/db";
 
 /**
  * AI coaching assist: turns a learner's off-track signals + their adaptive plan into concrete
- * guidance for the human coach — a short situation summary, talking points to raise in the next
+ * guidance for the human coach, a short situation summary, talking points to raise in the next
  * session, a one-line session focus, and a ready-to-send encouraging message. Mirrors the
  * studyPlanEngine pattern: one anthropic call returning strict JSON, with a deterministic
  * fallback so it never throws and works even before an API key is configured.
@@ -32,7 +32,7 @@ function fallbackAssist(input: CoachAssistInput): CoachAssist {
       (input.masteryPct != null ? ` (mastery around ${Math.round(input.masteryPct)}%)` : "") +
       `. The signals point to ${areaPhrase}. A ${input.planItems.length}-step plan is in place; ${remaining.length} step${remaining.length === 1 ? "" : "s"} still open.`,
     talkingPoints: [
-      `Open by acknowledging effort, not the score — keep it non-shaming.`,
+      `Open by acknowledging effort, not the score, keep it non-shaming.`,
       `Focus the session on ${areaPhrase}; ask ${first} to talk you through one recent problem so you can hear the reasoning.`,
       remaining[0]
         ? `Do the first open plan step together: "${remaining[0].title}".`
@@ -41,7 +41,7 @@ function fallbackAssist(input: CoachAssistInput): CoachAssist {
     ],
     sessionFocus: areas.length ? `Rebuild confidence in ${areas[0]}` : `Re-establish momentum and a clear next step`,
     suggestedMessage:
-      `Hi ${first} — I saw you've hit a rough patch in ${input.courseTitle}, which happens to everyone. ` +
+      `Hi ${first}, I saw you've hit a rough patch in ${input.courseTitle}, which happens to everyone. ` +
       `I've lined up a short plan to get you back on track, and I'd like to work through the first step with you. When are you free this week?`,
   };
 }

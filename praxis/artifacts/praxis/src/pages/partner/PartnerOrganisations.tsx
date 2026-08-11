@@ -13,12 +13,12 @@ import {
 import { cn } from '@/lib/utils';
 import {
   Building, ChevronRight, Wallet, Users, Landmark, Receipt, ShieldCheck, GraduationCap, Mail,
-  Plus, CheckCircle2, Sparkles,
+  Plus, CheckCircle2,
 } from 'lucide-react';
 import { ZAR, getActivePartnerId } from '@/lib/partnerHubData';
 
 /**
- * Organisations (selector) — now backed by REAL data. Every card's plan/seats/funders/coaches/
+ * Organisations (selector), now backed by REAL data. Every card's plan/seats/funders/coaches/
  * delegated/open-invoices is computed from the same partner-scoped endpoints the individual Hub
  * pages use (/organisations, /partners/:id/billing, /funding, /delegated-admins, /members), so the
  * overview agrees with the hubs instead of showing fabricated figures from the old client mock.
@@ -167,7 +167,7 @@ export function PartnerOrganisations() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> New organisation</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">New organisation</DialogTitle>
             <DialogDescription>Provision a new organisation under this partner. It gets its own hub and reporting immediately.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
-  ShieldCheck, AlertTriangle, Clock, Wrench, Download, CircleDashed, Sparkles, Loader2, Gauge,
+  ShieldCheck, AlertTriangle, Clock, Wrench, Download, CircleDashed, Loader2, Gauge,
 } from "lucide-react";
 import { ProjectWorkspace } from "@/components/engine/ProjectWorkspace";
 import { QaReportView } from "@/components/engine/QaReportView";
@@ -360,7 +360,7 @@ export default function ProjectQA() {
             {running ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> Running</>
             ) : (
-              <><Sparkles className="mr-2 h-4 w-4" aria-hidden="true" /> Run QA</>
+              <>Run QA</>
             )}
           </Button>
           <Button variant="outline" onClick={() => exportReport(project.title)}>
@@ -409,7 +409,7 @@ export default function ProjectQA() {
                     {running ? (
                       <><Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> Running</>
                     ) : (
-                      <><Sparkles className="mr-2 h-4 w-4" aria-hidden="true" /> Run QA</>
+                      <>Run QA</>
                     )}
                   </Button>
                 </CardContent>

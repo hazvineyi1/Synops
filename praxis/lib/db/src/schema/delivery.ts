@@ -26,7 +26,7 @@ export const attendanceStatusEnum = pgEnum("attendance_status", [
 
 export const deliverySessionsTable = pgTable("delivery_sessions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  // Owning organisation — scopes who may manage the session (mirrors courses.tenant_id).
+  // Owning organisation, scopes who may manage the session (mirrors courses.tenant_id).
   tenantId: text("tenant_id").notNull(),
   // Optional link to a course/program; null for a standalone session (e.g. a workshop).
   courseId: text("course_id"),

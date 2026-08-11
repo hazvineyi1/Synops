@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useSession } from "@/context/SessionContext";
 
 /**
- * Admin console shell — layout ported from Sokratify's SuperAdmin (AdminLayout): a dark
+ * Admin console shell, layout ported from Sokratify's SuperAdmin (AdminLayout): a dark
  * navy sidebar with section nav over a warm off-white content area, sticky on desktop
  * with a mobile drawer. Self-contained and full-screen (rendered outside AppLayout).
  */

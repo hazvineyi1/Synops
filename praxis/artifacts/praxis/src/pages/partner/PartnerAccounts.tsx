@@ -110,7 +110,7 @@ export function PartnerAccounts() {
 
   const flashMsg = (m: string) => { setFlash(m); window.setTimeout(() => setFlash(null), 3500); };
 
-  // Delegated admins (PU7) — real, persistent register.
+  // Delegated admins (PU7), real, persistent register.
   const { data: delegatesData } = useQuery({ queryKey: ['delegated-admins', partnerId], queryFn: () => apiFetch<DelegatedAdmin[]>(`/partners/${partnerId}/delegated-admins`), enabled: !!partnerId });
   const delegates = delegatesData ?? [];
   const [dName, setDName] = useState('');
@@ -170,7 +170,7 @@ export function PartnerAccounts() {
   const credM = useMutation({
     mutationFn: ({ id, mode }: { id: string; mode: 'temp' | 'link' }) =>
       apiFetch<{ link?: string; password?: string; emailed?: boolean }>(`/partners/${partnerId}/members/${id}/credentials`, { method: 'POST', body: JSON.stringify({ mode }) }),
-    onSuccess: (r, v) => { setCred(r); flashMsg(v.mode === 'temp' ? 'Temporary password set.' : (r.emailed ? 'Reset link emailed.' : 'Reset link created — copy it below.')); },
+    onSuccess: (r, v) => { setCred(r); flashMsg(v.mode === 'temp' ? 'Temporary password set.' : (r.emailed ? 'Reset link emailed.' : 'Reset link created, copy it below.')); },
     onError: (e: any) => flashMsg(e?.message ?? 'Could not update credentials.'),
   });
   const lifecycleM = useMutation({
@@ -268,7 +268,7 @@ export function PartnerAccounts() {
                   <tr key={a.id} className={cn('hover:bg-muted/20', (a.archived || a.deleted) && 'opacity-60')}>
                     <td className="p-3"><div className="font-medium">{a.name}</div><div className="text-xs text-muted-foreground">{a.email}</div></td>
                     <td className="p-3"><span className={cn('rounded px-2 py-0.5 text-xs font-medium capitalize', roleBadge(a.role))}>{a.role.replace(/_/g, ' ')}</span></td>
-                    <td className="p-3">{a.orgName ?? '—'}</td>
+                    <td className="p-3">{a.orgName ?? ', '}</td>
                     <td className="p-3">
                       {a.deleted ? <Badge variant="outline" className="border-red-300 text-red-600">Removed</Badge>
                         : a.archived ? <Badge variant="outline" className="border-amber-300 text-amber-600">Archived</Badge>
@@ -304,7 +304,7 @@ export function PartnerAccounts() {
           )}
         </TabsContent>
 
-        {/* Learner Pool — provision learners to the Partner, then assign into organisations */}
+        {/* Learner Pool, provision learners to the Partner, then assign into organisations */}
         <TabsContent value="pool" className="mt-4 space-y-4">
           <Card className="p-4 flex items-start gap-3 text-sm">
             <Users className="h-4 w-4 text-primary shrink-0 mt-0.5" />
@@ -519,7 +519,7 @@ export function PartnerAccounts() {
                   <tr key={a.id}>
                     <td className="p-3 font-medium">{a.name}</td>
                     <td className="p-3 capitalize">{a.role.replace(/_/g, ' ')}</td>
-                    <td className="p-3">{a.orgName ?? '—'}</td>
+                    <td className="p-3">{a.orgName ?? ', '}</td>
                   </tr>
                 ))}
                 {delegates.map((d) => (
@@ -554,7 +554,7 @@ export function PartnerAccounts() {
               <>
               <DialogHeader>
                 <DialogTitle>{selected.name}</DialogTitle>
-                <DialogDescription>{selected.email} · <span className="capitalize">{selected.role.replace(/_/g, ' ')}</span> · {selected.orgName ?? '—'}</DialogDescription>
+                <DialogDescription>{selected.email} · <span className="capitalize">{selected.role.replace(/_/g, ' ')}</span> · {selected.orgName ?? ', '}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
@@ -627,7 +627,7 @@ export function PartnerAccounts() {
                       {!selected.deleted && (
                         pendingDelete ? (
                           <div className="mt-2 rounded-md border border-red-300 bg-red-50/60 dark:bg-red-950/20 px-3 py-2 text-xs space-y-2">
-                            <div className="text-red-700 dark:text-red-300">Remove <span className="font-medium">{selected.name}</span>? They lose access immediately. This is recoverable — the account moves to “archived &amp; removed” and can be restored.</div>
+                            <div className="text-red-700 dark:text-red-300">Remove <span className="font-medium">{selected.name}</span>? They lose access immediately. This is recoverable, the account moves to “archived &amp; removed” and can be restored.</div>
                             <div className="flex gap-2">
                               <Button size="sm" variant="outline" className="h-7 gap-1 text-red-600 border-red-300" disabled={lifecycleM.isPending} onClick={() => lifecycleM.mutate({ id: selected.id, action: 'delete' })}><Trash2 className="h-3.5 w-3.5" /> Confirm remove</Button>
                               <Button size="sm" variant="ghost" className="h-7" onClick={() => setPendingDelete(false)}>Cancel</Button>
@@ -650,7 +650,7 @@ export function PartnerAccounts() {
                   </Button>
                 )}
 
-                {/* Login activity — real sign-in trail (super admin) */}
+                {/* Login activity, real sign-in trail (super admin) */}
                 {isSuper && (
                   <div>
                     <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

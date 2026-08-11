@@ -103,7 +103,7 @@ router.patch("/organisations/:orgId", requireAuth, async (req, res) => {
   res.json(toOrgResponse(updated));
 });
 
-// DELETE /organisations/:orgId — remove an EMPTY org (super admin only).
+// DELETE /organisations/:orgId, remove an EMPTY org (super admin only).
 // Guarded: refuses unless the org has zero members and none of its classes have learners, so a
 // populated tenant can never be deleted by mistake. Cascades only the org's own class scaffolding.
 router.delete("/organisations/:orgId", requireAuth, async (req, res) => {
@@ -137,13 +137,13 @@ router.delete("/organisations/:orgId", requireAuth, async (req, res) => {
 
 // GET /organisations/:orgId/members
 router.get("/organisations/:orgId/members", requireAuth, async (req, res) => {
-  // Was requireAuth-only: any user could enumerate any org's roster (name/email/role) — PII leak.
+  // Was requireAuth-only: any user could enumerate any org's roster (name/email/role), PII leak.
   const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, req.params.orgId) });
   if (!org) { res.status(404).json({ error: "Not found" }); return; }
   if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
   // Bounded + paginated. No-param callers get the historical behaviour (up to 2000, now stably
   // ordered); ?limit/&offset page and ?search filters, with the true count in X-Total-Count so a
-  // large org is never silently truncated. Body stays a plain array — every existing consumer is safe.
+  // large org is never silently truncated. Body stays a plain array, every existing consumer is safe.
   const rawLimit = Number((req.query.limit as string) ?? 2000);
   const limit = Math.min(Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 2000), 2000);
   const rawOffset = Number((req.query.offset as string) ?? 0);
@@ -208,7 +208,7 @@ router.post("/organisations/:orgId/members", requireAuth, async (req, res) => {
         email,
         role,
         status: "invited",
-        // Own the new member to the ORG's partner, not the actor's — a Super Admin
+        // Own the new member to the ORG's partner, not the actor's, a Super Admin
         // acting here has no partnerId of their own.
         partnerId: org.partnerId,
         organisationId: req.params.orgId,
@@ -227,7 +227,7 @@ router.post("/organisations/:orgId/members", requireAuth, async (req, res) => {
   res.status(201).json(toUserResponse(member));
 });
 
-// PATCH /organisations/:orgId/members/:userId — change role
+// PATCH /organisations/:orgId/members/:userId, change role
 router.patch("/organisations/:orgId/members/:userId", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   if (!canAdministerOrg(user.role)) {
@@ -259,7 +259,7 @@ router.patch("/organisations/:orgId/members/:userId", requireAuth, async (req, r
   res.json(toUserResponse(updated));
 });
 
-// DELETE /organisations/:orgId/members/:userId — remove from org
+// DELETE /organisations/:orgId/members/:userId, remove from org
 router.delete("/organisations/:orgId/members/:userId", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   if (!canAdministerOrg(user.role)) {

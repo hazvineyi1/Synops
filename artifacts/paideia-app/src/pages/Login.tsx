@@ -151,7 +151,7 @@ export default function Login() {
               <div className="relative flex justify-center"><span className="bg-card px-2 text-xs text-muted-foreground">or</span></div>
             </div>
             <Button type="button" variant="outline" className="w-full" onClick={() => setLoc("/demo")}>
-              Try the live demo — no sign-up
+              Try the live demo, no sign-up
             </Button>
             <p className="text-sm text-center text-muted-foreground">
               No account yet? <Link href="/signup" className="text-primary underline">Create one</Link>

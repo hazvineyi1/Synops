@@ -17,7 +17,7 @@ import {
 } from "@/lib/casesApi";
 import { API } from "@/lib/api";
 import { AvatarPicker, TutorAvatar } from "@/components/TutorAvatar";
-import { ArrowLeft, Sparkles, Plus, Trash2, Copy, Link2, Play } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Copy, Link2, Play } from "lucide-react";
 
 type Tab = "case" | "rubric" | "share";
 
@@ -33,7 +33,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 const inputCls = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 
-// Convenience starting points for the AI persona — content-agnostic across entrepreneurship
+// Convenience starting points for the AI persona, content-agnostic across entrepreneurship
 // skills. Authors can use one as-is, tweak it, or write their own from scratch.
 const PERSONA_PRESETS: { label: string; value: string }[] = [
   { label: "Finance & cash flow", value: "a pragmatic small-business finance mentor who thinks in cash flow, margins and runway" },
@@ -120,7 +120,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
     return <div className="space-y-4"><Skeleton className="h-8 w-64" /><Skeleton className="h-96 rounded-xl" /></div>;
   }
   // Show an error instead of an endless skeleton when the case can't be loaded (the body below
-  // dereferences `data`, so it must exist past this guard — same contract as before, minus the hang).
+  // dereferences `data`, so it must exist past this guard, same contract as before, minus the hang).
   if (isError || !data) {
     return <div className="text-center text-muted-foreground py-16">This case could not be loaded. Please refresh or go back.</div>;
   }
@@ -162,7 +162,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
           <Field label="Learning objective" hint="What should the learner be able to reason about after this case?">
             <textarea className={inputCls} rows={2} value={form.learningObjective ?? ""} onChange={(e) => set("learningObjective", e.target.value)} />
           </Field>
-          <Field label="AI persona" hint="Who the tutor is for this case — the expert lens its questions come from. Pick a starting point or write your own. Leave blank for a neutral entrepreneurship mentor.">
+          <Field label="AI persona" hint="Who the tutor is for this case, the expert lens its questions come from. Pick a starting point or write your own. Leave blank for a neutral entrepreneurship mentor.">
             <div className="flex flex-wrap gap-1.5 mb-2">
               {PERSONA_PRESETS.map((p) => (
                 <button
@@ -178,7 +178,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
             </div>
             <textarea className={inputCls} rows={2} value={form.aiPersona ?? ""} onChange={(e) => set("aiPersona", e.target.value)} placeholder="e.g. a pragmatic small-business finance mentor who thinks in cash flow, margins and runway" />
           </Field>
-          <Field label="Tutor name & face" hint="Name the tutor and give it a face — learners see and hear it during the session. Pick a preset or upload your own.">
+          <Field label="Tutor name & face" hint="Name the tutor and give it a face, learners see and hear it during the session. Pick a preset or upload your own.">
             <div className="flex items-center gap-4">
               <TutorAvatar avatar={form.tutorAvatar || "f1"} size={56} />
               <Input className="max-w-xs" value={form.tutorName ?? ""} onChange={(e) => set("tutorName", e.target.value)} placeholder="e.g. Coach Naledi" />
@@ -202,7 +202,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
             <textarea className={inputCls} rows={6} value={form.contextBlock ?? ""} onChange={(e) => set("contextBlock", e.target.value)} />
           </Field>
           <Field label="Calibrated opening question" hint="Optional. If set, the tutor opens with exactly this. Leave blank to auto-generate from context.">
-            <textarea className={inputCls} rows={2} value={form.openingQuestion ?? ""} onChange={(e) => set("openingQuestion", e.target.value)} placeholder="e.g. Before we begin — what do you notice about who carries the risk here?" />
+            <textarea className={inputCls} rows={2} value={form.openingQuestion ?? ""} onChange={(e) => set("openingQuestion", e.target.value)} placeholder="e.g. Before we begin, what do you notice about who carries the risk here?" />
           </Field>
           <Field label="Focus areas" hint="Concepts to probe, one per line.">
             <textarea className={inputCls} rows={3} value={(form.focusAreas ?? []).join("\n")} onChange={(e) => set("focusAreas", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))} />
@@ -210,7 +210,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
           <Field label="Guiding instructions" hint="What should the tutor probe or push on?">
             <textarea className={inputCls} rows={2} value={form.guidingInstructions ?? ""} onChange={(e) => set("guidingInstructions", e.target.value)} />
           </Field>
-          <Field label="AI constraints" hint="Things the tutor must NEVER reveal — only lead the learner toward.">
+          <Field label="AI constraints" hint="Things the tutor must NEVER reveal, only lead the learner toward.">
             <textarea className={inputCls} rows={2} value={form.aiConstraints ?? ""} onChange={(e) => set("aiConstraints", e.target.value)} placeholder="e.g. Never state the outcome of the case; never name the correct legal test." />
           </Field>
           <div className="grid grid-cols-2 gap-4">
@@ -247,7 +247,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
               <p className="text-xs mt-1">Total: <span className={totalPoints === 100 ? "text-emerald-600 font-medium" : "text-amber-600 font-medium"}>{totalPoints} pts</span></p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => genRubric.mutate()} disabled={genRubric.isPending}><Sparkles className="h-4 w-4 mr-2" />{genRubric.isPending ? "Generating…" : "AI draft"}</Button>
+              <Button variant="outline" onClick={() => genRubric.mutate()} disabled={genRubric.isPending}>{genRubric.isPending ? "Generating…" : "AI draft"}</Button>
               <Button onClick={() => saveRubric.mutate()} disabled={saveRubric.isPending}>Save rubric</Button>
             </div>
           </div>
@@ -261,8 +261,8 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
               </div>
               <Field label="Unit standard (optional)">
                 <select className={inputCls} value={cr.unitStandardId ?? ""} onChange={(e) => setCriteria((cs) => cs.map((c, j) => j === i ? { ...c, unitStandardId: e.target.value || null } : c))}>
-                  <option value="">— none —</option>
-                  {(standards ?? []).map((s) => <option key={s.id} value={s.id}>{s.code} — {s.title}</option>)}
+                  <option value="">, none, </option>
+                  {(standards ?? []).map((s) => <option key={s.id} value={s.id}>{s.code}, {s.title}</option>)}
                 </select>
               </Field>
               {cr.levels?.length > 0 && (

@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { GAME_TEMPLATES, DIGITAL_CATALOG, BAND_LABEL, type Band } from "./gameTemplates";
 
 /**
- * Seeds the reusable "Game Library" — the repository of ready-to-use game activities that any teacher
+ * Seeds the reusable "Game Library", the repository of ready-to-use game activities that any teacher
  * can browse and add to their classes.
  *
  * Everything here is a PLATFORM library item: `isLibrary: true` + `organisationId: null`, which the
@@ -12,7 +12,7 @@ import { GAME_TEMPLATES, DIGITAL_CATALOG, BAND_LABEL, type Band } from "./gameTe
  *   1. Built game-show templates (Jeopardy, Feud, Bingo, …) rendered with band-appropriate sample
  *      content, tagged `game-library`, `game:<key>`, `band:<band>` so the library is filterable.
  *   2. A curated CATALOG of commercial digital titles (Prodigy, Blooket, Minecraft Education, …) as
- *      `source:"embed"` link cards — these are recommended, not rebuilt, so they open externally.
+ *      `source:"embed"` link cards, these are recommended, not rebuilt, so they open externally.
  *
  * Idempotent: matched by title (+ isLibrary), so re-running refreshes content in place.
  */
@@ -52,7 +52,7 @@ export async function seedGameLibrary(createdByUserId: string): Promise<{
     const tags = ["game-catalog", "external-tool", c.subjects, ...c.bands.map((b) => `band:${b}`), ...c.bands.map((b) => BAND_LABEL[b])];
     const fields = {
       organisationId: null, courseId: null, moduleId: null,
-      title: c.name, instructions: `${c.subjects} — ${c.note}`, html: "",
+      title: c.name, instructions: `${c.subjects}, ${c.note}`, html: "",
       source: "embed" as const, embedUrl: c.url, kind: "external-tool",
       bloomsLevel: "Apply", difficulty: "intermediate" as const,
       isLibrary: true, tags, published: true, createdByUserId,

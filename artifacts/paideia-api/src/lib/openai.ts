@@ -98,7 +98,7 @@ export async function generateJSON<T>(
       messages: [
         {
           role: "system",
-          content: `${systemPrompt}\n\nRespond with ONLY the JSON described above — no markdown, no code fences, and no commentary before or after it.`,
+          content: `${systemPrompt}\n\nRespond with ONLY the JSON described above, no markdown, no code fences, and no commentary before or after it.`,
         },
         { role: "user", content: userPrompt },
       ],

@@ -13,7 +13,7 @@ const router = Router();
 
 const REQUESTABLE_ROLES = ["org_admin", "instructional_designer", "coach"];
 
-// POST /access-requests — PUBLIC (no auth). Anyone may request platform access.
+// POST /access-requests, PUBLIC (no auth). Anyone may request platform access.
 router.post("/access-requests", async (req, res) => {
   const { firstName, lastName, email, organisationName, requestedRole, message } = req.body ?? {};
   if (!firstName || !email) {
@@ -36,7 +36,7 @@ router.post("/access-requests", async (req, res) => {
   res.status(201).json({ id: row.id, status: row.status });
 });
 
-// GET /platform/access-requests?status=pending — super-admin queue.
+// GET /platform/access-requests?status=pending, super-admin queue.
 router.get("/platform/access-requests", requireAuth, requireSuperAdmin, async (req, res) => {
   const status = req.query.status;
   const valid = status === "pending" || status === "approved" || status === "denied";
@@ -48,7 +48,7 @@ router.get("/platform/access-requests", requireAuth, requireSuperAdmin, async (r
   res.json(rows);
 });
 
-// PATCH /platform/access-requests/:id — approve or deny. Audited.
+// PATCH /platform/access-requests/:id, approve or deny. Audited.
 router.patch("/platform/access-requests/:id", requireAuth, requireSuperAdmin, async (req, res) => {
   const { status, note } = req.body ?? {};
   if (status !== "approved" && status !== "denied") {

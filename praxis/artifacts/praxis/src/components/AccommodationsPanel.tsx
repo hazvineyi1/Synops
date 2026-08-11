@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Check, Clock, Volume2, Type, Captions, Mic, Sparkles } from "lucide-react";
+import { Check, Clock, Volume2, Type, Captions, Mic } from "lucide-react";
 import { useCoachProfile } from "@/lib/coachApi";
 import { useSession } from "@/context/SessionContext";
 import { personaByEmail } from "@/lib/k12Personas";
@@ -113,9 +113,6 @@ export function AccommodationsPanel({ compact = false }: { compact?: boolean } =
   return (
     <Card className="p-4 sm:p-5" style={{ borderColor: `${accent}44`, background: `${accent}0D` }}>
       <div className="flex items-start gap-2.5 mb-1">
-        <div className="h-8 w-8 shrink-0 rounded-lg flex items-center justify-center text-white" style={{ background: accent }}>
-          <Sparkles className="h-4.5 w-4.5" />
-        </div>
         <div className="min-w-0">
           <p className="font-semibold leading-tight">
             {persona ? L(`How ${persona.first} learns`, `Los apoyos de ${persona.first}`) : L("Your learning supports", "Tus apoyos de aprendizaje")}

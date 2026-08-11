@@ -31,12 +31,12 @@ async function ensureTemplateKey() {
   await db.execute(sql`ALTER TABLE partner_documents ADD COLUMN IF NOT EXISTS template_key text`);
 }
 
-// GET /platform/document-templates — the standard pack (super admin).
+// GET /platform/document-templates, the standard pack (super admin).
 router.get("/platform/document-templates", requireAuth, requireRole("super_admin"), (_req, res) => {
   res.json(TEMPLATES.map(({ key, title, docType }) => ({ key, title, docType })));
 });
 
-// GET /document-templates/:key — a template's on-platform content (any authenticated user, so a
+// GET /document-templates/:key, a template's on-platform content (any authenticated user, so a
 // partner can read a template that was sent to them).
 router.get("/document-templates/:key", requireAuth, (req, res) => {
   const t = byKey(req.params.key);
@@ -47,7 +47,7 @@ router.get("/document-templates/:key", requireAuth, (req, res) => {
 interface DocFile { docxName: string; pdfName: string; docx: string; pdf: string | null }
 const FILES = filesData as Record<string, DocFile>;
 
-// GET /document-templates/:key/download?format=docx|pdf — the real letterhead file (any authed user).
+// GET /document-templates/:key/download?format=docx|pdf, the real letterhead file (any authed user).
 router.get("/document-templates/:key/download", requireAuth, (req, res) => {
   const f = FILES[req.params.key];
   if (!f) { res.status(404).json({ error: "Not found" }); return; }
@@ -65,7 +65,7 @@ router.get("/document-templates/:key/download", requireAuth, (req, res) => {
   res.send(buf);
 });
 
-// POST /platform/document-templates/:key/send { partnerIds } — file this template into each partner's
+// POST /platform/document-templates/:key/send { partnerIds }, file this template into each partner's
 // Documents & Filing repository (super admin).
 router.post("/platform/document-templates/:key/send", requireAuth, requireRole("super_admin"), async (req, res) => {
   const t = byKey(req.params.key);
@@ -112,7 +112,7 @@ router.post("/platform/document-templates/:key/send", requireAuth, requireRole("
   res.json({ sent: targets.length, skipped: partnerIds.length - targets.length });
 });
 
-// GET /platform/document-templates/:key/recipients — which partners already have it filed.
+// GET /platform/document-templates/:key/recipients, which partners already have it filed.
 router.get("/platform/document-templates/:key/recipients", requireAuth, requireRole("super_admin"), async (req, res) => {
   try {
     const rows = await db

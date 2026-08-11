@@ -67,7 +67,7 @@ router.get("/analytics/overview", requireAuth, async (req, res) => {
     return { date: d.toISOString().split("T")[0], value: Math.floor(Math.random() * 5) };
   });
 
-  // Shared, real average mastery (same source as the Funder report) so the two screens agree —
+  // Shared, real average mastery (same source as the Funder report) so the two screens agree, 
   // they previously hardcoded 0.72 vs 0.73. And a credential implies a completion, so completions
   // can't be fewer than credentials.
   const avgMastery = await computeAvgMastery();
@@ -88,7 +88,7 @@ router.get("/analytics/overview", requireAuth, async (req, res) => {
 router.get("/analytics/activity", requireAuth, async (req, res) => {
   const user = req.dbUser!;
   // Staff-only feed (decision §4.2). NOTE: the event list itself is not yet org/section
-  // filtered — follow-up is to scope the rows to the actor's learners as in /overview.
+  // filtered, follow-up is to scope the rows to the actor's learners as in /overview.
   if (!(isSuperAdmin(user.role) || isFacilitator(user.role) || isCoFacilitator(user.role))) {
     res.status(403).json({ error: "Forbidden" });
     return;
@@ -135,7 +135,7 @@ router.get("/analytics/competency-breakdown", requireAuth, async (req, res) => {
     res.status(403).json({ error: "Forbidden" });
     return;
   }
-  // Simplified — in production compute from session scores
+  // Simplified, in production compute from session scores
   res.json([
     { tag: "Financial Literacy", avgScore: 0.74, learnerCount: 12, masteredCount: 8 },
     { tag: "Business Planning", avgScore: 0.61, learnerCount: 10, masteredCount: 5 },

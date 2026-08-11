@@ -114,7 +114,7 @@ async function loadActionableAlert(req: any, res: any): Promise<AlertRow | null>
 
 const STATUS_RANK: Record<string, number> = { off_track: 0, at_risk: 1, on_track: 2 };
 
-// GET /coach/interventions — the caller's flagged, unresolved learners with their plan.
+// GET /coach/interventions, the caller's flagged, unresolved learners with their plan.
 router.get("/coach/interventions", requireAuth, async (req, res) => {
   const user = req.dbUser as StaffUser & { id: string; organisationId?: string | null; partnerId?: string | null };
   const flagged = await db
@@ -153,7 +153,7 @@ router.get("/coach/interventions", requireAuth, async (req, res) => {
   res.json(items);
 });
 
-// POST /coach/interventions/:alertId/assist — generate + cache AI coaching talking points.
+// POST /coach/interventions/:alertId/assist, generate + cache AI coaching talking points.
 router.post("/coach/interventions/:alertId/assist", requireAuth, async (req, res) => {
   const alert = await loadActionableAlert(req, res);
   if (!alert) return;
@@ -173,7 +173,7 @@ router.post("/coach/interventions/:alertId/assist", requireAuth, async (req, res
   res.json(assist);
 });
 
-// PATCH /coach/interventions/:alertId/note — set the coach's working note.
+// PATCH /coach/interventions/:alertId/note, set the coach's working note.
 router.patch("/coach/interventions/:alertId/note", requireAuth, async (req, res) => {
   const alert = await loadActionableAlert(req, res);
   if (!alert) return;
@@ -182,7 +182,7 @@ router.patch("/coach/interventions/:alertId/note", requireAuth, async (req, res)
   res.json({ coachNote: note });
 });
 
-// POST /coach/interventions/:alertId/plan/toggle — coach ticks/unticks a plan step for the learner.
+// POST /coach/interventions/:alertId/plan/toggle, coach ticks/unticks a plan step for the learner.
 router.post("/coach/interventions/:alertId/plan/toggle", requireAuth, async (req, res) => {
   const alert = await loadActionableAlert(req, res);
   if (!alert) return;
@@ -201,7 +201,7 @@ router.post("/coach/interventions/:alertId/plan/toggle", requireAuth, async (req
   res.json(await buildIntervention((await db.query.gradebookAlertsTable.findFirst({ where: eq(gradebookAlertsTable.id, alert.id) }))!));
 });
 
-// POST /coach/interventions/:alertId/plan/step — coach adds a custom step to the plan.
+// POST /coach/interventions/:alertId/plan/step, coach adds a custom step to the plan.
 router.post("/coach/interventions/:alertId/plan/step", requireAuth, async (req, res) => {
   const alert = await loadActionableAlert(req, res);
   if (!alert) return;
@@ -216,7 +216,7 @@ router.post("/coach/interventions/:alertId/plan/step", requireAuth, async (req, 
     const items = [...((plan?.items as StudyPlanItem[]) ?? []), step];
     await db.update(coachPlansTable).set({ items, status: "active", updatedAt: new Date() }).where(eq(coachPlansTable.id, planId));
   } else {
-    // No auto-plan existed yet — create one seeded with this step.
+    // No auto-plan existed yet, create one seeded with this step.
     const [row] = await db
       .insert(coachPlansTable)
       .values({
@@ -235,7 +235,7 @@ router.post("/coach/interventions/:alertId/plan/step", requireAuth, async (req, 
   res.json(await buildIntervention((await db.query.gradebookAlertsTable.findFirst({ where: eq(gradebookAlertsTable.id, alert.id) }))!));
 });
 
-// POST /coach/interventions/:alertId/resolve — mark the intervention resolved (or reopen).
+// POST /coach/interventions/:alertId/resolve, mark the intervention resolved (or reopen).
 router.post("/coach/interventions/:alertId/resolve", requireAuth, async (req, res) => {
   const alert = await loadActionableAlert(req, res);
   if (!alert) return;
@@ -250,7 +250,7 @@ router.post("/coach/interventions/:alertId/resolve", requireAuth, async (req, re
   res.json({ resolvedAt: resolved ? new Date().toISOString() : null });
 });
 
-// POST /coach/interventions/:alertId/nudge — send the learner a personalised nudge (in-app + email).
+// POST /coach/interventions/:alertId/nudge, send the learner a personalised nudge (in-app + email).
 router.post("/coach/interventions/:alertId/nudge", requireAuth, async (req, res) => {
   const alert = await loadActionableAlert(req, res);
   if (!alert) return;
@@ -298,7 +298,7 @@ router.post("/coach/interventions/:alertId/nudge", requireAuth, async (req, res)
 const coachName = (u: { firstName: string | null; lastName: string | null; email: string } | null | undefined) =>
   u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email : "Someone";
 
-/** The coaches leading the learner's section(s) in a course — recipients when a learner replies. */
+/** The coaches leading the learner's section(s) in a course, recipients when a learner replies. */
 async function sectionLeadersFor(courseId: string, learnerId: string): Promise<string[]> {
   const memberGroups = await db
     .select({ groupId: courseGroupMembersTable.groupId })
@@ -314,7 +314,7 @@ async function sectionLeadersFor(courseId: string, learnerId: string): Promise<s
   return [...new Set(leaders.map((l) => l.userId))];
 }
 
-// GET /my/interventions — the caller's OWN active interventions (learner-facing), so a learner can
+// GET /my/interventions, the caller's OWN active interventions (learner-facing), so a learner can
 // find and open the conversation with their coach from /grades.
 router.get("/my/interventions", requireAuth, async (req, res) => {
   const rows = await db
@@ -329,7 +329,7 @@ router.get("/my/interventions", requireAuth, async (req, res) => {
   );
 });
 
-// GET /coach-thread/:alertId — the conversation. Readable by the learner it's about or a coach/
+// GET /coach-thread/:alertId, the conversation. Readable by the learner it's about or a coach/
 // facilitator who can act on that course.
 router.get("/coach-thread/:alertId", requireAuth, async (req, res) => {
   const alert = await db.query.gradebookAlertsTable.findFirst({ where: eq(gradebookAlertsTable.id, req.params.alertId) });
@@ -349,7 +349,7 @@ router.get("/coach-thread/:alertId", requireAuth, async (req, res) => {
   });
 });
 
-// POST /coach-thread/:alertId — post a message; notifies the other party (in-app + branded email
+// POST /coach-thread/:alertId, post a message; notifies the other party (in-app + branded email
 // when the coach messages the learner).
 router.post("/coach-thread/:alertId", requireAuth, async (req, res) => {
   const alert = await db.query.gradebookAlertsTable.findFirst({ where: eq(gradebookAlertsTable.id, req.params.alertId) });
@@ -387,7 +387,7 @@ router.post("/coach-thread/:alertId", requireAuth, async (req, res) => {
 
 const OFFTRACK_RANK: Record<string, number> = { off_track: 0, at_risk: 1, on_track: 2 };
 
-// GET /coach/learners — the caller's learners with a REAL readiness signal from the gradebook.
+// GET /coach/learners, the caller's learners with a REAL readiness signal from the gradebook.
 // Scope: a coach sees only learners in the sections they lead; a facilitator sees their org/partner;
 // super_admin sees all. Status + top gaps come from unresolved gradebook alerts, not a session ratio.
 router.get("/coach/learners", requireAuth, async (req, res) => {
@@ -428,7 +428,7 @@ router.get("/coach/learners", requireAuth, async (req, res) => {
     alertsByUser.set(a.userId, arr);
   }
 
-  // Batch the two per-learner lookups into two grouped queries (was 2 queries PER learner — an
+  // Batch the two per-learner lookups into two grouped queries (was 2 queries PER learner, an
   // unbounded N+1 that fanned out to the whole platform for a super_admin).
   const credCounts = new Map<string, number>();
   const lastSeen = new Map<string, Date>();
@@ -536,7 +536,7 @@ router.get("/coach/learners/:userId/presession", requireAuth, async (req, res) =
 // GET /coach/submissions
 router.get("/coach/submissions", requireAuth, async (req, res) => {
   const user = req.dbUser!;
-  // Legacy module-submission work (approve/attest inline) — scoped to the caller's learners. The
+  // Legacy module-submission work (approve/attest inline), scoped to the caller's learners. The
   // old query returned every learner's submitted work platform-wide to any authenticated user.
   const viewIds = await viewableLearnerIds(user);
   const submissions = viewIds === null
@@ -609,7 +609,7 @@ router.get("/coach/submissions", requireAuth, async (req, res) => {
 router.patch("/coach/submissions/:submissionId", requireAuth, async (req, res) => {
   const { status, feedback } = req.body;
   // Only staff who oversee the submitting learner may grade/attest. Previously ANY authenticated
-  // user (including a learner) could approve any submission and stamp themselves as the coach —
+  // user (including a learner) could approve any submission and stamp themselves as the coach, 
   // and module attestations feed credential issuance.
   const existing = await db.query.submissionsTable.findFirst({ where: eq(submissionsTable.id, req.params.submissionId) });
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }

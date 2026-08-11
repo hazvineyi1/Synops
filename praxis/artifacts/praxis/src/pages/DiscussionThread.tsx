@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ChevronRight, MessageSquare, Sparkles, Languages, CheckCircle, Settings } from 'lucide-react';
+import { ChevronRight, MessageSquare, Bot, Languages, CheckCircle, Settings } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { VoiceInputButton } from '@/components/VoiceInputButton';
@@ -161,7 +161,6 @@ export function DiscussionThread() {
                 disabled={patch.isPending}
                 onChange={(e) => patch.mutate({ aiFacilitated: e.target.checked })}
               />
-              <Sparkles className="h-3.5 w-3.5 text-violet-500" />
               AI facilitation
             </label>
 
@@ -205,7 +204,7 @@ export function DiscussionThread() {
             : <MessageSquare className="h-4 w-4 text-muted-foreground shrink-0" />}
           <span className="text-sm">
             {p.met
-              ? <span className="font-medium text-emerald-600">Participation complete — {p.posts} of {p.required}</span>
+              ? <span className="font-medium text-emerald-600">Participation complete, {p.posts} of {p.required}</span>
               : <><span className="font-medium">{p.posts} of {p.required} contributions</span>
                   <span className="text-muted-foreground">
                     {' '}· {isInitial ? 'start with your opening post' : `${p.required - p.posts} to go`}
@@ -260,7 +259,7 @@ export function DiscussionThread() {
                       <AvatarFallback
                         className={ai ? 'bg-violet-100 text-violet-700' : reply.isInstructorReply ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}
                         style={{ fontSize: '12px' }}>
-                        {ai ? <Sparkles className="h-4 w-4" /> : (reply.author?.firstName?.[0] ?? '?')}
+                        {ai ? <Bot className="h-4 w-4" /> : (reply.author?.firstName?.[0] ?? '?')}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
@@ -330,9 +329,9 @@ export function DiscussionThread() {
                       : 'text-amber-600')}>
                     {words} {words === 1 ? 'word' : 'words'}
                     {isInitial
-                      ? words > maxW ? ` — ${words - maxW} over the limit`
-                        : words < minW ? ` — ${minW - words} to go` : ' — good to post'
-                      : words < minW ? ` — ${minW - words} to go` : ' — good to post'}
+                      ? words > maxW ? `, ${words - maxW} over the limit`
+                        : words < minW ? `, ${minW - words} to go` : ', good to post'
+                      : words < minW ? `, ${minW - words} to go` : ', good to post'}
                   </span>
                 </span>
                 <Button

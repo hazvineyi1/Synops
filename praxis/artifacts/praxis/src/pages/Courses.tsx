@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useListCourses } from "@workspace/api-client-react";
-import { BookOpen, ArrowRight, CheckCircle2, Layers, Award, Plus, Sparkles, Copy } from "lucide-react";
+import { BookOpen, ArrowRight, CheckCircle2, Layers, Award, Plus, Copy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -292,7 +292,7 @@ export function Courses() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> New course</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">New course</DialogTitle>
             <DialogDescription>Create a course, then add modules, case studies, interactives and assignments inside it.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

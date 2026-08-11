@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { API } from "@/lib/api";
 import { streamCaseTurn, LANGUAGES, type CaseMessage, type CaseSessionRow } from "@/lib/casesApi";
 import { Button } from "@/components/ui/button";
-import { Send, Sparkles, BookOpen, Settings2 } from "lucide-react";
+import { Send, BookOpen, Settings2 } from "lucide-react";
 import { AnalysisView } from "@/pages/CaseSession";
 import { TutorAvatar, tutorGender } from "@/components/TutorAvatar";
 import { useSpeech } from "@/lib/speech";
@@ -21,7 +21,7 @@ interface PublicCase {
 
 /**
  * Public, unauthenticated case runner reached via a signed embed token (/c/:token).
- * No app chrome, no login — the token is the credential.
+ * No app chrome, no login, the token is the credential.
  */
 export function CaseEmbed({ params }: { params?: { token?: string } }) {
   const token = params?.token ?? "";
@@ -131,7 +131,7 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
           </div>
           {caseData.learningObjective && <p className="text-sm text-muted-foreground">{caseData.learningObjective}</p>}
           <div className="rounded-lg bg-muted/40 border p-4 text-sm whitespace-pre-wrap max-h-56 overflow-auto">{caseData.contextBlock}</div>
-          <p className="text-xs text-muted-foreground">A coach will guide you with questions — there are no lectures. Reason out loud; you'll get an analysis at the end.</p>
+          <p className="text-xs text-muted-foreground">A coach will guide you with questions, there are no lectures. Reason out loud; you'll get an analysis at the end.</p>
           <input className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Your name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
           <label className="block text-sm">
             <span className="text-muted-foreground text-xs">Language</span>
@@ -157,7 +157,7 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
         <p className="text-xs rounded-md px-2.5 py-1.5" style={{ background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>Goal: {factsTx?.objective ?? caseData.learningObjective}</p>
       )}
       <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{factsTx?.context ?? caseData.contextBlock ?? "No background provided."}</p>
-      <p className="text-[11px] text-muted-foreground pt-1">The coach's questions are grounded in these facts — refer back any time.</p>
+      <p className="text-[11px] text-muted-foreground pt-1">The coach's questions are grounded in these facts, refer back any time.</p>
     </div>
   );
 
@@ -227,7 +227,7 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
               {budgetReached && (
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border bg-emerald-500/5 border-emerald-500/30 px-3 py-2">
                   <p className="text-xs text-emerald-800">You've reached the planned depth. Keep going, or finish for your analysis.</p>
-                  <Button size="sm" onClick={finish} disabled={analysing}><Sparkles className="h-4 w-4 mr-1.5" />{analysing ? "Analysing…" : "Finish"}</Button>
+                  <Button size="sm" onClick={finish} disabled={analysing}>{analysing ? "Analysing…" : "Finish"}</Button>
                 </div>
               )}
               <div className="flex gap-2 items-end">

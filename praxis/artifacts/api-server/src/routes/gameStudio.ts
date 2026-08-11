@@ -7,7 +7,7 @@ import { GAME_TEMPLATES, templateByKey, BAND_LABEL, type Band } from "../lib/gam
 import { generateGameContent, RIGOR_LEVELS, type Rigor } from "../lib/gameGenerator";
 
 /**
- * Game Studio — turn lesson content into a playable game with AI. The admin picks a game type, subject,
+ * Game Studio, turn lesson content into a playable game with AI. The admin picks a game type, subject,
  * grade band and rigor, and either pastes content or pulls a module's reading; the model returns the
  * game CONTENT (grounded in that content), which we render with the template's own build(). The result
  * is a DRAFT the admin previews and edits before saving as a normal activity via POST /activities.

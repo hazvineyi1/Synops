@@ -64,7 +64,7 @@ function toBeatResponse(b: typeof beatsTable.$inferSelect) {
   };
 }
 
-// GET /courses/:courseId/modules — the module LIST (titles/order/status) is catalogue overview
+// GET /courses/:courseId/modules, the module LIST (titles/order/status) is catalogue overview
 // info, so catalogue viewers (browsing an unenrolled course) may read it. Content within each
 // module (beats/readings/cases via their own routes) stays enrolment-gated.
 router.get("/courses/:courseId/modules", requireAuth, async (req, res) => {

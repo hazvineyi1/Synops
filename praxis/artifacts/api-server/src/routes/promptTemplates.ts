@@ -28,7 +28,7 @@ router.get("/orgs/:orgId/prompt-templates", requireAuth, async (req, res) => {
   res.json(rows);
 });
 
-// GET /platform/prompt-templates/pending — the cross-org review queue (super admin).
+// GET /platform/prompt-templates/pending, the cross-org review queue (super admin).
 router.get("/platform/prompt-templates/pending", requireAuth, async (req, res) => {
   if (!isSuperAdmin(req.dbUser!.role)) { res.status(403).json({ error: "Forbidden" }); return; }
   const rows = await db
@@ -84,7 +84,7 @@ router.patch("/prompt-templates/:id", requireAuth, async (req, res) => {
   res.json(row);
 });
 
-// POST /prompt-templates/:id/review { decision: approve|retire } — super-admin review gate.
+// POST /prompt-templates/:id/review { decision: approve|retire }, super-admin review gate.
 router.post("/prompt-templates/:id/review", requireAuth, async (req, res) => {
   if (!isSuperAdmin(req.dbUser!.role)) { res.status(403).json({ error: "Forbidden" }); return; }
   const decision = req.body?.decision;

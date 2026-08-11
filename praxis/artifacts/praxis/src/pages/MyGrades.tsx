@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Sparkles, TrendingDown, TrendingUp, Minus, GraduationCap } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Circle, TrendingDown, TrendingUp, Minus, GraduationCap } from "lucide-react";
 
 const pillBand = (band: string) =>
   band === "good"
@@ -63,7 +63,7 @@ export function MyGrades() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="My grades & progress" icon={TrendingUp} subtitle="Your mastery across every assignment, case and activity — and a plan when you need one." />
+      <PageHeader title="My grades & progress" icon={TrendingUp} subtitle="Your mastery across every assignment, case and activity, and a plan when you need one." />
 
 
       <div className="flex flex-wrap gap-2">
@@ -81,7 +81,7 @@ export function MyGrades() {
               // An on-track learner is not failing: a low overall here just reflects progress
               // (content not yet reached), so show it neutrally rather than in the red "low" band.
               c.alertStatus === "on_track" && c.band === "low" ? "bg-muted text-muted-foreground" : pillBand(c.band))}>
-              {c.overallPercent == null ? "—" : `${Math.round(c.overallPercent)}%`}
+              {c.overallPercent == null ? ", " : `${Math.round(c.overallPercent)}%`}
             </span>
             {c.alertStatus === "off_track" && <AlertTriangle className="h-3.5 w-3.5 text-red-600" />}
           </button>
@@ -97,7 +97,6 @@ export function MyGrades() {
           {me.data.plan && (
             <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
               <div className="mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
                 <h2 className="font-semibold text-foreground">Your personalised study plan</h2>
               </div>
               <p className="mb-3 text-sm text-muted-foreground">{me.data.plan.rationale}</p>
@@ -158,7 +157,7 @@ export function MyGrades() {
                       const f = cell?.fraction ?? null;
                       const gt = ((c as { gradeType?: string }).gradeType) ?? "points";
                       const auto = !!(cell as { auto?: boolean } | undefined)?.auto;
-                      let label = "—";
+                      let label = ", ";
                       let tone: "muted" | "green" | "amber" | "red" = "muted";
                       if (f != null) {
                         if (gt === "pass_fail") { const pass = f >= 0.5; label = pass ? "Pass" : "Fail"; tone = pass ? "green" : "red"; }
@@ -208,7 +207,7 @@ function OverviewBar({ me }: { me: MeGradebook }) {
             : me.overallPercent >= 70 ? "text-green-600"
             : me.alert.status === "on_track" ? "text-foreground"
             : "text-red-600")}>
-            {me.overallPercent == null ? "—" : `${Math.round(me.overallPercent)}%`}
+            {me.overallPercent == null ? ", " : `${Math.round(me.overallPercent)}%`}
           </div>
           <div className="text-xs text-muted-foreground">Overall mastery</div>
         </div>
@@ -230,7 +229,7 @@ function OverviewBar({ me }: { me: MeGradebook }) {
         <div className={cn("flex items-start gap-3 rounded-xl border p-4", off ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-amber-300 bg-amber-50 dark:bg-amber-950/20")}>
           <AlertTriangle className={cn("mt-0.5 h-5 w-5 shrink-0", off ? "text-red-600" : "text-amber-600")} />
           <div className="text-sm">
-            <div className="font-semibold text-foreground">{off ? "You've fallen a little behind — let's fix that." : "You're close to the line — a little push will help."}</div>
+            <div className="font-semibold text-foreground">{off ? "You've fallen a little behind, let's fix that." : "You're close to the line, a little push will help."}</div>
             {me.alert.reasonLabels && me.alert.reasonLabels.length > 0 && (
               <div className="text-muted-foreground">{me.alert.reasonLabels.join(" · ")}</div>
             )}
@@ -244,7 +243,7 @@ function OverviewBar({ me }: { me: MeGradebook }) {
         <div className="flex items-start gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 dark:bg-emerald-950/20">
           <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
           <div className="text-sm">
-            <div className="font-semibold text-foreground">You're on track — keep it up.</div>
+            <div className="font-semibold text-foreground">You're on track, keep it up.</div>
             <div className="text-muted-foreground">Nothing is overdue and your mastery is where it should be. No study plan needed right now.</div>
           </div>
         </div>

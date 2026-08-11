@@ -68,8 +68,8 @@ async function ensureHubTables(): Promise<void> {
  * Seed REAL partner-hub records (billing, funding, documents, delegated admins) for the live Enza
  * partner and its organisations. The four Hub pages query these tables directly by partner_id, so
  * before this the pages read empty (the figures the demo showed lived only in a front-end mock).
- * This gives the real partner genuine rows so the hubs — and the Organisations rollup once it is
- * pointed at these endpoints — show real numbers. Idempotent: skips if billing already exists.
+ * This gives the real partner genuine rows so the hubs, and the Organisations rollup once it is
+ * pointed at these endpoints, show real numbers. Idempotent: skips if billing already exists.
  */
 export async function seedEnzaHub(): Promise<{ ok: boolean; seeded: boolean; message: string }> {
   const partner = firstOrNull(await db.select().from(partnersTable).where(eq(partnersTable.slug, ENZA_SLUG)));
@@ -94,7 +94,7 @@ export async function seedEnzaHub(): Promise<{ ok: boolean; seeded: boolean; mes
   const learnerCount = new Map<string, number>();
   for (const o of orgs) learnerCount.set(o.id, await activeLearners(o.id));
 
-  // Already seeded? Don't duplicate — RECONCILE instead: correct each subscription's active seats
+  // Already seeded? Don't duplicate, RECONCILE instead: correct each subscription's active seats
   // (and lift the contracted total if it somehow sits below actual usage) to match real learners.
   const existing = await db.select().from(billingSubscriptionsTable).where(eq(billingSubscriptionsTable.partnerId, pid));
   if (existing.length > 0) {

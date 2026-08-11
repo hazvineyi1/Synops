@@ -49,7 +49,7 @@ import {
 const router = Router();
 
 /**
- * Platform console — super_admin only.
+ * Platform console, super_admin only.
  *
  * Everything here is destructive or privileged, so EVERY action writes an audit event.
  * A console that can impersonate any user and reset any password without leaving a
@@ -80,7 +80,7 @@ const CREATABLE_ROLES = ["super_admin", "partner_admin", "org_admin", "coach", "
 
 /* ───────────────────────────── Users ───────────────────────────── */
 
-/** GET /platform/users?q= — search every user on the platform. */
+/** GET /platform/users?q=, search every user on the platform. */
 router.get("/platform/users", requireAuth, requireSuperAdmin, async (req, res) => {
   const q = String(req.query.q ?? "").trim();
   const limit = Math.min(Number(req.query.limit ?? 50), 200);
@@ -115,7 +115,7 @@ router.get("/platform/users", requireAuth, requireSuperAdmin, async (req, res) =
   res.json(rows);
 });
 
-/** GET /platform/users/:id — full detail incl. sessions, logins, enrolments. */
+/** GET /platform/users/:id, full detail incl. sessions, logins, enrolments. */
 router.get("/platform/users/:id", requireAuth, requireSuperAdmin, async (req, res) => {
   const { id } = req.params;
 
@@ -224,7 +224,7 @@ router.post("/platform/stop-impersonating", requireAuth, async (req, res) => {
 });
 
 /**
- * POST /platform/users — create a new user with any role and return a one-time set-password link.
+ * POST /platform/users, create a new user with any role and return a one-time set-password link.
  * The account starts as "invited" with no password; the returned link lets them set one (or an admin
  * hands it over). This is the missing "add a user" path: users used to only be creatable against an
  * organisation (org member add), so there was no way to mint a platform admin from the console.
@@ -262,7 +262,7 @@ router.post("/platform/users", requireAuth, requireSuperAdmin, async (req, res) 
 });
 
 /**
- * DELETE /platform/users/:id — hard-delete a user and their access rows in one transaction.
+ * DELETE /platform/users/:id, hard-delete a user and their access rows in one transaction.
  * Removes login ability and the PII in the auth trail (sessions, resets, login events) plus their
  * enrolments and section memberships, so dashboards do not dangle. Content they authored (courses,
  * cases) is intentionally left. You cannot delete your own account.
@@ -317,7 +317,7 @@ router.post("/platform/users/:id/reset-link", requireAuth, requireSuperAdmin, as
   res.json({ link, expiresAt, email: user.email, emailed });
 });
 
-/** POST /platform/users/:id/suspend — blocks sign-in AND kills live sessions. */
+/** POST /platform/users/:id/suspend, blocks sign-in AND kills live sessions. */
 router.post("/platform/users/:id/suspend", requireAuth, requireSuperAdmin, async (req, res) => {
   const { id } = req.params;
   if (id === req.userId) {
@@ -365,7 +365,7 @@ router.post("/platform/users/:id/role", requireAuth, requireSuperAdmin, async (r
   res.json({ ok: true });
 });
 
-/** POST /platform/users/:id/revoke-sessions — force sign-out everywhere. */
+/** POST /platform/users/:id/revoke-sessions, force sign-out everywhere. */
 router.post("/platform/users/:id/revoke-sessions", requireAuth, requireSuperAdmin, async (req, res) => {
   const { id } = req.params;
   await db
@@ -378,13 +378,13 @@ router.post("/platform/users/:id/revoke-sessions", requireAuth, requireSuperAdmi
 
 /* ───────────────────────── Login activity & audit ───────────────────────── */
 
-/** GET /platform/login-activity — platform-wide, including failures. */
+/** GET /platform/login-activity, platform-wide, including failures. */
 /** GET /platform/health - detailed health snapshot for the admin status dashboard. */
 router.get("/platform/health", requireAuth, requireSuperAdmin, async (_req, res) => {
   res.json(await healthSnapshot());
 });
 
-// GET /platform/ops/anomalies — the ops-agent feed (active by default; ?status=resolved for history).
+// GET /platform/ops/anomalies, the ops-agent feed (active by default; ?status=resolved for history).
 router.get("/platform/ops/anomalies", requireAuth, requireSuperAdmin, async (req, res) => {
   const status = req.query.status === "resolved" ? "resolved" : "active";
   try {
@@ -400,7 +400,7 @@ router.get("/platform/ops/anomalies", requireAuth, requireSuperAdmin, async (req
   }
 });
 
-// POST /platform/ops/scan — run a scan on demand (the agent also runs every minute on its own).
+// POST /platform/ops/scan, run a scan on demand (the agent also runs every minute on its own).
 router.post("/platform/ops/scan", requireAuth, requireSuperAdmin, async (_req, res) => {
   res.json({ firing: await runOpsScan() });
 });
@@ -445,7 +445,7 @@ router.get("/platform/login-activity", requireAuth, requireSuperAdmin, async (re
   res.json(rows);
 });
 
-/** GET /platform/audit — the trail of every privileged action. */
+/** GET /platform/audit, the trail of every privileged action. */
 router.get("/platform/audit", requireAuth, requireSuperAdmin, async (req, res) => {
   const q = req.query as Record<string, string | undefined>;
   const limit = Math.min(Number(q.limit ?? 100), 1000);
@@ -481,7 +481,7 @@ router.get("/platform/audit", requireAuth, requireSuperAdmin, async (req, res) =
   res.json(rows);
 });
 
-// GET /platform/audit/actions — the distinct action + resourceType values, for filter UIs.
+// GET /platform/audit/actions, the distinct action + resourceType values, for filter UIs.
 router.get("/platform/audit/actions", requireAuth, requireSuperAdmin, async (_req, res) => {
   const rows = await db
     .selectDistinct({ action: auditEventsTable.action, resourceType: auditEventsTable.resourceType })
@@ -513,7 +513,7 @@ router.get("/platform/api-keys", requireAuth, requireSuperAdmin, async (_req, re
   res.json(rows);
 });
 
-/** POST /platform/api-keys — the plaintext key is returned ONCE and never stored. */
+/** POST /platform/api-keys, the plaintext key is returned ONCE and never stored. */
 router.post("/platform/api-keys", requireAuth, requireSuperAdmin, async (req, res) => {
   const name = String(req.body?.name ?? "").trim();
   if (!name) {
@@ -554,7 +554,7 @@ router.delete("/platform/api-keys/:id", requireAuth, requireSuperAdmin, async (r
 
 /* ───────────────────────── Tenancy overview ───────────────────────── */
 
-/** GET /platform/overview — headline numbers for the console home. */
+/** GET /platform/overview, headline numbers for the console home. */
 router.get("/platform/overview", requireAuth, requireSuperAdmin, async (_req, res) => {
   const [users] = await db
     .select({
@@ -595,7 +595,7 @@ router.get("/platform/overview", requireAuth, requireSuperAdmin, async (_req, re
 });
 
 /**
- * GET /platform/financials — platform-wide financial roll-up aggregated from the REAL per-partner
+ * GET /platform/financials, platform-wide financial roll-up aggregated from the REAL per-partner
  * billing + funding data (billing_subscriptions, billing_invoices, funding_agreements). Returns a
  * per-partner breakdown and platform totals. Missing tables (pre-first-write) are treated as empty.
  */
@@ -639,7 +639,7 @@ router.get("/platform/financials", requireAuth, requireSuperAdmin, async (_req, 
 });
 
 /**
- * GET /platform/alerts — real, platform-wide "attention needed" signals derived from live data:
+ * GET /platform/alerts, real, platform-wide "attention needed" signals derived from live data:
  * funding agreements expiring/expired, unpaid invoices, action-required documents, partners still
  * onboarding, and courses still in draft. Plus a small real health block (learners, active
  * enrolments). Missing tables (pre-first-write) count as zero.
@@ -658,7 +658,7 @@ router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res)
       return Number.isFinite(t) && t <= soon;
     }).length;
   });
-  // Count in SQL (WHERE ... ) instead of pulling whole tables into Node and filtering — these grow
+  // Count in SQL (WHERE ... ) instead of pulling whole tables into Node and filtering, these grow
   // linearly with platform size; the users/enrolments scans especially would hurt at scale.
   const sqlCount = async (q: Promise<Array<{ c: number }>>) => { const [r] = await q; return Number(r?.c ?? 0); };
   const unpaidInvoices = await safeCount(() => sqlCount(
@@ -694,7 +694,7 @@ router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res)
 });
 
 /**
- * GET /platform/users/:id/login-activity — a user's recent login events (super admin). Real sign-in
+ * GET /platform/users/:id/login-activity, a user's recent login events (super admin). Real sign-in
  * trail (successes + failures + impersonations) from login_events, newest first.
  */
 router.get("/platform/users/:id/login-activity", requireAuth, requireSuperAdmin, async (req, res) => {

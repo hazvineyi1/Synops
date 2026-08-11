@@ -12,7 +12,7 @@ export interface MathProblem {
   eq?: { a: number; b: number; c: number };
 }
 
-/** Lenient answer check — mirrors the server's checkMathAnswer. */
+/** Lenient answer check, mirrors the server's checkMathAnswer. */
 export function check(student: string, correct: string): boolean {
   const norm = (s: string) => String(s ?? "").toLowerCase().replace(/\s+/g, "").replace(/^[a-z]=/, "").replace(/[.,;]$/, "");
   const a = norm(student), b = norm(correct);

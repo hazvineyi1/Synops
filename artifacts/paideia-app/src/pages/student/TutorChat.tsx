@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useStudentAuth } from "@/hooks/use-student-auth";
 import type { TutorConversation, TutorMessage } from "@/lib/types";
-import { ArrowLeft, Loader2, Send, ToggleLeft, ToggleRight, MessageSquare, Sparkles } from "lucide-react";
+import { ArrowLeft, Loader2, Send, ToggleLeft, ToggleRight, MessageSquare } from "lucide-react";
 
 export default function TutorChat() {
   const [match, params] = useRoute("/student/tutor/:id");
@@ -149,7 +149,6 @@ export default function TutorChat() {
         <div className="shrink-0 bg-amber-50 border-b border-amber-100">
           <div className="max-w-3xl mx-auto px-4 py-2 flex items-center justify-between">
             <p className="text-xs text-amber-800">
-              <Sparkles className="h-3 w-3 inline mr-1" />
               Socratic mode: the tutor will lead with questions rather than answers.
             </p>
             <Button variant="ghost" size="sm" className="h-6 text-xs text-amber-700" onClick={() => setSocraticHint(false)}>

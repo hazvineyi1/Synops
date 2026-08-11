@@ -251,7 +251,7 @@ export function OrgMembers() {
 
                   <RoleBadge role={member.role} />
 
-                  {/* Actions — don't allow editing yourself */}
+                  {/* Actions, don't allow editing yourself */}
                   {member.id !== me?.id && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

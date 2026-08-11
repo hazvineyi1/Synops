@@ -6,7 +6,7 @@ import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { mathHint, mathWorkedExample, generateMathSet } from "../lib/mathCoach";
 
 /**
- * Math Coach — a Socratic hint layer for the interactive math game. The learner works a problem on
+ * Math Coach, a Socratic hint layer for the interactive math game. The learner works a problem on
  * the frontend; when stuck they call /math-coach/hint, which returns ONE guiding question that never
  * reveals the answer, and after repeated misses /math-coach/worked-example models a similar problem.
  * /math-coach/generate builds a problem set from lesson content (authoring).

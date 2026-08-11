@@ -108,7 +108,7 @@ export function PlatformOverview() {
       <PageHeader title="Platform overview" icon={LayoutDashboard}
         subtitle={`${partnerCount} partner${partnerCount === 1 ? '' : 's'} on the platform. Jump into any area, or open a partner below.`} />
 
-      {/* Hub tiles — the platform home: live stats that double as the door into each area. */}
+      {/* Hub tiles, the platform home: live stats that double as the door into each area. */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {hubTiles.map((tile) => (
           <button
@@ -128,7 +128,7 @@ export function PlatformOverview() {
         ))}
       </div>
 
-      {/* Attention needed — REAL alerts derived from live data */}
+      {/* Attention needed, REAL alerts derived from live data */}
       <Card className="p-5">
         <div className="flex items-center justify-between">
           <SectionTitle>Attention needed</SectionTitle>
@@ -224,7 +224,7 @@ export function PlatformOverview() {
         </div>
       </div>
 
-      {/* Platform financials — REAL, aggregated across partners */}
+      {/* Platform financials, REAL, aggregated across partners */}
       <Card className="p-5">
         <SectionTitle>Platform financials</SectionTitle>
         <p className="mt-1 text-xs text-muted-foreground">Aggregated live from every partner's subscriptions, invoices and funding agreements.</p>

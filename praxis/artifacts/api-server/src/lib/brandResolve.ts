@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 /**
  * Public-safe tenant branding used by unauthenticated surfaces (the public verification page and
- * the credential certificate PDF). Superset of EmailBrand — adds the secondary/accent colours and
+ * the credential certificate PDF). Superset of EmailBrand, adds the secondary/accent colours and
  * the credential title. Resolved server-side from a tenant key so the public verify page (which
  * cannot call the auth-gated /brand/theme) can still be branded.
  */
@@ -56,7 +56,7 @@ export function normaliseHost(host?: string | null): string {
 
 /**
  * Resolve branding for an incoming request hostname. Powers custom domains: a partner that has
- * set brand_themes.customDomain to (e.g.) learn.theiracademy.com gets their theme on that host —
+ * set brand_themes.customDomain to (e.g.) learn.theiracademy.com gets their theme on that host, 
  * including the pre-auth login/marketing pages, before any user session exists. Falls back to the
  * platform default for the app's own domains or an unknown host. Never throws.
  */

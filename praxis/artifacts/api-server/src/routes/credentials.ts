@@ -54,7 +54,7 @@ router.get("/credentials/:credentialId", requireAuth, async (req, res) => {
   res.json(toCredentialResponse(credential, getBaseUrl(req)));
 });
 
-// GET /credentials/:credentialId/certificate.pdf — tenant-branded certificate download.
+// GET /credentials/:credentialId/certificate.pdf, tenant-branded certificate download.
 // PUBLIC, like /verify: it renders only what the public verification page already shows, keyed by
 // the unguessable credential UUID, so employers verifying a credential can download the PDF too.
 router.get("/credentials/:credentialId/certificate.pdf", async (req, res) => {
@@ -83,7 +83,7 @@ router.get("/credentials/:credentialId/certificate.pdf", async (req, res) => {
   res.end(buf);
 });
 
-// GET /verify/:credentialId — PUBLIC, no auth
+// GET /verify/:credentialId, PUBLIC, no auth
 router.get("/verify/:credentialId", async (req, res) => {
   const credential = await db.query.credentialsTable.findFirst({
     where: eq(credentialsTable.id, req.params.credentialId),

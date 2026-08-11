@@ -1,7 +1,7 @@
 /**
  * Minimal transactional mailer.
  *
- * Sends email via Resend's HTTP API using plain fetch — no SMTP client, no npm dependency,
+ * Sends email via Resend's HTTP API using plain fetch, no SMTP client, no npm dependency,
  * nothing to bundle/externalise. It is a SAFE NO-OP until the environment is configured, so
  * shipping it never breaks anything: in-app notifications keep working; email simply starts
  * flowing once RESEND_API_KEY + EMAIL_FROM are set.
@@ -104,7 +104,7 @@ function escapeAttr(s: string): string {
 /**
  * Wrap body content in a brandable HTML shell. When a tenant `brand` is passed, the header
  * shows that tenant's logo (or name), the CTA + accents use its primary colour, and the footer
- * names the tenant — so an off-track email from a partner looks like it came from that academy,
+ * names the tenant, so an off-track email from a partner looks like it came from that academy,
  * not from Praxis.
  */
 export function emailShell(opts: {

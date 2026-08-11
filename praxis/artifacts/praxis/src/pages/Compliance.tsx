@@ -104,10 +104,10 @@ export function Compliance() {
                   <div>
                     <p className="font-medium">
                       <span className="uppercase text-xs font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded mr-2">{s.framework}</span>
-                      {s.code} — {s.title}
+                      {s.code}, {s.title}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {s.nqfLevel != null ? `NQF ${s.nqfLevel}` : 'NQF —'} · {s.credits != null ? `${s.credits} credits` : 'credits —'}
+                      {s.nqfLevel != null ? `NQF ${s.nqfLevel}` : 'NQF, '} · {s.credits != null ? `${s.credits} credits` : 'credits, '}
                     </p>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => delStd.mutate(s.id)}>
@@ -172,7 +172,7 @@ function CourseCompliance({ courseId, standards, isHub }: { courseId: string; st
 
   const stdLabel = (id: string) => {
     const s = standards.find((x) => x.id === id);
-    return s ? `${s.code} — ${s.title}` : id;
+    return s ? `${s.code}, ${s.title}` : id;
   };
   const moduleLabel = (id: string) => (modules ?? []).find((m) => m.id === id)?.title ?? id;
 
@@ -188,7 +188,7 @@ function CourseCompliance({ courseId, standards, isHub }: { courseId: string; st
             <div className="flex flex-col sm:flex-row gap-3">
               <select value={stdId} onChange={(e) => setStdId(e.target.value)} className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm">
                 <option value="">Select standard…</option>
-                {standards.map((s) => <option key={s.id} value={s.id}>{s.code} — {s.title}</option>)}
+                {standards.map((s) => <option key={s.id} value={s.id}>{s.code}, {s.title}</option>)}
               </select>
               <select value={target} onChange={(e) => setTarget(e.target.value)} className="flex-1 h-10 rounded-md border border-input bg-background px-3 text-sm">
                 <option value="">Map to…</option>
@@ -221,7 +221,7 @@ function CourseCompliance({ courseId, standards, isHub }: { courseId: string; st
         <CardHeader>
           <CardTitle>Compliance report</CardTitle>
           <CardDescription>
-            {report ? `${report.courseTitle} — ${report.enrolledLearners} enrolled learner${report.enrolledLearners === 1 ? '' : 's'}` : 'Auditable completion by unit standard.'}
+            {report ? `${report.courseTitle}, ${report.enrolledLearners} enrolled learner${report.enrolledLearners === 1 ? '' : 's'}` : 'Auditable completion by unit standard.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -237,7 +237,7 @@ function CourseCompliance({ courseId, standards, isHub }: { courseId: string; st
                       <div>
                         <p className="font-medium">
                           <span className="uppercase text-xs font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded mr-2">{s.framework}</span>
-                          {s.code} — {s.title}
+                          {s.code}, {s.title}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           Mapped to: {s.mappedModules.length > 0 ? s.mappedModules.map((m) => m.title ?? m.moduleId).join(', ') : 'course'} · {s.evidenceRecords} evidence record{s.evidenceRecords === 1 ? '' : 's'}

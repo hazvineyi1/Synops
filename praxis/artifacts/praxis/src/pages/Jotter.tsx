@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 /**
- * The Student Jotter — the learner's own space.
+ * The Student Jotter, the learner's own space.
  *
  * A single scratch surface for the things students actually do around studying: sticky
  * notes they can drag anywhere, free-hand sketching/diagrams, a to-do list, reminders, and
@@ -18,7 +18,7 @@ import {
  * it. They can even change the paper colour.
  *
  * Persistence is per-user localStorage. That means it lives on this browser (a genuine
- * limitation — noted for a future backend-synced version), but it needs no schema, no
+ * limitation, noted for a future backend-synced version), but it needs no schema, no
  * migration, and survives refreshes and restarts, which is what a personal scratchpad needs
  * on day one. Everything is keyed by the signed-in user's id so two people on one machine
  * never see each other's board.
@@ -201,7 +201,7 @@ export function Jotter() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="My Jotter" icon={NotebookPen} subtitle="Your own space — sticky notes, sketches, to-dos, reminders and a study plan. Only you can see this." />
+      <PageHeader title="My Jotter" icon={NotebookPen} subtitle="Your own space, sticky notes, sketches, to-dos, reminders and a study plan. Only you can see this." />
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-2">
@@ -241,7 +241,7 @@ export function Jotter() {
           className="relative h-[560px] overflow-hidden rounded-2xl border border-border shadow-inner"
           style={{ backgroundColor: paper.bg, backgroundImage: `radial-gradient(${paper.dot} 1px, transparent 1px)`, backgroundSize: '18px 18px' }}
         >
-          {/* Drawing layer — captures pointer only in draw mode so notes stay draggable otherwise */}
+          {/* Drawing layer, captures pointer only in draw mode so notes stay draggable otherwise */}
           <canvas
             ref={canvasRef}
             onPointerDown={startDraw}
@@ -281,7 +281,7 @@ export function Jotter() {
           {state.notes.length === 0 && !state.drawing && (
             <div className={cn('pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 text-sm', dark ? 'text-white/50' : 'text-black/30')}>
               <StickyNote className="h-6 w-6" />
-              <p>Add a note or start drawing — this space is yours.</p>
+              <p>Add a note or start drawing, this space is yours.</p>
             </div>
           )}
         </div>
@@ -360,7 +360,7 @@ export function Jotter() {
                         <textarea
                           value={state.planner[key] ?? ''}
                           onChange={(e) => patch({ planner: { ...state.planner, [key]: e.target.value } })}
-                          placeholder="—"
+                          placeholder=", "
                           className="h-16 w-full resize-none bg-transparent p-2 text-xs leading-snug placeholder:text-muted-foreground/40 focus:bg-primary/5 focus:outline-none"
                         />
                       </td>

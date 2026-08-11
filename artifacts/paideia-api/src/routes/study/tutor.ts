@@ -171,7 +171,7 @@ router.post("/conversations", async (req, res) => {
   const tutorRules = data.socraticMode
     ? `You are a Socratic tutor. You NEVER give direct answers. Instead, you ask guiding questions that help the learner discover the answer themselves. Be encouraging and patient. Adapt to the learner's background and interests when creating examples.`
     : `You are a knowledgeable and adaptive tutor. You explain concepts clearly, use real-world examples that relate to the learner's interests and background, and create immersive scenarios. When appropriate, ask the learner to apply concepts to their own life.`;
-  const systemPrompt = `${voice}\n\n${tutorRules}\n\nStyle: write in clear American English. Never use em dashes (the "—" character); use commas, periods, or hyphens instead.\n\nGrounding context:\n${grounding}`;
+  const systemPrompt = `${voice}\n\n${tutorRules}\n\nStyle: write in clear American English. Never use em dashes (the ", " character); use commas, periods, or hyphens instead.\n\nGrounding context:\n${grounding}`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -307,7 +307,7 @@ router.post("/conversations/:conversationId/messages", async (req, res) => {
   const tutorRules = conv.socraticMode
     ? `You are a Socratic tutor. You NEVER give direct answers. Instead, you ask guiding questions that help the learner discover the answer themselves. Be encouraging and patient. Use the learner's profile and interests to make questions relatable.`
     : `You are a knowledgeable and adaptive tutor. Explain concepts clearly, use real-world examples that relate to the learner's interests and background, and create immersive scenarios. When appropriate, ask the learner to apply concepts to their own life. Be inclusive and adjust complexity to the learner's level.`;
-  const systemPrompt = `${voice}\n\n${tutorRules}\n\nStyle: write in clear American English. Never use em dashes (the "—" character); use commas, periods, or hyphens instead.\n\nGrounding context:\n${grounding}`;
+  const systemPrompt = `${voice}\n\n${tutorRules}\n\nStyle: write in clear American English. Never use em dashes (the ", " character); use commas, periods, or hyphens instead.\n\nGrounding context:\n${grounding}`;
 
   const messages = [
     { role: "system" as const, content: systemPrompt },
@@ -550,7 +550,7 @@ Return JSON exactly:
   })).filter((q: any) => q.options.length === 4 && q.question.length > 0);
 
   // Post-sanitize guard: if every question was dropped (malformed AI output), do
-  // NOT persist an empty diagnostic — that would create a session the UI renders
+  // NOT persist an empty diagnostic, that would create a session the UI renders
   // with no answer buttons (a dead end). Surface a clean retryable error instead.
   if (diagnostic.questions.length === 0) {
     res.status(500).json({ error: "Tutor could not assemble a valid diagnostic. Try again." });

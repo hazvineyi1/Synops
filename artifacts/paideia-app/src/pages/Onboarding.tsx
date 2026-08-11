@@ -29,7 +29,7 @@ export default function Onboarding() {
 
   // Always call the API so the server marks the teacher onboarded (sets onboardedAt).
   // Navigating to /dashboard WITHOUT this leaves onboardedAt null, and the Protected
-  // guard immediately bounces the teacher back here — which looks like a dead button.
+  // guard immediately bounces the teacher back here, which looks like a dead button.
   const complete = async (payload: {
     country: string;
     schoolName: string;

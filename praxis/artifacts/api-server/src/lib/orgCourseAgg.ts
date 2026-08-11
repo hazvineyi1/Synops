@@ -10,7 +10,7 @@
 export interface EnrolRow {
   courseId: string;
   status: string | null;
-  completedAt: unknown; // Date | string | null — truthy means completed
+  completedAt: unknown; // Date | string | null, truthy means completed
 }
 export interface CourseRow {
   id: string;

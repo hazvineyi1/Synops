@@ -27,7 +27,7 @@ import { approvedOrgPromptOverlay } from "../lib/orgPromptOverlay";
 /**
  * Public, UNAUTHENTICATED case runner via a signed embed token. A learner outside Praxis
  * can open a shared case, hold the Socratic dialogue, and receive the end-of-session
- * analysis — without an account. Access is gated only by the opaque token, its active flag
+ * analysis, without an account. Access is gated only by the opaque token, its active flag
  * and its expiry. Every open is logged (case_link_access) and the link's counter bumped.
  *
  * SECURITY: no auth middleware here by design; the token IS the credential. Nothing here
@@ -65,7 +65,7 @@ function ctx(c: CaseScenario, learnerName: string | null, turnCount: number, lan
   };
 }
 
-// GET /case-embed/:token — public case view (no answers, no constraints leaked).
+// GET /case-embed/:token, public case view (no answers, no constraints leaked).
 router.get("/case-embed/:token", async (req, res) => {
   const resolved = await resolveLink(req.params.token);
   if (!resolved) { res.status(404).json({ error: "This link is not available." }); return; }
@@ -88,7 +88,7 @@ router.get("/case-embed/:token", async (req, res) => {
   });
 });
 
-// POST /case-embed/:token/start — create an embed session and return the opening question.
+// POST /case-embed/:token/start, create an embed session and return the opening question.
 router.post("/case-embed/:token/start", async (req, res) => {
   const resolved = await resolveLink(req.params.token);
   if (!resolved) { res.status(404).json({ error: "This link is not available." }); return; }
@@ -115,7 +115,7 @@ router.post("/case-embed/:token/start", async (req, res) => {
   res.status(201).json({ sessionId: s.id, messages, promptLimit: s.promptLimit, promptCount: 0, contextBlock: facts.context, learningObjective: facts.objective });
 });
 
-// POST /case-embed/:token/chat — SSE Socratic turn for an embed session.
+// POST /case-embed/:token/chat, SSE Socratic turn for an embed session.
 router.post("/case-embed/:token/chat", async (req, res) => {
   const resolved = await resolveLink(req.params.token);
   if (!resolved) { res.status(404).json({ error: "This link is not available." }); return; }
@@ -173,7 +173,7 @@ router.post("/case-embed/:token/chat", async (req, res) => {
   }
 });
 
-// POST /case-embed/:token/analysis — generate + persist analysis for an embed session.
+// POST /case-embed/:token/analysis, generate + persist analysis for an embed session.
 router.post("/case-embed/:token/analysis", async (req, res) => {
   const resolved = await resolveLink(req.params.token);
   if (!resolved) { res.status(404).json({ error: "This link is not available." }); return; }

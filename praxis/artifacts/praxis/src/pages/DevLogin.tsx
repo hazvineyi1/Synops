@@ -15,7 +15,7 @@ interface SeedUser {
 const ROLE_ORDER = ["super_admin", "partner_admin", "org_admin", "coach", "learner"];
 
 const ROLE_META: Record<string, { label: string; color: string; bg: string; description: string }> = {
-  super_admin:    { label: "Super Admin",    color: "text-purple-700",  bg: "bg-purple-50 border-purple-200",  description: "Full platform control — partners, orgs, billing" },
+  super_admin:    { label: "Super Admin",    color: "text-purple-700",  bg: "bg-purple-50 border-purple-200",  description: "Full platform control, partners, orgs, billing" },
   partner_admin:  { label: "Partner Admin",  color: "text-blue-700",    bg: "bg-blue-50 border-blue-200",      description: "Manage organisations and coaches within a partner" },
   org_admin:      { label: "Org Admin",      color: "text-teal-700",    bg: "bg-teal-50 border-teal-200",      description: "Manage learners, courses, and reporting for one org" },
   coach:          { label: "Coach",          color: "text-amber-700",   bg: "bg-amber-50 border-amber-200",    description: "Review submissions, send feedback, track progress" },
@@ -131,7 +131,7 @@ export function DevLogin() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Demo Login</h1>
           <p className="text-slate-400">
-            Click any account to log in instantly as that user with all their seeded data — courses, enrolments, notifications, and content.
+            Click any account to log in instantly as that user with all their seeded data, courses, enrolments, notifications, and content.
           </p>
         </div>
 

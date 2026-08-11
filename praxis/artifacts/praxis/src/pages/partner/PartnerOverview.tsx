@@ -24,7 +24,7 @@ type Funding = { orgId?: string | null; funderName?: string; seatsFunded?: numbe
 type Delegate = { orgId?: string | null };
 
 /**
- * Partner Platform Overview — the top-level dashboard for a Partner account. REAL data: aggregates
+ * Partner Platform Overview, the top-level dashboard for a Partner account. REAL data: aggregates
  * the same partner-scoped endpoints the Financial/Funders/Organisations hubs use (/organisations,
  * /partners/:id/billing, /funding, /delegated-admins). Replaces the old partnerHubData mock, which
  * rendered the fabricated TalentForge/MTN/Vodacom tenant here.

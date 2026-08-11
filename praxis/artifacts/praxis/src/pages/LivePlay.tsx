@@ -39,7 +39,7 @@ function LiveMathPlayer({ problems, code, playerId, onScore }: { problems: MathP
   const checkIt = () => {
     if (!p || !current) { setFb({ ok: false, msg: "Enter an answer." }); return; }
     if (check(current, p.answer)) { setFb({ ok: true, msg: "Correct! 🎉" }); setTimeout(() => next(true), 800); }
-    else { setAttempts((a) => a + 1); setFb({ ok: false, msg: "Not quite — try again or ask the coach." }); }
+    else { setAttempts((a) => a + 1); setFb({ ok: false, msg: "Not quite, try again or ask the coach." }); }
   };
   const ask = async () => {
     if (!p) return; setBusy(true);
@@ -70,7 +70,7 @@ function LiveMathPlayer({ problems, code, playerId, onScore }: { problems: MathP
 
 /**
  * Public "join a live game" screen. A student enters the code their teacher shows, picks a name and
- * team, then plays the game — their score streams to the shared leaderboard, and they can buzz in.
+ * team, then plays the game, their score streams to the shared leaderboard, and they can buzz in.
  * No account required (code-gated).
  */
 export function LivePlay({ params }: { params?: { code?: string } }) {
@@ -202,7 +202,7 @@ export function LivePlay({ params }: { params?: { code?: string } }) {
                 ? <LiveMathPlayer problems={problems} code={code} playerId={playerId} onScore={(s) => onSubmit({ score: s })} />
                 : <ActivityPlayer html={game.html} embedUrl={game.embedUrl} onSubmit={onSubmit} />}
             </div>
-            {myScore != null && kind !== "math-coach" && <div className="text-center text-sm font-semibold text-emerald-700">Your score this round: {myScore} — sent to the leaderboard! 🎉</div>}
+            {myScore != null && kind !== "math-coach" && <div className="text-center text-sm font-semibold text-emerald-700">Your score this round: {myScore}, sent to the leaderboard! 🎉</div>}
 
             {state && (
               <div className="grid sm:grid-cols-2 gap-4">

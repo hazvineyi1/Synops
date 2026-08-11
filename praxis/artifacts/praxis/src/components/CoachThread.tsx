@@ -26,7 +26,7 @@ export function CoachThread({ alertId, suggested }: { alertId: string; suggested
     <div>
       <div className="space-y-2 max-h-56 overflow-y-auto rounded-lg border border-border p-3 bg-muted/20">
         {isLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
-        {!isLoading && msgs.length === 0 && <p className="text-xs text-muted-foreground italic">No messages yet — start the conversation below.</p>}
+        {!isLoading && msgs.length === 0 && <p className="text-xs text-muted-foreground italic">No messages yet, start the conversation below.</p>}
         {msgs.map((m) => (
           <div key={m.id} className={`flex ${m.mine ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${m.mine ? 'bg-primary text-primary-foreground' : 'bg-card border border-border'}`}>

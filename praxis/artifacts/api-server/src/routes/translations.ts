@@ -17,7 +17,7 @@ const router = Router();
 
 const VALID_STATUS = new Set(["machine", "approved", "rejected"]);
 
-// GET /platform/translations — review queue. Filter by lang + status, newest first, paginated.
+// GET /platform/translations, review queue. Filter by lang + status, newest first, paginated.
 router.get("/platform/translations", requireAuth, requireSuperAdmin, async (req, res) => {
   const lang = typeof req.query.lang === "string" && LANG_NAMES[req.query.lang] ? req.query.lang : null;
   const status = typeof req.query.status === "string" && VALID_STATUS.has(req.query.status) ? req.query.status : "machine";
@@ -48,7 +48,7 @@ router.get("/platform/translations", requireAuth, requireSuperAdmin, async (req,
   })));
 });
 
-// GET /platform/translations/summary — counts per language + status, to drive the review dashboard.
+// GET /platform/translations/summary, counts per language + status, to drive the review dashboard.
 router.get("/platform/translations/summary", requireAuth, requireSuperAdmin, async (_req, res) => {
   const rows = await db
     .select({ lang: contentTranslationsTable.lang, status: contentTranslationsTable.status, n: count() })
@@ -57,14 +57,14 @@ router.get("/platform/translations/summary", requireAuth, requireSuperAdmin, asy
   res.json(rows.map((r) => ({ lang: r.lang, languageName: languageName(r.lang), status: r.status, count: r.n })));
 });
 
-// GET /platform/translations/glossary/:lang — reviewer reference for the terminology glossary.
+// GET /platform/translations/glossary/:lang, reviewer reference for the terminology glossary.
 router.get("/platform/translations/glossary/:lang", requireAuth, requireSuperAdmin, (req, res) => {
   const g = glossaryFor(req.params.lang);
   if (!g) { res.status(404).json({ error: "No glossary for this language." }); return; }
   res.json(g);
 });
 
-// POST /platform/translations/:id/review — approve (optionally with an edited translation) or reject.
+// POST /platform/translations/:id/review, approve (optionally with an edited translation) or reject.
 router.post("/platform/translations/:id/review", requireAuth, requireSuperAdmin, async (req, res) => {
   const decision = req.body?.decision;
   if (decision !== "approve" && decision !== "reject") {

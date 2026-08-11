@@ -1,6 +1,6 @@
 /**
  * Development-only routes for demo and testing.
- * Guarded by NODE_ENV check — returns 404 in production.
+ * Guarded by NODE_ENV check, returns 404 in production.
  */
 import { Router } from "express";
 import { db } from "@workspace/db";
@@ -23,7 +23,7 @@ export const devRoutesEnabled =
   process.env.ENABLE_DEV_ROUTES === "true" && process.env.NODE_ENV !== "production";
 const isDev = devRoutesEnabled;
 
-// POST /dev/impersonate — sign in as any seed user without a password (dev only).
+// POST /dev/impersonate, sign in as any seed user without a password (dev only).
 // Now that requireAuth reads a real auth_session, this mints one instead of the old
 // raw-userId cookie. Still hard-gated to non-production. Name kept for DevLogin.tsx.
 async function devLogin(req: any, res: any) {
@@ -43,7 +43,7 @@ async function devLogin(req: any, res: any) {
 router.post("/dev/impersonate", devLogin);
 router.post("/dev/login", devLogin);
 
-// GET /dev/impersonate — who am I currently signed in as? (null if nobody)
+// GET /dev/impersonate, who am I currently signed in as? (null if nobody)
 //
 // DevLogin.tsx calls this on mount. It did not exist, so Express fell through to its
 // HTML 404 handler; the page's `.json()` then threw, the enclosing Promise.all
@@ -80,7 +80,7 @@ router.get("/dev/impersonate", async (req, res) => {
   });
 });
 
-// DELETE /dev/impersonate — sign out (revoke the current session).
+// DELETE /dev/impersonate, sign out (revoke the current session).
 router.delete("/dev/impersonate", async (req, res) => {
   if (!isDev) { res.status(404).json({ error: "Not found" }); return; }
   const token = req.cookies?.[SESSION_COOKIE];
@@ -91,7 +91,7 @@ router.delete("/dev/impersonate", async (req, res) => {
   res.json({ ok: true });
 });
 
-// POST /dev/set-role — change your own role (dev only, requires active session)
+// POST /dev/set-role, change your own role (dev only, requires active session)
 router.post("/dev/set-role", requireAuth, async (req, res) => {
   if (!isDev) { res.status(404).json({ error: "Not found" }); return; }
   const { role } = req.body;
@@ -114,7 +114,7 @@ router.post("/dev/set-role", requireAuth, async (req, res) => {
   res.json({ ok: true, user: { id: updated.id, role: updated.role, partnerId: updated.partnerId, organisationId: updated.organisationId } });
 });
 
-// GET /dev/seed-users — list all seed users for reference
+// GET /dev/seed-users, list all seed users for reference
 router.get("/dev/seed-users", async (req, res) => {
   if (!isDev) { res.status(404).json({ error: "Not found" }); return; }
   const users = await db.select({
@@ -129,7 +129,7 @@ router.get("/dev/seed-users", async (req, res) => {
   res.json(users);
 });
 
-// POST /dev/promote — promote your account to match a seed user's role/partner/org
+// POST /dev/promote, promote your account to match a seed user's role/partner/org
 router.post("/dev/promote", requireAuth, async (req, res) => {
   if (!isDev) { res.status(404).json({ error: "Not found" }); return; }
   const { targetUserId } = req.body;

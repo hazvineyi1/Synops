@@ -29,7 +29,7 @@ function splitRow(line: string): string[] {
 // Brand rule: no em dashes. Replace em dashes with a comma (reads naturally in
 // prose) and en dashes with a hyphen, collapsing any doubled spaces.
 export function stripEmDashes(s: string): string {
-  return (s ?? "").replace(/\s*—\s*/g, ", ").replace(/\s*–\s*/g, "-").replace(/ {2,}/g, " ");
+  return (s ?? "").replace(/\s*, \s*/g, ", ").replace(/\s*–\s*/g, "-").replace(/ {2,}/g, " ");
 }
 
 export function Markdown({ content }: { content: string }) {
@@ -42,7 +42,7 @@ export function Markdown({ content }: { content: string }) {
     const line = lines[i] ?? "";
     if (!line.trim()) { i++; continue; }
 
-    // Heading — clear separation above, a little below.
+    // Heading, clear separation above, a little below.
     const h = line.match(/^(#{1,4})\s+(.*)$/);
     if (h) {
       const level = h[1] ? h[1].length : 1;
@@ -69,7 +69,7 @@ export function Markdown({ content }: { content: string }) {
       continue;
     }
 
-    // Bullet list — comfortable gaps between items.
+    // Bullet list, comfortable gaps between items.
     if (/^\s*[-*]\s+/.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^\s*[-*]\s+/.test(lines[i] ?? "")) { items.push((lines[i] ?? "").replace(/^\s*[-*]\s+/, "")); i++; }

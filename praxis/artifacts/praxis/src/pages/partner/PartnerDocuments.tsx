@@ -37,7 +37,7 @@ const statusStyle: Record<DocStatus, { cls: string; icon: React.ComponentType<{ 
 const sizeLabel = (bytes: number) => (bytes > 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
 
 /**
- * Documents & Filing — a real, persistent filing register per partner (partner_documents). Upload
+ * Documents & Filing, a real, persistent filing register per partner (partner_documents). Upload
  * records each file's metadata; status is tracked per document. Durable storage of the file BYTES
  * (with virus scan + retention) is a further step needing storage credentials, so this files the
  * paperwork register rather than the binaries.
@@ -181,7 +181,7 @@ export function PartnerDocuments() {
                     </select>
                   </td>
                   <td className="p-3 text-muted-foreground whitespace-nowrap">{new Date(d.createdAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                  <td className="p-3 text-right tabular-nums text-muted-foreground">{d.size ?? '—'}</td>
+                  <td className="p-3 text-right tabular-nums text-muted-foreground">{d.size ?? ', '}</td>
                   <td className="p-3 text-right whitespace-nowrap">
                     {d.templateKey && <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => setViewKey({ key: d.templateKey!, name: d.name })}><Eye className="h-3.5 w-3.5" /> View</Button>}
                     {d.templateKey && <a href={`${API}/document-templates/${d.templateKey}/download?format=docx`} title="Download Word"><Button size="sm" variant="ghost" className="h-7 gap-1 text-xs"><Download className="h-3.5 w-3.5" /> Word</Button></a>}
@@ -210,7 +210,7 @@ export function PartnerDocuments() {
         </DialogContent>
       </Dialog>
 
-      <p className="text-xs text-muted-foreground">The filing register (names, categories, org, status) is stored persistently. Durable storage of the file contents themselves — with virus scan and retention policy — is a further step that needs live storage credentials.</p>
+      <p className="text-xs text-muted-foreground">The filing register (names, categories, org, status) is stored persistently. Durable storage of the file contents themselves, with virus scan and retention policy, is a further step that needs live storage credentials.</p>
     </div>
   );
 }

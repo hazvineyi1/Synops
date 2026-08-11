@@ -26,7 +26,7 @@ interface Member { id: string; name: string; role: string }
 interface SeatAssignment { id: string; learnerId: string; learnerName: string | null }
 
 const FUNDER_TYPES = ['SETA', 'Corporate CSI', 'NSFAS', 'Government', 'Foundation', 'Other'];
-const fmtMonth = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }) : '—');
+const fmtMonth = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-ZA', { month: 'short', year: 'numeric' }) : ', ');
 
 function NumInput({ value, onChange, onCommit, prefix, width = 'w-32' }: { value: number; onChange: (n: number) => void; onCommit?: () => void; prefix?: string; width?: string }) {
   return (
@@ -100,7 +100,7 @@ function AgreementSeats({ partnerId, agreement, learners, used, onChanged }: {
 }
 
 /**
- * Funders Hub (spec §4) — now backed by real funding_agreements. A partner's funding agreements,
+ * Funders Hub (spec §4), now backed by real funding_agreements. A partner's funding agreements,
  * funded-seat totals and grant conditions persist via /partners/:id/funding. Seat-level assignment
  * to individual learners is still to come, so the allocation view is derived read-only from the
  * funded-seat count on each agreement.
@@ -212,7 +212,7 @@ export function PartnerFunders() {
           <TabsTrigger value="portal">Funder Portal</TabsTrigger>
         </TabsList>
 
-        {/* Funding Agreements — real, editable */}
+        {/* Funding Agreements, real, editable */}
         <TabsContent value="agreements" className="mt-4 space-y-3">
           <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Pencil className="h-3 w-3" /> Value, funded seats, status and conditions save automatically. Add a funder with the button above.</p>
           {isLoading && <Card className="p-6 text-center text-sm text-muted-foreground">Loading agreements…</Card>}
@@ -259,7 +259,7 @@ export function PartnerFunders() {
           {!isLoading && agreements.length === 0 && <Card className="p-6 text-center text-sm text-muted-foreground">No funding agreements yet. Add a funder to get started.</Card>}
         </TabsContent>
 
-        {/* Seat Allocation — assign real learners to a grant's funded seats */}
+        {/* Seat Allocation, assign real learners to a grant's funded seats */}
         <TabsContent value="allocation" className="mt-4 space-y-3">
           {agreements.map((a) => (
             <AgreementSeats key={a.id} partnerId={partnerId} agreement={a} learners={learners} used={usedMap[a.id] ?? 0} onChanged={refreshUsage} />
@@ -268,7 +268,7 @@ export function PartnerFunders() {
           <p className="text-xs text-muted-foreground">Assigning a learner to a funded seat links them to the grant, so completion evidence attributes back to the right agreement. Capacity is the agreement's funded-seat count.</p>
         </TabsContent>
 
-        {/* B-BBEE / SETA Conditions — derived from agreements */}
+        {/* B-BBEE / SETA Conditions, derived from agreements */}
         <TabsContent value="conditions" className="mt-4">
           <Card className="overflow-hidden">
             <table className="w-full text-sm">
@@ -290,7 +290,7 @@ export function PartnerFunders() {
           <p className="mt-2 text-xs text-muted-foreground">Grant-specific compliance. Completion and outcome evidence is drawn from learner Progress data and rolls up into the SETA/QCTO reports.</p>
         </TabsContent>
 
-        {/* Funder Portal — derived from agreement funders */}
+        {/* Funder Portal, derived from agreement funders */}
         <TabsContent value="portal" className="mt-4 space-y-3">
           <Card className="p-4 text-sm text-muted-foreground">
             Each funder gets a scoped, read-only dashboard showing only the seats and outcomes tied to their own agreement - never other funders' data or the partner's finances.

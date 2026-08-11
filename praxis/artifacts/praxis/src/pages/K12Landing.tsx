@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Award, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Award, CheckCircle2, ChevronDown } from 'lucide-react';
 import { useSession } from '@/context/SessionContext';
 import { K12_PERSONAS } from '@/lib/k12Personas';
 
@@ -59,7 +59,7 @@ export default function K12Landing() {
           </div>
           <div className="flex items-center gap-3">
             <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-medium px-3 py-1.5 rounded-full" style={{ background: '#FBEEDC', color: AMBER, border: '1px solid #f2ddbf' }}>
-              <Sparkles className="h-3 w-3" /> Live demo, no sign-up
+              Live demo, no sign-up
             </span>
             <a href="https://synops-consulting.com/contact" className="inline-flex items-center rounded-lg px-3.5 py-1.5 text-[13px] font-semibold text-white shadow-sm" style={{ background: INDIGO }}>Request access</a>
           </div>
@@ -123,7 +123,6 @@ export default function K12Landing() {
         {comm && comm.subjects.length > 0 && <CommendationsSection data={comm} />}
 
         <div className="mt-8 pt-4 flex items-center gap-1.5 text-[11px]" style={{ borderTop: '1px solid #ece7f2', color: '#9b96a8' }}>
-          <Sparkles className="h-3 w-3" style={{ color: AMBER }} />
           Synops Academy · Confidential demo · <a href="https://synops-consulting.com" style={{ color: INDIGO }}>synops-consulting.com</a>
         </div>
       </div>

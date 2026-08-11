@@ -3,8 +3,8 @@ import type { Request, Response } from "express";
 /**
  * Small dependency-free request-body validator for write endpoints.
  *
- * LENIENT BY DESIGN: it only checks the fields named in the spec — unknown fields pass through
- * untouched — so it can be added to a live endpoint without rejecting payloads that already work.
+ * LENIENT BY DESIGN: it only checks the fields named in the spec, unknown fields pass through
+ * untouched, so it can be added to a live endpoint without rejecting payloads that already work.
  * It centralises the ad-hoc "x is required" checks the handlers were doing by hand, and adds type /
  * shape / bound guards so a malformed write is rejected with a clean 400 instead of reaching the DB.
  */
@@ -25,7 +25,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Validate `req.body` against `spec`. On the first failure it writes a 400 (`{ error, errors }`)
- * and returns null — callers do `const body = validateBody(req, res, spec); if (!body) return;`.
+ * and returns null, callers do `const body = validateBody(req, res, spec); if (!body) return;`.
  * Returns the body (typed) when valid.
  */
 export function validateBody<T = Record<string, unknown>>(

@@ -71,14 +71,14 @@ function fmtDuration(seconds: number | null | undefined): string {
   return `${h}h ${m % 60}m`;
 }
 function fmtDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return ", ";
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
+  return Number.isNaN(d.getTime()) ? ", " : d.toLocaleDateString();
 }
 function fmtDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
+  if (!iso) return ", ";
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
+  return Number.isNaN(d.getTime()) ? ", " : d.toLocaleString();
 }
 function money(minor: number, currency = "USD"): string {
   return `${currency} ${(minor / 100).toFixed(2)}`;
@@ -123,7 +123,7 @@ function BarList({ title, items }: { title: string; items: Array<{ key: string |
         ) : (
           items.map((i, idx) => (
             <div key={idx} className="flex items-center gap-2 text-xs">
-              <div className="w-28 truncate" title={i.key ?? "—"}>{i.key ?? "—"}</div>
+              <div className="w-28 truncate" title={i.key ?? ", "}>{i.key ?? ", "}</div>
               <div className="flex-1 bg-muted rounded h-3 overflow-hidden">
                 <div className="bg-primary h-full" style={{ width: `${(i.count / max) * 100}%` }} />
               </div>
@@ -168,7 +168,7 @@ function DashboardSection() {
         <Kpi label="Mock exams" value={ov?.total_exams ?? 0} />
       </div>
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-sm">Activity — last 30 days</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm">Activity, last 30 days</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-end gap-0.5 h-32">
             {(usage ?? []).map((u) => (
@@ -323,7 +323,7 @@ function Roster() {
                         value={(u.subscription_tier as string) || "free"}
                         onChange={(e) => quickSetPlan(u.id, e.target.value as "free" | "plus" | "pro")}
                         disabled={setPlan.isPending}
-                        title="Change plan — comps instantly, no payment (use the row for a timed grant)"
+                        title="Change plan, comps instantly, no payment (use the row for a timed grant)"
                         className="border rounded h-8 px-1.5 text-xs bg-background capitalize"
                       >
                         <option value="free">free</option>
@@ -466,8 +466,8 @@ function Roster() {
                         <TableRow key={i}>
                           <TableCell className="text-xs">{fmtDateTime(String(s["started_at"] ?? ""))}</TableCell>
                           <TableCell className="text-xs">{fmtDuration(Number(s["seconds"]))}</TableCell>
-                          <TableCell className="text-xs">{String(s["device"] ?? "—")}</TableCell>
-                          <TableCell className="text-xs">{[s["city"], s["country"]].filter(Boolean).join(", ") || "—"}</TableCell>
+                          <TableCell className="text-xs">{String(s["device"] ?? ", ")}</TableCell>
+                          <TableCell className="text-xs">{[s["city"], s["country"]].filter(Boolean).join(", ") || ", "}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -497,12 +497,12 @@ function LoginsView() {
           {(logins ?? []).map((l, i) => (
             <TableRow key={i}>
               <TableCell className="text-xs">{fmtDateTime(l.started_at)}</TableCell>
-              <TableCell className="text-xs">{l.email ?? "—"}</TableCell>
+              <TableCell className="text-xs">{l.email ?? ", "}</TableCell>
               <TableCell><Badge variant={l.plan === "paid" ? "default" : "secondary"}>{l.plan}</Badge></TableCell>
               <TableCell className="text-right text-xs">{fmtDuration(l.seconds)}</TableCell>
-              <TableCell className="text-xs">{l.device ?? "—"}</TableCell>
-              <TableCell className="text-xs">{[l.city, l.region, l.country].filter(Boolean).join(", ") || "—"}</TableCell>
-              <TableCell className="text-xs text-muted-foreground">{l.ip_address ?? "—"}</TableCell>
+              <TableCell className="text-xs">{l.device ?? ", "}</TableCell>
+              <TableCell className="text-xs">{[l.city, l.region, l.country].filter(Boolean).join(", ") || ", "}</TableCell>
+              <TableCell className="text-xs text-muted-foreground">{l.ip_address ?? ", "}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -516,7 +516,7 @@ function UpgradeTargetsView() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Free users ranked by engagement — your warmest upgrade leads.</p>
+        <p className="text-sm text-muted-foreground">Free users ranked by engagement, your warmest upgrade leads.</p>
         <Button variant="outline" size="sm" onClick={() => downloadCsv("upgrade-targets.csv", (targets ?? []) as unknown as Array<Record<string, unknown>>)}>
           <Download className="w-4 h-4 mr-1" /> Export CSV
         </Button>
@@ -542,7 +542,7 @@ function UpgradeTargetsView() {
                   <TableCell className="text-right tabular-nums">{t.session_count}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtDuration(t.total_time_seconds)}</TableCell>
                   <TableCell className="text-right tabular-nums">{t.material_count}</TableCell>
-                  <TableCell className="text-xs">{t.days_since_active == null ? "—" : t.days_since_active === 0 ? "today" : `${t.days_since_active}d ago`}</TableCell>
+                  <TableCell className="text-xs">{t.days_since_active == null ? ", " : t.days_since_active === 0 ? "today" : `${t.days_since_active}d ago`}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -605,7 +605,7 @@ function PlansPanel() {
                   <TableCell>{p.name}</TableCell>
                   <TableCell className="text-right">{money(p.priceMinor, p.currency)}</TableCell>
                   <TableCell className="text-xs">{p.interval}</TableCell>
-                  <TableCell>{p.id < 0 ? <Badge variant="outline" title="From the live pricing config — add a plan to override">config</Badge> : <Button size="sm" variant="outline" onClick={() => update.mutate({ id: p.id, active: !p.active }, { onSuccess: refresh })}>{p.active ? "Active" : "Inactive"}</Button>}</TableCell>
+                  <TableCell>{p.id < 0 ? <Badge variant="outline" title="From the live pricing config, add a plan to override">config</Badge> : <Button size="sm" variant="outline" onClick={() => update.mutate({ id: p.id, active: !p.active }, { onSuccess: refresh })}>{p.active ? "Active" : "Inactive"}</Button>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -646,7 +646,7 @@ function PaymentMethodsPanel() {
                   <TableCell className="font-mono text-xs">{m.key}</TableCell>
                   <TableCell>{m.label}</TableCell>
                   <TableCell className="text-xs">{m.provider}</TableCell>
-                  <TableCell>{m.id < 0 ? <Badge variant="outline" title="From the billing config — add a method to override">config</Badge> : <Button size="sm" variant="outline" onClick={() => update.mutate({ id: m.id, enabled: !m.enabled }, { onSuccess: refresh })}>{m.enabled ? "Enabled" : "Disabled"}</Button>}</TableCell>
+                  <TableCell>{m.id < 0 ? <Badge variant="outline" title="From the billing config, add a method to override">config</Badge> : <Button size="sm" variant="outline" onClick={() => update.mutate({ id: m.id, enabled: !m.enabled }, { onSuccess: refresh })}>{m.enabled ? "Enabled" : "Disabled"}</Button>}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -730,9 +730,9 @@ function AccessAuditSection() {
             {(data?.audit ?? []).map((a) => (
               <TableRow key={a.id}>
                 <TableCell className="text-xs">{fmtDateTime(a.createdAt)}</TableCell>
-                <TableCell className="text-xs">{a.actorEmail ?? "—"}</TableCell>
+                <TableCell className="text-xs">{a.actorEmail ?? ", "}</TableCell>
                 <TableCell className="text-xs font-mono">{a.action}</TableCell>
-                <TableCell className="text-xs">{[a.targetType, a.targetId].filter(Boolean).join(":") || "—"}</TableCell>
+                <TableCell className="text-xs">{[a.targetType, a.targetId].filter(Boolean).join(":") || ", "}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -762,7 +762,7 @@ function DeveloperApiSection() {
   }
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">API keys authenticate integrations against the Coach API. The full key is shown once at creation — store it securely.</p>
+      <p className="text-sm text-muted-foreground">API keys authenticate integrations against the Coach API. The full key is shown once at creation, store it securely.</p>
       <div className="flex items-end gap-2">
         <div><label className="text-xs">Key name</label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Zapier integration" className="w-64" /></div>
         <Button onClick={add} disabled={create.isPending}>{create.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Plus className="w-4 h-4 mr-1" /> Generate key</>}</Button>
@@ -770,7 +770,7 @@ function DeveloperApiSection() {
       {newKey ? (
         <Card className="border-primary/40">
           <CardContent className="p-3 space-y-1">
-            <div className="text-xs font-medium">Copy your new key now — you won&apos;t see it again:</div>
+            <div className="text-xs font-medium">Copy your new key now, you won&apos;t see it again:</div>
             <div className="flex items-center gap-2">
               <code className="text-xs bg-muted px-2 py-1 rounded flex-1 overflow-x-auto">{newKey}</code>
               <Button size="sm" variant="outline" onClick={copy}><Copy className="w-4 h-4 mr-1" />{copied ? "Copied" : "Copy"}</Button>
@@ -859,16 +859,16 @@ function AmbassadorsTracker() {
 
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{selected?.userName} — ambassador detail</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{selected?.userName}, ambassador detail</DialogTitle></DialogHeader>
           {selected ? (
             <div className="space-y-4 text-sm">
               <div className="text-xs text-muted-foreground break-all">
                 Code <span className="font-mono text-foreground">{selected.referralCode}</span> · Link{" "}
-                <span className="font-mono">/study/signup?ref={selected.referralCode}</span> · Payout {selected.payoutMethod ?? "—"} {selected.payoutHandle ?? ""}
+                <span className="font-mono">/study/signup?ref={selected.referralCode}</span> · Payout {selected.payoutMethod ?? ", "} {selected.payoutHandle ?? ""}
               </div>
               <div>
                 <div className="font-semibold text-xs uppercase text-muted-foreground mb-1">
-                  Referred customers ({referrals.data?.referrals.length ?? 0}) — who signed up via the link
+                  Referred customers ({referrals.data?.referrals.length ?? 0}), who signed up via the link
                 </div>
                 {referrals.isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
                   <div className="border rounded max-h-64 overflow-y-auto">

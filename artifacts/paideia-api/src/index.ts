@@ -27,7 +27,7 @@ void ensureSamplesSeed()
   .catch((err) => logger.error({ err }, "Sample seed failed"));
 // One-click demo accounts (Synops Teacher + Synops Coach). Reseed (delete + recreate) on boot so
 // content edits ship on deploy. Demo teacher seeds example materials, so the materials table must
-// exist first — chain the reseeds after ensureMaterialsSchema. The demo-login routes still lazily
+// exist first, chain the reseeds after ensureMaterialsSchema. The demo-login routes still lazily
 // ensure the account exists between boots without wiping it.
 void ensureMaterialsSchema().then(() => {
   void reseedTeacherDemo()

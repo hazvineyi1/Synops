@@ -1,12 +1,12 @@
 import { pgTable, text, timestamp, numeric, integer, boolean, jsonb, unique } from "drizzle-orm/pg-core";
 
 /**
- * Unified gradebook — the layer that pulls every graded thing in a course into one place.
+ * Unified gradebook, the layer that pulls every graded thing in a course into one place.
  *
  * Praxis already had a course-assignment gradebook (`gradebook_entries` in assignments.ts).
  * That only ever covered `assignments`. This adds a thin, source-agnostic REGISTRY so that
  * cases (case_sessions), interactive activities (activity_submissions) and hand-entered
- * ("manual") items can also appear as gradebook columns — categorised, tagged formative or
+ * ("manual") items can also appear as gradebook columns, categorised, tagged formative or
  * summative, and rolled into a single mastery percentage per learner.
  *
  * Design:
@@ -24,7 +24,7 @@ import { pgTable, text, timestamp, numeric, integer, boolean, jsonb, unique } fr
  *                         evaluation (mastery low, trend down, missing overdue summative) that
  *                         drives in-app alerts and the auto-generated adaptive study plan.
  *
- * No table uses real FK constraints (matches the rest of this schema — ids are joined in app).
+ * No table uses real FK constraints (matches the rest of this schema, ids are joined in app).
  */
 
 /** A gradebook column. `source_type` says where its per-learner scores come from. */

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { resolveVideo, VIDEO_PROVIDERS_HINT } from "@/lib/videoEmbed";
-import { Layers, Boxes, Gamepad2, BookOpen, Send, Building2, GraduationCap, Sparkles, ShieldCheck, Video, Trash2 } from "lucide-react";
+import { Layers, Boxes, Gamepad2, BookOpen, Send, Building2, GraduationCap, ShieldCheck, Video, Trash2 } from "lucide-react";
 
 /**
  * Super-admin Content Catalog. One shared "Platform Templates & Games" catalog plus one catalog per
- * partner/organisation — strictly demarcated so no partner's content mixes with another's. Pick a
+ * partner/organisation, strictly demarcated so no partner's content mixes with another's. Pick a
  * tenant on the left to see ONLY its content; deploy a platform game to a partner (an isolated copy),
  * or author directly into the selected catalog. Backed by /admin/catalog/*.
  */
@@ -60,7 +60,7 @@ export default function ContentCatalog() {
       </div>
       <p className="text-sm text-muted-foreground mb-5 flex items-center gap-1.5">
         <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-        Each catalog is isolated — you only ever see the selected tenant's content. Build in the platform library, then deploy to a partner.
+        Each catalog is isolated, you only ever see the selected tenant's content. Build in the platform library, then deploy to a partner.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-5">
@@ -70,7 +70,7 @@ export default function ContentCatalog() {
             onClick={() => setSel("platform")}
             className={`w-full text-left rounded-lg px-3 py-2.5 text-sm font-medium flex items-center gap-2 transition ${isPlatform ? "bg-indigo-600 text-white" : "hover:bg-muted"}`}
           >
-            <Sparkles className="h-4 w-4" /> Platform Templates & Games
+            <Boxes className="h-4 w-4" /> Platform Templates & Games
           </button>
           <div className="pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground px-1">Partners</div>
           {partners.map((p) => (
@@ -106,7 +106,7 @@ export default function ContentCatalog() {
 
           {cat && (
             <div className="space-y-6">
-              {/* Game templates — shared, usable everywhere */}
+              {/* Game templates, shared, usable everywhere */}
               <section>
                 <div className="flex items-center gap-2 mb-2">
                   <Gamepad2 className="h-4 w-4 text-indigo-600" />
@@ -233,7 +233,7 @@ function VideoLessonCreator({ tenantId, tenantName, onDone, onCancel }: {
       <p className="text-[11px] text-muted-foreground -mt-1">{videoUrl.trim() ? (v.kind === "none" ? "Couldn't recognise that link." : <>Plays inline as a <span className="capitalize font-medium">{v.provider}</span> clip.</>) : VIDEO_PROVIDERS_HINT}</p>
 
       <div className="space-y-2">
-        <div className="text-[12px] font-medium">Interactive checkpoints <span className="font-normal text-muted-foreground">(optional — a question pops mid-clip; YouTube/Khan/file)</span></div>
+        <div className="text-[12px] font-medium">Interactive checkpoints <span className="font-normal text-muted-foreground">(optional, a question pops mid-clip; YouTube/Khan/file)</span></div>
         {cps.map((c, i) => (
           <div key={i} className="rounded-lg border bg-background p-2.5 space-y-2">
             <div className="flex items-center gap-2">

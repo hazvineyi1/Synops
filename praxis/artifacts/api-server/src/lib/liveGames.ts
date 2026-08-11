@@ -1,15 +1,15 @@
 /**
- * Live multiplayer game rooms — the "host a game for the class" layer over the game activities.
+ * Live multiplayer game rooms, the "host a game for the class" layer over the game activities.
  *
  * DELIBERATELY in-memory and REST-polled, not websockets: a classroom session is small (tens of
  * players), short-lived, and this is a single Railway instance, so an in-process Map is the simplest
  * thing that works. Players short-poll `GET /live/:code/state` (~1.5s) for the shared leaderboard,
- * team totals and buzzer feed. Rooms are EPHEMERAL — a redeploy or a 3h idle clears them, which is the
+ * team totals and buzzer feed. Rooms are EPHEMERAL, a redeploy or a 3h idle clears them, which is the
  * correct lifetime for a live class game (nothing here is a system of record). If this ever needs to
  * survive restarts or scale horizontally, swap this module for a Redis-backed store behind the same
  * function signatures.
  *
- * Privacy: the only thing stored about a joiner is a display name they type — no account, no PII. Join
+ * Privacy: the only thing stored about a joiner is a display name they type, no account, no PII. Join
  * is code-gated and unauthenticated (so students without accounts can play); hosting requires auth.
  */
 

@@ -7,7 +7,7 @@ import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 
 const router = Router();
 
-// GET /announcements — all announcements relevant to current user
+// GET /announcements, all announcements relevant to current user
 router.get("/announcements", requireAuth, async (req, res) => {
   // Get all platform-wide + course announcements for enrolled courses
   const rows = await db
@@ -43,7 +43,7 @@ router.get("/courses/:courseId/announcements", requireAuth, async (req, res) => 
 
 // POST /courses/:courseId/announcements
 /**
- * POST /courses/:courseId/announcements — STAFF ONLY.
+ * POST /courses/:courseId/announcements, STAFF ONLY.
  *
  * This writes a notification to every enrolled learner on the course. It had no
  * authorisation check, so any authenticated user could push a message to the whole cohort.

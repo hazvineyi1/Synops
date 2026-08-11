@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
   Loader2, ArrowRight, BookOpen, Headphones, Eye, Brain,
-  CheckCircle2, Clock, Sparkles, Lightbulb, Play,
+  CheckCircle2, Clock, Lightbulb, Play,
 } from "lucide-react";
 import { useGenerateStrategy, useMaterialStrategy } from "@/hooks/use-study-journey";
 
@@ -17,7 +17,7 @@ const MODALITY_ICONS: Record<Modality, typeof BookOpen> = {
   listen: Headphones,
   watch: Eye,
   practice: Brain,
-  reflect: Sparkles,
+  reflect: Lightbulb,
 };
 
 const MODALITY_LABEL: Record<Modality, string> = {
@@ -64,7 +64,6 @@ export default function StudyStrategy() {
           <div className="relative w-16 h-16 mx-auto mb-4">
             <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
             <div className="absolute inset-0 rounded-full border-2 border-t-primary animate-spin" />
-            <Sparkles className="absolute inset-0 m-auto h-6 w-6 text-primary" />
           </div>
           <h2 className="font-semibold mb-1">Building your personalized strategy</h2>
           <p className="text-sm text-muted-foreground">

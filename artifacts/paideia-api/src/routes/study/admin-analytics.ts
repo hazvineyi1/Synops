@@ -83,7 +83,7 @@ function maskIp(ip: unknown): string | null {
 
 // ─── Analytics ───────────────────────────────────────────────────────────────
 
-// GET /admin/overview — headline KPIs.
+// GET /admin/overview, headline KPIs.
 router.get("/overview", async (_req, res) => {
   const result = await db.execute(sql`
     SELECT
@@ -108,7 +108,7 @@ router.get("/overview", async (_req, res) => {
   res.json((result.rows ?? [])[0] ?? {});
 });
 
-// GET /admin/funnel — activation funnel + a simple return-rate, over non-suspended
+// GET /admin/funnel, activation funnel + a simple return-rate, over non-suspended
 // learners. Built entirely on data we already collect (signups, materials,
 // practice/exams, last-active). Percentages are computed client-side.
 router.get("/funnel", async (_req, res) => {
@@ -134,7 +134,7 @@ router.get("/funnel", async (_req, res) => {
   res.json((result.rows ?? [])[0] ?? {});
 });
 
-// GET /admin/feedback — in-app feedback submissions (stored in the activity log).
+// GET /admin/feedback, in-app feedback submissions (stored in the activity log).
 router.get("/feedback", async (_req, res) => {
   const result = await db.execute(sql`
     SELECT a.id, a.created_at, a.metadata, u.email, u.name
@@ -147,7 +147,7 @@ router.get("/feedback", async (_req, res) => {
   res.json(result.rows ?? []);
 });
 
-// GET /admin/usage — 30-day daily time series.
+// GET /admin/usage, 30-day daily time series.
 router.get("/usage", async (_req, res) => {
   const result = await db.execute(sql`
     WITH days AS (
@@ -171,7 +171,7 @@ router.get("/usage", async (_req, res) => {
   res.json(result.rows ?? []);
 });
 
-// GET /admin/breakdown — distributions (plan, tier, country, device, activity type).
+// GET /admin/breakdown, distributions (plan, tier, country, device, activity type).
 router.get("/breakdown", async (_req, res) => {
   const [plans, tiers, countries, devices, activities] = await Promise.all([
     db.execute(sql`SELECT CASE WHEN ${PAID} THEN 'paid' ELSE 'free' END AS key, count(*)::int AS count FROM study_users GROUP BY 1 ORDER BY count DESC`),
@@ -189,7 +189,7 @@ router.get("/breakdown", async (_req, res) => {
   });
 });
 
-// GET /admin/logins — recent sessions: who, when, how long, from where, on what.
+// GET /admin/logins, recent sessions: who, when, how long, from where, on what.
 router.get("/logins", async (_req, res) => {
   const result = await db.execute(sql`
     SELECT s.started_at, s.last_seen_at,
@@ -206,7 +206,7 @@ router.get("/logins", async (_req, res) => {
   res.json(rows);
 });
 
-// GET /admin/users — per-user list with usage counts (search via ?q=).
+// GET /admin/users, per-user list with usage counts (search via ?q=).
 router.get("/users", async (req, res) => {
   const q = typeof req.query["q"] === "string" ? req.query["q"].trim().toLowerCase() : "";
   const like = `%${q}%`;
@@ -228,7 +228,7 @@ router.get("/users", async (req, res) => {
   res.json(result.rows ?? []);
 });
 
-// GET /admin/users/:id — one learner's full profile, sessions, activity, payments.
+// GET /admin/users/:id, one learner's full profile, sessions, activity, payments.
 router.get("/users/:id", async (req, res) => {
   const id = String(req.params.id);
   const [profile, sessions, activity, payments] = await Promise.all([
@@ -256,7 +256,7 @@ router.get("/users/:id", async (req, res) => {
   res.json({ user: row, sessions: sessions.rows ?? [], activity: activity.rows ?? [], payments: payments.rows ?? [] });
 });
 
-// GET /admin/upgrade-targets — free users ranked by an engagement score, for
+// GET /admin/upgrade-targets, free users ranked by an engagement score, for
 // marketing/upgrade outreach. Score weights high-intent actions and heavy usage;
 // days_since_active surfaces how warm the lead is.
 router.get("/upgrade-targets", async (_req, res) => {
@@ -336,7 +336,7 @@ router.get("/plans", async (_req, res) => {
     res.json({ plans: rows, fromConfig: false });
     return;
   }
-  // No custom plans saved yet — surface the live pricing config (USD anchor) as
+  // No custom plans saved yet, surface the live pricing config (USD anchor) as
   // read-only rows (negative id = config-derived, not editable) so the table isn't blank.
   const zw = COUNTRIES.ZW;
   const plans = (["plus", "pro"] as const).map((key, i) => ({
@@ -413,7 +413,7 @@ router.get("/payment-methods", async (_req, res) => {
     res.json({ paymentMethods: rows, fromConfig: false });
     return;
   }
-  // No custom methods saved yet — surface the configured gateways as read-only rows.
+  // No custom methods saved yet, surface the configured gateways as read-only rows.
   const paymentMethods = Object.values(METHODS).map((m, i) => ({
     id: -(i + 1),
     key: m.id,

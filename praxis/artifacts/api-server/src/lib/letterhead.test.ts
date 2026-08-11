@@ -47,7 +47,7 @@ describe("letterhead", () => {
 
   it("stamps a footer on every page with the provider name and no codename", () => {
     const doc = makeDoc(3);
-    drawLetterheadFooters(doc as never, "Accreditation Readiness Report — Acme");
+    drawLetterheadFooters(doc as never, "Accreditation Readiness Report, Acme");
     // one footer per page
     expect(doc.texts).toHaveLength(3);
     for (const line of doc.texts) {

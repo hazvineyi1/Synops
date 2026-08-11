@@ -16,7 +16,7 @@ const router = Router();
 
 function canManage(user: { role: string; partnerId?: string | null }, partnerId: string) {
   // Tenant match AND a facilitator-tier role. A learner/coach carries partnerId too, so a bare
-  // tenant match let them read/write billing + invoices — this adds the role gate.
+  // tenant match let them read/write billing + invoices, this adds the role gate.
   return isSuperAdmin(user.role) || (isFacilitator(user.role) && user.partnerId === partnerId);
 }
 const int = (v: unknown, d = 0) => (Number.isFinite(+(v as number)) ? Math.max(0, Math.trunc(+(v as number))) : d);
@@ -52,7 +52,7 @@ async function ensureTables() {
     )`);
 }
 
-// GET /partners/:partnerId/billing — subscriptions + invoices for a partner.
+// GET /partners/:partnerId/billing, subscriptions + invoices for a partner.
 router.get("/partners/:partnerId/billing", requireAuth, async (req, res) => {
   const { partnerId } = req.params;
   if (!canManage(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -133,7 +133,7 @@ router.post("/partners/:partnerId/invoices", requireAuth, async (req, res) => {
   res.status(201).json(row);
 });
 
-// PATCH /partners/:partnerId/invoices/:id — edit net / mark paid.
+// PATCH /partners/:partnerId/invoices/:id, edit net / mark paid.
 router.patch("/partners/:partnerId/invoices/:id", requireAuth, async (req, res) => {
   const { partnerId, id } = req.params;
   if (!canManage(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -158,7 +158,7 @@ router.delete("/partners/:partnerId/invoices/:id", requireAuth, async (req, res)
   res.status(204).send();
 });
 
-// GET /partners/:partnerId/seat-usage — pooled-seat reconciliation: licensed vs. consumed vs.
+// GET /partners/:partnerId/seat-usage, pooled-seat reconciliation: licensed vs. consumed vs.
 // funder-funded vs. net billable, per org, computed from real learners (not the hand-entered number).
 router.get("/partners/:partnerId/seat-usage", requireAuth, async (req, res) => {
   const { partnerId } = req.params;
@@ -170,7 +170,7 @@ router.get("/partners/:partnerId/seat-usage", requireAuth, async (req, res) => {
   }
 });
 
-// POST /partners/:partnerId/invoices/generate { period, dueDate? } — draft one invoice per org from
+// POST /partners/:partnerId/invoices/generate { period, dueDate? }, draft one invoice per org from
 // its net billable seats x price. Drafts only (a human reviews and issues); orgs with nothing to
 // bill are skipped. Never charges anything - there is no payment gateway by design.
 router.post("/partners/:partnerId/invoices/generate", requireAuth, async (req, res) => {

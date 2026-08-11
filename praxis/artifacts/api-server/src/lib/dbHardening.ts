@@ -181,7 +181,7 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`CREATE UNIQUE INDEX IF NOT EXISTS gradebook_org_overrides_uidx ON gradebook_org_overrides (course_id, org_id, source_type, source_id)`,
     ]],
     // Performance indexes for the hottest lookups (gradebook matrix, org courses, class rosters,
-    // partner rosters). Non-unique, CREATE IF NOT EXISTS — cheap once present, big win at scale.
+    // partner rosters). Non-unique, CREATE IF NOT EXISTS, cheap once present, big win at scale.
     ["perf_indexes", [
       sql`CREATE INDEX IF NOT EXISTS enrolments_course_idx ON enrolments (course_id)`,
       sql`CREATE INDEX IF NOT EXISTS enrolments_user_idx ON enrolments (user_id)`,
@@ -231,7 +231,7 @@ export async function ensureIntegrityConstraints(): Promise<void> {
     try {
       for (const s of stmts) await db.execute(s);
     } catch (err) {
-      // A missing table (not yet created) or an odd column is fine — skip and keep the others.
+      // A missing table (not yet created) or an odd column is fine, skip and keep the others.
       logger.warn({ err, table }, "integrity-constraint heal skipped");
     }
   }

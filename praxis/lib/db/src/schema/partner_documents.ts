@@ -1,7 +1,7 @@
 import { pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 /**
- * Partner filing cabinet — a persistent register of paperwork (invoices, contracts, funder
+ * Partner filing cabinet, a persistent register of paperwork (invoices, contracts, funder
  * agreements, compliance records) per partner. Stores metadata + status; the actual file bytes are
  * kept in object storage (fileUrl) when configured, otherwise the row is a metadata-only filing
  * entry. Backs the Partner Documents & Filing page.

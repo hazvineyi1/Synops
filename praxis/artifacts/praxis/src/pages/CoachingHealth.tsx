@@ -31,7 +31,7 @@ export function CoachingHealth() {
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div className="flex flex-col gap-2">
           <h1 className="text-4xl font-serif font-bold tracking-tight flex items-center gap-3"><Activity className="h-8 w-8 text-primary" /> Coaching health</h1>
-          <p className="text-muted-foreground">How your coaches are keeping learners on track — who's flagged, who's slipping through, and how quickly interventions get resolved.</p>
+          <p className="text-muted-foreground">How your coaches are keeping learners on track, who's flagged, who's slipping through, and how quickly interventions get resolved.</p>
         </div>
         <Button variant="outline" className="shrink-0" disabled={digest.isPending} onClick={() => digest.mutate()}>
           {digest.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />} Email me this summary
@@ -45,7 +45,7 @@ export function CoachingHealth() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Kpi label="Flagged learners" value={data.summary.flaggedLearners} sub={`${data.summary.offTrack} off track · ${data.summary.atRisk} at risk`} icon={<AlertTriangle className="h-4 w-4" />} tone={data.summary.flaggedLearners ? 'amber' : undefined} />
             <Kpi label="Flagged & unassigned" value={data.summary.unassignedFlagged} sub="no coach yet" icon={<LifeBuoy className="h-4 w-4" />} tone={data.summary.unassignedFlagged ? 'red' : 'green'} />
-            <Kpi label="Resolution rate" value={data.summary.resolutionRate == null ? '—' : `${data.summary.resolutionRate}%`} sub={`${data.summary.resolvedTotal} resolved`} icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
+            <Kpi label="Resolution rate" value={data.summary.resolutionRate == null ? ', ' : `${data.summary.resolutionRate}%`} sub={`${data.summary.resolvedTotal} resolved`} icon={<CheckCircle2 className="h-4 w-4" />} tone="green" />
             <Kpi label={data.summary.coaches === 1 ? 'Coach' : 'Coaches'} value={data.summary.coaches} sub={`${data.summary.courses} course${data.summary.courses === 1 ? '' : 's'}`} icon={<UserCog className="h-4 w-4" />} />
           </div>
 

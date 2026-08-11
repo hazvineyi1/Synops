@@ -3,7 +3,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useGetSession, useGetModule } from '@workspace/api-client-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Send, Sparkles, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion, Lightbulb, ChevronRight, PencilLine, Check, TrendingUp, X } from 'lucide-react';
+import { ArrowLeft, Send, Info, FileText, ChevronDown, ChevronUp, Target, Clock, MessageCircleQuestion, Lightbulb, ChevronRight, PencilLine, Check, TrendingUp, X } from 'lucide-react';
 
 // Adaptive-difficulty levels. The coach calibrates how demanding its questions are as the learner's
 // reasoning strengthens; we surface that as a visible level so the learner always knows where they
@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 // Functional colour map (cognitive-load brief §4): colour encodes the KIND of step so a
 // learner can tell what it is without reading the label. Content/reading = purple,
 // applied scenario = coral, structural framing = slate; current work falls back to teal.
-// Nothing here is red — red is reserved for genuine errors only.
+// Nothing here is red, red is reserved for genuine errors only.
 const BEAT_BADGE: Record<string, string> = {
   title_card: 'text-slate-600 bg-slate-500/10',
   close: 'text-slate-600 bg-slate-500/10',
@@ -42,7 +42,7 @@ const beatBadge = (type: string): string => BEAT_BADGE[type] ?? 'text-teal-700 b
 // divider before display. Belt-and-braces with the server-side sanitiser.
 function sanitizePlain(text: string): string {
   return (text || '')
-    .replace(/—/g, ', ')
+    .replace(/, /g, ', ')
     .replace(/–/g, '-')
     .replace(/^\s*[-*_]{3,}\s*$/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
@@ -353,7 +353,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
 
   const currentBeat = moduleData?.beats?.find(b => b.id === session.currentBeatId);
 
-  // The "fact pattern": the context the learner should be able to see at all times — what
+  // The "fact pattern": the context the learner should be able to see at all times, what
   // they're catching up on (if remedial), the module's premise, and the situation for the
   // current step. Composed from the session + module + current beat.
   const factPattern = {
@@ -481,7 +481,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
   };
 
   // Deliberate scaffolding: fetch ONE structured worked example, which then renders as its own
-  // interactive card (a distinct box) in the transcript. Not streamed — it comes back as JSON.
+  // interactive card (a distinct box) in the transcript. Not streamed, it comes back as JSON.
   const handleWorkedExample = async () => {
     if (isStreaming) return;
     setShowScaffold(false);
@@ -597,7 +597,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
       <div className="flex flex-1 min-h-0">
       <section className="flex flex-1 flex-col min-h-0 min-w-0">
 
-      {/* Guidance bar — sticky under the header. "How this works" lives here (minimisable); the Fact
+      {/* Guidance bar, sticky under the header. "How this works" lives here (minimisable); the Fact
           pattern now has its own rail/drawer, so the header no longer crowds. */}
       {!sessionEnded && (
         <div className="shrink-0 sticky top-14 z-10 border-b border-border bg-muted">
@@ -624,7 +624,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             </div>
           </div>
 
-          {/* How this works — expectations, mastery, and time to complete */}
+          {/* How this works, expectations, mastery, and time to complete */}
           {showHow && (
             <div className="border-t border-border bg-background">
               <div className="mx-auto max-w-3xl grid gap-3 px-4 py-3 text-sm sm:grid-cols-3">
@@ -723,7 +723,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
             </motion.div>
           )}
 
-          {/* Scaffolding offer — appears after a run of struggle. Warm, not punitive:
+          {/* Scaffolding offer, appears after a run of struggle. Warm, not punitive:
               it normalises the difficulty and offers a worked example, opt-in. */}
           {showScaffold && !isStreaming && !sessionEnded && (
             <motion.div
@@ -802,7 +802,7 @@ export function LearnSession({ params }: { params: { sessionId: string } }) {
         <MasteryScorecard score={lastScore} showRubric={showRubric} onToggleRubric={() => setShowRubric(v => !v)} reducedMotion={!!prefersReducedMotion} />
       )}
 
-      {/* Input Area — selectable answer choices for most questions, with a "type my own" escape;
+      {/* Input Area, selectable answer choices for most questions, with a "type my own" escape;
           free-text box when the coach asks for the learner's own words (or they choose to write). */}
       <footer className="shrink-0 bg-background border-t border-border p-4 pb-safe shadow-[0_-2px_16px_rgba(0,0,0,0.04)]">
         <div className="max-w-3xl mx-auto">
@@ -1018,7 +1018,7 @@ function SessionSetup({ moduleTitle, saving, onChoose, onBack, reducedMotion }: 
 }
 
 const VERDICT_META: Record<SessionAnalysis['verdict'], { label: string; className: string; icon: React.ComponentType<{ className?: string }> }> = {
-  certified: { label: 'Mastered', className: 'text-green-600 bg-green-500/10 ring-green-500/20', icon: Sparkles },
+  certified: { label: 'Mastered', className: 'text-green-600 bg-green-500/10 ring-green-500/20', icon: Check },
   nearly: { label: 'Nearly there', className: 'text-teal-600 bg-teal-500/10 ring-teal-500/20', icon: TrendingUp },
   keep_going: { label: 'Keep building', className: 'text-amber-600 bg-amber-500/10 ring-amber-500/20', icon: Target },
 };
@@ -1112,7 +1112,7 @@ function EndAnalysisPanel({ endedReason, certified, analysis, masteryPct, onRevi
 
       <div className="flex flex-wrap gap-3 mt-6">
         {onReviewCredential && (
-          <Button onClick={onReviewCredential}><Sparkles className="mr-1.5 h-4 w-4" /> View PraxisMark Credential</Button>
+          <Button onClick={onReviewCredential}>View PraxisMark Credential</Button>
         )}
         <Button variant={onReviewCredential ? 'outline' : 'default'} onClick={onBack}>Back to dashboard</Button>
       </div>
@@ -1238,7 +1238,7 @@ function MilestoneToast({ milestone, reducedMotion }: { milestone: number | null
             className="relative flex items-center gap-2.5 rounded-2xl border border-primary/30 bg-card px-5 py-3 shadow-xl"
           >
             {!reducedMotion && <Confetti />}
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary"><Sparkles className="h-4 w-4" /></span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-primary"><TrendingUp className="h-4 w-4" /></span>
             <div>
               <p className="text-sm font-bold text-foreground">Halfway to mastery</p>
               <p className="text-xs text-muted-foreground">You're at 50% - your reasoning is really coming together.</p>

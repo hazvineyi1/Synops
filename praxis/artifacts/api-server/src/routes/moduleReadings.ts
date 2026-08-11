@@ -40,7 +40,7 @@ function toRow(r: typeof moduleReadingsTable.$inferSelect) {
   };
 }
 
-// POST /modules/:moduleId/readings — staff attach a reading.
+// POST /modules/:moduleId/readings, staff attach a reading.
 router.post("/modules/:moduleId/readings", requireAuth, requireCoFacilitatorOrAbove, async (req, res) => {
   const { moduleId } = req.params;
   const { url, filename, dataBase64, text, title: rawTitle } = (req.body ?? {}) as {
@@ -117,7 +117,7 @@ router.post("/modules/:moduleId/readings", requireAuth, requireCoFacilitatorOrAb
   }
 });
 
-// GET /modules/:moduleId/readings — metadata list (no content).
+// GET /modules/:moduleId/readings, metadata list (no content).
 router.get("/modules/:moduleId/readings", requireAuth, async (req, res) => {
   const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
   if (!mod) { res.status(404).json({ error: "Not found" }); return; }
@@ -133,7 +133,7 @@ router.get("/modules/:moduleId/readings", requireAuth, async (req, res) => {
   res.json(rows.filter((r) => r.published).map(toRow));
 });
 
-// GET /readings/:id — full parsed text for the online reader.
+// GET /readings/:id, full parsed text for the online reader.
 router.get("/readings/:id", requireAuth, async (req, res) => {
   const row = await db.query.moduleReadingsTable.findFirst({
     where: eq(moduleReadingsTable.id, req.params.id),
@@ -147,7 +147,7 @@ router.get("/readings/:id", requireAuth, async (req, res) => {
   res.json({ ...toRow(row), content: row.content ?? "" });
 });
 
-// DELETE /readings/:id — staff remove a reading.
+// DELETE /readings/:id, staff remove a reading.
 router.delete("/readings/:id", requireAuth, requireCoFacilitatorOrAbove, async (req, res) => {
   await db.delete(moduleReadingsTable).where(eq(moduleReadingsTable.id, req.params.id));
   res.status(204).send();

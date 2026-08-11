@@ -110,7 +110,7 @@ function submissionResponse(s: typeof activitySubmissionsTable.$inferSelect) {
 
 /* ─────────────────────────── Activities ─────────────────────────── */
 
-/** GET /activities?moduleId=&courseId= — list, tenant + library + assignment scoped. */
+/** GET /activities?moduleId=&courseId=, list, tenant + library + assignment scoped. */
 router.get("/activities", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const { moduleId, courseId } = req.query as { moduleId?: string; courseId?: string };
@@ -154,7 +154,7 @@ router.get("/activities", requireAuth, async (req, res) => {
   res.json(rows.map((a) => ({ ...activityResponse(a), mySubmitted: submitted.has(a.id) })));
 });
 
-/** GET /activities/:id — scoped to tenant / library / assignment; unpublished = managers only. */
+/** GET /activities/:id, scoped to tenant / library / assignment; unpublished = managers only. */
 router.get("/activities/:id", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const [a] = await db.select().from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.id, req.params.id)).limit(1);
@@ -207,7 +207,7 @@ router.post("/activities", requireAuth, requireAuthor, async (req, res) => {
  * POST /activities/:id/clone-to-module  { moduleId }
  *
  * Add a game from the shared library into one of a class's courses. Library items are shared
- * platform records, so we never mutate the original — we CLONE it into the target module as a
+ * platform records, so we never mutate the original, we CLONE it into the target module as a
  * tenant-owned, published activity the class's learners will see. This is how a teacher "adds a
  * game to a class": pick a module in a course the class is taking, and drop a copy of the game in.
  */
@@ -286,7 +286,7 @@ router.delete("/activities/:id", requireAuth, requireAuthor, async (req, res) =>
 
 /* ─────────────────────────── AI generation ─────────────────────────── */
 
-/** POST /activities/extract — pull plain text from an uploaded document or a URL, so the AI
+/** POST /activities/extract, pull plain text from an uploaded document or a URL, so the AI
  *  generator can work from real course material (PDF/Word/PowerPoint/Excel/text/Google Docs). */
 router.post("/activities/extract", requireAuth, requireAuthor, async (req, res) => {
   const { url, filename, dataBase64 } = req.body ?? {};
@@ -310,7 +310,7 @@ router.post("/activities/extract", requireAuth, requireAuthor, async (req, res) 
   }
 });
 
-/** POST /activities/generate — AI proposes a menu of gamified activities (not persisted). */
+/** POST /activities/generate, AI proposes a menu of gamified activities (not persisted). */
 router.post("/activities/generate", requireAuth, requireAuthor, async (req, res) => {
   const content = String(req.body?.content ?? "").trim();
   if (content.length < 40) { res.status(400).json({ error: "Paste more course content so the generator has something to work from." }); return; }
@@ -332,7 +332,7 @@ router.post("/activities/generate", requireAuth, requireAuthor, async (req, res)
 /* ─────────────────────────── Submissions ─────────────────────────── */
 
 /**
- * POST /activities/:id/submit — the learner-facing hand-in.
+ * POST /activities/:id/submit, the learner-facing hand-in.
  * The sandboxed iframe posts a result to the parent page, and the parent (which holds
  * the session cookie) calls this. The iframe itself is never authenticated.
  */
@@ -380,7 +380,7 @@ router.post("/activities/:id/submit", requireAuth, async (req, res) => {
   res.status(201).json(submissionResponse(row));
 });
 
-/** GET /activities/:id/submissions — staff view of everyone's hand-ins for an activity. */
+/** GET /activities/:id/submissions, staff view of everyone's hand-ins for an activity. */
 router.get("/activities/:id/submissions", requireAuth, requireAuthor, async (req, res) => {
   const rows = await db
     .select({
@@ -403,7 +403,7 @@ router.get("/activities/:id/submissions", requireAuth, requireAuthor, async (req
   );
 });
 
-/** GET /activities/:id/my-submissions — a learner's own history for one activity. */
+/** GET /activities/:id/my-submissions, a learner's own history for one activity. */
 router.get("/activities/:id/my-submissions", requireAuth, async (req, res) => {
   const rows = await db
     .select()
@@ -418,7 +418,7 @@ router.get("/activities/:id/my-submissions", requireAuth, async (req, res) => {
   res.json(rows.map(submissionResponse));
 });
 
-/** PATCH /activities/submissions/:submissionId/review — coach grades/annotates. */
+/** PATCH /activities/submissions/:submissionId/review, coach grades/annotates. */
 router.patch(
   "/activities/submissions/:submissionId/review",
   requireAuth,
@@ -446,7 +446,7 @@ router.patch(
       res.status(404).json({ error: "Submission not found" });
       return;
     }
-    // A reviewed score can move a learner on/off track — refresh their gradebook alert.
+    // A reviewed score can move a learner on/off track, refresh their gradebook alert.
     void onGradeEvent({ sourceType: "activity", sourceId: row.activityId, userId: row.userId });
     res.json(submissionResponse(row));
   },
@@ -464,7 +464,7 @@ router.get("/activities/:id/embed-links", requireAuth, requireAuthor, async (req
   res.json(links.map((l) => ({ id: l.id, token: l.token, label: l.label, isActive: l.isActive, accessCount: Number(l.accessCount), expiresAt: l.expiresAt?.toISOString() ?? null, createdAt: l.createdAt.toISOString() })));
 });
 
-// POST /activities/:id/embed-links — mint a public token (activity must be published).
+// POST /activities/:id/embed-links, mint a public token (activity must be published).
 router.post("/activities/:id/embed-links", requireAuth, requireAuthor, async (req, res) => {
   const u = req.dbUser! as U;
   const [a] = await db.select().from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.id, req.params.id)).limit(1);
@@ -477,7 +477,7 @@ router.post("/activities/:id/embed-links", requireAuth, requireAuthor, async (re
   res.status(201).json({ id: link.id, token: link.token, label: link.label, isActive: link.isActive, accessCount: 0, expiresAt: link.expiresAt?.toISOString() ?? null, createdAt: link.createdAt.toISOString() });
 });
 
-// DELETE /activities/:id/embed-links/:linkId — soft deactivate.
+// DELETE /activities/:id/embed-links/:linkId, soft deactivate.
 router.delete("/activities/:id/embed-links/:linkId", requireAuth, requireAuthor, async (req, res) => {
   const u = req.dbUser! as U;
   const [a] = await db.select().from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.id, req.params.id)).limit(1);
@@ -638,7 +638,7 @@ router.get("/activities/:id/assignments", requireAuth, async (req, res) => {
   res.json(all.map((x) => ({ ...assignmentResponse(x), targetName: x.tier === "partner" ? (pN.get(x.partnerId!) ?? null) : x.tier === "organisation" ? (oN.get(x.organisationId!) ?? null) : (uN.get(x.userId!) ?? null) })));
 });
 
-// GET /activity-assignments/my — the current learner's assigned activities.
+// GET /activity-assignments/my, the current learner's assigned activities.
 router.get("/activity-assignments/my", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const rows = await db.select().from(activityAssignmentsTable)
@@ -650,7 +650,7 @@ router.get("/activity-assignments/my", requireAuth, async (req, res) => {
   res.json(rows.map((x) => { const act = byId.get(x.activityId); return { ...assignmentResponse(x), title: act?.title ?? null, instructions: act?.instructions ?? null, kind: act?.kind ?? null, bloomsLevel: act?.bloomsLevel ?? null, difficulty: act?.difficulty ?? null, published: act?.published ?? false }; }).filter((r) => r.title && r.published));
 });
 
-// DELETE /activity-assignments/:id — soft revoke + cascade descendants.
+// DELETE /activity-assignments/:id, soft revoke + cascade descendants.
 router.delete("/activity-assignments/:id", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const [a] = await db.select().from(activityAssignmentsTable).where(eq(activityAssignmentsTable.id, req.params.id)).limit(1);

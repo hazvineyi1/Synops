@@ -18,7 +18,7 @@ const DIFFS = ["foundational", "intermediate", "advanced"];
 /**
  * No-code builder: pick an interaction type, fill a simple content form, see a live preview,
  * and it generates the self-contained gamified HTML via the shared template engine. This is
- * the same renderer the AI generator and the library use — one spec, many interactives.
+ * the same renderer the AI generator and the library use, one spec, many interactives.
  */
 export function ActivityBuilder({ onClose, onCreated }: { onClose: () => void; onCreated: (a: Activity) => void }) {
   const qc = useQueryClient();
@@ -175,7 +175,7 @@ function PairForm({ spec, patch, field, a, b, labelA, labelB, addLabel }: { spec
 function OrderForm({ spec, patch }: { spec: any; patch: (fn: (s: any) => void) => void }) {
   return (
     <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">Enter the steps in the CORRECT order — learners will see them shuffled.</p>
+      <p className="text-xs text-muted-foreground">Enter the steps in the CORRECT order, learners will see them shuffled.</p>
       {spec.items.map((it: string, i: number) => (
         <Row key={i} onRemove={spec.items.length > 2 ? () => patch((s) => s.items.splice(i, 1)) : undefined}>
           <div className="flex items-center gap-2"><span className="text-xs w-5 text-muted-foreground">{i + 1}.</span>

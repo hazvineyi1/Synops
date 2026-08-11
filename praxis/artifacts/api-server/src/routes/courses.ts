@@ -154,7 +154,7 @@ router.post("/courses", requireAuth, requireRole("super_admin", "partner_admin",
 });
 
 /**
- * POST /courses/setup-platform (super admin) — one-time: make the assignment table exist and
+ * POST /courses/setup-platform (super admin), one-time: make the assignment table exist and
  * bring EVERY existing course under super-admin ownership (tenantId "platform") so the whole
  * catalogue is owned centrally and delivered to partners by assignment. Idempotent. Needed
  * because the server has no psql access to run the migration by hand.
@@ -175,7 +175,7 @@ router.post("/courses/setup-platform", requireAuth, requireRole("super_admin"), 
   res.json({ ok: true, coursesAdopted: updated.length });
 });
 
-// GET /courses/:courseId/partners (super admin) — which partners this course is assigned to.
+// GET /courses/:courseId/partners (super admin), which partners this course is assigned to.
 router.get("/courses/:courseId/partners", requireAuth, requireRole("super_admin"), async (req, res) => {
   try {
     const rows = await db
@@ -189,7 +189,7 @@ router.get("/courses/:courseId/partners", requireAuth, requireRole("super_admin"
   }
 });
 
-// PUT /courses/:courseId/partners (super admin) — replace the set of partners a course is
+// PUT /courses/:courseId/partners (super admin), replace the set of partners a course is
 // assigned to. Body: { partnerIds: string[] }.
 router.put("/courses/:courseId/partners", requireAuth, requireRole("super_admin"), async (req, res) => {
   const courseId = req.params.courseId;
@@ -205,7 +205,7 @@ router.put("/courses/:courseId/partners", requireAuth, requireRole("super_admin"
   res.json({ partnerIds });
 });
 
-// GET /partners/:partnerId/courses (super admin) — course ids assigned to a partner.
+// GET /partners/:partnerId/courses (super admin), course ids assigned to a partner.
 router.get("/partners/:partnerId/courses", requireAuth, requireRole("super_admin"), async (req, res) => {
   try {
     const rows = await db
@@ -218,7 +218,7 @@ router.get("/partners/:partnerId/courses", requireAuth, requireRole("super_admin
   }
 });
 
-// PUT /partners/:partnerId/courses (super admin) — replace the set of courses assigned to a
+// PUT /partners/:partnerId/courses (super admin), replace the set of courses assigned to a
 // partner. Self-creates the assignment table so the create-partner flow works before the
 // one-time setup-platform has ever run.
 router.put("/partners/:partnerId/courses", requireAuth, requireRole("super_admin"), async (req, res) => {
@@ -250,7 +250,7 @@ router.get("/courses/:courseId", requireAuth, async (req, res) => {
   });
   if (!course) { res.status(404).json({ error: "Not found" }); return; }
   // A learner may VIEW any course in their catalogue (their tenant owns it, or it is assigned to
-  // their partner), even before enrolling — the detail page is the enrol/overview surface. Gating
+  // their partner), even before enrolling, the detail page is the enrol/overview surface. Gating
   // this on enrolment 403'd every non-enrolled catalogue course, and the client rendered that 403
   // as "Course not found", so 13 of 14 catalogue links looked broken. Enrolment still gates the
   // actual coursework routes; visibility here only needs catalogue scope.

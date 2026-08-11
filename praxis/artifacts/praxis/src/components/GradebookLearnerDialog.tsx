@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { gradebookApi, type GradebookColumn } from "@/lib/gradebookApi";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Sparkles, TrendingDown, TrendingUp, Minus, CheckCircle2, Circle, ArrowRight } from "lucide-react";
+import { AlertTriangle, TrendingDown, TrendingUp, Minus, CheckCircle2, Circle, ArrowRight } from "lucide-react";
 
 const pillBand = (band: string) =>
   band === "good" ? "bg-green-100 text-green-800 dark:bg-green-950/40 dark:text-green-300"
@@ -51,7 +51,7 @@ export function GradebookLearnerDialog({ courseId, userId, onClose }: { courseId
             <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-background p-4">
               <div>
                 <div className={cn("text-3xl font-bold", d.overallPercent == null ? "text-muted-foreground" : d.overallPercent >= 70 ? "text-green-600" : "text-red-600")}>
-                  {d.overallPercent == null ? "—" : `${Math.round(d.overallPercent)}%`}
+                  {d.overallPercent == null ? ", " : `${Math.round(d.overallPercent)}%`}
                 </div>
                 <div className="text-xs text-muted-foreground">Overall mastery</div>
               </div>
@@ -82,7 +82,7 @@ export function GradebookLearnerDialog({ courseId, userId, onClose }: { courseId
 
             {d.plan && (
               <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
-                <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground"><Sparkles className="h-4 w-4 text-primary" /> Auto study plan</div>
+                <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">Auto study plan</div>
                 <p className="mb-2 text-xs text-muted-foreground">{d.plan.rationale}</p>
                 <ol className="space-y-1.5">
                   {d.plan.items.map((it, i) => {
@@ -92,7 +92,7 @@ export function GradebookLearnerDialog({ courseId, userId, onClose }: { courseId
                         {it.done ? <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" /> : <Circle className="mt-0.5 h-4 w-4 text-muted-foreground" />}
                         <div className="min-w-0 flex-1">
                           <span className={cn("text-foreground", it.done && "line-through opacity-60")}>{it.title}</span>
-                          <span className="text-xs text-muted-foreground"> — {it.why}</span>
+                          <span className="text-xs text-muted-foreground">, {it.why}</span>
                         </div>
                         {href && <a href={href} target="_blank" rel="noreferrer" className="shrink-0 text-primary"><ArrowRight className="h-3.5 w-3.5" /></a>}
                       </li>
@@ -123,7 +123,7 @@ export function GradebookLearnerDialog({ courseId, userId, onClose }: { courseId
                             <span className="flex items-center gap-3">
                               {cell?.note && <span className="max-w-[220px] truncate text-xs italic text-muted-foreground" title={cell.note}>“{cell.note}”</span>}
                               <span className={cn("rounded px-2 py-0.5 font-mono text-xs", f == null ? "bg-muted text-muted-foreground" : f >= 0.9 ? "bg-green-50 text-green-700" : f >= 0.7 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700")}>
-                                {f == null ? "—" : `${Math.round(f * c.pointsPossible)}/${c.pointsPossible}`}
+                                {f == null ? ", " : `${Math.round(f * c.pointsPossible)}/${c.pointsPossible}`}
                               </span>
                             </span>
                           </div>

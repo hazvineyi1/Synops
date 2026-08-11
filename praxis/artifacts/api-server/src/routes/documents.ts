@@ -50,7 +50,7 @@ router.get("/partners/:partnerId/documents", requireAuth, async (req, res) => {
   }
 });
 
-// POST /partners/:partnerId/documents — file a document (metadata; optional fileUrl).
+// POST /partners/:partnerId/documents, file a document (metadata; optional fileUrl).
 router.post("/partners/:partnerId/documents", requireAuth, async (req, res) => {
   const { partnerId } = req.params;
   const user = req.dbUser!;
@@ -74,7 +74,7 @@ router.post("/partners/:partnerId/documents", requireAuth, async (req, res) => {
   res.status(201).json(row);
 });
 
-// PATCH /partners/:partnerId/documents/:id — change status / rename.
+// PATCH /partners/:partnerId/documents/:id, change status / rename.
 router.patch("/partners/:partnerId/documents/:id", requireAuth, async (req, res) => {
   const { partnerId, id } = req.params;
   if (!canManage(req.dbUser!, partnerId)) { res.status(403).json({ error: "Forbidden" }); return; }

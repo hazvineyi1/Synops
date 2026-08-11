@@ -17,7 +17,7 @@ router.get("/healthz", (_req, res) => {
   res.json(data);
 });
 
-// Build/version identity. No DB, public, cheap. Answers "which build is actually live right now?" —
+// Build/version identity. No DB, public, cheap. Answers "which build is actually live right now?", 
 // the first question during incident triage and the check that confirms a rollback took.
 router.get("/version", (_req, res) => {
   res.json({

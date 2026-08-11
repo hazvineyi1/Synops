@@ -28,7 +28,7 @@ const toRows = (cols: GradebookColumn[]): Row[] =>
   }));
 
 /**
- * Configure how each deliverable in a course is graded — grade type (points / pass-fail / completion),
+ * Configure how each deliverable in a course is graded, grade type (points / pass-fail / completion),
  * counts vs practice, points, and whether it is included. "Applies to" chooses the scope: the course
  * default (gradebook_items) or one organisation's override (gradebook_org_overrides). Writes through
  * PUT /courses/:id/gradebook/config.

@@ -50,7 +50,7 @@ router.post("/live/:code/worked-example", async (req, res) => {
   res.json(out);
 });
 
-// The hosted game's HTML — public but CODE-GATED (only the one activity being hosted, nothing else),
+// The hosted game's HTML, public but CODE-GATED (only the one activity being hosted, nothing else),
 // so a joined student without an account can render and play it in the sandbox.
 router.get("/live/:code/activity", async (req, res) => {
   const r = getRoom(req.params.code);

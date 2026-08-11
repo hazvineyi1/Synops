@@ -3,7 +3,7 @@ import { templateByKey, BAND_LABEL, type Band } from "./gameTemplates";
 
 /**
  * AI game generator. Given a subject, grade band, rigor and the lesson content, produce the CONTENT
- * JSON for a chosen game template — grounded strictly in the content — then the caller renders it with
+ * JSON for a chosen game template, grounded strictly in the content, then the caller renders it with
  * the template's own build() function. Returns a DRAFT (content + html), never saved; the admin reviews
  * and edits before saving. Same model + strict-JSON pattern as the activity generator.
  */
@@ -12,9 +12,9 @@ export const RIGOR_LEVELS = ["foundational", "intermediate", "advanced"] as cons
 export type Rigor = (typeof RIGOR_LEVELS)[number];
 
 const RIGOR_GUIDE: Record<Rigor, string> = {
-  foundational: "recall and basic understanding — straightforward prompts, single-step answers",
-  intermediate: "application and analysis — multi-step reasoning, connect ideas",
-  advanced: "evaluation and synthesis — justify, compare, apply to new situations",
+  foundational: "recall and basic understanding, straightforward prompts, single-step answers",
+  intermediate: "application and analysis, multi-step reasoning, connect ideas",
+  advanced: "evaluation and synthesis, justify, compare, apply to new situations",
 };
 
 export interface GenerateGameInput {
@@ -34,14 +34,14 @@ export async function generateGameContent(input: GenerateGameInput): Promise<{ c
   const content = (input.content || "").trim();
   if (content.length < 20) throw new Error("Add more lesson content to generate a game from (a paragraph or two works well).");
 
-  const system = `You are an expert instructional designer building a "${tpl.name}" classroom review game. You ground every question strictly in the provided lesson content — never invent facts outside it. You write clear, age-appropriate, engaging prompts, and you make the game a genuine review of the material, not trivia.
+  const system = `You are an expert instructional designer building a "${tpl.name}" classroom review game. You ground every question strictly in the provided lesson content, never invent facts outside it. You write clear, age-appropriate, engaging prompts, and you make the game a genuine review of the material, not trivia.
 
 Return ONLY a single strict JSON object (no prose, no code fences, no HTML) matching EXACTLY the required shape.`;
 
   const user = `Create the CONTENT for a "${tpl.name}" game.
 Subject: ${input.subject || "General"}
 Grade level: ${bandLabel}
-Rigor: ${rigor} — ${RIGOR_GUIDE[rigor as Rigor]}
+Rigor: ${rigor}, ${RIGOR_GUIDE[rigor as Rigor]}
 ${input.topic ? `Focus topic: ${input.topic}\n` : ""}
 Ground every item in the LESSON CONTENT below and pitch the difficulty to ${bandLabel} at ${rigor} rigor.
 
@@ -66,6 +66,6 @@ Return ONLY the JSON object.`;
   if (!tpl.validate(json)) {
     throw new Error("The generated game didn't match the required shape. Try again, or adjust the content.");
   }
-  const title = (json as { title?: string }).title || `${input.subject || tpl.name} — ${tpl.name}`;
+  const title = (json as { title?: string }).title || `${input.subject || tpl.name}, ${tpl.name}`;
   return { content: json, title };
 }

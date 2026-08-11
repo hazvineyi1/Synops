@@ -40,7 +40,7 @@ export function PartnerSettings() {
   const [pcontact, setPcontact] = useState('');
   useEffect(() => { if (partner) { setPname(partner.name ?? ''); setPcontact(partner.contactEmail ?? ''); } }, [partner]);
 
-  // Declared BEFORE the mutation that calls it — previously flashMsg was defined after saveProfile,
+  // Declared BEFORE the mutation that calls it, previously flashMsg was defined after saveProfile,
   // so the first save's success callback closed over a not-yet-initialised binding and the green
   // confirmation only appeared on the second save.
   const [flash, setFlash] = useState<string | null>(null);

@@ -15,7 +15,7 @@ import { assembleLearnerExport } from "../../lib/learnerExport.js";
 const router: IRouter = Router();
 router.use(requireStudyUser);
 
-// GET /export — a complete machine-readable copy of the learner's own data.
+// GET /export, a complete machine-readable copy of the learner's own data.
 // Streamed as a downloadable JSON attachment. The password hash is never included.
 router.get("/export", async (req, res) => {
   const userId = req.studyUser!.id;
@@ -32,7 +32,7 @@ router.get("/export", async (req, res) => {
   res.send(JSON.stringify(payload, null, 2));
 });
 
-// POST /delete — permanently delete the learner's own account and all their data.
+// POST /delete, permanently delete the learner's own account and all their data.
 // Requires the account password to confirm (also blocks an impersonating admin,
 // who would not know it). Every study_* row cascades from the user row, including
 // sessions, so this is a hard delete.

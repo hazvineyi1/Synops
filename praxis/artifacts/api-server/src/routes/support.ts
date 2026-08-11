@@ -72,7 +72,7 @@ function ticketResponse(t: typeof supportTicketsTable.$inferSelect, extra?: Reco
 
 /* ─────────────────────────── Tickets ─────────────────────────── */
 
-/** POST /support/tickets — anyone signed in opens a ticket. */
+/** POST /support/tickets, anyone signed in opens a ticket. */
 router.post("/support/tickets", requireAuth, async (req, res) => {
   const subject = String(req.body?.subject ?? "").trim();
   const body = String(req.body?.body ?? "").trim();
@@ -99,7 +99,7 @@ router.post("/support/tickets", requireAuth, async (req, res) => {
   res.status(201).json(ticketResponse(ticket));
 });
 
-/** GET /support/tickets?status= — scoped list. */
+/** GET /support/tickets?status=, scoped list. */
 router.get("/support/tickets", requireAuth, async (req, res) => {
   const role = req.dbUser!.role;
   const status = String(req.query.status ?? "");
@@ -141,7 +141,7 @@ router.get("/support/tickets", requireAuth, async (req, res) => {
   );
 });
 
-/** GET /support/tickets/:id — ticket + thread. Internal notes hidden from the requester. */
+/** GET /support/tickets/:id, ticket + thread. Internal notes hidden from the requester. */
 router.get("/support/tickets/:id", requireAuth, async (req, res) => {
   const [ticket] = await db
     .select()
@@ -183,7 +183,7 @@ router.get("/support/tickets/:id", requireAuth, async (req, res) => {
       createdAt: r.message.createdAt.toISOString(),
     }));
 
-  // Resolve the requester's (and assignee's) name — the detail response omitted these, so the
+  // Resolve the requester's (and assignee's) name, the detail response omitted these, so the
   // thread header and the opening-message bubble fell back to "You"/"Unknown" when staff viewed
   // someone else's ticket.
   const nameIds = [ticket.requesterId, ticket.assigneeId].filter((v): v is string => !!v);
@@ -206,7 +206,7 @@ router.get("/support/tickets/:id", requireAuth, async (req, res) => {
   });
 });
 
-/** POST /support/tickets/:id/messages — reply. Requester or staff. */
+/** POST /support/tickets/:id/messages, reply. Requester or staff. */
 router.post("/support/tickets/:id/messages", requireAuth, async (req, res) => {
   const body = String(req.body?.body ?? "").trim();
   if (!body) {
@@ -272,7 +272,7 @@ router.post("/support/tickets/:id/messages", requireAuth, async (req, res) => {
   res.status(201).json({ ok: true, status: nextStatus });
 });
 
-/** PATCH /support/tickets/:id — staff set status / priority / assignee. */
+/** PATCH /support/tickets/:id, staff set status / priority / assignee. */
 router.patch("/support/tickets/:id", requireAuth, requireStaff, async (req, res) => {
   const [ticket] = await db
     .select()
@@ -323,7 +323,7 @@ router.patch("/support/tickets/:id", requireAuth, requireStaff, async (req, res)
   res.json(ticketResponse(updated));
 });
 
-/** GET /support/overview — status counts for the staff queue header. */
+/** GET /support/overview, status counts for the staff queue header. */
 router.get("/support/overview", requireAuth, requireStaff, async (req, res) => {
   const role = req.dbUser!.role;
   const scope = [];
@@ -347,7 +347,7 @@ router.get("/support/overview", requireAuth, requireStaff, async (req, res) => {
   res.json(row);
 });
 
-// POST /support/chat — learner-facing support chatbot. Stateless: the client sends the running
+// POST /support/chat, learner-facing support chatbot. Stateless: the client sends the running
 // conversation and gets the next reply. Helps with using the platform, never does coursework.
 router.post("/support/chat", requireAuth, async (req, res) => {
   const raw = Array.isArray(req.body?.messages) ? req.body.messages : [];

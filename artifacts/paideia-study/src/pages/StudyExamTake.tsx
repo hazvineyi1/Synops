@@ -7,7 +7,7 @@ import {
   useGetStudyExam,
   useSubmitStudyExam,
 } from "@workspace/paideia-api-client";
-import { ArrowLeft, Clock, CheckCircle2, XCircle, Award, Sparkles } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, XCircle, Award } from "lucide-react";
 
 export default function StudyExamTake() {
   const { examId } = useParams<{ examId: string }>();
@@ -180,7 +180,7 @@ export default function StudyExamTake() {
           Question {currentIndex + 1} of {exam.questionCount}
           {question.format && question.format !== "multiple-choice" && (
             <span className="ml-2 inline-flex items-center gap-1 text-xs uppercase tracking-wider text-primary">
-              <Sparkles className="h-3 w-3" /> {question.format.replace("-", " ")}
+              {question.format.replace("-", " ")}
             </span>
           )}
         </p>

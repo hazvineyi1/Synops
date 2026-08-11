@@ -89,7 +89,7 @@ function SuperAdminDashboard() {
 function PartnerAdminDashboard({ partnerId }: { partnerId?: string }) {
   // NOTE: the generated hook disables the query when partnerId is null/undefined, so
   // `statsLoading` is only ever true while an ENABLED query is genuinely fetching. Never
-  // gate the whole page on `!stats` — a disabled/errored query would hang the skeleton
+  // gate the whole page on `!stats`, a disabled/errored query would hang the skeleton
   // forever (that was the infinite-loading Overview bug). Fall back to the orgs list.
   const { data: stats, isLoading: statsLoading } = useGetPartnerStats(partnerId as string);
   const { data: orgs, isLoading: orgsLoading } = useListOrganisations();
@@ -167,7 +167,7 @@ function OrgAdminDashboard() {
 }
 
 function CoachDashboard() {
-  // Real data — the previous version showed hardcoded 24 / 7 / 82% figures, which is not acceptable
+  // Real data, the previous version showed hardcoded 24 / 7 / 82% figures, which is not acceptable
   // to show a coach at a paying partner.
   const { data: learners, isLoading: learnersLoading } = useQuery<any[]>({ queryKey: ['coach-learners'], queryFn: () => apiFetch('/coach/learners'), retry: false });
   const { data: submissions } = useQuery<any[]>({ queryKey: ['coach-submissions'], queryFn: () => apiFetch('/coach/submissions'), retry: false });
@@ -181,9 +181,9 @@ function CoachDashboard() {
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard title="Learners Assigned" value={learnersLoading ? '—' : total} icon={Users} />
+        <StatCard title="Learners Assigned" value={learnersLoading ? ', ' : total} icon={Users} />
         <StatCard title="Pending Submissions" value={pending} icon={FileText} />
-        <StatCard title="Avg Learner Readiness" value={avgReadiness == null ? '—' : `${avgReadiness}%`} icon={TrendingUp} />
+        <StatCard title="Avg Learner Readiness" value={avgReadiness == null ? ', ' : `${avgReadiness}%`} icon={TrendingUp} />
       </div>
       <Card>
         <CardHeader>

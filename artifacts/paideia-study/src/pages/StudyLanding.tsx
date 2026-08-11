@@ -6,7 +6,7 @@ import { useStudyAuth } from "@/hooks/use-study-auth";
 import { useStudyProfile } from "@/hooks/use-study-journey";
 import {
   BookOpen, BrainCircuit, Zap, Award, TrendingUp,
-  Layers, Sparkles, ArrowRight, Brain, Network, Target,
+  Layers, ArrowRight, Brain, Network, Target,
   Compass, BarChart3, FileText, Image, Link2, Mic, Globe,
   ChevronDown, Star
 } from "lucide-react";
@@ -80,7 +80,6 @@ export default function StudyLanding() {
           <div className="absolute bottom-[10%] right-[10%] w-96 h-96 bg-amber-500/5 rounded-full blur-3xl" />
 
           <Badge variant="secondary" className="mb-6 gap-1.5 px-3 py-1 text-xs">
-            <Sparkles className="h-3 w-3" />
             AI-Powered Adaptive Learning
           </Badge>
 
@@ -258,7 +257,6 @@ export default function StudyLanding() {
               personalized study that actually sticks.
             </p>
             <Button size="lg" className="gap-2" onClick={() => setLoc("/signup")}>
-              <Sparkles className="h-4 w-4" />
               Create Free Account
             </Button>
             <p className="text-xs text-muted-foreground mt-3">

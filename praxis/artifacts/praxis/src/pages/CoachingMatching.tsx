@@ -150,7 +150,7 @@ function MatchingBoard({ courseId }: { courseId: string }) {
             <Button disabled={!newSection.trim() || createSection.isPending} onClick={() => createSection.mutate()}><Plus className="h-4 w-4 mr-1" /> Add section</Button>
           </div>
 
-          {data.sections.length === 0 && <p className="text-sm text-muted-foreground">No sections yet — create one, assign a coach, then add learners.</p>}
+          {data.sections.length === 0 && <p className="text-sm text-muted-foreground">No sections yet, create one, assign a coach, then add learners.</p>}
 
           {data.sections.map((sec) => (
             <Card key={sec.id}>
@@ -189,7 +189,7 @@ function MatchingBoard({ courseId }: { courseId: string }) {
                       </div>
                     </div>
                   ))}
-                  {sec.members.length === 0 && <p className="text-xs text-muted-foreground italic">No learners yet — assign from the left.</p>}
+                  {sec.members.length === 0 && <p className="text-xs text-muted-foreground italic">No learners yet, assign from the left.</p>}
                 </div>
 
                 {/* Quick add learner */}

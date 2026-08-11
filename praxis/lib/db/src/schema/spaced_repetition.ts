@@ -3,7 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
 /**
- * Concept mastery — the invisible SM-2 spaced-repetition engine.
+ * Concept mastery, the invisible SM-2 spaced-repetition engine.
  * One row per (learner, module). Mastery is what the learner sees;
  * ef/interval/reps/dueDate schedule when the Coach brings a concept back.
  * When a PraxisMark credential decays, its module surfaces here as due.
@@ -40,7 +40,7 @@ export type InsertConceptMastery = z.infer<typeof insertConceptMasterySchema>;
 export type ConceptMastery = typeof conceptMasteryTable.$inferSelect;
 
 /**
- * Coach daily plan — the "spine". Each day the Coach opens with a
+ * Coach daily plan, the "spine". Each day the Coach opens with a
  * rationale-backed plan built from due concepts, weakest concepts and
  * yesterday's activity. Stored so tomorrow's plan can reference today.
  */

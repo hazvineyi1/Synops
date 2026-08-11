@@ -192,7 +192,7 @@ async function handleNewOffTrack(courseId: string, userId: string, transition: A
           html: emailShell({
             brand,
             heading: "Let's get you back on track",
-            bodyHtml: `Hi ${learner.firstName || "there"}, in <strong>${courseTitle}</strong> we noticed you're falling behind${reasonPhrase}. ${planCreated ? "We've built a short, personalised plan to help you catch up — work through it a step at a time." : "Your coach has been notified and will help you catch up."}`,
+            bodyHtml: `Hi ${learner.firstName || "there"}, in <strong>${courseTitle}</strong> we noticed you're falling behind${reasonPhrase}. ${planCreated ? "We've built a short, personalised plan to help you catch up, work through it a step at a time." : "Your coach has been notified and will help you catch up."}`,
             ctaLabel: planCreated ? "View my study plan" : "View my grades",
             ctaUrl: appUrl("/grades"),
           }),

@@ -6,7 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { useDailySession, useStartPathStep, useCompletePathStep } from "@/hooks/use-study-journey";
 import {
   Brain, BookOpen, Zap, Target, MessageCircle, CheckCircle2,
-  ArrowRight, Clock, ChevronLeft, Sparkles, Loader2,
+  ArrowRight, Clock, ChevronLeft, Loader2,
   RotateCcw, Award,
 } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
@@ -41,9 +41,6 @@ export default function StudyDailySession() {
     return (
       <div className="min-h-screen bg-background">
         <main className="max-w-2xl mx-auto px-4 py-16 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-            <Sparkles className="h-8 w-8 text-primary" />
-          </div>
           <h1 className="text-2xl font-bold mb-3">Start Your Learning Journey</h1>
           <p className="text-muted-foreground mb-8 max-w-md mx-auto">
             Upload materials and take a quick diagnostic. AI will build your personalized path.
@@ -138,7 +135,6 @@ export default function StudyDailySession() {
                     {coachingMessage && (
                       <div className="bg-muted/50 rounded-lg p-3 mb-5 border-l-2 border-primary/40">
                         <div className="flex items-start gap-2">
-                          <Sparkles className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
                           <p className="text-xs text-muted-foreground leading-relaxed">{coachingMessage}</p>
                         </div>
                       </div>

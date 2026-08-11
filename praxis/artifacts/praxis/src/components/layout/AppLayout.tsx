@@ -23,7 +23,6 @@ import {
   X,
   UserCog,
   ShieldCheck,
-  Sparkles,
   LifeBuoy,
   Landmark,
   TrendingUp,
@@ -169,7 +168,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const getNavGroups = (): NavGroup[] => {
     // Learner preview ("View as"): while previewing a learner's experience we must NOT show the
-    // full Partner Admin nav (Financial Hub, Funders, Audit, etc.) — that misrepresents "this is
+    // full Partner Admin nav (Financial Hub, Funders, Audit, etc.), that misrepresents "this is
     // what they see" and is a trust concern. Collapse to a single clear exit back to the org.
     if (location.startsWith('/partner/impersonate')) {
       const back = (() => {
@@ -246,7 +245,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     }
 
     if (role === 'learner') {
-      // Young K-12 learners (K-5) get a slimmed, jargon-free nav with kid words — no "My grades",
+      // Young K-12 learners (K-5) get a slimmed, jargon-free nav with kid words, no "My grades",
       // "Jotter" or "My sessions". Everything is reachable, just named for a child.
       const kidPersona = personaByEmail(user?.email);
       if (kidPersona && (kidPersona.band === 'early' || kidPersona.band === 'elementary')) {
@@ -286,7 +285,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
           { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
-          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
           { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],
       }];
@@ -302,7 +301,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
           { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
-          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
           { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
           { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
           { label: t('nav.reports'), href: '/reports', icon: FileText },
@@ -344,7 +343,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             { label: t('nav.incompleteCourses', 'Incomplete courses'), href: '/incomplete-courses', icon: FileWarning },
             { label: t('nav.studio'), href: '/studio', icon: PenTool },
             { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
-            { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+            { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
           ],
         },
         {
@@ -378,7 +377,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           heading: t('nav.groups.operations', 'Operations'),
           items: [
             { label: t('nav.health', 'System health'), href: '/admin/health', icon: Activity },
-            { label: t('nav.cleanup', 'Environment cleanup'), href: '/admin/cleanup', icon: Sparkles },
+            { label: t('nav.cleanup', 'Environment cleanup'), href: '/admin/cleanup', icon: RotateCcw },
             { label: t('nav.translations', 'Translation review'), href: '/admin/translations', icon: Languages },
             { label: t('nav.dataRequests', 'Data requests'), href: '/admin/data-requests', icon: ShieldCheck },
           ],
@@ -406,7 +405,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.compliance', 'Compliance'), href: '/compliance', icon: ShieldCheck },
           { label: t('nav.accreditation', 'Accreditation'), href: '/accreditation', icon: Award },
-          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Sparkles },
+          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
           { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],
       }];

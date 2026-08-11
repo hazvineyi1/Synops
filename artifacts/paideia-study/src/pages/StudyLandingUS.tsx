@@ -1,5 +1,5 @@
 // US-focused Coach landing. Shown when a visitor arrives from the marketing site
-// (synops-consulting.com) — the US-facing Synops Consulting brand. Direct visitors get
+// (synops-consulting.com), the US-facing Synops Consulting brand. Direct visitors get
 // the default StudyLanding instead. This page is standalone and safe to edit: the
 // copy lives in plain JSX below, and the US_EXAMS list drives the exam chips.
 import { useEffect } from "react";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useStudyAuth } from "@/hooks/use-study-auth";
 import { useStudyProfile } from "@/hooks/use-study-journey";
 import {
-  Brain, Sparkles, Zap, Network, Compass, Target, BarChart3,
+  Brain, Zap, Network, Compass, Target, BarChart3,
   FileText, Image, Link2, Mic, Globe, Star, GraduationCap, ShieldCheck,
 } from "lucide-react";
 
@@ -74,7 +74,7 @@ export default function StudyLandingUS() {
       </header>
 
       <main>
-        {/* Hero — US framing */}
+        {/* Hero, US framing */}
         <section className="text-center px-6 py-24 max-w-3xl mx-auto relative overflow-hidden">
           <div className="absolute top-[20%] left-[10%] w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
           <div className="absolute bottom-[10%] right-[10%] w-96 h-96 bg-amber-500/5 rounded-full blur-3xl" />
@@ -94,7 +94,7 @@ export default function StudyLandingUS() {
           <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-xl mx-auto leading-relaxed">
             An AI study coach for the SAT, MCAT, bar, CPA, NCLEX, and your college
             coursework. Upload your materials and it builds a personalized plan that
-            adapts to how you learn — so you study less and score higher.
+            adapts to how you learn, so you study less and score higher.
           </p>
           <div className="flex items-center justify-center gap-3">
             <Button size="lg" className="gap-2" onClick={() => setLoc("/signup")}>
@@ -122,7 +122,7 @@ export default function StudyLandingUS() {
               <h2 className="text-3xl font-bold mb-3">Turn your prep materials into a plan</h2>
               <p className="text-muted-foreground max-w-lg mx-auto">
                 Drop in your textbooks, class notes, practice tests, lecture recordings, or
-                review-course PDFs — the AI organizes it into connected, exam-ready knowledge.
+                review-course PDFs, the AI organizes it into connected, exam-ready knowledge.
               </p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 max-w-3xl mx-auto">
@@ -150,7 +150,7 @@ export default function StudyLandingUS() {
               <FeatureCard icon={Brain} title="Cognitive Profiling" description="Analyzes your accuracy and timing to build a learning fingerprint unique to you." />
               <FeatureCard icon={Network} title="Knowledge Graph" description="Maps every concept and its prerequisites so you never build on a shaky foundation." />
               <FeatureCard icon={Compass} title="Adaptive Study Plans" description="A fresh daily plan driven by your gaps, forgetting curves, and test date." />
-              <FeatureCard icon={Zap} title="Spaced Repetition" description="Reviews timed to the moment right before you'd forget — proven to boost retention." />
+              <FeatureCard icon={Zap} title="Spaced Repetition" description="Reviews timed to the moment right before you'd forget, proven to boost retention." />
               <FeatureCard icon={Target} title="Realistic Practice" description="Question difficulty adapts in real time, with full-length mock exams to build stamina." />
               <FeatureCard icon={BarChart3} title="Score Insights" description="Weekly briefs predict your readiness and tell you exactly what to do next." />
             </div>
@@ -169,7 +169,7 @@ export default function StudyLandingUS() {
               plan that actually sticks.
             </p>
             <Button size="lg" className="gap-2" onClick={() => setLoc("/signup")}>
-              <Sparkles className="h-4 w-4" /> Create Free Account
+              Create Free Account
             </Button>
             <p className="text-xs text-muted-foreground mt-3">
               Free plan includes unlimited materials, flashcards, and practice. Premium adds

@@ -20,7 +20,7 @@ const selectCls =
   "h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring";
 
 /**
- * "Include in gradebook" — attaches a case or activity to a course's gradebook as a column,
+ * "Include in gradebook", attaches a case or activity to a course's gradebook as a column,
  * categorised and tagged formative/summative. Shows where it's already included.
  */
 export function AddToGradebookDialog({

@@ -8,7 +8,7 @@ import { auditEventsTable } from "@workspace/db";
  * operation it records.
  *
  * Attribution: an action taken while a super_admin is impersonating is credited to the
- * REAL admin (impersonatorId), not the impersonated user — the trail always names the
+ * REAL admin (impersonatorId), not the impersonated user, the trail always names the
  * true actor.
  */
 export async function logAudit(

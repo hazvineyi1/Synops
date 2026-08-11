@@ -1,7 +1,7 @@
 // Usage telemetry: the client posts a heartbeat while the app is open. We keep one
 // open activity_session per user (continued while heartbeats keep arriving), and
 // start a fresh session after a gap. This yields login times, time-on-app, device,
-// IP and geo per visit, plus the user's last_active_at marker — the raw data behind
+// IP and geo per visit, plus the user's last_active_at marker, the raw data behind
 // the admin analytics and upgrade targeting. Any authenticated user may call it.
 import { Router, type IRouter, type Request } from "express";
 import { db, studyUsersTable, studyActivitySessionsTable } from "@workspace/paideia-db";

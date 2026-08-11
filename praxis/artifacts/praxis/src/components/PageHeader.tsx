@@ -2,7 +2,7 @@ import React from 'react';
 
 /**
  * Shared page header for consistency across the app. Before this, pages hand-rolled their own
- * <h1> at 2xl/3xl/4xl, serif or not — this normalises them to one 3xl serif header with an
+ * <h1> at 2xl/3xl/4xl, serif or not, this normalises them to one 3xl serif header with an
  * optional icon tile, subtitle and right-aligned action.
  */
 export function PageHeader({

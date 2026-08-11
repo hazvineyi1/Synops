@@ -14,7 +14,7 @@ const router = Router();
 
 type Actor = { id: string; role: string; organisationId?: string | null };
 
-/** Facilitator of the session's org (or Super Admin) — may create/edit/delete sessions. */
+/** Facilitator of the session's org (or Super Admin), may create/edit/delete sessions. */
 function canManageOrgDelivery(user: Actor, tenantId: string): boolean {
   if (isSuperAdmin(user.role)) return true;
   return canAdministerOrg(user.role) && !!user.organisationId && user.organisationId === tenantId;
@@ -53,7 +53,7 @@ async function resolveModuleScheduling(user: Actor, moduleId: string): Promise<
 }
 
 /**
- * GET /modules/:moduleId/delivery-sessions — workshops for one module.
+ * GET /modules/:moduleId/delivery-sessions, workshops for one module.
  *
  * Returns each learner's OWN attendance row only. Deliberately not the roster: this is a
  * learner-facing surface and other people's attendance is nobody else's business (the
@@ -80,7 +80,7 @@ router.get("/modules/:moduleId/delivery-sessions", requireAuth, async (req, res)
   })));
 });
 
-// POST /modules/:moduleId/delivery-sessions — schedule a workshop against a module.
+// POST /modules/:moduleId/delivery-sessions, schedule a workshop against a module.
 router.post("/modules/:moduleId/delivery-sessions", requireAuth, async (req, res) => {
   const scope = await resolveModuleScheduling(req.dbUser!, req.params.moduleId);
   if (!scope.ok) { res.status(scope.status).json({ error: scope.error }); return; }
@@ -110,7 +110,7 @@ router.post("/modules/:moduleId/delivery-sessions", requireAuth, async (req, res
   res.status(201).json(session);
 });
 
-// GET /courses/:courseId/delivery-sessions — sessions attached to a course.
+// GET /courses/:courseId/delivery-sessions, sessions attached to a course.
 router.get("/courses/:courseId/delivery-sessions", requireAuth, async (req, res) => {
   const rows = await db
     .select()
@@ -120,7 +120,7 @@ router.get("/courses/:courseId/delivery-sessions", requireAuth, async (req, res)
   res.json(rows);
 });
 
-// GET /orgs/:orgId/delivery-sessions — all of an org's sessions (org staff only).
+// GET /orgs/:orgId/delivery-sessions, all of an org's sessions (org staff only).
 router.get("/orgs/:orgId/delivery-sessions", requireAuth, async (req, res) => {
   if (!canManageOrgDelivery(req.dbUser!, req.params.orgId)) { res.status(403).json({ error: "Forbidden" }); return; }
   const rows = await db
@@ -131,7 +131,7 @@ router.get("/orgs/:orgId/delivery-sessions", requireAuth, async (req, res) => {
   res.json(rows);
 });
 
-// POST /delivery-sessions — create a session (facilitator of the org).
+// POST /delivery-sessions, create a session (facilitator of the org).
 router.post("/delivery-sessions", requireAuth, async (req, res) => {
   const { tenantId, courseId, moduleId, title, sessionType, scheduledAt, durationMinutes, location, joinUrl, notes } = req.body;
   if (!tenantId || !title || !scheduledAt) {
@@ -198,7 +198,7 @@ router.delete("/delivery-sessions/:id", requireAuth, async (req, res) => {
   res.status(204).send();
 });
 
-// GET /delivery-sessions/:id/attendance — staff view of who attended.
+// GET /delivery-sessions/:id/attendance, staff view of who attended.
 router.get("/delivery-sessions/:id/attendance", requireAuth, async (req, res) => {
   const session = await db.query.deliverySessionsTable.findFirst({ where: eq(deliverySessionsTable.id, req.params.id) });
   if (!session) { res.status(404).json({ error: "Session not found" }); return; }
@@ -214,7 +214,7 @@ router.get("/delivery-sessions/:id/attendance", requireAuth, async (req, res) =>
   })));
 });
 
-// POST /delivery-sessions/:id/attendance — upsert a batch of attendance rows.
+// POST /delivery-sessions/:id/attendance, upsert a batch of attendance rows.
 // Body: { records: [{ userId, status?, coachingHours? }] }
 router.post("/delivery-sessions/:id/attendance", requireAuth, async (req, res) => {
   const session = await db.query.deliverySessionsTable.findFirst({ where: eq(deliverySessionsTable.id, req.params.id) });
@@ -245,7 +245,7 @@ router.post("/delivery-sessions/:id/attendance", requireAuth, async (req, res) =
   res.status(201).json(out);
 });
 
-// GET /me/attendance — a learner's own attendance history (self-service).
+// GET /me/attendance, a learner's own attendance history (self-service).
 router.get("/me/attendance", requireAuth, async (req, res) => {
   const rows = await db
     .select({ record: attendanceRecordsTable, session: deliverySessionsTable })
@@ -256,7 +256,7 @@ router.get("/me/attendance", requireAuth, async (req, res) => {
   res.json(rows.map((r) => ({ ...r.record, session: r.session })));
 });
 
-// GET /orgs/:orgId/coaching-hours — aggregate coaching-hour total for an org (staff/super).
+// GET /orgs/:orgId/coaching-hours, aggregate coaching-hour total for an org (staff/super).
 router.get("/orgs/:orgId/coaching-hours", requireAuth, async (req, res) => {
   if (!canManageOrgDelivery(req.dbUser!, req.params.orgId)) { res.status(403).json({ error: "Forbidden" }); return; }
   const total = await orgCoachingHours(req.params.orgId);

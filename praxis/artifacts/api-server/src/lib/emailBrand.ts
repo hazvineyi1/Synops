@@ -8,7 +8,7 @@ import type { EmailBrand } from "./mailer";
  *
  * Tenancy mirrors the app: a user's brand is their partner's theme (partnerId), else the
  * platform theme. Returns safe Synops defaults when no theme row exists, so callers never
- * need to null-check. Best-effort — any DB hiccup falls back to defaults rather than throwing.
+ * need to null-check. Best-effort, any DB hiccup falls back to defaults rather than throwing.
  */
 export async function resolveEmailBrand(partnerId: string | null | undefined): Promise<EmailBrand> {
   const tenantId = partnerId ?? "platform";

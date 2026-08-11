@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { casesApi, streamCaseTurn, LANGUAGES, type CaseMessage, type CaseSessionRow } from "@/lib/casesApi";
 import { TutorAvatar, tutorGender } from "@/components/TutorAvatar";
 import { useSpeech } from "@/lib/speech";
-import { ArrowLeft, Send, Sparkles, CheckCircle2, TrendingUp, BookOpen, Settings2, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle2, TrendingUp, BookOpen, Settings2, Loader2 } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { personaByEmail } from "@/lib/k12Personas";
 
@@ -34,7 +34,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const [, navigate] = useLocation();
 
   // Youngest learners (K-5) get a colorful, playful, kid-worded coach instead of the plain
-  // professional case UI — bigger avatar and bubbles, bright accent, friendly labels.
+  // professional case UI, bigger avatar and bubbles, bright accent, friendly labels.
   const { user } = useSession();
   const persona = personaByEmail(user?.email);
   const young = !!persona && (persona.band === "early" || persona.band === "elementary");
@@ -177,7 +177,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const answerTiles = [...new Set(derivedLetters)].slice(0, 6);
   const tiles = answerTiles.length ? answerTiles : ["S", "A", "T", "P", "I", "N"];
   const replayLast = () => { if (lastTutorMsg) say(lastTutorMsg); };
-  // Language helper for the tap bar (English vs Español) — follows the conversation language.
+  // Language helper for the tap bar (English vs Español), follows the conversation language.
   // NOTE: T() above is adult-vs-kid WORDING, not language; don't use it for translations.
   const L = (en: string, spa: string) => (lang === "es" ? spa : en);
 
@@ -193,7 +193,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
       <p className={`text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 transition-opacity ${switching ? "opacity-40" : ""}`}>{factsCtx || "No background was provided for this case."}</p>
       {switching
         ? <p className="text-[11px] text-muted-foreground pt-1 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Switching the conversation into {LANGUAGES.find((l) => l.code === lang)?.name}…</p>
-        : <p className="text-[11px] text-muted-foreground pt-1">The coach's questions are grounded in these facts — refer back any time.</p>}
+        : <p className="text-[11px] text-muted-foreground pt-1">The coach's questions are grounded in these facts, refer back any time.</p>}
     </div>
   );
 
@@ -215,7 +215,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
             <BookOpen className="h-3.5 w-3.5" /><span className="hidden sm:inline">Facts</span>
           </button>
           <div className="relative inline-flex items-center">
-            <select value={lang} onChange={(e) => void changeLanguage(e.target.value)} disabled={switching || streaming} title="Language — switches the whole conversation" className="text-xs rounded-md border border-input bg-background px-1.5 py-1.5 disabled:opacity-60">
+            <select value={lang} onChange={(e) => void changeLanguage(e.target.value)} disabled={switching || streaming} title="Language, switches the whole conversation" className="text-xs rounded-md border border-input bg-background px-1.5 py-1.5 disabled:opacity-60">
               {langOptions.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
             </select>
             {switching && <Loader2 className="h-3.5 w-3.5 ml-1 animate-spin text-muted-foreground" />}
@@ -273,12 +273,12 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
               {budgetReached && (
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border bg-emerald-500/5 border-emerald-500/30 px-3 py-2">
                   <p className="text-xs text-emerald-800">{T("You've reached the planned depth. Keep going, or finish for your reasoning analysis.", "Great job! You can keep chatting, or tap the button when you're all done. 🎉")}</p>
-                  <Button size="sm" onClick={finish} disabled={analysing} style={young ? { background: kidAccent } : undefined}><Sparkles className="h-4 w-4 mr-1.5" />{analysing ? T("Analysing…", "One sec…") : T("Finish & analyse", "I'm done!")}</Button>
+                  <Button size="sm" onClick={finish} disabled={analysing} style={young ? { background: kidAccent } : undefined}>{analysing ? T("Analysing…", "One sec…") : T("Finish & analyse", "I'm done!")}</Button>
                 </div>
               )}
               {young ? (
                 /* Tap to answer: hear the prompt, tap a big letter (which plays its sound), or a quick reply.
-                   No typing or reading required — right for a 6-year-old. */
+                   No typing or reading required, right for a 6-year-old. */
                 <div className="space-y-3">
                   <div className="flex justify-center">
                     <button onClick={replayLast} disabled={streaming}
@@ -288,7 +288,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
                   <div className="flex flex-wrap justify-center gap-2.5">
                     {tiles.map((L) => (
                       <button key={L} disabled={streaming}
-                        onClick={() => { say(`/${L.toLowerCase()}/`); void send(`It's the letter ${L} — ${L} says /${L.toLowerCase()}/.`); }}
+                        onClick={() => { say(`/${L.toLowerCase()}/`); void send(`It's the letter ${L}, ${L} says /${L.toLowerCase()}/.`); }}
                         className="h-16 w-16 rounded-2xl text-3xl font-extrabold text-white shadow-md active:scale-90 disabled:opacity-50"
                         style={{ background: kidAccent }}>{L}</button>
                     ))}

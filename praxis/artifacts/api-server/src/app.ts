@@ -20,7 +20,7 @@ import { shouldRedirectToCanonical } from "./lib/canonicalHost";
 const app: Express = express();
 
 // Behind Railway's proxy: trust exactly one hop so req.ip / X-Forwarded-For are the real client
-// (needed for correct rate-limit keying and audit IPs). Not `true` — that would trust a spoofable
+// (needed for correct rate-limit keying and audit IPs). Not `true`, that would trust a spoofable
 // chain and express-rate-limit rejects it.
 app.set("trust proxy", 1);
 
@@ -53,7 +53,7 @@ app.use(helmet({
 // Tuned, ENFORCED Content-Security-Policy. Verified first in report-only mode (zero violations across
 // the app's core pages) before enforcing. Deliberately pragmatic for an LMS: HTTPS media / uploads /
 // embeds (Supabase storage audio+video, external images, framed learning content) and wss realtime
-// are allowed so nothing in the learning flow breaks, while the real wins are enforced — no plugins
+// are allowed so nothing in the learning flow breaks, while the real wins are enforced, no plugins
 // (object-src none), no base-uri or cross-origin form hijack, and clickjacking protection via
 // frame-ancestors. 'unsafe-inline' stays because the SPA uses pervasive inline styles + bootstrap.
 //
@@ -61,7 +61,7 @@ app.use(helmet({
 // /a/:token embeds are DESIGNED to be embedded on external sites, so they allow any ancestor.
 //
 // ROLLBACK: if an un-tested page trips it, change the header name below back to
-// "Content-Security-Policy-Report-Only" — that instantly stops blocking while keeping the reports.
+// "Content-Security-Policy-Report-Only", that instantly stops blocking while keeping the reports.
 const CSP_BASE = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' https://www.youtube.com https://s.ytimg.com",
@@ -82,7 +82,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting. In-process store (per instance) — a real backstop for a single Railway instance;
+// Rate limiting. In-process store (per instance), a real backstop for a single Railway instance;
 // swap for a shared store (Redis) before horizontal scaling. Auth/impersonation paths are throttled
 // hard against credential stuffing; the broad /api limit is a generous DoS backstop that will not
 // trip a normal dashboard.
@@ -93,7 +93,7 @@ const authLimiter = rateLimit({
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, limit: 1000, standardHeaders: "draft-7", legacyHeaders: false,
   // Exempt the health/identity probes: /api/readyz is this service's Railway
-  // healthcheck, so it must never be rate-limited — a traffic spike would
+  // healthcheck, so it must never be rate-limited, a traffic spike would
   // otherwise 429 the probe and get an otherwise-healthy instance restarted at
   // the worst possible moment. (req.originalUrl is the full path across the /api mount.)
   skip: (req) => {

@@ -96,7 +96,7 @@ router.post("/sessions", requireAuth, async (req, res) => {
 
   // Authorization: the module must exist and be published, and the learner
   // must have an active enrolment in its course. This keeps credentials
-  // trustworthy — you can only earn one for content you are enrolled in.
+  // trustworthy, you can only earn one for content you are enrolled in.
   const module = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, moduleId) });
   if (!module || module.status !== "published") {
     res.status(404).json({ error: "Module not available" });
@@ -236,7 +236,7 @@ router.get("/sessions/:sessionId", requireAuth, async (req, res) => {
   });
 });
 
-// POST /sessions/:sessionId/respond — SSE streaming Socratic response
+// POST /sessions/:sessionId/respond, SSE streaming Socratic response
 router.post("/sessions/:sessionId/respond", requireAuth, async (req, res) => {
   const { response, beatId } = req.body;
   const isSelection = req.body?.isSelection === true;
@@ -499,7 +499,7 @@ router.get("/sessions/:sessionId/analysis", requireAuth, async (req, res) => {
 });
 
 /**
- * POST /sessions/:sessionId/worked-example — the deliberate scaffolding bump.
+ * POST /sessions/:sessionId/worked-example, the deliberate scaffolding bump.
  *
  * When a learner has struggled several times, another Socratic question adds load
  * without adding support. This ONE turn relaxes the "questions only" rule and gives a

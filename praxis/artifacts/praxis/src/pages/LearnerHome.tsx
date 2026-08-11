@@ -13,7 +13,6 @@ import {
   Megaphone,
   ArrowRight,
   GraduationCap,
-  Sparkles,
   CheckCircle2,
   LifeBuoy,
 } from "lucide-react";
@@ -273,8 +272,8 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
       {/* K-12: one slim status band (level/XP + supports) sits ABOVE the lessons but stays small, so the
           lessons remain the hero. Non-K-12 learners keep the full supports + gamification panels. */}
       {isK12 && <K12Gamification compact />}
-      {/* Maximum-gamification personas (e.g. the Grade-6 showcase) get the FULL suite —
-          class leaderboard, mascots along the quest map, badge board and confetti — not just
+      {/* Maximum-gamification personas (e.g. the Grade-6 showcase) get the FULL suite, 
+          class leaderboard, mascots along the quest map, badge board and confetti, not just
           the slim bar. Other K-12 learners keep the lessons as the hero. */}
       {isK12 && persona?.maxGamified && <K12Gamification />}
       {!isK12 && <AccommodationsPanel />}
@@ -480,7 +479,6 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
           {!plan?.catchUp?.active && (
             <Card className="p-5 bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
               <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="h-4 w-4 text-primary" />
                 <h2 className="font-serif font-semibold">Your coach</h2>
               </div>
               {nextUp ? (

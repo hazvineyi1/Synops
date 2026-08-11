@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { Check, MessageCircle, Sparkles } from "lucide-react";
+import { Check, MessageCircle } from "lucide-react";
 
 export function CoachSettings() {
   const { data: profile, isLoading, isError } = useCoachProfile();
@@ -60,11 +60,11 @@ export function CoachSettings() {
 
   return (
     <div className="space-y-8 max-w-3xl">
-      <PageHeader title="Your coach" icon={Sparkles} subtitle="Shape how your coach questions you. Changes apply to your next exchange, here and on WhatsApp." />
+      <PageHeader title="Your coach" icon={MessageCircle} subtitle="Shape how your coach questions you. Changes apply to your next exchange, here and on WhatsApp." />
 
       {/* Personality */}
       <section className="space-y-3">
-        <SectionHeading icon={Sparkles} title="Coaching style" hint="How your coach pushes and encourages you." />
+        <SectionHeading icon={MessageCircle} title="Coaching style" hint="How your coach pushes and encourages you." />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {(Object.keys(PERSONALITY_META) as CoachPersonality[]).map((key) => {
             const m = PERSONALITY_META[key];

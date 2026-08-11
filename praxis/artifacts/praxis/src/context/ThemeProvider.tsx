@@ -37,7 +37,7 @@ export function useBrandTheme() {
 }
 
 /**
- * Public branding resolved from the current hostname. Only runs when signed out — on a partner's
+ * Public branding resolved from the current hostname. Only runs when signed out, on a partner's
  * custom domain this themes the login/marketing pages before any session exists. On the app's own
  * domain the endpoint returns the platform default, so nothing changes.
  */

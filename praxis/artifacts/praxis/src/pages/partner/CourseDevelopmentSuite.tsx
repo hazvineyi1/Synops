@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ActivityPlayer } from '@/components/ActivityPlayer';
 import { cn } from '@/lib/utils';
 import {
-  Sparkles, Target, ClipboardCheck, Video, ArrowLeft, Wand2, CheckCircle2, AlertTriangle,
+  Target, ClipboardCheck, Video, ArrowLeft, CheckCircle2, AlertTriangle,
   Check, X, Pencil, Play, ShieldCheck, FileText, Film, RotateCcw, ClipboardList, Rocket, BookOpen,
 } from 'lucide-react';
 import {
@@ -43,7 +43,7 @@ export function CourseDevelopmentSuite() {
         <button onClick={() => navigate('/learning')} className="mb-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Learning Hub
         </button>
-        <PageHeader title="Course Development Suite" icon={Sparkles}
+        <PageHeader title="Course Development Suite" icon={Rocket}
           subtitle="From a course description and your uploaded materials: generate Bloom-aligned objectives, scaffold assessments, and author interactive video. Every AI draft is reviewed by you before it ships." />
       </div>
 
@@ -79,7 +79,7 @@ export function CourseDevelopmentSuite() {
                 </button>
               ))}
             </div>
-            <Button className="gap-1.5" onClick={genObjectives} disabled={!levels.length}><Wand2 className="h-4 w-4" /> Generate objectives</Button>
+            <Button className="gap-1.5" onClick={genObjectives} disabled={!levels.length}>Generate objectives</Button>
           </Card>
 
           {objectives.length > 0 && (
@@ -221,7 +221,7 @@ function ReviewFinalize() {
             {!readyToPublish && detail?.status !== 'published' && <p className="text-xs text-amber-600 mt-2">Resolve the amber items to publish. You can still publish individual modules/activities as you go.</p>}
           </Card>
 
-          {/* Modules — open each to review its content and video */}
+          {/* Modules, open each to review its content and video */}
           <Card className="p-5">
             <SectionTitle>Modules ({modules.length})</SectionTitle>
             {detailLoading ? <Skeleton className="h-16 mt-3" /> : (detailError || !detail) ? (
@@ -245,7 +245,7 @@ function ReviewFinalize() {
             )}
           </Card>
 
-          {/* Interactive activities — preview inline */}
+          {/* Interactive activities, preview inline */}
           <Card className="p-5">
             <SectionTitle>Interactive activities ({activities.length}{withVideo.length ? ` · ${withVideo.length} video` : ''})</SectionTitle>
             {activities.length === 0 ? (
@@ -355,7 +355,7 @@ function InteractiveVideo({ videos }: { videos: { id: string; title: string }[] 
               {videos.length === 0 && <option value="">No videos - upload one in the Learning Hub</option>}
               {videos.map((v) => <option key={v.id} value={v.id}>{v.title}</option>)}
             </select></label>
-          <Button className="gap-1.5" onClick={run} disabled={!sourceId}><Wand2 className="h-4 w-4" /> {segments ? 'Re-run auto-audit' : 'Run AI auto-audit'}</Button>
+          <Button className="gap-1.5" onClick={run} disabled={!sourceId}>{segments ? 'Re-run auto-audit' : 'Run AI auto-audit'}</Button>
         </div>
 
         {segments && (

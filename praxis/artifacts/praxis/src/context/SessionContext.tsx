@@ -148,7 +148,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const stopImpersonating = useCallback(async () => {
     // Restores the admin's own session from the praxis_impersonator cookie (server-side),
     // then a FULL reload so every cached query resets to the restored admin identity. This
-    // must NOT be signOut — that would revoke the session and drop the admin at /sign-in.
+    // must NOT be signOut, that would revoke the session and drop the admin at /sign-in.
     await fetch(`${API}/platform/stop-impersonating`, { method: "POST", credentials: "include" }).catch(
       () => {},
     );

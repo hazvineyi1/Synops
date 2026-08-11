@@ -7,7 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { courseProgress } from "./progressMath";
 
 /**
- * Class insight aggregation — turns the activity/game/Math-Coach submissions and lesson progress of a
+ * Class insight aggregation, turns the activity/game/Math-Coach submissions and lesson progress of a
  * class's learners into a per-learner and class-level picture a teacher can act on. Off-track is
  * derived from the signals we actually have here (progress, scores, recency) so it works even when the
  * formal gradebook-alert pipeline hasn't run for a course.
@@ -62,7 +62,7 @@ export async function computeClassInsights(classId: string): Promise<ClassInsigh
   const users = await db.select({ id: usersTable.id, firstName: usersTable.firstName, lastName: usersTable.lastName, email: usersTable.email }).from(usersTable).where(inArray(usersTable.id, learnerIds));
   const userById = new Map(users.map((u) => [u.id, u]));
 
-  // Which of the class's courses each learner is actually enrolled in — progress is averaged over
+  // Which of the class's courses each learner is actually enrolled in, progress is averaged over
   // those, not all class courses (a learner may only take one subject in the class).
   const enrols = courseIds.length
     ? await db.select({ userId: enrolmentsTable.userId, courseId: enrolmentsTable.courseId }).from(enrolmentsTable).where(and(inArray(enrolmentsTable.userId, learnerIds), inArray(enrolmentsTable.courseId, courseIds)))

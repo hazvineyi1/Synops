@@ -1,5 +1,5 @@
 /**
- * Generic activity template engine — the single source of truth for building interactive,
+ * Generic activity template engine, the single source of truth for building interactive,
  * gamified activities from a small structured SPEC (the content). Used by:
  *  - the no-code builder (author fills a form -> spec -> renderActivity),
  *  - the AI generator (Claude returns a spec -> renderActivity),

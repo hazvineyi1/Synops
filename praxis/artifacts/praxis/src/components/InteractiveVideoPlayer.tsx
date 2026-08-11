@@ -22,7 +22,7 @@ export interface IVQuestion {
   questionType: string;
   points: number;
   pauseOnReach: boolean;
-  // Present only for inline (catalog-authored) questions — enables local grading with no beat.
+  // Present only for inline (catalog-authored) questions, enables local grading with no beat.
   correctOptionIds?: string[];
   feedbackCorrect?: string;
   feedbackIncorrect?: string;
@@ -150,7 +150,7 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQues
       const resp = activeQuestion.questionType === 'check_all' ? selectedOptions : selectedOptions[0];
       respondMutation.mutate({ questionId: activeQuestion.id, response: resp });
     } else {
-      // Inline (catalog) question — grade locally against the provided correct answers.
+      // Inline (catalog) question, grade locally against the provided correct answers.
       const correctIds = activeQuestion.correctOptionIds ?? [];
       const isCorrect = activeQuestion.questionType === 'check_all'
         ? correctIds.length === selectedOptions.length && correctIds.every((c) => selectedOptions.includes(c))
@@ -173,7 +173,7 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQues
         ) : isFile ? (
           <video ref={videoRef} src={resolved.src} className="w-full h-full object-contain" controls={!activeQuestion} onTimeUpdate={onFileTime} onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)} />
         ) : (
-          // Providers without a JS API (Vimeo, TikTok…) — inline embed, no checkpoints.
+          // Providers without a JS API (Vimeo, TikTok…), inline embed, no checkpoints.
           <iframe src={resolved.src} title="Lesson video" className="absolute inset-0 w-full h-full" referrerPolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
         )}
 

@@ -3,9 +3,9 @@ import { drawLetterheadHeader, drawLetterheadFooters, LETTERHEAD } from "./lette
 
 /**
  * Renders an AccreditationReport to downloadable files.
- *  - Excel via ExcelJS — Summary, Standards coverage matrix, Gaps sheets. (Replaced SheetJS/xlsx,
+ *  - Excel via ExcelJS, Summary, Standards coverage matrix, Gaps sheets. (Replaced SheetJS/xlsx,
  *    which is stuck on 0.18.5 on npm with unpatched CVEs.)
- *  - PDF via pdfkit — a formatted self-study document organised by framework + standard.
+ *  - PDF via pdfkit, a formatted self-study document organised by framework + standard.
  * Both libraries are dynamically imported and externalised in build.mjs.
  */
 
@@ -150,7 +150,7 @@ export async function buildPdf(report: AccreditationReport): Promise<Buffer> {
       lastFramework = r.framework;
     }
     ensure(74);
-    doc.fillColor(ink).fontSize(11).font("Helvetica-Bold").text(`${r.code} — ${r.title}`, { width });
+    doc.fillColor(ink).fontSize(11).font("Helvetica-Bold").text(`${r.code}, ${r.title}`, { width });
     const meta = [
       r.nqfLevel !== null ? `NQF ${r.nqfLevel}` : null,
       r.credits !== null ? `${r.credits} credits` : null,
@@ -172,16 +172,16 @@ export async function buildPdf(report: AccreditationReport): Promise<Buffer> {
   doc.moveDown(0.4);
   doc.fillColor(soft).fontSize(11).font("Helvetica-Bold").text("Standards covered but without learner evidence");
   doc.fontSize(9.5).font("Helvetica");
-  if (report.gaps.noEvidence.length === 0) doc.fillColor("#6b7a76").text("None — every covered standard has evidence.");
-  else report.gaps.noEvidence.forEach((g) => { ensure(16); doc.fillColor(ink).text(`• ${g.code} — ${g.title}`); });
+  if (report.gaps.noEvidence.length === 0) doc.fillColor("#6b7a76").text("None, every covered standard has evidence.");
+  else report.gaps.noEvidence.forEach((g) => { ensure(16); doc.fillColor(ink).text(`• ${g.code}, ${g.title}`); });
   doc.moveDown(0.6);
   doc.fillColor(soft).fontSize(11).font("Helvetica-Bold").text("Published courses not mapped to any unit standard");
   doc.fontSize(9.5).font("Helvetica");
-  if (report.gaps.unmappedCourses.length === 0) doc.fillColor("#6b7a76").text("None — every published course maps to at least one standard.");
+  if (report.gaps.unmappedCourses.length === 0) doc.fillColor("#6b7a76").text("None, every published course maps to at least one standard.");
   else report.gaps.unmappedCourses.forEach((c) => { ensure(16); doc.fillColor(ink).text(`• ${c.title}`); });
 
   // Standard letterhead footer on every page (provider name + doc title + page X of Y).
-  drawLetterheadFooters(doc as never, `Accreditation Readiness Report — ${report.org.name}`);
+  drawLetterheadFooters(doc as never, `Accreditation Readiness Report, ${report.org.name}`);
 
   doc.end();
   return done;

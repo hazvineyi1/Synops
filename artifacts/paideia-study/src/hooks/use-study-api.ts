@@ -1040,7 +1040,7 @@ export function useStudyRevokeApiKey() {
   });
 }
 
-// Re-run concept extraction for a material (synchronous — returns the new count or
+// Re-run concept extraction for a material (synchronous, returns the new count or
 // an error). Recovers a material stuck on "analyzing", or kicks extraction off.
 export function useStudyReanalyzeMaterial() {
   return useMutation<{ conceptCount: number; warning?: string }, ErrorType<unknown>, string>({

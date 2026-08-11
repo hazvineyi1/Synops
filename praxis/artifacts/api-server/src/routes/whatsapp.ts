@@ -102,7 +102,7 @@ async function startSession(
   return { sessionId: session.id, beat: firstBeat ?? null, opening };
 }
 
-// POST /whatsapp/webhook — Twilio inbound (two-way Socratic dialogue over WhatsApp)
+// POST /whatsapp/webhook, Twilio inbound (two-way Socratic dialogue over WhatsApp)
 router.post(
   "/whatsapp/webhook",
   express.urlencoded({ extended: false }),
@@ -297,7 +297,7 @@ router.post(
   }
 );
 
-// POST /whatsapp/test-send — dev helper to verify outbound is configured.
+// POST /whatsapp/test-send, dev helper to verify outbound is configured.
 // Restricted to non-production or platform admins so it can't be abused to
 // burn Twilio outbound spend.
 router.post("/whatsapp/test-send", requireAuth, async (req, res) => {
@@ -315,7 +315,7 @@ router.post("/whatsapp/test-send", requireAuth, async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 });
 
-// GET /whatsapp/status — is the outbound channel live?
+// GET /whatsapp/status, is the outbound channel live?
 router.get("/whatsapp/status", requireAuth, async (_req, res) => {
   res.json({ configured: twilioConfigured() });
 });

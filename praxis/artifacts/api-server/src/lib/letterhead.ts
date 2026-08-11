@@ -15,7 +15,7 @@
 export const LETTERHEAD = {
   providerName: "Synops Consulting Group",
   strapline: "Skills development, training and coaching",
-  confidentiality: "Confidential — prepared by Synops Consulting Group.",
+  confidentiality: "Confidential, prepared by Synops Consulting Group.",
 };
 
 /** pdfkit doc surface we depend on (kept loose because pdfkit is imported dynamically). */
@@ -73,7 +73,7 @@ export function drawLetterheadFooters(doc: PdfLike, docTitle: string, colors: Le
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
     doc.fillColor(sub).fontSize(8).font("Helvetica").text(
-      `${LETTERHEAD.providerName} — ${docTitle} — page ${i + 1} of ${range.count}`,
+      `${LETTERHEAD.providerName}, ${docTitle}, page ${i + 1} of ${range.count}`,
       left, doc.page.height - 34, { width, align: "center" },
     );
   }

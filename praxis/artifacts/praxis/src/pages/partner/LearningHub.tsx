@@ -9,7 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import {
   BookOpen, Upload, Video, FileText, Link2, Image as ImageIcon, Package, Layers,
-  Building2, Check, CheckCircle2, Clock, Trash2, Sparkles, GraduationCap, ArrowRight, Send,
+  Building2, Check, CheckCircle2, Clock, Trash2, GraduationCap, ArrowRight, Send,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
@@ -172,7 +172,6 @@ export function LearningHub() {
         {/* ── Courses & Templates ─────────────────────────── */}
         <TabsContent value="templates" className="mt-4 space-y-4">
           <Card className="p-4 flex items-start gap-3 text-sm border-dashed">
-            <Sparkles className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <div className="text-muted-foreground">Reusable templates are the starting point for every partner course. Open the Course Development Suite to generate objectives and assessments from a description and your uploaded materials.</div>
           </Card>
           <div className="grid sm:grid-cols-2 gap-3">
@@ -226,7 +225,7 @@ export function LearningHub() {
       {/* Bridge to the Course Development Suite (Phase 3) */}
       <Card className="p-5 flex flex-wrap items-center justify-between gap-3 bg-primary/5 border-primary/20">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Sparkles className="h-5 w-5" /></span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"><Layers className="h-5 w-5" /></span>
           <div>
             <div className="text-sm font-semibold">Course Development Suite</div>
             <div className="text-xs text-muted-foreground">Generate learning objectives, assessments and interactive video from a description and your materials.</div>

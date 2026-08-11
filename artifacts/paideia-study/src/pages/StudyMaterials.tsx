@@ -11,7 +11,7 @@ import {
   getListStudyMaterialsQueryKey,
 } from "@workspace/paideia-api-client";
 import { useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2, BookOpen, FileText, Layers, Sparkles, Network, ChevronRight } from "lucide-react";
+import { Plus, Trash2, BookOpen, FileText, Layers, Network, ChevronRight } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
 import { useStudyAuth } from "@/hooks/use-study-auth";
 
@@ -137,7 +137,7 @@ export default function StudyMaterials() {
                             {m.conceptCount ?? 0} concepts
                           </span>
                           <span className="flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" />
+                            <Layers className="h-3 w-3" />
                             {m.flashcardCount ?? 0} flashcards
                           </span>
                           <span>{new Date(m.createdAt).toLocaleDateString()}</span>

@@ -9,7 +9,7 @@ import { logger } from "../lib/logger";
  * REMOVEBG_API_KEY env var) and cached in memory, so the browser only ever sees a same-origin PNG.
  *
  * IMPORTANT: REMOVEBG_API_KEY must be set as an env var on the praxis-api Railway service (and the
- * remove.bg account must have quota). Without it, backgrounds are NOT removed — every key 302-redirects
+ * remove.bg account must have quota). Without it, backgrounds are NOT removed, every key 302-redirects
  * to the full source photo (still a real photo, just with its background). Setting the key upgrades the
  * images to cut-outs automatically on next load (the fallback is served no-store), no redeploy needed.
  *
@@ -19,7 +19,7 @@ import { logger } from "../lib/logger";
  */
 const router = Router();
 
-// Source photos (same set as the frontend kidPictures map). Whitelisted — nothing else is fetchable.
+// Source photos (same set as the frontend kidPictures map). Whitelisted, nothing else is fetchable.
 const S = (id: string) => `https://images.unsplash.com/photo-${id}?w=600&h=600&fit=crop&crop=entropy&auto=format&q=80`;
 const KID_SRC: Record<string, string> = {
   cat: S("1514888286974-6c03e2ca1dba"),
@@ -31,11 +31,11 @@ const KID_SRC: Record<string, string> = {
   fish: S("1522069169874-c58ec4b76be5"),
   tree: S("1502082553048-f009c37129b9"),
   // Topical objects so EVERY subject (not just reading) shows a real background-removed photo.
-  flag: S("1626836014893-37663794dca7"),    // US flag — civics / government
-  gavel: S("1676181739859-08330dea8999"),   // gavel — civics / law
-  book: S("1527176930608-09cb256ab504"),     // single open book on white — reading / history / writing
-  pencil: S("1595584354232-f07d525d87c1"),   // pencil — writing / math
-  globe: S("1593632717071-218c1d85c663"),    // desk globe on light bg — world history / civilizations
+  flag: S("1626836014893-37663794dca7"),    // US flag, civics / government
+  gavel: S("1676181739859-08330dea8999"),   // gavel, civics / law
+  book: S("1527176930608-09cb256ab504"),     // single open book on white, reading / history / writing
+  pencil: S("1595584354232-f07d525d87c1"),   // pencil, writing / math
+  globe: S("1593632717071-218c1d85c663"),    // desk globe on light bg, world history / civilizations
 };
 
 const cache = new Map<string, Buffer>();

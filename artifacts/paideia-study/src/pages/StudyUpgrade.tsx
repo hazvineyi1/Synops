@@ -105,7 +105,7 @@ export default function StudyUpgrade() {
   const isUS = useMemo(() => isUsAudience(), []);
 
   const country = useMemo(() => {
-    const code = isUS ? "ZW" : countryCode; // ZW's currency is USD — the USD anchor
+    const code = isUS ? "ZW" : countryCode; // ZW's currency is USD, the USD anchor
     const found = config?.countries.find((c) => c.code === code);
     if (!found) return null;
     const methods = isUS

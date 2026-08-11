@@ -19,7 +19,7 @@ export interface SocraticContext {
   recentPerformance?: "struggling" | "steady" | "thriving"; // drives adaptive cadence
 }
 
-// ── Coach personalities (Coach-inspired) — voice & pressure only.
+// ── Coach personalities (Coach-inspired), voice & pressure only.
 // Accuracy, pedagogy and memory are identical across all four.
 const PERSONALITIES: Record<string, string> = {
   socratic_mentor:
@@ -54,14 +54,14 @@ const ACCOMMODATIONS: Record<string, string> = {
     "Avoid idioms, sarcasm and figurative language. Ask exactly what you mean.",
 };
 
-// ── VARK learning styles — adapt HOW you question, never label the learner.
+// ── VARK learning styles, adapt HOW you question, never label the learner.
 const VARK: Record<string, string> = {
   visual:
     "LEARNING STYLE (adapt questioning): ask the learner to picture, map or sketch relationships. Use spatial framing ('where does this sit relative to...').",
   auditory:
     "LEARNING STYLE (adapt questioning): keep it conversational, invite the learner to talk it through aloud, to explain as if teaching a colleague.",
   kinesthetic:
-    "LEARNING STYLE (adapt questioning): frame around action and doing — 'walk me through what you would physically do next'.",
+    "LEARNING STYLE (adapt questioning): frame around action and doing, 'walk me through what you would physically do next'.",
   reading_writing:
     "LEARNING STYLE (adapt questioning): invite precise, structured wording, definitions and step lists in prose.",
 };
@@ -189,7 +189,7 @@ export function buildSocraticSystemPrompt(ctx: SocraticContext, isOpening: boole
 }
 
 /**
- * Non-streaming Socratic turn — used by channels that cannot stream
+ * Non-streaming Socratic turn, used by channels that cannot stream
  * (e.g. WhatsApp). Returns the full coach question, guaranteed to end
  * on a question mark.
  */

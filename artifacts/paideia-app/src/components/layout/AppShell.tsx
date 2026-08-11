@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useUsage } from "@/hooks/use-usage";
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "@/lib/api";
-import { LayoutDashboard, FileText, ClipboardList, MessageSquare, HelpCircle, Users, Settings, LogOut, BarChart3, FolderOpen, FolderInput, Inbox, Sparkles, Home } from "lucide-react";
+import { LayoutDashboard, FileText, ClipboardList, MessageSquare, HelpCircle, Users, Settings, LogOut, BarChart3, FolderOpen, FolderInput, Inbox, Home } from "lucide-react";
 
 const NAV = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -119,7 +119,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="block mb-2 px-3 py-2 rounded-md bg-secondary/60 hover:bg-secondary text-xs"
             >
               <div className="flex items-center gap-2 mb-1">
-                <Sparkles className="h-3.5 w-3.5 text-accent" />
                 <span className="font-medium">{usage.used} of {usage.limit} free generations</span>
               </div>
               <div className="text-muted-foreground">
@@ -131,7 +130,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
           {usage?.subscribed ? (
             <div className="mb-2 px-3 py-2 rounded-md bg-primary/10 text-xs flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
               <span className="font-medium text-primary">Unlimited plan</span>
             </div>
           ) : null}

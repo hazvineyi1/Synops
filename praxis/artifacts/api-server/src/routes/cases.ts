@@ -56,7 +56,7 @@ function canAuthorCases(role: string): boolean {
 
 /**
  * A case's `organisationId` is a generic tenant id that may be an organisation OR a
- * partner — exactly like a course's tenantId. Partner admins (transitional flatten) carry
+ * partner, exactly like a course's tenantId. Partner admins (transitional flatten) carry
  * partnerId with a null organisationId, so a case they author is tenant-scoped to their
  * partner. Scope checks therefore match EITHER the user's org or their partner.
  */
@@ -115,7 +115,7 @@ function caseResponse(c: CaseScenario) {
 
 /* ───────────────────────────── Authoring CRUD ───────────────────────────── */
 
-// GET /courses/:courseId/cases — case studies attached to a course (via gradebook case columns).
+// GET /courses/:courseId/cases, case studies attached to a course (via gradebook case columns).
 router.get("/courses/:courseId/cases", requireAuth, async (req, res) => {
   const items = await db.select().from(gradebookItemsTable)
     .where(and(eq(gradebookItemsTable.courseId, req.params.courseId), eq(gradebookItemsTable.sourceType, "case")));
@@ -130,7 +130,7 @@ router.get("/courses/:courseId/cases", requireAuth, async (req, res) => {
   })));
 });
 
-// GET /modules/:moduleId/cases — case studies homed in a specific module. Any authenticated learner
+// GET /modules/:moduleId/cases, case studies homed in a specific module. Any authenticated learner
 // working through the module can see its published cases, regardless of which org owns the case.
 router.get("/modules/:moduleId/cases", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
@@ -141,7 +141,7 @@ router.get("/modules/:moduleId/cases", requireAuth, async (req, res) => {
   res.json(rows.map(caseResponse));
 });
 
-// GET /cases — list cases visible to the caller.
+// GET /cases, list cases visible to the caller.
 router.get("/cases", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const status = typeof req.query.status === "string" ? req.query.status : undefined;
@@ -192,7 +192,7 @@ router.get("/cases", requireAuth, async (req, res) => {
   res.json(rows.slice(offset, offset + limit).map(caseResponse));
 });
 
-// GET /cases/:id — a single case (+ rubric).
+// GET /cases/:id, a single case (+ rubric).
 router.get("/cases/:id", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
@@ -203,7 +203,7 @@ router.get("/cases/:id", requireAuth, async (req, res) => {
   res.json({ ...caseResponse(c), rubric: rubric ? { criteria: rubric.criteria, totalPoints: rubric.totalPoints } : null, canManage: canManageCase(u, c) });
 });
 
-// POST /cases — create a case.
+// POST /cases, create a case.
 router.post("/cases", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   if (!canAuthorCases(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -250,7 +250,7 @@ router.post("/cases", requireAuth, async (req, res) => {
   res.status(201).json(caseResponse(row));
 });
 
-// PUT /cases/:id — update a case.
+// PUT /cases/:id, update a case.
 router.put("/cases/:id", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
@@ -275,7 +275,7 @@ router.put("/cases/:id", requireAuth, async (req, res) => {
   if (b.promptLimit !== undefined && Number.isFinite(b.promptLimit)) up.promptLimit = Math.max(3, Math.min(20, Math.round(b.promptLimit)));
   if (b.status !== undefined && ["draft", "published"].includes(b.status)) up.status = b.status;
   if (b.tags !== undefined) up.tags = Array.isArray(b.tags) ? b.tags : null;
-  // Publishing requires a fact pattern — check the effective value (incoming or existing).
+  // Publishing requires a fact pattern, check the effective value (incoming or existing).
   if (up.status === "published") {
     const effectiveContext = b.contextBlock !== undefined ? b.contextBlock : c.contextBlock;
     if (!effectiveContext || !String(effectiveContext).trim()) {
@@ -301,7 +301,7 @@ router.delete("/cases/:id", requireAuth, async (req, res) => {
   res.status(204).send();
 });
 
-// POST /cases/:id/fork — duplicate an existing case into the author's scope.
+// POST /cases/:id/fork, duplicate an existing case into the author's scope.
 router.post("/cases/:id/fork", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   if (!canAuthorCases(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -348,7 +348,7 @@ router.get("/cases/:id/rubric", requireAuth, async (req, res) => {
   res.json(rubric ? { criteria: rubric.criteria, totalPoints: rubric.totalPoints } : { criteria: [], totalPoints: 100 });
 });
 
-// PUT /cases/:id/rubric — upsert; syncs unit-standard mappings so standard-linked criteria
+// PUT /cases/:id/rubric, upsert; syncs unit-standard mappings so standard-linked criteria
 // flow into the QCTO/SETA compliance report (target_type='case').
 router.put("/cases/:id/rubric", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
@@ -375,7 +375,7 @@ router.put("/cases/:id/rubric", requireAuth, async (req, res) => {
   res.json({ criteria, totalPoints });
 });
 
-// POST /cases/:id/rubric/generate — AI draft (does not persist).
+// POST /cases/:id/rubric/generate, AI draft (does not persist).
 router.post("/cases/:id/rubric/generate", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
@@ -413,7 +413,7 @@ router.post("/cases/:id/embed-links", requireAuth, async (req, res) => {
   res.status(201).json({ id: link.id, token: link.token, label: link.label, isActive: link.isActive, accessCount: 0, expiresAt: link.expiresAt?.toISOString() ?? null, createdAt: link.createdAt.toISOString() });
 });
 
-// DELETE /cases/:id/embed-links/:linkId — deactivate (soft) a link.
+// DELETE /cases/:id/embed-links/:linkId, deactivate (soft) a link.
 router.delete("/cases/:id/embed-links/:linkId", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
@@ -468,7 +468,7 @@ function ctxFromCase(c: CaseScenario, learner: U | null, turnCount: number, lang
   };
 }
 
-// POST /cases/:id/sessions — start an authenticated attempt.
+// POST /cases/:id/sessions, start an authenticated attempt.
 router.post("/cases/:id/sessions", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
@@ -526,7 +526,7 @@ router.get("/case-sessions/my", requireAuth, async (req, res) => {
   res.json(rows.map(sessionResponse));
 });
 
-// GET /cases/:id/sessions — author/admin review of attempts on a case.
+// GET /cases/:id/sessions, author/admin review of attempts on a case.
 router.get("/cases/:id/sessions", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
@@ -555,7 +555,7 @@ router.get("/case-sessions/:id", requireAuth, async (req, res) => {
   });
 });
 
-// POST /case-sessions/:id/language — switch the language of a live session. Everything the
+// POST /case-sessions/:id/language, switch the language of a live session. Everything the
 // system produced (the fact pattern + every prior tutor turn) is re-translated into the new
 // language and persisted, so the whole conversation reads in the chosen language immediately;
 // subsequent turns are generated in it too. The learner's own typed messages are left exactly
@@ -572,7 +572,7 @@ router.post("/case-sessions/:id/language", requireAuth, async (req, res) => {
 
   const src = (s.messages ?? []) as CaseMessage[];
 
-  // No-op fast path: already in this language — return the current view unchanged.
+  // No-op fast path: already in this language, return the current view unchanged.
   if (lang === (s.language ?? c.language)) {
     res.json({
       language: lang,
@@ -607,7 +607,7 @@ router.post("/case-sessions/:id/language", requireAuth, async (req, res) => {
   res.json({ language: lang, messages: newMessages, contextBlock: facts.context, learningObjective: facts.objective });
 });
 
-// POST /case-sessions/:id/message — SSE streaming Socratic turn.
+// POST /case-sessions/:id/message, SSE streaming Socratic turn.
 router.post("/case-sessions/:id/message", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const { response } = req.body ?? {};
@@ -674,7 +674,7 @@ router.post("/case-sessions/:id/message", requireAuth, async (req, res) => {
   }
 });
 
-// POST /case-sessions/:id/complete — generate + persist the end-of-session analysis.
+// POST /case-sessions/:id/complete, generate + persist the end-of-session analysis.
 router.post("/case-sessions/:id/complete", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const s = await db.query.caseSessionsTable.findFirst({ where: eq(caseSessionsTable.id, req.params.id) });
@@ -735,7 +735,7 @@ function roleTier(role: string): Tier | null {
   return null;
 }
 
-/** Active (non-revoked) grants for a case — used for chain enforcement + dedup. */
+/** Active (non-revoked) grants for a case, used for chain enforcement + dedup. */
 async function activeAssignments(caseId: string): Promise<CaseAssignment[]> {
   return db.select().from(caseAssignmentsTable).where(and(eq(caseAssignmentsTable.caseId, caseId), ne(caseAssignmentsTable.status, "revoked")));
 }
@@ -770,7 +770,7 @@ function assignmentResponse(a: CaseAssignment) {
   };
 }
 
-// GET /cases/:id/assign/targets — the eligible recipients for the actor's next tier, each
+// GET /cases/:id/assign/targets, the eligible recipients for the actor's next tier, each
 // flagged if already assigned; learner tier also returns the org's cohorts (course groups).
 router.get("/cases/:id/assign/targets", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
@@ -818,7 +818,7 @@ router.get("/cases/:id/assign/targets", requireAuth, async (req, res) => {
   res.json({ tier, targets: learners.map((l) => ({ id: l.id, name: [l.firstName, l.lastName].filter(Boolean).join(" ") || l.email, alreadyAssigned: set.has(l.id) })), groups });
 });
 
-// POST /cases/:id/assign — grant a case down one tier of the chain.
+// POST /cases/:id/assign, grant a case down one tier of the chain.
 router.post("/cases/:id/assign", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
@@ -888,7 +888,7 @@ router.post("/cases/:id/assign", requireAuth, async (req, res) => {
   res.status(201).json({ created: inserted.length, skipped, assignments: inserted.map(assignmentResponse) });
 });
 
-// GET /cases/:id/assignments — grants on this case within the actor's scope, with target names.
+// GET /cases/:id/assignments, grants on this case within the actor's scope, with target names.
 router.get("/cases/:id/assignments", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const c = await db.query.caseScenariosTable.findFirst({ where: eq(caseScenariosTable.id, req.params.id) });
@@ -916,7 +916,7 @@ router.get("/cases/:id/assignments", requireAuth, async (req, res) => {
   })));
 });
 
-// GET /case-assignments/my — the current learner's assigned cases (+ due date + status).
+// GET /case-assignments/my, the current learner's assigned cases (+ due date + status).
 router.get("/case-assignments/my", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const rows = await db.select().from(caseAssignmentsTable)
@@ -933,7 +933,7 @@ router.get("/case-assignments/my", requireAuth, async (req, res) => {
     .filter((r) => r.caseTitle));
 });
 
-// DELETE /case-assignments/:id — revoke a grant (soft) and cascade-revoke its descendants.
+// DELETE /case-assignments/:id, revoke a grant (soft) and cascade-revoke its descendants.
 router.delete("/case-assignments/:id", requireAuth, async (req, res) => {
   const u = req.dbUser! as U;
   const a = await db.query.caseAssignmentsTable.findFirst({ where: eq(caseAssignmentsTable.id, req.params.id) });

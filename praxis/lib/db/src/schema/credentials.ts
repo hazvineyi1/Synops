@@ -32,7 +32,7 @@ export const insertCredentialSchema = createInsertSchema(credentialsTable).omit(
 export type InsertCredential = z.infer<typeof insertCredentialSchema>;
 export type Credential = typeof credentialsTable.$inferSelect;
 
-// Append-only evidence ledger — never updated, only inserted
+// Append-only evidence ledger, never updated, only inserted
 export const evidenceRecordsTable = pgTable("evidence_records", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   credentialId: text("credential_id"),

@@ -92,7 +92,7 @@ export function PlatformFinance() {
           <TabsTrigger value="filing" className="gap-1.5"><FolderOpen className="h-4 w-4" /> Contracts &amp; MOUs</TabsTrigger>
         </TabsList>
 
-        {/* Financials — aggregated from real per-partner billing + funding */}
+        {/* Financials, aggregated from real per-partner billing + funding */}
         <TabsContent value="financials" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard icon={Wallet} label="Monthly recurring (incl. VAT)" value={ZAR(totals.mrrGross)} tint="bg-emerald-500/10 text-emerald-600" />
@@ -139,7 +139,7 @@ export function PlatformFinance() {
           <p className="text-xs text-muted-foreground">Aggregated live from each partner's subscriptions, invoices and funding agreements.</p>
         </TabsContent>
 
-        {/* Contracts & MOUs — real filing cabinet */}
+        {/* Contracts & MOUs, real filing cabinet */}
         <TabsContent value="filing" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard icon={FileText} label="Documents on file" value={filingList.length} tint="bg-indigo-500/10 text-indigo-600" />

@@ -82,7 +82,7 @@ export function GradebookSettingsDialog({
                       <Input type="number" min={0} max={100} value={s.formativeWeight} onChange={(e) => upd({ formativeWeight: Number(e.target.value) })} />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">Relative weights — e.g. 70 / 30. Formative 0 = practice never counts.</p>
+                  <p className="text-xs text-muted-foreground">Relative weights, e.g. 70 / 30. Formative 0 = practice never counts.</p>
                   {categories.length > 0 && (
                     <div className="space-y-1.5">
                       <Label>Category weights</Label>

@@ -71,7 +71,7 @@ router.post("/redeem-code", async (req, res) => {
     return;
   }
   if (coupon.discountType !== "grant" || !coupon.grantTier) {
-    res.status(400).json({ error: "That's a discount code — apply it at checkout, not here." });
+    res.status(400).json({ error: "That's a discount code, apply it at checkout, not here." });
     return;
   }
   if (coupon.expiresAt && new Date(coupon.expiresAt).getTime() < Date.now()) {

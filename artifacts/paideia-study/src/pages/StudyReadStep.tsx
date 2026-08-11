@@ -6,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, BookOpen, CheckCircle2, Clock, Image as ImageIcon, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, Clock, Image as ImageIcon, Loader2 } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
 import { useMemo, useState } from "react";
 
@@ -176,7 +176,7 @@ export default function StudyReadStep() {
           <>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-blue-700 font-semibold">
-                <Sparkles className="w-4 h-4" /> AI-led step
+                AI-led step
               </div>
               {totalSteps > 0 && stepIndex >= 0 && (
                 <div className="text-xs text-gray-500">

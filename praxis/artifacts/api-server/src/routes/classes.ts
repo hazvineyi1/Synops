@@ -12,7 +12,7 @@ import { orgCourseIds, aggregateOrgCourses } from "../lib/orgCourseAgg";
 import { computeClassInsights } from "../lib/classInsights";
 
 /**
- * Organisation classes (cohorts) — real, persistent. Access: super admin, the org's partner_admin,
+ * Organisation classes (cohorts), real, persistent. Access: super admin, the org's partner_admin,
  * or an admin of the org itself. Self-creates the tables. Bulk PUT endpoints replace a class's
  * whole learner/course/staff set (so the UI can save a multi-select in one call), and an enrol
  * endpoint materialises real enrolments for every class learner x class course.
@@ -44,7 +44,7 @@ function canAdminOrg(user: U, org: { id: string; partnerId: string | null } | nu
 const strArr = (v: unknown): string[] =>
   Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && x.length > 0))] : [];
 
-// GET /organisations/:orgId/classes — class list with counts.
+// GET /organisations/:orgId/classes, class list with counts.
 router.get("/organisations/:orgId/classes", requireAuth, async (req, res) => {
   const { orgId } = req.params;
   const org = await orgFor(orgId);
@@ -88,7 +88,7 @@ async function classWithOrg(classId: string) {
   return { cls, org };
 }
 
-// GET /organisations/:orgId/courses — the org's REAL courses, replacing the old synthetic list.
+// GET /organisations/:orgId/courses, the org's REAL courses, replacing the old synthetic list.
 // A course counts as "in the org" if it is attached to one of the org's classes OR an org member is
 // enrolled in it. Enrolled counts and completion-based progress are computed from real enrolments.
 router.get("/organisations/:orgId/courses", requireAuth, async (req, res) => {
@@ -115,7 +115,7 @@ router.get("/organisations/:orgId/courses", requireAuth, async (req, res) => {
   }
 });
 
-// GET /classes/:classId — detail.
+// GET /classes/:classId, detail.
 router.get("/classes/:classId", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
   if (!cls || !canAccessOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
@@ -127,7 +127,7 @@ router.get("/classes/:classId", requireAuth, async (req, res) => {
   res.json({ id: cls.id, orgId: cls.orgId, name: cls.name, learnerIds: learners.map((r) => r.v), courseIds: courses.map((r) => r.v), staff });
 });
 
-// GET /my-classes — the classes the caller can see (for the teacher insight dashboard picker).
+// GET /my-classes, the classes the caller can see (for the teacher insight dashboard picker).
 router.get("/my-classes", requireAuth, async (req, res) => {
   const u = req.dbUser!;
   try {
@@ -153,7 +153,7 @@ router.get("/my-classes", requireAuth, async (req, res) => {
   }
 });
 
-// GET /classes/:classId/insights — aggregated per-learner + class-level stats for the teacher dashboard.
+// GET /classes/:classId/insights, aggregated per-learner + class-level stats for the teacher dashboard.
 router.get("/classes/:classId/insights", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
   if (!cls) { res.status(404).json({ error: "Not found" }); return; }
@@ -193,7 +193,7 @@ router.delete("/classes/:classId", requireAuth, async (req, res) => {
   res.status(204).send();
 });
 
-// PUT /classes/:classId/learners { learnerIds } — replace the roster.
+// PUT /classes/:classId/learners { learnerIds }, replace the roster.
 router.put("/classes/:classId/learners", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
   if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
@@ -203,7 +203,7 @@ router.put("/classes/:classId/learners", requireAuth, async (req, res) => {
   res.json({ learnerIds });
 });
 
-// PUT /classes/:classId/courses { courseIds } — replace the assigned courses.
+// PUT /classes/:classId/courses { courseIds }, replace the assigned courses.
 router.put("/classes/:classId/courses", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
   if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
@@ -213,7 +213,7 @@ router.put("/classes/:classId/courses", requireAuth, async (req, res) => {
   res.json({ courseIds });
 });
 
-// PUT /classes/:classId/staff { staff: [{staffId, role}] } — replace staff assignments.
+// PUT /classes/:classId/staff { staff: [{staffId, role}] }, replace staff assignments.
 router.put("/classes/:classId/staff", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
   if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
@@ -226,7 +226,7 @@ router.put("/classes/:classId/staff", requireAuth, async (req, res) => {
   res.json({ staff: staff.map(({ staffId, role }: { staffId: string; role: string }) => ({ staffId, role })) });
 });
 
-// POST /classes/:classId/enrol — materialise real enrolments for every learner x course in the class.
+// POST /classes/:classId/enrol, materialise real enrolments for every learner x course in the class.
 router.post("/classes/:classId/enrol", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
   if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }

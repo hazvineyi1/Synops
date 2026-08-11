@@ -24,7 +24,7 @@ const router = Router();
 const fullName = (u: { firstName: string | null; lastName: string | null; email: string } | null | undefined) =>
   u ? `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email : "Unknown";
 
-// GET /courses/:courseId/matching — everything the coach-matching dashboard needs in one call:
+// GET /courses/:courseId/matching, everything the coach-matching dashboard needs in one call:
 // the course's sections (each with its coach + learners), all enrolled learners with their
 // section + off-track flag, and the coaches available to lead a section. Facilitator-scoped.
 router.get("/courses/:courseId/matching", requireAuth, async (req, res) => {
@@ -145,7 +145,7 @@ async function canManageCourseSections(user: ScopedUser, courseId: string): Prom
   return canAccessCourse(user, course);
 }
 
-// GET /coaching/health — org/partner-wide coaching effectiveness (facilitator-scoped). The
+// GET /coaching/health, org/partner-wide coaching effectiveness (facilitator-scoped). The
 // management layer over the matching + intervention flow. Aggregation lives in lib/coachingHealth
 // so the dashboard and the digest email share one source of truth.
 router.get("/coaching/health", requireAuth, async (req, res) => {
@@ -172,13 +172,13 @@ function healthDigestHtml(health: CoachingHealth, brand: EmailBrand, appLink: st
     stat(rate, "Resolved") +
     `</tr></table>` +
     (s.unassignedFlagged > 0
-      ? `<p style="color:#b91c1c"><strong>${s.unassignedFlagged}</strong> flagged learner${s.unassignedFlagged === 1 ? " is" : "s are"} slipping through with no coach assigned — match them so someone owns the intervention.</p>`
+      ? `<p style="color:#b91c1c"><strong>${s.unassignedFlagged}</strong> flagged learner${s.unassignedFlagged === 1 ? " is" : "s are"} slipping through with no coach assigned, match them so someone owns the intervention.</p>`
       : `<p>Every flagged learner has a coach assigned.</p>`) +
     (rows ? `<p style="margin-top:12px;font-weight:600">Coaches with flagged learners</p><table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;font-size:14px">${rows}</table>` : "");
   return emailShell({ brand, heading: "Coaching health", bodyHtml: body, ctaLabel: "Open coaching health", ctaUrl: appLink });
 }
 
-// POST /coaching/health/digest — email the caller (an admin) the current coaching snapshot. This is
+// POST /coaching/health/digest, email the caller (an admin) the current coaching snapshot. This is
 // the on-demand path; a scheduled weekly send is a Railway cron hitting this endpoint.
 router.post("/coaching/health/digest", requireAuth, async (req, res) => {
   const user = req.dbUser as ScopedUser & { id: string; email?: string; organisationId?: string | null; partnerId?: string | null };
@@ -278,7 +278,7 @@ router.post("/groups/:groupId/join", requireAuth, async (req, res) => {
   res.status(201).json(member);
 });
 
-// POST /groups/:groupId/members — a Facilitator assigns a user to a section, optionally
+// POST /groups/:groupId/members, a Facilitator assigns a user to a section, optionally
 // as its "leader" (the section's Co-facilitator). This is how Co-facilitators become
 // bound to the sections they teach (decision §8). Idempotent: re-assigning updates role.
 router.post("/groups/:groupId/members", requireAuth, async (req, res) => {
@@ -301,7 +301,7 @@ router.post("/groups/:groupId/members", requireAuth, async (req, res) => {
   res.status(201).json(member);
 });
 
-// DELETE /groups/:groupId/members/:userId — a member may remove themselves; removing
+// DELETE /groups/:groupId/members/:userId, a member may remove themselves; removing
 // anyone else is a Facilitator action scoped to the course's org.
 router.delete("/groups/:groupId/members/:userId", requireAuth, async (req, res) => {
   const actor = req.dbUser!;

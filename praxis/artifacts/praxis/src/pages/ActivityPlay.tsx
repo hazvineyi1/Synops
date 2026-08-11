@@ -48,7 +48,7 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
   const curIdx = orderedMods.findIndex((mm) => mm.id === a?.moduleId);
   const nextMod = curIdx >= 0 ? orderedMods[curIdx + 1] : undefined;
   const sameModule = a?.courseId && a?.moduleId ? `/courses/${a.courseId}/modules/${a.moduleId}` : "/dashboard";
-  // A young learner who just finished the LAST lesson of the course is DONE — send them to their
+  // A young learner who just finished the LAST lesson of the course is DONE, send them to their
   // lessons home with a clear finish, not back to the course start (which looks like the beginning).
   const courseComplete = young && orderedMods.length > 0 && curIdx >= 0 && !nextMod;
   const backTo = young

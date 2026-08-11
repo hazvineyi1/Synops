@@ -12,7 +12,7 @@ import { pgTable, text, timestamp, integer, boolean, jsonb } from "drizzle-orm/p
  *  - Runtime reuses the Socratic engine (lib/caseEngine wraps lib/socraticEngine).
  *  - Rubrics can link criteria to QCTO/SETA unit standards (schema/compliance.ts) via
  *    `unit_standard_mappings` rows with target_type='case', so a case's reasoning targets
- *    flow into the accreditation report — an upgrade over Sokratify (whose rubric linked
+ *    flow into the accreditation report, an upgrade over Sokratify (whose rubric linked
  *    to nothing).
  *  - Case sessions are stored separately from module `sessions` because a case has its own
  *    prompt-budget runtime and can run UNAUTHENTICATED via a signed embed link.
@@ -153,7 +153,7 @@ export type CaseLinkAccess = typeof caseLinkAccessTable.$inferSelect;
  * grants a case to a partner; that partner_admin then grants it down to specific organisations
  * under their partner; each org_admin then grants it to individual learners (or a whole course
  * group / cohort, expanded to one row per member). Nothing appears at a tier until the tier
- * above deliberately passes it on — enforced in routes by requiring an upstream grant to exist
+ * above deliberately passes it on, enforced in routes by requiring an upstream grant to exist
  * (super admins bypass, since they hold all-tier access).
  *
  * One row = one grant to one recipient at one tier:

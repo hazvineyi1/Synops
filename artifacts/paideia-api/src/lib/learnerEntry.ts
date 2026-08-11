@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 /**
  * Signed, self-verifying "magic link" tokens that let a learner who was pushed in
  * from an external LMS (Praxis) open the Coach without a password. The token is a
- * stateless HMAC over { userId, expiry } — no table needed. It is exchanged once at
+ * stateless HMAC over { userId, expiry }, no table needed. It is exchanged once at
  * POST /api/study/auth/enter for a normal study session cookie, after which the
  * learner is a fully ordinary signed-in Coach user.
  *

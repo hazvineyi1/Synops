@@ -143,7 +143,7 @@ router.get("/courses/:courseId/discussions/:discussionId", requireAuth, async (r
   });
 });
 
-// PATCH /discussions/:discussionId — the author may edit their own text; moderation
+// PATCH /discussions/:discussionId, the author may edit their own text; moderation
 // flags (pin/close) are delivery-staff-only, scoped to the course (decision §4.2).
 router.patch("/discussions/:discussionId", requireAuth, async (req, res) => {
   const actor = req.dbUser!;
@@ -318,7 +318,7 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
 });
 
 /**
- * DELETE /discussions/:discussionId — staff only.
+ * DELETE /discussions/:discussionId, staff only.
  *
  * There was no way to remove a discussion at all, so a thread created in error was
  * permanent. Deletes the replies first because nothing enforces the foreign key, and
@@ -378,7 +378,7 @@ router.post("/discussions/:discussionId/translate", requireAuth, async (req, res
   });
 });
 
-// DELETE /discussions/replies/:replyId — the reply's author may delete their own; anyone
+// DELETE /discussions/replies/:replyId, the reply's author may delete their own; anyone
 // else needs delivery-staff moderation rights scoped to the course (decision §4.2).
 router.delete("/discussions/replies/:replyId", requireAuth, async (req, res) => {
   const actor = req.dbUser!;

@@ -92,7 +92,7 @@ export default function StudyLogin() {
             className="w-full mt-3"
             onClick={() => setLoc("/demo")}
           >
-            Try the live demo — no sign-up
+            Try the live demo, no sign-up
           </Button>
           <p className="text-center text-sm text-muted-foreground mt-4">
             Don&apos;t have an account?{" "}

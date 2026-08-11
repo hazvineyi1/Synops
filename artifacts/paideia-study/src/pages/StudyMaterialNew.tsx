@@ -15,7 +15,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useStudyProfile, useUpdateStudyProfile } from "@/hooks/use-study-journey";
 import { useEffect } from "react";
 import {
-  ArrowLeft, Sparkles, FileText, Link2, Upload, Image as ImageIcon,
+  ArrowLeft, FileText, Link2, Upload, Image as ImageIcon,
   Brain, Loader2, CheckCircle2, X, Rocket, Search,
   BookOpen, Zap, Compass, ChevronRight, FileAudio, FileVideo, File as FileIcon, AlertCircle
 } from "lucide-react";
@@ -280,7 +280,7 @@ export default function StudyMaterialNew() {
             className="gap-2 w-full max-w-xs"
             onClick={handleGenerateStrategy}
           >
-            <Sparkles className="h-4 w-4" /> Generate My Study Strategy <ChevronRight className="h-4 w-4" />
+            Generate My Study Strategy <ChevronRight className="h-4 w-4" />
           </Button>
 
           <Button
@@ -596,7 +596,7 @@ export default function StudyMaterialNew() {
           {submitting ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> AI is analyzing your material...</>
           ) : (
-            <><Sparkles className="h-4 w-4" /> Start Learning - Generate Concepts & Path</>
+            <>Start Learning - Generate Concepts & Path</>
           )}
         </Button>
 

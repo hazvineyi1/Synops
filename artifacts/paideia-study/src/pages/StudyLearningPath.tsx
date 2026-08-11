@@ -7,7 +7,7 @@ import { useStudyPath } from "@/hooks/use-study-journey";
 import {
   Brain, BookOpen, Zap, Target, MessageCircle, CheckCircle2,
   Lock, ArrowLeft, Flame, Award, TrendingUp, Clock,
-  ChevronRight, Sparkles, Circle
+  ChevronRight, Circle
 } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
 
@@ -211,7 +211,6 @@ export default function StudyLearningPath() {
         {percentComplete === 100 && (
           <Card className="border-emerald-200 bg-emerald-50/50">
             <CardContent className="py-6 text-center">
-              <Sparkles className="h-8 w-8 text-emerald-500 mx-auto mb-3" />
               <h3 className="font-semibold text-lg mb-1">Learning Path Complete!</h3>
               <p className="text-sm text-muted-foreground">
                 You've mastered all concepts in this path. Add more materials to continue growing.

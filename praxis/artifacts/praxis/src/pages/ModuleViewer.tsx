@@ -32,7 +32,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle, BookOpen, List,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
-  Users, Layers, Target, Compass, Info, Save, Settings, Sparkles, Link2,
+  Users, Layers, Target, Compass, Info, Save, Settings, Link2,
   Pause, Square, Headphones, Plus, Trash2, Languages,
   Lightbulb, Store, Repeat, ListChecks, Rocket,
 } from 'lucide-react';
@@ -501,7 +501,7 @@ function SlideLesson({ slides, onReachedEnd }: { slides: VideoSlide[]; onReached
         <div className="hidden sm:flex w-[38%] shrink-0 relative items-center justify-center overflow-hidden" style={{ background: 'linear-gradient(135deg, #111 0%, #1c2a10 100%)' }}>
           <div className="absolute w-56 h-56 rounded-full border-2" style={{ borderColor: '#9CDF0033' }} />
           <div className="absolute w-40 h-40 rounded-full border-2" style={{ borderColor: '#9CDF0055' }} />
-          {(() => { const Ico = SLIDE_VISUAL[s.visual ?? 'welcome'] ?? Sparkles; return <Ico className="h-20 w-20 relative" style={{ color: '#9CDF00' }} strokeWidth={1.5} />; })()}
+          {(() => { const Ico = SLIDE_VISUAL[s.visual ?? 'welcome'] ?? Lightbulb; return <Ico className="h-20 w-20 relative" style={{ color: '#9CDF00' }} strokeWidth={1.5} />; })()}
         </div>
         <div className="absolute bottom-0 left-0 h-1 bg-[#9CDF00] transition-all" style={{ width: `${((clampedI + 1) / shown.length) * 100}%` }} />
       </div>
@@ -2053,7 +2053,7 @@ function MarkdownView({ text }: { text: string }) {
     const headMatch = line.match(/^(#{1,3})\s+(.*)$/);
     if (headMatch && /^\d+\.\s/.test(headMatch[2])) {
       // A "heading" whose text starts with an ordinal like "4. " is never a real section
-      // heading — it's a quiz/review question that leaked into the reading markdown (e.g. a
+      // heading, it's a quiz/review question that leaked into the reading markdown (e.g. a
       // civics "check understanding" item). Render it as an ordinary numbered question so it
       // can never appear as a mis-numbered underlined H2/H3 heading. (Issue 1)
       flush();
@@ -2281,10 +2281,10 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
   return (
     <div className="rounded-xl border border-dashed border-primary/30 p-4 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-sm font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Activities in this module <span className="text-xs font-normal text-muted-foreground">Instructor</span></div>
+        <div className="text-sm font-semibold flex items-center gap-2">Activities in this module <span className="text-xs font-normal text-muted-foreground">Instructor</span></div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setPickOpen((v) => !v)}><Plus className="h-3.5 w-3.5" /> Add existing</Button>
-          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Sparkles className="h-3.5 w-3.5" /> New</Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Plus className="h-3.5 w-3.5" /> New</Button>
         </div>
       </div>
 
@@ -3394,7 +3394,7 @@ function ModuleHubView({
                 {(moduleActivities ?? []).map((a) => (
                   <button key={a.id} onClick={() => navigate(`/activities/${a.id}/play`)}
                     className="w-full flex items-center gap-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-500/5 p-4 text-left hover:shadow-sm transition-shadow">
-                    <span className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center shrink-0"><Sparkles className="h-5 w-5" /></span>
+                    <span className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center shrink-0"><Zap className="h-5 w-5" /></span>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm truncate">{a.title}</div>
                       <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}{a.difficulty ? ` · ${a.difficulty}` : ''}</div>

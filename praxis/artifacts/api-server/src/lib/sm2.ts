@@ -2,7 +2,7 @@
  * SM-2 spaced-repetition algorithm (adapted).
  * grade: 0-3 (from a checkpoint grade).
  *   0 = no understanding, 1 = shaky, 2 = solid, 3 = mastery.
- * The learner never sees ef/interval/reps — they experience it as the
+ * The learner never sees ef/interval/reps, they experience it as the
  * Coach knowing when to bring a concept back.
  */
 /**

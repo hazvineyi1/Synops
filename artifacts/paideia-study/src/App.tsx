@@ -26,7 +26,7 @@ import { FeedbackWidget } from "@/components/FeedbackWidget";
 
 // Authenticated pages are the heavy part of the bundle (charts, admin console,
 // editors). Lazy-load them so a first visit downloads only the small public
-// pages — important on low-end Android over a slow connection.
+// pages, important on low-end Android over a slow connection.
 const StudyDashboard = lazy(() => import("@/pages/StudyDashboard"));
 const StudyMaterials = lazy(() => import("@/pages/StudyMaterials"));
 const StudyMaterialNew = lazy(() => import("@/pages/StudyMaterialNew"));

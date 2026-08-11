@@ -13,7 +13,7 @@ import {
   useStudyKnowledgeGraph,
 } from "@/hooks/use-study-api";
 import {
-  MessageSquare, Plus, GraduationCap, Sparkles, Loader2,
+  MessageSquare, Plus, GraduationCap, Loader2,
   Brain, Target, Clock, BookOpen, RefreshCw, ChevronRight, MessagesSquare,
   AlertCircle, Compass,
 } from "lucide-react";
@@ -163,7 +163,7 @@ export default function StudyTutor() {
                   <div className="flex items-center gap-1.5">
                     <h2 className="font-semibold text-sm">Guided diagnostic</h2>
                     <Badge className="text-[10px] h-4 px-1.5 bg-primary/15 text-primary hover:bg-primary/15 border-0">
-                      <Sparkles className="h-2.5 w-2.5 mr-0.5" /> recommended
+                      recommended
                     </Badge>
                   </div>
                   <div className="text-[11px] text-muted-foreground">Diagnose → teach → check</div>
@@ -299,7 +299,7 @@ export default function StudyTutor() {
                   >
                     <div className="text-xs font-medium truncate">{m.title}</div>
                     <div className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                      <Sparkles className="h-2.5 w-2.5" /> tutor on this
+                      tutor on this
                     </div>
                   </button>
                 ))}

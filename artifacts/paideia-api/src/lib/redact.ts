@@ -4,7 +4,7 @@
 // The platform never injects a learner's name/email/id into prompts. But free-
 // text profile fields (background, goals, interests) are learner-entered and
 // could contain contact details. This removes the unambiguous direct identifiers
-// — email addresses and phone numbers — from that text.
+//, email addresses and phone numbers, from that text.
 //
 // Apply this ONLY to free-text profile fields, never to a learner's own uploaded
 // study material (that is the point of the product) or to AI-generated concept

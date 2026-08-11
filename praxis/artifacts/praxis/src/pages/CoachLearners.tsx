@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { FileText, AlertCircle, Activity, Award, AlertTriangle, Sparkles, Send, Plus, CheckCircle2, Circle, Loader2, LifeBuoy, MessageSquare } from 'lucide-react';
+import { FileText, AlertCircle, Activity, Award, AlertTriangle, Send, Plus, CheckCircle2, Circle, Loader2, LifeBuoy, MessageSquare } from 'lucide-react';
 import { Link } from 'wouter';
 import { CoachThread } from '@/components/CoachThread';
 
@@ -375,7 +375,7 @@ function InterventionDialog({ iv, onClose }: { iv: Intervention; onClose: () => 
                   </div>
                 </button>
               ))}
-              {(!iv.plan || iv.plan.items.length === 0) && <p className="text-sm text-muted-foreground italic">No plan steps yet — add one below.</p>}
+              {(!iv.plan || iv.plan.items.length === 0) && <p className="text-sm text-muted-foreground italic">No plan steps yet, add one below.</p>}
             </div>
             <div className="flex gap-2 mt-3">
               <input
@@ -393,9 +393,9 @@ function InterventionDialog({ iv, onClose }: { iv: Intervention; onClose: () => 
           {/* AI coaching guidance */}
           <div className="rounded-xl border border-border p-4 bg-muted/20">
             <div className="flex items-center justify-between mb-2">
-              <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-primary" /> Coaching guidance</h4>
+              <h4 className="font-bold text-sm uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">Coaching guidance</h4>
               <Button size="sm" variant="outline" onClick={runAssist} disabled={assisting}>
-                {assisting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                {assisting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                 {assist ? 'Regenerate' : 'Generate'}
               </Button>
             </div>

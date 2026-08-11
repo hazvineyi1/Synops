@@ -53,7 +53,7 @@ export function Cases() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-serif font-bold tracking-tight">Case studies</h1>
-          <p className="text-muted-foreground">Authored Socratic cases — work a real scenario through guided questioning, then get a reasoning analysis.</p>
+          <p className="text-muted-foreground">Authored Socratic cases, work a real scenario through guided questioning, then get a reasoning analysis.</p>
         </div>
         {canAuthor && (
           <Button onClick={() => create.mutate()} disabled={create.isPending}>

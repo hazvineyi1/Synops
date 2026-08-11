@@ -176,7 +176,7 @@ export default function StudyAdminCoupons() {
           <div>
             <h1 className="font-serif text-3xl mb-1">Codes</h1>
             <p className="text-muted-foreground text-sm">
-              Discount codes apply at checkout. Access-grant codes unlock a plan for free — learners redeem them on the upgrade page.
+              Discount codes apply at checkout. Access-grant codes unlock a plan for free, learners redeem them on the upgrade page.
             </p>
           </div>
           {!showForm && (

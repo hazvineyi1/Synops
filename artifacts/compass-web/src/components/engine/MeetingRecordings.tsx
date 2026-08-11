@@ -17,7 +17,6 @@ import {
   CheckCircle2,
   Trash2,
   Clock,
-  Sparkles,
   FileText,
   ChevronDown,
   ListPlus,
@@ -506,10 +505,8 @@ export function MeetingRecordings({ projectId, meeting, onInsertNotes, onControl
                           onClick={() => transcribe(r.id)}
                           disabled={isTranscribing || aiUnavailable}
                         >
-                          {isTranscribing ? (
+                          {isTranscribing && (
                             <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" />
-                          ) : (
-                            <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
                           )}
                           {isTranscribing ? "Transcribing..." : "Transcribe and draft notes"}
                         </Button>

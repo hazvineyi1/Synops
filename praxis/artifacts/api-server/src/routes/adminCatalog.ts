@@ -10,7 +10,7 @@ import { GAME_TEMPLATES } from "../lib/gameTemplates";
 import { logAudit } from "../lib/audit";
 
 /**
- * Super-admin Content Catalog — the central place where platform content (games, activities, courses)
+ * Super-admin Content Catalog, the central place where platform content (games, activities, courses)
  * and the reusable game templates live, cleanly demarcated by owner so one partner's content never
  * mixes with another's. There is one shared "Platform Templates & Games" catalog (isLibrary items +
  * platform-owned courses + the game templates) plus one catalog per partner/organisation. From here a
@@ -27,7 +27,7 @@ async function partnerOrgIds(partnerId: string): Promise<string[]> {
   return orgs.map((o) => o.id);
 }
 
-// GET /admin/catalog/tenants — the switcher: a shared Platform catalog + every partner (with its orgs).
+// GET /admin/catalog/tenants, the switcher: a shared Platform catalog + every partner (with its orgs).
 router.get("/admin/catalog/tenants", requireAuth, requireSuperAdmin, async (_req, res) => {
   const [partners, orgs] = await Promise.all([
     db.select({ id: partnersTable.id, name: partnersTable.name, slug: partnersTable.slug }).from(partnersTable),
@@ -51,7 +51,7 @@ function activityCard(a: typeof interactiveActivitiesTable.$inferSelect) {
   };
 }
 
-// GET /admin/catalog/:tenantId — content owned by / delivered to exactly this tenant, nothing else.
+// GET /admin/catalog/:tenantId, content owned by / delivered to exactly this tenant, nothing else.
 router.get("/admin/catalog/:tenantId", requireAuth, requireSuperAdmin, async (req, res) => {
   const tenantId = req.params.tenantId;
   const templates = GAME_TEMPLATES.map((t) => ({ key: t.key, name: t.name, blurb: t.blurb, bands: t.bands }));
@@ -102,7 +102,7 @@ router.get("/admin/catalog/:tenantId", requireAuth, requireSuperAdmin, async (re
   });
 });
 
-// POST /admin/catalog/deploy { activityId, targetTenantId } — deploy a game/activity to a partner:
+// POST /admin/catalog/deploy { activityId, targetTenantId }, deploy a game/activity to a partner:
 // an isolated COPY owned by the target tenant. The source (often a platform-library item) is untouched.
 router.post("/admin/catalog/deploy", requireAuth, requireSuperAdmin, async (req, res) => {
   const { activityId, targetTenantId } = req.body ?? {};
@@ -123,7 +123,7 @@ router.post("/admin/catalog/deploy", requireAuth, requireSuperAdmin, async (req,
   res.status(201).json(activityCard(copy));
 });
 
-// POST /admin/catalog/activity { targetTenantId, title, ... } — author an activity directly INTO a
+// POST /admin/catalog/activity { targetTenantId, title, ... }, author an activity directly INTO a
 // tenant's catalog (or the shared platform library when targetTenantId = "platform").
 router.post("/admin/catalog/activity", requireAuth, requireSuperAdmin, async (req, res) => {
   const b = req.body ?? {};

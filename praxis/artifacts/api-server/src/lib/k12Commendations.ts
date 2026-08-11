@@ -10,7 +10,7 @@ import { K12_PARTNER_SLUG } from "./k12Seed";
 /**
  * Public, PII-free "commendations" view for the K-12 demo landing page. A commendation is a standard
  * the program demonstrably MEETS, with the evidence for it: the interactive quizzes, games, and Math
- * Coach activities that assess it, and the aggregate mastery learners reached — no learner names, just
+ * Coach activities that assess it, and the aggregate mastery learners reached, no learner names, just
  * counts and percentages. It is a per-subject slice of the same logic the accreditation engine uses,
  * so what the public page claims and what the internal readiness report shows stay in agreement.
  */
@@ -150,7 +150,7 @@ export async function buildK12Commendations(): Promise<K12CommendationsReport | 
           coverageLevel: assessed ? "Assessed" : "Practised",
           masteryPct, learnersAssessed: learnerBest.length,
           howMet: assessed && masteryPct != null
-            ? `${howMet} — ${learnerBest.length} learner${learnerBest.length === 1 ? "" : "s"} at ${masteryPct}% average mastery.`
+            ? `${howMet}, ${learnerBest.length} learner${learnerBest.length === 1 ? "" : "s"} at ${masteryPct}% average mastery.`
             : `${howMet}.`,
         });
         totalStandards += 1;

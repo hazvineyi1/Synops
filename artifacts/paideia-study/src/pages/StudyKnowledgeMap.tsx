@@ -15,7 +15,7 @@ import { upgradeError } from "@/lib/upgrade";
 import StudyNav from "@/components/StudyNav";
 import {
   Network, Brain, ZoomIn, ZoomOut, Maximize2,
-  Target, BookOpen, Search, Plus, Loader2, MessageCircle, Sparkles, X,
+  Target, BookOpen, Search, Plus, Loader2, MessageCircle, X,
 } from "lucide-react";
 
 const CAT_PALETTE = [
@@ -163,7 +163,6 @@ export default function StudyKnowledgeMap() {
 
       <div className="max-w-5xl w-full mx-auto px-4 pt-4 pb-3">
         <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-4 h-4 text-blue-600" />
           <span className="text-xs uppercase tracking-wider text-blue-700 font-semibold">AI knowledge map</span>
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-1">What you know, at a glance</h1>

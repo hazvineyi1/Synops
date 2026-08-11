@@ -25,7 +25,7 @@ const router = Router();
 const rp = (req: { headers: Record<string, unknown>; protocol?: string }) =>
   rpFromRequest(req.headers.host as string | undefined, (req as { protocol?: string }).protocol);
 
-// GET /auth/mfa/factors — the user's enrolled methods + capabilities for the /security page.
+// GET /auth/mfa/factors, the user's enrolled methods + capabilities for the /security page.
 router.get("/auth/mfa/factors", requireAuth, async (req, res) => {
   const u = req.dbUser!;
   const [factors, backupLeft] = await Promise.all([listFactors(u.id), backupCodesRemaining(u.id)]);

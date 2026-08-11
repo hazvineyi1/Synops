@@ -104,7 +104,7 @@ export const DEFAULT_SETTINGS: GradebookSettings = {
 // The gradebook reads everything live on every request, which keeps GRADES from ever drifting but
 // re-runs the same structural queries (which columns exist, weighting/letter bands) on every matrix
 // load and every grade write's alert recompute. Those change only when staff edit the gradebook,
-// not when a score is entered — so we cache them for a few seconds and invalidate on the write paths.
+// not when a score is entered, so we cache them for a few seconds and invalidate on the write paths.
 // Scores/cells are NEVER cached: computeLearner + getScoreData still read fresh, so a grade change is
 // always reflected immediately. Per-instance (single Railway instance today); short TTL bounds any
 // cross-instance staleness if it ever scales horizontally.
@@ -156,7 +156,7 @@ export async function getGradebookSettings(courseId: string): Promise<GradebookS
     cacheSet(settingsCache, courseId, result, SETTINGS_TTL_MS);
     return result;
   } catch {
-    // Table not migrated yet — fall back to defaults so the gradebook keeps working. Don't cache the
+    // Table not migrated yet, fall back to defaults so the gradebook keeps working. Don't cache the
     // error fallback, so settings appear the moment the table exists.
     return DEFAULT_SETTINGS;
   }
@@ -340,7 +340,7 @@ export async function getScoreData(
   const manualColByItem = new Map(columns.filter((c) => c.sourceType === "manual" && c.itemId).map((c) => [c.itemId!, c]));
 
   await Promise.all([
-    // Assignments — gradebook_entries hold the canonical score.
+    // Assignments, gradebook_entries hold the canonical score.
     (async () => {
       if (assignmentIds.length === 0) return;
       const rows = await db
@@ -355,7 +355,7 @@ export async function getScoreData(
         if (s !== null && col.pointsPossible > 0) setFrac(r.userId, col.key, Math.max(0, Math.min(1, s / col.pointsPossible)));
       }
     })(),
-    // Cases — best completed session (rubric total, else engagement/10).
+    // Cases, best completed session (rubric total, else engagement/10).
     (async () => {
       if (caseIds.length === 0) return;
       const [sessions, rubrics] = await Promise.all([
@@ -383,7 +383,7 @@ export async function getScoreData(
         void hasRubric;
       }
     })(),
-    // Activities — best submission score / activity max.
+    // Activities, best submission score / activity max.
     (async () => {
       if (activityIds.length === 0) return;
       const [subs, acts] = await Promise.all([
@@ -403,7 +403,7 @@ export async function getScoreData(
         if (prev === undefined || frac > prev) setFrac(sub.userId, col.key, frac); // best attempt
       }
     })(),
-    // Attendance — one column per delivery session, scored from the learner's own record.
+    // Attendance, one column per delivery session, scored from the learner's own record.
     //
     // FAIRNESS, deliberately:
     //  * present / late  -> 1. They attended. Docking marks for lateness is a policy the
@@ -429,7 +429,7 @@ export async function getScoreData(
         setFrac(r.userId, col.key, r.status === "absent" ? 0 : 1);
       }
     })(),
-    // Completion — one column per module, scored as the fraction of that module's beats the learner
+    // Completion, one column per module, scored as the fraction of that module's beats the learner
     // has viewed (0..1). This is how readings/video/lesson completion is recorded in the gradebook:
     // it is engagement, not a mark, so these columns are formative (visible, not counted in the grade).
     (async () => {
@@ -565,13 +565,13 @@ export function computeLearner(
 }
 
 /**
- * Fallback gradebook derived from interactive-activity mastery — the SAME source the Credentials
+ * Fallback gradebook derived from interactive-activity mastery, the SAME source the Credentials
  * page and the public commendations report read (best submission per quiz / game / Math-Coach).
  *
  * Used ONLY when a learner's real gradebook produced no scored summative column, e.g. the K-12 demo
  * courses: their quizzes and games ARE the assessment, but they were never registered as
  * `gradebook_items` rows (no one ran POST /gradebook/sync), so the normal engine sees no columns and
- * My Grades shows "—" / "Not enough data" even though the learner has real, verified mastery.
+ * My Grades shows ", " / "Not enough data" even though the learner has real, verified mastery.
  *
  * Each scored activity becomes a summative, graded column so the overall %, breakdown rows and trend
  * reflect the learner's true mastery, consistent with their Credentials %. Returns null when there is
@@ -722,7 +722,7 @@ export interface AlertTransition {
 }
 
 /**
- * Recompute and persist one learner's alert for a course. Pure state update — it never
+ * Recompute and persist one learner's alert for a course. Pure state update, it never
  * sends notifications or generates a plan (the caller orchestrates those). NEVER throws:
  * it is called from inside grade-write paths and must not break them.
  */

@@ -8,7 +8,7 @@ import StudyNav from "@/components/StudyNav";
 import { Markdown } from "@/components/Markdown";
 import {
   Brain, CheckCircle2, XCircle, Loader2, ChevronRight,
-  Globe, Sparkles, GraduationCap, Trophy, BookOpen, RefreshCw,
+  Globe, GraduationCap, Trophy, BookOpen, RefreshCw,
 } from "lucide-react";
 
 type DiagnosticQuestion = {
@@ -291,9 +291,6 @@ function TurnView({
     return (
       <div className="space-y-3">
         <div className="flex items-start gap-2.5">
-          <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-          </div>
           <p className="text-sm leading-relaxed pt-1">{turn.intro}</p>
         </div>
         {turn.questions.map((q, i) => (

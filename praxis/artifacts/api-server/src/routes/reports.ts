@@ -36,7 +36,7 @@ router.get("/reports/funder", requireAuth, async (req, res) => {
   const targetOrgId = (orgId as string) ?? user.organisationId;
 
   let orgName = "All Organisations";
-  // Scope the whole report to the target org's learners — it previously counted the WHOLE platform
+  // Scope the whole report to the target org's learners, it previously counted the WHOLE platform
   // regardless of org, so two funders scoped to different orgs each saw platform-wide totals.
   let learnerIds: string[] | null = null; // null = all (no org filter)
   if (targetOrgId) {
@@ -74,7 +74,7 @@ router.get("/reports/funder", requireAuth, async (req, res) => {
     credentialsIssued: Number(credentialsIssued.count),
     coachHandoffs: Number(coachHandoffs.count),
     avgMastery,
-    // Competency highlights are omitted until computed from real per-tag mastery — a funder-facing
+    // Competency highlights are omitted until computed from real per-tag mastery, a funder-facing
     // report must never show fabricated figures. (Was hardcoded demo data.)
     competencyHighlights: [] as { tag: string; avgScore: number; learnerCount: number; masteredCount: number }[],
   });

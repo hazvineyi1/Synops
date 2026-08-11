@@ -57,7 +57,7 @@ async function requireStaffOnCourse(req: any, res: any, courseId: string): Promi
 /**
  * Self-heal the gradebook_entries mirror for a course. Grading writes both the submission score
  * AND a gradebook_entries row, but earlier grades (before the applyGrade upsert fix) only landed
- * on the submission — their entry row was never created because the learner enrolled after the
+ * on the submission, their entry row was never created because the learner enrolled after the
  * assignment existed. Reconcile: for every graded submission in this course, ensure a matching
  * entry row carries the same score. Cheap (a few small queries) and idempotent, so it can run on
  * each gradebook load and keep the grid honest without a manual backfill.
@@ -102,7 +102,7 @@ async function reconcileAssignmentEntries(courseId: string): Promise<void> {
  * scored SUMMATIVE column (an actual mark, not a value auto-filled from course completion). K-12 demo
  * courses register their quizzes/games as the assessment but were never added as `gradebook_items`,
  * so the engine sees only the ungraded course assignment: overall is either null, or a placeholder
- * auto-filled from completion %. In both cases the page shows "—" / "Not enough data" even though the
+ * auto-filled from completion %. In both cases the page shows ", " / "Not enough data" even though the
  * learner has real, verified quiz/game mastery.
  *
  * Fires when there is NO real graded summative, i.e. overall is null OR every summative cell is
@@ -308,7 +308,7 @@ router.get("/courses/:courseId/gradebook/export.csv", requireAuth, async (req, r
 });
 
 // ── Hierarchy navigation (browse down to a course gradebook, scoped by role) ──────
-// GET /gradebook/nav — the entry level for this actor.
+// GET /gradebook/nav, the entry level for this actor.
 router.get("/gradebook/nav", requireAuth, async (req, res) => {
   const u = req.dbUser as U;
   if (isSuperAdmin(u.role)) { res.json({ level: "partners" }); return; }
@@ -329,7 +329,7 @@ function rollup(rows: RollupInput[]) {
   return { learnersEvaluated: learners.size, offTrack: off.size, atRisk: risk.size, avgMastery };
 }
 
-// GET /gradebook/nav/partners — super_admin only.
+// GET /gradebook/nav/partners, super_admin only.
 router.get("/gradebook/nav/partners", requireAuth, async (req, res) => {
   const u = req.dbUser as U;
   if (!isSuperAdmin(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -352,7 +352,7 @@ router.get("/gradebook/nav/partners", requireAuth, async (req, res) => {
   res.json(partners.map((p) => ({ id: p.id, name: p.name, orgCount: count.get(p.id) ?? 0, ...rollup(byPartner.get(p.id) ?? []) })));
 });
 
-// GET /gradebook/nav/organisations?partnerId= — super (any/all), partner_admin (own partner).
+// GET /gradebook/nav/organisations?partnerId=, super (any/all), partner_admin (own partner).
 router.get("/gradebook/nav/organisations", requireAuth, async (req, res) => {
   const u = req.dbUser as U;
   const partnerId = typeof req.query.partnerId === "string" ? req.query.partnerId : null;
@@ -381,7 +381,7 @@ router.get("/gradebook/nav/organisations", requireAuth, async (req, res) => {
   res.json(rows.map((o) => ({ id: o.id, name: o.name, partnerId: o.partnerId, ...rollup(byOrg.get(o.id) ?? []) })));
 });
 
-// GET /gradebook/nav/courses?organisationId= — courses (with cohorts) the actor can grade.
+// GET /gradebook/nav/courses?organisationId=, courses (with cohorts) the actor can grade.
 router.get("/gradebook/nav/courses", requireAuth, async (req, res) => {
   const u = req.dbUser as U;
   const organisationId = typeof req.query.organisationId === "string" ? req.query.organisationId : null;
@@ -476,8 +476,8 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
   let computed = computeLearner(columns, scoreData.fractions.get(userId), scoreData.notes.get(userId), false, settings);
   // When the gradebook has no REAL scored summative column (e.g. K-12 demo courses whose quizzes/games
   // were never registered as gradebook_items, so overall is null or only auto-filled from completion),
-  // surface the learner's real interactive-activity mastery — the same source as Credentials and the
-  // /gradebook/mine summary — instead of "—" / "Not enough data".
+  // surface the learner's real interactive-activity mastery, the same source as Credentials and the
+  // /gradebook/mine summary, instead of ", " / "Not enough data".
   if (needsActivityFallback(columns, computed)) {
     const fb = await deriveActivityGradebook(courseId, userId, settings);
     if (fb) { columns = fb.columns; computed = fb.computed; }
@@ -539,7 +539,7 @@ router.get("/courses/:courseId/gradebook/me", requireAuth, async (req, res) => {
   });
 });
 
-// POST /courses/:courseId/gradebook/sync — register EVERY deliverable in the course as a gradebook
+// POST /courses/:courseId/gradebook/sync, register EVERY deliverable in the course as a gradebook
 // column, so the gradebook stays in sync with all course activities. Idempotent (onConflictDoNothing):
 // activities, cases, workshops and per-module completion each become a gradebook_items row.
 // Assignments already appear as default columns, so they are not duplicated here. Staff-only.
@@ -579,7 +579,7 @@ router.post("/courses/:courseId/gradebook/sync", requireAuth, async (req, res) =
   }
 });
 
-// GET /courses/:courseId/gradebook/learner/:userId — staff drill-in on one learner.
+// GET /courses/:courseId/gradebook/learner/:userId, staff drill-in on one learner.
 router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (req, res) => {
   const { courseId, userId } = req.params;
   const actor = req.dbUser as U;
@@ -628,7 +628,7 @@ router.get("/courses/:courseId/gradebook/learner/:userId", requireAuth, async (r
   });
 });
 
-// GET /gradebook/mine — cross-course summary for the learner nav page.
+// GET /gradebook/mine, cross-course summary for the learner nav page.
 router.get("/gradebook/mine", requireAuth, async (req, res) => {
   const userId = req.userId!;
   const enrols = await db
@@ -645,7 +645,7 @@ router.get("/gradebook/mine", requireAuth, async (req, res) => {
   const alertByCourse = new Map(alerts.map((a) => [a.courseId, a]));
   const titleById = new Map(courses.map((c) => [c.id, c.title]));
 
-  // Compute each course's summary in PARALLEL — the courses are independent, so the old serial
+  // Compute each course's summary in PARALLEL, the courses are independent, so the old serial
   // per-course loop (reconcile + columns + scores, each awaited before the next) needlessly
   // multiplied latency by the learner's course count.
   const out = await Promise.all(courseIds.map(async (cid) => {
@@ -794,7 +794,7 @@ router.post("/courses/:courseId/gradebook-items", requireAuth, async (req, res) 
     invalidateGradebookCaches(courseId);
     res.status(201).json(row);
   } catch (e: any) {
-    // Unique (course, source) — already included.
+    // Unique (course, source), already included.
     if (String(e?.message || "").includes("gradebook_items_course_source")) {
       res.status(409).json({ error: "This item is already in the gradebook for this course." });
       return;
@@ -823,7 +823,7 @@ router.patch("/gradebook-items/:id", requireAuth, async (req, res) => {
   res.json(row);
 });
 
-// PUT /courses/:courseId/gradebook/config — upsert per-column grading config (gradeType, itemType,
+// PUT /courses/:courseId/gradebook/config, upsert per-column grading config (gradeType, itemType,
 // pointsPossible, includeInGrade) by (sourceType, sourceId). Works for columns that already have an
 // item row AND for default assignment columns that don't (an override row is created). Powers the
 // admin gradebook configuration editor. Staff-only.
@@ -899,7 +899,7 @@ router.put("/courses/:courseId/gradebook/config", requireAuth, async (req, res) 
   }
 });
 
-// DELETE /gradebook-items/:id — removes the column (and its cells).
+// DELETE /gradebook-items/:id, removes the column (and its cells).
 router.delete("/gradebook-items/:id", requireAuth, async (req, res) => {
   const item = await db.query.gradebookItemsTable.findFirst({ where: eq(gradebookItemsTable.id, req.params.id) });
   if (!item) { res.json({ ok: true }); return; }
@@ -910,7 +910,7 @@ router.delete("/gradebook-items/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /gradebook/source/:sourceType/:sourceId — where a case/activity is already included.
+// GET /gradebook/source/:sourceType/:sourceId, where a case/activity is already included.
 router.get("/gradebook/source/:sourceType/:sourceId", requireAuth, async (req, res) => {
   const { sourceType, sourceId } = req.params;
   const rows = await db
@@ -925,7 +925,7 @@ router.get("/gradebook/source/:sourceType/:sourceId", requireAuth, async (req, r
   res.json(rows.map((r) => ({ id: r.id, courseId: r.courseId, courseTitle: titleById.get(r.courseId) ?? "Course", category: r.category, itemType: r.itemType, pointsPossible: Number(r.pointsPossible), includeInGrade: r.includeInGrade })));
 });
 
-// GET /gradebook/manageable-courses — courses the actor can add items to (include-dialog picker).
+// GET /gradebook/manageable-courses, courses the actor can add items to (include-dialog picker).
 router.get("/gradebook/manageable-courses", requireAuth, async (req, res) => {
   const u = req.dbUser as U;
   const all = await db.select({ id: coursesTable.id, title: coursesTable.title, tenantId: coursesTable.tenantId }).from(coursesTable);
@@ -1026,7 +1026,7 @@ router.post("/courses/:courseId/gradebook/scan", requireAuth, async (req, res) =
   res.json(summary);
 });
 
-// POST /gradebook/test-email — super-admin sends a sample off-track email to themselves.
+// POST /gradebook/test-email, super-admin sends a sample off-track email to themselves.
 router.post("/gradebook/test-email", requireAuth, async (req, res) => {
   const u = req.dbUser as U & { email?: string };
   if (!isSuperAdmin(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
@@ -1036,7 +1036,7 @@ router.post("/gradebook/test-email", requireAuth, async (req, res) => {
   }
   const override = (typeof req.body?.to === "string" && req.body.to.trim()) || (typeof req.query.to === "string" && req.query.to.trim());
   const to = override || u.email;
-  if (!to) { res.status(400).json({ error: "No recipient — pass a 'to' or set an email on your account." }); return; }
+  if (!to) { res.status(400).json({ error: "No recipient, pass a 'to' or set an email on your account." }); return; }
   const brand = await resolveEmailBrand((u as any).partnerId ?? null);
   const r = await sendMail({
     to,
@@ -1045,7 +1045,7 @@ router.post("/gradebook/test-email", requireAuth, async (req, res) => {
     html: emailShell({
       brand,
       heading: "Email delivery is set up",
-      bodyHtml: `This is a test of ${brand.displayName} off-track email reports. If you can read this, learners, coaches and org admins will receive their alerts by email — branded with this tenant's logo, colour and sender name.`,
+      bodyHtml: `This is a test of ${brand.displayName} off-track email reports. If you can read this, learners, coaches and org admins will receive their alerts by email, branded with this tenant's logo, colour and sender name.`,
       ctaLabel: `Open ${brand.displayName}`,
       ctaUrl: appUrl("/"),
     }),

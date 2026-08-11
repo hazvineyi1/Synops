@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
-  CheckCircle, Clock, AlertCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Sparkles
+  CheckCircle, Clock, AlertCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -538,7 +538,7 @@ function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isI
       {isInstructor && (
         <div className="flex flex-wrap justify-end gap-2">
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAttachOpen((v) => !v)}><Plus className="h-4 w-4" /> Attach existing</Button>
-          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Sparkles className="h-4 w-4" /> New interactive</Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Play className="h-4 w-4" /> New interactive</Button>
         </div>
       )}
 
@@ -700,7 +700,7 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: BookOpen },
   { id: 'modules', label: 'Modules', icon: BookOpen },
   { id: 'assignments', label: 'Assignments', icon: ClipboardList },
-  { id: 'activities', label: 'Activities', icon: Sparkles },
+  { id: 'activities', label: 'Activities', icon: Play },
   { id: 'cases', label: 'Case studies', icon: FileText },
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
@@ -969,7 +969,7 @@ function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
             <p className="text-xs text-muted-foreground">Shown to learners on the course overview.</p>
           </div>
           <Button size="sm" variant="outline" className="gap-1.5 flex-shrink-0" onClick={() => setGenOpen((o) => !o)}>
-            <Sparkles className="h-3.5 w-3.5" /> Generate
+            Generate
           </Button>
         </div>
       </CardHeader>
@@ -997,7 +997,7 @@ function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
             </div>
             <div className="flex justify-end">
               <Button size="sm" className="gap-1.5" disabled={!levels.length} onClick={generate}>
-                <Sparkles className="h-3.5 w-3.5" /> Generate objectives
+                Generate objectives
               </Button>
             </div>
           </div>
@@ -1637,7 +1637,7 @@ export function CourseDetail() {
             {isInstructor && (
               <Card className="border-dashed">
                 <CardContent className="py-4 flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium mr-1 flex items-center gap-1.5"><Sparkles className="h-4 w-4 text-primary" /> Add to this course:</span>
+                  <span className="text-sm font-medium mr-1 flex items-center gap-1.5">Add to this course:</span>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate('/studio')}><Layers className="h-3.5 w-3.5" /> Author a module (Studio)</Button>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/cases?courseId=${courseId}`)}><FileText className="h-3.5 w-3.5" /> Case study</Button>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Play className="h-3.5 w-3.5" /> Interactive</Button>
@@ -1766,7 +1766,7 @@ export function CourseDetail() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">My Grades</h2>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-foreground">{myGrades.overallPercent != null ? `${myGrades.overallPercent.toFixed(1)}%` : '—'}</div>
+                    <div className="text-2xl font-bold text-foreground">{myGrades.overallPercent != null ? `${myGrades.overallPercent.toFixed(1)}%` : ', '}</div>
                     <div className="text-xs text-muted-foreground">Overall ({myGrades.totalEarned} / {myGrades.totalPossible} pts)</div>
                   </div>
                 </div>
@@ -1788,10 +1788,10 @@ export function CourseDetail() {
                             {g.dueDate && <div className="text-xs text-muted-foreground">{formatDate(g.dueDate)}</div>}
                           </td>
                           <td className="py-2.5 px-3 text-right font-mono">
-                            {g.score !== null ? `${g.score} / ${g.pointsPossible}` : '—'}
+                            {g.score !== null ? `${g.score} / ${g.pointsPossible}` : ', '}
                           </td>
                           <td className="py-2.5 px-3 text-right">
-                            {g.letterGrade ? <Badge variant="outline">{g.letterGrade}</Badge> : '—'}
+                            {g.letterGrade ? <Badge variant="outline">{g.letterGrade}</Badge> : ', '}
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             {g.missing && <Badge variant="destructive" className="text-xs">Missing</Badge>}
@@ -1921,7 +1921,7 @@ export function CourseDetail() {
                       {roster.map((r) => (
                         <tr key={r.enrolmentId} className="border-b border-border/50 hover:bg-muted/30">
                           <td className="py-2.5 px-3 font-medium">{r.user?.firstName} {r.user?.lastName}</td>
-                          {isInstructor && <td className="py-2.5 px-3 text-muted-foreground">{r.user?.email ?? '—'}</td>}
+                          {isInstructor && <td className="py-2.5 px-3 text-muted-foreground">{r.user?.email ?? ', '}</td>}
                           <td className="py-2.5 px-3 text-muted-foreground capitalize">{r.user?.role === 'learner' ? 'Learner' : (r.user?.role?.replace('_', ' ') ?? 'Learner')}</td>
                           <td className="py-2.5 px-3">
                             <Badge variant={r.enrolmentStatus === 'completed' ? 'default' : r.enrolmentStatus === 'active' ? 'secondary' : 'outline'} className="text-xs">

@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 /**
  * Public, unauthenticated activity runner (route /a/:token). This is what a published embed
- * link resolves to — droppable into an LMS or website via an <iframe>. No account needed;
+ * link resolves to, droppable into an LMS or website via an <iframe>. No account needed;
  * anonymous plays are not recorded (tracked completion is the authenticated assignment flow).
  */
 export function ActivityEmbed({ params }: { params?: { token?: string } }) {

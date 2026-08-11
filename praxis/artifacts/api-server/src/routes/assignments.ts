@@ -74,7 +74,7 @@ async function applyGrade(opts: {
       .where(eq(assignmentSubmissionsTable.id, opts.submissionId))
       .returning();
 
-    // Mirror the score into gradebook_entries via a real UPSERT — race-safe now that a unique index
+    // Mirror the score into gradebook_entries via a real UPSERT, race-safe now that a unique index
     // on (assignment_id, user_id) exists (see dbHardening). No more findFirst-then-insert drift.
     await tx.insert(gradebookEntriesTable)
       .values({
@@ -95,7 +95,7 @@ async function applyGrade(opts: {
       userId: opts.learnerId,
       type: "assignment_graded",
       title: "Your assignment has been graded",
-      body: `Score: ${opts.score ?? "--"} — ${opts.feedback?.slice(0, 80) ?? "View feedback in gradebook"}`,
+      body: `Score: ${opts.score ?? "--"}, ${opts.feedback?.slice(0, 80) ?? "View feedback in gradebook"}`,
       link: `/courses/${opts.courseId}/assignments/${opts.assignmentId}`,
       courseId: opts.courseId,
       actorId: opts.graderId,
@@ -387,7 +387,7 @@ router.post("/assignments/:assignmentId/submit", requireAuth, async (req, res) =
       parsedText, sourceFilename,
       status: isLate ? "late" : "submitted", submittedAt: new Date(),
     }).returning();
-    // Update gradebook — mark as submitted (upsert: a learner who enrolled after the
+    // Update gradebook, mark as submitted (upsert: a learner who enrolled after the
     // assignment was created has no seeded entry row, so a bare UPDATE would no-op and the
     // work would still read as "missing").
     const existingEntry = await db.query.gradebookEntriesTable.findFirst({
@@ -427,7 +427,7 @@ router.get("/assignments/:assignmentId/my-submission", requireAuth, async (req, 
   res.json(submission ?? null);
 });
 
-// GET /assignments/:assignmentId/submissions — instructor view
+// GET /assignments/:assignmentId/submissions, instructor view
 router.get("/assignments/:assignmentId/submissions", requireAuth, async (req, res) => {
   const assignment = await db.query.assignmentsTable.findFirst({
     where: eq(assignmentsTable.id, req.params.assignmentId),

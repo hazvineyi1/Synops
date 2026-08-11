@@ -41,7 +41,7 @@ export async function funderOrgIds(funderId: string): Promise<string[]> {
 }
 
 /**
- * Total coaching hours logged for an organisation (§10.3) — summed across every attendance
+ * Total coaching hours logged for an organisation (§10.3), summed across every attendance
  * record whose delivery session belongs to that org. Used by facilitator reporting and by
  * the funder report's aggregate coaching-hour total.
  */
@@ -208,7 +208,7 @@ export async function canParticipateInCourse(user: StaffUser, courseId: string):
  * May this user VIEW a course in the catalogue (its overview + module list), even before enrolling?
  * Broader than participation: a learner browsing the catalogue can see any course their tenant owns
  * or that is assigned to their partner, plus platform courses. This gates read-only catalogue
- * surfaces (course detail, module titles) — NOT coursework or content (beats/readings/cases stay on
+ * surfaces (course detail, module titles), NOT coursework or content (beats/readings/cases stay on
  * canParticipateInCourse). Without this, browsing an unenrolled course 403'd and the UI hung.
  */
 export async function canViewCourseCatalog(user: StaffUser, courseId: string): Promise<boolean> {

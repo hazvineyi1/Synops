@@ -20,7 +20,7 @@ type Report = {
 
 /**
  * Funder / sponsor dashboard (decision doc §10.2). Read-only, aggregate-only. Shows the
- * outcomes for the organisations this funder finances and nothing else — no individual
+ * outcomes for the organisations this funder finances and nothing else, no individual
  * learner data ever reaches this view.
  */
 export function FunderDashboard({ firstName }: { firstName?: string | null }) {
@@ -84,7 +84,7 @@ export function FunderDashboard({ firstName }: { firstName?: string | null }) {
           <Card>
             <CardHeader>
               <CardTitle>By organisation</CardTitle>
-              <CardDescription>Read-only. Aggregate figures only — no individual learner data.</CardDescription>
+              <CardDescription>Read-only. Aggregate figures only, no individual learner data.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">

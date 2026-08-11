@@ -198,7 +198,7 @@ export type SSEDone = { promptCount?: number; promptLimit?: number; budgetReache
 
 /**
  * Stream a Socratic case turn. Works for both authenticated (/case-sessions/:id/message)
- * and public embed (/case-embed/:token/chat) endpoints — pass the full path and body.
+ * and public embed (/case-embed/:token/chat) endpoints, pass the full path and body.
  */
 export async function streamCaseTurn(
   path: string,

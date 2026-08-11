@@ -25,7 +25,7 @@ const TEMPLATES = [
 ];
 
 /**
- * Communications (upgrade §7) — real, persistent broadcast history. Compose an in-app or email
+ * Communications (upgrade §7), real, persistent broadcast history. Compose an in-app or email
  * announcement to all organisations, one organisation, or a role; recipient counts come from the
  * partner's REAL members, and the sent record persists via /partners/:id/announcements. Actual
  * in-app / email delivery is the messaging step; this records the broadcast + audit trail.

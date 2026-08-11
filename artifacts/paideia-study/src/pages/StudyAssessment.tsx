@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useStudyAssessment, useCompleteAssessment } from "@/hooks/use-study-journey";
 import {
   Brain, CheckCircle2, XCircle, ArrowRight, RotateCcw,
-  Sparkles, Clock, Target, Zap, BookOpen, Trophy,
+  Clock, Target, Zap, BookOpen, Trophy,
   ChevronRight, Loader2, TrendingUp, Lightbulb
 } from "lucide-react";
 import StudyNav from "@/components/StudyNav";
@@ -130,7 +130,6 @@ export default function StudyAssessment() {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full mb-3">
-              <Sparkles className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium text-primary">Your Study Plan is Ready</span>
             </div>
             <h1 className="text-2xl font-bold mb-2">Here's What the AI Found</h1>
