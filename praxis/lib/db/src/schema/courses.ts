@@ -12,6 +12,8 @@ export const coursesTable = pgTable("courses", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   title: text("title").notNull(),
   description: text("description"),
+  // Short, catalogue-facing blurb (distinct from the full description). Shown on course cards.
+  catalogDescription: text("catalog_description"),
   tenantId: text("tenant_id").notNull(),
   status: courseStatusEnum("status").notNull().default("draft"),
   moduleCount: integer("module_count").notNull().default(0),

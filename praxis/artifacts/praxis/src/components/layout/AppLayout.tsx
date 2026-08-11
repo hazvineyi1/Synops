@@ -335,15 +335,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           ],
         },
         {
-          heading: t('nav.groups.learningHub', 'Learning Hub'),
+          // Simplified to the course-first builder: one place to create and finish courses. The old
+          // separate surfaces (Content Catalog, Learning Hub upload, Studio, Case studies, Activities)
+          // now live inside a course/module, so they are no longer top-level nav.
+          heading: t('nav.groups.courses', 'Courses'),
           items: [
-            { label: t('nav.contentCatalog', 'Content Catalog'), href: '/content-catalog', icon: Layers },
-            { label: t('nav.learningHub', 'Learning Hub'), href: '/learning', icon: BookOpen },
             { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: GraduationCap },
             { label: t('nav.incompleteCourses', 'Incomplete courses'), href: '/incomplete-courses', icon: FileWarning },
-            { label: t('nav.studio'), href: '/studio', icon: PenTool },
-            { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
-            { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
           ],
         },
         {

@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { initObservability } from "./lib/observability";
 import { ensureIntegrityConstraints } from "./lib/dbHardening";
+import { ensureCourseColumns } from "./lib/courseColumns";
 import { correctSeededAnnouncements } from "./lib/seedCorrections";
 import { startOpsAgent } from "./lib/opsAgent";
 
@@ -10,6 +11,8 @@ void initObservability();
 // Fire-and-forget: dedupe + add the unique indexes that make credential/funded-seat/gradebook
 // writes race-safe. Never throws; skips any table that isn't present yet.
 void ensureIntegrityConstraints();
+// Fire-and-forget: add course-builder columns (catalog_description) if missing. Idempotent.
+void ensureCourseColumns();
 // Fire-and-forget: rewrite the one untrue "interactive video" demo announcement to a truthful
 // message. Idempotent + guarded on the old text; never blocks boot.
 void correctSeededAnnouncements();

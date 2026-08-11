@@ -5,6 +5,7 @@ import { eq, ne, desc, and, inArray, sql, count, ilike } from "drizzle-orm";
 import { requireAuth, requireRole, requireHub } from "../middlewares/requireAuth";
 import { canParticipateInCourse, canStaffActOnCourse, canViewCourseCatalog } from "../lib/scope";
 import { loadCourseCompleteness, type CourseCompleteness } from "../lib/courseCompleteness";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 // Courses belong to the super admin (tenantId "platform") and are assigned OUT to partners.
 const HUB_ROLES = new Set(["super_admin", "instructional_designer"]);
@@ -24,6 +25,7 @@ function toCourseResponse(c: typeof coursesTable.$inferSelect, completeness?: Co
     id: c.id,
     title: c.title,
     description: c.description,
+    catalogDescription: c.catalogDescription,
     tenantId: c.tenantId,
     status: c.status,
     moduleCount: c.moduleCount,
@@ -145,12 +147,61 @@ router.post("/courses", requireAuth, requireRole("super_admin", "partner_admin",
   // Hub roles (super admin / ID) author the platform catalogue: their courses are owned by
   // "platform" and assigned to partners afterwards. A partner/org author's course stays their own.
   const tenantId = isHub(user.role) ? "platform" : (user.partnerId ?? user.organisationId ?? user.id);
-  const { title, description, competencyTags, nqfLevel, thumbnailUrl } = req.body;
+  const { title, description, catalogDescription, competencyTags, objectives, nqfLevel, thumbnailUrl } = req.body;
   const [course] = await db
     .insert(coursesTable)
-    .values({ title, description, tenantId, competencyTags: competencyTags ?? [], nqfLevel, thumbnailUrl })
+    .values({
+      title, description, catalogDescription, tenantId,
+      competencyTags: competencyTags ?? [],
+      objectives: Array.isArray(objectives) ? objectives : [],
+      nqfLevel, thumbnailUrl,
+    })
     .returning();
   res.status(201).json(toCourseResponse(course));
+});
+
+// POST /courses/generate-objectives -- draft course-level learning objectives (and a short catalogue
+// blurb) from the title/description and any uploaded material. The author reviews/edits before saving.
+router.post("/courses/generate-objectives", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  const title = String(req.body?.title ?? "").trim();
+  const description = String(req.body?.description ?? "").trim();
+  const materialText = String(req.body?.materialText ?? "").slice(0, 12000);
+  if (!title && !description && !materialText) {
+    res.status(400).json({ error: "Provide a title, description, or material to generate from." });
+    return;
+  }
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1500,
+      messages: [{
+        role: "user",
+        content: `You are an expert instructional designer. From the course details below, produce:
+1. "catalogDescription": one short catalogue-facing sentence (max 160 characters) that clearly sells the course to a learner.
+2. "objectives": 4 to 6 course-level learning objectives. Each must be measurable, start with a Bloom's action verb, describe what a learner can DO on completion, be specific to this course, and avoid jargon. No numbering, no em dashes.
+
+Course title: ${title || "(none provided)"}
+Description: ${description || "(none provided)"}
+${materialText ? `Source material:\n${materialText}\n` : ""}
+Return ONLY valid JSON, no markdown: { "catalogDescription": "...", "objectives": ["...", "..."] }`,
+      }],
+    });
+    const content = message.content[0];
+    if (!content || content.type !== "text") throw new Error("Unexpected response");
+    let parsed: { catalogDescription?: string; objectives?: string[] };
+    try {
+      parsed = JSON.parse(content.text);
+    } catch {
+      const m = content.text.match(/\{[\s\S]*\}/);
+      parsed = m ? JSON.parse(m[0]) : { objectives: [] };
+    }
+    res.json({
+      catalogDescription: String(parsed.catalogDescription ?? "").slice(0, 200),
+      objectives: Array.isArray(parsed.objectives) ? parsed.objectives.map((o) => String(o)).filter(Boolean).slice(0, 8) : [],
+    });
+  } catch {
+    res.status(502).json({ error: "Could not generate objectives. Please try again." });
+  }
 });
 
 /**
@@ -287,11 +338,12 @@ router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "part
   // requireRole proves staff SOMEWHERE, not staff on THIS course, so a coach/admin of one
   // org could edit another org's course metadata. Add the course-scoped check.
   if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
-  const { title, description, status, competencyTags, nqfLevel, thumbnailUrl, objectives } = req.body;
+  const { title, description, catalogDescription, status, competencyTags, nqfLevel, thumbnailUrl, objectives } = req.body;
   const [updated] = await db
     .update(coursesTable)
     .set({
       title, description, status, competencyTags, nqfLevel, thumbnailUrl,
+      ...(catalogDescription !== undefined ? { catalogDescription } : {}),
       ...(objectives !== undefined ? { objectives } : {}),
       updatedAt: new Date(),
     })
