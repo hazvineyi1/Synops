@@ -29,20 +29,18 @@ export function MaterialPicker({
   const [materials, setMaterials] = useState<TeacherMaterial[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Preselect when arriving from a material's "Create from this" link (/plans/new?material=<id>).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const pre = new URLSearchParams(window.location.search).get("material");
-    if (pre && !value) onChange(pre);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useEffect(() => {
     let active = true;
     api
       .get<{ materials: TeacherMaterial[] }>("/materials")
       .then((res) => {
-        if (active) setMaterials(res.materials ?? []);
+        const mats = res.materials ?? [];
+        if (!active) return;
+        setMaterials(mats);
+        // Preselect when arriving from a material's "Create from this" link
+        // (/plans/new?material=<id>). Done AFTER load so the option exists when we set the value.
+        const pre = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("material") : null;
+        if (pre && !value && mats.some((m) => m.id === pre)) onChange(pre);
       })
       .catch(() => {
         if (active) setMaterials([]);
@@ -53,6 +51,7 @@ export function MaterialPicker({
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loaded && materials.length === 0) {
