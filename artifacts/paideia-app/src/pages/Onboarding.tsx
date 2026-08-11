@@ -57,7 +57,7 @@ export default function Onboarding() {
   const skip = () => complete({ country: "", schoolName: "", subjects: [], yearGroups: [] });
 
   return (
-    <AuthShell title="Tell us about your class (optional)" subtitle="You can skip this and fill it in later when you generate your first resource.">
+    <AuthShell wide title="Tell us about your class (optional)" subtitle="You can skip this and fill it in later when you generate your first resource.">
       <form onSubmit={submit} className="space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
