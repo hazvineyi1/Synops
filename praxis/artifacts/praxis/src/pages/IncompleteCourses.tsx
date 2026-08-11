@@ -1,12 +1,12 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { useGetMe } from '@workspace/api-client-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, BookOpen, ArrowRight, CheckCircle2, FileWarning } from 'lucide-react';
+import { AlertTriangle, BookOpen, ArrowRight, CheckCircle2, FileWarning, Trash2 } from 'lucide-react';
 
 /** One module's blocking reasons (missing components, and/or "not published yet"). */
 type IncompleteReason = { moduleId: string; moduleTitle: string; moduleStatus: string; missing: string[] };
@@ -31,7 +31,22 @@ type IncompleteCourse = {
 export function IncompleteCourses() {
   const { data: user } = useGetMe();
   const [, navigate] = useLocation();
+  const qc = useQueryClient();
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const isHub = user?.role === 'super_admin' || user?.role === 'instructional_designer';
+
+  const remove = async (id: string, title: string) => {
+    if (!window.confirm(`Delete "${title}" and everything in it? This cannot be undone.`)) return;
+    setDeletingId(id);
+    try {
+      await apiFetch(`/courses/${id}`, { method: 'DELETE' });
+      await qc.invalidateQueries({ queryKey: ['courses'] });
+    } catch {
+      window.alert('Could not delete this course. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const { data: courses, isLoading, isError } = useQuery({
     queryKey: ['courses', 'incomplete'],
@@ -105,9 +120,21 @@ export function IncompleteCourses() {
                     )}
                   </CardDescription>
                 </div>
-                <Button size="sm" onClick={() => navigate(`/courses/${course.id}`)} className="shrink-0">
-                  Open to finish <ArrowRight className="ml-1.5 h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => remove(course.id, course.title)}
+                    disabled={deletingId === course.id}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    {deletingId === course.id ? 'Deleting...' : 'Delete'}
+                  </Button>
+                  <Button size="sm" onClick={() => navigate(`/courses/${course.id}`)}>
+                    Open to finish <ArrowRight className="ml-1.5 h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Course-wide blockers (not published yet, no modules). */}
