@@ -6,6 +6,7 @@ import { requireAuth, requireRole, requireHub } from "../middlewares/requireAuth
 import { canParticipateInCourse, canStaffActOnCourse, canViewCourseCatalog } from "../lib/scope";
 import { loadCourseCompleteness, type CourseCompleteness } from "../lib/courseCompleteness";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { uploadObject, storageEnabled } from "../lib/supabaseStorage";
 
 // Courses belong to the super admin (tenantId "platform") and are assigned OUT to partners.
 const HUB_ROLES = new Set(["super_admin", "instructional_designer"]);
@@ -158,6 +159,53 @@ router.post("/courses", requireAuth, requireRole("super_admin", "partner_admin",
     })
     .returning();
   res.status(201).json(toCourseResponse(course));
+});
+
+// POST /courses/generate-banner -- generate a photorealistic course banner from the description
+// using OpenAI's image model. Stores it (Supabase if configured, else a data URL) and returns the
+// url plus AI alt text (accessibility from the start). Requires OPENAI_API_KEY on the server.
+router.post("/courses/generate-banner", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  const apiKey = process.env["OPENAI_API_KEY"];
+  if (!apiKey) {
+    res.status(503).json({ error: "Banner generation is not configured. Set OPENAI_API_KEY on the server." });
+    return;
+  }
+  const title = String(req.body?.title ?? "").trim();
+  const description = String(req.body?.description ?? "").trim();
+  const courseId = String(req.body?.courseId ?? "").trim();
+  if (!title && !description) {
+    res.status(400).json({ error: "Provide a title or description to generate a banner." });
+    return;
+  }
+  const prompt = `A photorealistic, professional cover banner image for an online course. Subject: ${title}. ${description}. Cinematic wide composition, natural lighting, high detail, editorial photography style, relevant real-world scene. Absolutely no text, no letters, no words, no logos, no watermarks in the image.`;
+  try {
+    const r = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", n: 1 }),
+    });
+    if (!r.ok) {
+      const detail = await r.text().catch(() => "");
+      throw new Error(`Image API error (${r.status}) ${detail.slice(0, 200)}`);
+    }
+    const data = (await r.json()) as { data?: Array<{ b64_json?: string }> };
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!b64) throw new Error("The image service returned no image.");
+    const buf = Buffer.from(b64, "base64");
+    let thumbnailUrl: string;
+    if (storageEnabled()) {
+      const path = `course-banners/${courseId || "draft"}-${Date.now()}.png`;
+      const up = await uploadObject(path, buf, "image/png");
+      thumbnailUrl = up.url;
+    } else {
+      // No object storage configured: return a data URL so the flow still works.
+      thumbnailUrl = `data:image/png;base64,${b64}`;
+    }
+    const alt = `Course banner for ${title || "this course"}: ${description ? description.slice(0, 120) : "an illustrative photograph representing the course subject"}.`;
+    res.json({ thumbnailUrl, alt });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Could not generate a banner." });
+  }
 });
 
 // POST /courses/generate-objectives -- draft course-level learning objectives (and a short catalogue

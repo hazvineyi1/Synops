@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { BookOpen, Plus, X, ArrowLeft, Wand2, Image as ImageIcon } from "lucide-react";
+import { BookOpen, Plus, X, ArrowLeft, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,10 @@ export function CourseBuilder() {
   const [generating, setGenerating] = useState(false);
   const [genErr, setGenErr] = useState<string | null>(null);
 
+  const [bannerGen, setBannerGen] = useState(false);
+  const [bannerErr, setBannerErr] = useState<string | null>(null);
+  const [bannerAlt, setBannerAlt] = useState("");
+
   const [creating, setCreating] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
 
@@ -68,6 +72,27 @@ export function CourseBuilder() {
   const removeObjectiveAt = (i: number) =>
     setObjectives((list) => list.filter((_, idx) => idx !== i));
   const addObjective = () => setObjectives((list) => [...list, ""]);
+
+  const generateBanner = async () => {
+    if (!title.trim() && !description.trim()) {
+      setBannerErr("Add a title or description first.");
+      return;
+    }
+    setBannerGen(true);
+    setBannerErr(null);
+    try {
+      const r = await apiFetch<{ thumbnailUrl: string; alt: string }>("/courses/generate-banner", {
+        method: "POST",
+        body: JSON.stringify({ title: title.trim(), description: description.trim() }),
+      });
+      setThumbnailUrl(r.thumbnailUrl);
+      setBannerAlt(r.alt || "");
+    } catch (e) {
+      setBannerErr(e instanceof Error ? e.message : "Could not generate a banner.");
+    } finally {
+      setBannerGen(false);
+    }
+  };
 
   const generateObjectives = async () => {
     if (!title.trim() && !description.trim()) {
@@ -143,7 +168,7 @@ export function CourseBuilder() {
           {hasBannerImage && (
             <img
               src={thumbnailUrl.trim()}
-              alt=""
+              alt={bannerAlt || `Banner for ${title.trim() || "this course"}`}
               className="absolute inset-0 h-full w-full object-cover"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = "none";
@@ -157,10 +182,16 @@ export function CourseBuilder() {
             </h2>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Auto-generated banner from the course title. Add a banner image URL to use your own.
-          Photorealistic AI-generated banners are coming.
-        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="sm" className="gap-1.5" disabled={bannerGen} onClick={generateBanner}>
+            <ImageIcon className="h-4 w-4" />
+            {bannerGen ? "Generating banner..." : "Generate a photorealistic banner"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Generated from the course description. Or paste your own image URL below. Falls back to a themed banner.
+          </p>
+        </div>
+        {bannerErr && <p className="text-xs text-rose-600">{bannerErr}</p>}
       </div>
 
       {/* Details */}
@@ -233,7 +264,6 @@ export function CourseBuilder() {
               disabled={generating}
               onClick={generateObjectives}
             >
-              <Wand2 className="h-4 w-4" />
               {generating ? "Generating..." : "Generate objectives from the description"}
             </Button>
           </div>
