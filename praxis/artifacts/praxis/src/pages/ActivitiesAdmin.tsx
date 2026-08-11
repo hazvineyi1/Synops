@@ -117,6 +117,7 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
   const isEmbed = source === "embed";
   const parsed = useMemo(() => (isEmbed ? parseEmbed(embedRaw) : { embedUrl: null, html }), [isEmbed, embedRaw, html]);
 
+  const [, navigateTo] = useLocation();
   const save = useMutation({
     mutationFn: () => {
       const input = {
@@ -131,7 +132,13 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
       };
       return activity ? activitiesApi.update(activity.id, input) : activitiesApi.create(input);
     },
-    onSuccess: (a) => { toast({ title: activity ? "Activity saved" : "Activity created" }); qc.invalidateQueries({ queryKey: ["activities"] }); onSaved(a); },
+    onSuccess: (a) => {
+      toast({ title: activity ? "Activity saved" : "Activity created" });
+      qc.invalidateQueries({ queryKey: ["activities"] });
+      onSaved(a);
+      // Take the author to where the activity now lives so they can see it in context.
+      if (courseId) navigateTo(`/courses/${courseId}?tab=activities`);
+    },
     onError: (e) => toast({ title: "Save failed", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 

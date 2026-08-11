@@ -14,9 +14,11 @@ import { cn } from '@/lib/utils';
 import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
-  CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers
+  CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Image as ImageIcon
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
@@ -496,7 +498,7 @@ function NewDiscussion({ courseId, modules }: { courseId: string; modules: { id:
 }
 
 // --- Types ---
-interface Course { id: string; title: string; description: string; status: string; competencyTags: string[]; nqfLevel?: number; objectives?: string[]; }
+interface Course { id: string; title: string; description: string; status: string; competencyTags: string[]; nqfLevel?: number; objectives?: string[]; thumbnailUrl?: string; catalogDescription?: string; }
 interface Module { id: string; courseId: string; title: string; description?: string; order: number; status: string; lessonType?: string; estimatedMinutes: number; beatCount: number; beats?: Beat[]; }
 interface Beat { id: string; type: string; title: string; order: number; videoUrl?: string; narration?: string | null; bulletPoints?: string[] | null; scenario?: string | null; }
 interface Assignment { id: string; title: string; description?: string; dueDate?: string; pointsPossible: number; published: boolean; }
@@ -512,6 +514,29 @@ interface ModuleProgress { moduleId: string; title: string; order: number; viewe
 interface CourseProgress { courseId: string; viewedBeats: number; totalBeats: number; percent: number; certified?: boolean; modules: ModuleProgress[]; }
 
 interface CourseActivity { id: string; title: string; kind: string; published: boolean; courseId?: string | null; moduleId?: string | null; bloomsLevel?: string | null; difficulty?: string | null; html?: string; embedUrl?: string | null; }
+
+/** Deterministic string hash (djb2), so a given course title always yields the same banner. */
+function hashString(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/**
+ * A calm, themed gradient derived from the course title, used when no banner image is set.
+ * Two HSL hues + an angle come from the title hash, with a couple of soft radial highlights
+ * layered on top so the placeholder banner has some depth instead of a flat wash.
+ */
+function bannerGradientStyle(title: string): React.CSSProperties {
+  const h = hashString(title || 'course');
+  const hue1 = h % 360;
+  const hue2 = (hue1 + 40 + ((h >> 3) % 60)) % 360;
+  const angle = (h >> 5) % 360;
+  const base = `linear-gradient(${angle}deg, hsl(${hue1} 55% 42%), hsl(${hue2} 60% 34%))`;
+  const dot1 = `radial-gradient(circle at ${20 + (h % 30)}% 30%, hsl(${hue1} 70% 70% / 0.35), transparent 45%)`;
+  const dot2 = `radial-gradient(circle at ${70 + ((h >> 7) % 20)}% 75%, hsl(${hue2} 70% 70% / 0.30), transparent 50%)`;
+  return { backgroundImage: `${dot1}, ${dot2}, ${base}` };
+}
 
 /** In-course Interactives: list activities linked to this course, attach existing ones, or author new. */
 function CourseActivitiesTab({ courseId, isInstructor }: { courseId: string; isInstructor: boolean }) {
@@ -1231,6 +1256,33 @@ export function CourseDetail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['course', courseId] }),
   });
 
+  // Instructor-only: set the course banner from an image URL.
+  const [bannerOpen, setBannerOpen] = useState(false);
+  const [bannerUrl, setBannerUrl] = useState('');
+  const [bannerError, setBannerError] = useState<string | null>(null);
+  const [bannerImgFailed, setBannerImgFailed] = useState(false);
+  const [bannerSaving, setBannerSaving] = useState(false);
+  const openBannerDialog = () => {
+    setBannerUrl(course?.thumbnailUrl ?? '');
+    setBannerError(null);
+    setBannerOpen(true);
+  };
+  const saveBanner = async () => {
+    setBannerSaving(true);
+    setBannerError(null);
+    try {
+      const url = bannerUrl.trim();
+      await apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify({ thumbnailUrl: url || null }) });
+      await qc.invalidateQueries({ queryKey: ['course', courseId] });
+      setBannerImgFailed(false);
+      setBannerOpen(false);
+    } catch (e) {
+      setBannerError(e instanceof Error ? e.message : 'Could not save the banner.');
+    } finally {
+      setBannerSaving(false);
+    }
+  };
+
   // Course structure = published modules in order, each annotated with the learner's
   // progress (complete / certified / percent) so the Overview shows a real module map.
   const moduleProgressById = new Map((progress?.modules ?? []).map((m) => [m.moduleId, m] as const));
@@ -1270,39 +1322,100 @@ export function CourseDetail() {
         <span className="text-foreground font-medium truncate max-w-xs">{course.title}</span>
       </div>
 
-      {/* Course header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{course.title}</h1>
-          <p className="text-muted-foreground mt-1 text-sm max-w-2xl">{course.description}</p>
-          <div className="flex flex-wrap gap-2 mt-3">
-            {courseLevelLabel(course) && <Badge variant="outline">{es ? courseLevelLabel(course)!.replace(/^Grade /, 'Grado ') : courseLevelLabel(course)}</Badge>}
-            {/* Standards/skill tags are jargon for K-12 learners, hidden so the page stays short. */}
-            {!isK12Learner && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+      {/* Course header - banner hero */}
+      <div className="relative mb-4 h-48 md:h-56 overflow-hidden rounded-2xl border border-border shadow-sm">
+        {course.thumbnailUrl && !bannerImgFailed ? (
+          <img
+            src={course.thumbnailUrl}
+            alt={`Banner for ${course.title}`}
+            className="absolute inset-0 h-full w-full object-cover"
+            onError={() => setBannerImgFailed(true)}
+          />
+        ) : (
+          <div className="absolute inset-0" style={bannerGradientStyle(course.title)} />
+        )}
+        {/* Scrim so white text and controls read on any image */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+
+        {/* Title, bottom-left */}
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 md:p-5">
+          <h1 className="font-serif text-2xl md:text-3xl font-bold text-white drop-shadow-md line-clamp-2 max-w-2xl">
+            {course.title}
+          </h1>
+          {/* Instructor controls, bottom-right, styled to read on the image */}
+          {isInstructor && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-sm"
+                onClick={openBannerDialog}
+              >
+                <ImageIcon className="h-4 w-4" /> Change banner
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-sm"
+                disabled={deleteCourseMutation.isPending}
+                onClick={() => {
+                  if (window.confirm('Delete this course and everything in it? This cannot be undone.')) deleteCourseMutation.mutate();
+                }}
+              >
+                <Trash2 className="h-4 w-4" /> {deleteCourseMutation.isPending ? 'Deleting...' : 'Delete course'}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Enrolled badge, top-right on the banner */}
+        {enrolment && (
+          <div className="absolute right-4 top-4">
+            <Badge variant="outline" className="bg-white/85 text-green-700 border-green-600 backdrop-blur-sm">{L('Enrolled', 'Inscrito')}</Badge>
           </div>
+        )}
+      </div>
+
+      {/* Description + badges, below the banner */}
+      <div className="mb-6">
+        <p className="max-w-3xl text-muted-foreground leading-relaxed">{course.description}</p>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {courseLevelLabel(course) && <Badge variant="outline">{es ? courseLevelLabel(course)!.replace(/^Grade /, 'Grado ') : courseLevelLabel(course)}</Badge>}
+          {/* Standards/skill tags are jargon for K-12 learners, hidden so the page stays short. */}
+          {!isK12Learner && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
         </div>
         {role === 'learner' && !enrolment && (
-          <div className="max-w-xs shrink-0 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          <div className="mt-3 max-w-md rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             Enrolment is managed by your organisation. Ask your admin to assign this course to you.
           </div>
         )}
-        <div className="flex items-center gap-2 shrink-0">
-          {enrolment && <Badge variant="outline" className="text-green-600 border-green-600">{L('Enrolled', 'Inscrito')}</Badge>}
-          {isInstructor && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="gap-1.5 text-muted-foreground hover:text-rose-600"
-              disabled={deleteCourseMutation.isPending}
-              onClick={() => {
-                if (window.confirm('Delete this course and everything in it? This cannot be undone.')) deleteCourseMutation.mutate();
-              }}
-            >
-              <Trash2 className="h-4 w-4" /> {deleteCourseMutation.isPending ? 'Deleting...' : 'Delete course'}
-            </Button>
-          )}
-        </div>
       </div>
+
+      {/* Change banner dialog */}
+      {isInstructor && (
+        <Dialog open={bannerOpen} onOpenChange={setBannerOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Change banner</DialogTitle>
+              <DialogDescription>Paste an image URL to use as this course's banner. Leave it empty to clear the banner.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <label htmlFor="banner-url" className="text-sm font-medium">Banner image URL</label>
+              <Input
+                id="banner-url"
+                value={bannerUrl}
+                onChange={(e) => setBannerUrl(e.target.value)}
+                placeholder="https://example.com/banner.jpg"
+              />
+              {bannerError && <p className="text-sm text-rose-600">{bannerError}</p>}
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setBannerOpen(false)} disabled={bannerSaving}>Cancel</Button>
+              <Button onClick={saveBanner} disabled={bannerSaving}>{bannerSaving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Real completion, from beats actually viewed. Only shown to enrolled learners:
           an unenrolled visitor browsing the catalog has no progress to speak of. */}
