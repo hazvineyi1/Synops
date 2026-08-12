@@ -1267,17 +1267,49 @@ export function CourseDetail() {
   // This surfaces the common failure mode (a page URL or hotlink-blocked link that is
   // not a direct image) instead of silently falling back to the themed gradient.
   const [bannerPreview, setBannerPreview] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
+  const [bannerResolving, setBannerResolving] = useState(false);
   const openBannerDialog = () => {
     setBannerUrl(course?.thumbnailUrl ?? '');
     setBannerError(null);
     setBannerPreview(course?.thumbnailUrl ? 'loading' : 'idle');
     setBannerOpen(true);
   };
+  // Ask the server to turn a page URL (Unsplash/Pexels/etc.) into a direct image URL by reading
+  // its preview image. Returns the direct URL, or null on failure (error surfaced to the user).
+  const resolvePageToImage = async (): Promise<string | null> => {
+    const url = bannerUrl.trim();
+    if (!url) return null;
+    setBannerResolving(true);
+    setBannerError(null);
+    try {
+      const r = await apiFetch<{ imageUrl: string }>('/courses/resolve-image', {
+        method: 'POST',
+        body: JSON.stringify({ url }),
+      });
+      if (r.imageUrl && r.imageUrl !== url) {
+        setBannerUrl(r.imageUrl);
+        setBannerPreview('loading');
+      }
+      return r.imageUrl || null;
+    } catch (e) {
+      setBannerError(e instanceof Error ? e.message : 'Could not fetch an image from that page.');
+      return null;
+    } finally {
+      setBannerResolving(false);
+    }
+  };
   const saveBanner = async () => {
     setBannerSaving(true);
     setBannerError(null);
     try {
-      const url = bannerUrl.trim();
+      let url = bannerUrl.trim();
+      // If the pasted link is not itself a displayable image (page link, hotlink-blocked),
+      // try to resolve it into a direct image URL before saving, so the banner actually shows.
+      if (url && bannerPreview !== 'ok') {
+        const resolved = await resolvePageToImage();
+        if (!resolved) { setBannerSaving(false); return; }
+        url = resolved;
+      }
       await apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify({ thumbnailUrl: url || null }) });
       await qc.invalidateQueries({ queryKey: ['course', courseId] });
       setBannerImgFailed(false);
@@ -1440,9 +1472,21 @@ export function CourseDetail() {
                     />
                   </div>
                   {bannerPreview === 'error' && (
-                    <p className="px-2 py-1.5 text-xs text-rose-600">
-                      That URL could not be loaded as an image. Check it is a direct image link and allows embedding.
-                    </p>
+                    <div className="space-y-1.5 px-2 py-1.5">
+                      <p className="text-xs text-rose-600">
+                        That URL could not be loaded as an image. If it is a photo page (e.g. Unsplash), fetch the image from it.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 gap-1.5 text-xs"
+                        disabled={bannerResolving}
+                        onClick={resolvePageToImage}
+                      >
+                        <ImageIcon className="h-3.5 w-3.5" />
+                        {bannerResolving ? 'Fetching...' : 'Fetch image from this page'}
+                      </Button>
+                    </div>
                   )}
                   {bannerPreview === 'ok' && (
                     <p className="px-2 py-1.5 text-xs text-green-700">Looks good. This is how the banner will appear.</p>
@@ -1452,8 +1496,8 @@ export function CourseDetail() {
               {bannerError && <p className="text-sm text-rose-600">{bannerError}</p>}
             </div>
             <DialogFooter>
-              <Button variant="ghost" onClick={() => setBannerOpen(false)} disabled={bannerSaving}>Cancel</Button>
-              <Button onClick={saveBanner} disabled={bannerSaving}>{bannerSaving ? 'Saving...' : 'Save'}</Button>
+              <Button variant="ghost" onClick={() => setBannerOpen(false)} disabled={bannerSaving || bannerResolving}>Cancel</Button>
+              <Button onClick={saveBanner} disabled={bannerSaving || bannerResolving}>{bannerResolving ? 'Fetching...' : bannerSaving ? 'Saving...' : 'Save'}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

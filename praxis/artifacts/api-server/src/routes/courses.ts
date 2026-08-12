@@ -318,6 +318,84 @@ router.post("/courses/generate-banner", requireAuth, requireRole("super_admin", 
   }
 });
 
+// POST /courses/resolve-image -- turn a page URL (an Unsplash/Pexels/Wikipedia photo page, an
+// article, etc.) into a DIRECT image URL the browser can display as a banner. If the URL is already
+// a direct image it is returned unchanged; otherwise the page's og:image / twitter:image is used.
+// This runs server-side because the browser cannot read another origin's HTML (CORS). Staff-only,
+// same authoring roles as banner generation.
+router.post("/courses/resolve-image", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  const raw = String(req.body?.url ?? "").trim();
+  if (!raw) { res.status(400).json({ error: "Provide a URL." }); return; }
+
+  let parsed: URL;
+  try { parsed = new URL(raw); } catch { res.status(400).json({ error: "That is not a valid URL." }); return; }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    res.status(400).json({ error: "Only http(s) URLs are supported." });
+    return;
+  }
+  // Basic SSRF guard: never let this fetch internal/loopback/link-local/private hosts.
+  const host = parsed.hostname.toLowerCase();
+  const isBlockedHost =
+    host === "localhost" ||
+    host.endsWith(".local") ||
+    /^(127\.|10\.|169\.254\.|192\.168\.|::1$|fe80:|fc00:|fd00:)/.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  if (isBlockedHost) { res.status(400).json({ error: "That host is not allowed." }); return; }
+
+  const abs = (u: string): string | null => {
+    try { return new URL(u, parsed).toString(); } catch { return null; }
+  };
+
+  try {
+    const r = await fetch(raw, {
+      redirect: "follow",
+      headers: {
+        // Some CDNs (Unsplash included) serve HTML only to browser-like agents.
+        "User-Agent": "Mozilla/5.0 (compatible; SynopsBanner/1.0)",
+        Accept: "text/html,application/xhtml+xml,image/*;q=0.9,*/*;q=0.8",
+      },
+    });
+    if (!r.ok) { res.status(502).json({ error: `Could not fetch that URL (${r.status}).` }); return; }
+
+    const contentType = (r.headers.get("content-type") || "").toLowerCase();
+
+    // Already a direct image: use the final (post-redirect) URL as-is.
+    if (contentType.startsWith("image/")) {
+      res.json({ imageUrl: r.url || raw, source: "direct" });
+      return;
+    }
+
+    // Otherwise parse the HTML for a share/preview image.
+    if (!contentType.includes("html")) {
+      res.status(422).json({ error: "That link is not an image and has no preview image." });
+      return;
+    }
+    const html = (await r.text()).slice(0, 500_000); // cap: preview meta lives in <head>
+
+    const metaContent = (re: RegExp): string | null => {
+      const m = html.match(re);
+      return m && m[1] ? m[1].trim() : null;
+    };
+    const candidate =
+      metaContent(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i) ||
+      metaContent(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      metaContent(/<meta[^>]+name=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      metaContent(/<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i) ||
+      metaContent(/<meta[^>]+content=["']([^"']+)["'][^>]*property=["']og:image["']/i) ||
+      metaContent(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i);
+
+    if (!candidate) {
+      res.status(422).json({ error: "No preview image found on that page. Use a direct image link instead." });
+      return;
+    }
+    const resolved = abs(candidate);
+    if (!resolved) { res.status(422).json({ error: "Found a preview image but could not read its address." }); return; }
+    res.json({ imageUrl: resolved, source: "og" });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Could not resolve that URL." });
+  }
+});
+
 // POST /courses/generate-objectives -- draft course-level learning objectives (and a short catalogue
 // blurb) from the title/description and any uploaded material. The author reviews/edits before saving.
 router.post("/courses/generate-objectives", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
