@@ -29,7 +29,7 @@ import { useGetMe } from '@workspace/api-client-react';
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { activitiesApi } from '@/lib/activitiesApi';
 import { RichTextEditor, BulletStyleBar, BulletIcon, objectivesHtmlToItems, itemsToPlain, escapeHtml } from '@/components/RichTextEditor';
-import { renderActivity, validateSpec, type InteractionType, type ActivitySpec } from '@/lib/activityTemplates';
+import { renderActivity, type InteractionType, type ActivitySpec } from '@/lib/activityTemplates';
 import {
   ChevronLeft, ChevronRight, ChevronDown, CheckCircle, BookOpen, List, Sparkles, Pencil,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
@@ -2299,27 +2299,29 @@ function ReadingCoursework({ courseId, moduleId, readings }: { courseId: string;
     setActBusy(true); setErr(null); setMsg(null);
     try {
       const content = await gatherContent();
-      if (content.length < 80) { setErr('Add or generate a reading first — there is no content to build from.'); return; }
+      if (content.length < 80) { setErr('No reading content was found to build from. Open a reading first, then try again.'); return; }
       const { activities } = await apiFetch<{ activities: { type: string; title: string; instructions: string; bloomsLevel: string; difficulty: string; spec: unknown }[] }>(
         `/activities/generate`, { method: 'POST', body: JSON.stringify({ content: content.slice(0, 12000), count: 4 }) });
-      let made = 0;
+      const madeTitles: string[] = [];
       for (const a of activities ?? []) {
         const type = a.type as InteractionType;
         try {
-          if (validateSpec(type, a.spec as ActivitySpec)) continue; // returns an error string when invalid
+          // The generator already validated the spec server-side; render straight to HTML and only
+          // skip if rendering genuinely throws, so we don't silently drop good activities.
           const html = renderActivity(type, a.spec as ActivitySpec);
+          if (!html) continue;
           await activitiesApi.create({
             title: a.title, instructions: a.instructions || undefined, source: 'html', html,
             kind: 'game', bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null,
             published: true, courseId, moduleId,
           });
-          made += 1;
-        } catch { /* skip a single bad one */ }
+          madeTitles.push(a.title);
+        } catch (itemErr) { console.error('activity create failed:', itemErr); }
       }
-      if (!made) { setErr('Could not build activities from this reading. Try the activity builder instead.'); return; }
+      if (!madeTitles.length) { setErr(`The generator returned ${activities?.length ?? 0} draft(s) but none could be saved. Please try again.`); return; }
       qc.invalidateQueries({ queryKey: ['module-activities', moduleId] });
-      setMsg(`Added ${made} interactive ${made === 1 ? 'activity' : 'activities'} to this module.`);
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not build activities.'); }
+      setMsg(`Added ${madeTitles.length} interactive ${madeTitles.length === 1 ? 'activity' : 'activities'} to the Activities section: ${madeTitles.join(', ')}.`);
+    } catch (e) { console.error('buildActivities:', e); setErr(e instanceof Error ? e.message : 'Could not build activities.'); }
     finally { setActBusy(false); }
   };
 
@@ -2328,11 +2330,13 @@ function ReadingCoursework({ courseId, moduleId, readings }: { courseId: string;
     try {
       const r = await apiFetch<{ created: { id: string; title: string }[] }>(
         `/modules/${moduleId}/discussions/generate`, { method: 'POST', body: JSON.stringify({}) });
-      const n = r.created?.length ?? 0;
-      qc.invalidateQueries({ queryKey: ['course-discussions', courseId] });
-      qc.invalidateQueries({ queryKey: ['module-discussions', moduleId] });
-      setMsg(`Added ${n} discussion ${n === 1 ? 'question' : 'questions'} to this module.`);
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not extract discussion questions.'); }
+      const titles = (r.created ?? []).map((c) => c.title);
+      // The module Discussions tab is keyed on ['discussions', courseId, moduleId].
+      qc.invalidateQueries({ queryKey: ['discussions', courseId, moduleId] });
+      qc.invalidateQueries({ queryKey: ['discussions'] });
+      if (!titles.length) { setErr('No discussion-worthy questions were found in this reading.'); return; }
+      setMsg(`Added ${titles.length} discussion ${titles.length === 1 ? 'question' : 'questions'} to the Discussions section: ${titles.join(', ')}.`);
+    } catch (e) { console.error('buildDiscussions:', e); setErr(e instanceof Error ? e.message : 'Could not extract discussion questions.'); }
     finally { setDiscBusy(false); }
   };
 
@@ -2527,6 +2531,13 @@ function ReadingsSection({ courseId, moduleId, isInstructor }: { courseId: strin
             </Button>
           )}
         </div>
+        {/* Instructors get the "turn this reading into coursework" tools while reading too, since a
+            single-reading module opens straight into the reader and never shows the list view. */}
+        {isInstructor && (readings ?? []).some((r) => r.hasContent) && (
+          <div className="max-w-3xl mx-auto w-full pt-2">
+            <ReadingCoursework courseId={courseId} moduleId={moduleId} readings={readings ?? []} />
+          </div>
+        )}
       </div>
     );
   }
