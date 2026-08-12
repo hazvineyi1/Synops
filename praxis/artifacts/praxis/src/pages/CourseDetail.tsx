@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
-  CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Image as ImageIcon
+  CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Image as ImageIcon, Upload, Lightbulb
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -1063,6 +1063,233 @@ function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
   );
 }
 
+// ---- AI course architect ------------------------------------------------------------------
+// "The material defines everything." The author pastes or uploads source content; an expert
+// instructional-designer persona proposes a full blueprint (objectives, modules with per-section
+// plans, suggested videos, gap analysis). Nothing is written until the author approves, then it
+// scaffolds real modules.
+type ArchitectSections = { reading: string | null; lecture: string | null; activity: string | null; caseStudy: string | null; assessment: string | null };
+type ArchitectModule = { title: string; overview: string; objectives: string[]; sections: ArchitectSections; sourceMapping: string; suggestedVideo: string; summary: string };
+type Blueprint = { courseObjectives: string[]; modules: ArchitectModule[]; gaps: { gap: string; suggestion: string }[]; flowNote: string };
+
+function CourseArchitect({ courseId, onScaffolded }: { courseId: string; onScaffolded: () => void }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [content, setContent] = useState('');
+  const [guidance, setGuidance] = useState('');
+  const [fileBusy, setFileBusy] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [plan, setPlan] = useState<Blueprint | null>(null);
+  const [skip, setSkip] = useState<Set<number>>(new Set());
+  const [useObjectives, setUseObjectives] = useState(true);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setFileBusy(true); setError(null);
+    try {
+      const dataBase64 = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(String(r.result).split(',')[1] ?? '');
+        r.onerror = () => reject(new Error('Could not read that file.'));
+        r.readAsDataURL(file);
+      });
+      const r = await apiFetch<{ text: string }>('/activities/extract', { method: 'POST', body: JSON.stringify({ filename: file.name, dataBase64 }) });
+      setContent((c) => (c ? `${c}\n\n` : '') + (r.text ?? ''));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not read that file.');
+    } finally {
+      setFileBusy(false);
+    }
+  };
+
+  const analyze = async () => {
+    setAnalyzing(true); setError(null); setPlan(null); setSkip(new Set());
+    try {
+      const r = await apiFetch<Blueprint>(`/courses/${courseId}/architect`, {
+        method: 'POST',
+        body: JSON.stringify({ materialText: content, guidance }),
+      });
+      setPlan(r);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The architect could not analyse that content.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const apply = async () => {
+    if (!plan) return;
+    const modules = plan.modules.filter((_, i) => !skip.has(i));
+    if (modules.length === 0) { setError('Select at least one module to create.'); return; }
+    setApplying(true); setError(null);
+    try {
+      await apiFetch(`/courses/${courseId}/architect/apply`, {
+        method: 'POST',
+        body: JSON.stringify({ modules, courseObjectives: useObjectives ? plan.courseObjectives : undefined }),
+      });
+      await qc.invalidateQueries({ queryKey: ['modules', courseId] });
+      await qc.invalidateQueries({ queryKey: ['course', courseId] });
+      setPlan(null); setContent(''); setGuidance(''); setOpen(false);
+      onScaffolded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create the modules.');
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const toggleSkip = (i: number) => setSkip((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
+  const sectionLabels: [keyof ArchitectSections, string][] = [
+    ['reading', 'Reading'], ['lecture', 'Lecture'], ['activity', 'Activity'], ['caseStudy', 'Case study'], ['assessment', 'Assessment'],
+  ];
+
+  return (
+    <Card className="border-primary/30">
+      <CardHeader className="pb-2">
+        <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-start gap-2 text-left">
+          {open ? <ChevronDown className="h-4 w-4 mt-1 flex-shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 mt-1 flex-shrink-0 text-muted-foreground" />}
+          <FileText className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
+          <div className="min-w-0">
+            <CardTitle className="text-base">Build from content</CardTitle>
+            <p className="text-xs text-muted-foreground">Paste or upload your material. The AI designs the modules, objectives, and structure from it.</p>
+          </div>
+        </button>
+      </CardHeader>
+      {open && (
+        <CardContent className="space-y-4">
+          {!plan && (
+            <>
+              <Textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={8}
+                placeholder="Paste the source material here: a syllabus, lecture notes, a chapter, a transcript, anything the course should be built from."
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <input ref={fileRef} type="file" className="hidden" onChange={onPickFile}
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.csv" />
+                <Button size="sm" variant="outline" className="gap-1.5" disabled={fileBusy} onClick={() => fileRef.current?.click()}>
+                  <Upload className="h-4 w-4" /> {fileBusy ? 'Reading file...' : 'Upload a file'}
+                </Button>
+                <span className="text-xs text-muted-foreground">PDF, Word, PowerPoint, Excel, or text. Adds to the box above.</span>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Guidance for the architect (optional)</label>
+                <Input value={guidance} onChange={(e) => setGuidance(e.target.value)} placeholder="e.g. audience is first-year students; keep it to 5 modules; emphasise practical application." />
+              </div>
+              {error && <p className="text-sm text-rose-600">{error}</p>}
+              <div className="flex justify-end">
+                <Button size="sm" disabled={analyzing || content.trim().length < 80} onClick={analyze}>
+                  {analyzing ? 'Designing the course...' : 'Design the course'}
+                </Button>
+              </div>
+              {content.trim().length > 0 && content.trim().length < 80 && (
+                <p className="text-xs text-muted-foreground text-right">Add a bit more content to analyse.</p>
+              )}
+            </>
+          )}
+
+          {plan && (
+            <div className="space-y-5">
+              {/* Flow note */}
+              {plan.flowNote && (
+                <div className="rounded-lg bg-primary/[0.04] border border-primary/20 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Learning arc</p>
+                  <p className="text-sm text-foreground">{plan.flowNote}</p>
+                </div>
+              )}
+
+              {/* Derived objectives */}
+              {plan.courseObjectives.length > 0 && (
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input type="checkbox" className="h-4 w-4" checked={useObjectives} onChange={(e) => setUseObjectives(e.target.checked)} />
+                    Save these {plan.courseObjectives.length} course objectives
+                  </label>
+                  <ul className="mt-2 space-y-1">
+                    {plan.courseObjectives.map((o, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/50" />{o}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Proposed modules */}
+              <div>
+                <p className="text-sm font-medium mb-2">Proposed modules ({plan.modules.length - skip.size} of {plan.modules.length} selected)</p>
+                <div className="space-y-3">
+                  {plan.modules.map((m, i) => {
+                    const off = skip.has(i);
+                    return (
+                      <div key={i} className={cn('rounded-lg border p-3 transition-opacity', off ? 'opacity-45 border-border' : 'border-primary/30')}>
+                        <div className="flex items-start gap-2">
+                          <input type="checkbox" className="mt-1 h-4 w-4" checked={!off} onChange={() => toggleSkip(i)} />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-foreground">{i + 1}. {m.title}</p>
+                            {m.overview && <p className="text-sm text-muted-foreground mt-0.5">{m.overview}</p>}
+                            {m.objectives.length > 0 && (
+                              <ul className="mt-2 space-y-0.5">
+                                {m.objectives.map((o, k) => (
+                                  <li key={k} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                                    <Target className="h-3 w-3 mt-0.5 shrink-0 text-primary/60" />{o}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {sectionLabels.filter(([k]) => m.sections[k]).map(([k, label]) => (
+                                <span key={k} title={m.sections[k] ?? ''} className="rounded-full border border-border bg-muted/50 px-2 py-0.5 text-[11px] text-foreground">{label}</span>
+                              ))}
+                            </div>
+                            {m.suggestedVideo && <p className="mt-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">Video idea:</span> {m.suggestedVideo}</p>}
+                            {m.summary && <p className="mt-1 text-xs text-muted-foreground"><span className="font-medium text-foreground">Summary:</span> {m.summary}</p>}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Gaps */}
+              {plan.gaps.length > 0 && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-amber-700 mb-2">
+                    <Lightbulb className="h-3.5 w-3.5" /> Gaps to fill
+                  </p>
+                  <ul className="space-y-2">
+                    {plan.gaps.map((g, i) => (
+                      <li key={i} className="text-sm">
+                        <span className="font-medium text-foreground">{g.gap}</span>
+                        <span className="text-muted-foreground"> {g.suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {error && <p className="text-sm text-rose-600">{error}</p>}
+              <div className="flex items-center justify-between gap-2">
+                <Button size="sm" variant="ghost" disabled={applying} onClick={() => setPlan(null)}>Back to content</Button>
+                <Button size="sm" disabled={applying} onClick={apply}>
+                  {applying ? 'Creating modules...' : `Create ${plan.modules.length - skip.size} module${plan.modules.length - skip.size === 1 ? '' : 's'}`}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 const LESSON_TYPE_META: Record<string, { icon: React.ElementType; label: string; color: string }> = {
   socratic: { icon: MessageSquare, label: 'Socratic',   color: 'text-violet-600' },
   video:    { icon: Play,          label: 'Video',      color: 'text-blue-600'   },
@@ -1787,10 +2014,19 @@ export function CourseDetail() {
         {/* ---- INSTRUCTOR BUILD VIEW: guided, single column, no learner sidebar ---- */}
         {activeTab === 'overview' && isInstructor && (
           <div className="max-w-3xl space-y-8">
-            {/* Step 1: the essentials */}
+            {/* Step 1: start from content -- the material defines everything */}
             <section className="space-y-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 1 · Course details</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 1 · Start from content</p>
+                <p className="text-sm text-muted-foreground">Upload or paste your material and let the AI design the modules, objectives, and structure. Optional, you can also build by hand below.</p>
+              </div>
+              <CourseArchitect courseId={courseId} onScaffolded={() => setTab('modules')} />
+            </section>
+
+            {/* Step 2: the essentials */}
+            <section className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 2 · Course details</p>
                 <p className="text-sm text-muted-foreground">Title, description, level, and status.</p>
               </div>
               <CourseSettingsCard
@@ -1801,10 +2037,10 @@ export function CourseDetail() {
               />
             </section>
 
-            {/* Step 2: objectives (collapsible card) */}
+            {/* Step 3: objectives (collapsible card) */}
             <section className="space-y-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 2 · Learning objectives</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 3 · Learning objectives</p>
                 <p className="text-sm text-muted-foreground">What a learner can do by the end. Modules and assessments align to these.</p>
               </div>
               <CourseObjectivesCard
@@ -1817,11 +2053,11 @@ export function CourseDetail() {
               />
             </section>
 
-            {/* Step 3: build the content */}
+            {/* Step 4: build the content */}
             <section className="space-y-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 3 · Build the content</p>
-                <p className="text-sm text-muted-foreground">Add modules, activities, assessments, readings, and case studies from the tabs above.</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 4 · Build the content</p>
+                <p className="text-sm text-muted-foreground">Add or refine modules, activities, assessments, readings, and case studies from the tabs above.</p>
               </div>
               <Card>
                 <CardContent className="flex flex-wrap gap-2 py-4">
@@ -1834,11 +2070,11 @@ export function CourseDetail() {
               </Card>
             </section>
 
-            {/* Step 4: publish -- assign to partners, only relevant at the end */}
+            {/* Step 5: publish -- assign to partners, only relevant at the end */}
             {role === 'super_admin' && (
               <section className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 4 · Publish</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 5 · Publish</p>
                   <p className="text-sm text-muted-foreground">When the course is ready, assign it to the partners who should deliver it.</p>
                 </div>
                 <AssignPartnersCard courseId={courseId} />

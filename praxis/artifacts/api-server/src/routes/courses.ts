@@ -470,6 +470,140 @@ Return ONLY valid JSON, no markdown: { "catalogDescription": "...", "objectives"
   }
 });
 
+// POST /courses/:courseId/architect -- the AI course architect. Given source content (pasted or
+// extracted from an upload) plus the course title/description, an expert instructional-designer
+// persona proposes a full course blueprint: derived objectives, a sequence of modules each with the
+// standard sections (overview, objectives, reading, lecture, activity, case study, assessment,
+// summary) mapped to the content, a suggested video search, and a gap analysis. NOTHING is written;
+// the author reviews and then calls /architect/apply to scaffold. This is the "material defines
+// everything" flow.
+router.post("/courses/:courseId/architect", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, req.params.courseId) });
+  if (!course) { res.status(404).json({ error: "Course not found" }); return; }
+  const materialText = String(req.body?.materialText ?? "").slice(0, 45000);
+  const extraGuidance = String(req.body?.guidance ?? "").slice(0, 1000);
+  if (materialText.trim().length < 80) {
+    res.status(400).json({ error: "Paste or upload more source content so the architect has something to work from." });
+    return;
+  }
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4500,
+      messages: [{
+        role: "user",
+        content: `You are a world-class instructional designer, instructional technologist, accessibility (WCAG) expert, pedagogy and adult-learning-theory expert, experienced teacher, and project manager. You design courses that are coherent, measurable, accessible, and genuinely engaging.
+
+Analyse the SOURCE CONTENT below and design a course blueprint. Think about scope and sequence: what a learner must know first, how ideas build, and where understanding could break down.
+
+Course title: ${course.title || "(untitled)"}
+Course description: ${course.description || "(none)"}
+Existing course objectives: ${(course.objectives ?? []).join(" | ") || "(none yet)"}
+${extraGuidance ? `Author guidance: ${extraGuidance}\n` : ""}
+Produce a JSON object with exactly these keys:
+- "courseObjectives": 4-6 measurable course-level objectives, each starting with a Bloom's action verb, describing what a learner can DO on completion. If good objectives already exist, refine them.
+- "modules": an ordered array (aim for 4-8) of modules. Each module object has:
+    - "title": a clear, specific module title
+    - "overview": 1-2 sentences framing what this module is about and why it matters
+    - "objectives": 2-4 measurable module objectives that ladder up to the course objectives
+    - "sections": for each of "reading","lecture","activity","caseStudy","assessment", a ONE-sentence plan describing what it should contain, drawn from the source content where possible. If the content does not support a section, set its value to null.
+    - "sourceMapping": one sentence naming which part of the source content this module draws from
+    - "suggestedVideo": a short search phrase an author could use to find a suitable YouTube or Khan Academy video for this module (no URL, just the phrase)
+    - "summary": one sentence a learner reads at the end to consolidate the module
+- "gaps": an array of 2-5 objects { "gap": "...", "suggestion": "..." } naming what the source content is MISSING for a complete, coherent course, and concretely how to fill each gap.
+- "flowNote": one or two sentences on the overall learning arc and how the modules connect into a sensible progression.
+
+Rules: measurable, jargon-free, no numbering inside strings, no em dashes. Return ONLY valid JSON, no markdown, no commentary.
+
+SOURCE CONTENT:
+${materialText}`,
+      }],
+    });
+    const content = message.content[0];
+    if (!content || content.type !== "text") throw new Error("Unexpected response");
+    let parsed: any;
+    try { parsed = JSON.parse(content.text); }
+    catch { const m = content.text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+
+    // Normalise defensively so the frontend always gets a predictable shape.
+    const modules = Array.isArray(parsed?.modules) ? parsed.modules.slice(0, 12).map((m: any) => ({
+      title: String(m?.title ?? "").slice(0, 200),
+      overview: String(m?.overview ?? "").slice(0, 600),
+      objectives: Array.isArray(m?.objectives) ? m.objectives.map((o: any) => String(o)).filter(Boolean).slice(0, 6) : [],
+      sections: {
+        reading: m?.sections?.reading ? String(m.sections.reading).slice(0, 400) : null,
+        lecture: m?.sections?.lecture ? String(m.sections.lecture).slice(0, 400) : null,
+        activity: m?.sections?.activity ? String(m.sections.activity).slice(0, 400) : null,
+        caseStudy: m?.sections?.caseStudy ? String(m.sections.caseStudy).slice(0, 400) : null,
+        assessment: m?.sections?.assessment ? String(m.sections.assessment).slice(0, 400) : null,
+      },
+      sourceMapping: String(m?.sourceMapping ?? "").slice(0, 300),
+      suggestedVideo: String(m?.suggestedVideo ?? "").slice(0, 160),
+      summary: String(m?.summary ?? "").slice(0, 400),
+    })) : [];
+    res.json({
+      courseObjectives: Array.isArray(parsed?.courseObjectives) ? parsed.courseObjectives.map((o: any) => String(o)).filter(Boolean).slice(0, 8) : [],
+      modules,
+      gaps: Array.isArray(parsed?.gaps) ? parsed.gaps.slice(0, 6).map((g: any) => ({ gap: String(g?.gap ?? "").slice(0, 300), suggestion: String(g?.suggestion ?? "").slice(0, 400) })) : [],
+      flowNote: String(parsed?.flowNote ?? "").slice(0, 500),
+    });
+  } catch (err) {
+    req.log?.error({ err }, "course architect error");
+    res.status(502).json({ error: "The architect could not analyse that content. Please try again." });
+  }
+});
+
+// POST /courses/:courseId/architect/apply -- scaffold the approved blueprint into real modules.
+// Creates one module per entry (title, overview as description, objectives) in order, appended after
+// any existing modules. The rich per-section content is stored in the module description as a plan
+// the author then fills in from the module tabs. Optionally saves the derived course objectives.
+router.post("/courses/:courseId/architect/apply", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  const courseId = req.params.courseId;
+  if (!(await canStaffActOnCourse(req.dbUser!, courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const incoming = Array.isArray(req.body?.modules) ? req.body.modules : [];
+  const courseObjectives = Array.isArray(req.body?.courseObjectives) ? req.body.courseObjectives.map((o: any) => String(o)).filter(Boolean).slice(0, 12) : null;
+  if (incoming.length === 0) { res.status(400).json({ error: "No modules to create." }); return; }
+
+  // Append after existing modules so re-running does not renumber the current ones.
+  const existing = await db.select({ order: modulesTable.order }).from(modulesTable).where(eq(modulesTable.courseId, courseId));
+  let nextOrder = existing.reduce((mx, r) => Math.max(mx, r.order ?? 0), -1) + 1;
+
+  const created: string[] = [];
+  for (const m of incoming) {
+    const title = String(m?.title ?? "").trim();
+    if (!title) continue;
+    // Fold the section plan into the module description so the author sees the intended shape.
+    const s = m?.sections ?? {};
+    const planLines = [
+      m?.overview ? String(m.overview).trim() : "",
+      "",
+      s?.reading ? `Reading: ${String(s.reading).trim()}` : "",
+      s?.lecture ? `Lecture: ${String(s.lecture).trim()}` : "",
+      s?.activity ? `Activity: ${String(s.activity).trim()}` : "",
+      s?.caseStudy ? `Case study: ${String(s.caseStudy).trim()}` : "",
+      s?.assessment ? `Assessment: ${String(s.assessment).trim()}` : "",
+      m?.suggestedVideo ? `Suggested video: ${String(m.suggestedVideo).trim()}` : "",
+      m?.summary ? `Summary: ${String(m.summary).trim()}` : "",
+    ].filter((l) => l !== undefined);
+    const description = planLines.join("\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
+    const objectives = Array.isArray(m?.objectives) ? m.objectives.map((o: any) => String(o)).filter(Boolean).slice(0, 8) : [];
+    const [mod] = await db.insert(modulesTable).values({
+      courseId, title, description, objectives, order: nextOrder++, status: "draft",
+    }).returning();
+    created.push(mod.id);
+  }
+
+  // Refresh the course module count and, if asked, save the derived objectives.
+  await db.update(coursesTable).set({
+    moduleCount: existing.length + created.length,
+    ...(courseObjectives ? { objectives: courseObjectives } : {}),
+    updatedAt: new Date(),
+  }).where(eq(coursesTable.id, courseId));
+
+  res.status(201).json({ created: created.length, moduleIds: created });
+});
+
 /**
  * POST /courses/setup-platform (super admin), one-time: make the assignment table exist and
  * bring EVERY existing course under super-admin ownership (tenantId "platform") so the whole
