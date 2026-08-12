@@ -1865,6 +1865,7 @@ export function CourseDetail() {
     mutationFn: (patch: Record<string, unknown>) =>
       apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['course', courseId] }),
+    onError: (e) => alert(e instanceof Error ? e.message : 'Could not save. Please try again.'),
   });
 
   // Instructor-only: set the course banner from an image URL.
