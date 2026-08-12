@@ -1630,7 +1630,11 @@ export function CourseDetail() {
 
   const { data: user } = useGetMe();
   const role = user?.role ?? 'learner';
-  const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(role);
+  const canInstruct = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(role);
+  // "View as student": staff can preview the course exactly as a learner sees it while building.
+  // When on, isInstructor renders false so all instructor controls/tabs hide and learner views show.
+  const [previewAsStudent, setPreviewAsStudent] = useState(false);
+  const isInstructor = canInstruct && !previewAsStudent;
   // Youngest learners (K-5) get a stripped, jargon-free course page: just "Start here", no
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
@@ -1643,6 +1647,11 @@ export function CourseDetail() {
   const L = (en: string, esT: string) => (es ? esT : en);
 
   const setTab = (tab: string) => navigate(`/courses/${courseId}?tab=${tab}`);
+  // Leaving a staff-only tab when entering student view, so the preview never lands on a blank tab.
+  useEffect(() => {
+    if (previewAsStudent && (activeTab === 'build' || activeTab === 'alignment')) setTab('overview');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewAsStudent, activeTab]);
 
   const { data: course, isLoading: courseLoading } = useQuery({ queryKey: ['course', courseId], queryFn: () => apiFetch<Course>(`/courses/${courseId}`) });
   // Real completion, computed from beats the learner has actually viewed.
@@ -1829,12 +1838,26 @@ export function CourseDetail() {
         <CourseToc courseId={courseId} activeTab={activeTab} setTab={setTab} isInstructor={isInstructor} modules={modules} navigate={navigate} />
       )}
       <div className="min-w-0 space-y-0">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-        <a href="/courses" className="hover:text-foreground transition-colors">{L('Courses', 'Cursos')}</a>
-        <ChevronRight className="h-4 w-4" />
-        <span className="text-foreground font-medium truncate max-w-xs">{course.title}</span>
+      {/* Breadcrumb + View-as-student toggle (staff only) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <a href="/courses" className="hover:text-foreground transition-colors">{L('Courses', 'Cursos')}</a>
+          <ChevronRight className="h-4 w-4" />
+          <span className="text-foreground font-medium truncate max-w-xs">{course.title}</span>
+        </div>
+        {canInstruct && (
+          <Button size="sm" variant={previewAsStudent ? 'default' : 'outline'} className="gap-1.5"
+            onClick={() => setPreviewAsStudent((v) => !v)}>
+            <Users className="h-4 w-4" />
+            {previewAsStudent ? 'Exit student view' : 'View as student'}
+          </Button>
+        )}
       </div>
+      {previewAsStudent && (
+        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          You are previewing this course as a student would see it. Instructor tools and the Build tab are hidden. Click "Exit student view" to return to building.
+        </div>
+      )}
 
       {/* Course header - banner hero (full-bleed, fills the content column) */}
       <div className="relative mb-4 h-56 md:h-72 overflow-hidden rounded-xl">
