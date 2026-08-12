@@ -2545,7 +2545,14 @@ export function CourseDetail() {
                   <div className="space-y-2">
                     <HeadingStyleBar style={objHStyle} onChange={setObjHStyle} />
                     <BulletStyleBar bullet={bulletDraft} onChange={setBulletDraft} />
-                    <ObjectivesEditor value={objDraft} onChange={setObjDraft} />
+                    <Textarea
+                      rows={Math.max(6, objDraft.length + 2)}
+                      value={objDraft.join('\n')}
+                      onChange={(e) => setObjDraft(e.target.value.split('\n'))}
+                      placeholder={"One objective per line, e.g.\nDescribe the key characteristics of a successful entrepreneur\nConstruct measurable short and long term business goals"}
+                      className="text-sm leading-relaxed"
+                    />
+                    <p className="text-xs text-muted-foreground">Write one objective per line. The bullet style above is applied to each.</p>
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setObjEditing(false)}>Cancel</Button>
                       <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ objectives: objDraft.map((o) => o.trim()).filter(Boolean), overviewConfig: JSON.stringify({ ...ovCfg, objectivesHeading: objHeadingDraft.trim() || "What you'll be able to do", objHColor: objHStyle.color, objHSize: objHStyle.size, bulletShape: bulletDraft.shape, bulletColor: bulletDraft.color }) }, { onSuccess: () => setObjEditing(false) })}>
