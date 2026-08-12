@@ -29,6 +29,9 @@ export const coursesTable = pgTable("courses", {
   architectBlueprint: text("architect_blueprint"),
   // Small JSON of overview customisations (e.g. custom section heading labels).
   overviewConfig: text("overview_config"),
+  // The source material uploaded/pasted into the AI architect, kept so module readings can be
+  // generated from the actual content later.
+  sourceMaterial: text("source_material"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

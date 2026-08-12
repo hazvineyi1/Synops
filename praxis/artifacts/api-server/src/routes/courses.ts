@@ -724,6 +724,9 @@ router.post("/courses/:courseId/architect", requireAuth, requireRole("super_admi
     createdAt: Date.now(), updatedAt: Date.now(),
   };
   architectJobs.set(job.id, job);
+  // Keep the source material on the course so module readings can be generated from the real
+  // content later (best-effort; never blocks the job).
+  try { await db.update(coursesTable).set({ sourceMaterial: materialText } as any).where(eq(coursesTable.id, req.params.courseId)); } catch { /* non-fatal */ }
   // Fire and forget: the request returns now, processing continues in the background.
   void runArchitectJob(job, course, materialText, extraGuidance);
   res.status(202).json({ jobId: job.id });

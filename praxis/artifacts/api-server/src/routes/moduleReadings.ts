@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { moduleReadingsTable, modulesTable } from "@workspace/db";
+import { moduleReadingsTable, modulesTable, coursesTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { requireAuth, requireCoFacilitatorOrAbove } from "../middlewares/requireAuth";
 import { canParticipateInCourse } from "../lib/scope";
@@ -85,24 +85,36 @@ router.post("/modules/:moduleId/readings/generate", requireAuth, requireCoFacili
     `Module title: ${mod.title}`,
     mod.description ? `Overview: ${mod.description}` : "",
     objectives.length ? `Learning objectives:\n${objectives.map((o) => `- ${o}`).join("\n")}` : "",
-    typeof req.body?.extra === "string" && req.body.extra.trim() ? `Additional source notes:\n${String(req.body.extra).slice(0, 8000)}` : "",
   ].filter(Boolean).join("\n\n");
+
+  // If the course kept the uploaded source material, build the reading FROM that content (pulling the
+  // parts that apply to this module), so the reading is the real material, not a generic write-up.
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, mod.courseId) });
+  const source = ((course as { sourceMaterial?: string } | undefined)?.sourceMaterial ?? "").slice(0, 45000);
+  const prompt = source
+    ? `From the SOURCE MATERIAL below, produce the COMPLETE reading for this specific module. Include every part of the source that applies to this module's topic and objectives: the full explanations, definitions, criteria tables, processes, and examples. Preserve the detail, do not over-summarise or drop content. Organise it with clear markdown section headings (##), short paragraphs, and lists/tables where the source has them. End with a short "Key takeaways" list. No preamble. Start directly with the reading.\n\nMODULE:\n${context}\n\nSOURCE MATERIAL:\n${source}`
+    : `Write a complete, self-contained reading that fully teaches this course module. 700 to 1200 words, accurate and practical, with markdown section headings (##), short paragraphs, lists where useful, key terms defined, a concrete example, and a short "Key takeaways" list. No preamble. Start directly with the reading.\n\nMODULE:\n${context}`;
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 3500,
-      messages: [{
-        role: "user",
-        content: `Write a complete, self-contained reading that fully teaches this course module. Requirements:\n- 700 to 1200 words, accurate, practical, and engaging for adult learners.\n- Structure with clear markdown section headings (##), short paragraphs, and bullet lists where useful.\n- Cover the concepts a learner needs to meet the objectives; define key terms; include a concrete example.\n- End with a short "Key takeaways" list.\n- No preamble or meta-commentary. Start directly with the reading (a level-1 # title is fine).\n\nMODULE:\n${context}`,
-      }],
-    }, { timeout: 120000, maxRetries: 2 });
+      max_tokens: source ? 6000 : 3500,
+      messages: [{ role: "user", content: prompt }],
+    }, { timeout: 150000, maxRetries: 2 });
     const content = message.content[0];
     const text = content && content.type === "text" ? content.text.trim() : "";
     if (text.length < 200) throw new Error("Empty reading");
-    const [row] = await db.insert(moduleReadingsTable).values({
-      moduleId: mod.id, courseId: mod.courseId, title: `${mod.title}: Reading`,
-      kind: "document", content: text, chars: text.length, createdBy: req.userId!,
-    }).returning();
+    // Replace the architect's starter stub if one exists, so we do not leave two readings behind.
+    const existing = await db.select().from(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, mod.id));
+    const stub = existing.find((r) => (r.content ?? "").includes("starter reading generated from your material") || (r.chars ?? 0) < 400);
+    let row;
+    if (stub) {
+      [row] = await db.update(moduleReadingsTable).set({ title: `${mod.title}: Reading`, content: text, chars: text.length }).where(eq(moduleReadingsTable.id, stub.id)).returning();
+    } else {
+      [row] = await db.insert(moduleReadingsTable).values({
+        moduleId: mod.id, courseId: mod.courseId, title: `${mod.title}: Reading`,
+        kind: "document", content: text, chars: text.length, createdBy: req.userId!,
+      }).returning();
+    }
     res.status(201).json(toRow(row));
   } catch (err) {
     // eslint-disable-next-line no-console
