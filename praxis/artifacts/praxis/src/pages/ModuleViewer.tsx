@@ -3357,7 +3357,7 @@ function ModuleHubView({
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
 
         <nav aria-label="Module sections"
-          className="lg:w-full lg:shrink-0 lg:sticky lg:top-4 lg:self-start lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
+          className="lg:w-64 lg:shrink-0 lg:sticky lg:top-4 lg:self-start lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
           <div className="hidden lg:flex items-center justify-between px-1 pb-2 mb-1 border-b border-border">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contents</span>
             {isInstructor && (
