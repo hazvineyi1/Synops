@@ -930,12 +930,22 @@ function AssignPartnersCard({ courseId }: { courseId: string }) {
     mutationFn: () => apiFetch(`/courses/${courseId}/partners`, { method: 'PUT', body: JSON.stringify({ partnerIds: [...chosen] }) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['course-partners', courseId] }); setSel(null); },
   });
+  // Collapsed by default: assigning to partners is the final publish step, not something you set
+  // up mid-build, so it stays out of the way until you open it.
+  const [open, setOpen] = useState(false);
+  const assignedCount = current?.partnerIds?.length ?? 0;
   return (
     <Card className="border-dashed border-primary/30">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Assign to partners</CardTitle>
-        <p className="text-xs text-muted-foreground">This course belongs to the platform. Choose which partners can see and deliver it.</p>
+        <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center gap-2 text-left">
+          {open ? <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
+          <Layers className="h-4 w-4 text-primary flex-shrink-0" />
+          <CardTitle className="text-base">Assign to partners</CardTitle>
+          <span className="ml-auto text-xs text-muted-foreground">{assignedCount > 0 ? `${assignedCount} assigned` : 'Final step'}</span>
+        </button>
+        {open && <p className="mt-1 text-xs text-muted-foreground">This course belongs to the platform. Choose which partners can see and deliver it. Do this once the course is built.</p>}
       </CardHeader>
+      {open && (
       <CardContent className="space-y-3">
         {isLoading ? (
           <p className="text-xs text-muted-foreground">Loading partners...</p>
@@ -957,6 +967,7 @@ function AssignPartnersCard({ courseId }: { courseId: string }) {
           <Button size="sm" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>{save.isPending ? 'Saving...' : 'Save assignments'}</Button>
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }
@@ -972,6 +983,9 @@ function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
 }) {
   const [draft, setDraft] = useState<string[]>(initial.length ? initial : ['']);
   const [genOpen, setGenOpen] = useState(false);
+  // Collapsed by default once objectives exist, so a long list does not dominate the build page.
+  // Empty starts expanded so a new course prompts you to add them.
+  const [open, setOpen] = useState(initial.length === 0);
   const [levels, setLevels] = useState<BloomLevel[]>(DEFAULT_BLOOM);
   const clean = draft.map((s) => s.trim()).filter(Boolean);
   const dirty = JSON.stringify(clean) !== JSON.stringify(initial);
@@ -990,15 +1004,24 @@ function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <CardTitle className="text-base">Course learning objectives</CardTitle>
-            <p className="text-xs text-muted-foreground">Shown to learners on the course overview.</p>
-          </div>
-          <Button size="sm" variant="outline" className="gap-1.5 flex-shrink-0" onClick={() => setGenOpen((o) => !o)}>
-            Generate
-          </Button>
+          <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-start gap-2 text-left min-w-0">
+            {open ? <ChevronDown className="h-4 w-4 mt-1 flex-shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 mt-1 flex-shrink-0 text-muted-foreground" />}
+            <div className="min-w-0">
+              <CardTitle className="text-base">
+                Course learning objectives
+                {!open && clean.length > 0 && <span className="ml-2 text-xs font-normal text-muted-foreground">({clean.length})</span>}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Shown to learners on the course overview.</p>
+            </div>
+          </button>
+          {open && (
+            <Button size="sm" variant="outline" className="gap-1.5 flex-shrink-0" onClick={() => setGenOpen((o) => !o)}>
+              Generate
+            </Button>
+          )}
         </div>
       </CardHeader>
+      {open && (
       <CardContent className="space-y-3">
         {genOpen && (
           <div className="rounded-lg border border-dashed border-primary/30 bg-primary/[0.03] p-3 space-y-2.5">
@@ -1035,6 +1058,7 @@ function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
           </Button>
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }
@@ -1760,7 +1784,71 @@ export function CourseDetail() {
             )}
           </div>
         )}
-        {activeTab === 'overview' && (isInstructor || !enrolment) && (
+        {/* ---- INSTRUCTOR BUILD VIEW: guided, single column, no learner sidebar ---- */}
+        {activeTab === 'overview' && isInstructor && (
+          <div className="max-w-3xl space-y-8">
+            {/* Step 1: the essentials */}
+            <section className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 1 · Course details</p>
+                <p className="text-sm text-muted-foreground">Title, description, level, and status.</p>
+              </div>
+              <CourseSettingsCard
+                key={`${course.title}|${course.status}|${course.nqfLevel}`}
+                course={course as any}
+                saving={saveCourse.isPending}
+                onSave={(patch) => saveCourse.mutate(patch)}
+              />
+            </section>
+
+            {/* Step 2: objectives (collapsible card) */}
+            <section className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 2 · Learning objectives</p>
+                <p className="text-sm text-muted-foreground">What a learner can do by the end. Modules and assessments align to these.</p>
+              </div>
+              <CourseObjectivesCard
+                key={JSON.stringify(course.objectives ?? [])}
+                initial={course.objectives ?? []}
+                saving={saveCourse.isPending}
+                onSave={(objectives) => saveCourse.mutate({ objectives })}
+                title={course.title}
+                description={course.description}
+              />
+            </section>
+
+            {/* Step 3: build the content */}
+            <section className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 3 · Build the content</p>
+                <p className="text-sm text-muted-foreground">Add modules, activities, assessments, readings, and case studies from the tabs above.</p>
+              </div>
+              <Card>
+                <CardContent className="flex flex-wrap gap-2 py-4">
+                  <Button size="sm" variant="outline" onClick={() => setTab('modules')}>Modules</Button>
+                  <Button size="sm" variant="outline" onClick={() => setTab('activities')}>Activities</Button>
+                  <Button size="sm" variant="outline" onClick={() => setTab('assignments')}>Assignments</Button>
+                  <Button size="sm" variant="outline" onClick={() => setTab('cases')}>Case studies</Button>
+                  <Button size="sm" variant="outline" onClick={() => setTab('pages')}>Pages</Button>
+                </CardContent>
+              </Card>
+            </section>
+
+            {/* Step 4: publish -- assign to partners, only relevant at the end */}
+            {role === 'super_admin' && (
+              <section className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 4 · Publish</p>
+                  <p className="text-sm text-muted-foreground">When the course is ready, assign it to the partners who should deliver it.</p>
+                </div>
+                <AssignPartnersCard courseId={courseId} />
+              </section>
+            )}
+          </div>
+        )}
+
+        {/* ---- CATALOG PREVIEW (unenrolled visitor, not an instructor) ---- */}
+        {activeTab === 'overview' && !isInstructor && !enrolment && (
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-6">
               <Card>
@@ -1769,28 +1857,6 @@ export function CourseDetail() {
                   <p className="text-muted-foreground leading-relaxed">{course.description}</p>
                 </CardContent>
               </Card>
-              {/* Instructor: edit core course settings (title, description, NQF, status). */}
-              {isInstructor && (
-                <CourseSettingsCard
-                  key={`${course.title}|${course.status}|${course.nqfLevel}`}
-                  course={course as any}
-                  saving={saveCourse.isPending}
-                  onSave={(patch) => saveCourse.mutate(patch)}
-                />
-              )}
-              {/* Instructor: edit course learning objectives (authoring). */}
-              {isInstructor && (
-                <CourseObjectivesCard
-                  key={JSON.stringify(course.objectives ?? [])}
-                  initial={course.objectives ?? []}
-                  saving={saveCourse.isPending}
-                  onSave={(objectives) => saveCourse.mutate({ objectives })}
-                  title={course.title}
-                  description={course.description}
-                />
-              )}
-              {/* Super admin: assign this platform-owned course out to partners. */}
-              {role === 'super_admin' && <AssignPartnersCard courseId={courseId} />}
               {/* Front page content */}
               {pages?.find(p => p.frontPage) && (
                 <Card>
