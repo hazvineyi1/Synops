@@ -1570,7 +1570,19 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
   // Sections only staff should see (course setup + roster/roster-management). Learners and visitors
   // never see these in the table of contents.
   const STAFF_ONLY = new Set(['build', 'alignment', 'people', 'groups']);
-  const sections = TABS.filter((t) => isInstructor || !STAFF_ONLY.has(t.id));
+  const baseSections = TABS.filter((t) => isInstructor || !STAFF_ONLY.has(t.id));
+  // Custom order (drag-free up/down reordering in Customize mode), saved per course.
+  const ORDER_KEY = `toc-order:${courseId}`;
+  const [order, setOrder] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(ORDER_KEY) || '[]'); } catch { return []; } });
+  const rank = (id: string) => { const i = order.indexOf(id); return i === -1 ? 1000 + baseSections.findIndex((s) => s.id === id) : i; };
+  const sections = [...baseSections].sort((a, b) => rank(a.id) - rank(b.id));
+  const move = (id: string, dir: -1 | 1) => {
+    const ids = sections.map((s) => s.id);
+    const idx = ids.indexOf(id); const j = idx + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[idx], ids[j]] = [ids[j], ids[idx]];
+    setOrder(ids); try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+  };
   const hasModules = (modules?.length ?? 0) > 0;
   return (
     <aside className="lg:w-full shrink-0 lg:sticky lg:top-4 self-start mb-6 lg:mb-0 lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
@@ -1587,7 +1599,13 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
           <div key={t.id}>
             <div className="flex items-center gap-1">
               {customizing && isInstructor && (
-                <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!hidden.has(t.id)} onChange={() => toggle(t.id)} title="Show in table of contents" />
+                <>
+                  <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!hidden.has(t.id)} onChange={() => toggle(t.id)} title="Show in table of contents" />
+                  <span className="flex flex-col shrink-0">
+                    <button className="text-muted-foreground hover:text-foreground" title="Move up" onClick={() => move(t.id, -1)}><ChevronRight className="h-3 w-3 -rotate-90" /></button>
+                    <button className="text-muted-foreground hover:text-foreground" title="Move down" onClick={() => move(t.id, 1)}><ChevronRight className="h-3 w-3 rotate-90" /></button>
+                  </span>
+                </>
               )}
               <button onClick={() => setTab(t.id)}
                 className={cn('flex-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
@@ -1727,6 +1745,44 @@ function RichTextEditor({ value, onChange }: { value: string; onChange: (html: s
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning onInput={sync}
         className="prose prose-sm max-w-none min-h-[9rem] p-3 focus:outline-none [&_h2]:font-serif [&_h3]:font-serif" />
+    </div>
+  );
+}
+
+// Course-level action: generate the full reading for every module from the uploaded source, one at a
+// time (each is its own request, so no single call times out). Shows progress.
+function GenerateAllReadings({ modules }: { modules?: { id: string; title: string }[] }) {
+  const qc = useQueryClient();
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
+  const run = async () => {
+    const mods = modules ?? [];
+    if (!mods.length) { setError('This course has no modules yet.'); return; }
+    setRunning(true); setError(null); setFailed([]);
+    const fails: string[] = [];
+    for (let i = 0; i < mods.length; i++) {
+      setProgress(`Generating reading ${i + 1} of ${mods.length}: ${mods[i].title}`);
+      try {
+        await apiFetch(`/modules/${mods[i].id}/readings/generate`, { method: 'POST', body: JSON.stringify({}) });
+        qc.invalidateQueries({ queryKey: ['module-readings', mods[i].id] });
+      } catch { fails.push(mods[i].title); }
+    }
+    setFailed(fails);
+    setProgress(fails.length ? `Done, ${fails.length} could not be generated.` : `Done. Full readings generated for ${mods.length} module${mods.length === 1 ? '' : 's'}.`);
+    setRunning(false);
+  };
+  return (
+    <div className="rounded-lg border border-dashed border-primary/30 p-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold">Generate full readings for all modules</p>
+        <p className="text-xs text-muted-foreground">Builds each module's reading from your uploaded material, replacing the starter stubs. Takes a minute per module.</p>
+        {progress && <p className="text-xs text-muted-foreground mt-1">{progress}</p>}
+        {error && <p className="text-xs text-rose-600 mt-1">{error}</p>}
+        {failed.length > 0 && <p className="text-xs text-amber-600 mt-1">Retry these: {failed.join(', ')}</p>}
+      </div>
+      <Button size="sm" disabled={running} onClick={run}>{running ? 'Generating…' : 'Generate all readings'}</Button>
     </div>
   );
 }
@@ -2485,13 +2541,24 @@ export function CourseDetail() {
               />
             </section>
 
+            {/* Generate the full readings for every module from the uploaded source. */}
+            {(modules?.length ?? 0) > 0 && (
+              <section className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 4 · Module readings</p>
+                  <p className="text-sm text-muted-foreground">Generate each module's full reading from your uploaded material.</p>
+                </div>
+                <GenerateAllReadings modules={modules} />
+              </section>
+            )}
+
             {/* Publish -- assign to partners, only relevant at the end. (The Modules/Activities/
                 Assignments/Cases/Pages tabs at the top of the page are the build surface, so a
                 duplicate row of buttons here was redundant and has been removed.) */}
             {role === 'super_admin' && (
               <section className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 4 · Publish</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 5 · Publish</p>
                   <p className="text-sm text-muted-foreground">When the course is ready, assign it to the partners who should deliver it.</p>
                 </div>
                 <AssignPartnersCard courseId={courseId} />

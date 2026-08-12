@@ -3168,6 +3168,16 @@ function ModuleHubView({
   const [railCustomizing, setRailCustomizing] = useState(false);
   const [railHidden, setRailHidden] = useState<Set<string>>(() => { try { return new Set<string>(JSON.parse(localStorage.getItem(`module-toc-hidden:${moduleId}`) || '[]')); } catch { return new Set<string>(); } });
   const toggleRailHidden = (id: string) => setRailHidden((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); try { localStorage.setItem(`module-toc-hidden:${moduleId}`, JSON.stringify([...n])); } catch { /* ignore */ } return n; });
+  const [railOrder, setRailOrder] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(`module-toc-order:${moduleId}`) || '[]'); } catch { return []; } });
+  const railRank = (id: string) => { const i = railOrder.indexOf(id); return i === -1 ? 1000 : i; };
+  const orderedRailTabs = [...railTabs].sort((a, b) => railRank(a.id) - railRank(b.id));
+  const moveRail = (id: string, dir: -1 | 1) => {
+    const ids = orderedRailTabs.map((t) => t.id);
+    const idx = ids.indexOf(id); const j = idx + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[idx], ids[j]] = [ids[j], ids[idx]];
+    setRailOrder(ids); try { localStorage.setItem(`module-toc-order:${moduleId}`, JSON.stringify(ids)); } catch { /* ignore */ }
+  };
 
   // ── Guided linear progression ──────────────────────────────────────────────
   // Every deliverable that exists, in the order the module should be worked through.
@@ -3365,7 +3375,7 @@ function ModuleHubView({
             )}
           </div>
           <ol className="flex lg:flex-col gap-2 lg:gap-0.5 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
-            {railTabs.filter((t) => railCustomizing || !railHidden.has(t.id)).map((t) => {
+            {orderedRailTabs.filter((t) => railCustomizing || !railHidden.has(t.id)).map((t) => {
               const active = tab === t.id;
               const st = tabState[t.id];
               const isDeliverable = t.id !== 'overview';
@@ -3373,7 +3383,13 @@ function ModuleHubView({
               return (
                 <li key={t.id} className="shrink-0 lg:shrink flex items-center gap-1">
                   {railCustomizing && isInstructor && (
-                    <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!railHidden.has(t.id)} onChange={() => toggleRailHidden(t.id)} title="Show in the menu" />
+                    <>
+                      <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!railHidden.has(t.id)} onChange={() => toggleRailHidden(t.id)} title="Show in the menu" />
+                      <span className="flex flex-col shrink-0">
+                        <button className="text-muted-foreground hover:text-foreground" title="Move up" onClick={() => moveRail(t.id, -1)}><ChevronRight className="h-3 w-3 -rotate-90" /></button>
+                        <button className="text-muted-foreground hover:text-foreground" title="Move down" onClick={() => moveRail(t.id, 1)}><ChevronRight className="h-3 w-3 rotate-90" /></button>
+                      </span>
+                    </>
                   )}
                   <button
                     onClick={() => {
