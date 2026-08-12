@@ -3243,7 +3243,7 @@ function ModuleHubView({
     <div className="min-h-screen bg-background">
       {/* Sticky top bar */}
       <header className="border-b border-border bg-card sticky top-0 z-30 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-[68px] flex items-center gap-3">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-[68px] flex items-center gap-3">
           <Button
             variant="ghost"
             size="sm"
@@ -3269,7 +3269,7 @@ function ModuleHubView({
             <img src={mod.bannerUrl} alt={`Banner for ${mod?.title ?? 'this module'}`} className="absolute inset-0 h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
             <div className="absolute inset-x-0 bottom-0">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 text-white">
+              <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 text-white">
                 <p className="text-xs font-semibold uppercase tracking-wider text-white/80 mb-1.5">{course?.title ?? courseFull?.title}</p>
                 <h2 className="text-2xl sm:text-3xl font-bold drop-shadow-sm">{mod?.title}</h2>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-white/85">
@@ -3286,14 +3286,14 @@ function ModuleHubView({
             )}
           </div>
           {mod?.description && (
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
+            <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
               <p className="text-muted-foreground max-w-2xl leading-relaxed">{cleanModuleDescription(mod.description)}</p>
             </div>
           )}
         </div>
       ) : (
         <div className="border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 relative">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
               {course?.title ?? courseFull?.title}
             </p>
@@ -3357,7 +3357,7 @@ function ModuleHubView({
           The rail is ordered the way the module should be worked through, so its top-to-
           bottom order is itself the instruction. On mobile it collapses to a scrolling row
           above the content, because a fixed side rail on a phone eats the reading width. */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
 
         <nav aria-label="Module sections"
           className={cn("lg:shrink-0 lg:sticky lg:top-[84px] lg:self-start", railOpen ? "lg:w-60" : "lg:w-auto")}>
@@ -3879,7 +3879,7 @@ function ModuleHubView({
 
       {/* Continue bar: a clear forward path -- through the module's learning experiences,
           then on to the next module, and finally a course-completion celebration. */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-12">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         {allModulesComplete ? (
           <div className="rounded-2xl border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-8 text-center">
             <div className="h-14 w-14 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center mx-auto mb-3">
