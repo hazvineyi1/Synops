@@ -1567,7 +1567,10 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
     try { localStorage.setItem(STORAGE, JSON.stringify([...n])); } catch { /* ignore */ }
     return n;
   });
-  const sections = TABS.filter((t) => (t.id !== 'alignment' && t.id !== 'build') || isInstructor);
+  // Sections only staff should see (course setup + roster/roster-management). Learners and visitors
+  // never see these in the table of contents.
+  const STAFF_ONLY = new Set(['build', 'alignment', 'people', 'groups']);
+  const sections = TABS.filter((t) => isInstructor || !STAFF_ONLY.has(t.id));
   const hasModules = (modules?.length ?? 0) > 0;
   return (
     <aside className="lg:w-full shrink-0 lg:sticky lg:top-4 self-start mb-6 lg:mb-0 lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">

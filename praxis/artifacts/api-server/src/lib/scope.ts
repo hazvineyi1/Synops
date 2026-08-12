@@ -217,8 +217,12 @@ export async function canViewCourseCatalog(user: StaffUser, courseId: string): P
   const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
   if (!course) return false;
   const scope = user.partnerId ?? user.organisationId ?? user.id;
-  if (course.tenantId === scope || course.tenantId === "platform") return true;
-  if (user.partnerId) {
+  // A course owned by the viewer's own tenant is visible to them.
+  if (course.tenantId === scope) return true;
+  // Platform courses are NOT visible to a tenant just because they exist. They are the super
+  // admin's to build and MUST be explicitly assigned to a partner before that partner's people can
+  // see them. (Previously every platform course leaked to every tenant, including drafts in build.)
+  if (course.tenantId === "platform" && user.partnerId) {
     try {
       const a = await db
         .select({ courseId: coursePartnerAssignmentsTable.courseId })
