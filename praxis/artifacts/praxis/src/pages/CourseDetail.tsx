@@ -1072,9 +1072,18 @@ type ArchitectSections = { reading: string | null; lecture: string | null; activ
 type ArchitectModule = { title: string; overview: string; objectives: string[]; sections: ArchitectSections; sourceMapping: string; suggestedVideo: string; summary: string };
 type Blueprint = { courseObjectives: string[]; modules: ArchitectModule[]; gaps: { gap: string; suggestion: string }[]; flowNote: string };
 
-function CourseArchitect({ courseId, onScaffolded }: { courseId: string; onScaffolded: () => void }) {
+function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { courseId: string; onScaffolded: () => void; defaultOpen?: boolean }) {
   const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  // When launched straight from "Create course", open and scroll the upload panel into view so
+  // adding course materials is the obvious first step.
+  useEffect(() => {
+    if (defaultOpen) {
+      const t = setTimeout(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250);
+      return () => clearTimeout(t);
+    }
+  }, [defaultOpen]);
   const [content, setContent] = useState('');
   const [guidance, setGuidance] = useState('');
   const [fileBusy, setFileBusy] = useState(false);
@@ -1164,7 +1173,7 @@ function CourseArchitect({ courseId, onScaffolded }: { courseId: string; onScaff
   ];
 
   return (
-    <Card className="border-primary/30">
+    <Card ref={cardRef} className="border-primary/30 scroll-mt-24">
       <CardHeader className="pb-2">
         <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-start gap-2 text-left">
           {open ? <ChevronDown className="h-4 w-4 mt-1 flex-shrink-0 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 mt-1 flex-shrink-0 text-muted-foreground" />}
@@ -1442,6 +1451,8 @@ export function CourseDetail() {
   const [, navigate] = useLocation();
   const searchParams = new URLSearchParams(search);
   const activeTab = searchParams.get('tab') || 'overview';
+  // Set when arriving straight from "Create course": open the Build-from-content panel first.
+  const startBuild = searchParams.get('build') === 'content';
   const [ivBeat, setIvBeat] = useState<Beat | null>(null);
   const [selectedPage, setSelectedPage] = useState<Page | null>(null);
   const [calendarView, setCalendarView] = useState<'month' | 'list'>('month');
@@ -2042,7 +2053,7 @@ export function CourseDetail() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 1 · Start from content</p>
                 <p className="text-sm text-muted-foreground">Upload or paste your material and let the AI design the modules, objectives, and structure. Optional, you can also build by hand below.</p>
               </div>
-              <CourseArchitect courseId={courseId} onScaffolded={() => setTab('modules')} />
+              <CourseArchitect courseId={courseId} onScaffolded={() => setTab('modules')} defaultOpen={startBuild} />
             </section>
 
             {/* Step 2: the essentials */}

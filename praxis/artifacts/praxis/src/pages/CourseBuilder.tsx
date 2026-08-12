@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { BookOpen, Plus, X, ArrowLeft, Image as ImageIcon } from "lucide-react";
+import { BookOpen, Plus, X, ArrowLeft, Image as ImageIcon, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,7 +122,7 @@ export function CourseBuilder() {
     }
   };
 
-  const createCourse = async () => {
+  const createCourse = async (withMaterials = false) => {
     if (!title.trim()) return;
     setCreating(true);
     setCreateErr(null);
@@ -138,7 +138,8 @@ export function CourseBuilder() {
           thumbnailUrl: thumbnailUrl.trim() || undefined,
         }),
       });
-      navigate(`/courses/${created.id}`);
+      // withMaterials opens the "Build from content" upload panel on the course page.
+      navigate(withMaterials ? `/courses/${created.id}?build=content` : `/courses/${created.id}`);
     } catch (e) {
       setCreateErr(e instanceof Error ? e.message : "Could not create the course.");
     } finally {
@@ -310,12 +311,15 @@ export function CourseBuilder() {
       {/* Actions */}
       <div className="flex flex-col gap-2">
         {createErr && <p className="text-sm text-rose-600">{createErr}</p>}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button variant="outline" onClick={() => navigate("/courses")}>
             Cancel
           </Button>
-          <Button className="gap-1.5" disabled={!title.trim() || creating} onClick={createCourse}>
-            <Plus className="h-4 w-4" /> {creating ? "Creating..." : "Create course"}
+          <Button variant="outline" disabled={!title.trim() || creating} onClick={() => createCourse(false)}>
+            {creating ? "Creating..." : "Create empty course"}
+          </Button>
+          <Button className="gap-1.5" disabled={!title.trim() || creating} onClick={() => createCourse(true)}>
+            <Upload className="h-4 w-4" /> {creating ? "Creating..." : "Create and add materials"}
           </Button>
         </div>
       </div>
