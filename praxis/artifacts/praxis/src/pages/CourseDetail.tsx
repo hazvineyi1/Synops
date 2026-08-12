@@ -1624,6 +1624,20 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
   );
 }
 
+// Turn objectives HTML (from the rich editor) into per-item HTML strings, and into plain text for
+// the structured course.objectives array used elsewhere (alignment, learner views).
+function objectivesHtmlToItems(html: string): string[] {
+  const li = [...(html || '').matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)].map((m) => m[1].trim());
+  if (li.length) return li.filter(Boolean);
+  return (html || '')
+    .split(/<br\s*\/?>|<\/p>|<\/div>|\n/i)
+    .map((s) => s.replace(/<\/?(p|div|ul|ol)[^>]*>/gi, '').trim())
+    .filter(Boolean);
+}
+function itemsToPlain(items: string[]): string[] {
+  return items.map((h) => h.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim()).filter(Boolean);
+}
+
 // Shared palette + bullet shapes for the overview styling controls.
 const STYLE_COLORS = ['#111827', '#f97316', '#2563eb', '#16a34a', '#dc2626', '#7c3aed', '#0891b2', '#db2777'];
 const HEADING_SIZES: { key: string; label: string; cls: string }[] = [
@@ -1779,6 +1793,7 @@ export function CourseDetail() {
   const [aboutDraft, setAboutDraft] = useState('');
   const [objEditing, setObjEditing] = useState(false);
   const [objDraft, setObjDraft] = useState<string[]>([]);
+  const [objHtmlDraft, setObjHtmlDraft] = useState('');
   const [aboutHeadingDraft, setAboutHeadingDraft] = useState('');
   const [objHeadingDraft, setObjHeadingDraft] = useState('');
   // Heading + bullet style drafts (colour/size/shape) while editing a section.
@@ -1985,7 +2000,7 @@ export function CourseDetail() {
 
   // Custom overview section headings + rich "About" HTML (author-adjustable, persisted on the course).
   const ovCfg: {
-    aboutHeading?: string; objectivesHeading?: string; aboutHtml?: string;
+    aboutHeading?: string; objectivesHeading?: string; aboutHtml?: string; objectivesHtml?: string;
     aboutHColor?: string; aboutHSize?: string; objHColor?: string; objHSize?: string;
     bulletShape?: string; bulletColor?: string;
   } = (() => {
@@ -2540,7 +2555,11 @@ export function CourseDetail() {
                     </h2>
                   )}
                   {isInstructor && !objEditing && (
-                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setObjDraft((course.objectives?.length ? course.objectives : ['']) as string[]); setObjHeadingDraft(objectivesHeading); setObjHStyle({ color: ovCfg.objHColor, size: ovCfg.objHSize }); setBulletDraft({ shape: ovCfg.bulletShape, color: ovCfg.bulletColor }); setObjEditing(true); }}>
+                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => {
+                      const seed = ovCfg.objectivesHtml || ('<ul>' + (course.objectives ?? []).map((o) => `<li>${escapeHtml(o)}</li>`).join('') + '</ul>');
+                      setObjHtmlDraft(seed);
+                      setObjHeadingDraft(objectivesHeading); setObjHStyle({ color: ovCfg.objHColor, size: ovCfg.objHSize }); setBulletDraft({ shape: ovCfg.bulletShape, color: ovCfg.bulletColor }); setObjEditing(true);
+                    }}>
                       <Pencil className="h-3.5 w-3.5" /> Edit
                     </Button>
                   )}
@@ -2549,27 +2568,24 @@ export function CourseDetail() {
                   <div className="space-y-2">
                     <HeadingStyleBar style={objHStyle} onChange={setObjHStyle} />
                     <BulletStyleBar bullet={bulletDraft} onChange={setBulletDraft} />
-                    <Textarea
-                      rows={Math.max(6, objDraft.length + 2)}
-                      value={objDraft.join('\n')}
-                      onChange={(e) => setObjDraft(e.target.value.split('\n'))}
-                      placeholder={"One objective per line, e.g.\nDescribe the key characteristics of a successful entrepreneur\nConstruct measurable short and long term business goals"}
-                      className="text-sm leading-relaxed"
-                    />
-                    <p className="text-xs text-muted-foreground">Write one objective per line. The bullet style above is applied to each.</p>
+                    <RichTextEditor value={objHtmlDraft} onChange={setObjHtmlDraft} />
+                    <p className="text-xs text-muted-foreground">Each list item (or line) becomes an objective. The bullet style above is applied to each.</p>
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setObjEditing(false)}>Cancel</Button>
-                      <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ objectives: objDraft.map((o) => o.trim()).filter(Boolean), overviewConfig: JSON.stringify({ ...ovCfg, objectivesHeading: objHeadingDraft.trim() || "What you'll be able to do", objHColor: objHStyle.color, objHSize: objHStyle.size, bulletShape: bulletDraft.shape, bulletColor: bulletDraft.color }) }, { onSuccess: () => setObjEditing(false) })}>
+                      <Button size="sm" disabled={saveCourse.isPending} onClick={() => {
+                        const items = objectivesHtmlToItems(objHtmlDraft);
+                        saveCourse.mutate({ objectives: itemsToPlain(items), overviewConfig: JSON.stringify({ ...ovCfg, objectivesHtml: objHtmlDraft, objectivesHeading: objHeadingDraft.trim() || "What you'll be able to do", objHColor: objHStyle.color, objHSize: objHStyle.size, bulletShape: bulletDraft.shape, bulletColor: bulletDraft.color }) }, { onSuccess: () => setObjEditing(false) });
+                      }}>
                         {saveCourse.isPending ? 'Saving...' : 'Save'}
                       </Button>
                     </div>
                   </div>
-                ) : (course.objectives?.length ?? 0) > 0 ? (
+                ) : ((ovCfg.objectivesHtml && objectivesHtmlToItems(ovCfg.objectivesHtml).length > 0) || (course.objectives?.length ?? 0) > 0) ? (
                   <ul className="space-y-2.5">
-                    {course.objectives!.map((o: string, i: number) => (
+                    {(ovCfg.objectivesHtml ? objectivesHtmlToItems(ovCfg.objectivesHtml) : (course.objectives ?? []).map((o) => escapeHtml(o))).map((itemHtml: string, i: number) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm">
                         <span className="mt-1"><BulletIcon shape={ovCfg.bulletShape} color={ovCfg.bulletColor} /></span>
-                        <span className="leading-relaxed">{o}</span>
+                        <span className="leading-relaxed [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: itemHtml }} />
                       </li>
                     ))}
                   </ul>
