@@ -3245,8 +3245,8 @@ function ModuleHubView({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Sticky top bar */}
-      <header className="border-b border-border bg-card sticky top-0 z-30 shadow-sm">
+      {/* Top bar (not sticky, so it does not slide over the banner as you scroll). */}
+      <header className="border-b border-border bg-card relative z-10 shadow-sm">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-[68px] flex items-center gap-3">
           <Button
             variant="ghost"
@@ -3364,7 +3364,7 @@ function ModuleHubView({
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
 
         <nav aria-label="Module sections"
-          className={cn("lg:shrink-0 lg:sticky lg:top-[84px] lg:self-start", railOpen ? "lg:w-60" : "lg:w-auto")}>
+          className={cn("lg:shrink-0 lg:sticky lg:top-4 lg:self-start", railOpen ? "lg:w-60" : "lg:w-auto")}>
           <button onClick={() => setRailOpen((v) => !v)}
             className="hidden lg:inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 mb-2 rounded-md hover:bg-muted/40"
             title={railOpen ? 'Hide the steps and read full-width' : 'Show the steps'}>
