@@ -723,6 +723,7 @@ function CourseCasesTab({ courseId, isInstructor }: { courseId: string; isInstru
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: BookOpen },
+  { id: 'build', label: 'Build', icon: PenTool },
   { id: 'modules', label: 'Modules', icon: BookOpen },
   { id: 'assignments', label: 'Assignments', icon: ClipboardList },
   { id: 'activities', label: 'Activities', icon: Play },
@@ -1563,7 +1564,7 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
     try { localStorage.setItem(STORAGE, JSON.stringify([...n])); } catch { /* ignore */ }
     return n;
   });
-  const sections = TABS.filter((t) => t.id !== 'alignment' || isInstructor);
+  const sections = TABS.filter((t) => (t.id !== 'alignment' && t.id !== 'build') || isInstructor);
   return (
     <aside className="lg:w-full shrink-0 lg:sticky lg:top-4 self-start mb-6 lg:mb-0 lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
       <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-border">
@@ -1617,9 +1618,9 @@ export function CourseDetail() {
   const search = useSearch();
   const [, navigate] = useLocation();
   const searchParams = new URLSearchParams(search);
-  const activeTab = searchParams.get('tab') || 'overview';
-  // Set when arriving straight from "Create course": open the Build-from-content panel first.
+  // Set when arriving straight from "Create course": open the Build tab with the content panel.
   const startBuild = searchParams.get('build') === 'content';
+  const activeTab = searchParams.get('tab') || (startBuild ? 'build' : 'overview');
   const [ivBeat, setIvBeat] = useState<Beat | null>(null);
   const [selectedPage, setSelectedPage] = useState<Page | null>(null);
   const [calendarView, setCalendarView] = useState<'month' | 'list'>('month');
@@ -2234,8 +2235,9 @@ export function CourseDetail() {
             )}
           </div>
         )}
-        {/* ---- INSTRUCTOR BUILD VIEW: guided, single column, no learner sidebar ---- */}
-        {activeTab === 'overview' && isInstructor && (
+        {/* ---- INSTRUCTOR BUILD VIEW (the setup wizard, under the Build tab, super-admin/staff
+             only). This is the process to generate/assemble the course, NOT the learner overview. */}
+        {activeTab === 'build' && isInstructor && (
           <div className="max-w-3xl space-y-8">
             {/* Step 1: start from content -- the material defines everything */}
             <section className="space-y-3">
@@ -2291,8 +2293,10 @@ export function CourseDetail() {
           </div>
         )}
 
-        {/* ---- CATALOG PREVIEW (unenrolled visitor, not an instructor) ---- */}
-        {activeTab === 'overview' && !isInstructor && !enrolment && (
+        {/* ---- COURSE OVERVIEW (instructors and unenrolled visitors). The learner-facing
+             overview of the course: what it covers, its objectives, and its modules. The build
+             wizard lives under the Build tab, not here. ---- */}
+        {activeTab === 'overview' && !enrolment && (
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-6">
               <Card>
@@ -2301,6 +2305,38 @@ export function CourseDetail() {
                   <p className="text-muted-foreground leading-relaxed">{course.description}</p>
                 </CardContent>
               </Card>
+              {/* Course objectives */}
+              {(course.objectives?.length ?? 0) > 0 && (
+                <Card>
+                  <CardHeader><CardTitle className="text-base">What you'll be able to do</CardTitle></CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      {course.objectives!.map((o: string, i: number) => (
+                        <li key={i} className="flex items-start gap-2.5 text-sm">
+                          <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                          <span className="leading-relaxed">{o}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+              {/* Modules in this course */}
+              {(modules?.length ?? 0) > 0 && (
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Modules</CardTitle></CardHeader>
+                  <CardContent className="space-y-1.5">
+                    {modules!.map((m, i) => (
+                      <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
+                        className="w-full flex items-center gap-3 rounded-lg border border-border p-3 text-left hover:bg-muted/40 transition-colors">
+                        <span className="h-7 w-7 rounded-lg bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                        <span className="flex-1 text-sm font-medium truncate">{m.title}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      </button>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
               {/* Front page content */}
               {pages?.find(p => p.frontPage) && (
                 <Card>
