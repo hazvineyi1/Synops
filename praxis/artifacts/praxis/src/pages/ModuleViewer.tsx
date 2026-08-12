@@ -2139,6 +2139,80 @@ function MarkdownView({ text }: { text: string }) {
   return <div className="font-sans">{out}</div>;
 }
 
+// Instructor: find current videos and articles online (web search) relevant to this module, and add
+// them directly. A video becomes a video lesson; an article becomes a reading whose text is pulled in.
+type WebHit = { title: string; url: string; note: string };
+function ModuleWebFinder({ moduleId }: { moduleId: string }) {
+  const qc = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [videos, setVideos] = useState<WebHit[]>([]);
+  const [articles, setArticles] = useState<WebHit[]>([]);
+  const [added, setAdded] = useState<Set<string>>(new Set());
+  const [ran, setRan] = useState(false);
+
+  const find = async () => {
+    setLoading(true); setErr(null);
+    try {
+      const r = await apiFetch<{ videos: WebHit[]; articles: WebHit[] }>(`/modules/${moduleId}/web-suggestions`, { method: 'POST', body: JSON.stringify({}) });
+      setVideos(r.videos ?? []); setArticles(r.articles ?? []); setRan(true);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not fetch suggestions.');
+    } finally { setLoading(false); }
+  };
+  const addVideo = async (v: WebHit) => {
+    try {
+      const beat = await apiFetch<{ id: string }>(`/modules/${moduleId}/beats`, { method: 'POST', body: JSON.stringify({ type: 'video', title: v.title || 'Video lesson', narration: '', order: 999 }) });
+      await apiFetch(`/beats/${beat.id}`, { method: 'PATCH', body: JSON.stringify({ videoUrl: v.url }) });
+      setAdded((s) => new Set(s).add(v.url));
+      qc.invalidateQueries({ queryKey: ['module-detail', moduleId] });
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not add that video.'); }
+  };
+  const addArticle = async (a: WebHit) => {
+    try {
+      await apiFetch(`/modules/${moduleId}/readings`, { method: 'POST', body: JSON.stringify({ url: a.url, title: a.title }) });
+      setAdded((s) => new Set(s).add(a.url));
+      qc.invalidateQueries({ queryKey: ['module-readings', moduleId] });
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not add that article.'); }
+  };
+
+  const Row = ({ hit, kind, onAdd }: { hit: WebHit; kind: 'video' | 'article'; onAdd: (h: WebHit) => void }) => (
+    <div className="flex items-start gap-2 rounded-lg border border-border bg-card p-2.5">
+      {kind === 'video' ? <PlayCircle className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" /> : <FileText className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />}
+      <div className="min-w-0 flex-1">
+        <a href={hit.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-primary hover:underline line-clamp-1">{hit.title}</a>
+        {hit.note && <p className="text-xs text-muted-foreground line-clamp-2">{hit.note}</p>}
+      </div>
+      {added.has(hit.url)
+        ? <span className="text-xs text-emerald-600 shrink-0 inline-flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" /> Added</span>
+        : <Button size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => onAdd(hit)}>Add</Button>}
+    </div>
+  );
+
+  return (
+    <div className="border-t border-border/60 pt-3 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground max-w-md">Or find current videos and articles online that fit this module, and add them directly.</p>
+        <Button size="sm" variant="outline" disabled={loading} onClick={find}>{loading ? 'Searching…' : (ran ? 'Search again' : 'Find videos & articles online')}</Button>
+      </div>
+      {err && <p className="text-xs text-rose-600">{err}</p>}
+      {ran && !loading && videos.length === 0 && articles.length === 0 && <p className="text-xs text-muted-foreground">No suggestions came back. Try again.</p>}
+      {videos.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Videos</p>
+          {videos.map((v) => <Row key={v.url} hit={v} kind="video" onAdd={addVideo} />)}
+        </div>
+      )}
+      {articles.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">Articles</p>
+          {articles.map((a) => <Row key={a.url} hit={a} kind="article" onAdd={addArticle} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstructor: boolean }) {
   const qc = useQueryClient();
   const { data: readings } = useQuery({
@@ -2333,6 +2407,7 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
               </Button>
             </div>
           </div>
+          <ModuleWebFinder moduleId={moduleId} />
           {error && <p className="text-xs text-rose-600">{error}</p>}
         </div>
       )}

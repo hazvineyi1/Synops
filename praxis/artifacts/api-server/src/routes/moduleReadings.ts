@@ -41,6 +41,39 @@ function toRow(r: typeof moduleReadingsTable.$inferSelect) {
   };
 }
 
+// POST /modules/:moduleId/web-suggestions -- use web search to find current, freely accessible
+// videos and articles relevant to this module. Returns a short curated list the author can add to
+// the module (a video becomes a video lesson; an article becomes a reading whose text is pulled in).
+// Uses Anthropic's built-in web_search tool; if that is unavailable, returns a clear error.
+router.post("/modules/:moduleId/web-suggestions", requireAuth, requireCoFacilitatorOrAbove, async (req, res) => {
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
+  const topic = `${mod.title}. ${mod.description ?? ""} Objectives: ${(mod.objectives ?? []).join("; ")}`.slice(0, 1200);
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1800,
+      tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }] as any,
+      messages: [{
+        role: "user",
+        content: `Find high-quality, current, freely accessible learning resources for this course module.\n\nModule topic: ${topic}\n\nUse web search to find up to 4 YouTube or Khan Academy VIDEOS and up to 4 ARTICLES (reputable, and accessible without a paywall where possible) that directly help teach this module.\n\nThen reply with ONLY a JSON object, no prose:\n{ "videos": [{"title":"...","url":"https://...","note":"one short line on why it fits"}], "articles": [{"title":"...","url":"https://...","note":"one short line on why it fits"}] }\nUse only real URLs you actually found via search.`,
+      }],
+    }, { timeout: 120000, maxRetries: 1 });
+    const text = (message.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
+    let parsed: any = {};
+    try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+    const clean = (arr: any) => Array.isArray(arr)
+      ? arr.map((x: any) => ({ title: String(x?.title ?? "").slice(0, 200), url: String(x?.url ?? ""), note: String(x?.note ?? "").slice(0, 200) }))
+          .filter((x: any) => /^https?:\/\//.test(x.url)).slice(0, 6)
+      : [];
+    res.json({ videos: clean(parsed.videos), articles: clean(parsed.articles) });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("web-suggestions failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: "Could not fetch web suggestions. Web search may not be enabled for this server." });
+  }
+});
+
 // POST /modules/:moduleId/readings/generate -- write a COMPLETE reading for this module from its
 // topic, overview, and objectives (not a stub), and attach it. This is the "full reading material
 // pulled into the module" for authors who do not have a source document to upload.
