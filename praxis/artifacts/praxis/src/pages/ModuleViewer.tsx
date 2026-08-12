@@ -2029,14 +2029,64 @@ function mdInline(s: string, kb: string): React.ReactNode[] {
  * bold and paragraphs, styled for comfortable reading. Plain text passes through unharmed. Replaces the
  * old raw whitespace-pre render that showed literal '#' and '**'.
  */
+/**
+ * Pick a punchy, self-contained sentence to use as an auto pull-quote for a long reading, so a
+ * wall of text gets a magazine-style visual break even when the source has no markup. Returns null
+ * for short readings (nothing to break up) so it never fires on a two-paragraph note.
+ */
+function pickPullQuote(text: string): string | null {
+  const sentences = (text.match(/[^.!?\n]{45,150}[.!?]/g) ?? [])
+    .map((s) => s.trim())
+    .filter((s) => !/^#|^\s*[-*]|^\s*\d+\.|^>/.test(s) && !/https?:\/\//.test(s));
+  if (sentences.length < 4) return null;
+  return sentences[Math.floor(sentences.length * 0.45)] ?? null;
+}
+
 function MarkdownView({ text }: { text: string }) {
   const lines = (text ?? '').split('\n');
+  // How many prose paragraphs are there, and should we auto-insert a pull-quote (and where)?
+  const proseCount = lines.filter((l) => {
+    const t = l.trim();
+    return t && !/^#|^\s*[-*]\s|^\s*\d+\.\s|^>|^!\[|^-{3,}$|^\[\[fig:/.test(t);
+  }).length;
+  const autoQuote = proseCount >= 6 ? pickPullQuote(text ?? '') : null;
+  const quoteAt = autoQuote ? Math.floor(proseCount * 0.6) : -1;
+
   const out: React.ReactNode[] = [];
   let list: React.ReactNode[] = [];
   let k = 0;
+  let proseSeen = 0;
+  let firstProse = true;
   const flush = () => { if (list.length) { out.push(<ul key={'ul' + k++} className="list-disc pl-6 space-y-2 my-4 marker:text-primary">{list}</ul>); list = []; } };
+
+  const PullQuote = ({ children }: { children: React.ReactNode }) => (
+    <blockquote key={k++} className="my-6 border-l-4 border-primary/60 pl-5 pr-2">
+      <p className="font-serif text-lg sm:text-xl italic leading-snug text-foreground/90">{children}</p>
+    </blockquote>
+  );
+
   for (const raw of lines) {
     const line = raw.replace(/\s+$/, '');
+
+    // Inline image: ![alt](url) -> responsive figure that breaks up the text with imagery.
+    const imgM = line.match(/^\s*!\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)\s*$/);
+    if (imgM) {
+      flush();
+      out.push(
+        <figure key={k++} className="my-6">
+          <img src={imgM[2]} alt={imgM[1] || ''} className="w-full rounded-2xl border border-border shadow-sm" loading="lazy" />
+          {imgM[1] && <figcaption className="text-xs text-muted-foreground mt-2 text-center">{imgM[1]}</figcaption>}
+        </figure>
+      );
+      continue;
+    }
+
+    // Horizontal rule -> hairline divider.
+    if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { flush(); out.push(<hr key={k++} className="my-8 border-border/60" />); continue; }
+
+    // Blockquote -> styled pull-quote.
+    if (/^\s*>\s?/.test(line)) { flush(); out.push(<PullQuote key={k++}>{mdInline(line.replace(/^\s*>\s?/, ''), 'bq' + k)}</PullQuote>); continue; }
+
     const figM = line.match(/^\s*\[\[fig:([a-z0-9-]+)(?:\|([^\]]+))?\]\]\s*$/i);
     if (figM) {
       const fs = figureSvg(figM[1]);
@@ -2067,7 +2117,16 @@ function MarkdownView({ text }: { text: string }) {
     else if (/^\s*[-*]\s+/.test(line)) { list.push(<li key={k++} className="leading-relaxed pl-1">{mdInline(line.replace(/^\s*[-*]\s+/, ''), 'li' + k)}</li>); }
     else if (/^\s*\d+\.\s+/.test(line)) { list.push(<li key={k++} className="leading-relaxed pl-1">{mdInline(line.replace(/^\s*\d+\.\s+/, ''), 'li' + k)}</li>); }
     else if (line.trim() === '') { flush(); }
-    else { flush(); out.push(<p key={k++} className="my-3 leading-[1.75] text-[15px] text-foreground/85">{mdInline(line, 'p' + k)}</p>); }
+    else {
+      flush();
+      // First paragraph gets a magazine drop cap; a long reading gets one auto pull-quote
+      // partway through so it never reads as an unbroken wall of text.
+      const dropCap = firstProse ? ' [&::first-letter]:float-left [&::first-letter]:mr-2 [&::first-letter]:mt-1 [&::first-letter]:font-serif [&::first-letter]:text-5xl [&::first-letter]:leading-[0.8] [&::first-letter]:font-bold [&::first-letter]:text-primary' : '';
+      out.push(<p key={k++} className={cn('my-3 leading-[1.8] text-[15px] text-foreground/85', dropCap)}>{mdInline(line, 'p' + k)}</p>);
+      firstProse = false;
+      proseSeen += 1;
+      if (autoQuote && proseSeen === quoteAt) out.push(<PullQuote key={k++}>{autoQuote}</PullQuote>);
+    }
   }
   flush();
   return <div className="font-sans">{out}</div>;
@@ -2341,11 +2400,11 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
  * uploading a file (routed to Supabase Storage via the Learning Hub upload endpoint). Sets the
  * videoUrl on the module's video beat, creating one if the module has none yet.
  */
-function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBeats: any[] }) {
+function ModuleVideoAdmin({ moduleId, videoBeats, suggestedQuery }: { moduleId: string; videoBeats: any[]; suggestedQuery?: string }) {
   const qc = useQueryClient();
   const existing = videoBeats[0];
   const [url, setUrl] = useState<string>(existing?.videoUrl ?? '');
-  const [title, setTitle] = useState<string>(existing?.title ?? 'Video lesson');
+  const [title, setTitle] = useState<string>(existing?.title ?? (suggestedQuery ? suggestedQuery : 'Video lesson'));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -2379,6 +2438,22 @@ function ModuleVideoAdmin({ moduleId, videoBeats }: { moduleId: string; videoBea
   return (
     <div className="rounded-xl border border-dashed border-primary/30 p-4 space-y-3">
       <div className="text-sm font-semibold flex items-center gap-2"><PlayCircle className="h-4 w-4 text-primary" /> {existing?.videoUrl ? 'Change module video' : 'Add a video to this module'} <span className="text-xs font-normal text-muted-foreground">Instructor</span></div>
+      {suggestedQuery && !existing?.videoUrl && (
+        <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 space-y-2">
+          <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Suggested by the course architect:</span> {suggestedQuery}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
+              onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(suggestedQuery)}`, '_blank', 'noopener')}>
+              <PlayCircle className="h-3.5 w-3.5" /> Search YouTube
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs"
+              onClick={() => window.open(`https://www.khanacademy.org/search?page_search_query=${encodeURIComponent(suggestedQuery)}`, '_blank', 'noopener')}>
+              <BookOpen className="h-3.5 w-3.5" /> Search Khan Academy
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">Find a fitting clip, copy its link, and paste it below to embed it in this module.</p>
+        </div>
+      )}
       <label className="text-xs block"><span className="mb-1 block text-muted-foreground">Video title</span>
         <input value={title} onChange={(e) => setTitle(e.target.value)} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
       <label className="text-xs block"><span className="mb-1 block text-muted-foreground">Video URL (paste a link, or upload below)</span>
@@ -2876,6 +2951,11 @@ function ModuleHubView({
     ? mod.objectives
     : (allBeats.find(b => b.type === 'close')?.bulletPoints ?? []);
 
+  // The course architect folds a "Suggested video: <phrase>" line into the module description.
+  // Surface it in the instructor video panel as a one-click search so the author can find and
+  // embed a fitting clip without leaving the module.
+  const suggestedVideo = (mod?.description ?? '').match(/^\s*Suggested video:\s*(.+)$/im)?.[1]?.trim() ?? '';
+
   const open = (mode: string) => navigate(`/courses/${courseId}/modules/${moduleId}?mode=${mode}`);
 
   const TABS: { id: HubTab; label: string; icon: React.ElementType; count?: number }[] = [
@@ -3244,6 +3324,51 @@ function ModuleHubView({
                 onSave={(patch) => saveModule.mutate(patch)}
               />
             )}
+
+            {/* Plain-language "how to complete this module" strip. Lists the parts that actually
+                exist, in order, and explains how completion works. The steps are the instruction. */}
+            {(() => {
+              const steps = DELIVERABLES.filter((d) => tabState[d.id].has);
+              return (
+                <div className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-4 sm:p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Compass className="h-4 w-4 text-primary" />
+                    <h3 className="font-semibold text-sm">How to complete this module</h3>
+                  </div>
+                  {steps.length > 0 ? (
+                    <>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Work through each part below from top to bottom. Your progress saves automatically as you go, a green check marks each part done. Finish them all to complete the module.
+                      </p>
+                      <ol className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
+                        {steps.map((d, i) => {
+                          const meta = TABS.find((t) => t.id === d.id);
+                          const done = tabState[d.id].done;
+                          return (
+                            <li key={d.id} className="flex items-center gap-1.5">
+                              <button onClick={() => setTab(d.id)}
+                                className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium transition-colors',
+                                  done ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30' : 'border-border bg-card hover:bg-muted/50')}>
+                                <span className="tabular-nums text-muted-foreground">{i + 1}</span>
+                                {meta && <meta.icon className="h-3.5 w-3.5" />}
+                                {labelFor({ id: d.id, label: d.label })}
+                                {done && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
+                              </button>
+                              {i < steps.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />}
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      This module does not have any content yet.{isInstructor ? ' Add a video, readings, activities, or an assessment from the sections in the rail.' : ' Check back soon.'}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             <div>
               <SectionHead title="What you'll be able to do" sub="The learning objectives for this module." />
               {objectives.length > 0 ? (
@@ -3374,7 +3499,7 @@ function ModuleHubView({
         {/* VIDEO */}
         {tab === 'video' && (
           <div className="space-y-4">
-            {isInstructor && <ModuleVideoAdmin moduleId={moduleId} videoBeats={videoBeats} />}
+            {isInstructor && <ModuleVideoAdmin moduleId={moduleId} videoBeats={videoBeats} suggestedQuery={suggestedVideo} />}
             {videoBeats.length > 0 ? (
             <div className="space-y-8">
               {videoBeats.map((b) => {
