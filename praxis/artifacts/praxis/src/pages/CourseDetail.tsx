@@ -14,7 +14,8 @@ import { cn } from '@/lib/utils';
 import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
-  CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Image as ImageIcon, Upload, Lightbulb
+  CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Image as ImageIcon, Upload, Lightbulb,
+  Bold, Italic, Underline, List, ListOrdered, Link2
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -1619,6 +1620,59 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
   );
 }
 
+/**
+ * Lightweight rich-text editor with a formatting toolbar (headings, bold/italic/underline, font
+ * size, colour, lists, links). Uses the browser's editing commands and stores HTML. No extra deps.
+ */
+function RichTextEditor({ value, onChange }: { value: string; onChange: (html: string) => void }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  // Seed the editable div once; after that the DOM is the source of truth (React must not re-set it).
+  useEffect(() => { if (ref.current) ref.current.innerHTML = value || ''; /* eslint-disable-next-line */ }, []);
+  const sync = () => onChange(ref.current?.innerHTML ?? '');
+  const exec = (cmd: string, arg?: string) => { ref.current?.focus(); document.execCommand(cmd, false, arg); sync(); };
+  const COLORS = ['#111827', '#f97316', '#2563eb', '#16a34a', '#dc2626', '#7c3aed'];
+  const Btn = ({ children, title, onClick }: { children: React.ReactNode; title: string; onClick: () => void }) => (
+    <button type="button" title={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick}
+      className="h-7 min-w-7 px-1.5 rounded hover:bg-muted text-sm text-foreground inline-flex items-center justify-center">{children}</button>
+  );
+  return (
+    <div className="rounded-md border border-border overflow-hidden">
+      <div className="flex flex-wrap items-center gap-0.5 border-b border-border bg-muted/30 p-1">
+        <select title="Text style" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => { exec('formatBlock', e.target.value); e.target.value=''; }}
+          className="h-7 rounded border border-input bg-background px-1 text-xs">
+          <option value="">Style</option>
+          <option value="H2">Heading</option>
+          <option value="H3">Subheading</option>
+          <option value="P">Paragraph</option>
+        </select>
+        <select title="Font size" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => { exec('fontSize', e.target.value); e.target.value=''; }}
+          className="h-7 rounded border border-input bg-background px-1 text-xs">
+          <option value="">Size</option>
+          <option value="2">Small</option>
+          <option value="3">Normal</option>
+          <option value="5">Large</option>
+          <option value="6">X-Large</option>
+        </select>
+        <span className="mx-0.5 h-5 w-px bg-border" />
+        <Btn title="Bold" onClick={() => exec('bold')}><Bold className="h-4 w-4" /></Btn>
+        <Btn title="Italic" onClick={() => exec('italic')}><Italic className="h-4 w-4" /></Btn>
+        <Btn title="Underline" onClick={() => exec('underline')}><Underline className="h-4 w-4" /></Btn>
+        <span className="mx-0.5 h-5 w-px bg-border" />
+        <Btn title="Bulleted list" onClick={() => exec('insertUnorderedList')}><List className="h-4 w-4" /></Btn>
+        <Btn title="Numbered list" onClick={() => exec('insertOrderedList')}><ListOrdered className="h-4 w-4" /></Btn>
+        <Btn title="Link" onClick={() => { const u = window.prompt('Link URL'); if (u) exec('createLink', u); }}><Link2 className="h-4 w-4" /></Btn>
+        <span className="mx-0.5 h-5 w-px bg-border" />
+        {COLORS.map((c) => (
+          <button key={c} type="button" title="Text colour" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('foreColor', c)}
+            className="h-5 w-5 rounded-full border border-border" style={{ backgroundColor: c }} />
+        ))}
+      </div>
+      <div ref={ref} contentEditable suppressContentEditableWarning onInput={sync}
+        className="prose prose-sm max-w-none min-h-[9rem] p-3 focus:outline-none [&_h2]:font-serif [&_h3]:font-serif" />
+    </div>
+  );
+}
+
 export function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
   const search = useSearch();
@@ -1845,12 +1899,14 @@ export function CourseDetail() {
   );
   if (!course) return <div className="text-muted-foreground">Course not found.</div>;
 
-  // Custom overview section headings (author-adjustable, persisted on the course).
-  const ovCfg: { aboutHeading?: string; objectivesHeading?: string } = (() => {
+  // Custom overview section headings + rich "About" HTML (author-adjustable, persisted on the course).
+  const ovCfg: { aboutHeading?: string; objectivesHeading?: string; aboutHtml?: string } = (() => {
     try { return (course as { overviewConfig?: string }).overviewConfig ? JSON.parse((course as { overviewConfig?: string }).overviewConfig!) : {}; } catch { return {}; }
   })();
   const aboutHeading = ovCfg.aboutHeading || 'About this course';
   const objectivesHeading = ovCfg.objectivesHeading || "What you'll be able to do";
+  const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+  const stripHtml = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
   return (
     <div className={cn('space-y-0', !isLearnerView && 'lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start')}>
@@ -2356,23 +2412,25 @@ export function CourseDetail() {
                   </h2>
                 )}
                 {isInstructor && !aboutEditing && (
-                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(course.description ?? ''); setAboutHeadingDraft(aboutHeading); setAboutEditing(true); }}>
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(ovCfg.aboutHtml || escapeHtml(course.description ?? '')); setAboutHeadingDraft(aboutHeading); setAboutEditing(true); }}>
                     <Pencil className="h-3.5 w-3.5" /> Edit
                   </Button>
                 )}
               </div>
               {isInstructor && aboutEditing ? (
                 <div className="space-y-2">
-                  <Textarea rows={6} value={aboutDraft} onChange={(e) => setAboutDraft(e.target.value)} className="text-sm leading-relaxed" />
+                  <RichTextEditor value={aboutDraft} onChange={setAboutDraft} />
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setAboutEditing(false)}>Cancel</Button>
                     <Button size="sm" disabled={saveCourse.isPending} onClick={() => {
-                      saveCourse.mutate({ description: aboutDraft.trim(), overviewConfig: JSON.stringify({ ...ovCfg, aboutHeading: aboutHeadingDraft.trim() || 'About this course' }) }, { onSuccess: () => setAboutEditing(false) });
+                      saveCourse.mutate({ description: stripHtml(aboutDraft), overviewConfig: JSON.stringify({ ...ovCfg, aboutHtml: aboutDraft, aboutHeading: aboutHeadingDraft.trim() || 'About this course' }) }, { onSuccess: () => setAboutEditing(false) });
                     }}>
                       {saveCourse.isPending ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
                 </div>
+              ) : ovCfg.aboutHtml ? (
+                <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed [&_h2]:font-serif [&_h2]:text-foreground [&_h3]:font-serif [&_h3]:text-foreground" dangerouslySetInnerHTML={{ __html: ovCfg.aboutHtml }} />
               ) : (
                 <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{course.description || (isInstructor ? 'No description yet. Click Edit to add one.' : '')}</p>
               )}
