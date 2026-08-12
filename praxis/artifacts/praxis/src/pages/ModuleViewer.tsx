@@ -2224,6 +2224,8 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
   });
 
   const [readerId, setReaderId] = useState<string | null>(null);
+  const [justDone, setJustDone] = useState(false);
+  const [doneReadings, setDoneReadings] = useState<Set<string>>(new Set());
   // One-click reading: when a module has a single reading, open it immediately instead of showing a
   // chooser card the learner has to click "Read" on. Multi-reading modules still show the list.
   useEffect(() => {
@@ -2328,8 +2330,15 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
               Next reading <ChevronRight className="h-4 w-4" />
             </Button>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => setReaderId(null)} className="gap-1.5">
-              Done <CheckCircle className="h-4 w-4" />
+            <Button size="sm" disabled={justDone}
+              className={cn('gap-1.5 transition-colors', justDone ? 'bg-emerald-600 hover:bg-emerald-600 text-white' : '')}
+              variant={justDone ? 'default' : 'outline'}
+              onClick={() => {
+                if (readerId) setDoneReadings((s) => new Set(s).add(readerId));
+                setJustDone(true);
+                window.setTimeout(() => { setJustDone(false); setReaderId(null); }, 800);
+              }}>
+              {justDone ? <>Completed <CheckCircle className="h-4 w-4 animate-in zoom-in duration-300" /></> : <>Mark as done <CheckCircle className="h-4 w-4" /></>}
             </Button>
           )}
         </div>
@@ -2351,12 +2360,15 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
               {r.hasContent ? ` · ${Math.max(1, Math.round(r.chars / 1500))} min read` : ''}
             </div>
           </div>
+          {doneReadings.has(r.id) && (
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 shrink-0"><CheckCircle className="h-4 w-4" /> Done</span>
+          )}
           {r.kind === 'link' && r.sourceUrl && (
             <a href={r.sourceUrl} target="_blank" rel="noreferrer"
               className="text-xs font-medium text-primary hover:underline shrink-0">Open</a>
           )}
           {r.hasContent && (
-            <Button size="sm" variant="outline" className="shrink-0" onClick={() => setReaderId(r.id)}>Read</Button>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => setReaderId(r.id)}>{doneReadings.has(r.id) ? 'Reread' : 'Read'}</Button>
           )}
           {isInstructor && (
             <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-rose-500 shrink-0"
