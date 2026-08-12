@@ -3008,6 +3008,11 @@ function ModuleHubView({
   const [previewAsStudent, setPreviewAsStudent] = useState(() => { try { return localStorage.getItem('viewAsStudent') === '1'; } catch { return false; } });
   const toggleStudentView = () => setPreviewAsStudent((v) => { const nv = !v; try { localStorage.setItem('viewAsStudent', nv ? '1' : '0'); } catch { /* ignore */ } return nv; });
   const isInstructor = canInstruct && !previewAsStudent;
+  // Inline editing of the module overview content (summary + objectives).
+  const [modDescEditing, setModDescEditing] = useState(false);
+  const [modDescDraft, setModDescDraft] = useState('');
+  const [modObjEditing, setModObjEditing] = useState(false);
+  const [modObjDraft, setModObjDraft] = useState<string[]>([]);
   const qc = useQueryClient();
   const saveModule = useMutation({
     mutationFn: (patch: Record<string, unknown>) =>
@@ -3421,112 +3426,105 @@ function ModuleHubView({
             )}
           </div>
         )}
-        {mod?.description && <p className="text-muted-foreground max-w-2xl leading-relaxed mb-6">{cleanModuleDescription(mod.description)}</p>}
+        <div className="mb-6" />
 
 
         {/* OVERVIEW */}
         {tab === 'overview' && (
-          <div className="space-y-6">
-            {isInstructor && (
-              <ModuleSettingsEditor
-                key={JSON.stringify([mod?.objectives ?? [], mod?.modality ?? 'async'])}
-                initialObjectives={mod?.objectives ?? []}
-                initialModality={(mod?.modality ?? 'async') as 'async' | 'sync' | 'hybrid'}
-                saving={saveModule.isPending}
-                onSave={(patch) => saveModule.mutate(patch)}
-              />
-            )}
+          <div className="max-w-3xl space-y-8">
+            {/* Overview: an editable summary of what this module is about. */}
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-serif text-lg font-bold">Overview</h2>
+                {isInstructor && !modDescEditing && (
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setModDescDraft(mod?.description ?? ''); setModDescEditing(true); }}>
+                    <Settings className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                )}
+              </div>
+              {isInstructor && modDescEditing ? (
+                <div className="space-y-2">
+                  <textarea rows={4} value={modDescDraft} onChange={(e) => setModDescDraft(e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed" />
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" disabled={saveModule.isPending} onClick={() => setModDescEditing(false)}>Cancel</Button>
+                    <Button size="sm" disabled={saveModule.isPending} onClick={() => saveModule.mutate({ description: modDescDraft.trim() }, { onSuccess: () => setModDescEditing(false) })}>
+                      {saveModule.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{cleanModuleDescription(mod?.description) || (isInstructor ? 'No overview yet. Click Edit to add one.' : '')}</p>
+              )}
+            </section>
 
-            {/* Plain-language "how to complete this module" strip. Lists the parts that actually
-                exist, in order, and explains how completion works. The steps are the instruction. */}
+            {/* Learning objectives: editable, plain numbered list (professional, no decorative icons). */}
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-serif text-lg font-bold">Learning objectives</h2>
+                {isInstructor && !modObjEditing && (
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setModObjDraft((mod?.objectives?.length ? mod.objectives : ['']) as string[]); setModObjEditing(true); }}>
+                    <Settings className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                )}
+              </div>
+              {isInstructor && modObjEditing ? (
+                <div className="space-y-2">
+                  <textarea rows={Math.max(4, modObjDraft.length + 2)} value={modObjDraft.join('\n')} onChange={(e) => setModObjDraft(e.target.value.split('\n'))}
+                    placeholder="One objective per line" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed" />
+                  <p className="text-xs text-muted-foreground">One objective per line.</p>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" disabled={saveModule.isPending} onClick={() => setModObjEditing(false)}>Cancel</Button>
+                    <Button size="sm" disabled={saveModule.isPending} onClick={() => saveModule.mutate({ objectives: modObjDraft.map((o) => o.trim()).filter(Boolean) }, { onSuccess: () => setModObjEditing(false) })}>
+                      {saveModule.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              ) : objectives.length > 0 ? (
+                <ol className="list-decimal pl-5 space-y-1.5 marker:text-muted-foreground marker:font-medium">
+                  {objectives.map((o, i) => (
+                    <li key={i} className="pl-1 text-sm leading-relaxed">{o}</li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="text-sm text-muted-foreground">{isInstructor ? 'No objectives yet. Click Edit to add them.' : 'No objectives listed for this module yet.'}</p>
+              )}
+            </section>
+
+            {/* How to complete this module: a plain, linear map of the parts, in order. Not links,
+                just the contents and how completion works. */}
             {(() => {
               const steps = DELIVERABLES.filter((d) => tabState[d.id].has);
+              if (steps.length === 0) {
+                return (
+                  <section>
+                    <h2 className="font-serif text-lg font-bold mb-2">How to complete this module</h2>
+                    <p className="text-sm text-muted-foreground">This module does not have any content yet.{isInstructor ? ' Add a video, readings, activities, or an assessment from the sections on the left.' : ' Check back soon.'}</p>
+                  </section>
+                );
+              }
               return (
-                <div className="rounded-2xl border border-primary/20 bg-primary/[0.04] p-4 sm:p-5">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Compass className="h-4 w-4 text-primary" />
-                    <h3 className="font-semibold text-sm">How to complete this module</h3>
-                  </div>
-                  {steps.length > 0 ? (
-                    <>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        Work through each part below from top to bottom. Your progress saves automatically as you go, a green check marks each part done. Finish them all to complete the module.
-                      </p>
-                      <ol className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-                        {steps.map((d, i) => {
-                          const meta = TABS.find((t) => t.id === d.id);
-                          const done = tabState[d.id].done;
-                          return (
-                            <li key={d.id} className="flex items-center gap-1.5">
-                              <button onClick={() => setTab(d.id)}
-                                className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-medium transition-colors',
-                                  done ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30' : 'border-border bg-card hover:bg-muted/50')}>
-                                <span className="tabular-nums text-muted-foreground">{i + 1}</span>
-                                {meta && <meta.icon className="h-3.5 w-3.5" />}
-                                {labelFor({ id: d.id, label: d.label })}
-                                {done && <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />}
-                              </button>
-                              {i < steps.length - 1 && <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50" />}
-                            </li>
-                          );
-                        })}
-                      </ol>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      This module does not have any content yet.{isInstructor ? ' Add a video, readings, activities, or an assessment from the sections in the rail.' : ' Check back soon.'}
-                    </p>
-                  )}
-                </div>
+                <section>
+                  <h2 className="font-serif text-lg font-bold mb-2">How to complete this module</h2>
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-3">Work through each part in order using the menu on the left. Your progress saves automatically; complete every part to finish the module.</p>
+                  <ol className="space-y-1.5">
+                    {steps.map((d, i) => {
+                      const meta = TABS.find((t) => t.id === d.id);
+                      const done = tabState[d.id].done;
+                      const count = meta?.count;
+                      return (
+                        <li key={d.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
+                          <span className="h-6 w-6 rounded bg-muted text-xs font-semibold text-muted-foreground flex items-center justify-center shrink-0 tabular-nums">{i + 1}</span>
+                          <span className="flex-1 text-sm font-medium">{labelFor({ id: d.id, label: d.label })}</span>
+                          {typeof count === 'number' && count > 0 && <span className="text-xs text-muted-foreground tabular-nums">{count}</span>}
+                          {done && <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />}
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </section>
               );
             })()}
-
-            <div>
-              <SectionHead title="What you'll be able to do" sub="The learning objectives for this module." />
-              {objectives.length > 0 ? (
-                <ul className="space-y-2.5">
-                  {objectives.map((o, i) => (
-                    <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-                      <Target className="h-3 w-3 text-orange-500 mt-1 shrink-0" strokeWidth={2.5} />
-                      <span className="text-sm leading-relaxed">{o}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState icon={Target} title="Learning objectives haven't been added yet"
-                  note="Your instructional designer can add clear, measurable objectives for this module in the Studio editor." />
-              )}
-            </div>
-
-            <div>
-              <SectionHead title="What's inside" />
-              {/* Linear, professional list of the parts of this module. Learners see only the parts
-                  that have content; instructors see all so they know what still needs building. */}
-              <div className="rounded-xl border border-border divide-y divide-border overflow-hidden">
-                {([
-                  { id: 'video' as HubTab,       label: 'Video',       n: videoBeats.length,        icon: PlayCircle },
-                  { id: 'readings' as HubTab,    label: 'Readings',    n: readingCount,             icon: BookOpen },
-                  { id: 'complete' as HubTab,    label: 'Activities',  n: practiceCount,            icon: Zap },
-                  { id: 'cases' as HubTab,       label: 'Case studies', n: moduleCases?.length ?? 0, icon: Layers },
-                  { id: 'assignments' as HubTab, label: 'Assignments', n: moduleAssignments.length, icon: FileText },
-                ]).filter((s) => isInstructor || s.n > 0).map((s) => (
-                  <button key={s.id} onClick={() => setTab(s.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors">
-                    <s.icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span className="flex-1 text-sm font-medium">{s.label}</span>
-                    <span className="text-xs text-muted-foreground tabular-nums">{s.n}</span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* One clear call to action: Start here -> the module's Structure (the ordered path). */}
-            <div className="pt-1">
-              <Button className="h-11 gap-2" onClick={() => setTab('structure')}>
-                <Play className="h-4 w-4" /> Start here
-              </Button>
-            </div>
           </div>
         )}
 
