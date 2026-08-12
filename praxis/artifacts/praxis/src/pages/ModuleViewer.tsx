@@ -2168,21 +2168,13 @@ function ReadingBody({ text }: { text: string }) {
   const allOpen = open.size === sections.length;
   const toggle = (i: number) => setOpen((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
   const setAll = (on: boolean) => setOpen(on ? new Set(sections.map((_, i) => i)) : new Set());
-  const jump = (i: number) => { setOpen((s) => new Set(s).add(i)); requestAnimationFrame(() => document.getElementById(`rsec-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); };
 
   return (
     <div>
       {intro && <div className="mb-5"><MarkdownView text={intro} /></div>}
-      {/* Section tabs: quick jump across the reading. */}
-      <div className="flex flex-wrap gap-1.5 mb-4">
-        {sections.map((s, i) => (
-          <button key={i} onClick={() => jump(i)}
-            className="rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground/80 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors">
-            {s.title}
-          </button>
-        ))}
+      <div className="flex justify-end mb-2">
         <button onClick={() => setAll(!allOpen)}
-          className="ml-auto rounded-full px-3 py-1 text-xs font-medium text-primary hover:underline">
+          className="text-xs font-medium text-primary hover:underline">
           {allOpen ? 'Collapse all' : 'Expand all'}
         </button>
       </div>
