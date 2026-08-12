@@ -547,14 +547,36 @@ function chunkText(text: string, maxChars: number, maxChunks: number): string[] 
   return chunks.slice(0, maxChunks);
 }
 
-// Reduce: design the blueprint from (already condensed) material.
+// Parse model JSON that may have trailing prose or be truncated at max_tokens. Tries a strict parse,
+// then the outermost {...}, then closes any still-open strings/objects/arrays as a best effort.
+function parseLooseJson(raw: string): any {
+  const tryParse = (s: string) => { try { return JSON.parse(s); } catch { return undefined; } };
+  let v = tryParse(raw);
+  if (v !== undefined) return v;
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (m) { v = tryParse(m[0]); if (v !== undefined) return v; }
+  // Best-effort close of a truncated object.
+  let inStr = false, esc = false; const stack: string[] = [];
+  for (const c of raw) {
+    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === "{") stack.push("}");
+    else if (c === "[") stack.push("]");
+    else if (c === "}" || c === "]") stack.pop();
+  }
+  let t = raw;
+  if (inStr) t += '"';
+  t = t.replace(/,\s*$/, "");
+  while (stack.length) t += stack.pop();
+  v = tryParse(t);
+  return v !== undefined ? v : {};
+}
+
+// Reduce: design the blueprint from (already condensed) material. Uses an assistant prefill of "{"
+// so the model must return a JSON object (no preamble/markdown), and retries once if it comes back
+// empty. Robust parsing handles a reply truncated at max_tokens.
 async function architectDesign(course: any, material: string, guidance: string): Promise<ArchitectBlueprint> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4500,
-    messages: [{
-      role: "user",
-      content: `You are a world-class instructional designer, instructional technologist, accessibility (WCAG) expert, pedagogy and adult-learning-theory expert, experienced teacher, and project manager. You design courses that are coherent, measurable, accessible, and genuinely engaging.
+  const prompt = `You are a world-class instructional designer, instructional technologist, accessibility (WCAG) expert, pedagogy and adult-learning-theory expert, experienced teacher, and project manager. You design courses that are coherent, measurable, accessible, and genuinely engaging.
 
 Analyse the SOURCE MATERIAL below (it may be condensed notes covering a long document) and design a course blueprint. Think about scope and sequence: what a learner must know first, how ideas build, and where understanding could break down.
 
@@ -564,29 +586,39 @@ Existing course objectives: ${(course.objectives ?? []).join(" | ") || "(none ye
 ${guidance ? `Author guidance: ${guidance}\n` : ""}
 Produce a JSON object with exactly these keys:
 - "courseObjectives": 4-6 measurable course-level objectives, each starting with a Bloom's action verb, describing what a learner can DO on completion. If good objectives already exist, refine them.
-- "modules": an ordered array (aim for 4-10) of modules. Each module object has:
+- "modules": an ordered array of 5 to 8 modules. Each module object has:
     - "title": a clear, specific module title
-    - "overview": 1-2 sentences framing what this module is about and why it matters
-    - "objectives": 2-4 measurable module objectives that ladder up to the course objectives
-    - "sections": for each of "reading","lecture","activity","caseStudy","assessment", a ONE-sentence plan describing what it should contain, drawn from the source where possible. If unsupported, set its value to null.
-    - "sourceMapping": one sentence naming which part of the source this module draws from
+    - "overview": ONE sentence framing what this module is about and why it matters
+    - "objectives": 2-3 measurable module objectives that ladder up to the course objectives
+    - "sections": for each of "reading","lecture","activity","caseStudy","assessment", a ONE-sentence plan drawn from the source where possible. If unsupported, set its value to null.
+    - "sourceMapping": one short phrase naming which part of the source this module draws from
     - "suggestedVideo": a short search phrase for a suitable YouTube or Khan Academy video (no URL)
     - "summary": one sentence a learner reads at the end to consolidate the module
-- "gaps": an array of 2-5 objects { "gap": "...", "suggestion": "..." } naming what the source is MISSING for a complete course, and how to fill each gap.
-- "flowNote": one or two sentences on the overall learning arc and how the modules connect.
+- "gaps": an array of 2-4 objects { "gap": "...", "suggestion": "..." } naming what the source is MISSING for a complete course, and how to fill each gap.
+- "flowNote": one sentence on the overall learning arc.
 
-Rules: measurable, jargon-free, no numbering inside strings, no em dashes. Return ONLY valid JSON, no markdown, no commentary.
+Rules: keep every string short, measurable, jargon-free, no numbering inside strings, no em dashes. Return ONLY the JSON object.
 
 SOURCE MATERIAL:
-${material}`,
-    }],
-  }, { timeout: 110000, maxRetries: 1 });
-  const content = message.content[0];
-  if (!content || content.type !== "text") throw new Error("Unexpected response");
-  let parsed: any;
-  try { parsed = JSON.parse(content.text); }
-  catch { const m = content.text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
-  return normalizeBlueprint(parsed);
+${material}`;
+
+  const callOnce = async (): Promise<ArchitectBlueprint> => {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 5000,
+      messages: [
+        { role: "user", content: prompt },
+        { role: "assistant", content: "{" }, // prefill: force a JSON object, no prose
+      ],
+    }, { timeout: 150000, maxRetries: 2 });
+    const content = message.content[0];
+    const body = content && content.type === "text" ? content.text : "";
+    return normalizeBlueprint(parseLooseJson("{" + body));
+  };
+
+  let bp = await callOnce();
+  if (!bp.modules.length) bp = await callOnce(); // one retry on an empty result
+  return bp;
 }
 
 // Map: condense one chunk of a large document into compact teachable notes.
@@ -619,7 +651,7 @@ async function runArchitectJob(job: ArchitectJob, course: any, fullText: string,
         job.step = i; job.updatedAt = Date.now();
         notes.push(`--- Section ${i + 1} ---\n` + await condenseChunk(chunks[i]));
       }
-      material = notes.join("\n\n").slice(0, 24000);
+      material = notes.join("\n\n").slice(0, 18000);
       job.phase = "Designing the course"; job.step = chunks.length; job.updatedAt = Date.now();
     } else {
       job.totalSteps = 1; job.step = 0; job.phase = "Designing the course"; job.updatedAt = Date.now();
@@ -632,6 +664,9 @@ async function runArchitectJob(job: ArchitectJob, course: any, fullText: string,
     }
     job.result = blueprint; job.status = "done"; job.step = job.totalSteps; job.phase = "Done"; job.updatedAt = Date.now();
   } catch (err) {
+    // Log the real cause server-side (visible in Railway logs) while showing a friendly message.
+    // eslint-disable-next-line no-console
+    console.error("architect job failed:", err instanceof Error ? err.message : err);
     job.status = "error";
     job.error = "The architect could not finish designing from that content. Please try again, or with less material.";
     job.updatedAt = Date.now();
