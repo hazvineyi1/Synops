@@ -3275,58 +3275,8 @@ function ModuleHubView({
         </div>
       </header>
 
-      {/* Hero -- magazine style. A module banner image (if set) sits behind the title with a
-          scrim so the text stays readable; otherwise a themed gradient. */}
-      {mod?.bannerUrl ? (
-        <div className="relative border-b border-border">
-          <div className="relative h-52 sm:h-64 w-full overflow-hidden">
-            <img src={mod.bannerUrl} alt={`Banner for ${mod?.title ?? 'this module'}`} className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
-            <div className="absolute inset-x-0 bottom-0">
-              <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6 text-white">
-                <p className="text-xs font-semibold uppercase tracking-wider text-white/80 mb-1.5">{course?.title ?? courseFull?.title}</p>
-                <h2 className="text-2xl sm:text-3xl font-bold drop-shadow-sm">{mod?.title}</h2>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-white/85">
-                  {(mod?.estimatedMinutes ?? 0) > 0 && <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes} min</span>}
-                  <span className="inline-flex items-center gap-1.5"><mm.icon className="h-3.5 w-3.5" /> {mm.label} · {mm.sub}</span>
-                </div>
-              </div>
-            </div>
-            {isInstructor && (
-              <Button size="sm" variant="ghost" onClick={openModBanner}
-                className="absolute right-3 top-3 gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-sm">
-                <ImageIcon className="h-4 w-4" /> Change banner
-              </Button>
-            )}
-          </div>
-          {mod?.description && (
-            <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
-              <p className="text-muted-foreground max-w-2xl leading-relaxed">{cleanModuleDescription(mod.description)}</p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
-          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-              {course?.title ?? courseFull?.title}
-            </p>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-2">{mod?.title}</h2>
-            {mod?.description && (
-              <p className="text-muted-foreground max-w-2xl leading-relaxed">{cleanModuleDescription(mod.description)}</p>
-            )}
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-xs text-muted-foreground">
-              {(mod?.estimatedMinutes ?? 0) > 0 && <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes} min</span>}
-              <span className="inline-flex items-center gap-1.5"><mm.icon className="h-3.5 w-3.5" /> {mm.label} · {mm.sub}</span>
-            </div>
-            {isInstructor && (
-              <Button size="sm" variant="outline" onClick={openModBanner} className="absolute right-4 top-6 gap-1.5">
-                <ImageIcon className="h-4 w-4" /> Add banner
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Hero moved into the content column (below) so it aligns with the section rail, like the
+          course overview page. */}
 
       {/* Change module banner overlay (instructor). Plain overlay to avoid extra component imports. */}
       {isInstructor && modBannerOpen && (
@@ -3436,6 +3386,43 @@ function ModuleHubView({
 
         {/* Tab content */}
         <div className="flex-1 min-w-0">
+
+        {/* Module banner hero, top of the content column, aligned with the section rail. */}
+        {mod?.bannerUrl ? (
+          <div className="relative mb-4 h-52 sm:h-64 w-full overflow-hidden rounded-xl">
+            <img src={mod.bannerUrl} alt={`Banner for ${mod?.title ?? 'this module'}`} className="absolute inset-0 h-full w-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
+            <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+              <p className="text-xs font-semibold uppercase tracking-wider text-white/80 mb-1.5">{course?.title ?? courseFull?.title}</p>
+              <h2 className="text-2xl sm:text-3xl font-bold drop-shadow-sm">{mod?.title}</h2>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-white/85">
+                {(mod?.estimatedMinutes ?? 0) > 0 && <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes} min</span>}
+                <span className="inline-flex items-center gap-1.5"><mm.icon className="h-3.5 w-3.5" /> {mm.label} · {mm.sub}</span>
+              </div>
+            </div>
+            {isInstructor && (
+              <Button size="sm" variant="ghost" onClick={openModBanner} className="absolute right-3 top-3 gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-sm">
+                <ImageIcon className="h-4 w-4" /> Change banner
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="relative mb-4 rounded-xl border border-border bg-gradient-to-b from-primary/5 to-transparent p-6">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{course?.title ?? courseFull?.title}</p>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2">{mod?.title}</h2>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-muted-foreground">
+              {(mod?.estimatedMinutes ?? 0) > 0 && <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes} min</span>}
+              <span className="inline-flex items-center gap-1.5"><mm.icon className="h-3.5 w-3.5" /> {mm.label} · {mm.sub}</span>
+            </div>
+            {isInstructor && (
+              <Button size="sm" variant="outline" onClick={openModBanner} className="absolute right-4 top-4 gap-1.5">
+                <ImageIcon className="h-4 w-4" /> Add banner
+              </Button>
+            )}
+          </div>
+        )}
+        {mod?.description && <p className="text-muted-foreground max-w-2xl leading-relaxed mb-6">{cleanModuleDescription(mod.description)}</p>}
+
 
         {/* OVERVIEW */}
         {tab === 'overview' && (
