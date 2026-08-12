@@ -1166,9 +1166,30 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
         );
         if (s.phase) setProgress(s.totalSteps && s.totalSteps > 1 ? `${s.phase} (${Math.min((s.step ?? 0) + 1, s.totalSteps)}/${s.totalSteps})` : s.phase);
         if (s.status === 'done' && s.result) {
-          setPlan(s.result);
           // Fill the real course fields (description, catalogue blurb, objectives) from the design.
           await fillCourseFromBlueprint(s.result);
+          // For a fresh course (no modules yet), build the modules automatically so the whole course
+          // is populated in one step. If modules already exist, show the review to add selectively.
+          let autoBuilt = false;
+          try {
+            const mods = await apiFetch<unknown[]>(`/courses/${courseId}/modules`);
+            if ((mods?.length ?? 0) === 0 && s.result.modules.length > 0) {
+              await apiFetch(`/courses/${courseId}/architect/apply`, {
+                method: 'POST',
+                body: JSON.stringify({
+                  modules: s.result.modules,
+                  courseObjectives: s.result.courseObjectives,
+                  courseDescription: s.result.courseDescription,
+                  catalogDescription: s.result.catalogDescription,
+                }),
+              });
+              await qc.invalidateQueries({ queryKey: ['modules', courseId] });
+              await qc.invalidateQueries({ queryKey: ['course', courseId] });
+              autoBuilt = true;
+            }
+          } catch { /* fall back to the review */ }
+          if (autoBuilt) { setPlan(null); setContent(''); setOpen(false); onScaffolded(); }
+          else setPlan(s.result);
           break;
         }
         if (s.status === 'error') throw new Error(s.error || 'The architect could not analyse that content.');
@@ -1266,39 +1287,15 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
 
           {plan && (
             <div className="space-y-5">
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
-                <p className="text-sm text-emerald-800 dark:text-emerald-300">
-                  The course description, catalogue blurb, and course objectives have been filled in on the course from this design. Review the modules below, then create them.
-                </p>
-              </div>
-
-              {/* Generated course description (also saved to the course details) */}
-              {plan.courseDescription && (
-                <div>
-                  <p className="text-sm font-medium mb-1">Course description</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{plan.courseDescription}</p>
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground">
+                The course description and objectives have been filled in on the course. This course already has modules, so choose which of these to add.
+              </p>
 
               {/* Flow note */}
               {plan.flowNote && (
                 <div className="rounded-lg bg-primary/[0.04] border border-primary/20 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">Learning arc</p>
                   <p className="text-sm text-foreground">{plan.flowNote}</p>
-                </div>
-              )}
-
-              {/* Derived objectives */}
-              {plan.courseObjectives.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium">Course objectives <span className="font-normal text-muted-foreground">(added to the course)</span></p>
-                  <ul className="mt-2 space-y-1">
-                    {plan.courseObjectives.map((o, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary/50" />{o}
-                      </li>
-                    ))}
-                  </ul>
                 </div>
               )}
 
