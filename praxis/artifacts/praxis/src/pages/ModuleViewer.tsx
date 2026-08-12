@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useGetMe } from '@workspace/api-client-react';
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { activitiesApi } from '@/lib/activitiesApi';
+import { RichTextEditor, BulletStyleBar, BulletIcon, objectivesHtmlToItems, itemsToPlain, escapeHtml } from '@/components/RichTextEditor';
 import {
   ChevronLeft, ChevronRight, CheckCircle, BookOpen, List,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
@@ -163,6 +164,7 @@ interface ModuleDetail {
   title: string;
   description?: string;
   bannerUrl?: string | null;
+  overviewConfig?: string | null;
   courseId: string;
   estimatedMinutes: number;
   beatCount: number;
@@ -3008,11 +3010,14 @@ function ModuleHubView({
   const [previewAsStudent, setPreviewAsStudent] = useState(() => { try { return localStorage.getItem('viewAsStudent') === '1'; } catch { return false; } });
   const toggleStudentView = () => setPreviewAsStudent((v) => { const nv = !v; try { localStorage.setItem('viewAsStudent', nv ? '1' : '0'); } catch { /* ignore */ } return nv; });
   const isInstructor = canInstruct && !previewAsStudent;
-  // Inline editing of the module overview content (summary + objectives).
-  const [modDescEditing, setModDescEditing] = useState(false);
-  const [modDescDraft, setModDescDraft] = useState('');
+  // Inline rich-text editing of the module overview (summary, objectives, how-to-complete).
+  const [modOvEditing, setModOvEditing] = useState(false);
+  const [modOvDraft, setModOvDraft] = useState('');
   const [modObjEditing, setModObjEditing] = useState(false);
-  const [modObjDraft, setModObjDraft] = useState<string[]>([]);
+  const [modObjHtmlDraft, setModObjHtmlDraft] = useState('');
+  const [modBulletDraft, setModBulletDraft] = useState<{ shape?: string; color?: string }>({});
+  const [modHowEditing, setModHowEditing] = useState(false);
+  const [modHowDraft, setModHowDraft] = useState('');
   const qc = useQueryClient();
   const saveModule = useMutation({
     mutationFn: (patch: Record<string, unknown>) =>
@@ -3071,6 +3076,11 @@ function ModuleHubView({
   const objectives = (mod?.objectives && mod.objectives.length > 0)
     ? mod.objectives
     : (allBeats.find(b => b.type === 'close')?.bulletPoints ?? []);
+
+  // Parsed module overview customisations (rich HTML + bullet styling), persisted on the module.
+  const modCfg: { overviewHtml?: string; objectivesHtml?: string; howToHtml?: string; bulletShape?: string; bulletColor?: string } = (() => {
+    try { return mod?.overviewConfig ? JSON.parse(mod.overviewConfig) : {}; } catch { return {}; }
+  })();
 
   // The course architect folds a "Suggested video: <phrase>" line into the module description.
   // Surface it in the instructor video panel as a one-click search so the author can find and
@@ -3432,99 +3442,110 @@ function ModuleHubView({
         {/* OVERVIEW */}
         {tab === 'overview' && (
           <div className="max-w-3xl space-y-8">
-            {/* Overview: an editable summary of what this module is about. */}
+            {/* Overview: rich, editable summary of what this module is about. */}
             <section>
               <div className="flex items-center justify-between mb-2">
                 <h2 className="font-serif text-lg font-bold">Overview</h2>
-                {isInstructor && !modDescEditing && (
-                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setModDescDraft(mod?.description ?? ''); setModDescEditing(true); }}>
+                {isInstructor && !modOvEditing && (
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setModOvDraft(modCfg.overviewHtml || escapeHtml(mod?.description ?? '')); setModOvEditing(true); }}>
                     <Settings className="h-3.5 w-3.5" /> Edit
                   </Button>
                 )}
               </div>
-              {isInstructor && modDescEditing ? (
+              {isInstructor && modOvEditing ? (
                 <div className="space-y-2">
-                  <textarea rows={4} value={modDescDraft} onChange={(e) => setModDescDraft(e.target.value)}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed" />
+                  <RichTextEditor value={modOvDraft} onChange={setModOvDraft} />
                   <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="ghost" disabled={saveModule.isPending} onClick={() => setModDescEditing(false)}>Cancel</Button>
-                    <Button size="sm" disabled={saveModule.isPending} onClick={() => saveModule.mutate({ description: modDescDraft.trim() }, { onSuccess: () => setModDescEditing(false) })}>
+                    <Button size="sm" variant="ghost" disabled={saveModule.isPending} onClick={() => setModOvEditing(false)}>Cancel</Button>
+                    <Button size="sm" disabled={saveModule.isPending} onClick={() => saveModule.mutate({ description: modOvDraft.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), overviewConfig: JSON.stringify({ ...modCfg, overviewHtml: modOvDraft }) }, { onSuccess: () => setModOvEditing(false) })}>
                       {saveModule.isPending ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
                 </div>
+              ) : modCfg.overviewHtml ? (
+                <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed [&_h2]:font-serif [&_h2]:text-foreground [&_h3]:font-serif [&_h3]:text-foreground [&_a]:text-primary" dangerouslySetInnerHTML={{ __html: modCfg.overviewHtml }} />
               ) : (
                 <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{cleanModuleDescription(mod?.description) || (isInstructor ? 'No overview yet. Click Edit to add one.' : '')}</p>
               )}
             </section>
 
-            {/* Learning objectives: editable, plain numbered list (professional, no decorative icons). */}
+            {/* Learning objectives: rich editing + bullet styling, same as the course overview. */}
             <section>
               <div className="flex items-center justify-between mb-2">
                 <h2 className="font-serif text-lg font-bold">Learning objectives</h2>
                 {isInstructor && !modObjEditing && (
-                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setModObjDraft((mod?.objectives?.length ? mod.objectives : ['']) as string[]); setModObjEditing(true); }}>
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setModObjHtmlDraft(modCfg.objectivesHtml || ('<ul>' + (mod?.objectives ?? []).map((o) => `<li>${escapeHtml(o)}</li>`).join('') + '</ul>')); setModBulletDraft({ shape: modCfg.bulletShape, color: modCfg.bulletColor }); setModObjEditing(true); }}>
                     <Settings className="h-3.5 w-3.5" /> Edit
                   </Button>
                 )}
               </div>
               {isInstructor && modObjEditing ? (
                 <div className="space-y-2">
-                  <textarea rows={Math.max(4, modObjDraft.length + 2)} value={modObjDraft.join('\n')} onChange={(e) => setModObjDraft(e.target.value.split('\n'))}
-                    placeholder="One objective per line" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed" />
-                  <p className="text-xs text-muted-foreground">One objective per line.</p>
+                  <BulletStyleBar bullet={modBulletDraft} onChange={setModBulletDraft} />
+                  <RichTextEditor value={modObjHtmlDraft} onChange={setModObjHtmlDraft} />
+                  <p className="text-xs text-muted-foreground">Each list item (or line) becomes an objective; the bullet style above is applied to each.</p>
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="ghost" disabled={saveModule.isPending} onClick={() => setModObjEditing(false)}>Cancel</Button>
-                    <Button size="sm" disabled={saveModule.isPending} onClick={() => saveModule.mutate({ objectives: modObjDraft.map((o) => o.trim()).filter(Boolean) }, { onSuccess: () => setModObjEditing(false) })}>
+                    <Button size="sm" disabled={saveModule.isPending} onClick={() => { const items = objectivesHtmlToItems(modObjHtmlDraft); saveModule.mutate({ objectives: itemsToPlain(items), overviewConfig: JSON.stringify({ ...modCfg, objectivesHtml: modObjHtmlDraft, bulletShape: modBulletDraft.shape, bulletColor: modBulletDraft.color }) }, { onSuccess: () => setModObjEditing(false) }); }}>
                       {saveModule.isPending ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
                 </div>
-              ) : objectives.length > 0 ? (
-                <ol className="list-decimal pl-5 space-y-1.5 marker:text-muted-foreground marker:font-medium">
-                  {objectives.map((o, i) => (
-                    <li key={i} className="pl-1 text-sm leading-relaxed">{o}</li>
+              ) : ((modCfg.objectivesHtml && objectivesHtmlToItems(modCfg.objectivesHtml).length > 0) || objectives.length > 0) ? (
+                <ul className="space-y-2.5">
+                  {(modCfg.objectivesHtml ? objectivesHtmlToItems(modCfg.objectivesHtml) : objectives.map((o) => escapeHtml(o))).map((itemHtml, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm">
+                      <span className="mt-1"><BulletIcon shape={modCfg.bulletShape} color={modCfg.bulletColor} /></span>
+                      <span className="leading-relaxed [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: itemHtml }} />
+                    </li>
                   ))}
-                </ol>
+                </ul>
               ) : (
                 <p className="text-sm text-muted-foreground">{isInstructor ? 'No objectives yet. Click Edit to add them.' : 'No objectives listed for this module yet.'}</p>
               )}
             </section>
 
-            {/* How to complete this module: a plain, linear map of the parts, in order. Not links,
-                just the contents and how completion works. */}
-            {(() => {
-              const steps = DELIVERABLES.filter((d) => tabState[d.id].has);
-              if (steps.length === 0) {
+            {/* How to complete this module: an editable rich-text block (defaults to a generated map). */}
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-serif text-lg font-bold">How to complete this module</h2>
+                {isInstructor && !modHowEditing && (
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => {
+                    const steps = DELIVERABLES.filter((d) => tabState[d.id].has);
+                    const fallback = steps.length
+                      ? `<p>Work through each part in order using the menu on the left. Your progress saves automatically; complete every part to finish the module.</p><ol>${steps.map((d) => `<li>${labelFor({ id: d.id, label: d.label })}</li>`).join('')}</ol>`
+                      : '<p>Describe how a learner should work through this module.</p>';
+                    setModHowDraft(modCfg.howToHtml || fallback); setModHowEditing(true);
+                  }}>
+                    <Settings className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                )}
+              </div>
+              {isInstructor && modHowEditing ? (
+                <div className="space-y-2">
+                  <RichTextEditor value={modHowDraft} onChange={setModHowDraft} />
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" disabled={saveModule.isPending} onClick={() => setModHowEditing(false)}>Cancel</Button>
+                    <Button size="sm" disabled={saveModule.isPending} onClick={() => saveModule.mutate({ overviewConfig: JSON.stringify({ ...modCfg, howToHtml: modHowDraft }) }, { onSuccess: () => setModHowEditing(false) })}>
+                      {saveModule.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              ) : modCfg.howToHtml ? (
+                <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed [&_h2]:font-serif [&_h2]:text-foreground [&_h3]:font-serif [&_h3]:text-foreground [&_a]:text-primary" dangerouslySetInnerHTML={{ __html: modCfg.howToHtml }} />
+              ) : (() => {
+                const steps = DELIVERABLES.filter((d) => tabState[d.id].has);
+                if (steps.length === 0) return <p className="text-sm text-muted-foreground">This module does not have any content yet.{isInstructor ? ' Add content from the sections on the left.' : ' Check back soon.'}</p>;
                 return (
-                  <section>
-                    <h2 className="font-serif text-lg font-bold mb-2">How to complete this module</h2>
-                    <p className="text-sm text-muted-foreground">This module does not have any content yet.{isInstructor ? ' Add a video, readings, activities, or an assessment from the sections on the left.' : ' Check back soon.'}</p>
-                  </section>
+                  <>
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-3">Work through each part in order using the menu on the left. Your progress saves automatically; complete every part to finish the module.</p>
+                    <ol className="list-decimal pl-5 space-y-1 text-sm marker:text-muted-foreground marker:font-medium">
+                      {steps.map((d) => <li key={d.id} className="pl-1">{labelFor({ id: d.id, label: d.label })}</li>)}
+                    </ol>
+                  </>
                 );
-              }
-              return (
-                <section>
-                  <h2 className="font-serif text-lg font-bold mb-2">How to complete this module</h2>
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-3">Work through each part in order using the menu on the left. Your progress saves automatically; complete every part to finish the module.</p>
-                  <ol className="space-y-1.5">
-                    {steps.map((d, i) => {
-                      const meta = TABS.find((t) => t.id === d.id);
-                      const done = tabState[d.id].done;
-                      const count = meta?.count;
-                      return (
-                        <li key={d.id} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
-                          <span className="h-6 w-6 rounded bg-muted text-xs font-semibold text-muted-foreground flex items-center justify-center shrink-0 tabular-nums">{i + 1}</span>
-                          <span className="flex-1 text-sm font-medium">{labelFor({ id: d.id, label: d.label })}</span>
-                          {typeof count === 'number' && count > 0 && <span className="text-xs text-muted-foreground tabular-nums">{count}</span>}
-                          {done && <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                </section>
-              );
-            })()}
+              })()}
+            </section>
           </div>
         )}
 

@@ -30,6 +30,8 @@ export const modulesTable = pgTable("modules", {
   description: text("description"),
   // Optional magazine-style banner image for the module hero.
   bannerUrl: text("banner_url"),
+  // Small JSON of overview customisations (rich HTML for overview/objectives/how-to, styling).
+  overviewConfig: text("overview_config"),
   status: moduleStatusEnum("module_status").notNull().default("draft"),
   lessonType: lessonTypeEnum("lesson_type").notNull().default("socratic"),
   // Learner-facing module-level learning objectives (what you will be able to do).

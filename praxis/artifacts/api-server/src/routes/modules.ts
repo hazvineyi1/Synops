@@ -36,6 +36,7 @@ function toModuleResponse(m: typeof modulesTable.$inferSelect) {
     title: m.title,
     description: m.description,
     bannerUrl: m.bannerUrl ?? null,
+    overviewConfig: (m as { overviewConfig?: string | null }).overviewConfig ?? null,
     status: m.status,
     lessonType: m.lessonType ?? 'socratic',
     objectives: m.objectives ?? [],
@@ -119,7 +120,7 @@ router.patch("/modules/:moduleId", requireAuth, requireRole("super_admin", "part
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!(await staffOn(req, res, existing.courseId))) return;
 
-  const { title, description, status, lessonType, estimatedMinutes, order, objectives, modality, bannerUrl } = req.body;
+  const { title, description, status, lessonType, estimatedMinutes, order, objectives, modality, bannerUrl, overviewConfig } = req.body;
   const [updated] = await db
     .update(modulesTable)
     .set({
@@ -128,8 +129,9 @@ router.patch("/modules/:moduleId", requireAuth, requireRole("super_admin", "part
       ...(objectives !== undefined ? { objectives } : {}),
       ...(modality !== undefined ? { modality } : {}),
       ...(bannerUrl !== undefined ? { bannerUrl: bannerUrl || null } : {}),
+      ...(overviewConfig !== undefined ? { overviewConfig } as Record<string, unknown> : {}),
       updatedAt: new Date(),
-    })
+    } as any)
     .where(eq(modulesTable.id, req.params.moduleId))
     .returning();
   res.json(toModuleResponse(updated));
