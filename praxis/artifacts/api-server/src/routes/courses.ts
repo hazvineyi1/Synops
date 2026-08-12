@@ -669,6 +669,8 @@ async function runArchitectJob(job: ArchitectJob, course: any, fullText: string,
       throw new Error("Empty blueprint");
     }
     job.result = blueprint; job.status = "done"; job.step = job.totalSteps; job.phase = "Done"; job.updatedAt = Date.now();
+    // Persist so the generated design is not lost if the author navigates away before applying.
+    try { await db.update(coursesTable).set({ architectBlueprint: JSON.stringify(blueprint) }).where(eq(coursesTable.id, job.courseId)); } catch { /* non-fatal */ }
   } catch (err) {
     // Log the real cause server-side (visible in Railway logs) and include a short detail in the
     // user-facing message (super-admin only surface) so failures can be diagnosed without log access.
@@ -723,6 +725,23 @@ router.get("/courses/:courseId/architect/jobs/:jobId", requireAuth, requireRole(
   });
 });
 
+// GET /courses/:courseId/architect/blueprint -- the last saved blueprint (survives navigation).
+router.get("/courses/:courseId/architect/blueprint", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, req.params.courseId) });
+  if (!course) { res.status(404).json({ error: "Course not found" }); return; }
+  let blueprint: ArchitectBlueprint | null = null;
+  if (course.architectBlueprint) { try { blueprint = JSON.parse(course.architectBlueprint); } catch { blueprint = null; } }
+  res.json({ blueprint });
+});
+
+// DELETE /courses/:courseId/architect/blueprint -- discard the saved blueprint.
+router.delete("/courses/:courseId/architect/blueprint", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  await db.update(coursesTable).set({ architectBlueprint: null }).where(eq(coursesTable.id, req.params.courseId));
+  res.status(204).send();
+});
+
 // POST /courses/:courseId/architect/apply -- scaffold the approved blueprint into real modules.
 // Creates one module per entry (title, overview as description, objectives) in order, appended after
 // any existing modules. The rich per-section content is stored in the module description as a plan
@@ -738,34 +757,68 @@ router.post("/courses/:courseId/architect/apply", requireAuth, requireRole("supe
   const existing = await db.select({ order: modulesTable.order }).from(modulesTable).where(eq(modulesTable.courseId, courseId));
   let nextOrder = existing.reduce((mx, r) => Math.max(mx, r.order ?? 0), -1) + 1;
 
+  const createdBy = req.dbUser!.id;
   const created: string[] = [];
   for (const m of incoming) {
     const title = String(m?.title ?? "").trim();
     if (!title) continue;
-    // Fold the section plan into the module description so the author sees the intended shape.
     const s = m?.sections ?? {};
-    const planLines = [
-      m?.overview ? String(m.overview).trim() : "",
-      "",
-      s?.reading ? `Reading: ${String(s.reading).trim()}` : "",
-      s?.lecture ? `Lecture: ${String(s.lecture).trim()}` : "",
-      s?.activity ? `Activity: ${String(s.activity).trim()}` : "",
-      s?.caseStudy ? `Case study: ${String(s.caseStudy).trim()}` : "",
-      s?.assessment ? `Assessment: ${String(s.assessment).trim()}` : "",
-      m?.suggestedVideo ? `Suggested video: ${String(m.suggestedVideo).trim()}` : "",
-      m?.summary ? `Summary: ${String(m.summary).trim()}` : "",
-    ].filter((l) => l !== undefined);
-    const description = planLines.join("\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 4000);
+    const overview = m?.overview ? String(m.overview).trim() : "";
+    const summary = m?.summary ? String(m.summary).trim() : "";
+    const readingPlan = s?.reading ? String(s.reading).trim() : "";
+    const lecturePlan = s?.lecture ? String(s.lecture).trim() : "";
+    const activityPlan = s?.activity ? String(s.activity).trim() : "";
+    const casePlan = s?.caseStudy ? String(s.caseStudy).trim() : "";
+    const assessmentPlan = s?.assessment ? String(s.assessment).trim() : "";
+    const video = m?.suggestedVideo ? String(m.suggestedVideo).trim() : "";
+
+    // Module description = overview + summary + a "Teaching plan" note for the aspects that stay as
+    // guidance (lecture, activity, case study, video). Reading and assessment become real content.
+    const planNotes = [
+      lecturePlan ? `Lecture: ${lecturePlan}` : "",
+      activityPlan ? `Activity: ${activityPlan}` : "",
+      casePlan ? `Case study: ${casePlan}` : "",
+      video ? `Suggested video: ${video}` : "",
+    ].filter(Boolean);
+    const description = [
+      overview,
+      summary ? `Summary: ${summary}` : "",
+      planNotes.length ? `Teaching plan:\n${planNotes.map((n) => `- ${n}`).join("\n")}` : "",
+    ].filter(Boolean).join("\n\n").slice(0, 4000);
+
     const objectives = Array.isArray(m?.objectives) ? m.objectives.map((o: any) => String(o)).filter(Boolean).slice(0, 8) : [];
     const [mod] = await db.insert(modulesTable).values({
       courseId, title, description, objectives, order: nextOrder++, status: "draft",
     }).returning();
     created.push(mod.id);
+
+    // Populate the module's sections with real starter content the author expands. Each is
+    // best-effort so one failure never aborts the whole scaffold.
+    if (readingPlan) {
+      const content = [overview, readingPlan, "This is a starter reading generated from your material. Expand it with the full text."]
+        .filter(Boolean).join("\n\n");
+      try {
+        await db.insert(moduleReadingsTable).values({
+          moduleId: mod.id, courseId, title: "Reading", kind: "document",
+          content, chars: content.length, createdBy,
+        } as any);
+      } catch { /* non-fatal */ }
+    }
+    if (assessmentPlan) {
+      try {
+        await db.insert(assignmentsTable).values({
+          courseId, moduleId: mod.id, title: "Assessment",
+          description: assessmentPlan, instructions: assessmentPlan, published: false,
+        } as any);
+      } catch { /* non-fatal */ }
+    }
   }
 
-  // Refresh the course module count and, if asked, save the derived objectives.
+  // Refresh the course module count, optionally save the derived objectives, and clear the saved
+  // blueprint now that it has been applied.
   await db.update(coursesTable).set({
     moduleCount: existing.length + created.length,
+    architectBlueprint: null,
     ...(courseObjectives ? { objectives: courseObjectives } : {}),
     updatedAt: new Date(),
   }).where(eq(coursesTable.id, courseId));

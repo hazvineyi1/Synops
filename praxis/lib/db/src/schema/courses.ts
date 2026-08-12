@@ -24,6 +24,9 @@ export const coursesTable = pgTable("courses", {
   objectives: text("objectives").array().notNull().default([]),
   nqfLevel: integer("nqf_level"),
   thumbnailUrl: text("thumbnail_url"),
+  // The most recent AI architect blueprint (JSON), saved so a generated design is not lost when the
+  // author navigates away before applying it. Cleared once applied or discarded.
+  architectBlueprint: text("architect_blueprint"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

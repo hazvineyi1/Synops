@@ -1084,6 +1084,22 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
       return () => clearTimeout(t);
     }
   }, [defaultOpen]);
+  // Restore a previously generated blueprint so it is not lost when the author navigates away and
+  // comes back before applying it.
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const r = await apiFetch<{ blueprint: Blueprint | null }>(`/courses/${courseId}/architect/blueprint`);
+        if (!cancel && r.blueprint && (r.blueprint.modules?.length ?? 0) > 0) { setPlan(r.blueprint); setOpen(true); }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancel = true; };
+  }, [courseId]);
+  const discard = async () => {
+    try { await apiFetch(`/courses/${courseId}/architect/blueprint`, { method: 'DELETE' }); } catch { /* ignore */ }
+    setPlan(null); setSkip(new Set());
+  };
   const [content, setContent] = useState('');
   const [guidance, setGuidance] = useState('');
   const [fileBusy, setFileBusy] = useState(false);
@@ -1307,8 +1323,12 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
               )}
 
               {error && <p className="text-sm text-rose-600">{error}</p>}
-              <div className="flex items-center justify-between gap-2">
-                <Button size="sm" variant="ghost" disabled={applying} onClick={() => setPlan(null)}>Back to content</Button>
+              <p className="text-xs text-muted-foreground">This design is saved. You can leave and come back to it before applying.</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" disabled={applying} onClick={() => setPlan(null)}>Back to content</Button>
+                  <Button size="sm" variant="ghost" disabled={applying} className="text-muted-foreground hover:text-rose-600" onClick={discard}>Discard</Button>
+                </div>
                 <Button size="sm" disabled={applying} onClick={apply}>
                   {applying ? 'Creating modules...' : `Create ${plan.modules.length - skip.size} module${plan.modules.length - skip.size === 1 ? '' : 's'}`}
                 </Button>
