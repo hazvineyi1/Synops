@@ -350,12 +350,29 @@ router.post("/courses/resolve-image", requireAuth, requireRole("super_admin", "p
     const r = await fetch(raw, {
       redirect: "follow",
       headers: {
-        // Some CDNs (Unsplash included) serve HTML only to browser-like agents.
-        "User-Agent": "Mozilla/5.0 (compatible; SynopsBanner/1.0)",
-        Accept: "text/html,application/xhtml+xml,image/*;q=0.9,*/*;q=0.8",
+        // Present as a real browser: sites like Unsplash return 401/403 to obvious bot
+        // user-agents, so a generic "SynopsBanner" UA gets blocked. This does not defeat a
+        // hard IP block, which is why the 401/403 branch below tells the user what to do.
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
       },
     });
-    if (!r.ok) { res.status(502).json({ error: `Could not fetch that URL (${r.status}).` }); return; }
+    if (!r.ok) {
+      // A blocked fetch (site rejects our server) is common for stock/photo sites. Give the
+      // universal workaround instead of a bare status code: copying the direct image address
+      // always works because the browser loads it directly (no server fetch involved).
+      if (r.status === 401 || r.status === 403) {
+        res.status(502).json({
+          error:
+            "That site blocked the fetch. On the photo, right-click the image and choose \"Copy image address\", then paste that link here.",
+        });
+        return;
+      }
+      res.status(502).json({ error: `Could not fetch that URL (${r.status}).` });
+      return;
+    }
 
     const contentType = (r.headers.get("content-type") || "").toLowerCase();
 
