@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useSearch, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, API } from '@/lib/api';
@@ -1262,9 +1262,15 @@ export function CourseDetail() {
   const [bannerError, setBannerError] = useState<string | null>(null);
   const [bannerImgFailed, setBannerImgFailed] = useState(false);
   const [bannerSaving, setBannerSaving] = useState(false);
+  // Live preview in the dialog: 'idle' before a URL is entered, 'loading' while the
+  // browser fetches it, 'ok' once it loads, 'error' if it cannot be loaded as an image.
+  // This surfaces the common failure mode (a page URL or hotlink-blocked link that is
+  // not a direct image) instead of silently falling back to the themed gradient.
+  const [bannerPreview, setBannerPreview] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle');
   const openBannerDialog = () => {
     setBannerUrl(course?.thumbnailUrl ?? '');
     setBannerError(null);
+    setBannerPreview(course?.thumbnailUrl ? 'loading' : 'idle');
     setBannerOpen(true);
   };
   const saveBanner = async () => {
@@ -1282,6 +1288,10 @@ export function CourseDetail() {
       setBannerSaving(false);
     }
   };
+  // When the saved banner changes (e.g. after saveBanner refetches the course), clear any
+  // stale image-failed flag so a newly saved, valid banner is not suppressed by a previous
+  // bad URL's onError.
+  useEffect(() => { setBannerImgFailed(false); }, [course?.thumbnailUrl]);
 
   // Course structure = published modules in order, each annotated with the learner's
   // progress (complete / certified / percent) so the Overview shows a real module map.
@@ -1404,9 +1414,41 @@ export function CourseDetail() {
               <Input
                 id="banner-url"
                 value={bannerUrl}
-                onChange={(e) => setBannerUrl(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setBannerUrl(v);
+                  setBannerPreview(v.trim() ? 'loading' : 'idle');
+                }}
                 placeholder="https://example.com/banner.jpg"
               />
+              <p className="text-xs text-muted-foreground">
+                Use a direct link to an image (ending in .jpg, .png, or .webp). A page link will not display.
+              </p>
+
+              {/* Live preview so a bad or non-image URL is visible here rather than silently
+                  reverting to the themed banner after saving. */}
+              {bannerUrl.trim() && (
+                <div className="mt-1 overflow-hidden rounded-lg border border-border">
+                  <div className="relative h-32 w-full bg-muted">
+                    <img
+                      key={bannerUrl.trim()}
+                      src={bannerUrl.trim()}
+                      alt="Banner preview"
+                      className="absolute inset-0 h-full w-full object-cover"
+                      onLoad={() => setBannerPreview('ok')}
+                      onError={() => setBannerPreview('error')}
+                    />
+                  </div>
+                  {bannerPreview === 'error' && (
+                    <p className="px-2 py-1.5 text-xs text-rose-600">
+                      That URL could not be loaded as an image. Check it is a direct image link and allows embedding.
+                    </p>
+                  )}
+                  {bannerPreview === 'ok' && (
+                    <p className="px-2 py-1.5 text-xs text-green-700">Looks good. This is how the banner will appear.</p>
+                  )}
+                </div>
+              )}
               {bannerError && <p className="text-sm text-rose-600">{bannerError}</p>}
             </div>
             <DialogFooter>
