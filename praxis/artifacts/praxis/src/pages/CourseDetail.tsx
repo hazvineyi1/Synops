@@ -1641,9 +1641,11 @@ export function CourseDetail() {
   // When on, isInstructor renders false so all instructor controls/tabs hide and learner views show.
   const [previewAsStudent, setPreviewAsStudent] = useState(false);
   const isInstructor = canInstruct && !previewAsStudent;
-  // Inline edit of the course overview description ("About this course").
+  // Inline edit of the course overview content ("About this course", objectives).
   const [aboutEditing, setAboutEditing] = useState(false);
   const [aboutDraft, setAboutDraft] = useState('');
+  const [objEditing, setObjEditing] = useState(false);
+  const [objDraft, setObjDraft] = useState<string[]>([]);
   // Youngest learners (K-5) get a stripped, jargon-free course page: just "Start here", no
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
@@ -2330,107 +2332,107 @@ export function CourseDetail() {
              overview of the course: what it covers, its objectives, and its modules. The build
              wizard lives under the Build tab, not here. ---- */}
         {activeTab === 'overview' && !enrolment && (
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-2 space-y-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                  <CardTitle>About this course</CardTitle>
-                  {isInstructor && !aboutEditing && (
-                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(course.description ?? ''); setAboutEditing(true); }}>
+          <div className="max-w-3xl space-y-8">
+            {/* About this course - flat, inline-editable */}
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-serif text-lg font-bold flex items-center gap-2">
+                  <span className="h-4 w-1 rounded-full bg-orange-500" />About this course
+                </h2>
+                {isInstructor && !aboutEditing && (
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(course.description ?? ''); setAboutEditing(true); }}>
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                )}
+              </div>
+              {isInstructor && aboutEditing ? (
+                <div className="space-y-2">
+                  <Textarea rows={6} value={aboutDraft} onChange={(e) => setAboutDraft(e.target.value)} className="text-sm leading-relaxed" />
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setAboutEditing(false)}>Cancel</Button>
+                    <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ description: aboutDraft.trim() }, { onSuccess: () => setAboutEditing(false) })}>
+                      {saveCourse.isPending ? 'Saving...' : 'Save'}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{course.description || (isInstructor ? 'No description yet. Click Edit to add one.' : '')}</p>
+              )}
+            </section>
+
+            {/* What you'll be able to do - flat, inline-editable objectives */}
+            {((course.objectives?.length ?? 0) > 0 || isInstructor) && (
+              <section>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-serif text-lg font-bold flex items-center gap-2">
+                    <span className="h-4 w-1 rounded-full bg-orange-500" />What you'll be able to do
+                  </h2>
+                  {isInstructor && !objEditing && (
+                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setObjDraft((course.objectives?.length ? course.objectives : ['']) as string[]); setObjEditing(true); }}>
                       <Pencil className="h-3.5 w-3.5" /> Edit
                     </Button>
                   )}
-                </CardHeader>
-                <CardContent>
-                  {isInstructor && aboutEditing ? (
-                    <div className="space-y-2">
-                      <Textarea rows={6} value={aboutDraft} onChange={(e) => setAboutDraft(e.target.value)} className="text-sm leading-relaxed" />
-                      <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setAboutEditing(false)}>Cancel</Button>
-                        <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ description: aboutDraft.trim() }, { onSuccess: () => setAboutEditing(false) })}>
-                          {saveCourse.isPending ? 'Saving...' : 'Save'}
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{course.description || (isInstructor ? 'No description yet. Click Edit to add one.' : '')}</p>
-                  )}
-                </CardContent>
-              </Card>
-              {/* Course objectives */}
-              {(course.objectives?.length ?? 0) > 0 && (
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                    <CardTitle className="text-base">What you'll be able to do</CardTitle>
-                    {isInstructor && (
-                      <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => setTab('build')}>
-                        <Pencil className="h-3.5 w-3.5" /> Edit
+                </div>
+                {isInstructor && objEditing ? (
+                  <div className="space-y-2">
+                    <ObjectivesEditor value={objDraft} onChange={setObjDraft} />
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setObjEditing(false)}>Cancel</Button>
+                      <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ objectives: objDraft.map((o) => o.trim()).filter(Boolean) }, { onSuccess: () => setObjEditing(false) })}>
+                        {saveCourse.isPending ? 'Saving...' : 'Save'}
                       </Button>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2">
-                      {course.objectives!.map((o: string, i: number) => (
-                        <li key={i} className="flex items-start gap-2.5 text-sm">
-                          <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                          <span className="leading-relaxed">{o}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
-              {/* Modules are listed in the left Table of Contents, so they are not repeated here. */}
-              {/* Front page content */}
-              {pages?.find(p => p.frontPage) && (
-                <Card>
-                  <CardHeader><CardTitle>{pages.find(p => p.frontPage)!.title}</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="prose prose-sm max-w-none text-foreground" dangerouslySetInnerHTML={{ __html: parseMarkdown(pages.find(p => p.frontPage)!.body) }} />
-                  </CardContent>
-                </Card>
-              )}
-              {/* Pinned announcement */}
-              {announcements?.find(a => a.pinned) && (
-                <Card className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center gap-2">
-                      <Megaphone className="h-4 w-4 text-amber-600" />
-                      <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Pinned Announcement</span>
                     </div>
-                    <CardTitle className="text-base">{announcements.find(a => a.pinned)!.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">{announcements.find(a => a.pinned)!.body.slice(0, 200)}{announcements.find(a => a.pinned)!.body.length > 200 ? '...' : ''}</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-            <div className="space-y-4">
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Upcoming</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                  {assignments?.filter(a => a.dueDate && !isOverdue(a.dueDate)).slice(0, 3).map(a => (
+                  </div>
+                ) : (course.objectives?.length ?? 0) > 0 ? (
+                  <ul className="space-y-2.5">
+                    {course.objectives!.map((o: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2.5 text-sm">
+                        <Target className="h-3 w-3 text-orange-500 mt-1 shrink-0" strokeWidth={2.5} />
+                        <span className="leading-relaxed">{o}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No objectives yet. Click Edit to add them.</p>
+                )}
+              </section>
+            )}
+
+            {/* Front page content (flat) */}
+            {pages?.find(p => p.frontPage) && (
+              <section>
+                <h2 className="font-serif text-lg font-bold flex items-center gap-2 mb-2"><span className="h-4 w-1 rounded-full bg-orange-500" />{pages.find(p => p.frontPage)!.title}</h2>
+                <div className="prose prose-sm max-w-none text-foreground" dangerouslySetInnerHTML={{ __html: parseMarkdown(pages.find(p => p.frontPage)!.body) }} />
+              </section>
+            )}
+
+            {/* Pinned announcement (subtle accent, not a heavy box) */}
+            {announcements?.find(a => a.pinned) && (
+              <section className="border-l-2 border-amber-400 pl-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Megaphone className="h-4 w-4 text-amber-600" />
+                  <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Pinned Announcement</span>
+                </div>
+                <p className="font-medium text-foreground text-sm">{announcements.find(a => a.pinned)!.title}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{announcements.find(a => a.pinned)!.body.slice(0, 200)}{announcements.find(a => a.pinned)!.body.length > 200 ? '...' : ''}</p>
+              </section>
+            )}
+
+            {/* Upcoming deadlines, only when there are any (flat) */}
+            {assignments?.some(a => a.dueDate && !isOverdue(a.dueDate)) && (
+              <section>
+                <h3 className="font-serif text-base font-bold flex items-center gap-2 mb-2"><span className="h-4 w-1 rounded-full bg-orange-500" />Upcoming</h3>
+                <div className="space-y-1.5">
+                  {assignments.filter(a => a.dueDate && !isOverdue(a.dueDate)).slice(0, 5).map(a => (
                     <div key={a.id} className="flex items-center gap-2 text-sm">
                       <Clock className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                       <span className="truncate text-foreground">{a.title}</span>
                       <span className="text-muted-foreground text-xs flex-shrink-0">{formatDate(a.dueDate)}</span>
                     </div>
                   ))}
-                  {!assignments?.some(a => a.dueDate && !isOverdue(a.dueDate)) && <p className="text-xs text-muted-foreground">No upcoming deadlines</p>}
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2"><CardTitle className="text-sm">Quick links</CardTitle></CardHeader>
-                <CardContent className="space-y-1">
-                  {['assignments', 'discussions', 'gradebook'].map(t => (
-                    <button key={t} onClick={() => setTab(t)} className="w-full text-left text-sm text-primary hover:underline capitalize flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3" /> {t}
-                    </button>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </section>
+            )}
           </div>
         )}
 

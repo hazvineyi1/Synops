@@ -3490,7 +3490,7 @@ function ModuleHubView({
                 <ul className="space-y-2.5">
                   {objectives.map((o, i) => (
                     <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-                      <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <Target className="h-3 w-3 text-orange-500 mt-1 shrink-0" strokeWidth={2.5} />
                       <span className="text-sm leading-relaxed">{o}</span>
                     </li>
                   ))}
