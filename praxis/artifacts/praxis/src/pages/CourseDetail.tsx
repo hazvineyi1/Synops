@@ -1559,12 +1559,14 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
     try { const raw = localStorage.getItem(STORAGE); return new Set<string>(raw ? JSON.parse(raw) : []); } catch { return new Set<string>(); }
   });
   const [customizing, setCustomizing] = useState(false);
+  const [modulesOpen, setModulesOpen] = useState(true);
   const toggle = (id: string) => setHidden((prev) => {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id);
     try { localStorage.setItem(STORAGE, JSON.stringify([...n])); } catch { /* ignore */ }
     return n;
   });
   const sections = TABS.filter((t) => (t.id !== 'alignment' && t.id !== 'build') || isInstructor);
+  const hasModules = (modules?.length ?? 0) > 0;
   return (
     <aside className="lg:w-full shrink-0 lg:sticky lg:top-4 self-start mb-6 lg:mb-0 lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
       <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-border">
@@ -1577,38 +1579,42 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
       </div>
       <nav className="space-y-0.5">
         {sections.filter((t) => customizing || !hidden.has(t.id)).map((t) => (
-          <div key={t.id} className="flex items-center gap-1">
-            {customizing && isInstructor && (
-              <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!hidden.has(t.id)} onChange={() => toggle(t.id)} title="Show in table of contents" />
+          <div key={t.id}>
+            <div className="flex items-center gap-1">
+              {customizing && isInstructor && (
+                <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!hidden.has(t.id)} onChange={() => toggle(t.id)} title="Show in table of contents" />
+              )}
+              <button onClick={() => setTab(t.id)}
+                className={cn('flex-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
+                  activeTab === t.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/60')}>
+                <t.icon className="h-4 w-4 shrink-0" />{t.label}
+              </button>
+              {/* The Modules entry expands to show each module as a collapsible sub-menu. */}
+              {t.id === 'modules' && hasModules && (
+                <button onClick={() => setModulesOpen((o) => !o)} className="p-1 text-muted-foreground hover:text-foreground" title={modulesOpen ? 'Collapse modules' : 'Expand modules'}>
+                  {modulesOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </button>
+              )}
+            </div>
+            {t.id === 'modules' && hasModules && modulesOpen && (
+              <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
+                {(modules ?? []).map((m, i) => (
+                  <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
+                    className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left text-muted-foreground hover:text-foreground hover:bg-muted/60">
+                    <span className="text-[10px] font-bold tabular-nums shrink-0 w-5">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="truncate">{m.title}</span>
+                  </button>
+                ))}
+                {isInstructor && (
+                  <button onClick={() => setTab('modules')} className="w-full px-2 py-1.5 text-left text-xs text-primary hover:bg-muted/40 rounded-md">
+                    Add or manage modules
+                  </button>
+                )}
+              </div>
             )}
-            <button onClick={() => setTab(t.id)}
-              className={cn('flex-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
-                activeTab === t.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/60')}>
-              <t.icon className="h-4 w-4 shrink-0" />{t.label}
-            </button>
           </div>
         ))}
       </nav>
-
-      {(modules?.length ?? 0) > 0 && (
-        <div className="mt-4 pt-3 border-t border-border">
-          <div className="px-1 pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Modules</div>
-          <nav className="space-y-0.5">
-            {(modules ?? []).map((m, i) => (
-              <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
-                className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-left text-foreground hover:bg-muted/60">
-                <span className="h-5 w-5 rounded bg-muted text-[10px] font-bold text-muted-foreground flex items-center justify-center shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                <span className="truncate">{m.title}</span>
-              </button>
-            ))}
-          </nav>
-          {isInstructor && (
-            <button onClick={() => setTab('modules')} className="w-full mt-1 px-2.5 py-2 text-left text-xs text-primary hover:bg-muted/40 rounded-md">
-              Add or manage modules
-            </button>
-          )}
-        </div>
-      )}
     </aside>
   );
 }
@@ -1635,6 +1641,9 @@ export function CourseDetail() {
   // When on, isInstructor renders false so all instructor controls/tabs hide and learner views show.
   const [previewAsStudent, setPreviewAsStudent] = useState(false);
   const isInstructor = canInstruct && !previewAsStudent;
+  // Inline edit of the course overview description ("About this course").
+  const [aboutEditing, setAboutEditing] = useState(false);
+  const [aboutDraft, setAboutDraft] = useState('');
   // Youngest learners (K-5) get a stripped, jargon-free course page: just "Start here", no
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
@@ -1939,9 +1948,10 @@ export function CourseDetail() {
         )}
       </div>
 
-      {/* Description + badges, below the banner */}
+      {/* Badges below the banner. The description itself is shown (and edited) in the Overview's
+          "About this course" card, so it is not repeated here on the Overview tab. */}
       <div className="mb-6">
-        <p className="max-w-3xl text-muted-foreground leading-relaxed">{course.description}</p>
+        {activeTab !== 'overview' && <p className="max-w-3xl text-muted-foreground leading-relaxed">{course.description}</p>}
         <div className="flex flex-wrap gap-2 mt-3">
           {courseLevelLabel(course) && <Badge variant="outline">{es ? courseLevelLabel(course)!.replace(/^Grade /, 'Grado ') : courseLevelLabel(course)}</Badge>}
           {/* Standards/skill tags are jargon for K-12 learners, hidden so the page stays short. */}
@@ -2323,15 +2333,41 @@ export function CourseDetail() {
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-6">
               <Card>
-                <CardHeader><CardTitle>About this course</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <CardTitle>About this course</CardTitle>
+                  {isInstructor && !aboutEditing && (
+                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(course.description ?? ''); setAboutEditing(true); }}>
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </Button>
+                  )}
+                </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground leading-relaxed">{course.description}</p>
+                  {isInstructor && aboutEditing ? (
+                    <div className="space-y-2">
+                      <Textarea rows={6} value={aboutDraft} onChange={(e) => setAboutDraft(e.target.value)} className="text-sm leading-relaxed" />
+                      <div className="flex justify-end gap-2">
+                        <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setAboutEditing(false)}>Cancel</Button>
+                        <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ description: aboutDraft.trim() }, { onSuccess: () => setAboutEditing(false) })}>
+                          {saveCourse.isPending ? 'Saving...' : 'Save'}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground leading-relaxed whitespace-pre-line">{course.description || (isInstructor ? 'No description yet. Click Edit to add one.' : '')}</p>
+                  )}
                 </CardContent>
               </Card>
               {/* Course objectives */}
               {(course.objectives?.length ?? 0) > 0 && (
                 <Card>
-                  <CardHeader><CardTitle className="text-base">What you'll be able to do</CardTitle></CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                    <CardTitle className="text-base">What you'll be able to do</CardTitle>
+                    {isInstructor && (
+                      <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => setTab('build')}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                    )}
+                  </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
                       {course.objectives!.map((o: string, i: number) => (
@@ -2344,22 +2380,7 @@ export function CourseDetail() {
                   </CardContent>
                 </Card>
               )}
-              {/* Modules in this course */}
-              {(modules?.length ?? 0) > 0 && (
-                <Card>
-                  <CardHeader><CardTitle className="text-base">Modules</CardTitle></CardHeader>
-                  <CardContent className="space-y-1.5">
-                    {modules!.map((m, i) => (
-                      <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
-                        className="w-full flex items-center gap-3 rounded-lg border border-border p-3 text-left hover:bg-muted/40 transition-colors">
-                        <span className="h-7 w-7 rounded-lg bg-primary/10 text-primary text-xs font-bold flex items-center justify-center shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                        <span className="flex-1 text-sm font-medium truncate">{m.title}</span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                      </button>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
+              {/* Modules are listed in the left Table of Contents, so they are not repeated here. */}
               {/* Front page content */}
               {pages?.find(p => p.frontPage) && (
                 <Card>
