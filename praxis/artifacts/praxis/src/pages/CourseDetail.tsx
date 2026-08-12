@@ -1070,7 +1070,7 @@ function CourseObjectivesCard({ initial, saving, onSave, title, description }: {
 // scaffolds real modules.
 type ArchitectSections = { reading: string | null; lecture: string | null; activity: string | null; caseStudy: string | null; assessment: string | null };
 type ArchitectModule = { title: string; overview: string; objectives: string[]; sections: ArchitectSections; sourceMapping: string; suggestedVideo: string; summary: string };
-type Blueprint = { courseObjectives: string[]; modules: ArchitectModule[]; gaps: { gap: string; suggestion: string }[]; flowNote: string };
+type Blueprint = { courseDescription?: string; catalogDescription?: string; courseObjectives: string[]; modules: ArchitectModule[]; gaps: { gap: string; suggestion: string }[]; flowNote: string };
 
 function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { courseId: string; onScaffolded: () => void; defaultOpen?: boolean }) {
   const qc = useQueryClient();
@@ -1109,7 +1109,6 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<Blueprint | null>(null);
   const [skip, setSkip] = useState<Set<number>>(new Set());
-  const [useObjectives, setUseObjectives] = useState(true);
   const fileRef = React.useRef<HTMLInputElement>(null);
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1152,7 +1151,13 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
           `/courses/${courseId}/architect/jobs/${jobId}`,
         );
         if (s.phase) setProgress(s.totalSteps && s.totalSteps > 1 ? `${s.phase} (${Math.min((s.step ?? 0) + 1, s.totalSteps)}/${s.totalSteps})` : s.phase);
-        if (s.status === 'done' && s.result) { setPlan(s.result); break; }
+        if (s.status === 'done' && s.result) {
+          setPlan(s.result);
+          // The backend auto-fills empty course fields (description, catalogue blurb, objectives)
+          // when generation finishes, so refresh the course so those fields show the new values.
+          await qc.invalidateQueries({ queryKey: ['course', courseId] });
+          break;
+        }
         if (s.status === 'error') throw new Error(s.error || 'The architect could not analyse that content.');
       }
     } catch (err) {
@@ -1170,7 +1175,12 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
     try {
       await apiFetch(`/courses/${courseId}/architect/apply`, {
         method: 'POST',
-        body: JSON.stringify({ modules, courseObjectives: useObjectives ? plan.courseObjectives : undefined }),
+        body: JSON.stringify({
+          modules,
+          courseObjectives: plan.courseObjectives,
+          courseDescription: plan.courseDescription,
+          catalogDescription: plan.catalogDescription,
+        }),
       });
       await qc.invalidateQueries({ queryKey: ['modules', courseId] });
       await qc.invalidateQueries({ queryKey: ['course', courseId] });
@@ -1243,6 +1253,20 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
 
           {plan && (
             <div className="space-y-5">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
+                <p className="text-sm text-emerald-800 dark:text-emerald-300">
+                  The course description, catalogue blurb, and course objectives have been filled in on the course from this design. Review the modules below, then create them.
+                </p>
+              </div>
+
+              {/* Generated course description (also saved to the course details) */}
+              {plan.courseDescription && (
+                <div>
+                  <p className="text-sm font-medium mb-1">Course description</p>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{plan.courseDescription}</p>
+                </div>
+              )}
+
               {/* Flow note */}
               {plan.flowNote && (
                 <div className="rounded-lg bg-primary/[0.04] border border-primary/20 p-3">
@@ -1254,10 +1278,7 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
               {/* Derived objectives */}
               {plan.courseObjectives.length > 0 && (
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium">
-                    <input type="checkbox" className="h-4 w-4" checked={useObjectives} onChange={(e) => setUseObjectives(e.target.checked)} />
-                    Save these {plan.courseObjectives.length} course objectives
-                  </label>
+                  <p className="text-sm font-medium">Course objectives <span className="font-normal text-muted-foreground">(added to the course)</span></p>
                   <ul className="mt-2 space-y-1">
                     {plan.courseObjectives.map((o, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
@@ -2083,7 +2104,7 @@ export function CourseDetail() {
                 <p className="text-sm text-muted-foreground">Title, description, level, and status.</p>
               </div>
               <CourseSettingsCard
-                key={`${course.title}|${course.status}|${course.nqfLevel}`}
+                key={`${course.title}|${course.status}|${course.nqfLevel}|${(course.description ?? '').length}|${(course.catalogDescription ?? '').length}`}
                 course={course as any}
                 saving={saveCourse.isPending}
                 onSave={(patch) => saveCourse.mutate(patch)}

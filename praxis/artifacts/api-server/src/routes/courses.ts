@@ -480,6 +480,8 @@ Return ONLY valid JSON, no markdown: { "catalogDescription": "...", "objectives"
 // in-flight jobs, which the client surfaces as a normal error to retry.
 
 type ArchitectBlueprint = {
+  courseDescription: string;
+  catalogDescription: string;
   courseObjectives: string[];
   modules: Array<{
     title: string; overview: string; objectives: string[];
@@ -520,6 +522,8 @@ function normalizeBlueprint(parsed: any): ArchitectBlueprint {
     summary: String(m?.summary ?? "").slice(0, 400),
   })) : [];
   return {
+    courseDescription: String(parsed?.courseDescription ?? "").slice(0, 1500),
+    catalogDescription: String(parsed?.catalogDescription ?? "").slice(0, 200),
     courseObjectives: Array.isArray(parsed?.courseObjectives) ? parsed.courseObjectives.map((o: any) => String(o)).filter(Boolean).slice(0, 8) : [],
     modules,
     gaps: Array.isArray(parsed?.gaps) ? parsed.gaps.slice(0, 6).map((g: any) => ({ gap: String(g?.gap ?? "").slice(0, 300), suggestion: String(g?.suggestion ?? "").slice(0, 400) })) : [],
@@ -585,6 +589,8 @@ Course description: ${course.description || "(none)"}
 Existing course objectives: ${(course.objectives ?? []).join(" | ") || "(none yet)"}
 ${guidance ? `Author guidance: ${guidance}\n` : ""}
 Produce a JSON object with exactly these keys:
+- "courseDescription": a 2 to 3 sentence course description for the course page, describing what the course covers, who it is for, and what learners can do by the end.
+- "catalogDescription": one short catalogue-facing sentence (max 160 characters) that sells the course.
 - "courseObjectives": 4-6 measurable course-level objectives, each starting with a Bloom's action verb, describing what a learner can DO on completion. If good objectives already exist, refine them.
 - "modules": an ordered array of 5 to 8 modules. Each module object has:
     - "title": a clear, specific module title
@@ -669,8 +675,17 @@ async function runArchitectJob(job: ArchitectJob, course: any, fullText: string,
       throw new Error("Empty blueprint");
     }
     job.result = blueprint; job.status = "done"; job.step = job.totalSteps; job.phase = "Done"; job.updatedAt = Date.now();
-    // Persist so the generated design is not lost if the author navigates away before applying.
-    try { await db.update(coursesTable).set({ architectBlueprint: JSON.stringify(blueprint) }).where(eq(coursesTable.id, job.courseId)); } catch { /* non-fatal */ }
+    // Persist the blueprint AND populate the real course-level fields that are still empty, so the
+    // generated design lands in the proper places (description, catalogue blurb, objectives) rather
+    // than only living in a review panel. Never overwrite something the author already wrote.
+    try {
+      const fill: Record<string, unknown> = { architectBlueprint: JSON.stringify(blueprint) };
+      if (!(course.description ?? "").trim() && blueprint.courseDescription) fill.description = blueprint.courseDescription;
+      if (!(course.catalogDescription ?? "").trim() && blueprint.catalogDescription) fill.catalogDescription = blueprint.catalogDescription;
+      if ((!course.objectives || course.objectives.length === 0) && blueprint.courseObjectives.length) fill.objectives = blueprint.courseObjectives;
+      fill.updatedAt = new Date();
+      await db.update(coursesTable).set(fill).where(eq(coursesTable.id, job.courseId));
+    } catch { /* non-fatal */ }
   } catch (err) {
     // Log the real cause server-side (visible in Railway logs) and include a short detail in the
     // user-facing message (super-admin only surface) so failures can be diagnosed without log access.
@@ -751,8 +766,11 @@ router.post("/courses/:courseId/architect/apply", requireAuth, requireRole("supe
   if (!(await canStaffActOnCourse(req.dbUser!, courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const incoming = Array.isArray(req.body?.modules) ? req.body.modules : [];
   const courseObjectives = Array.isArray(req.body?.courseObjectives) ? req.body.courseObjectives.map((o: any) => String(o)).filter(Boolean).slice(0, 12) : null;
+  const courseDescription = String(req.body?.courseDescription ?? "").slice(0, 1500);
+  const catalogDescription = String(req.body?.catalogDescription ?? "").slice(0, 200);
   if (incoming.length === 0) { res.status(400).json({ error: "No modules to create." }); return; }
 
+  const courseRow = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
   // Append after existing modules so re-running does not renumber the current ones.
   const existing = await db.select({ order: modulesTable.order }).from(modulesTable).where(eq(modulesTable.courseId, courseId));
   let nextOrder = existing.reduce((mx, r) => Math.max(mx, r.order ?? 0), -1) + 1;
@@ -814,12 +832,14 @@ router.post("/courses/:courseId/architect/apply", requireAuth, requireRole("supe
     }
   }
 
-  // Refresh the course module count, optionally save the derived objectives, and clear the saved
-  // blueprint now that it has been applied.
+  // Refresh the course module count, save the derived course-level fields (only filling ones the
+  // author has not already written), and clear the saved blueprint now that it has been applied.
   await db.update(coursesTable).set({
     moduleCount: existing.length + created.length,
     architectBlueprint: null,
-    ...(courseObjectives ? { objectives: courseObjectives } : {}),
+    ...(courseObjectives && (!courseRow?.objectives || courseRow.objectives.length === 0) ? { objectives: courseObjectives } : {}),
+    ...(courseDescription && !(courseRow?.description ?? "").trim() ? { description: courseDescription } : {}),
+    ...(catalogDescription && !(courseRow?.catalogDescription ?? "").trim() ? { catalogDescription } : {}),
     updatedAt: new Date(),
   }).where(eq(coursesTable.id, courseId));
 
