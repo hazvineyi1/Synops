@@ -2009,9 +2009,10 @@ function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onP
       <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Languages className="h-3.5 w-3.5" /> {esUi ? 'Leer en:' : 'Read in:'}</span>
       {langs.map(([code, name]) => (
         <button key={code} type="button" disabled={busy} onClick={() => onPick(code)}
-          className={cn('text-xs rounded-full px-2.5 py-1 border transition-colors disabled:opacity-50',
+          className={cn('text-xs rounded-full px-2.5 py-1 border transition-colors disabled:opacity-50 inline-flex items-center',
             value === code ? 'bg-primary text-primary-foreground border-primary' : 'border-border hover:bg-muted')}>
           {name}
+          {code !== 'en' && <sup className="ml-0.5 text-[8px] font-semibold uppercase tracking-wide opacity-70">Beta</sup>}
         </button>
       ))}
       {busy && <span className="text-xs text-muted-foreground animate-pulse">{esUi ? 'traduciendo…' : 'translating…'}</span>}
@@ -2311,7 +2312,6 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
             )}
             <div className="mt-4"><LangChips value={tLang} busy={tBusy} onPick={translateReading} /></div>
             {/* Read-aloud always uses the original English text - only the written content is translated. */}
-            {reader?.content ? <div className="mt-3 mb-2"><ReadAloudBar text={reader.content} /></div> : null}
             <div className="mt-4 border-t border-border/60 pt-5">
               <MarkdownView text={tReading?.content ?? reader?.content ?? ''} />
             </div>
