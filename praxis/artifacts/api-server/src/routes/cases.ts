@@ -13,6 +13,7 @@ import {
   usersTable,
   coursesTable,
   modulesTable,
+  moduleReadingsTable,
   courseGroupsTable,
   courseGroupMembersTable,
   gradebookItemsTable,
@@ -248,6 +249,63 @@ router.post("/cases", requireAuth, async (req, res) => {
     .returning();
   await logAudit(req, "case.create", "case", row.id, { title: row.title, organisationId });
   res.status(201).json(caseResponse(row));
+});
+
+// POST /modules/:moduleId/cases/generate -- draft a decision-based case study from THIS module's
+// own content (overview, objectives, readings) and attach it to the module as a draft the author
+// then reviews and publishes. This is the "develop case studies for each module from the content".
+router.post("/modules/:moduleId/cases/generate", requireAuth, async (req, res) => {
+  const u = req.dbUser! as U;
+  if (!canAuthorCases(u.role)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
+
+  const readings = await db.select().from(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, mod.id));
+  const material = [
+    `Module: ${mod.title}`,
+    mod.description ? `Overview: ${mod.description}` : "",
+    (mod.objectives?.length ? `Objectives:\n${mod.objectives.map((o) => `- ${o}`).join("\n")}` : ""),
+    ...readings.map((r) => (r.content ? `Reading (${r.title}):\n${String(r.content).slice(0, 6000)}` : "")),
+  ].filter(Boolean).join("\n\n").slice(0, 20000);
+  if (material.trim().length < 60) {
+    res.status(400).json({ error: "This module has too little content to build a case study from. Add a reading or overview first." });
+    return;
+  }
+
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1800,
+      messages: [
+        { role: "user", content: `You are an expert instructional designer writing a realistic, decision-based case study for learners, grounded in the module content below. Make it specific and concrete (named protagonist, organisation, and a situation with genuine tension and a decision to make).\n\nProduce a JSON object with these keys:\n- "title": a specific case title\n- "contextBlock": a 2 to 4 paragraph scenario / fact pattern the tutor grounds its questions in\n- "openingQuestion": the first question the tutor asks the learner\n- "learningObjective": one measurable objective this case assesses\n- "focusAreas": 3 to 5 short focus areas\nNo em dashes. Return ONLY the JSON object.\n\nMODULE CONTENT:\n${material}` },
+        { role: "assistant", content: "{" },
+      ],
+    }, { timeout: 90000, maxRetries: 2 });
+    const content = message.content[0];
+    const body = content && content.type === "text" ? content.text : "";
+    let parsed: any = {};
+    try { parsed = JSON.parse("{" + body); } catch { const m = ("{" + body).match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+
+    const organisationId = u.organisationId ?? u.partnerId ?? null;
+    const [row] = await db.insert(caseScenariosTable).values({
+      organisationId,
+      moduleId: mod.id,
+      createdBy: u.id,
+      createdByName: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email,
+      title: String(parsed.title || `${mod.title} case study`).slice(0, 200),
+      learningObjective: parsed.learningObjective ? String(parsed.learningObjective).slice(0, 600) : null,
+      contextBlock: String(parsed.contextBlock || "").slice(0, 6000),
+      openingQuestion: parsed.openingQuestion ? String(parsed.openingQuestion).slice(0, 600) : null,
+      focusAreas: Array.isArray(parsed.focusAreas) ? parsed.focusAreas.map((x: any) => String(x)).slice(0, 8) : null,
+      difficulty: "intermediate",
+      status: "draft",
+      promptLimit: 8,
+    }).returning();
+    await logAudit(req, "case.generate", "case", row.id, { moduleId: mod.id });
+    res.status(201).json(caseResponse(row));
+  } catch (err) {
+    res.status(502).json({ error: "Could not generate a case study from this module. Please try again." });
+  }
 });
 
 // PUT /cases/:id, update a case.

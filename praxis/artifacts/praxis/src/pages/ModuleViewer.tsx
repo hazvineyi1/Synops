@@ -2865,6 +2865,12 @@ function ModuleHubView({
     onSuccess: (s) => navigate(`/case-run/${s.id}`),
     onError: (e: any) => setCaseErr(e?.message ?? 'Could not open the case study. Please try again.'),
   });
+  // Instructor: draft a case study from this module's own content (overview, objectives, readings).
+  const genCase = useMutation({
+    mutationFn: () => apiFetch(`/modules/${moduleId}/cases/generate`, { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: () => { setCaseErr(null); qc.invalidateQueries({ queryKey: ['module-cases', moduleId] }); },
+    onError: (e: any) => setCaseErr(e?.message ?? 'Could not generate a case study from this module.'),
+  });
   // Uploaded readings (documents/links) attached to this module. Shares its cache key with
   // ReadingsSection, so this is one request, not two.
   const { data: moduleReadings } = useQuery({
@@ -3645,6 +3651,17 @@ function ModuleHubView({
         {tab === 'cases' && (
           <div className="space-y-4">
             <SectionHead title="Case studies" sub="Apply this module to a realistic business scenario with an AI coach who guides you with questions, not answers." />
+            {isInstructor && (
+              <div className="rounded-xl border border-dashed border-primary/30 p-4 flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Develop a case study from this module</p>
+                  <p className="text-xs text-muted-foreground">Drafts a realistic, decision-based case grounded in this module's overview, objectives, and readings. You review and publish it.</p>
+                </div>
+                <Button size="sm" disabled={genCase.isPending} onClick={() => genCase.mutate()}>
+                  {genCase.isPending ? 'Generating…' : 'Generate case study'}
+                </Button>
+              </div>
+            )}
             <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-500/5 p-4 text-sm space-y-2">
               <div className="font-semibold text-teal-800 dark:text-teal-300">How this works - read before you start</div>
               <ol className="list-decimal pl-5 space-y-1 text-foreground/85">
