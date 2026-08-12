@@ -2344,9 +2344,12 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
         <div className="text-sm font-semibold flex items-center gap-2">Activities in this module <span className="text-xs font-normal text-muted-foreground">Instructor</span></div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setPickOpen((v) => !v)}><Plus className="h-3.5 w-3.5" /> Add existing</Button>
-          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Plus className="h-3.5 w-3.5" /> New</Button>
+          <Button size="sm" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}&moduleId=${moduleId}`)}><Plus className="h-3.5 w-3.5" /> New</Button>
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Use New to open the activity builder for this module, then "Generate with AI" or "Generate a game" to turn content into interactive games. Anything you create there attaches to this module automatically.
+      </p>
 
       {pickOpen && (
         <div className="rounded-lg border border-border bg-muted/20 p-3">
