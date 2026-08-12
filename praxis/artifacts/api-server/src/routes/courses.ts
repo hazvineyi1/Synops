@@ -790,19 +790,11 @@ router.post("/courses/:courseId/architect/apply", requireAuth, requireRole("supe
     const assessmentPlan = s?.assessment ? String(s.assessment).trim() : "";
     const video = m?.suggestedVideo ? String(m.suggestedVideo).trim() : "";
 
-    // Module description = overview + summary + a "Teaching plan" note for the aspects that stay as
-    // guidance (lecture, activity, case study, video). Reading and assessment become real content.
-    const planNotes = [
-      lecturePlan ? `Lecture: ${lecturePlan}` : "",
-      activityPlan ? `Activity: ${activityPlan}` : "",
-      casePlan ? `Case study: ${casePlan}` : "",
-      video ? `Suggested video: ${video}` : "",
-    ].filter(Boolean);
-    const description = [
-      overview,
-      summary ? `Summary: ${summary}` : "",
-      planNotes.length ? `Teaching plan:\n${planNotes.map((n) => `- ${n}`).join("\n")}` : "",
-    ].filter(Boolean).join("\n\n").slice(0, 4000);
+    // Keep the module description clean: just the overview (and a short summary line). The section
+    // intents (lecture/activity/case/video) become real content or on-demand generators, so they no
+    // longer get dumped into the description as a wall of text.
+    const description = [overview, summary].filter(Boolean).join("\n\n").slice(0, 2000);
+    void lecturePlan; void activityPlan; void casePlan; void video; // retained for future per-section generation
 
     const objectives = Array.isArray(m?.objectives) ? m.objectives.map((o: any) => String(o)).filter(Boolean).slice(0, 8) : [];
     const [mod] = await db.insert(modulesTable).values({

@@ -5,6 +5,7 @@ import { eq, asc } from "drizzle-orm";
 import { requireAuth, requireCoFacilitatorOrAbove } from "../middlewares/requireAuth";
 import { canParticipateInCourse } from "../lib/scope";
 import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 const router = Router();
 
@@ -39,6 +40,43 @@ function toRow(r: typeof moduleReadingsTable.$inferSelect) {
     createdAt: r.createdAt.toISOString(),
   };
 }
+
+// POST /modules/:moduleId/readings/generate -- write a COMPLETE reading for this module from its
+// topic, overview, and objectives (not a stub), and attach it. This is the "full reading material
+// pulled into the module" for authors who do not have a source document to upload.
+router.post("/modules/:moduleId/readings/generate", requireAuth, requireCoFacilitatorOrAbove, async (req, res) => {
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
+  const objectives = mod.objectives ?? [];
+  const context = [
+    `Module title: ${mod.title}`,
+    mod.description ? `Overview: ${mod.description}` : "",
+    objectives.length ? `Learning objectives:\n${objectives.map((o) => `- ${o}`).join("\n")}` : "",
+    typeof req.body?.extra === "string" && req.body.extra.trim() ? `Additional source notes:\n${String(req.body.extra).slice(0, 8000)}` : "",
+  ].filter(Boolean).join("\n\n");
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 3500,
+      messages: [{
+        role: "user",
+        content: `Write a complete, self-contained reading that fully teaches this course module. Requirements:\n- 700 to 1200 words, accurate, practical, and engaging for adult learners.\n- Structure with clear markdown section headings (##), short paragraphs, and bullet lists where useful.\n- Cover the concepts a learner needs to meet the objectives; define key terms; include a concrete example.\n- End with a short "Key takeaways" list.\n- No preamble or meta-commentary. Start directly with the reading (a level-1 # title is fine).\n\nMODULE:\n${context}`,
+      }],
+    }, { timeout: 120000, maxRetries: 2 });
+    const content = message.content[0];
+    const text = content && content.type === "text" ? content.text.trim() : "";
+    if (text.length < 200) throw new Error("Empty reading");
+    const [row] = await db.insert(moduleReadingsTable).values({
+      moduleId: mod.id, courseId: mod.courseId, title: `${mod.title}: Reading`,
+      kind: "document", content: text, chars: text.length, createdBy: req.userId!,
+    }).returning();
+    res.status(201).json(toRow(row));
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("reading gen failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: "Could not generate a reading for this module. Please try again." });
+  }
+});
 
 // POST /modules/:moduleId/readings, staff attach a reading.
 router.post("/modules/:moduleId/readings", requireAuth, requireCoFacilitatorOrAbove, async (req, res) => {

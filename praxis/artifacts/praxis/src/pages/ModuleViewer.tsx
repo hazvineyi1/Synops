@@ -114,6 +114,13 @@ function VideoChecks({ title, es }: { title?: string; es: boolean }) {
   );
 }
 
+// Show a clean overview in the hero: trim off the older "Summary:" / "Teaching plan:" notes that
+// earlier scaffolds folded into the description, so the hero is a short overview, not a wall of text.
+function cleanModuleDescription(desc?: string | null): string {
+  if (!desc) return '';
+  return desc.split(/\n+\s*(?:Summary:|Teaching plan:)/i)[0].trim();
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface QuizOption { id: string; text: string; }
@@ -2181,6 +2188,11 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
     mutationFn: (id: string) => apiFetch(`/readings/${id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['module-readings', moduleId] }),
   });
+  const genReading = useMutation({
+    mutationFn: () => apiFetch(`/modules/${moduleId}/readings/generate`, { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: () => { setError(null); qc.invalidateQueries({ queryKey: ['module-readings', moduleId] }); },
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not generate a reading.'),
+  });
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
@@ -2313,6 +2325,14 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
           <p className="text-xs text-muted-foreground">
             Documents are parsed so learners can read them here. Links open in a new window.
           </p>
+          <div className="border-t border-border/60 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground max-w-md">Or let AI write a complete reading (700 to 1200 words) from this module's topic and objectives.</p>
+              <Button size="sm" variant="outline" disabled={genReading.isPending} onClick={() => genReading.mutate()}>
+                {genReading.isPending ? 'Writing…' : 'Generate a full reading'}
+              </Button>
+            </div>
+          </div>
           {error && <p className="text-xs text-rose-600">{error}</p>}
         </div>
       )}
@@ -3171,7 +3191,7 @@ function ModuleHubView({
                 <p className="text-xs font-semibold uppercase tracking-wider text-white/80 mb-1.5">{course?.title ?? courseFull?.title}</p>
                 <h2 className="text-2xl sm:text-3xl font-bold drop-shadow-sm">{mod?.title}</h2>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs text-white/85">
-                  <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes ?? 0} min</span>
+                  {(mod?.estimatedMinutes ?? 0) > 0 && <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes} min</span>}
                   <span className="inline-flex items-center gap-1.5"><mm.icon className="h-3.5 w-3.5" /> {mm.label} · {mm.sub}</span>
                 </div>
               </div>
@@ -3185,7 +3205,7 @@ function ModuleHubView({
           </div>
           {mod?.description && (
             <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
-              <p className="text-muted-foreground max-w-2xl leading-relaxed">{mod.description}</p>
+              <p className="text-muted-foreground max-w-2xl leading-relaxed">{cleanModuleDescription(mod.description)}</p>
             </div>
           )}
         </div>
@@ -3197,10 +3217,10 @@ function ModuleHubView({
             </p>
             <h2 className="text-2xl sm:text-3xl font-bold mb-2">{mod?.title}</h2>
             {mod?.description && (
-              <p className="text-muted-foreground max-w-2xl leading-relaxed">{mod.description}</p>
+              <p className="text-muted-foreground max-w-2xl leading-relaxed">{cleanModuleDescription(mod.description)}</p>
             )}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-4 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes ?? 0} min</span>
+              {(mod?.estimatedMinutes ?? 0) > 0 && <span className="inline-flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {mod?.estimatedMinutes} min</span>}
               <span className="inline-flex items-center gap-1.5"><mm.icon className="h-3.5 w-3.5" /> {mm.label} · {mm.sub}</span>
             </div>
             {isInstructor && (
@@ -3432,7 +3452,7 @@ function ModuleHubView({
                 repeating it here just answered a question nobody was asking. */}
             <div>
               <SectionHead title="How this module is built"
-                sub={`What is inside, in the order you should work through it. About ${mod?.estimatedMinutes ?? 0} minutes in total.`} />
+                sub={`What is inside, in the order you should work through it.${(mod?.estimatedMinutes ?? 0) > 0 ? ` About ${mod?.estimatedMinutes} minutes in total.` : ''}`} />
               <div className="space-y-1.5">
                 {DELIVERABLES.filter((d) => tabState[d.id].has).map((d, i) => {
                   const meta = TABS.find((t) => t.id === d.id);

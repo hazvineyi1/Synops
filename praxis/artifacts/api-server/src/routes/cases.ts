@@ -272,19 +272,22 @@ router.post("/modules/:moduleId/cases/generate", requireAuth, async (req, res) =
     return;
   }
 
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1800,
-      messages: [
-        { role: "user", content: `You are an expert instructional designer writing a realistic, decision-based case study for learners, grounded in the module content below. Make it specific and concrete (named protagonist, organisation, and a situation with genuine tension and a decision to make).\n\nProduce a JSON object with these keys:\n- "title": a specific case title\n- "contextBlock": a 2 to 4 paragraph scenario / fact pattern the tutor grounds its questions in\n- "openingQuestion": the first question the tutor asks the learner\n- "learningObjective": one measurable objective this case assesses\n- "focusAreas": 3 to 5 short focus areas\nNo em dashes. Return ONLY the JSON object.\n\nMODULE CONTENT:\n${material}` },
-        { role: "assistant", content: "{" },
-      ],
-    }, { timeout: 90000, maxRetries: 2 });
+  const promptText = `You are an expert instructional designer writing a realistic, decision-based case study for learners, grounded in the module content below. Make it specific and concrete (named protagonist, organisation, and a situation with genuine tension and a decision to make).\n\nProduce a JSON object with these keys:\n- "title": a specific case title\n- "contextBlock": a 2 to 4 paragraph scenario / fact pattern the tutor grounds its questions in\n- "openingQuestion": the first question the tutor asks the learner\n- "learningObjective": one measurable objective this case assesses\n- "focusAreas": 3 to 5 short focus areas\nNo em dashes. Return ONLY the JSON object.\n\nMODULE CONTENT:\n${material}`;
+  const callCase = async (usePrefill: boolean): Promise<any> => {
+    const messages = usePrefill
+      ? [{ role: "user" as const, content: promptText }, { role: "assistant" as const, content: "{" }]
+      : [{ role: "user" as const, content: promptText + "\n\nReturn ONLY the JSON object, starting with {." }];
+    const message = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 1800, messages }, { timeout: 90000, maxRetries: 2 });
     const content = message.content[0];
     const body = content && content.type === "text" ? content.text : "";
+    const raw = usePrefill ? "{" + body : body;
+    try { return JSON.parse(raw); } catch { const m = raw.match(/\{[\s\S]*\}/); return m ? JSON.parse(m[0]) : {}; }
+  };
+
+  try {
     let parsed: any = {};
-    try { parsed = JSON.parse("{" + body); } catch { const m = ("{" + body).match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+    try { parsed = await callCase(true); if (!parsed?.contextBlock) parsed = await callCase(false); }
+    catch (e) { req.log?.error({ err: e }, "case gen prefill failed"); parsed = await callCase(false); }
 
     const organisationId = u.organisationId ?? u.partnerId ?? null;
     const [row] = await db.insert(caseScenariosTable).values({
@@ -304,7 +307,9 @@ router.post("/modules/:moduleId/cases/generate", requireAuth, async (req, res) =
     await logAudit(req, "case.generate", "case", row.id, { moduleId: mod.id });
     res.status(201).json(caseResponse(row));
   } catch (err) {
-    res.status(502).json({ error: "Could not generate a case study from this module. Please try again." });
+    // eslint-disable-next-line no-console
+    console.error("case gen failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: `Could not generate a case study from this module. Details: ${(err instanceof Error ? err.message : String(err)).slice(0, 200)}` });
   }
 });
 
