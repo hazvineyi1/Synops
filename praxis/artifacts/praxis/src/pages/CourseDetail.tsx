@@ -1646,6 +1646,8 @@ export function CourseDetail() {
   const [aboutDraft, setAboutDraft] = useState('');
   const [objEditing, setObjEditing] = useState(false);
   const [objDraft, setObjDraft] = useState<string[]>([]);
+  const [aboutHeadingDraft, setAboutHeadingDraft] = useState('');
+  const [objHeadingDraft, setObjHeadingDraft] = useState('');
   // Youngest learners (K-5) get a stripped, jargon-free course page: just "Start here", no
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
@@ -1842,6 +1844,13 @@ export function CourseDetail() {
     </div>
   );
   if (!course) return <div className="text-muted-foreground">Course not found.</div>;
+
+  // Custom overview section headings (author-adjustable, persisted on the course).
+  const ovCfg: { aboutHeading?: string; objectivesHeading?: string } = (() => {
+    try { return (course as { overviewConfig?: string }).overviewConfig ? JSON.parse((course as { overviewConfig?: string }).overviewConfig!) : {}; } catch { return {}; }
+  })();
+  const aboutHeading = ovCfg.aboutHeading || 'About this course';
+  const objectivesHeading = ovCfg.objectivesHeading || "What you'll be able to do";
 
   return (
     <div className={cn('space-y-0', !isLearnerView && 'lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start')}>
@@ -2333,14 +2342,21 @@ export function CourseDetail() {
              wizard lives under the Build tab, not here. ---- */}
         {activeTab === 'overview' && !enrolment && (
           <div className="max-w-3xl space-y-8">
-            {/* About this course - flat, inline-editable */}
+            {/* About this course - flat, inline-editable (heading + body) */}
             <section>
               <div className="flex items-center justify-between mb-2">
-                <h2 className="font-serif text-lg font-bold flex items-center gap-2">
-                  <span className="h-4 w-1 rounded-full bg-orange-500" />About this course
-                </h2>
+                {isInstructor && aboutEditing ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <span className="h-5 w-1 rounded-full bg-orange-500 shrink-0" />
+                    <Input value={aboutHeadingDraft} onChange={(e) => setAboutHeadingDraft(e.target.value)} className="font-serif text-lg font-bold h-9 max-w-sm" />
+                  </div>
+                ) : (
+                  <h2 className="font-serif text-lg font-bold flex items-center gap-2">
+                    <span className="h-4 w-1 rounded-full bg-orange-500" />{aboutHeading}
+                  </h2>
+                )}
                 {isInstructor && !aboutEditing && (
-                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(course.description ?? ''); setAboutEditing(true); }}>
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(course.description ?? ''); setAboutHeadingDraft(aboutHeading); setAboutEditing(true); }}>
                     <Pencil className="h-3.5 w-3.5" /> Edit
                   </Button>
                 )}
@@ -2350,7 +2366,9 @@ export function CourseDetail() {
                   <Textarea rows={6} value={aboutDraft} onChange={(e) => setAboutDraft(e.target.value)} className="text-sm leading-relaxed" />
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setAboutEditing(false)}>Cancel</Button>
-                    <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ description: aboutDraft.trim() }, { onSuccess: () => setAboutEditing(false) })}>
+                    <Button size="sm" disabled={saveCourse.isPending} onClick={() => {
+                      saveCourse.mutate({ description: aboutDraft.trim(), overviewConfig: JSON.stringify({ ...ovCfg, aboutHeading: aboutHeadingDraft.trim() || 'About this course' }) }, { onSuccess: () => setAboutEditing(false) });
+                    }}>
                       {saveCourse.isPending ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
@@ -2364,11 +2382,18 @@ export function CourseDetail() {
             {((course.objectives?.length ?? 0) > 0 || isInstructor) && (
               <section>
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="font-serif text-lg font-bold flex items-center gap-2">
-                    <span className="h-4 w-1 rounded-full bg-orange-500" />What you'll be able to do
-                  </h2>
+                  {isInstructor && objEditing ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="h-5 w-1 rounded-full bg-orange-500 shrink-0" />
+                      <Input value={objHeadingDraft} onChange={(e) => setObjHeadingDraft(e.target.value)} className="font-serif text-lg font-bold h-9 max-w-sm" />
+                    </div>
+                  ) : (
+                    <h2 className="font-serif text-lg font-bold flex items-center gap-2">
+                      <span className="h-4 w-1 rounded-full bg-orange-500" />{objectivesHeading}
+                    </h2>
+                  )}
                   {isInstructor && !objEditing && (
-                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setObjDraft((course.objectives?.length ? course.objectives : ['']) as string[]); setObjEditing(true); }}>
+                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setObjDraft((course.objectives?.length ? course.objectives : ['']) as string[]); setObjHeadingDraft(objectivesHeading); setObjEditing(true); }}>
                       <Pencil className="h-3.5 w-3.5" /> Edit
                     </Button>
                   )}
@@ -2378,7 +2403,7 @@ export function CourseDetail() {
                     <ObjectivesEditor value={objDraft} onChange={setObjDraft} />
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setObjEditing(false)}>Cancel</Button>
-                      <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ objectives: objDraft.map((o) => o.trim()).filter(Boolean) }, { onSuccess: () => setObjEditing(false) })}>
+                      <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ objectives: objDraft.map((o) => o.trim()).filter(Boolean), overviewConfig: JSON.stringify({ ...ovCfg, objectivesHeading: objHeadingDraft.trim() || "What you'll be able to do" }) }, { onSuccess: () => setObjEditing(false) })}>
                         {saveCourse.isPending ? 'Saving...' : 'Save'}
                       </Button>
                     </div>

@@ -27,6 +27,8 @@ export const coursesTable = pgTable("courses", {
   // The most recent AI architect blueprint (JSON), saved so a generated design is not lost when the
   // author navigates away before applying it. Cleared once applied or discarded.
   architectBlueprint: text("architect_blueprint"),
+  // Small JSON of overview customisations (e.g. custom section heading labels).
+  overviewConfig: text("overview_config"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
