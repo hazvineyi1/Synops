@@ -1079,6 +1079,7 @@ function CourseArchitect({ courseId, onScaffolded }: { courseId: string; onScaff
   const [guidance, setGuidance] = useState('');
   const [fileBusy, setFileBusy] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [progress, setProgress] = useState<string>('');
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<Blueprint | null>(null);
@@ -1108,28 +1109,31 @@ function CourseArchitect({ courseId, onScaffolded }: { courseId: string; onScaff
   };
 
   const analyze = async () => {
-    setAnalyzing(true); setError(null); setPlan(null); setSkip(new Set());
-    // Big documents make the model call slow; without a timeout the button spins forever if it
-    // exceeds a gateway limit. Abort at 150s and tell the user how to proceed. Only the first
-    // ~40k characters are needed to design the outline, so trim before sending.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 150000);
+    setAnalyzing(true); setError(null); setPlan(null); setSkip(new Set()); setProgress('Starting');
+    // The architect runs as a background job so even very large documents are read in full (in
+    // chunks) without hitting a request timeout. Start the job, then poll for progress.
     try {
-      const r = await apiFetch<Blueprint>(`/courses/${courseId}/architect`, {
+      const { jobId } = await apiFetch<{ jobId: string }>(`/courses/${courseId}/architect`, {
         method: 'POST',
-        body: JSON.stringify({ materialText: content.slice(0, 60000), guidance }),
-        signal: controller.signal,
+        body: JSON.stringify({ materialText: content.slice(0, 300000), guidance }),
       });
-      setPlan(r);
-    } catch (err) {
-      if ((err as { name?: string })?.name === 'AbortError' || controller.signal.aborted) {
-        setError('That is taking too long for a document this large. Try one file at a time, or trim the pasted content to the most important pages, then design again.');
-      } else {
-        setError(err instanceof Error ? err.message : 'The architect could not analyse that content.');
+      const started = Date.now();
+      // Poll until done/error, up to 8 minutes.
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (Date.now() - started > 8 * 60 * 1000) throw new Error('This is taking longer than expected. Please try again with less material.');
+        await new Promise((r) => setTimeout(r, 3000));
+        const s = await apiFetch<{ status: string; phase?: string; step?: number; totalSteps?: number; result?: Blueprint; error?: string }>(
+          `/courses/${courseId}/architect/jobs/${jobId}`,
+        );
+        if (s.phase) setProgress(s.totalSteps && s.totalSteps > 1 ? `${s.phase} (${Math.min((s.step ?? 0) + 1, s.totalSteps)}/${s.totalSteps})` : s.phase);
+        if (s.status === 'done' && s.result) { setPlan(s.result); break; }
+        if (s.status === 'error') throw new Error(s.error || 'The architect could not analyse that content.');
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The architect could not analyse that content.');
     } finally {
-      clearTimeout(timer);
-      setAnalyzing(false);
+      setAnalyzing(false); setProgress('');
     }
   };
 
@@ -1197,14 +1201,14 @@ function CourseArchitect({ courseId, onScaffolded }: { courseId: string; onScaff
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground">
                   {content.trim().length > 0 && `${content.trim().length.toLocaleString()} characters`}
-                  {content.length > 60000 && ' · only the first 60,000 are used'}
+                  {content.length > 300000 && ' · only the first 300,000 are used'}
                 </p>
                 <Button size="sm" disabled={analyzing || content.trim().length < 80} onClick={analyze}>
-                  {analyzing ? 'Designing the course...' : 'Design the course'}
+                  {analyzing ? (progress || 'Designing the course...') : 'Design the course'}
                 </Button>
               </div>
               {analyzing && (
-                <p className="text-xs text-muted-foreground text-right">This can take up to a minute for large documents.</p>
+                <p className="text-xs text-muted-foreground text-right">Reading your whole document. Large files can take a few minutes, you can keep this open.</p>
               )}
               {content.trim().length > 0 && content.trim().length < 80 && (
                 <p className="text-xs text-muted-foreground text-right">Add a bit more content to analyse.</p>

@@ -470,90 +470,204 @@ Return ONLY valid JSON, no markdown: { "catalogDescription": "...", "objectives"
   }
 });
 
-// POST /courses/:courseId/architect -- the AI course architect. Given source content (pasted or
-// extracted from an upload) plus the course title/description, an expert instructional-designer
-// persona proposes a full course blueprint: derived objectives, a sequence of modules each with the
-// standard sections (overview, objectives, reading, lecture, activity, case study, assessment,
-// summary) mapped to the content, a suggested video search, and a gap analysis. NOTHING is written;
-// the author reviews and then calls /architect/apply to scaffold. This is the "material defines
-// everything" flow.
+// ── AI course architect ─────────────────────────────────────────────────────────────────────
+// The architect designs a full course blueprint from source content. Very large uploads (whole
+// textbooks, long transcripts) cannot go through one model call inside a request without hitting a
+// gateway timeout AND would be truncated. So the work runs as a BACKGROUND JOB: the whole document
+// is read in chunks (map step -> compact notes per chunk), the notes are combined, and the architect
+// designs from the combined notes (reduce step). The client starts the job and polls for progress.
+// Job state lives in memory (single Railway instance, like the rate limiter); a restart loses
+// in-flight jobs, which the client surfaces as a normal error to retry.
+
+type ArchitectBlueprint = {
+  courseObjectives: string[];
+  modules: Array<{
+    title: string; overview: string; objectives: string[];
+    sections: { reading: string | null; lecture: string | null; activity: string | null; caseStudy: string | null; assessment: string | null };
+    sourceMapping: string; suggestedVideo: string; summary: string;
+  }>;
+  gaps: Array<{ gap: string; suggestion: string }>;
+  flowNote: string;
+};
+type ArchitectJob = {
+  id: string; courseId: string;
+  status: "processing" | "done" | "error";
+  phase: string; step: number; totalSteps: number;
+  result?: ArchitectBlueprint; error?: string;
+  createdAt: number; updatedAt: number;
+};
+const architectJobs = new Map<string, ArchitectJob>();
+// Opportunistic cleanup so the map does not grow unbounded.
+function pruneArchitectJobs() {
+  const cutoff = Date.now() - 45 * 60 * 1000;
+  for (const [id, j] of architectJobs) if (j.updatedAt < cutoff) architectJobs.delete(id);
+}
+
+function normalizeBlueprint(parsed: any): ArchitectBlueprint {
+  const modules = Array.isArray(parsed?.modules) ? parsed.modules.slice(0, 12).map((m: any) => ({
+    title: String(m?.title ?? "").slice(0, 200),
+    overview: String(m?.overview ?? "").slice(0, 600),
+    objectives: Array.isArray(m?.objectives) ? m.objectives.map((o: any) => String(o)).filter(Boolean).slice(0, 6) : [],
+    sections: {
+      reading: m?.sections?.reading ? String(m.sections.reading).slice(0, 400) : null,
+      lecture: m?.sections?.lecture ? String(m.sections.lecture).slice(0, 400) : null,
+      activity: m?.sections?.activity ? String(m.sections.activity).slice(0, 400) : null,
+      caseStudy: m?.sections?.caseStudy ? String(m.sections.caseStudy).slice(0, 400) : null,
+      assessment: m?.sections?.assessment ? String(m.sections.assessment).slice(0, 400) : null,
+    },
+    sourceMapping: String(m?.sourceMapping ?? "").slice(0, 300),
+    suggestedVideo: String(m?.suggestedVideo ?? "").slice(0, 160),
+    summary: String(m?.summary ?? "").slice(0, 400),
+  })) : [];
+  return {
+    courseObjectives: Array.isArray(parsed?.courseObjectives) ? parsed.courseObjectives.map((o: any) => String(o)).filter(Boolean).slice(0, 8) : [],
+    modules,
+    gaps: Array.isArray(parsed?.gaps) ? parsed.gaps.slice(0, 6).map((g: any) => ({ gap: String(g?.gap ?? "").slice(0, 300), suggestion: String(g?.suggestion ?? "").slice(0, 400) })) : [],
+    flowNote: String(parsed?.flowNote ?? "").slice(0, 500),
+  };
+}
+
+// Split text into chunks of ~maxChars, breaking on paragraph/line boundaries so notes stay coherent.
+function chunkText(text: string, maxChars: number, maxChunks: number): string[] {
+  const paras = text.split(/\n\s*\n/);
+  const chunks: string[] = [];
+  let cur = "";
+  for (const p of paras) {
+    if (cur.length + p.length + 2 > maxChars && cur) { chunks.push(cur); cur = ""; }
+    // A single paragraph longer than maxChars is hard-split.
+    if (p.length > maxChars) {
+      if (cur) { chunks.push(cur); cur = ""; }
+      for (let i = 0; i < p.length; i += maxChars) chunks.push(p.slice(i, i + maxChars));
+    } else {
+      cur += (cur ? "\n\n" : "") + p;
+    }
+    if (chunks.length >= maxChunks) break;
+  }
+  if (cur && chunks.length < maxChunks) chunks.push(cur);
+  return chunks.slice(0, maxChunks);
+}
+
+// Reduce: design the blueprint from (already condensed) material.
+async function architectDesign(course: any, material: string, guidance: string): Promise<ArchitectBlueprint> {
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 4500,
+    messages: [{
+      role: "user",
+      content: `You are a world-class instructional designer, instructional technologist, accessibility (WCAG) expert, pedagogy and adult-learning-theory expert, experienced teacher, and project manager. You design courses that are coherent, measurable, accessible, and genuinely engaging.
+
+Analyse the SOURCE MATERIAL below (it may be condensed notes covering a long document) and design a course blueprint. Think about scope and sequence: what a learner must know first, how ideas build, and where understanding could break down.
+
+Course title: ${course.title || "(untitled)"}
+Course description: ${course.description || "(none)"}
+Existing course objectives: ${(course.objectives ?? []).join(" | ") || "(none yet)"}
+${guidance ? `Author guidance: ${guidance}\n` : ""}
+Produce a JSON object with exactly these keys:
+- "courseObjectives": 4-6 measurable course-level objectives, each starting with a Bloom's action verb, describing what a learner can DO on completion. If good objectives already exist, refine them.
+- "modules": an ordered array (aim for 4-10) of modules. Each module object has:
+    - "title": a clear, specific module title
+    - "overview": 1-2 sentences framing what this module is about and why it matters
+    - "objectives": 2-4 measurable module objectives that ladder up to the course objectives
+    - "sections": for each of "reading","lecture","activity","caseStudy","assessment", a ONE-sentence plan describing what it should contain, drawn from the source where possible. If unsupported, set its value to null.
+    - "sourceMapping": one sentence naming which part of the source this module draws from
+    - "suggestedVideo": a short search phrase for a suitable YouTube or Khan Academy video (no URL)
+    - "summary": one sentence a learner reads at the end to consolidate the module
+- "gaps": an array of 2-5 objects { "gap": "...", "suggestion": "..." } naming what the source is MISSING for a complete course, and how to fill each gap.
+- "flowNote": one or two sentences on the overall learning arc and how the modules connect.
+
+Rules: measurable, jargon-free, no numbering inside strings, no em dashes. Return ONLY valid JSON, no markdown, no commentary.
+
+SOURCE MATERIAL:
+${material}`,
+    }],
+  });
+  const content = message.content[0];
+  if (!content || content.type !== "text") throw new Error("Unexpected response");
+  let parsed: any;
+  try { parsed = JSON.parse(content.text); }
+  catch { const m = content.text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+  return normalizeBlueprint(parsed);
+}
+
+// Map: condense one chunk of a large document into compact teachable notes.
+async function condenseChunk(chunk: string): Promise<string> {
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1200,
+    messages: [{
+      role: "user",
+      content: `Condense this excerpt of course source material into compact teachable notes. Capture, in order: the main topics and subtopics, key terms with brief definitions, important processes or steps, and notable examples. Keep it factual and dense. No preamble, no commentary.
+
+EXCERPT:
+${chunk}`,
+    }],
+  });
+  const content = message.content[0];
+  return content && content.type === "text" ? content.text.trim() : "";
+}
+
+async function runArchitectJob(job: ArchitectJob, course: any, fullText: string, guidance: string): Promise<void> {
+  try {
+    let material = fullText;
+    // Only map-reduce when the document is genuinely large; small ones go straight to design.
+    if (fullText.length > 30000) {
+      const chunks = chunkText(fullText, 18000, 16); // up to ~288k chars of source
+      job.totalSteps = chunks.length + 1;
+      const notes: string[] = [];
+      for (let i = 0; i < chunks.length; i++) {
+        job.phase = `Reading your material (part ${i + 1} of ${chunks.length})`;
+        job.step = i; job.updatedAt = Date.now();
+        notes.push(`--- Section ${i + 1} ---\n` + await condenseChunk(chunks[i]));
+      }
+      material = notes.join("\n\n").slice(0, 40000);
+      job.phase = "Designing the course"; job.step = chunks.length; job.updatedAt = Date.now();
+    } else {
+      job.totalSteps = 1; job.step = 0; job.phase = "Designing the course"; job.updatedAt = Date.now();
+    }
+    const blueprint = await architectDesign(course, material, guidance);
+    job.result = blueprint; job.status = "done"; job.step = job.totalSteps; job.phase = "Done"; job.updatedAt = Date.now();
+  } catch (err) {
+    job.status = "error";
+    job.error = "The architect could not analyse that content. Please try again, or with less material.";
+    job.updatedAt = Date.now();
+  }
+}
+
+// POST /courses/:courseId/architect -- start an architect job. Returns a jobId immediately; poll the
+// status route below. NOTHING is written; the author reviews and then calls /architect/apply.
 router.post("/courses/:courseId/architect", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
   if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, req.params.courseId) });
   if (!course) { res.status(404).json({ error: "Course not found" }); return; }
-  // Cap the input so the model call stays well under gateway timeouts on very large uploads.
-  // ~32k characters (roughly 8k tokens) is plenty to design a course outline.
-  const materialText = String(req.body?.materialText ?? "").slice(0, 32000);
+  // Accept the WHOLE document (bounded generously). The job reads all of it in chunks.
+  const materialText = String(req.body?.materialText ?? "").slice(0, 300000);
   const extraGuidance = String(req.body?.guidance ?? "").slice(0, 1000);
   if (materialText.trim().length < 80) {
     res.status(400).json({ error: "Paste or upload more source content so the architect has something to work from." });
     return;
   }
-  try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4500,
-      messages: [{
-        role: "user",
-        content: `You are a world-class instructional designer, instructional technologist, accessibility (WCAG) expert, pedagogy and adult-learning-theory expert, experienced teacher, and project manager. You design courses that are coherent, measurable, accessible, and genuinely engaging.
+  pruneArchitectJobs();
+  const job: ArchitectJob = {
+    id: crypto.randomUUID(), courseId: req.params.courseId,
+    status: "processing", phase: "Starting", step: 0, totalSteps: 1,
+    createdAt: Date.now(), updatedAt: Date.now(),
+  };
+  architectJobs.set(job.id, job);
+  // Fire and forget: the request returns now, processing continues in the background.
+  void runArchitectJob(job, course, materialText, extraGuidance);
+  res.status(202).json({ jobId: job.id });
+});
 
-Analyse the SOURCE CONTENT below and design a course blueprint. Think about scope and sequence: what a learner must know first, how ideas build, and where understanding could break down.
-
-Course title: ${course.title || "(untitled)"}
-Course description: ${course.description || "(none)"}
-Existing course objectives: ${(course.objectives ?? []).join(" | ") || "(none yet)"}
-${extraGuidance ? `Author guidance: ${extraGuidance}\n` : ""}
-Produce a JSON object with exactly these keys:
-- "courseObjectives": 4-6 measurable course-level objectives, each starting with a Bloom's action verb, describing what a learner can DO on completion. If good objectives already exist, refine them.
-- "modules": an ordered array (aim for 4-8) of modules. Each module object has:
-    - "title": a clear, specific module title
-    - "overview": 1-2 sentences framing what this module is about and why it matters
-    - "objectives": 2-4 measurable module objectives that ladder up to the course objectives
-    - "sections": for each of "reading","lecture","activity","caseStudy","assessment", a ONE-sentence plan describing what it should contain, drawn from the source content where possible. If the content does not support a section, set its value to null.
-    - "sourceMapping": one sentence naming which part of the source content this module draws from
-    - "suggestedVideo": a short search phrase an author could use to find a suitable YouTube or Khan Academy video for this module (no URL, just the phrase)
-    - "summary": one sentence a learner reads at the end to consolidate the module
-- "gaps": an array of 2-5 objects { "gap": "...", "suggestion": "..." } naming what the source content is MISSING for a complete, coherent course, and concretely how to fill each gap.
-- "flowNote": one or two sentences on the overall learning arc and how the modules connect into a sensible progression.
-
-Rules: measurable, jargon-free, no numbering inside strings, no em dashes. Return ONLY valid JSON, no markdown, no commentary.
-
-SOURCE CONTENT:
-${materialText}`,
-      }],
-    });
-    const content = message.content[0];
-    if (!content || content.type !== "text") throw new Error("Unexpected response");
-    let parsed: any;
-    try { parsed = JSON.parse(content.text); }
-    catch { const m = content.text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
-
-    // Normalise defensively so the frontend always gets a predictable shape.
-    const modules = Array.isArray(parsed?.modules) ? parsed.modules.slice(0, 12).map((m: any) => ({
-      title: String(m?.title ?? "").slice(0, 200),
-      overview: String(m?.overview ?? "").slice(0, 600),
-      objectives: Array.isArray(m?.objectives) ? m.objectives.map((o: any) => String(o)).filter(Boolean).slice(0, 6) : [],
-      sections: {
-        reading: m?.sections?.reading ? String(m.sections.reading).slice(0, 400) : null,
-        lecture: m?.sections?.lecture ? String(m.sections.lecture).slice(0, 400) : null,
-        activity: m?.sections?.activity ? String(m.sections.activity).slice(0, 400) : null,
-        caseStudy: m?.sections?.caseStudy ? String(m.sections.caseStudy).slice(0, 400) : null,
-        assessment: m?.sections?.assessment ? String(m.sections.assessment).slice(0, 400) : null,
-      },
-      sourceMapping: String(m?.sourceMapping ?? "").slice(0, 300),
-      suggestedVideo: String(m?.suggestedVideo ?? "").slice(0, 160),
-      summary: String(m?.summary ?? "").slice(0, 400),
-    })) : [];
-    res.json({
-      courseObjectives: Array.isArray(parsed?.courseObjectives) ? parsed.courseObjectives.map((o: any) => String(o)).filter(Boolean).slice(0, 8) : [],
-      modules,
-      gaps: Array.isArray(parsed?.gaps) ? parsed.gaps.slice(0, 6).map((g: any) => ({ gap: String(g?.gap ?? "").slice(0, 300), suggestion: String(g?.suggestion ?? "").slice(0, 400) })) : [],
-      flowNote: String(parsed?.flowNote ?? "").slice(0, 500),
-    });
-  } catch (err) {
-    req.log?.error({ err }, "course architect error");
-    res.status(502).json({ error: "The architect could not analyse that content. Please try again." });
-  }
+// GET /courses/:courseId/architect/jobs/:jobId -- poll job status/result.
+router.get("/courses/:courseId/architect/jobs/:jobId", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const job = architectJobs.get(req.params.jobId);
+  if (!job || job.courseId !== req.params.courseId) { res.status(404).json({ error: "Job not found. It may have expired; please run the architect again." }); return; }
+  res.json({
+    status: job.status, phase: job.phase, step: job.step, totalSteps: job.totalSteps,
+    ...(job.status === "done" ? { result: job.result } : {}),
+    ...(job.status === "error" ? { error: job.error } : {}),
+  });
 });
 
 // POST /courses/:courseId/architect/apply -- scaffold the approved blueprint into real modules.
