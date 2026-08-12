@@ -3154,14 +3154,20 @@ function ModuleHubView({
     video: 'Watch', readings: 'Read', complete: 'Practice', cases: 'Talk to your tutor',
     participate: 'Share', assignments: 'Show what you know', workshop: 'Class time',
   };
-  const railTabs = isK12
+  // "Structure" is removed from the rail: the module Overview already lays out how to complete it.
+  const railTabs = (isK12
     ? TABS.filter((t) => t.id !== 'overview' && t.id !== 'structure' && tabState[t.id].has)
     // Learners only see the sections that actually have content (empty sections are hidden).
     // Instructors keep the full rail so they can add content to empty sections.
     : isInstructor
       ? TABS
-      : TABS.filter((t) => t.id === 'overview' || t.id === 'structure' || tabState[t.id].has);
+      : TABS.filter((t) => t.id === 'overview' || tabState[t.id].has)
+  ).filter((t) => t.id !== 'structure');
   const labelFor = (t: { id: HubTab; label: string }) => (isK12 ? (K12_LABELS[t.id] ?? t.label) : t.label);
+  // Customisable module Table of Contents (instructor can show/hide sections), saved per module.
+  const [railCustomizing, setRailCustomizing] = useState(false);
+  const [railHidden, setRailHidden] = useState<Set<string>>(() => { try { return new Set<string>(JSON.parse(localStorage.getItem(`module-toc-hidden:${moduleId}`) || '[]')); } catch { return new Set<string>(); } });
+  const toggleRailHidden = (id: string) => setRailHidden((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); try { localStorage.setItem(`module-toc-hidden:${moduleId}`, JSON.stringify([...n])); } catch { /* ignore */ } return n; });
 
   // ── Guided linear progression ──────────────────────────────────────────────
   // Every deliverable that exists, in the order the module should be worked through.
@@ -3351,29 +3357,26 @@ function ModuleHubView({
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
 
         <nav aria-label="Module sections"
-          className={cn("lg:shrink-0 lg:sticky lg:top-4 lg:self-start", railOpen ? "lg:w-60" : "lg:w-auto")}>
-          <button onClick={() => setRailOpen((v) => !v)}
-            className="hidden lg:inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 mb-2 rounded-md hover:bg-muted/40"
-            title={railOpen ? 'Hide the steps and read full-width' : 'Show the steps'}>
-            {railOpen ? <><ChevronLeft className="h-4 w-4" /> Hide</> : <><List className="h-4 w-4" /> Steps</>}
-          </button>
-          <ol className={cn("flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0", !railOpen && "lg:hidden")}>
-            {railTabs.map((t) => {
+          className="lg:w-full lg:shrink-0 lg:sticky lg:top-4 lg:self-start lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
+          <div className="hidden lg:flex items-center justify-between px-1 pb-2 mb-1 border-b border-border">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contents</span>
+            {isInstructor && (
+              <button onClick={() => setRailCustomizing((c) => !c)} className="text-xs text-primary hover:underline">{railCustomizing ? 'Done' : 'Customize'}</button>
+            )}
+          </div>
+          <ol className="flex lg:flex-col gap-2 lg:gap-0.5 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
+            {railTabs.filter((t) => railCustomizing || !railHidden.has(t.id)).map((t) => {
               const active = tab === t.id;
-              const c = TAB_COLOR[t.id];
               const st = tabState[t.id];
-              const isDeliverable = t.id !== 'overview' && t.id !== 'structure';
-              // Empty sections stay in the rail so the shape of the module is honest, but
-              // they are muted and carry no count. They remain clickable: opening one is
-              // how the learner is told where to go instead.
-              const muted = isDeliverable && !st.has;
+              const isDeliverable = t.id !== 'overview';
               const done = isDeliverable && st.has && st.done;
               return (
-                <li key={t.id} className="shrink-0 lg:shrink">
+                <li key={t.id} className="shrink-0 lg:shrink flex items-center gap-1">
+                  {railCustomizing && isInstructor && (
+                    <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!railHidden.has(t.id)} onChange={() => toggleRailHidden(t.id)} title="Show in the menu" />
+                  )}
                   <button
                     onClick={() => {
-                      // K-12: one click to the content. If a section has a single launch-able item,
-                      // open it directly instead of showing a chooser card.
                       if (isK12) {
                         if (t.id === 'complete' && (moduleActivities?.length ?? 0) === 1 && interactiveBeats.length === 0 && quizBeats.length === 0) {
                           navigate(`/activities/${moduleActivities![0].id}/play`); return;
@@ -3386,28 +3389,20 @@ function ModuleHubView({
                     }}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'w-full flex items-center gap-2.5 rounded-md border-2 px-3 py-2.5 text-sm font-medium transition-colors text-left',
-                      active
-                        ? cn(c.activeBg, 'border-transparent text-white shadow-sm')
-                        : muted
-                          ? 'border-dashed border-border bg-transparent text-muted-foreground/70 hover:bg-muted/30'
-                          : cn(c.border, c.text, 'bg-card hover:bg-muted/40'),
+                      'flex-1 min-w-0 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
+                      active ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/60',
                     )}
                   >
                     <t.icon className="h-4 w-4 shrink-0" />
                     <span className="flex-1 min-w-0 truncate">{labelFor(t)}</span>
-                    {done && (
-                      <CheckCircle className={cn('h-4 w-4 shrink-0', active ? 'text-white' : 'text-emerald-500')} />
-                    )}
+                    {done && <CheckCircle className="h-4 w-4 shrink-0 text-emerald-500" />}
                     {!done && typeof t.count === 'number' && t.count > 0 && (
-                      <span className={cn('rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
-                        active ? 'bg-white/25 text-white' : 'bg-muted text-muted-foreground')}>{t.count}</span>
+                      <span className="rounded-full px-1.5 text-[10px] font-semibold tabular-nums bg-muted text-muted-foreground">{t.count}</span>
                     )}
                   </button>
                 </li>
               );
             })}
-
           </ol>
         </nav>
 
