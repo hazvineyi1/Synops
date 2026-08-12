@@ -481,7 +481,9 @@ router.post("/courses/:courseId/architect", requireAuth, requireRole("super_admi
   if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, req.params.courseId) });
   if (!course) { res.status(404).json({ error: "Course not found" }); return; }
-  const materialText = String(req.body?.materialText ?? "").slice(0, 45000);
+  // Cap the input so the model call stays well under gateway timeouts on very large uploads.
+  // ~32k characters (roughly 8k tokens) is plenty to design a course outline.
+  const materialText = String(req.body?.materialText ?? "").slice(0, 32000);
   const extraGuidance = String(req.body?.guidance ?? "").slice(0, 1000);
   if (materialText.trim().length < 80) {
     res.status(400).json({ error: "Paste or upload more source content so the architect has something to work from." });
