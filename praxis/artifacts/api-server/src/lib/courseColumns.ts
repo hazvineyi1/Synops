@@ -9,6 +9,7 @@ import { logger } from "./logger";
 export async function ensureCourseColumns(): Promise<void> {
   try {
     await db.execute(sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS catalog_description text`);
+    await db.execute(sql`ALTER TABLE modules ADD COLUMN IF NOT EXISTS banner_url text`);
   } catch (err) {
     logger.error({ err }, "ensureCourseColumns failed");
   }

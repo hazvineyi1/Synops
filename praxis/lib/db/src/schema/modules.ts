@@ -28,6 +28,8 @@ export const modulesTable = pgTable("modules", {
   courseId: text("course_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
+  // Optional magazine-style banner image for the module hero.
+  bannerUrl: text("banner_url"),
   status: moduleStatusEnum("module_status").notNull().default("draft"),
   lessonType: lessonTypeEnum("lesson_type").notNull().default("socratic"),
   // Learner-facing module-level learning objectives (what you will be able to do).
