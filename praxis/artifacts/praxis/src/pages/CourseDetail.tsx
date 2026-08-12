@@ -1091,7 +1091,7 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
     (async () => {
       try {
         const r = await apiFetch<{ blueprint: Blueprint | null }>(`/courses/${courseId}/architect/blueprint`);
-        if (!cancel && r.blueprint && (r.blueprint.modules?.length ?? 0) > 0) { setPlan(r.blueprint); setOpen(true); }
+        if (!cancel && r.blueprint && (r.blueprint.modules?.length ?? 0) > 0) { setPlan(r.blueprint); setOpen(true); void fillCourseFromBlueprint(r.blueprint); }
       } catch { /* ignore */ }
     })();
     return () => { cancel = true; };
@@ -1099,6 +1099,20 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
   const discard = async () => {
     try { await apiFetch(`/courses/${courseId}/architect/blueprint`, { method: 'DELETE' }); } catch { /* ignore */ }
     setPlan(null); setSkip(new Set());
+  };
+
+  // Populate the real course fields from a blueprint, filling only the ones the author has not
+  // already written, then refresh the course so the Course details and objectives cards update.
+  const fillCourseFromBlueprint = async (bp: Blueprint) => {
+    try {
+      const cur = await apiFetch<{ description?: string; catalogDescription?: string; objectives?: string[] }>(`/courses/${courseId}`);
+      const patch: Record<string, unknown> = {};
+      if (!(cur.description ?? '').trim() && bp.courseDescription) patch.description = bp.courseDescription;
+      if (!(cur.catalogDescription ?? '').trim() && bp.catalogDescription) patch.catalogDescription = bp.catalogDescription;
+      if ((!cur.objectives || cur.objectives.length === 0) && bp.courseObjectives.length) patch.objectives = bp.courseObjectives;
+      if (Object.keys(patch).length) await apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify(patch) });
+      await qc.invalidateQueries({ queryKey: ['course', courseId] });
+    } catch { /* ignore */ }
   };
   const [content, setContent] = useState('');
   const [guidance, setGuidance] = useState('');
@@ -1153,9 +1167,8 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
         if (s.phase) setProgress(s.totalSteps && s.totalSteps > 1 ? `${s.phase} (${Math.min((s.step ?? 0) + 1, s.totalSteps)}/${s.totalSteps})` : s.phase);
         if (s.status === 'done' && s.result) {
           setPlan(s.result);
-          // The backend auto-fills empty course fields (description, catalogue blurb, objectives)
-          // when generation finishes, so refresh the course so those fields show the new values.
-          await qc.invalidateQueries({ queryKey: ['course', courseId] });
+          // Fill the real course fields (description, catalogue blurb, objectives) from the design.
+          await fillCourseFromBlueprint(s.result);
           break;
         }
         if (s.status === 'error') throw new Error(s.error || 'The architect could not analyse that content.');
