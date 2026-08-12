@@ -3002,7 +3002,12 @@ function ModuleHubView({
 
   // Instructor authoring: role gate + persist module objectives/modality.
   const { data: me } = useGetMe();
-  const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(me?.role ?? '');
+  const canInstruct = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(me?.role ?? '');
+  // "View as student" carries across the whole course via a shared flag, so a module previews as a
+  // learner too. Staff can toggle it here as well.
+  const [previewAsStudent, setPreviewAsStudent] = useState(() => { try { return localStorage.getItem('viewAsStudent') === '1'; } catch { return false; } });
+  const toggleStudentView = () => setPreviewAsStudent((v) => { const nv = !v; try { localStorage.setItem('viewAsStudent', nv ? '1' : '0'); } catch { /* ignore */ } return nv; });
+  const isInstructor = canInstruct && !previewAsStudent;
   const qc = useQueryClient();
   const saveModule = useMutation({
     mutationFn: (patch: Record<string, unknown>) =>
@@ -3259,7 +3264,12 @@ function ModuleHubView({
           </Button>
           <span className="text-muted-foreground/30 hidden sm:inline">/</span>
           <h1 className="font-semibold text-sm flex-1 truncate hidden sm:block">{mod?.title}</h1>
-          <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ml-auto shrink-0', mm.cls)}>
+          {canInstruct && (
+            <Button size="sm" variant={previewAsStudent ? 'default' : 'outline'} className="gap-1.5 ml-auto shrink-0" onClick={toggleStudentView}>
+              <Users className="h-4 w-4" />{previewAsStudent ? 'Exit student view' : 'View as student'}
+            </Button>
+          )}
+          <span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold shrink-0', canInstruct ? '' : 'ml-auto', mm.cls)}>
             <mm.icon className="h-3.5 w-3.5" /> {mm.label}
           </span>
         </div>

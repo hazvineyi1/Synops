@@ -1786,7 +1786,8 @@ export function CourseDetail() {
   const canInstruct = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(role);
   // "View as student": staff can preview the course exactly as a learner sees it while building.
   // When on, isInstructor renders false so all instructor controls/tabs hide and learner views show.
-  const [previewAsStudent, setPreviewAsStudent] = useState(false);
+  const [previewAsStudent, setPreviewAsStudent] = useState(() => { try { return localStorage.getItem('viewAsStudent') === '1'; } catch { return false; } });
+  const toggleStudentView = () => setPreviewAsStudent((v) => { const nv = !v; try { localStorage.setItem('viewAsStudent', nv ? '1' : '0'); } catch { /* ignore */ } return nv; });
   const isInstructor = canInstruct && !previewAsStudent;
   // Inline edit of the course overview content ("About this course", objectives).
   const [aboutEditing, setAboutEditing] = useState(false);
@@ -2026,7 +2027,7 @@ export function CourseDetail() {
         </div>
         {canInstruct && (
           <Button size="sm" variant={previewAsStudent ? 'default' : 'outline'} className="gap-1.5"
-            onClick={() => setPreviewAsStudent((v) => !v)}>
+            onClick={toggleStudentView}>
             <Users className="h-4 w-4" />
             {previewAsStudent ? 'Exit student view' : 'View as student'}
           </Button>
@@ -2038,7 +2039,9 @@ export function CourseDetail() {
         </div>
       )}
 
-      {/* Course header - banner hero (full-bleed, fills the content column) */}
+      {/* Course header - banner hero. Shown on the Overview only, so the course banner + description
+          do not appear on every section (Assignments, Activities, etc.). */}
+      {activeTab === 'overview' && (
       <div className="relative mb-4 h-56 md:h-72 overflow-hidden rounded-xl">
         {course.thumbnailUrl && !bannerImgFailed ? (
           <img
@@ -2117,12 +2120,12 @@ export function CourseDetail() {
           </div>
         )}
       </div>
+      )}
 
-      {/* Badges below the banner. The description itself is shown (and edited) in the Overview's
-          "About this course" card, so it is not repeated here on the Overview tab. */}
+      {/* Badges + enrolment note, on the Overview only (the description lives in the About card). */}
+      {activeTab === 'overview' && (
       <div className="mb-6">
-        {activeTab !== 'overview' && <p className="max-w-3xl text-muted-foreground leading-relaxed">{course.description}</p>}
-        <div className="flex flex-wrap gap-2 mt-3">
+        <div className="flex flex-wrap gap-2">
           {courseLevelLabel(course) && <Badge variant="outline">{es ? courseLevelLabel(course)!.replace(/^Grade /, 'Grado ') : courseLevelLabel(course)}</Badge>}
           {/* Standards/skill tags are jargon for K-12 learners, hidden so the page stays short. */}
           {!isK12Learner && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
@@ -2133,6 +2136,7 @@ export function CourseDetail() {
           </div>
         )}
       </div>
+      )}
 
       {/* Change banner dialog */}
       {isInstructor && (
