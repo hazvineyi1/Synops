@@ -372,9 +372,22 @@ router.post("/courses/resolve-image", requireAuth, requireRole("super_admin", "p
     }
     const html = (await r.text()).slice(0, 500_000); // cap: preview meta lives in <head>
 
+    // og:image URLs in HTML come entity-encoded (e.g. Unsplash returns "...&amp;w=1200").
+    // Left as-is, the browser reads "&amp;" literally in <img src> and the image 404s, so
+    // decode the common HTML entities back to real characters.
+    const decodeEntities = (s: string): string =>
+      s
+        .replace(/&amp;/g, "&")
+        .replace(/&#0*38;/g, "&")
+        .replace(/&#x0*26;/gi, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#0*39;/g, "'")
+        .replace(/&apos;/g, "'")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">");
     const metaContent = (re: RegExp): string | null => {
       const m = html.match(re);
-      return m && m[1] ? m[1].trim() : null;
+      return m && m[1] ? decodeEntities(m[1].trim()) : null;
     };
     const candidate =
       metaContent(/<meta[^>]+property=["']og:image:secure_url["'][^>]+content=["']([^"']+)["']/i) ||

@@ -1456,6 +1456,9 @@ export function CourseDetail() {
               <p className="text-xs text-muted-foreground">
                 Use a direct link to an image (ending in .jpg, .png, or .webp). A page link will not display.
               </p>
+              <p className="text-xs text-muted-foreground">
+                Best free sources: Unsplash, Pexels, or Wikimedia Commons. Paid sites like iStock and Getty block embedding and will not work.
+              </p>
 
               {/* Live preview so a bad or non-image URL is visible here rather than silently
                   reverting to the themed banner after saving. */}
