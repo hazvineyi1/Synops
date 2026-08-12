@@ -1540,6 +1540,80 @@ function NewModule({ courseId, nextOrder }: { courseId: string; nextOrder: numbe
   );
 }
 
+/**
+ * Brightspace-style left Table of Contents for the course page: course sections plus every module
+ * by name. Instructors can Customize which sections appear (saved per course in the browser). This
+ * replaces the old horizontal tab bar for instructors and visitors.
+ */
+function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigate }: {
+  courseId: string;
+  activeTab: string;
+  setTab: (t: string) => void;
+  isInstructor: boolean;
+  modules?: { id: string; title: string }[];
+  navigate: (to: string) => void;
+}) {
+  const STORAGE = `toc-hidden:${courseId}`;
+  const [hidden, setHidden] = useState<Set<string>>(() => {
+    try { const raw = localStorage.getItem(STORAGE); return new Set<string>(raw ? JSON.parse(raw) : []); } catch { return new Set<string>(); }
+  });
+  const [customizing, setCustomizing] = useState(false);
+  const toggle = (id: string) => setHidden((prev) => {
+    const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id);
+    try { localStorage.setItem(STORAGE, JSON.stringify([...n])); } catch { /* ignore */ }
+    return n;
+  });
+  const sections = TABS.filter((t) => t.id !== 'alignment' || isInstructor);
+  return (
+    <aside className="lg:w-64 shrink-0 lg:sticky lg:top-4 self-start space-y-4 mb-6 lg:mb-0">
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Table of contents</span>
+          {isInstructor && (
+            <button onClick={() => setCustomizing((c) => !c)} className="text-xs text-primary hover:underline">
+              {customizing ? 'Done' : 'Customize'}
+            </button>
+          )}
+        </div>
+        <nav className="p-1.5">
+          {sections.filter((t) => customizing || !hidden.has(t.id)).map((t) => (
+            <div key={t.id} className="flex items-center gap-1">
+              {customizing && isInstructor && (
+                <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!hidden.has(t.id)} onChange={() => toggle(t.id)} title="Show in table of contents" />
+              )}
+              <button onClick={() => setTab(t.id)}
+                className={cn('flex-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
+                  activeTab === t.id ? 'bg-primary text-primary-foreground font-medium' : 'text-foreground hover:bg-muted/60')}>
+                <t.icon className="h-4 w-4 shrink-0" />{t.label}
+              </button>
+            </div>
+          ))}
+        </nav>
+      </div>
+
+      {(modules?.length ?? 0) > 0 && (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <div className="px-3 py-2 border-b border-border text-xs font-semibold uppercase tracking-wider text-muted-foreground">Modules</div>
+          <nav className="p-1.5">
+            {(modules ?? []).map((m, i) => (
+              <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
+                className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-left text-foreground hover:bg-muted/60">
+                <span className="h-5 w-5 rounded bg-muted text-[10px] font-bold text-muted-foreground flex items-center justify-center shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                <span className="truncate">{m.title}</span>
+              </button>
+            ))}
+          </nav>
+          {isInstructor && (
+            <button onClick={() => setTab('modules')} className="w-full border-t border-border px-3 py-2 text-left text-xs text-primary hover:bg-muted/40">
+              Add or manage modules
+            </button>
+          )}
+        </div>
+      )}
+    </aside>
+  );
+}
+
 export function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
   const search = useSearch();
@@ -1579,7 +1653,7 @@ export function CourseDetail() {
     enabled: !!courseId,
   });
   // Also needed on the discussions tab, where a new thread can be scoped to a module.
-  const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: activeTab === 'modules' || activeTab === 'overview' || activeTab === 'discussions', retry: false });
+  const { data: modules, isLoading: modulesLoading, isError: modulesError } = useQuery({ queryKey: ['modules', courseId], queryFn: () => apiFetch<Module[]>(`/courses/${courseId}/modules`), enabled: !!courseId, retry: false });
   const { data: assignments, isLoading: assignmentsLoading } = useQuery({ queryKey: ['assignments', courseId], queryFn: () => apiFetch<Assignment[]>(`/courses/${courseId}/assignments`), enabled: activeTab === 'assignments' || activeTab === 'overview', retry: false });
   const { data: discussions, isLoading: discussionsLoading } = useQuery({ queryKey: ['discussions', courseId], queryFn: () => apiFetch<Discussion[]>(`/courses/${courseId}/discussions`), enabled: activeTab === 'discussions' || activeTab === 'overview', retry: false });
   const { data: announcements, isLoading: announcementsLoading } = useQuery({ queryKey: ['announcements', courseId], queryFn: () => apiFetch<Announcement[]>(`/courses/${courseId}/announcements`), enabled: activeTab === 'announcements' || activeTab === 'overview', retry: false });
@@ -1984,34 +2058,15 @@ export function CourseDetail() {
         </div>
       )}
 
-      {/* Course sections. Instructors/visitors get the horizontal tab bar; enrolled
-          learners get the clean single-flow page (no tab rail) rendered below. */}
-      <div>
+      {/* Course sections. Instructors/visitors get a left Table of Contents (sections + modules);
+          enrolled learners get the clean single-flow page (no rail) rendered below. */}
+      <div className={cn(!isLearnerView && 'lg:flex lg:gap-8 lg:items-start')}>
         {!isLearnerView && (
-          <nav className="mb-6">
-            <div className="flex flex-wrap gap-2 border-b border-border pb-4">
-              {TABS.filter((tab) => tab.id !== 'alignment' || isInstructor).map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setTab(tab.id)}
-                  aria-current={activeTab === tab.id ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
-                    activeTab === tab.id
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-                  )}
-                >
-                  <tab.icon className="h-4 w-4 shrink-0" />
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </nav>
+          <CourseToc courseId={courseId} activeTab={activeTab} setTab={setTab} isInstructor={isInstructor} modules={modules} navigate={navigate} />
         )}
 
         {/* Tab content */}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
         {/* OVERVIEW */}
         {/* Learners get the cognitively-optimized single-primary-action view; staff keep
             the informational overview (about + upcoming + quick links). */}
