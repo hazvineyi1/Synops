@@ -1127,10 +1127,10 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
         body: JSON.stringify({ materialText: content.slice(0, 300000), guidance }),
       });
       const started = Date.now();
-      // Poll until done/error, up to 8 minutes.
+      // Poll until done/error, up to 12 minutes.
       // eslint-disable-next-line no-constant-condition
       while (true) {
-        if (Date.now() - started > 8 * 60 * 1000) throw new Error('This is taking longer than expected. Please try again with less material.');
+        if (Date.now() - started > 12 * 60 * 1000) throw new Error('This is taking longer than expected. Please try again with less material.');
         await new Promise((r) => setTimeout(r, 3000));
         const s = await apiFetch<{ status: string; phase?: string; step?: number; totalSteps?: number; result?: Blueprint; error?: string }>(
           `/courses/${courseId}/architect/jobs/${jobId}`,

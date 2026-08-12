@@ -580,7 +580,7 @@ Rules: measurable, jargon-free, no numbering inside strings, no em dashes. Retur
 SOURCE MATERIAL:
 ${material}`,
     }],
-  });
+  }, { timeout: 110000, maxRetries: 1 });
   const content = message.content[0];
   if (!content || content.type !== "text") throw new Error("Unexpected response");
   let parsed: any;
@@ -601,7 +601,7 @@ async function condenseChunk(chunk: string): Promise<string> {
 EXCERPT:
 ${chunk}`,
     }],
-  });
+  }, { timeout: 70000, maxRetries: 1 });
   const content = message.content[0];
   return content && content.type === "text" ? content.text.trim() : "";
 }
@@ -611,7 +611,7 @@ async function runArchitectJob(job: ArchitectJob, course: any, fullText: string,
     let material = fullText;
     // Only map-reduce when the document is genuinely large; small ones go straight to design.
     if (fullText.length > 30000) {
-      const chunks = chunkText(fullText, 18000, 16); // up to ~288k chars of source
+      const chunks = chunkText(fullText, 20000, 12); // up to ~240k chars of source
       job.totalSteps = chunks.length + 1;
       const notes: string[] = [];
       for (let i = 0; i < chunks.length; i++) {
@@ -619,16 +619,21 @@ async function runArchitectJob(job: ArchitectJob, course: any, fullText: string,
         job.step = i; job.updatedAt = Date.now();
         notes.push(`--- Section ${i + 1} ---\n` + await condenseChunk(chunks[i]));
       }
-      material = notes.join("\n\n").slice(0, 40000);
+      material = notes.join("\n\n").slice(0, 24000);
       job.phase = "Designing the course"; job.step = chunks.length; job.updatedAt = Date.now();
     } else {
       job.totalSteps = 1; job.step = 0; job.phase = "Designing the course"; job.updatedAt = Date.now();
     }
     const blueprint = await architectDesign(course, material, guidance);
+    // An empty design usually means the model reply was truncated or not valid JSON. Surface it as
+    // an error so the author can retry, rather than showing a blank blueprint.
+    if (!blueprint.modules.length && !blueprint.courseObjectives.length) {
+      throw new Error("Empty blueprint");
+    }
     job.result = blueprint; job.status = "done"; job.step = job.totalSteps; job.phase = "Done"; job.updatedAt = Date.now();
   } catch (err) {
     job.status = "error";
-    job.error = "The architect could not analyse that content. Please try again, or with less material.";
+    job.error = "The architect could not finish designing from that content. Please try again, or with less material.";
     job.updatedAt = Date.now();
   }
 }
