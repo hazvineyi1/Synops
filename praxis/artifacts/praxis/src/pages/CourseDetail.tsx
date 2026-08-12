@@ -1609,6 +1609,22 @@ export function CourseDetail() {
     setBannerPreview(course?.thumbnailUrl ? 'loading' : 'idle');
     setBannerOpen(true);
   };
+  // Instructor-only: edit the course title inline on the banner.
+  const [titleEditing, setTitleEditing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [titleSaving, setTitleSaving] = useState(false);
+  const startTitleEdit = () => { setTitleDraft(course?.title ?? ''); setTitleEditing(true); };
+  const saveTitle = async () => {
+    const t = titleDraft.trim();
+    if (!t || t === course?.title) { setTitleEditing(false); return; }
+    setTitleSaving(true);
+    try {
+      await apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify({ title: t }) });
+      await qc.invalidateQueries({ queryKey: ['course', courseId] });
+      setTitleEditing(false);
+    } catch { /* keep editing on failure */ }
+    finally { setTitleSaving(false); }
+  };
   // Ask the server to turn a page URL (Unsplash/Pexels/etc.) into a direct image URL by reading
   // its preview image. Returns the direct URL, or null on failure (error surfaced to the user).
   const resolvePageToImage = async (): Promise<string | null> => {
@@ -1716,12 +1732,38 @@ export function CourseDetail() {
 
         {/* Title, bottom-left */}
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 p-4 md:p-5">
-          <h1 className="font-serif text-2xl md:text-3xl font-bold text-white drop-shadow-md line-clamp-2 max-w-2xl">
-            {course.title}
-          </h1>
+          {isInstructor && titleEditing ? (
+            <div className="flex items-center gap-2 max-w-2xl w-full">
+              <Input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveTitle(); if (e.key === 'Escape') setTitleEditing(false); }}
+                className="bg-white/90 text-foreground font-serif text-lg"
+              />
+              <Button size="sm" className="shrink-0" disabled={titleSaving} onClick={saveTitle}>{titleSaving ? 'Saving...' : 'Save'}</Button>
+              <Button size="sm" variant="ghost" className="shrink-0 text-white hover:bg-white/20" disabled={titleSaving} onClick={() => setTitleEditing(false)}>Cancel</Button>
+            </div>
+          ) : (
+            <h1
+              className={cn('font-serif text-2xl md:text-3xl font-bold text-white drop-shadow-md line-clamp-2 max-w-2xl', isInstructor && 'cursor-text')}
+              onClick={isInstructor ? startTitleEdit : undefined}
+              title={isInstructor ? 'Click to edit the title' : undefined}
+            >
+              {course.title}
+            </h1>
+          )}
           {/* Instructor controls, bottom-right, styled to read on the image */}
-          {isInstructor && (
+          {isInstructor && !titleEditing && (
             <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="gap-1.5 bg-white/15 hover:bg-white/25 text-white backdrop-blur-sm"
+                onClick={startTitleEdit}
+              >
+                <Pencil className="h-4 w-4" /> Edit title
+              </Button>
               <Button
                 size="sm"
                 variant="ghost"
@@ -2137,28 +2179,13 @@ export function CourseDetail() {
               />
             </section>
 
-            {/* Step 4: build the content */}
-            <section className="space-y-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 4 · Build the content</p>
-                <p className="text-sm text-muted-foreground">Add or refine modules, activities, assessments, readings, and case studies from the tabs above.</p>
-              </div>
-              <Card>
-                <CardContent className="flex flex-wrap gap-2 py-4">
-                  <Button size="sm" variant="outline" onClick={() => setTab('modules')}>Modules</Button>
-                  <Button size="sm" variant="outline" onClick={() => setTab('activities')}>Activities</Button>
-                  <Button size="sm" variant="outline" onClick={() => setTab('assignments')}>Assignments</Button>
-                  <Button size="sm" variant="outline" onClick={() => setTab('cases')}>Case studies</Button>
-                  <Button size="sm" variant="outline" onClick={() => setTab('pages')}>Pages</Button>
-                </CardContent>
-              </Card>
-            </section>
-
-            {/* Step 5: publish -- assign to partners, only relevant at the end */}
+            {/* Publish -- assign to partners, only relevant at the end. (The Modules/Activities/
+                Assignments/Cases/Pages tabs at the top of the page are the build surface, so a
+                duplicate row of buttons here was redundant and has been removed.) */}
             {role === 'super_admin' && (
               <section className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 5 · Publish</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 4 · Publish</p>
                   <p className="text-sm text-muted-foreground">When the course is ready, assign it to the partners who should deliver it.</p>
                 </div>
                 <AssignPartnersCard courseId={courseId} />
