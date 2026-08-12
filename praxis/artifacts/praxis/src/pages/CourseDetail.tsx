@@ -1565,36 +1565,34 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
   });
   const sections = TABS.filter((t) => t.id !== 'alignment' || isInstructor);
   return (
-    <aside className="lg:w-64 shrink-0 lg:sticky lg:top-4 self-start space-y-4 mb-6 lg:mb-0">
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Table of contents</span>
-          {isInstructor && (
-            <button onClick={() => setCustomizing((c) => !c)} className="text-xs text-primary hover:underline">
-              {customizing ? 'Done' : 'Customize'}
-            </button>
-          )}
-        </div>
-        <nav className="p-1.5">
-          {sections.filter((t) => customizing || !hidden.has(t.id)).map((t) => (
-            <div key={t.id} className="flex items-center gap-1">
-              {customizing && isInstructor && (
-                <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!hidden.has(t.id)} onChange={() => toggle(t.id)} title="Show in table of contents" />
-              )}
-              <button onClick={() => setTab(t.id)}
-                className={cn('flex-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
-                  activeTab === t.id ? 'bg-primary text-primary-foreground font-medium' : 'text-foreground hover:bg-muted/60')}>
-                <t.icon className="h-4 w-4 shrink-0" />{t.label}
-              </button>
-            </div>
-          ))}
-        </nav>
+    <aside className="lg:w-full shrink-0 lg:sticky lg:top-4 self-start mb-6 lg:mb-0 lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
+      <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-border">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Table of contents</span>
+        {isInstructor && (
+          <button onClick={() => setCustomizing((c) => !c)} className="text-xs text-primary hover:underline">
+            {customizing ? 'Done' : 'Customize'}
+          </button>
+        )}
       </div>
+      <nav className="space-y-0.5">
+        {sections.filter((t) => customizing || !hidden.has(t.id)).map((t) => (
+          <div key={t.id} className="flex items-center gap-1">
+            {customizing && isInstructor && (
+              <input type="checkbox" className="ml-1 h-3.5 w-3.5 shrink-0" checked={!hidden.has(t.id)} onChange={() => toggle(t.id)} title="Show in table of contents" />
+            )}
+            <button onClick={() => setTab(t.id)}
+              className={cn('flex-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
+                activeTab === t.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/60')}>
+              <t.icon className="h-4 w-4 shrink-0" />{t.label}
+            </button>
+          </div>
+        ))}
+      </nav>
 
       {(modules?.length ?? 0) > 0 && (
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          <div className="px-3 py-2 border-b border-border text-xs font-semibold uppercase tracking-wider text-muted-foreground">Modules</div>
-          <nav className="p-1.5">
+        <div className="mt-4 pt-3 border-t border-border">
+          <div className="px-1 pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Modules</div>
+          <nav className="space-y-0.5">
             {(modules ?? []).map((m, i) => (
               <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
                 className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-sm text-left text-foreground hover:bg-muted/60">
@@ -1604,7 +1602,7 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
             ))}
           </nav>
           {isInstructor && (
-            <button onClick={() => setTab('modules')} className="w-full border-t border-border px-3 py-2 text-left text-xs text-primary hover:bg-muted/40">
+            <button onClick={() => setTab('modules')} className="w-full mt-1 px-2.5 py-2 text-left text-xs text-primary hover:bg-muted/40 rounded-md">
               Add or manage modules
             </button>
           )}
@@ -1825,7 +1823,11 @@ export function CourseDetail() {
   if (!course) return <div className="text-muted-foreground">Course not found.</div>;
 
   return (
-    <div className="space-y-0">
+    <div className={cn('space-y-0', !isLearnerView && 'lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start')}>
+      {!isLearnerView && (
+        <CourseToc courseId={courseId} activeTab={activeTab} setTab={setTab} isInstructor={isInstructor} modules={modules} navigate={navigate} />
+      )}
+      <div className="min-w-0 space-y-0">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
         <a href="/courses" className="hover:text-foreground transition-colors">{L('Courses', 'Cursos')}</a>
@@ -1833,8 +1835,8 @@ export function CourseDetail() {
         <span className="text-foreground font-medium truncate max-w-xs">{course.title}</span>
       </div>
 
-      {/* Course header - banner hero */}
-      <div className="relative mb-4 h-48 md:h-56 overflow-hidden rounded-2xl border border-border shadow-sm">
+      {/* Course header - banner hero (full-bleed, fills the content column) */}
+      <div className="relative mb-4 h-56 md:h-72 overflow-hidden rounded-xl">
         {course.thumbnailUrl && !bannerImgFailed ? (
           <img
             src={course.thumbnailUrl}
@@ -2058,15 +2060,11 @@ export function CourseDetail() {
         </div>
       )}
 
-      {/* Course sections. Instructors/visitors get a left Table of Contents (sections + modules);
-          enrolled learners get the clean single-flow page (no rail) rendered below. */}
-      <div className={cn(!isLearnerView && 'lg:flex lg:gap-8 lg:items-start')}>
-        {!isLearnerView && (
-          <CourseToc courseId={courseId} activeTab={activeTab} setTab={setTab} isInstructor={isInstructor} modules={modules} navigate={navigate} />
-        )}
-
+      {/* Course sections content (the left Table of Contents now lives at the top-level, so this
+          is just the selected section's content). */}
+      <div>
         {/* Tab content */}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
         {/* OVERVIEW */}
         {/* Learners get the cognitively-optimized single-primary-action view; staff keep
             the informational overview (about + upcoming + quick links). */}
@@ -2794,6 +2792,7 @@ export function CourseDetail() {
         )}
         </div>
       </div>
+      </div>{/* end right column */}
 
       {/* Interactive Video Modal */}
       {ivBeat && (
