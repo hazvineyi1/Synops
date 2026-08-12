@@ -602,23 +602,29 @@ Rules: keep every string short, measurable, jargon-free, no numbering inside str
 SOURCE MATERIAL:
 ${material}`;
 
-  const callOnce = async (): Promise<ArchitectBlueprint> => {
+  const callOnce = async (usePrefill: boolean): Promise<ArchitectBlueprint> => {
+    const messages = usePrefill
+      ? [{ role: "user" as const, content: prompt }, { role: "assistant" as const, content: "{" }]
+      : [{ role: "user" as const, content: prompt + "\n\nReturn ONLY the JSON object, starting with {." }];
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 5000,
-      messages: [
-        { role: "user", content: prompt },
-        { role: "assistant", content: "{" }, // prefill: force a JSON object, no prose
-      ],
+      messages,
     }, { timeout: 150000, maxRetries: 2 });
     const content = message.content[0];
     const body = content && content.type === "text" ? content.text : "";
-    return normalizeBlueprint(parseLooseJson("{" + body));
+    return normalizeBlueprint(parseLooseJson(usePrefill ? "{" + body : body));
   };
 
-  let bp = await callOnce();
-  if (!bp.modules.length) bp = await callOnce(); // one retry on an empty result
-  return bp;
+  // Prefer the JSON-prefill call; if it errors or comes back empty, fall back to a plain call.
+  try {
+    const bp = await callOnce(true);
+    if (bp.modules.length) return bp;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error("architect design (prefill) failed:", e instanceof Error ? e.message : e);
+  }
+  return await callOnce(false);
 }
 
 // Map: condense one chunk of a large document into compact teachable notes.
@@ -664,11 +670,18 @@ async function runArchitectJob(job: ArchitectJob, course: any, fullText: string,
     }
     job.result = blueprint; job.status = "done"; job.step = job.totalSteps; job.phase = "Done"; job.updatedAt = Date.now();
   } catch (err) {
-    // Log the real cause server-side (visible in Railway logs) while showing a friendly message.
+    // Log the real cause server-side (visible in Railway logs) and include a short detail in the
+    // user-facing message (super-admin only surface) so failures can be diagnosed without log access.
+    const detail = (() => {
+      const anyErr = err as { status?: number; error?: { error?: { message?: string } }; message?: string };
+      const status = anyErr?.status ? `HTTP ${anyErr.status}: ` : "";
+      const msg = anyErr?.error?.error?.message || anyErr?.message || String(err);
+      return (status + msg).slice(0, 300);
+    })();
     // eslint-disable-next-line no-console
-    console.error("architect job failed:", err instanceof Error ? err.message : err);
+    console.error("architect job failed:", detail);
     job.status = "error";
-    job.error = "The architect could not finish designing from that content. Please try again, or with less material.";
+    job.error = `The architect could not finish designing from that content. Details: ${detail}`;
     job.updatedAt = Date.now();
   }
 }
