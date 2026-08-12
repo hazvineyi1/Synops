@@ -15,7 +15,8 @@ import {
   BookOpen, ClipboardList, MessageSquare, Megaphone, BarChart2,
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
   CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Image as ImageIcon, Upload, Lightbulb,
-  Bold, Italic, Underline, List, ListOrdered, Link2
+  Bold, Italic, Underline, List, ListOrdered, Link2,
+  Strikethrough, AlignLeft, AlignCenter, AlignRight, Eraser, Circle, Square, Star, Check
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -1620,6 +1621,30 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
   );
 }
 
+// Shared palette + bullet shapes for the overview styling controls.
+const STYLE_COLORS = ['#111827', '#f97316', '#2563eb', '#16a34a', '#dc2626', '#7c3aed', '#0891b2', '#db2777'];
+const HEADING_SIZES: { key: string; label: string; cls: string }[] = [
+  { key: 'sm', label: 'S', cls: 'text-base' },
+  { key: 'md', label: 'M', cls: 'text-lg' },
+  { key: 'lg', label: 'L', cls: 'text-2xl' },
+  { key: 'xl', label: 'XL', cls: 'text-3xl' },
+];
+const headingSizeCls = (k?: string) => HEADING_SIZES.find((s) => s.key === k)?.cls ?? 'text-lg';
+const BULLET_SHAPES = ['target', 'dot', 'check', 'square', 'star', 'arrow'] as const;
+type BulletShape = typeof BULLET_SHAPES[number];
+function BulletIcon({ shape, color, className }: { shape?: string; color?: string; className?: string }) {
+  const cls = cn('h-3 w-3 shrink-0', className);
+  const style = { color: color || '#f97316' };
+  switch (shape as BulletShape) {
+    case 'dot': return <Circle className={cls} style={style} fill="currentColor" strokeWidth={0} />;
+    case 'check': return <Check className={cls} style={style} strokeWidth={3} />;
+    case 'square': return <Square className={cls} style={style} fill="currentColor" strokeWidth={0} />;
+    case 'star': return <Star className={cls} style={style} fill="currentColor" strokeWidth={0} />;
+    case 'arrow': return <ChevronRight className={cls} style={style} strokeWidth={3} />;
+    default: return <Target className={cls} style={style} strokeWidth={2.5} />;
+  }
+}
+
 /**
  * Lightweight rich-text editor with a formatting toolbar (headings, bold/italic/underline, font
  * size, colour, lists, links). Uses the browser's editing commands and stores HTML. No extra deps.
@@ -1630,7 +1655,6 @@ function RichTextEditor({ value, onChange }: { value: string; onChange: (html: s
   useEffect(() => { if (ref.current) ref.current.innerHTML = value || ''; /* eslint-disable-next-line */ }, []);
   const sync = () => onChange(ref.current?.innerHTML ?? '');
   const exec = (cmd: string, arg?: string) => { ref.current?.focus(); document.execCommand(cmd, false, arg); sync(); };
-  const COLORS = ['#111827', '#f97316', '#2563eb', '#16a34a', '#dc2626', '#7c3aed'];
   const Btn = ({ children, title, onClick }: { children: React.ReactNode; title: string; onClick: () => void }) => (
     <button type="button" title={title} onMouseDown={(e) => e.preventDefault()} onClick={onClick}
       className="h-7 min-w-7 px-1.5 rounded hover:bg-muted text-sm text-foreground inline-flex items-center justify-center">{children}</button>
@@ -1645,30 +1669,82 @@ function RichTextEditor({ value, onChange }: { value: string; onChange: (html: s
           <option value="H3">Subheading</option>
           <option value="P">Paragraph</option>
         </select>
+        <select title="Font" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => { exec('fontName', e.target.value); e.target.value=''; }}
+          className="h-7 rounded border border-input bg-background px-1 text-xs">
+          <option value="">Font</option>
+          <option value="Georgia, serif">Serif</option>
+          <option value="Inter, system-ui, sans-serif">Sans</option>
+          <option value="ui-monospace, monospace">Mono</option>
+        </select>
         <select title="Font size" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => { exec('fontSize', e.target.value); e.target.value=''; }}
           className="h-7 rounded border border-input bg-background px-1 text-xs">
           <option value="">Size</option>
+          <option value="1">XS</option>
           <option value="2">Small</option>
           <option value="3">Normal</option>
+          <option value="4">Medium</option>
           <option value="5">Large</option>
           <option value="6">X-Large</option>
+          <option value="7">XX-Large</option>
         </select>
         <span className="mx-0.5 h-5 w-px bg-border" />
         <Btn title="Bold" onClick={() => exec('bold')}><Bold className="h-4 w-4" /></Btn>
         <Btn title="Italic" onClick={() => exec('italic')}><Italic className="h-4 w-4" /></Btn>
         <Btn title="Underline" onClick={() => exec('underline')}><Underline className="h-4 w-4" /></Btn>
+        <Btn title="Strikethrough" onClick={() => exec('strikeThrough')}><Strikethrough className="h-4 w-4" /></Btn>
+        <span className="mx-0.5 h-5 w-px bg-border" />
+        <Btn title="Align left" onClick={() => exec('justifyLeft')}><AlignLeft className="h-4 w-4" /></Btn>
+        <Btn title="Align centre" onClick={() => exec('justifyCenter')}><AlignCenter className="h-4 w-4" /></Btn>
+        <Btn title="Align right" onClick={() => exec('justifyRight')}><AlignRight className="h-4 w-4" /></Btn>
         <span className="mx-0.5 h-5 w-px bg-border" />
         <Btn title="Bulleted list" onClick={() => exec('insertUnorderedList')}><List className="h-4 w-4" /></Btn>
         <Btn title="Numbered list" onClick={() => exec('insertOrderedList')}><ListOrdered className="h-4 w-4" /></Btn>
         <Btn title="Link" onClick={() => { const u = window.prompt('Link URL'); if (u) exec('createLink', u); }}><Link2 className="h-4 w-4" /></Btn>
+        <Btn title="Clear formatting" onClick={() => exec('removeFormat')}><Eraser className="h-4 w-4" /></Btn>
         <span className="mx-0.5 h-5 w-px bg-border" />
-        {COLORS.map((c) => (
+        {STYLE_COLORS.map((c) => (
           <button key={c} type="button" title="Text colour" onMouseDown={(e) => e.preventDefault()} onClick={() => exec('foreColor', c)}
             className="h-5 w-5 rounded-full border border-border" style={{ backgroundColor: c }} />
         ))}
+        <input type="color" title="Custom colour" onMouseDown={(e) => e.stopPropagation()} onChange={(e) => exec('foreColor', e.target.value)} className="h-6 w-6 rounded border border-border bg-transparent p-0" />
       </div>
       <div ref={ref} contentEditable suppressContentEditableWarning onInput={sync}
         className="prose prose-sm max-w-none min-h-[9rem] p-3 focus:outline-none [&_h2]:font-serif [&_h3]:font-serif" />
+    </div>
+  );
+}
+
+function HeadingStyleBar({ style, onChange }: { style: { color?: string; size?: string }; onChange: (s: { color?: string; size?: string }) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1.5">
+      <span className="text-[11px] font-medium text-muted-foreground">Heading colour</span>
+      {STYLE_COLORS.map((c) => (
+        <button key={c} type="button" title={c} onClick={() => onChange({ ...style, color: c })}
+          className={cn('h-4 w-4 rounded-full border border-border', style.color === c && 'ring-2 ring-primary ring-offset-1')} style={{ backgroundColor: c }} />
+      ))}
+      <span className="ml-2 text-[11px] font-medium text-muted-foreground">Size</span>
+      {HEADING_SIZES.map((s) => (
+        <button key={s.key} type="button" onClick={() => onChange({ ...style, size: s.key })}
+          className={cn('h-6 px-1.5 rounded border text-xs', style.size === s.key ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-foreground')}>{s.label}</button>
+      ))}
+    </div>
+  );
+}
+function BulletStyleBar({ bullet, onChange }: { bullet: { shape?: string; color?: string }; onChange: (b: { shape?: string; color?: string }) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1.5">
+      <span className="text-[11px] font-medium text-muted-foreground">Bullet</span>
+      {BULLET_SHAPES.map((sh) => (
+        <button key={sh} type="button" title={sh} onClick={() => onChange({ ...bullet, shape: sh })}
+          className={cn('h-7 w-7 rounded border flex items-center justify-center', bullet.shape === sh ? 'border-primary bg-primary/10' : 'border-border')}>
+          <BulletIcon shape={sh} color={bullet.color} />
+        </button>
+      ))}
+      <span className="ml-2 text-[11px] font-medium text-muted-foreground">Colour</span>
+      {STYLE_COLORS.map((c) => (
+        <button key={c} type="button" title={c} onClick={() => onChange({ ...bullet, color: c })}
+          className={cn('h-4 w-4 rounded-full border border-border', bullet.color === c && 'ring-2 ring-primary ring-offset-1')} style={{ backgroundColor: c }} />
+      ))}
     </div>
   );
 }
@@ -1702,6 +1778,10 @@ export function CourseDetail() {
   const [objDraft, setObjDraft] = useState<string[]>([]);
   const [aboutHeadingDraft, setAboutHeadingDraft] = useState('');
   const [objHeadingDraft, setObjHeadingDraft] = useState('');
+  // Heading + bullet style drafts (colour/size/shape) while editing a section.
+  const [aboutHStyle, setAboutHStyle] = useState<{ color?: string; size?: string }>({});
+  const [objHStyle, setObjHStyle] = useState<{ color?: string; size?: string }>({});
+  const [bulletDraft, setBulletDraft] = useState<{ shape?: string; color?: string }>({});
   // Youngest learners (K-5) get a stripped, jargon-free course page: just "Start here", no
   // objectives lists, structure stat grid, competency tags, or calendar sidebar.
   const youngPersona = personaByEmail((user as { email?: string } | undefined)?.email);
@@ -1900,7 +1980,11 @@ export function CourseDetail() {
   if (!course) return <div className="text-muted-foreground">Course not found.</div>;
 
   // Custom overview section headings + rich "About" HTML (author-adjustable, persisted on the course).
-  const ovCfg: { aboutHeading?: string; objectivesHeading?: string; aboutHtml?: string } = (() => {
+  const ovCfg: {
+    aboutHeading?: string; objectivesHeading?: string; aboutHtml?: string;
+    aboutHColor?: string; aboutHSize?: string; objHColor?: string; objHSize?: string;
+    bulletShape?: string; bulletColor?: string;
+  } = (() => {
     try { return (course as { overviewConfig?: string }).overviewConfig ? JSON.parse((course as { overviewConfig?: string }).overviewConfig!) : {}; } catch { return {}; }
   })();
   const aboutHeading = ovCfg.aboutHeading || 'About this course';
@@ -2403,27 +2487,28 @@ export function CourseDetail() {
               <div className="flex items-center justify-between mb-2">
                 {isInstructor && aboutEditing ? (
                   <div className="flex items-center gap-2 flex-1">
-                    <span className="h-5 w-1 rounded-full bg-orange-500 shrink-0" />
+                    <span className="h-5 w-1 rounded-full shrink-0" style={{ backgroundColor: aboutHStyle.color || '#f97316' }} />
                     <Input value={aboutHeadingDraft} onChange={(e) => setAboutHeadingDraft(e.target.value)} className="font-serif text-lg font-bold h-9 max-w-sm" />
                   </div>
                 ) : (
-                  <h2 className="font-serif text-lg font-bold flex items-center gap-2">
-                    <span className="h-4 w-1 rounded-full bg-orange-500" />{aboutHeading}
+                  <h2 className={cn('font-serif font-bold flex items-center gap-2', headingSizeCls(ovCfg.aboutHSize))} style={{ color: ovCfg.aboutHColor }}>
+                    <span className="h-4 w-1 rounded-full" style={{ backgroundColor: ovCfg.aboutHColor || '#f97316' }} />{aboutHeading}
                   </h2>
                 )}
                 {isInstructor && !aboutEditing && (
-                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(ovCfg.aboutHtml || escapeHtml(course.description ?? '')); setAboutHeadingDraft(aboutHeading); setAboutEditing(true); }}>
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setAboutDraft(ovCfg.aboutHtml || escapeHtml(course.description ?? '')); setAboutHeadingDraft(aboutHeading); setAboutHStyle({ color: ovCfg.aboutHColor, size: ovCfg.aboutHSize }); setAboutEditing(true); }}>
                     <Pencil className="h-3.5 w-3.5" /> Edit
                   </Button>
                 )}
               </div>
               {isInstructor && aboutEditing ? (
                 <div className="space-y-2">
+                  <HeadingStyleBar style={aboutHStyle} onChange={setAboutHStyle} />
                   <RichTextEditor value={aboutDraft} onChange={setAboutDraft} />
                   <div className="flex justify-end gap-2">
                     <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setAboutEditing(false)}>Cancel</Button>
                     <Button size="sm" disabled={saveCourse.isPending} onClick={() => {
-                      saveCourse.mutate({ description: stripHtml(aboutDraft), overviewConfig: JSON.stringify({ ...ovCfg, aboutHtml: aboutDraft, aboutHeading: aboutHeadingDraft.trim() || 'About this course' }) }, { onSuccess: () => setAboutEditing(false) });
+                      saveCourse.mutate({ description: stripHtml(aboutDraft), overviewConfig: JSON.stringify({ ...ovCfg, aboutHtml: aboutDraft, aboutHeading: aboutHeadingDraft.trim() || 'About this course', aboutHColor: aboutHStyle.color, aboutHSize: aboutHStyle.size }) }, { onSuccess: () => setAboutEditing(false) });
                     }}>
                       {saveCourse.isPending ? 'Saving...' : 'Save'}
                     </Button>
@@ -2442,26 +2527,28 @@ export function CourseDetail() {
                 <div className="flex items-center justify-between mb-2">
                   {isInstructor && objEditing ? (
                     <div className="flex items-center gap-2 flex-1">
-                      <span className="h-5 w-1 rounded-full bg-orange-500 shrink-0" />
+                      <span className="h-5 w-1 rounded-full shrink-0" style={{ backgroundColor: objHStyle.color || '#f97316' }} />
                       <Input value={objHeadingDraft} onChange={(e) => setObjHeadingDraft(e.target.value)} className="font-serif text-lg font-bold h-9 max-w-sm" />
                     </div>
                   ) : (
-                    <h2 className="font-serif text-lg font-bold flex items-center gap-2">
-                      <span className="h-4 w-1 rounded-full bg-orange-500" />{objectivesHeading}
+                    <h2 className={cn('font-serif font-bold flex items-center gap-2', headingSizeCls(ovCfg.objHSize))} style={{ color: ovCfg.objHColor }}>
+                      <span className="h-4 w-1 rounded-full" style={{ backgroundColor: ovCfg.objHColor || '#f97316' }} />{objectivesHeading}
                     </h2>
                   )}
                   {isInstructor && !objEditing && (
-                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setObjDraft((course.objectives?.length ? course.objectives : ['']) as string[]); setObjHeadingDraft(objectivesHeading); setObjEditing(true); }}>
+                    <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setObjDraft((course.objectives?.length ? course.objectives : ['']) as string[]); setObjHeadingDraft(objectivesHeading); setObjHStyle({ color: ovCfg.objHColor, size: ovCfg.objHSize }); setBulletDraft({ shape: ovCfg.bulletShape, color: ovCfg.bulletColor }); setObjEditing(true); }}>
                       <Pencil className="h-3.5 w-3.5" /> Edit
                     </Button>
                   )}
                 </div>
                 {isInstructor && objEditing ? (
                   <div className="space-y-2">
+                    <HeadingStyleBar style={objHStyle} onChange={setObjHStyle} />
+                    <BulletStyleBar bullet={bulletDraft} onChange={setBulletDraft} />
                     <ObjectivesEditor value={objDraft} onChange={setObjDraft} />
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="ghost" disabled={saveCourse.isPending} onClick={() => setObjEditing(false)}>Cancel</Button>
-                      <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ objectives: objDraft.map((o) => o.trim()).filter(Boolean), overviewConfig: JSON.stringify({ ...ovCfg, objectivesHeading: objHeadingDraft.trim() || "What you'll be able to do" }) }, { onSuccess: () => setObjEditing(false) })}>
+                      <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ objectives: objDraft.map((o) => o.trim()).filter(Boolean), overviewConfig: JSON.stringify({ ...ovCfg, objectivesHeading: objHeadingDraft.trim() || "What you'll be able to do", objHColor: objHStyle.color, objHSize: objHStyle.size, bulletShape: bulletDraft.shape, bulletColor: bulletDraft.color }) }, { onSuccess: () => setObjEditing(false) })}>
                         {saveCourse.isPending ? 'Saving...' : 'Save'}
                       </Button>
                     </div>
@@ -2470,7 +2557,7 @@ export function CourseDetail() {
                   <ul className="space-y-2.5">
                     {course.objectives!.map((o: string, i: number) => (
                       <li key={i} className="flex items-start gap-2.5 text-sm">
-                        <Target className="h-3 w-3 text-orange-500 mt-1 shrink-0" strokeWidth={2.5} />
+                        <span className="mt-1"><BulletIcon shape={ovCfg.bulletShape} color={ovCfg.bulletColor} /></span>
                         <span className="leading-relaxed">{o}</span>
                       </li>
                     ))}
