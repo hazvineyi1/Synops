@@ -2894,6 +2894,13 @@ function ModuleHubView({
     onSuccess: () => { setCaseErr(null); qc.invalidateQueries({ queryKey: ['module-cases', moduleId] }); },
     onError: (e: any) => setCaseErr(e?.message ?? 'Could not generate a case study from this module.'),
   });
+  // Instructor: draft an assessment (assignment) from this module's content.
+  const [asmtErr, setAsmtErr] = useState<string | null>(null);
+  const genAssessment = useMutation({
+    mutationFn: () => apiFetch(`/modules/${moduleId}/assignments/generate`, { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: () => { setAsmtErr(null); qc.invalidateQueries({ queryKey: ['assignments', courseId] }); },
+    onError: (e: any) => setAsmtErr(e?.message ?? 'Could not generate an assessment from this module.'),
+  });
   // Uploaded readings (documents/links) attached to this module. Shares its cache key with
   // ReadingsSection, so this is one request, not two.
   const { data: moduleReadings } = useQuery({
@@ -3751,6 +3758,18 @@ function ModuleHubView({
         {tab === 'assignments' && (
           <div className="space-y-4">
             <SectionHead title="Assignments" sub="Submit your work. Grades and feedback flow into your gradebook." />
+            {isInstructor && (
+              <div className="rounded-xl border border-dashed border-primary/30 p-4 flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">Develop an assessment from this module</p>
+                  <p className="text-xs text-muted-foreground">Drafts a summative assessment aligned to this module's objectives and content. Created as a draft you review and publish.</p>
+                  {asmtErr && <p className="text-xs text-rose-600 mt-1">{asmtErr}</p>}
+                </div>
+                <Button size="sm" disabled={genAssessment.isPending} onClick={() => genAssessment.mutate()}>
+                  {genAssessment.isPending ? 'Generating…' : 'Generate assessment'}
+                </Button>
+              </div>
+            )}
             {moduleAssignments.length > 0 ? (
               <>
                 <Instruction>Open an assignment to read the full brief, then type your response or upload a file. You'll see your grade and feedback here once it's marked.</Instruction>

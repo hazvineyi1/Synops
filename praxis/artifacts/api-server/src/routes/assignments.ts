@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import {
   assignmentsTable, assignmentSubmissionsTable, gradebookEntriesTable,
   rubricsTable, usersTable, notificationsTable, enrolmentsTable,
+  modulesTable, moduleReadingsTable,
 } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -10,6 +11,7 @@ import { canGradeInCourse, canStaffActOnCourse, canParticipateInCourse } from ".
 import { onGradeEvent } from "../lib/gradebookAlerts";
 import { extractFromBuffer } from "../lib/extractText";
 import { generateAssignmentGrade } from "../lib/assignmentEngine";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 import type { AssignmentCriterionScore } from "@workspace/db";
 
 const router = Router();
@@ -275,6 +277,54 @@ router.post("/courses/:courseId/assignments", requireAuth, async (req, res) => {
   }
 
   res.status(201).json(toAssignmentResponse(assignment));
+});
+
+// POST /modules/:moduleId/assignments/generate -- draft an assessment (assignment) from THIS
+// module's own content and attach it to the module + course as an unpublished draft to review.
+router.post("/modules/:moduleId/assignments/generate", requireAuth, async (req, res) => {
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
+  if (!(await staffOn(req, res, mod.courseId))) return;
+
+  const readings = await db.select().from(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, mod.id));
+  const material = [
+    `Module: ${mod.title}`,
+    mod.description ? `Overview: ${mod.description}` : "",
+    (mod.objectives?.length ? `Objectives:\n${mod.objectives.map((o) => `- ${o}`).join("\n")}` : ""),
+    ...readings.map((r) => (r.content ? `Reading (${r.title}):\n${String(r.content).slice(0, 6000)}` : "")),
+  ].filter(Boolean).join("\n\n").slice(0, 18000);
+  if (material.trim().length < 60) { res.status(400).json({ error: "This module has too little content to build an assessment from." }); return; }
+
+  const prompt = `You are an expert instructional designer writing a summative assessment for this module, aligned to its objectives. Produce a JSON object:\n- "title": a specific assessment title\n- "description": one sentence describing the assessment and what it evaluates\n- "instructions": clear, numbered student instructions (what to produce, scope, and how it will be judged), 120 to 250 words\nNo em dashes. Return ONLY the JSON object.\n\nMODULE CONTENT:\n${material}`;
+  const call = async (usePrefill: boolean): Promise<any> => {
+    const messages = usePrefill
+      ? [{ role: "user" as const, content: prompt }, { role: "assistant" as const, content: "{" }]
+      : [{ role: "user" as const, content: prompt + "\n\nReturn ONLY the JSON object, starting with {." }];
+    const message = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 1500, messages }, { timeout: 90000, maxRetries: 2 });
+    const c = message.content[0];
+    const body = c && c.type === "text" ? c.text : "";
+    const raw = usePrefill ? "{" + body : body;
+    try { return JSON.parse(raw); } catch { const m = raw.match(/\{[\s\S]*\}/); return m ? JSON.parse(m[0]) : {}; }
+  };
+
+  try {
+    let parsed: any = {};
+    try { parsed = await call(true); if (!parsed?.instructions) parsed = await call(false); }
+    catch { parsed = await call(false); }
+
+    const [assignment] = await db.insert(assignmentsTable).values({
+      courseId: mod.courseId, moduleId: mod.id,
+      title: String(parsed.title || `${mod.title} assessment`).slice(0, 200),
+      description: parsed.description ? String(parsed.description).slice(0, 1000) : null,
+      instructions: parsed.instructions ? String(parsed.instructions).slice(0, 4000) : null,
+      pointsPossible: "100", published: false, position: 0,
+    }).returning();
+    res.status(201).json(toAssignmentResponse(assignment));
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("assignment gen failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: `Could not generate an assessment. Details: ${(err instanceof Error ? err.message : String(err)).slice(0, 200)}` });
+  }
 });
 
 // GET /assignments/:assignmentId

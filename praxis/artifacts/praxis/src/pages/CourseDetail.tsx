@@ -874,9 +874,23 @@ function CourseSettingsCard({ course, saving, onSave }: {
   });
   if (!open) {
     return (
-      <div className="flex justify-end">
-        <Button size="sm" variant="outline" className="gap-2" onClick={() => setOpen(true)}><Pencil className="h-3.5 w-3.5" /> Edit course</Button>
-      </div>
+      <Card>
+        <CardContent className="pt-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1.5">
+              <div className="font-serif font-semibold">{course.title || 'Untitled course'}</div>
+              {course.description
+                ? <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl whitespace-pre-line">{course.description}</p>
+                : <p className="text-sm text-muted-foreground italic">No description yet.</p>}
+              <div className="flex flex-wrap gap-2 pt-1 text-xs text-muted-foreground">
+                {course.nqfLevel != null && <span className="rounded-full border border-border px-2 py-0.5">NQF {course.nqfLevel}</span>}
+                <span className="rounded-full border border-border px-2 py-0.5 capitalize">{course.status ?? 'draft'}</span>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" className="gap-2 shrink-0" onClick={() => setOpen(true)}><Pencil className="h-3.5 w-3.5" /> Edit course</Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
   return (
@@ -1379,68 +1393,98 @@ const LESSON_TYPE_META: Record<string, { icon: React.ElementType; label: string;
   quiz:     { icon: ClipboardList, label: 'Quiz',       color: 'text-amber-600'  },
 };
 
-function ModuleRow({ mod, canEdit = false }: { mod: Module; canEdit?: boolean }) {
+function ModuleRow({ mod, canEdit = false, prev, next, index }: { mod: Module; canEdit?: boolean; prev?: Module; next?: Module; index?: number }) {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const isEmpty = mod.beatCount === 0;
   // Instructors can open a module even when it has no content yet, so they can go add some.
   const canOpen = !isEmpty || canEdit;
+  const [renaming, setRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState(mod.title);
+  const refresh = () => qc.invalidateQueries({ queryKey: ['modules', mod.courseId] });
 
   const del = useMutation({
     mutationFn: () => apiFetch(`/modules/${mod.id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['modules', mod.courseId] }),
+    onSuccess: refresh,
     onError: (e) => alert(e instanceof Error ? e.message : 'Could not delete that module.'),
   });
+  const rename = useMutation({
+    mutationFn: (title: string) => apiFetch(`/modules/${mod.id}`, { method: 'PATCH', body: JSON.stringify({ title }) }),
+    onSuccess: () => { setRenaming(false); refresh(); },
+  });
+  // Reorder by swapping this module's order with a neighbour's, so the list stays contiguous.
+  const swap = useMutation({
+    mutationFn: async (other: Module) => {
+      await apiFetch(`/modules/${mod.id}`, { method: 'PATCH', body: JSON.stringify({ order: other.order }) });
+      await apiFetch(`/modules/${other.id}`, { method: 'PATCH', body: JSON.stringify({ order: mod.order }) });
+    },
+    onSuccess: refresh,
+  });
+  const busy = swap.isPending || rename.isPending;
 
   return (
     <Card
       className={cn(
         'transition-shadow',
-        canOpen && 'hover:shadow-md cursor-pointer',
+        canOpen && !renaming && 'hover:shadow-md cursor-pointer',
         isEmpty && 'opacity-60',
       )}
-      onClick={() => canOpen && navigate(`/courses/${mod.courseId}/modules/${mod.id}`)}
+      onClick={() => canOpen && !renaming && navigate(`/courses/${mod.courseId}/modules/${mod.id}`)}
     >
       <CardHeader>
         <div className="flex items-center gap-4">
-          {/* Order badge */}
-          <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-sm flex-shrink-0 shrink-0">
-            {String(mod.order).padStart(2, '0')}
+          {/* Reorder controls (instructor) + order badge */}
+          <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {canEdit && (
+              <div className="flex flex-col">
+                <button className="text-muted-foreground hover:text-foreground disabled:opacity-25" title="Move up"
+                  disabled={!prev || busy} onClick={() => prev && swap.mutate(prev)}><ChevronRight className="h-3.5 w-3.5 -rotate-90" /></button>
+                <button className="text-muted-foreground hover:text-foreground disabled:opacity-25" title="Move down"
+                  disabled={!next || busy} onClick={() => next && swap.mutate(next)}><ChevronRight className="h-3.5 w-3.5 rotate-90" /></button>
+              </div>
+            )}
+            <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
+              {String((index ?? mod.order) + (index != null ? 1 : 0)).padStart(2, '0')}
+            </div>
           </div>
           {/* Title & meta */}
           <div className="flex-1 min-w-0">
-            <CardTitle className="text-base truncate">{mod.title}</CardTitle>
-            <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {mod.estimatedMinutes}min
-              </span>
-              <span>·</span>
-              <span>{mod.beatCount} {mod.beatCount === 1 ? 'page' : 'pages'}</span>
-              {isEmpty && <span className="text-amber-600">· No content yet</span>}
-            </div>
+            {renaming ? (
+              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <Input autoFocus value={nameDraft} onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && nameDraft.trim()) rename.mutate(nameDraft.trim()); if (e.key === 'Escape') setRenaming(false); }} className="h-8" />
+                <Button size="sm" disabled={!nameDraft.trim() || rename.isPending} onClick={() => rename.mutate(nameDraft.trim())}>Save</Button>
+                <Button size="sm" variant="ghost" onClick={() => { setRenaming(false); setNameDraft(mod.title); }}>Cancel</Button>
+              </div>
+            ) : (
+              <CardTitle className="text-base truncate">{mod.title}</CardTitle>
+            )}
+            {!renaming && (
+              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                {(mod.estimatedMinutes ?? 0) > 0 && <><span className="flex items-center gap-1"><Clock className="h-3 w-3" />{mod.estimatedMinutes}min</span><span>·</span></>}
+                <span>{mod.beatCount} {mod.beatCount === 1 ? 'page' : 'pages'}</span>
+                {isEmpty && <span className="text-amber-600">· No content yet</span>}
+              </div>
+            )}
           </div>
-          {/* Status + arrow */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Status + edit controls */}
+          <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
             <Badge variant={mod.status === 'published' ? 'default' : 'secondary'} className="text-xs">
               {mod.status}
             </Badge>
-            {canEdit && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 text-muted-foreground hover:text-rose-600"
-                disabled={del.isPending}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (window.confirm(`Delete the module "${mod.title}"? This cannot be undone.`)) del.mutate();
-                }}
-                title="Delete module"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            {canEdit && !renaming && (
+              <>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename module"
+                  onClick={() => { setNameDraft(mod.title); setRenaming(true); }}>
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-rose-600" disabled={del.isPending} title="Delete module"
+                  onClick={() => { if (window.confirm(`Delete the module "${mod.title}"? This cannot be undone.`)) del.mutate(); }}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
             )}
-            {canOpen && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            {canOpen && !renaming && <ChevronRight className="h-4 w-4 text-muted-foreground cursor-pointer" onClick={() => navigate(`/courses/${mod.courseId}/modules/${mod.id}`)} />}
           </div>
         </div>
       </CardHeader>
@@ -2278,8 +2322,10 @@ export function CourseDetail() {
               </div>
             )}
             {!modulesError && modules?.length === 0 && <div className="text-center text-muted-foreground py-12">No modules yet. Use "Author a module" above to add one.</div>}
-            {modules?.map((mod) => (
-              <ModuleRow key={mod.id} mod={mod} canEdit={isInstructor} />
+            {modules?.map((mod, i) => (
+              <ModuleRow key={mod.id} mod={mod} canEdit={isInstructor} index={i}
+                prev={i > 0 ? modules[i - 1] : undefined}
+                next={i < modules.length - 1 ? modules[i + 1] : undefined} />
             ))}
           </div>
         )}
