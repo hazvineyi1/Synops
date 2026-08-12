@@ -3363,7 +3363,14 @@ function ModuleHubView({
       ? TABS
       : TABS.filter((t) => t.id === 'overview' || tabState[t.id].has)
   ).filter((t) => t.id !== 'structure');
-  const labelFor = (t: { id: HubTab; label: string }) => (isK12 ? (K12_LABELS[t.id] ?? t.label) : t.label);
+  // Custom rail labels: instructors can rename any section (saved per module). Empty = default.
+  const [railLabels, setRailLabels] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem(`module-toc-labels:${moduleId}`) || '{}'); } catch { return {}; } });
+  const setRailLabel = (id: string, v: string) => setRailLabels((m) => { const n = { ...m, [id]: v }; try { localStorage.setItem(`module-toc-labels:${moduleId}`, JSON.stringify(n)); } catch { /* ignore */ } return n; });
+  const labelFor = (t: { id: HubTab; label: string }) => {
+    const custom = railLabels[t.id];
+    if (custom && custom.trim()) return custom;
+    return isK12 ? (K12_LABELS[t.id] ?? t.label) : t.label;
+  };
   // Customisable module Table of Contents (instructor can show/hide sections), saved per module.
   const [railCustomizing, setRailCustomizing] = useState(false);
   const [railHidden, setRailHidden] = useState<Set<string>>(() => { try { return new Set<string>(JSON.parse(localStorage.getItem(`module-toc-hidden:${moduleId}`) || '[]')); } catch { return new Set<string>(); } });
@@ -3591,6 +3598,14 @@ function ModuleHubView({
                       </span>
                     </>
                   )}
+                  {railCustomizing && isInstructor ? (
+                    <div className="flex-1 min-w-0 flex items-center gap-2 rounded-md px-2.5 py-1.5 bg-muted/40">
+                      <t.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <input value={labelFor(t)} onChange={(e) => setRailLabel(t.id, e.target.value)}
+                        className="flex-1 min-w-0 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                        aria-label={`Rename ${t.label}`} />
+                    </div>
+                  ) : (
                   <button
                     onClick={() => {
                       if (isK12) {
@@ -3616,6 +3631,7 @@ function ModuleHubView({
                       <span className="rounded-full px-1.5 text-[10px] font-semibold tabular-nums bg-muted text-muted-foreground">{t.count}</span>
                     )}
                   </button>
+                  )}
                 </li>
               );
             })}
@@ -4142,27 +4158,32 @@ function ModuleHubView({
             </div>
           </div>
         ) : moduleComplete ? (
-          <div className="rounded-2xl border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-            <span className="h-10 w-10 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle className="h-6 w-6" />
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold">Module complete</p>
-              <p className="text-sm text-muted-foreground">{nextMod ? `Up next: ${nextMod.title}` : 'That was the final module in this course.'}</p>
+          // Module complete "page": a full celebration with a recap and the forward path.
+          <div className="rounded-2xl border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-8 text-center">
+            <div className="h-14 w-14 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+              <CheckCircle className="h-7 w-7" />
             </div>
-            {nextMod ? (
-              <Button className="shrink-0" onClick={() => navigate(`/courses/${courseId}/modules/${nextMod.id}`)}>
-                Next module <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            ) : (
-              <Button variant="outline" className="shrink-0" onClick={() => navigate(`/courses/${courseId}`)}>Back to course</Button>
-            )}
+            <p className="font-serif font-bold text-xl text-emerald-800 dark:text-emerald-300">Module complete</p>
+            <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto">
+              You've finished {mod?.title ?? 'this module'}.{' '}
+              {nextMod ? `Up next: ${nextMod.title}.` : 'That was the final module in this course — nice work.'}
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center mt-5">
+              {nextMod ? (
+                <Button onClick={() => navigate(`/courses/${courseId}/modules/${nextMod.id}`)}>
+                  Next module <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              ) : (
+                <Button onClick={() => navigate(`/courses/${courseId}`)}>Back to course</Button>
+              )}
+              <Button variant="outline" onClick={() => setTab('overview')}>Review this module</Button>
+            </div>
           </div>
-        ) : tab === 'overview' ? null : (
+        ) : (
           <div className="rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Keep going</p>
-              <p className="text-sm text-muted-foreground">Work through each learning experience in order.</p>
+              <p className="font-semibold text-sm">{tab === 'overview' ? 'Ready to begin' : 'Keep going'}</p>
+              <p className="text-sm text-muted-foreground">{tab === 'overview' ? 'Start with the first section of this module.' : 'Work through each learning experience in order.'}</p>
             </div>
             <Button className="shrink-0" onClick={continueAction}>
               {continueLabel}

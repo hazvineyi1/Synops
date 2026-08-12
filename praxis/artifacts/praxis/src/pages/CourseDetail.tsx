@@ -1583,6 +1583,11 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
     [ids[idx], ids[j]] = [ids[j], ids[idx]];
     setOrder(ids); try { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
   };
+  // Custom labels: instructors can rename any menu item (saved per course). Empty = fall back to default.
+  const LABELS_KEY = `toc-labels:${courseId}`;
+  const [labels, setLabels] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem(LABELS_KEY) || '{}'); } catch { return {}; } });
+  const labelOf = (id: string, fallback: string) => (labels[id] && labels[id].trim() ? labels[id] : fallback);
+  const setLabel = (id: string, v: string) => setLabels((m) => { const n = { ...m, [id]: v }; try { localStorage.setItem(LABELS_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
   const hasModules = (modules?.length ?? 0) > 0;
   return (
     <aside className="lg:w-full shrink-0 lg:sticky lg:top-4 self-start mb-6 lg:mb-0 lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
@@ -1607,11 +1612,20 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
                   </span>
                 </>
               )}
-              <button onClick={() => setTab(t.id)}
-                className={cn('flex-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
-                  activeTab === t.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/60')}>
-                <t.icon className="h-4 w-4 shrink-0" />{t.label}
-              </button>
+              {customizing && isInstructor ? (
+                <div className="flex-1 flex items-center gap-2 rounded-md px-2.5 py-1.5 bg-muted/40">
+                  <t.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <input value={labelOf(t.id, t.label)} onChange={(e) => setLabel(t.id, e.target.value)}
+                    className="flex-1 min-w-0 rounded-md border border-input bg-background px-2 py-1 text-sm"
+                    aria-label={`Rename ${t.label}`} />
+                </div>
+              ) : (
+                <button onClick={() => setTab(t.id)}
+                  className={cn('flex-1 flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-left transition-colors',
+                    activeTab === t.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground hover:bg-muted/60')}>
+                  <t.icon className="h-4 w-4 shrink-0" />{labelOf(t.id, t.label)}
+                </button>
+              )}
               {/* The Modules entry expands to show each module as a collapsible sub-menu. */}
               {t.id === 'modules' && hasModules && (
                 <button onClick={() => setModulesOpen((o) => !o)} className="p-1 text-muted-foreground hover:text-foreground" title={modulesOpen ? 'Collapse modules' : 'Expand modules'}>
@@ -2699,6 +2713,22 @@ export function CourseDetail() {
                     </div>
                   ))}
                 </div>
+              </section>
+            )}
+
+            {/* Start here: send the learner straight into the first module from the bottom of the overview. */}
+            {(modules?.length ?? 0) > 0 && (
+              <section className="pt-2">
+                <button onClick={() => navigate(`/courses/${courseId}/modules/${modules![0].id}`)}
+                  className="group w-full flex items-center justify-between gap-4 rounded-2xl bg-primary px-6 py-5 text-left text-primary-foreground shadow-sm transition-all hover:shadow-md hover:brightness-105">
+                  <span className="min-w-0">
+                    <span className="block text-lg font-serif font-bold">Start here</span>
+                    <span className="block text-sm text-primary-foreground/80 truncate">Begin with {modules![0].title}</span>
+                  </span>
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 shrink-0 transition-transform group-hover:translate-x-0.5">
+                    <ChevronRight className="h-5 w-5" />
+                  </span>
+                </button>
               </section>
             )}
           </div>
