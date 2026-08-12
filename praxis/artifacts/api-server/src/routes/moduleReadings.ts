@@ -230,6 +230,21 @@ router.get("/readings/:id", requireAuth, async (req, res) => {
   res.json({ ...toRow(row), content: row.content ?? "" });
 });
 
+// PATCH /readings/:id, staff edit a reading's title and/or content (markdown). This is what makes
+// the reading itself editable in place -- the author can fix, trim, or rewrite the parsed/generated
+// text and learners see the update immediately.
+router.patch("/readings/:id", requireAuth, requireCoFacilitatorOrAbove, async (req, res) => {
+  const row = await db.query.moduleReadingsTable.findFirst({ where: eq(moduleReadingsTable.id, req.params.id) });
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  const b = (req.body ?? {}) as { title?: string; content?: string };
+  const patch: Record<string, unknown> = {};
+  if (typeof b.title === "string") patch.title = b.title.trim().slice(0, 200) || row.title;
+  if (typeof b.content === "string") { patch.content = b.content; patch.chars = b.content.length; }
+  if (!Object.keys(patch).length) { res.status(400).json({ error: "Nothing to update." }); return; }
+  const [updated] = await db.update(moduleReadingsTable).set(patch).where(eq(moduleReadingsTable.id, req.params.id)).returning();
+  res.json({ ...toRow(updated), content: updated.content ?? "" });
+});
+
 // DELETE /readings/:id, staff remove a reading.
 router.delete("/readings/:id", requireAuth, requireCoFacilitatorOrAbove, async (req, res) => {
   await db.delete(moduleReadingsTable).where(eq(moduleReadingsTable.id, req.params.id));

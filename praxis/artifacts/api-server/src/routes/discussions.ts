@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { discussionsTable, discussionRepliesTable, usersTable, notificationsTable } from "@workspace/db";
+import { discussionsTable, discussionRepliesTable, usersTable, notificationsTable, modulesTable, coursesTable, moduleReadingsTable } from "@workspace/db";
 import { eq, and, asc, desc, sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireAuth, requireCoFacilitatorOrAbove } from "../middlewares/requireAuth";
 import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 import { generateFacilitatorQuestion, countWords } from "../lib/discussionEngine";
 import { translateTexts } from "../lib/caseEngine";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 const router = Router();
 
@@ -97,6 +98,65 @@ router.post("/courses/:courseId/discussions", requireAuth, async (req, res) => {
     ...(isStaff && requiredInteractions != null ? { requiredInteractions } : {}),
   }).returning();
   res.status(201).json(discussion);
+});
+
+// POST /modules/:moduleId/discussions/generate
+//
+// Reading material often contains reflective PROMPTS -- "identify one skill you will develop first
+// and explain why", "which of these would you prioritise?" -- that belong in the Discussion section,
+// not buried in the reading. This scans the module's readings (and the course's stored source) and
+// turns the genuine discussion-worthy questions into module discussion threads. Staff-only.
+router.post("/modules/:moduleId/discussions/generate", requireAuth, requireCoFacilitatorOrAbove, async (req, res) => {
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
+  if (!(await canStaffActOnCourse(req.dbUser!, mod.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+
+  // Prefer the module's own readings; fall back to the course source material for this module's topic.
+  const readings = await db.select().from(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, mod.id));
+  let corpus = readings.map((r) => r.content ?? "").filter(Boolean).join("\n\n").trim();
+  if (corpus.length < 200) {
+    const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, mod.courseId) });
+    corpus = ((course as { sourceMaterial?: string } | undefined)?.sourceMaterial ?? "").trim();
+  }
+  if (corpus.length < 200) {
+    res.status(422).json({ error: "There isn't enough reading content in this module yet. Add or generate a reading first." });
+    return;
+  }
+
+  const topic = `${mod.title}. ${mod.description ?? ""}`.slice(0, 400);
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1600,
+      messages: [{
+        role: "user",
+        content: `You are curating DISCUSSION questions for an online course module from its reading.\n\nModule: ${topic}\n\nFrom the reading below, pull out the reflective / open-ended / opinion / "explain why" / "which would you choose" style questions that make good peer DISCUSSION (not quiz questions with one right answer, and not self-rating checklists). Rewrite each as a clear, engaging discussion prompt of 1-2 sentences. Return 2 to 5 of the best.\n\nReply with ONLY strict JSON, no prose:\n{ "discussions": [ { "title": "short thread title (<=8 words)", "prompt": "the discussion prompt" } ] }\n\n=== READING ===\n${corpus.slice(0, 40000)}`,
+      }],
+    }, { timeout: 90000, maxRetries: 1 });
+    const text = (message.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
+    let parsed: any = {};
+    try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+    const items = Array.isArray(parsed.discussions) ? parsed.discussions : [];
+    const clean = items
+      .map((x: any) => ({ title: String(x?.title ?? "").trim().slice(0, 120), prompt: String(x?.prompt ?? "").trim().slice(0, 1000) }))
+      .filter((x: any) => x.title && x.prompt)
+      .slice(0, 5);
+    if (!clean.length) { res.status(422).json({ error: "No discussion questions were found in this module's reading." }); return; }
+
+    const created = [];
+    for (const c of clean) {
+      const [d] = await db.insert(discussionsTable).values({
+        courseId: mod.courseId, moduleId: mod.id, authorId: req.userId!,
+        title: c.title, body: c.prompt, aiFacilitated: true, language: "en",
+      }).returning();
+      created.push({ id: d.id, title: d.title });
+    }
+    res.status(201).json({ created });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("discussion gen failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: "Could not extract discussion questions. Please try again." });
+  }
 });
 
 // GET /courses/:courseId/discussions/:discussionId

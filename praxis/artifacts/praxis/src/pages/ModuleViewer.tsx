@@ -29,8 +29,9 @@ import { useGetMe } from '@workspace/api-client-react';
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { activitiesApi } from '@/lib/activitiesApi';
 import { RichTextEditor, BulletStyleBar, BulletIcon, objectivesHtmlToItems, itemsToPlain, escapeHtml } from '@/components/RichTextEditor';
+import { renderActivity, validateSpec, type InteractionType, type ActivitySpec } from '@/lib/activityTemplates';
 import {
-  ChevronLeft, ChevronRight, CheckCircle, BookOpen, List,
+  ChevronLeft, ChevronRight, ChevronDown, CheckCircle, BookOpen, List, Sparkles, Pencil,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
   Users, Layers, Target, Compass, Info, Save, Settings, Link2,
@@ -2142,6 +2143,68 @@ function MarkdownView({ text }: { text: string }) {
   return <div className="font-sans">{out}</div>;
 }
 
+// A reading rendered as collapsible, tabbed sections. We split the markdown on level-2 (##) headings:
+// anything before the first ## is the always-visible intro, and each ## becomes its own collapsible
+// panel. A section rail lets the reader jump straight to a part, and Expand/Collapse all is one click.
+// If the reading has no ## sections we fall back to the plain flowing reader.
+function ReadingBody({ text }: { text: string }) {
+  const src = text ?? '';
+  const lines = src.split('\n');
+  const firstIdx = lines.findIndex((l) => /^##\s+/.test(l) && !/^\d+\.\s/.test(l.replace(/^##\s+/, '')));
+  if (firstIdx < 0) return <MarkdownView text={src} />;
+
+  const intro = lines.slice(0, firstIdx).join('\n').trim();
+  const sections: { title: string; body: string }[] = [];
+  let cur: { title: string; body: string[] } | null = null;
+  for (const l of lines.slice(firstIdx)) {
+    const m = l.match(/^##\s+(.*)$/);
+    if (m && !/^\d+\.\s/.test(m[1])) { if (cur) sections.push({ title: cur.title, body: cur.body.join('\n') }); cur = { title: m[1].trim(), body: [] }; }
+    else if (cur) cur.body.push(l);
+  }
+  if (cur) sections.push({ title: cur.title, body: cur.body.join('\n') });
+  if (sections.length < 2) return <MarkdownView text={src} />;
+
+  const [open, setOpen] = useState<Set<number>>(() => new Set(sections.map((_, i) => i)));
+  const allOpen = open.size === sections.length;
+  const toggle = (i: number) => setOpen((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
+  const setAll = (on: boolean) => setOpen(on ? new Set(sections.map((_, i) => i)) : new Set());
+  const jump = (i: number) => { setOpen((s) => new Set(s).add(i)); requestAnimationFrame(() => document.getElementById(`rsec-${i}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })); };
+
+  return (
+    <div>
+      {intro && <div className="mb-5"><MarkdownView text={intro} /></div>}
+      {/* Section tabs: quick jump across the reading. */}
+      <div className="flex flex-wrap gap-1.5 mb-4">
+        {sections.map((s, i) => (
+          <button key={i} onClick={() => jump(i)}
+            className="rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-foreground/80 hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors">
+            {s.title}
+          </button>
+        ))}
+        <button onClick={() => setAll(!allOpen)}
+          className="ml-auto rounded-full px-3 py-1 text-xs font-medium text-primary hover:underline">
+          {allOpen ? 'Collapse all' : 'Expand all'}
+        </button>
+      </div>
+      <div className="space-y-2.5">
+        {sections.map((s, i) => {
+          const isOpen = open.has(i);
+          return (
+            <div key={i} id={`rsec-${i}`} className="rounded-xl border border-border/70 bg-card/40 scroll-mt-24 overflow-hidden">
+              <button onClick={() => toggle(i)}
+                className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-muted/40 transition-colors">
+                <ChevronDown className={cn('h-4 w-4 text-primary shrink-0 transition-transform', isOpen ? '' : '-rotate-90')} />
+                <span className="font-serif font-semibold text-[15px] leading-tight">{s.title}</span>
+              </button>
+              {isOpen && <div className="px-4 sm:px-5 pb-4 pt-0 border-t border-border/50"><MarkdownView text={s.body} /></div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Instructor: find current videos and articles online (web search) relevant to this module, and add
 // them directly. A video becomes a video lesson; an article becomes a reading whose text is pulled in.
 type WebHit = { title: string; url: string; note: string };
@@ -2216,7 +2279,98 @@ function ModuleWebFinder({ moduleId }: { moduleId: string }) {
   );
 }
 
-function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstructor: boolean }) {
+// Instructor: turn what's already in the module's readings into coursework. Exercises/self-assessments
+// become interactive activities in the Activities section; reflective questions become discussion
+// threads in the Discussions section. This is how "activities in the reading go to the right place,
+// gamified" and "questions in the reading become discussion questions" happen with one click each.
+function ReadingCoursework({ courseId, moduleId, readings }: { courseId: string; moduleId: string; readings: ModuleReadingRow[] }) {
+  const qc = useQueryClient();
+  const [actBusy, setActBusy] = useState(false);
+  const [discBusy, setDiscBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const withContent = readings.filter((r) => r.hasContent);
+
+  // Pull the full text of every reading in this module (the list endpoint omits content).
+  const gatherContent = async () => {
+    const parts: string[] = [];
+    for (const r of withContent) {
+      try {
+        const full = await apiFetch<ModuleReadingRow & { content: string }>(`/readings/${r.id}`);
+        if (full.content) parts.push(full.content);
+      } catch { /* skip a reading we can't load */ }
+    }
+    return parts.join('\n\n').trim();
+  };
+
+  const buildActivities = async () => {
+    setActBusy(true); setErr(null); setMsg(null);
+    try {
+      const content = await gatherContent();
+      if (content.length < 80) { setErr('Add or generate a reading first — there is no content to build from.'); return; }
+      const { activities } = await apiFetch<{ activities: { type: string; title: string; instructions: string; bloomsLevel: string; difficulty: string; spec: unknown }[] }>(
+        `/activities/generate`, { method: 'POST', body: JSON.stringify({ content: content.slice(0, 12000), count: 4 }) });
+      let made = 0;
+      for (const a of activities ?? []) {
+        const type = a.type as InteractionType;
+        try {
+          if (validateSpec(type, a.spec as ActivitySpec)) continue; // returns an error string when invalid
+          const html = renderActivity(type, a.spec as ActivitySpec);
+          await activitiesApi.create({
+            title: a.title, instructions: a.instructions || undefined, source: 'html', html,
+            kind: 'game', bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null,
+            published: true, courseId, moduleId,
+          });
+          made += 1;
+        } catch { /* skip a single bad one */ }
+      }
+      if (!made) { setErr('Could not build activities from this reading. Try the activity builder instead.'); return; }
+      qc.invalidateQueries({ queryKey: ['module-activities', moduleId] });
+      setMsg(`Added ${made} interactive ${made === 1 ? 'activity' : 'activities'} to this module.`);
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not build activities.'); }
+    finally { setActBusy(false); }
+  };
+
+  const buildDiscussions = async () => {
+    setDiscBusy(true); setErr(null); setMsg(null);
+    try {
+      const r = await apiFetch<{ created: { id: string; title: string }[] }>(
+        `/modules/${moduleId}/discussions/generate`, { method: 'POST', body: JSON.stringify({}) });
+      const n = r.created?.length ?? 0;
+      qc.invalidateQueries({ queryKey: ['course-discussions', courseId] });
+      qc.invalidateQueries({ queryKey: ['module-discussions', moduleId] });
+      setMsg(`Added ${n} discussion ${n === 1 ? 'question' : 'questions'} to this module.`);
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not extract discussion questions.'); }
+    finally { setDiscBusy(false); }
+  };
+
+  return (
+    <div className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 text-primary" />
+        <span className="font-serif font-semibold text-sm">Turn this reading into coursework</span>
+        <Badge variant="outline" className="text-[10px] ml-1">Instructor</Badge>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Pull the exercises and questions out of the reading and file them where they belong — activities become
+        interactive games in the Activities section, reflective questions become threads in Discussions.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={actBusy || !withContent.length} onClick={buildActivities}>
+          <Zap className="h-3.5 w-3.5" /> {actBusy ? 'Building activities…' : 'Create interactive activities'}
+        </Button>
+        <Button size="sm" variant="outline" className="gap-1.5" disabled={discBusy || !withContent.length} onClick={buildDiscussions}>
+          <MessageSquare className="h-3.5 w-3.5" /> {discBusy ? 'Finding questions…' : 'Create discussion questions'}
+        </Button>
+      </div>
+      {!withContent.length && <p className="text-[11px] text-muted-foreground">Add or generate a reading above first.</p>}
+      {msg && <p className="text-xs text-emerald-600">{msg}</p>}
+      {err && <p className="text-xs text-rose-600">{err}</p>}
+    </div>
+  );
+}
+
+function ReadingsSection({ courseId, moduleId, isInstructor }: { courseId: string; moduleId: string; isInstructor: boolean }) {
   const qc = useQueryClient();
   const { data: readings } = useQuery({
     queryKey: ['module-readings', moduleId],
@@ -2227,6 +2381,20 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
   const [readerId, setReaderId] = useState<string | null>(null);
   const [justDone, setJustDone] = useState(false);
   const [doneReadings, setDoneReadings] = useState<Set<string>>(new Set());
+  // Inline editing of the open reading (instructor). editContent holds the markdown being edited.
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  useEffect(() => { setEditing(false); }, [readerId]);
+  const saveReading = useMutation({
+    mutationFn: (body: { title?: string; content?: string }) =>
+      apiFetch(`/readings/${readerId}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    onSuccess: () => {
+      setEditing(false);
+      qc.invalidateQueries({ queryKey: ['reading', readerId] });
+      qc.invalidateQueries({ queryKey: ['module-readings', moduleId] });
+    },
+  });
   // One-click reading: when a module has a single reading, open it immediately instead of showing a
   // chooser card the learner has to click "Read" on. Multi-reading modules still show the list.
   useEffect(() => {
@@ -2302,9 +2470,34 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
             {idx >= 0 && <span className="text-xs text-muted-foreground">Reading {idx + 1} of {list.length}</span>}
           </div>
         )}
-        {readerLoading ? <Skeleton className="h-64" /> : (
+        {readerLoading ? <Skeleton className="h-64" /> : editing ? (
+          <article className="rounded-2xl border border-primary/30 bg-card shadow-sm px-6 sm:px-10 py-8 max-w-3xl mx-auto space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary"><Pencil className="h-4 w-4" /> Editing reading</div>
+            <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-lg font-serif font-bold" />
+            <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)}
+              className="w-full h-[28rem] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono leading-relaxed"
+              placeholder="Markdown: use ## for section headings (they become collapsible tabs), - for bullets, **bold**." />
+            <p className="text-xs text-muted-foreground">Use <code>##</code> headings to split the reading into collapsible, tabbed sections. Supports <code>**bold**</code>, lists, and links.</p>
+            <div className="flex gap-2">
+              <Button size="sm" disabled={saveReading.isPending} onClick={() => saveReading.mutate({ title: editTitle, content: editContent })}>
+                {saveReading.isPending ? 'Saving…' : <><Save className="h-4 w-4 mr-1.5" /> Save reading</>}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+              {saveReading.isError && <span className="text-xs text-rose-600 self-center">Could not save.</span>}
+            </div>
+          </article>
+        ) : (
           <article className="rounded-2xl border border-border bg-card shadow-sm px-6 sm:px-10 py-8 max-w-3xl mx-auto">
-            <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{tReading?.title ?? reader?.title}</h3>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-2xl font-serif font-bold mb-2 leading-tight">{tReading?.title ?? reader?.title}</h3>
+              {isInstructor && reader && (
+                <Button size="sm" variant="outline" className="shrink-0 gap-1.5"
+                  onClick={() => { setEditTitle(reader.title ?? ''); setEditContent(reader.content ?? ''); setEditing(true); }}>
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+              )}
+            </div>
             {reader?.sourceUrl && (
               <a href={reader.sourceUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
                 Open the original in a new window
@@ -2313,7 +2506,7 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
             <div className="mt-4"><LangChips value={tLang} busy={tBusy} onPick={translateReading} /></div>
             {/* Read-aloud always uses the original English text - only the written content is translated. */}
             <div className="mt-4 border-t border-border/60 pt-5">
-              <MarkdownView text={tReading?.content ?? reader?.content ?? ''} />
+              <ReadingBody text={tReading?.content ?? reader?.content ?? ''} />
             </div>
             {(reader?.chars ?? 0) >= 200000 && (
               <p className="mt-4 text-xs text-amber-600">This document was long and has been truncated.</p>
@@ -2424,6 +2617,10 @@ function ReadingsSection({ moduleId, isInstructor }: { moduleId: string; isInstr
           <ModuleWebFinder moduleId={moduleId} />
           {error && <p className="text-xs text-rose-600">{error}</p>}
         </div>
+      )}
+
+      {isInstructor && (readings ?? []).some((r) => r.hasContent) && (
+        <ReadingCoursework courseId={courseId} moduleId={moduleId} readings={readings ?? []} />
       )}
     </div>
   );
@@ -3743,7 +3940,7 @@ function ModuleHubView({
             )}
 
             {/* Uploaded documents / links (+ the staff uploader). */}
-            <ReadingsSection moduleId={moduleId} isInstructor={isInstructor} />
+            <ReadingsSection courseId={courseId} moduleId={moduleId} isInstructor={isInstructor} />
 
             {readingCount === 0 && !isInstructor && (
               <NothingHere icon={BookOpen} title="No readings for this module" next={nextStep} />
