@@ -3124,7 +3124,11 @@ function ModuleHubView({
   };
   const railTabs = isK12
     ? TABS.filter((t) => t.id !== 'overview' && t.id !== 'structure' && tabState[t.id].has)
-    : TABS;
+    // Learners only see the sections that actually have content (empty sections are hidden).
+    // Instructors keep the full rail so they can add content to empty sections.
+    : isInstructor
+      ? TABS
+      : TABS.filter((t) => t.id === 'overview' || t.id === 'structure' || tabState[t.id].has);
   const labelFor = (t: { id: HubTab; label: string }) => (isK12 ? (K12_LABELS[t.id] ?? t.label) : t.label);
 
   // ── Guided linear progression ──────────────────────────────────────────────
@@ -3499,27 +3503,31 @@ function ModuleHubView({
 
             <div>
               <SectionHead title="What's inside" />
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {[
-                  { label: 'Video',       n: videoBeats.length,   icon: PlayCircle, go: () => setTab('video') },
-                  { label: 'Readings',    n: readingCount, icon: BookOpen,   go: () => setTab('readings') },
-                  { label: 'Activities',  n: practiceCount,       icon: Zap,        go: () => setTab('complete') },
-                  { label: 'Assignments', n: moduleAssignments.length, icon: FileText, go: () => setTab('assignments') },
-                ].map((s) => (
-                  <button key={s.label} onClick={s.go}
-                    className="rounded-xl border border-border bg-card p-4 text-left hover:shadow-sm transition-shadow">
-                    <s.icon className="h-5 w-5 text-muted-foreground mb-2" />
-                    <div className="text-xl font-serif font-bold leading-none">{s.n}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
+              {/* Linear, professional list of the parts of this module. Learners see only the parts
+                  that have content; instructors see all so they know what still needs building. */}
+              <div className="rounded-xl border border-border divide-y divide-border overflow-hidden">
+                {([
+                  { id: 'video' as HubTab,       label: 'Video',       n: videoBeats.length,        icon: PlayCircle },
+                  { id: 'readings' as HubTab,    label: 'Readings',    n: readingCount,             icon: BookOpen },
+                  { id: 'complete' as HubTab,    label: 'Activities',  n: practiceCount,            icon: Zap },
+                  { id: 'cases' as HubTab,       label: 'Case studies', n: moduleCases?.length ?? 0, icon: Layers },
+                  { id: 'assignments' as HubTab, label: 'Assignments', n: moduleAssignments.length, icon: FileText },
+                ]).filter((s) => isInstructor || s.n > 0).map((s) => (
+                  <button key={s.id} onClick={() => setTab(s.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors">
+                    <s.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="flex-1 text-sm font-medium">{s.label}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">{s.n}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* One forward action - walk through the module's sections in order. */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-1">
-              <Button className="flex-1 h-12" onClick={continueAction}>
-                <Play className="h-4 w-4 mr-2" /> {continueLabel}
+            {/* One clear call to action: Start here -> the module's Structure (the ordered path). */}
+            <div className="pt-1">
+              <Button className="h-11 gap-2" onClick={() => setTab('structure')}>
+                <Play className="h-4 w-4" /> Start here
               </Button>
             </div>
           </div>
@@ -3911,7 +3919,7 @@ function ModuleHubView({
               <Button variant="outline" className="shrink-0" onClick={() => navigate(`/courses/${courseId}`)}>Back to course</Button>
             )}
           </div>
-        ) : (
+        ) : tab === 'overview' ? null : (
           <div className="rounded-2xl border border-border bg-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm">Keep going</p>
