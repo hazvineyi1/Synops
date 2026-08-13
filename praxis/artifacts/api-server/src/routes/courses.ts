@@ -910,10 +910,10 @@ router.post("/courses/:courseId/syllabus/generate", requireAuth, requireRole("su
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6", max_tokens: 5000,
-      messages: [{ role: "user", content: prompt }, { role: "assistant", content: "{" }],
+      messages: [{ role: "user", content: prompt + "\n\nReturn ONLY the JSON object, starting with { and ending with }." }],
     }, { timeout: 150000, maxRetries: 1 });
     const text = (message.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
-    const raw = "{" + text;
+    const raw = text.trim();
     let parsed: any = {};
     try { parsed = JSON.parse(raw); }
     catch {
