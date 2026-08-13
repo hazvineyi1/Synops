@@ -2866,6 +2866,8 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
   const publish = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ published: true }) }), onSuccess: done });
   const unpublish = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ published: false }) }), onSuccess: done });
   const remove = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ moduleId: null }) }), onSuccess: done });
+  const { data: rubrics } = useQuery({ queryKey: ['rubrics', courseId], queryFn: () => apiFetch<{ id: string; title: string; totalPoints: number }[]>(`/courses/${courseId}/rubrics`), enabled: !!courseId });
+  const setRubric = useMutation({ mutationFn: ({ id, rubricId }: { id: string; rubricId: string }) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ rubricId: rubricId || null }) }), onSuccess: done });
   const list = (inModule ?? []) as any[];
   const candidates = ((all ?? []) as any[]).filter((a) => a.moduleId !== moduleId);
 
@@ -2912,7 +2914,16 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
                     ? <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-700">Published</span>
                     : <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-700">Draft</span>}
                 </div>
-                <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}</div>
+                <div className="text-xs text-muted-foreground capitalize flex items-center gap-2">{(a.kind || 'activity').replace(/_/g, ' ')}
+                  <span className="inline-flex items-center gap-1 not-italic normal-case">
+                    <span className="text-muted-foreground">· Rubric:</span>
+                    <select value={a.rubricId ?? ''} disabled={setRubric.isPending} onChange={(e) => setRubric.mutate({ id: a.id, rubricId: e.target.value })}
+                      className="rounded border border-input bg-background px-1 py-0.5 text-[11px]">
+                      <option value="">None</option>
+                      {(rubrics ?? []).map((r) => <option key={r.id} value={r.id}>{r.title} ({r.totalPoints}pts)</option>)}
+                    </select>
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {!a.published

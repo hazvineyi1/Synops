@@ -37,6 +37,8 @@ export const interactiveActivitiesTable = pgTable("interactive_activities", {
   /** For no-code interaction types (quiz/flashcards/…): the editable spec, so it can be re-edited
    *  later with rich text instead of only the baked HTML. */
   spec: jsonb("spec"),
+  /** Optional course rubric this activity is graded against. */
+  rubricId: text("rubric_id"),
   // The author-supplied HTML document body. Rendered inside a sandboxed iframe.
   html: text("html").notNull().default(""),
   /**

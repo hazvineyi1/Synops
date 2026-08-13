@@ -20,6 +20,8 @@ export async function ensureCourseColumns(): Promise<void> {
     await db.execute(sql`ALTER TABLE modules ADD COLUMN IF NOT EXISTS rail_config text`);
     await db.execute(sql`ALTER TABLE interactive_activities ADD COLUMN IF NOT EXISTS image_url text`);
     await db.execute(sql`ALTER TABLE interactive_activities ADD COLUMN IF NOT EXISTS spec jsonb`);
+    await db.execute(sql`ALTER TABLE interactive_activities ADD COLUMN IF NOT EXISTS rubric_id text`);
+    await db.execute(sql`ALTER TABLE case_scenarios ADD COLUMN IF NOT EXISTS rubric_id text`);
   } catch (err) {
     logger.error({ err }, "ensureCourseColumns failed");
   }

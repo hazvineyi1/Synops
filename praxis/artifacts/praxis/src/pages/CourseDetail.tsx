@@ -736,6 +736,7 @@ const TABS = [
   { id: 'discussions', label: 'Discussions', icon: MessageSquare },
   { id: 'announcements', label: 'Announcements', icon: Megaphone },
   { id: 'gradebook', label: 'Gradebook', icon: BarChart2 },
+  { id: 'rubrics', label: 'Rubrics', icon: ClipboardList },
   { id: 'alignment', label: 'Alignment', icon: Target },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'pages', label: 'Pages', icon: FileText },
@@ -2207,6 +2208,90 @@ function SyllabusTab({ courseId, syllabusJson, isInstructor, onSave, saving, ban
   );
 }
 
+/* ── Rubrics tab: reusable course rubrics (criteria + points) that activities attach to. ── */
+type RubricCrit = { name: string; descriptor: string; points: number };
+type Rubric = { id: string; title: string; criteria: RubricCrit[]; totalPoints: number };
+
+function RubricsTab({ courseId, isInstructor, bannerUrl, onBannerSave }: { courseId: string; isInstructor: boolean; bannerUrl?: string | null; onBannerSave?: (u: string) => void }) {
+  const qc = useQueryClient();
+  const { data: rubrics } = useQuery({ queryKey: ['rubrics', courseId], queryFn: () => apiFetch<Rubric[]>(`/courses/${courseId}/rubrics`) });
+  const [editing, setEditing] = useState<null | { id?: string; title: string; criteria: RubricCrit[] }>(null);
+  const save = useMutation({
+    mutationFn: (r: { id?: string; title: string; criteria: RubricCrit[] }) => r.id
+      ? apiFetch(`/rubrics/${r.id}`, { method: 'PATCH', body: JSON.stringify({ title: r.title, criteria: r.criteria }) })
+      : apiFetch(`/courses/${courseId}/rubrics`, { method: 'POST', body: JSON.stringify({ title: r.title, criteria: r.criteria }) }),
+    onSuccess: () => { setEditing(null); qc.invalidateQueries({ queryKey: ['rubrics', courseId] }); },
+  });
+  const del = useMutation({ mutationFn: (id: string) => apiFetch(`/rubrics/${id}`, { method: 'DELETE' }), onSuccess: () => qc.invalidateQueries({ queryKey: ['rubrics', courseId] }) });
+  const list = rubrics ?? [];
+
+  return (
+    <div className="space-y-5">
+      <SectionBanner title="Rubrics" icon={ClipboardList} bannerUrl={bannerUrl} isInstructor={isInstructor} onBannerSave={onBannerSave} />
+      <div className="max-w-3xl space-y-4">
+        <p className="text-sm text-muted-foreground">Reusable rubrics for this course. Attach a rubric to any activity so learners see exactly how it's judged. (Case studies carry their own rubric on the case.)</p>
+        {isInstructor && !editing && (
+          <Button size="sm" className="gap-1.5" onClick={() => setEditing({ title: '', criteria: [{ name: '', descriptor: '', points: 10 }] })}><Plus className="h-3.5 w-3.5" /> New rubric</Button>
+        )}
+
+        {editing && (
+          <div className="rounded-2xl border border-primary/30 bg-card p-4 space-y-3">
+            <Input value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} placeholder="Rubric title (e.g. Case analysis rubric)" className="font-medium" />
+            <div className="space-y-2">
+              {editing.criteria.map((c, i) => (
+                <div key={i} className="rounded-lg border border-border p-2.5 space-y-2">
+                  <div className="flex gap-2">
+                    <Input value={c.name} onChange={(e) => setEditing({ ...editing, criteria: editing.criteria.map((x, k) => k === i ? { ...x, name: e.target.value } : x) })} placeholder="Criterion (e.g. Evidence & reasoning)" />
+                    <div className="flex items-center gap-1 shrink-0"><Input type="number" value={c.points} onChange={(e) => setEditing({ ...editing, criteria: editing.criteria.map((x, k) => k === i ? { ...x, points: Number(e.target.value) } : x) })} className="w-20 text-center" /><span className="text-xs text-muted-foreground">pts</span></div>
+                    <Button size="sm" variant="ghost" className="text-rose-500 shrink-0" onClick={() => setEditing({ ...editing, criteria: editing.criteria.filter((_, k) => k !== i) })}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </div>
+                  <Textarea value={c.descriptor} onChange={(e) => setEditing({ ...editing, criteria: editing.criteria.map((x, k) => k === i ? { ...x, descriptor: e.target.value } : x) })} placeholder="What earns full marks on this criterion?" className="min-h-[52px] text-sm" />
+                </div>
+              ))}
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing({ ...editing, criteria: [...editing.criteria, { name: '', descriptor: '', points: 10 }] })}><Plus className="h-3.5 w-3.5" /> Add criterion</Button>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-sm font-medium">Total: {editing.criteria.reduce((s, c) => s + (Number(c.points) || 0), 0)} pts</span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
+                <Button size="sm" disabled={save.isPending || !editing.title.trim()} onClick={() => save.mutate(editing)}>{save.isPending ? 'Saving…' : 'Save rubric'}</Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {list.length === 0 && !editing ? (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">No rubrics yet.{isInstructor ? ' Create one, then attach it to activities.' : ''}</div>
+        ) : (
+          <div className="space-y-3">
+            {list.map((r) => (
+              <div key={r.id} className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="font-serif font-semibold">{r.title} <span className="text-xs font-normal text-muted-foreground">· {r.totalPoints} pts</span></h3>
+                  {isInstructor && (
+                    <div className="flex gap-1 shrink-0">
+                      <Button size="sm" variant="ghost" onClick={() => setEditing({ id: r.id, title: r.title, criteria: r.criteria.length ? r.criteria : [{ name: '', descriptor: '', points: 10 }] })}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="ghost" className="text-rose-500" onClick={() => { if (window.confirm(`Delete "${r.title}"?`)) del.mutate(r.id); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-2 divide-y divide-border/60">
+                  {r.criteria.map((c, i) => (
+                    <div key={i} className="flex items-start gap-3 py-1.5 text-sm">
+                      <span className="font-medium min-w-0 flex-1">{c.name}{c.descriptor && <span className="block text-xs text-muted-foreground font-normal">{c.descriptor}</span>}</span>
+                      <span className="text-muted-foreground shrink-0">{c.points} pts</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
   const search = useSearch();
@@ -3227,6 +3312,10 @@ export function CourseDetail() {
           <SyllabusTab courseId={courseId} syllabusJson={(course as { syllabus?: string | null }).syllabus ?? null} isInstructor={isInstructor}
             onSave={(j) => saveCourse.mutate({ syllabus: j })} saving={saveCourse.isPending}
             bannerUrl={sectionBannerUrl('syllabus')} onBannerSave={(u) => saveSectionBanner('syllabus', u)} />
+        )}
+
+        {activeTab === 'rubrics' && (
+          <RubricsTab courseId={courseId} isInstructor={isInstructor} bannerUrl={sectionBannerUrl('rubrics')} onBannerSave={(u) => saveSectionBanner('rubrics', u)} />
         )}
 
         {/* ANNOUNCEMENTS */}

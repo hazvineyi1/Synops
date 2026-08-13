@@ -25,6 +25,7 @@ export interface Activity {
   instructions: string | null;
   imageUrl: string | null;
   spec: unknown | null;
+  rubricId: string | null;
   html: string;
   source: "html" | "embed" | "ai";
   embedUrl: string | null;
@@ -97,6 +98,7 @@ export interface ActivityInput {
   instructions?: string | null;
   imageUrl?: string | null;
   spec?: unknown | null;
+  rubricId?: string | null;
   html?: string;
   source?: "html" | "embed" | "ai";
   embedUrl?: string | null;

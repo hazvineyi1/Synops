@@ -32,6 +32,14 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
     onSuccess: (s) => { setDone(true); setScore(s.score); },
   });
 
+  // The rubric this activity is graded against, if one is attached.
+  const rubricId = (activity as { rubricId?: string | null } | undefined)?.rubricId ?? null;
+  const { data: rubric } = useQuery({
+    queryKey: ["rubric", rubricId],
+    queryFn: () => apiFetch<{ title: string; criteria: { name: string; descriptor: string; points: number }[]; totalPoints: number }>(`/rubrics/${rubricId}`),
+    enabled: !!rubricId,
+  });
+
   // Young K-12 learners should move FORWARD after practice (next lesson / done), not land back on
   // the same module. Everyone else returns to the lesson they came from.
   const { user } = useSession();
@@ -114,6 +122,20 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
               return <InteractiveVideoPlayer videoUrl={vid} questions={qs} onComplete={() => submit.mutate({ payload: { watched: true }, score: 100 })} />;
             })() : (
               <ActivityPlayer html={activity.html} embedUrl={activity.embedUrl} onSubmit={(r) => submit.mutate(r)} />
+            )}
+
+            {rubric && (
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <h2 className="font-serif font-bold text-base flex items-center gap-2 mb-2"><span className="h-4 w-1 rounded-full bg-primary" /> How this is graded — {rubric.title} <span className="text-xs font-normal text-muted-foreground">· {rubric.totalPoints} pts</span></h2>
+                <div className="divide-y divide-border/60">
+                  {rubric.criteria.map((c, i) => (
+                    <div key={i} className="flex items-start gap-3 py-2 text-sm">
+                      <div className="min-w-0 flex-1"><p className="font-medium">{c.name}</p>{c.descriptor && <p className="text-xs text-muted-foreground">{c.descriptor}</p>}</div>
+                      <span className="text-muted-foreground shrink-0">{c.points} pts</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             {submit.isPending && (
