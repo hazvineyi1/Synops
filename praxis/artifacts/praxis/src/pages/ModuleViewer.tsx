@@ -33,7 +33,7 @@ import { renderActivity, type InteractionType, type ActivitySpec } from '@/lib/a
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { ActivityPlayer, type ActivityPlayerHandleResult } from '@/components/ActivityPlayer';
 import {
-  ChevronLeft, ChevronRight, ChevronDown, CheckCircle, BookOpen, List, Sparkles, Pencil,
+  ChevronLeft, ChevronRight, ChevronDown, CheckCircle, BookOpen, List, Pencil,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
   X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
   Users, Layers, Target, Compass, Info, Save, Settings, Link2,
@@ -3118,6 +3118,12 @@ function ModuleVideoAdmin({ moduleId, videoBeats, suggestedQuery }: { moduleId: 
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" disabled={busy} onClick={() => fileRef.current?.click()}><Link2 className="h-3.5 w-3.5" /> Upload file</Button>
         <Button size="sm" className="gap-1.5" disabled={busy} onClick={save}><Save className="h-3.5 w-3.5" /> Save video</Button>
+        {existing?.id && (
+          <Button size="sm" variant="ghost" className="gap-1.5 text-rose-500" disabled={busy}
+            onClick={async () => { if (!window.confirm('Remove this video from the module?')) return; setBusy(true); setMsg(null); try { await apiFetch(`/beats/${existing.id}`, { method: 'DELETE' }); setUrl(''); refresh(); setMsg('Video removed.'); } catch (e) { setMsg(e instanceof Error ? e.message : 'Could not remove.'); } finally { setBusy(false); } }}>
+            <Trash2 className="h-3.5 w-3.5" /> Remove video
+          </Button>
+        )}
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
       </div>
       <p className="text-xs text-muted-foreground">Direct file upload uses Supabase Storage; until that is configured, paste a hosted video URL. Learners see the video in this section once saved.</p>
@@ -3650,7 +3656,7 @@ function ModuleHubView({
     { id: 'complete',    label: 'Complete',    icon: Zap,           count: practiceCount },
     { id: 'cases',       label: 'Case studies', icon: Layers,       count: moduleCases?.length ?? 0 },
     { id: 'participate', label: 'Participate', icon: MessageSquare, count: discussions?.length ?? 0 },
-    { id: 'assignments', label: 'Reflection',  icon: Sparkles },
+    { id: 'assignments', label: 'Reflection',  icon: Lightbulb },
     { id: 'assessment',  label: 'Assessment',  icon: FileText,      count: moduleAssignments.length },
     { id: 'workshop',    label: 'Workshop',    icon: Users,         count: moduleWorkshops?.length ?? 0 },
   ];

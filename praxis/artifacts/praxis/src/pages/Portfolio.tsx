@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/RichTextEditor';
 import {
-  Image as ImageIcon, FileText, Link2, StickyNote, Trash2, Pencil, Sparkles,
+  Image as ImageIcon, FileText, Link2, StickyNote, Trash2, Pencil,
   ExternalLink, Presentation, Check,
 } from 'lucide-react';
 

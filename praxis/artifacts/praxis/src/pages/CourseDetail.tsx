@@ -16,7 +16,7 @@ import {
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
   CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Image as ImageIcon, Upload, Lightbulb,
   Bold, Italic, Underline, List, ListOrdered, Link2,
-  Strikethrough, AlignLeft, AlignCenter, AlignRight, Eraser, Circle, Square, Star, Check, ScrollText, Sparkles
+  Strikethrough, AlignLeft, AlignCenter, AlignRight, Eraser, Circle, Square, Star, Check, ScrollText
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
