@@ -2296,7 +2296,7 @@ function SyllabusTab({ courseId, syllabusJson, isInstructor, onSave, saving, ban
       <SectionBanner title="Syllabus" icon={ScrollText} bannerUrl={bannerUrl} isInstructor={isInstructor} onBannerSave={onBannerSave} />
       {isInstructor && (
         <div className="flex flex-wrap justify-end gap-2">
-          {!editing && <Button size="sm" variant="outline" className="gap-1.5" disabled={genBusy} onClick={generate}><Sparkles className="h-3.5 w-3.5" /> {genBusy ? 'Writing…' : 'Generate from this course'}</Button>}
+          {!editing && <Button size="sm" variant="outline" disabled={genBusy} onClick={generate}>{genBusy ? 'Writing…' : 'Generate from this course'}</Button>}
           {!editing && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setDraft(parse(syllabusJson)); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /> Edit syllabus</Button>}
         </div>
       )}
@@ -2389,7 +2389,7 @@ function RubricsTab({ courseId, isInstructor, bannerUrl, onBannerSave }: { cours
         {isInstructor && !editing && (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" className="gap-1.5" onClick={() => setEditing({ title: '', criteria: [{ name: '', descriptor: '', points: 10 }] })}><Plus className="h-3.5 w-3.5" /> New rubric</Button>
-            <Button size="sm" variant="outline" className="gap-1.5" disabled={gen.isPending} onClick={() => gen.mutate()}><Sparkles className="h-3.5 w-3.5" /> {gen.isPending ? 'Generating…' : 'Generate from content'}</Button>
+            <Button size="sm" variant="outline" disabled={gen.isPending} onClick={() => gen.mutate()}>{gen.isPending ? 'Generating…' : 'Generate from content'}</Button>
           </div>
         )}
 

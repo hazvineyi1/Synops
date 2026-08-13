@@ -30,6 +30,7 @@ import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { activitiesApi } from '@/lib/activitiesApi';
 import { RichTextEditor, BulletStyleBar, BulletIcon, objectivesHtmlToItems, itemsToPlain, escapeHtml } from '@/components/RichTextEditor';
 import { renderActivity, type InteractionType, type ActivitySpec } from '@/lib/activityTemplates';
+import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import {
   ChevronLeft, ChevronRight, ChevronDown, CheckCircle, BookOpen, List, Sparkles, Pencil,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
@@ -2375,7 +2376,6 @@ function ReflectionPanel({ moduleId }: { moduleId: string }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
       <div className="flex items-center gap-2 mb-1">
-        <Sparkles className="h-5 w-5 text-primary" />
         <h3 className="font-serif font-bold text-xl">Reflect on this module</h3>
       </div>
       <p className="text-sm text-muted-foreground mb-5">A guided reflection — there are no wrong answers. Your coach will read what you write and respond.</p>
@@ -2565,7 +2565,6 @@ function ReadingCoursework({ courseId, moduleId, readings }: { courseId: string;
   return (
     <div className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary" />
         <span className="font-serif font-semibold text-sm">Turn this reading into coursework</span>
         <Badge variant="outline" className="text-[10px] ml-1">Instructor</Badge>
       </div>
@@ -3073,6 +3072,8 @@ function ModuleVideoAdmin({ moduleId, videoBeats, suggestedQuery }: { moduleId: 
         {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
       </div>
       <p className="text-xs text-muted-foreground">Direct file upload uses Supabase Storage; until that is configured, paste a hosted video URL. Learners see the video in this section once saved.</p>
+      {/* One-click Khan Academy / YouTube suggestions for this module (adds a playable video lesson). */}
+      <ModuleWebFinder moduleId={moduleId} />
       {existing?.id && <CheckpointEditor beatId={existing.id} />}
     </div>
   );
@@ -4203,17 +4204,22 @@ function ModuleHubView({
                         : ' The lesson notes below cover the same material if you prefer to read.'}
                     </Instruction>
                     {b.videoUrl ? (
-                      <div onMouseEnter={() => markHubBeatViewed.mutate(b.id)}><VideoFrame url={b.videoUrl} /></div>
+                      <div onMouseEnter={() => markHubBeatViewed.mutate(b.id)}>
+                        {/* InteractiveVideoPlayer pops the beat's checkpoint questions during playback
+                            (falls back to a plain player when there are none). */}
+                        <InteractiveVideoPlayer beatId={b.id} videoUrl={b.videoUrl} onComplete={() => markHubBeatViewed.mutate(b.id)} />
+                      </div>
                     ) : (b.visualData?.slides && b.visualData.slides.length > 0) ? (
                       <SlideLesson slides={b.visualData.slides} onReachedEnd={() => markHubBeatViewed.mutate(b.id)} />
                     ) : (
                       <EmptyState icon={PlayCircle} title="Video file not uploaded yet"
                         note="This lesson is marked as a video but no file is attached yet. It can be added in the Studio editor." />
                     )}
-                    <div className="rounded-xl border border-border bg-card p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                    <details open className="rounded-xl border border-border bg-card p-4 group [&_summary::-webkit-details-marker]:hidden">
+                      <summary className="flex items-center gap-2 cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
                         {realTranscript ? 'Transcript' : 'Lesson notes'}
-                      </p>
+                      </summary>
                       {body ? (
                         <>
                           <ReadAloudBar text={body} />
@@ -4232,7 +4238,7 @@ function ModuleHubView({
                       {isInstructor && (
                         <TranscriptEditor beatId={b.id} initial={realTranscript} moduleId={moduleId} />
                       )}
-                    </div>
+                    </details>
                   </div>
                 );
               })}

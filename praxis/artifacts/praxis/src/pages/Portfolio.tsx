@@ -168,7 +168,7 @@ export function Portfolio() {
             className={cn('rounded-full border px-3 py-1 text-xs font-medium', portfolio.template === key ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-muted/60')}>{t.name}</button>
         ))}
         <Button size="sm" variant="outline" className="ml-auto gap-1.5" disabled={genBusy} onClick={generate}>
-          <Sparkles className="h-3.5 w-3.5" /> {genBusy ? 'Writing…' : 'Generate intro from my work'}
+          {genBusy ? 'Writing…' : 'Generate intro from my work'}
         </Button>
       </div>
 

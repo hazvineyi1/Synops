@@ -909,18 +909,27 @@ router.post("/courses/:courseId/syllabus/generate", requireAuth, requireRole("su
   const prompt = `You are writing a clear, professional course SYLLABUS. Use the course details and module list below. For fields you cannot know (instructor name, contact, meeting times/locations, course number), leave them as empty strings — do not invent them. Write the narrative sections as clean HTML (use <p>, <ul><li>, <strong>). The schedule should map the modules to a sensible week-by-week outline.\n\nReturn ONLY strict JSON with exactly these keys:\n{\n "basics": { "number":"", "name":"${(course.title ?? "").replace(/"/g, "'")}", "instructor":"", "contact":"", "times":"", "locations":"", "description":"<a 2-3 sentence course description>" },\n "objectivesHtml":"<overall + per-module objectives as HTML>",\n "scheduleHtml":"<week-by-week schedule mapping the modules, with placeholders for readings/deadlines/exams/holidays>",\n "assessmentHtml":"<assignments, projects, exams and how they are graded>",\n "responsibilitiesHtml":"<participation, homework, late/make-up policy, prerequisites>",\n "materialsHtml":"<required texts and resources and how to access them>",\n "communicationHtml":"<how to contact the instructor, office hours, where to find support>"\n}\n\nCOURSE: ${course.title}\nDESCRIPTION: ${course.description ?? ""}\nOBJECTIVES:\n- ${objectives}\n\nMODULES:\n${moduleList || "(none yet)"}`;
   try {
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6", max_tokens: 3000,
+      model: "claude-sonnet-4-6", max_tokens: 5000,
       messages: [{ role: "user", content: prompt }, { role: "assistant", content: "{" }],
-    }, { timeout: 120000, maxRetries: 1 });
-    const c = message.content[0];
-    const raw = "{" + (c && c.type === "text" ? c.text : "");
+    }, { timeout: 150000, maxRetries: 1 });
+    const text = (message.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
+    const raw = "{" + text;
     let parsed: any = {};
-    try { parsed = JSON.parse(raw); } catch { const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+    try { parsed = JSON.parse(raw); }
+    catch {
+      // Truncated/loose JSON: take the largest {...} span, and if it still fails, trim trailing junk.
+      const m = raw.match(/\{[\s\S]*\}/);
+      if (m) { try { parsed = JSON.parse(m[0]); } catch { try { parsed = JSON.parse(m[0].replace(/,\s*$/, "") + "}"); } catch { parsed = {}; } } }
+    }
+    if (!parsed || (!parsed.basics && !parsed.objectivesHtml && !parsed.scheduleHtml && !parsed.assessmentHtml)) {
+      res.status(502).json({ error: "The generator returned an unreadable result. Please try again." });
+      return;
+    }
     res.json({ syllabus: parsed });
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("syllabus gen failed:", err instanceof Error ? err.message : err);
-    res.status(502).json({ error: "Could not generate a syllabus. Please try again." });
+    res.status(502).json({ error: `Could not generate a syllabus. ${(err instanceof Error ? err.message : "").slice(0, 150)}` });
   }
 });
 
