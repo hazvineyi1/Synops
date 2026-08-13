@@ -282,6 +282,7 @@ router.post("/activities/:id/clone-to-module", requireAuth, requireAuthor, async
     organisationId, courseId: mod.courseId, moduleId,
     title: src.title, instructions: src.instructions, html: src.html,
     source: src.source, embedUrl: src.embedUrl, kind: src.kind,
+    spec: src.spec, imageUrl: src.imageUrl, rubricId: src.rubricId,
     bloomsLevel: src.bloomsLevel, difficulty: src.difficulty,
     isLibrary: false, tags: src.tags, maxScore: src.maxScore,
     published: true, createdByUserId: u.id,

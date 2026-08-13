@@ -1,9 +1,10 @@
 import { db } from "@workspace/db";
 import {
   partnersTable, organisationsTable, usersTable,
-  coursesTable, modulesTable, beatsTable, moduleReadingsTable,
+  coursesTable, modulesTable, beatsTable, interactiveActivitiesTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
+import { PEJ_M1_SPEC, PEJ_M2_SPEC } from "./stations";
 
 /**
  * Seed for the partner "Executive Learning" and its Project Expedite Justice demo course.
@@ -29,7 +30,8 @@ interface SeedModule {
   order: number;
   objectives: string[];
   minutes: number;
-  stationPath: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  spec: any;
   stationBlurb: string;
 }
 
@@ -38,7 +40,7 @@ const MODULES: SeedModule[] = [
     title: "Module 1 · Documenting the scene",
     order: 0,
     minutes: 35,
-    stationPath: "/demos/pej-evd-01",
+    spec: PEJ_M1_SPEC,
     stationBlurb:
       "A task-first rehearsal of the first hour at a conflict-related crime scene: sequencing under field conditions, the lawful basis for the inspection under martial law, taking a witness's initial account without leading, and auditing a colleague's chain of custody. The station result is computed from the decisions you take, across two equally-weighted streams, with a partly-conjunctive safety and evidential floor.",
     objectives: [
@@ -53,7 +55,7 @@ const MODULES: SeedModule[] = [
     title: "Module 2 · Getting the account",
     order: 1,
     minutes: 35,
-    stationPath: "/demos/pej-evd-02",
+    spec: PEJ_M2_SPEC,
     stationBlurb:
       "Taking a witness's account so consent is informed and continuous, the account is in the witness's own words, only proportionate detail is taken, a mid-interview disclosure of ill-treatment is handled without harm, and the testimony is preserved before the witness is displaced. Non-negotiables are informed consent, disclosure handled without harm, and preservation before displacement.",
     objectives: [
@@ -84,7 +86,7 @@ async function firstOrNull<T>(rows: T[]): Promise<T | null> {
   return rows.length ? rows[0] : null;
 }
 
-async function ensureModule(courseId: string, m: SeedModule, authorId: string): Promise<void> {
+async function ensureModule(courseId: string, orgId: string, m: SeedModule, authorId: string): Promise<void> {
   // Find-or-create the module by (courseId, title).
   let mod = await firstOrNull(
     await db.select().from(modulesTable).where(and(eq(modulesTable.courseId, courseId), eq(modulesTable.title, m.title))),
@@ -99,22 +101,24 @@ async function ensureModule(courseId: string, m: SeedModule, authorId: string): 
     await db.insert(beatsTable).values([
       { moduleId: mod.id, type: "title_card", order: 0, title: m.title, narration: `${m.stationBlurb}` },
       { moduleId: mod.id, type: "points", order: 1, title: "What you will be able to do", narration: "By the end of this station you will be able to:", bulletPoints: m.objectives },
-      { moduleId: mod.id, type: "scenario", order: 2, title: "Launch the interactive station", narration: "This module is delivered as an interactive station. Open it from the reading below titled \"Launch the interactive station\". Your decisions there produce a station result and a one-page field job aid." },
+      { moduleId: mod.id, type: "scenario", order: 2, title: "The interactive station", narration: "This module is a Decision Station: a task-first rehearsal where you make decisions under realistic constraints. It plays inline below. Your choices produce a station result and a one-page field job aid." },
       { moduleId: mod.id, type: "close", order: 3, title: "Before you finish", narration: "Every legal reference in this station is tagged with its sign-off status. This is a demo build: content marked \"confirm\" is pending subject-matter-expert verification and must not be relied on operationally." },
     ]);
     await db.update(modulesTable).set({ beatCount: 4 }).where(eq(modulesTable.id, mod.id));
   }
 
-  // Find-or-create the launch link reading for this module.
-  const existingLink = await db.select({ id: moduleReadingsTable.id })
-    .from(moduleReadingsTable)
-    .where(and(eq(moduleReadingsTable.moduleId, mod.id), eq(moduleReadingsTable.kind, "link")));
-  if (existingLink.length === 0) {
-    const body = `Launch the interactive station for this module. ${m.stationBlurb}`;
-    await db.insert(moduleReadingsTable).values({
-      moduleId: mod.id, courseId, title: "Launch the interactive station",
-      kind: "link", sourceUrl: m.stationPath, content: body, chars: body.length,
-      order: 0, published: true, createdBy: authorId,
+  // Find-or-create the native Decision Station activity for this module.
+  const existing = await db.select({ id: interactiveActivitiesTable.id })
+    .from(interactiveActivitiesTable)
+    .where(and(eq(interactiveActivitiesTable.moduleId, mod.id), eq(interactiveActivitiesTable.kind, "decision_station")));
+  if (existing.length === 0) {
+    await db.insert(interactiveActivitiesTable).values({
+      organisationId: orgId, courseId, moduleId: mod.id,
+      title: `Interactive station: ${m.title.replace(/^Module \d+ · /, "")}`,
+      instructions: "A task-first rehearsal. Every lesson opens with a decision under realistic constraints; your choices carry consequences and produce a computed station result.",
+      spec: m.spec, kind: "decision_station", source: "html", html: "",
+      bloomsLevel: "Evaluate", difficulty: "advanced",
+      published: true, isLibrary: false, createdByUserId: authorId,
     });
   }
 }
@@ -134,7 +138,7 @@ async function ensureCourseAndModules(partnerId: string, orgId: string, authorId
   }
 
   for (const m of MODULES) {
-    await ensureModule(course.id, m, authorId);
+    await ensureModule(course.id, orgId, m, authorId);
   }
   await db.update(coursesTable).set({ moduleCount: MODULES.length }).where(eq(coursesTable.id, course.id));
   return { courseId: course.id, created };

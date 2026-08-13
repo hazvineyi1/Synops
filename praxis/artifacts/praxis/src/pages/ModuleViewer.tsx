@@ -32,6 +32,7 @@ import { RichTextEditor, BulletStyleBar, BulletIcon, objectivesHtmlToItems, item
 import { renderActivity, type InteractionType, type ActivitySpec } from '@/lib/activityTemplates';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { ActivityPlayer, type ActivityPlayerHandleResult } from '@/components/ActivityPlayer';
+import { DecisionStationPlayer } from '@/components/DecisionStation';
 import { DiscussionThread } from '@/pages/DiscussionThread';
 import { AssignmentDetail } from '@/pages/AssignmentDetail';
 import {
@@ -3029,7 +3030,9 @@ function EmbeddedActivity({ a }: { a: any }) {
           {a.imageUrl && <img src={a.imageUrl} alt="" className="w-full max-h-52 object-cover rounded-lg border border-border" />}
           {a.instructions && <p className="text-sm text-muted-foreground">{a.instructions}</p>}
           <div className="rounded-lg border border-border bg-card overflow-hidden">
-            <ActivityPlayer html={a.html} embedUrl={a.embedUrl} onSubmit={(r) => submit.mutate(r)} />
+            {a.kind === 'decision_station'
+              ? <DecisionStationPlayer spec={a.spec} onSubmit={(r) => submit.mutate(r)} />
+              : <ActivityPlayer html={a.html} embedUrl={a.embedUrl} onSubmit={(r) => submit.mutate(r)} />}
           </div>
           {rubric && (
             <details className="rounded-lg border border-border bg-card p-3 text-sm">
