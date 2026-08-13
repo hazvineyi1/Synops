@@ -2052,7 +2052,14 @@ function ModuleBuildPanel({ courseId, mod, onStatus }: { courseId: string; mod: 
       const { activities } = await apiFetch<{ activities: { type: string; title: string; instructions: string; bloomsLevel: string; difficulty: string; spec: unknown }[] }>(`/activities/generate`, { method: 'POST', body: JSON.stringify(body) });
       let made = 0;
       for (const a of activities ?? []) {
-        try { const html = renderActivity(a.type as InteractionType, a.spec as ActivitySpec); if (!html) continue;
+        try {
+          // Give flashcards a relevant photorealistic image on each card.
+          if (a.type === 'flashcards' && Array.isArray((a.spec as any)?.cards)) {
+            for (const c of (a.spec as any).cards) {
+              try { const im = await apiFetch<{ imageUrl: string }>('/activities/generate-image', { method: 'POST', body: JSON.stringify({ title: String(c.front ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'flashcard concept' }) }); if (im.imageUrl) c.img = im.imageUrl; } catch { /* skip image */ }
+            }
+          }
+          const html = renderActivity(a.type as InteractionType, a.spec as ActivitySpec); if (!html) continue;
           await activitiesApi.create({ title: a.title, instructions: a.instructions || undefined, source: 'html', html, kind: a.type, spec: a.spec, bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null, published: true, courseId, moduleId: mod.id }); made++;
         } catch { /* skip one */ }
       }

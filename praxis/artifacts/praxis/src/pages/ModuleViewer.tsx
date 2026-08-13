@@ -35,7 +35,7 @@ import { ActivityPlayer, type ActivityPlayerHandleResult } from '@/components/Ac
 import {
   ChevronLeft, ChevronRight, ChevronDown, CheckCircle, BookOpen, List, Pencil,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
-  X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText, Zap,
+  X, Menu, Trophy, Clock, PlayCircle, GraduationCap, FileText,
   Users, Layers, Target, Compass, Info, Save, Settings, Link2,
   Pause, Square, Headphones, Plus, Trash2, Languages,
   Lightbulb, Store, Repeat, ListChecks, Rocket, Image as ImageIcon,
@@ -669,7 +669,6 @@ function DragOrderActivity({ ia }: { ia: Interactive }) {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
         <div className="rounded-2xl border border-violet-200 dark:border-violet-800 overflow-hidden shadow-sm">
           <div className="bg-violet-50 dark:bg-violet-950/20 px-5 py-3.5 border-b border-violet-200 dark:border-violet-800 flex items-center gap-2">
-            <Zap className="h-4 w-4 text-violet-600" />
             <span className="font-semibold text-sm text-violet-700 dark:text-violet-300">Sort in the correct order</span>
           </div>
           <div className="p-5 space-y-4">
@@ -776,7 +775,6 @@ function MatchPairsActivity({ ia }: { ia: Interactive }) {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
         <div className="rounded-2xl border border-violet-200 dark:border-violet-800 overflow-hidden shadow-sm">
           <div className="bg-violet-50 dark:bg-violet-950/20 px-5 py-3.5 border-b border-violet-200 dark:border-violet-800 flex items-center gap-2">
-            <Zap className="h-4 w-4 text-violet-600" />
             <span className="font-semibold text-sm text-violet-700 dark:text-violet-300">Match the pairs</span>
           </div>
           <div className="p-5 space-y-4">
@@ -899,7 +897,6 @@ function FillBlankActivity({ ia }: { ia: Interactive }) {
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
         <div className="rounded-2xl border border-violet-200 dark:border-violet-800 overflow-hidden shadow-sm">
           <div className="bg-violet-50 dark:bg-violet-950/20 px-5 py-3.5 border-b border-violet-200 dark:border-violet-800 flex items-center gap-2">
-            <Zap className="h-4 w-4 text-violet-600" />
             <span className="font-semibold text-sm text-violet-700 dark:text-violet-300">Fill in the blanks</span>
           </div>
           <div className="p-5 space-y-5">
@@ -2616,7 +2613,7 @@ function ReadingCoursework({ courseId, moduleId, readings }: { courseId: string;
       </p>
       <div className="flex flex-wrap gap-2">
         <Button size="sm" variant="outline" className="gap-1.5" disabled={actBusy || !withContent.length} onClick={buildActivities}>
-          <Zap className="h-3.5 w-3.5" /> {actBusy ? 'Building activities…' : 'Create interactive activities'}
+          {actBusy ? 'Building activities…' : 'Create interactive activities'}
         </Button>
         <Button size="sm" variant="outline" className="gap-1.5" disabled={discBusy || !withContent.length} onClick={buildDiscussions}>
           <MessageSquare className="h-3.5 w-3.5" /> {discBusy ? 'Finding questions…' : 'Create discussion questions'}
@@ -2766,17 +2763,21 @@ function ReadingsSection({ courseId, moduleId, isInstructor }: { courseId: strin
             {/* Read-aloud always uses the original English text - only the written content is translated. */}
             <div className="mt-4 border-t border-border/60 pt-5">
               {reader?.kind === 'link' && reader?.sourceUrl ? (
-                <>
-                  <EmbeddedLink url={reader.sourceUrl} />
-                  {((reader?.content ?? '').trim().length > 60) && (
-                    <details className="mt-4 rounded-xl border border-border bg-card p-4 group [&_summary::-webkit-details-marker]:hidden">
+                ((reader?.content ?? '').trim().length > 60) ? (
+                  <>
+                    {/* Embed the article's content inline (chunked/collapsible) — reliable even when the
+                        site blocks iframing. The live page is available as an optional embed below. */}
+                    <ReadingBody text={tReading?.content ?? reader?.content ?? ''} />
+                    <details className="mt-5 rounded-xl border border-border bg-card p-4 group [&_summary::-webkit-details-marker]:hidden">
                       <summary className="flex items-center gap-2 cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" /> Read the text version
+                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" /> View the original page
                       </summary>
-                      <div className="mt-3"><ReadingBody text={tReading?.content ?? reader?.content ?? ''} /></div>
+                      <div className="mt-3"><EmbeddedLink url={reader.sourceUrl} /></div>
                     </details>
-                  )}
-                </>
+                  </>
+                ) : (
+                  <EmbeddedLink url={reader.sourceUrl} />
+                )
               ) : (
                 <ReadingBody text={tReading?.content ?? reader?.content ?? ''} />
               )}
@@ -3015,7 +3016,6 @@ function EmbeddedActivity({ a }: { a: any }) {
   return (
     <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-500/5 overflow-hidden">
       <button onClick={() => setOpenState((v) => !v)} className="w-full flex items-center gap-3 p-4 text-left">
-        <span className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center shrink-0"><Zap className="h-5 w-5" /></span>
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm truncate flex items-center gap-2">{a.title}{done && <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle className="h-3.5 w-3.5" /> {score != null ? `${score}%` : 'Done'}</span>}</div>
           <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}{a.difficulty ? ` · ${a.difficulty}` : ''}</div>
@@ -3236,7 +3236,7 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
 
   return (
     <div className="rounded-lg bg-muted/30 border border-border p-3 space-y-2">
-      <div className="text-xs font-semibold flex items-center gap-1.5"><Zap className="h-3.5 w-3.5 text-amber-500" /> Interactive checkpoints <span className="font-normal text-muted-foreground">· pop a question mid-clip (YouTube/Khan/file)</span></div>
+      <div className="text-xs font-semibold flex items-center gap-1.5">Interactive checkpoints <span className="font-normal text-muted-foreground">· pop a question mid-clip (YouTube/Khan/file)</span></div>
       {questions.length > 0 && (
         <ul className="space-y-1">
           {questions.sort((a, b) => a.videoTimestamp - b.videoTimestamp).map((q) => (
@@ -3314,7 +3314,7 @@ function YoungLessonView({ courseId, moduleId, navigate, persona, allBeats }: {
   const steps = [
     { id: 'watch', label: T('Watch', 'Ver'), icon: PlayCircle, has: resolvedVid.kind !== 'none' },
     { id: 'read', label: T('Read', 'Leer'), icon: BookOpen, has: (readings?.length ?? 0) > 0 },
-    { id: 'practice', label: T('Practice', 'Practicar'), icon: Zap, has: (activities?.length ?? 0) > 0 },
+    { id: 'practice', label: T('Practice', 'Practicar'), icon: ListChecks, has: (activities?.length ?? 0) > 0 },
     { id: 'tutor', label: T('Talk to your tutor', 'Habla con tu tutor'), icon: MessageSquare, has: (cases?.length ?? 0) > 0 },
   ].filter((s) => s.has);
   const [stepIdx, setStepIdx] = useState(0);
@@ -3724,7 +3724,7 @@ function ModuleHubView({
     { id: 'structure',   label: 'Structure',   icon: List },
     { id: 'video',       label: 'Video',       icon: PlayCircle,    count: videoBeats.length },
     { id: 'readings',    label: 'Readings',    icon: BookOpen,      count: readingCount },
-    { id: 'complete',    label: 'Complete',    icon: Zap,           count: practiceCount },
+    { id: 'complete',    label: 'Complete',    icon: ListChecks,    count: practiceCount },
     { id: 'cases',       label: 'Case studies', icon: Layers,       count: moduleCases?.length ?? 0 },
     { id: 'participate', label: 'Participate', icon: MessageSquare, count: discussions?.length ?? 0 },
     { id: 'assignments', label: 'Reflection',  icon: Lightbulb },
@@ -4419,7 +4419,6 @@ function ModuleHubView({
                 {interactiveBeats.length > 0 && (
                   <button onClick={() => open('interactive')}
                     className="w-full flex items-center gap-4 rounded-xl border border-violet-200 dark:border-violet-800 bg-violet-500/5 p-4 text-left hover:shadow-sm transition-shadow">
-                    <span className="h-10 w-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 text-violet-600 flex items-center justify-center shrink-0"><Zap className="h-5 w-5" /></span>
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm">Interactive activities</div>
                       <div className="text-xs text-muted-foreground">{interactiveBeats.length} exercise{interactiveBeats.length !== 1 ? 's' : ''} · drag-order, match pairs, fill-in-the-blank</div>
@@ -4444,7 +4443,7 @@ function ModuleHubView({
                 ))}
               </>
             ) : (
-              <NothingHere icon={Zap} title="No interactive activities for this module" next={nextStep} />
+              <NothingHere icon={ListChecks} title="No interactive activities for this module" next={nextStep} />
             )}
           </div>
         )}

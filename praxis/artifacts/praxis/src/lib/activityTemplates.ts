@@ -88,13 +88,13 @@ function clean(type: InteractionType, spec: ActivitySpec): ActivitySpec {
 
 /* ── Shared styling injected into every activity ── */
 const BASE = `<style>
-  .ax{max-width:660px}
+  .ax{max-width:900px}
   .ax-hd{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap}
   .ax-chip{font-size:13px;background:#f1f5f9;border-radius:999px;padding:4px 10px}
-  .ax-bar{height:8px;background:#e2e8f0;border-radius:6px;overflow:hidden;margin:12px 0}
+  .ax-bar{height:8px;background:#e2e8f0;border-radius:6px;overflow:hidden;margin:10px 0}
   .ax-bar>i{display:block;height:100%;background:#4f46e5;width:0;transition:width .3s}
-  .ax-q{font-weight:600;font-size:18px;margin:10px 0 12px}
-  .ax-btn{display:block;width:100%;text-align:left;margin:8px 0;padding:12px 14px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px;cursor:pointer}
+  .ax-q{font-weight:600;font-size:17px;margin:8px 0 10px}
+  .ax-btn{display:block;width:100%;text-align:left;margin:6px 0;padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px;cursor:pointer}
   .ax-btn:hover{border-color:#94a3b8}
   .ax-btn.ok{border-color:#16a34a;background:#f0fdf4}
   .ax-btn.no{border-color:#dc2626;background:#fef2f2}
@@ -113,7 +113,7 @@ const BASE = `<style>
   .ax-placed{border-color:#16a34a;background:#f0fdf4}
   .ax-res{text-align:center;padding:24px 8px}
   .ax-score{font-size:46px;font-weight:800;color:#4f46e5}
-  .ax-card{border:1px solid #cbd5e1;border-radius:14px;padding:28px 18px;text-align:center;font-size:19px;min-height:120px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fff}
+  .ax-card{border:1px solid #cbd5e1;border-radius:14px;padding:20px 16px;text-align:center;font-size:18px;min-height:96px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:#fff}
   .ax-num{display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;border-radius:999px;background:#4f46e5;color:#fff;font-size:12px;margin-right:8px}
   .ax-inst{font-size:14px;color:#475569;margin:0 0 10px}
   .ax-msg{font-size:14px;margin:12px 0 0;padding:9px 12px;border-radius:8px}
