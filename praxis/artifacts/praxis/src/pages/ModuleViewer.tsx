@@ -3150,12 +3150,17 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
   const [correct, setCorrect] = useState(0);
   const [fb, setFb] = useState('');
   const [busy, setBusy] = useState(false);
+  const [genBusy, setGenBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const reset = () => { setTs('30'); setStem(''); setOpts(['', '', '', '']); setCorrect(0); setFb(''); };
   const refresh = () => qc.invalidateQueries({ queryKey: ['iv-questions', beatId] });
 
   const add = async () => {
+    setErr(null);
     const filled = opts.map((t, i) => ({ id: `o${i}`, text: t.trim() })).filter((o) => o.text);
-    if (!stem.trim() || filled.length < 2 || !filled[correct]) return;
+    if (!stem.trim()) { setErr('Enter the question.'); return; }
+    if (filled.length < 2) { setErr('Add at least two options.'); return; }
+    if (!opts[correct]?.trim()) { setErr('The option marked correct is empty — fill it in or pick another as correct.'); return; }
     setBusy(true);
     try {
       await apiFetch(`/beats/${beatId}/interactive-questions`, { method: 'POST', body: JSON.stringify({
@@ -3163,7 +3168,14 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
         options: filled, correctOptionIds: [`o${correct}`], feedbackCorrect: fb || null, pauseOnReach: true, points: 1,
       }) });
       reset(); setOpen(false); refresh();
-    } finally { setBusy(false); }
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save the checkpoint.'); }
+    finally { setBusy(false); }
+  };
+  const generate = async () => {
+    setErr(null); setGenBusy(true);
+    try { await apiFetch(`/beats/${beatId}/interactive-questions/generate`, { method: 'POST', body: JSON.stringify({ count: 3 }) }); refresh(); }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Could not generate checkpoints.'); }
+    finally { setGenBusy(false); }
   };
   const del = async (id: string) => { await apiFetch(`/interactive-questions/${id}`, { method: 'DELETE' }); refresh(); };
 
@@ -3181,8 +3193,12 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
           ))}
         </ul>
       )}
+      {err && <p className="text-xs text-rose-600">{err}</p>}
       {!open ? (
-        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setOpen(true)}>+ Add checkpoint</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setOpen(true)}>+ Add checkpoint</Button>
+          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={genBusy} onClick={generate}>{genBusy ? 'Generating…' : 'Generate from lesson'}</Button>
+        </div>
       ) : (
         <div className="space-y-2 bg-background rounded-lg border p-2.5">
           <div className="flex gap-2">

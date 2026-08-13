@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { interactiveVideoQuestionsTable, ivResponsesTable, beatsTable, modulesTable } from "@workspace/db";
+import { interactiveVideoQuestionsTable, ivResponsesTable, beatsTable, modulesTable, moduleReadingsTable } from "@workspace/db";
 import { eq, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canParticipateInCourse, canStaffActOnCourse } from "../lib/scope";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 const router = Router();
 
@@ -74,6 +75,57 @@ router.post("/beats/:beatId/interactive-questions", requireAuth, async (req, res
     points: String(points ?? 1),
   }).returning();
   res.status(201).json({ ...question, videoTimestamp: Number(question.videoTimestamp), points: Number(question.points) });
+});
+
+// POST /beats/:beatId/interactive-questions/generate -- draft checkpoint MCQs from the module's
+// content and insert them at spaced timestamps. Staff-only.
+router.post("/beats/:beatId/interactive-questions/generate", requireAuth, async (req, res) => {
+  if (!(await gate(req, res, req.params.beatId, "staff"))) return;
+  const beat = await db.query.beatsTable.findFirst({ where: eq(beatsTable.id, req.params.beatId) });
+  if (!beat) { res.status(404).json({ error: "Not found" }); return; }
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, beat.moduleId) });
+  const readings = await db.select().from(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, beat.moduleId));
+  const content = [
+    `Module: ${mod?.title ?? ""}`,
+    mod?.objectives?.length ? `Objectives: ${mod.objectives.join("; ")}` : "",
+    beat.title ? `Video: ${beat.title}` : "",
+    beat.narration ? `Video notes: ${beat.narration}` : "",
+    (beat as { transcript?: string }).transcript ? `Transcript: ${(beat as { transcript?: string }).transcript}` : "",
+    readings.map((r) => r.content ?? "").filter(Boolean).join("\n\n"),
+  ].filter(Boolean).join("\n\n").slice(0, 12000);
+  if (content.trim().length < 60) { res.status(400).json({ error: "Not enough lesson content to generate checkpoints from." }); return; }
+
+  const wantRaw = Number((req.body as { count?: number } | undefined)?.count);
+  const want = Number.isFinite(wantRaw) ? Math.max(1, Math.min(6, Math.round(wantRaw))) : 3;
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6", max_tokens: 1800,
+      messages: [{ role: "user", content: `Write ${want} multiple-choice CHECKPOINT questions to pop up while a learner watches a video on this topic. Each checks understanding of a key idea (not trivia), with 4 options and one correct answer, plus one line of feedback for the correct answer. Ground them in the content below.\n\nReturn ONLY strict JSON: { "questions": [ { "stem": "…", "options": ["A","B","C","D"], "correctIndex": 0, "feedback": "…" } ] }\n\n=== CONTENT ===\n${content}\n\nReturn ONLY the JSON object.` }],
+    }, { timeout: 90000, maxRetries: 1 });
+    const text = (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
+    let parsed: any = {}; try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+    const qs = Array.isArray(parsed.questions) ? parsed.questions : [];
+    const created = [];
+    let i = 0;
+    for (const q of qs.slice(0, want)) {
+      const opts = Array.isArray(q?.options) ? q.options.map((t: any, k: number) => ({ id: `o${k}`, text: String(t).slice(0, 300) })).filter((o: any) => o.text.trim()) : [];
+      const ci = Math.max(0, Math.min(opts.length - 1, Number(q?.correctIndex) || 0));
+      if (!q?.stem || opts.length < 2) continue;
+      const ts = 45 + i * 75; // spaced checkpoints; the author can adjust each one
+      const [row] = await db.insert(interactiveVideoQuestionsTable).values({
+        beatId: req.params.beatId, videoTimestamp: String(ts), questionType: "multiple_choice",
+        stem: String(q.stem).slice(0, 500), options: opts, correctOptionIds: [`o${ci}`],
+        feedbackCorrect: q?.feedback ? String(q.feedback).slice(0, 500) : null, pauseOnReach: true, required: true, points: "1",
+      }).returning();
+      created.push(row.id); i++;
+    }
+    if (!created.length) { res.status(422).json({ error: "Could not generate checkpoints. Try again." }); return; }
+    res.status(201).json({ created: created.length });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("checkpoint gen failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: "Could not generate checkpoints. Please try again." });
+  }
 });
 
 // PATCH /interactive-questions/:questionId
