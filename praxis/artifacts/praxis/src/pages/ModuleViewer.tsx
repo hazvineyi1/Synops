@@ -2164,7 +2164,7 @@ function ReadingBody({ text }: { text: string }) {
   if (cur) sections.push({ title: cur.title, body: cur.body.join('\n') });
   if (sections.length < 2) return <MarkdownView text={src} />;
 
-  const [open, setOpen] = useState<Set<number>>(() => new Set(sections.map((_, i) => i)));
+  const [open, setOpen] = useState<Set<number>>(() => new Set());
   const allOpen = open.size === sections.length;
   const toggle = (i: number) => setOpen((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
   const setAll = (on: boolean) => setOpen(on ? new Set(sections.map((_, i) => i)) : new Set());
