@@ -34,7 +34,7 @@ export async function generateGameContent(input: GenerateGameInput): Promise<{ c
   const content = (input.content || "").trim();
   if (content.length < 20) throw new Error("Add more lesson content to generate a game from (a paragraph or two works well).");
 
-  const system = `You are an expert instructional designer building a "${tpl.name}" classroom review game. You ground every question strictly in the provided lesson content, never invent facts outside it. You write clear, age-appropriate, engaging prompts, and you make the game a genuine review of the material, not trivia.
+  const system = `You are an expert instructional designer building a "${tpl.name}" review game. You ground every question strictly in the provided lesson content, never invent facts outside it. You write clear, audience-appropriate, engaging prompts (match the tone to the stated grade level — keep it professional and substantive for adult learners), and you make the game a genuine review of the material, not trivia.
 
 Return ONLY a single strict JSON object (no prose, no code fences, no HTML) matching EXACTLY the required shape.`;
 

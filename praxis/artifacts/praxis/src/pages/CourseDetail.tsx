@@ -1826,6 +1826,12 @@ const ACT_TYPES: { id: string; label: string }[] = [
   { id: 'order', label: 'Ordering' }, { id: 'categorize', label: 'Categorize' },
 ];
 const BLOOMS = ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create'];
+// Interactive review games (generated from content for any audience, not just K-12).
+const GAME_TYPES: { id: string; label: string }[] = [
+  { id: 'jeopardy', label: 'Jeopardy' }, { id: 'millionaire', label: 'Millionaire' }, { id: 'escape', label: 'Escape room' },
+  { id: 'feud', label: 'Family Feud' }, { id: 'sequence', label: 'Put in order' }, { id: 'categorize', label: 'Sort it out' },
+  { id: 'password', label: 'Password' },
+];
 function GenerateCoursework({ courseId, modules }: { courseId: string; modules?: { id: string; title: string }[] }) {
   const qc = useQueryClient();
   const [actCount, setActCount] = useState(2);
@@ -1834,11 +1840,14 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
   const [difficulty, setDifficulty] = useState('mixed');
   const [caseCount, setCaseCount] = useState(1);
   const [discCount, setDiscCount] = useState(2);
+  const [gameCount, setGameCount] = useState(0);
+  const [gameTypes, setGameTypes] = useState<Set<string>>(() => new Set(GAME_TYPES.map((t) => t.id)));
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const toggleType = (id: string) => setTypes((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleGame = (id: string) => setGameTypes((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const gather = async (moduleId: string) => {
     const list = await apiFetch<{ id: string; hasContent: boolean }[]>(`/modules/${moduleId}/readings`).catch(() => []);
@@ -1852,8 +1861,9 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
   const run = async () => {
     const mods = modules ?? [];
     if (!mods.length) { setError('This course has no modules yet.'); return; }
-    if (actCount === 0 && caseCount === 0 && discCount === 0) { setError('Choose at least one thing to generate.'); return; }
+    if (actCount === 0 && caseCount === 0 && discCount === 0 && gameCount === 0) { setError('Choose at least one thing to generate.'); return; }
     if (actCount > 0 && types.size === 0) { setError('Pick at least one activity type.'); return; }
+    if (gameCount > 0 && gameTypes.size === 0) { setError('Pick at least one game type.'); return; }
     setRunning(true); setError(null); setLog([]);
     const notes: string[] = [];
     for (let i = 0; i < mods.length; i++) {
@@ -1894,6 +1904,27 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
         try { await apiFetch(`/modules/${m.id}/discussions/generate`, { method: 'POST', body: JSON.stringify({ count: discCount }) }); }
         catch { notes.push(`${m.title}: discussions failed`); }
       }
+      // Games -> interactive review games generated from content, attached + published (any audience).
+      if (gameCount > 0) {
+        if (content.length < 40) { notes.push(`${m.title}: no content for games`); }
+        else {
+          const keys = [...gameTypes];
+          const rigor = difficulty !== 'mixed' ? difficulty : 'intermediate';
+          let gmade = 0;
+          for (let g = 0; g < gameCount; g++) {
+            const templateKey = keys[g % keys.length];
+            try {
+              const game = await apiFetch<{ title: string; html: string }>(`/games/generate`, { method: 'POST', body: JSON.stringify({ templateKey, subject: m.title, band: 'adult', rigor, content: content.slice(0, 12000) }) });
+              if (game.html) {
+                await activitiesApi.create({ title: game.title || `${m.title} game`, source: 'html', html: game.html, kind: 'game', bloomsLevel: 'Apply', difficulty: difficulty !== 'mixed' ? difficulty : null, published: true, courseId, moduleId: m.id });
+                gmade++;
+              }
+            } catch { /* skip one */ }
+          }
+          qc.invalidateQueries({ queryKey: ['module-activities', m.id] });
+          if (!gmade) notes.push(`${m.title}: games failed`);
+        }
+      }
     }
     setLog(notes);
     setProgress(notes.length ? `Done, with ${notes.length} item(s) to review below.` : `Done. Coursework generated across ${mods.length} module${mods.length === 1 ? '' : 's'}.`);
@@ -1911,7 +1942,7 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
     <div className="rounded-lg border border-dashed border-primary/30 p-4 space-y-4">
       <div>
         <p className="text-sm font-semibold">Generate coursework for every module</p>
-        <p className="text-xs text-muted-foreground">Builds activities, case studies and discussions from each module's own reading content. Runs one module at a time.</p>
+        <p className="text-xs text-muted-foreground">Builds activities, case studies, discussions and interactive games from each module's own reading content. Runs one module at a time.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -1943,6 +1974,22 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
         </div>
         <label className="flex items-start gap-2 text-sm font-medium"><FileText className="h-3.5 w-3.5 text-primary mt-1" /> Case studies / module <Num value={caseCount} set={setCaseCount} max={3} /></label>
         <label className="flex items-start gap-2 text-sm font-medium"><MessageSquare className="h-3.5 w-3.5 text-primary mt-1" /> Discussions / module <Num value={discCount} set={setDiscCount} max={5} /></label>
+      </div>
+
+      {/* Games — interactive review games generated from content, for any audience. */}
+      <div className="rounded-md bg-muted/40 p-3 space-y-2">
+        <label className="flex items-center gap-2 text-sm font-medium"><Star className="h-3.5 w-3.5 text-primary" /> Games / module <Num value={gameCount} set={setGameCount} max={3} /></label>
+        {gameCount > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap gap-1">
+              {GAME_TYPES.map((t) => (
+                <button key={t.id} type="button" onClick={() => toggleGame(t.id)} disabled={running}
+                  className={cn('rounded-full px-2 py-0.5 text-[11px] border', gameTypes.has(t.id) ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground')}>{t.label}</button>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">Interactive review games (Jeopardy, Escape room, Millionaire…) built from each module's content and pitched for adult/professional learners — uses the difficulty set above.</p>
+          </div>
+        )}
       </div>
 
       {progress && <p className="text-xs text-muted-foreground">{progress}</p>}

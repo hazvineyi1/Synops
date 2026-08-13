@@ -13,8 +13,8 @@
  * a later phase, it needs realtime session infrastructure this single-service stack doesn't have yet.
  */
 
-export type Band = "k2" | "35" | "68" | "912";
-export const BAND_LABEL: Record<Band, string> = { k2: "K–2", "35": "Grades 3–5", "68": "Grades 6–8", "912": "Grades 9–12" };
+export type Band = "k2" | "35" | "68" | "912" | "adult";
+export const BAND_LABEL: Record<Band, string> = { k2: "K–2", "35": "Grades 3–5", "68": "Grades 6–8", "912": "Grades 9–12", adult: "Professional / Adult learners" };
 
 // ── Shared sandbox shell ─────────────────────────────────────────────────────
 const CSS = ":root{--indigo:#4F46E5;--amber:#F59E0B;--ink:#1f2430;--ok:#15803d;--no:#b91c1c;--pap:#FBF7EF}"
