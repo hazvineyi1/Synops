@@ -2202,41 +2202,14 @@ function ReadingBody({ text }: { text: string }) {
 // content (backed by GET/POST /modules/:id/coach). Available to learners and to staff previewing.
 type CoachMsg = { role: 'user' | 'assistant'; content: string };
 
-// A friendly cartoon coach head that gently bobs and blinks — the face of the in-lesson coach.
+// The coach mark: the graduation cap, in pink, with a gentle bob. Symbol, not a face.
 function CoachAvatar({ size = 40 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 64" className="coach-bob" aria-hidden="true">
-      {/* headset band */}
-      <path d="M15 32 A17 17 0 0 1 49 32" fill="none" stroke="#111827" strokeWidth="3" strokeLinecap="round" />
-      {/* hair */}
-      <path d="M15 31 Q15 13 32 13 Q49 13 49 31 Q43 22 32 22 Q21 22 15 31 Z" fill="#3B3550" />
-      {/* face */}
-      <circle cx="32" cy="35" r="17" fill="#F7C6A0" />
-      {/* ears / ear-cups */}
-      <rect x="11" y="31" width="6" height="10" rx="3" fill="#111827" />
-      <rect x="47" y="31" width="6" height="10" rx="3" fill="#111827" />
-      {/* mic */}
-      <path d="M50 39 Q50 47 40 47" fill="none" stroke="#111827" strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx="38" cy="47" r="2.2" fill="#F97316" />
-      {/* cheeks */}
-      <circle cx="23" cy="40" r="3" fill="#F98C7A" opacity="0.45" />
-      <circle cx="41" cy="40" r="3" fill="#F98C7A" opacity="0.45" />
-      {/* eyes (blink) */}
-      <g className="coach-blink">
-        <circle cx="26" cy="34" r="2.6" fill="#1F2937" />
-        <circle cx="38" cy="34" r="2.6" fill="#1F2937" />
-      </g>
-      {/* smile */}
-      <path d="M25 41 Q32 46 39 41" fill="none" stroke="#7A3B2E" strokeWidth="2.2" strokeLinecap="round" />
-    </svg>
-  );
+  return <GraduationCap className="coach-bob" style={{ color: '#EC4899' }} width={size} height={size} strokeWidth={2.25} aria-hidden="true" />;
 }
 const COACH_ANIM_CSS = `
 @keyframes coachBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
-@keyframes coachBlink { 0%,90%,100%{transform:scaleY(1)} 95%{transform:scaleY(0.1)} }
 .coach-bob{ animation: coachBob 2.6s ease-in-out infinite; }
-.coach-blink{ transform-origin:center; transform-box:fill-box; animation: coachBlink 4.2s ease-in-out infinite; }
-@media (prefers-reduced-motion: reduce){ .coach-bob,.coach-blink{ animation:none } }
+@media (prefers-reduced-motion: reduce){ .coach-bob{ animation:none } }
 `;
 
 function CoachDock({ moduleId }: { moduleId: string }) {
