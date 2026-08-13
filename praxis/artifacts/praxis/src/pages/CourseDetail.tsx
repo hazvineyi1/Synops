@@ -2046,25 +2046,46 @@ const DEFAULT_POLICIES: Record<string, { title: string; html: string }> = {
   alignment: { title: 'How alignment works', html: `<p>This map shows how each course learning objective is covered by the assessments and activities across the modules. Use it to confirm every objective is both taught and assessed, and to spot gaps or over-assessment before the course goes out.</p>` },
 };
 
-function SectionPolicy({ title, html, isInstructor, onSave, saving, icon: Icon, bannerUrl }: { title: string; html: string; isInstructor: boolean; onSave: (html: string) => void; saving: boolean; icon?: React.ElementType; bannerUrl?: string | null }) {
+// An editable banner header for a section page. Uses the section's own image if set, otherwise the
+// course banner, otherwise a gradient. Instructors can paste/clear an image via "Change banner".
+function SectionBanner({ title, icon: Icon, bannerUrl, isInstructor, onBannerSave }: { title: string; icon?: React.ElementType; bannerUrl?: string | null; isInstructor: boolean; onBannerSave?: (url: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(bannerUrl ?? '');
+  useEffect(() => { if (!editing) setDraft(bannerUrl ?? ''); }, [bannerUrl, editing]);
+  return (
+    <div className="relative h-36 sm:h-44 w-full overflow-hidden rounded-2xl">
+      {bannerUrl ? (
+        <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-orange-500" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/25 to-black/5" />
+      <div className="absolute inset-x-0 bottom-0 p-5 flex items-center gap-2.5 text-white">
+        {Icon && <Icon className="h-6 w-6 drop-shadow-sm shrink-0" />}
+        <h2 className="text-2xl sm:text-3xl font-serif font-bold drop-shadow-sm">{title}</h2>
+      </div>
+      {isInstructor && onBannerSave && !editing && (
+        <button onClick={() => { setDraft(bannerUrl ?? ''); setEditing(true); }} className="absolute top-3 right-3 flex items-center gap-1 rounded-md bg-black/45 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/60"><ImageIcon className="h-3.5 w-3.5" /> Change banner</button>
+      )}
+      {isInstructor && onBannerSave && editing && (
+        <div className="absolute inset-x-3 top-3 flex gap-1.5">
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Paste an image URL…" className="flex-1 rounded-md border border-white/40 bg-white/95 px-2 py-1 text-xs" />
+          <button onClick={() => { onBannerSave(draft.trim()); setEditing(false); }} className="rounded-md bg-primary px-2 py-1 text-xs font-semibold text-primary-foreground">Save</button>
+          <button onClick={() => { onBannerSave(''); setEditing(false); }} className="rounded-md bg-white/90 px-2 py-1 text-xs">Clear</button>
+          <button onClick={() => setEditing(false)} className="rounded-md bg-white/90 px-2 py-1 text-xs">Cancel</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionPolicy({ title, html, isInstructor, onSave, saving, icon, bannerUrl, onBannerSave }: { title: string; html: string; isInstructor: boolean; onSave: (html: string) => void; saving: boolean; icon?: React.ElementType; bannerUrl?: string | null; onBannerSave?: (url: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(html);
   useEffect(() => { if (!editing) setDraft(html); }, [html, editing]);
   return (
     <div className="space-y-4">
-      {/* Banner header for the section page. Uses the course banner image if set, else a gradient. */}
-      <div className="relative h-36 sm:h-44 w-full overflow-hidden rounded-2xl">
-        {bannerUrl ? (
-          <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-orange-500" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/25 to-black/5" />
-        <div className="absolute inset-x-0 bottom-0 p-5 flex items-center gap-2.5 text-white">
-          {Icon && <Icon className="h-6 w-6 drop-shadow-sm shrink-0" />}
-          <h2 className="text-2xl sm:text-3xl font-serif font-bold drop-shadow-sm">{title}</h2>
-        </div>
-      </div>
+      <SectionBanner title={title} icon={icon} bannerUrl={bannerUrl} isInstructor={isInstructor} onBannerSave={onBannerSave} />
       <div className="max-w-3xl space-y-3">
       {isInstructor && !editing && (
         <div className="flex justify-end">
@@ -2337,10 +2358,13 @@ export function CourseDetail() {
   // Editable policy / how-to text for the course-level section tabs (activities, cases, discussions,
   // reflection, alignment). These tabs explain how to complete those sections as they appear in the
   // modules, rather than duplicating the module content. Persisted per course, seen by every viewer.
-  const policies: Record<string, string> = (() => {
+  const policies: Record<string, any> = (() => {
     try { return JSON.parse((course as { sectionPolicies?: string | null } | undefined)?.sectionPolicies || '{}'); } catch { return {}; }
   })();
   const savePolicy = (key: string, html: string) => saveCourse.mutate({ sectionPolicies: JSON.stringify({ ...policies, [key]: html }) });
+  // Per-section banner image (falls back to the course banner, then a gradient). Editable per section.
+  const sectionBannerUrl = (key: string): string | null => (policies.__banners && policies.__banners[key]) || course.thumbnailUrl || null;
+  const saveSectionBanner = (key: string, url: string) => saveCourse.mutate({ sectionPolicies: JSON.stringify({ ...policies, __banners: { ...(policies.__banners || {}), [key]: url || undefined } }) });
 
   return (
     <div className={cn('space-y-0', !isLearnerView && 'lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start')}>
@@ -3086,24 +3110,25 @@ export function CourseDetail() {
         {/* These course-level tabs are POLICY / how-to pages: the real content lives in the modules,
             so here we explain how learners complete each kind of work as they meet it. */}
         {activeTab === 'assignments' && (
-          <SectionPolicy icon={ClipboardList} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.reflection.title} html={policies.reflection ?? DEFAULT_POLICIES.reflection.html} isInstructor={isInstructor} onSave={(h) => savePolicy('reflection', h)} saving={saveCourse.isPending} />
+          <SectionPolicy icon={ClipboardList} bannerUrl={sectionBannerUrl('reflection')} onBannerSave={(u) => saveSectionBanner('reflection', u)} title={DEFAULT_POLICIES.reflection.title} html={policies.reflection ?? DEFAULT_POLICIES.reflection.html} isInstructor={isInstructor} onSave={(h) => savePolicy('reflection', h)} saving={saveCourse.isPending} />
         )}
 
         {activeTab === 'activities' && (
-          <SectionPolicy icon={Play} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.activities.title} html={policies.activities ?? DEFAULT_POLICIES.activities.html} isInstructor={isInstructor} onSave={(h) => savePolicy('activities', h)} saving={saveCourse.isPending} />
+          <SectionPolicy icon={Play} bannerUrl={sectionBannerUrl('activities')} onBannerSave={(u) => saveSectionBanner('activities', u)} title={DEFAULT_POLICIES.activities.title} html={policies.activities ?? DEFAULT_POLICIES.activities.html} isInstructor={isInstructor} onSave={(h) => savePolicy('activities', h)} saving={saveCourse.isPending} />
         )}
 
         {activeTab === 'cases' && (
-          <SectionPolicy icon={FileText} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.cases.title} html={policies.cases ?? DEFAULT_POLICIES.cases.html} isInstructor={isInstructor} onSave={(h) => savePolicy('cases', h)} saving={saveCourse.isPending} />
+          <SectionPolicy icon={FileText} bannerUrl={sectionBannerUrl('cases')} onBannerSave={(u) => saveSectionBanner('cases', u)} title={DEFAULT_POLICIES.cases.title} html={policies.cases ?? DEFAULT_POLICIES.cases.html} isInstructor={isInstructor} onSave={(h) => savePolicy('cases', h)} saving={saveCourse.isPending} />
         )}
 
         {activeTab === 'discussions' && (
-          <SectionPolicy icon={MessageSquare} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.discussions.title} html={policies.discussions ?? DEFAULT_POLICIES.discussions.html} isInstructor={isInstructor} onSave={(h) => savePolicy('discussions', h)} saving={saveCourse.isPending} />
+          <SectionPolicy icon={MessageSquare} bannerUrl={sectionBannerUrl('discussions')} onBannerSave={(u) => saveSectionBanner('discussions', u)} title={DEFAULT_POLICIES.discussions.title} html={policies.discussions ?? DEFAULT_POLICIES.discussions.html} isInstructor={isInstructor} onSave={(h) => savePolicy('discussions', h)} saving={saveCourse.isPending} />
         )}
 
         {/* ANNOUNCEMENTS */}
         {activeTab === 'announcements' && (
           <div className="space-y-3">
+            <SectionBanner title="Announcements" icon={Megaphone} bannerUrl={sectionBannerUrl('announcements')} isInstructor={isInstructor} onBannerSave={(u) => saveSectionBanner('announcements', u)} />
             {isInstructor && <NewAnnouncement courseId={courseId} />}
             {announcementsLoading && <Skeleton className="h-32" />}
             {!announcementsLoading && !announcements && <div className="text-center text-muted-foreground py-8 text-sm">Could not load announcements.</div>}
@@ -3188,7 +3213,7 @@ export function CourseDetail() {
         {/* ALIGNMENT (staff-only): objective coverage + assessment + WCAG accessibility */}
         {activeTab === 'alignment' && isInstructor && (
           <div className="space-y-6">
-            <SectionPolicy icon={Target} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.alignment.title} html={policies.alignment ?? DEFAULT_POLICIES.alignment.html} isInstructor={isInstructor} onSave={(h) => savePolicy('alignment', h)} saving={saveCourse.isPending} />
+            <SectionPolicy icon={Target} bannerUrl={sectionBannerUrl('alignment')} onBannerSave={(u) => saveSectionBanner('alignment', u)} title={DEFAULT_POLICIES.alignment.title} html={policies.alignment ?? DEFAULT_POLICIES.alignment.html} isInstructor={isInstructor} onSave={(h) => savePolicy('alignment', h)} saving={saveCourse.isPending} />
             {alignmentLoading && (
               <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">Running the alignment pass. This can take a few seconds.</div>
