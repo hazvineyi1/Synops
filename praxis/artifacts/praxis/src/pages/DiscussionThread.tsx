@@ -90,6 +90,12 @@ export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embed
     onSuccess: () => qc.invalidateQueries({ queryKey: ['discussion', discussionId] }),
   });
 
+  // Anyone may delete THEIR OWN reply (students included); staff may moderate. Backend enforces it.
+  const delReply = useMutation({
+    mutationFn: (replyId: string) => apiFetch(`/discussions/replies/${replyId}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['discussion', discussionId] }),
+    onError: (e) => setError(e instanceof Error ? e.message : 'Could not delete that post.'),
+  });
   const remove = useMutation({
     mutationFn: () => apiFetch(`/discussions/${discussionId}`, { method: 'DELETE' }),
     onSuccess: () => navigate(`/courses/${courseId}?tab=discussions`),
@@ -237,6 +243,14 @@ export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embed
                           ? <Badge variant="outline" className="text-xs text-violet-600 border-violet-300">AI facilitator</Badge>
                           : reply.isInstructorReply && <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">Instructor</Badge>}
                         <span className="text-xs text-muted-foreground">{formatDate(reply.createdAt)}</span>
+                        {!ai && (reply.author?.id === user?.id || isInstructor) && (
+                          <button
+                            onClick={() => { if (confirm('Delete this post? This cannot be undone.')) delReply.mutate(reply.id); }}
+                            disabled={delReply.isPending}
+                            className="ml-auto text-xs text-rose-600 hover:underline">
+                            Delete
+                          </button>
+                        )}
                       </div>
                       <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
                         {shownReply(reply.id, reply.body)}
