@@ -776,14 +776,24 @@ router.post("/courses/:courseId/architect/apply", requireAuth, requireRole("supe
 
   const courseRow = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
   // Append after existing modules so re-running does not renumber the current ones.
-  const existing = await db.select({ order: modulesTable.order }).from(modulesTable).where(eq(modulesTable.courseId, courseId));
+  const existing = await db.select({ order: modulesTable.order, title: modulesTable.title }).from(modulesTable).where(eq(modulesTable.courseId, courseId));
   let nextOrder = existing.reduce((mx, r) => Math.max(mx, r.order ?? 0), -1) + 1;
+
+  // Re-running the architect must FILL GAPS, not duplicate. Skip any incoming module whose title
+  // already exists on the course (and any repeats within this batch). Titles are matched loosely
+  // (case/space/punctuation-insensitive) so "Goals, Vision & Mission" won't be re-created as a twin.
+  const normTitle = (t: string) => t.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const seenTitles = new Set(existing.map((r) => normTitle(r.title ?? "")));
 
   const createdBy = req.dbUser!.id;
   const created: string[] = [];
+  let skipped = 0;
   for (const m of incoming) {
     const title = String(m?.title ?? "").trim();
     if (!title) continue;
+    const key = normTitle(title);
+    if (key && seenTitles.has(key)) { skipped++; continue; }
+    if (key) seenTitles.add(key);
     const s = m?.sections ?? {};
     const overview = m?.overview ? String(m.overview).trim() : "";
     const summary = m?.summary ? String(m.summary).trim() : "";
@@ -839,7 +849,34 @@ router.post("/courses/:courseId/architect/apply", requireAuth, requireRole("supe
     updatedAt: new Date(),
   }).where(eq(coursesTable.id, courseId));
 
-  res.status(201).json({ created: created.length, moduleIds: created });
+  res.status(201).json({ created: created.length, moduleIds: created, skipped });
+});
+
+// POST /courses/:courseId/modules/dedupe -- remove duplicate modules created by re-running the
+// architect. Keeps the EARLIEST module of each title (the one the author has been building) and
+// deletes the later twins. Staff-only. Returns how many were removed.
+router.post("/courses/:courseId/modules/dedupe", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  const courseId = req.params.courseId;
+  if (!(await canStaffActOnCourse(req.dbUser!, courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const mods = await db.select({ id: modulesTable.id, title: modulesTable.title, order: modulesTable.order })
+    .from(modulesTable).where(eq(modulesTable.courseId, courseId));
+  const norm = (t: string) => (t ?? "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const byTitle = new Map<string, { id: string; order: number }[]>();
+  for (const m of mods) { const k = norm(m.title); if (!k) continue; const a = byTitle.get(k) ?? []; a.push({ id: m.id, order: m.order ?? 0 }); byTitle.set(k, a); }
+  const toRemove: string[] = [];
+  for (const group of byTitle.values()) {
+    if (group.length <= 1) continue;
+    group.sort((a, b) => a.order - b.order); // keep the earliest
+    for (const g of group.slice(1)) toRemove.push(g.id);
+  }
+  for (const id of toRemove) {
+    await db.delete(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, id)).catch(() => {});
+    await db.delete(assignmentsTable).where(eq(assignmentsTable.moduleId, id)).catch(() => {});
+    await db.delete(modulesTable).where(eq(modulesTable.id, id)).catch(() => {});
+  }
+  const remaining = mods.length - toRemove.length;
+  await db.update(coursesTable).set({ moduleCount: remaining, updatedAt: new Date() }).where(eq(coursesTable.id, courseId)).catch(() => {});
+  res.json({ removed: toRemove.length, remaining });
 });
 
 /**

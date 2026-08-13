@@ -2744,6 +2744,15 @@ export function CourseDetail() {
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate('/studio')}><Layers className="h-3.5 w-3.5" /> Author a module (Studio)</Button>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/cases?courseId=${courseId}`)}><FileText className="h-3.5 w-3.5" /> Case study</Button>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/activities?courseId=${courseId}`)}><Play className="h-3.5 w-3.5" /> Interactive</Button>
+                  <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground ml-auto"
+                    onClick={async () => {
+                      if (!window.confirm('Remove duplicate modules? This keeps the first module of each title and deletes the later copies (and their starter content).')) return;
+                      try {
+                        const r = await apiFetch<{ removed: number; remaining: number }>(`/courses/${courseId}/modules/dedupe`, { method: 'POST', body: JSON.stringify({}) });
+                        await qc.invalidateQueries({ queryKey: ['modules', courseId] });
+                        window.alert(r.removed ? `Removed ${r.removed} duplicate module${r.removed === 1 ? '' : 's'}.` : 'No duplicate modules found.');
+                      } catch (e) { window.alert(e instanceof Error ? e.message : 'Could not remove duplicates.'); }
+                    }}><Trash2 className="h-3.5 w-3.5" /> Remove duplicate modules</Button>
                 </CardContent>
               </Card>
             )}
