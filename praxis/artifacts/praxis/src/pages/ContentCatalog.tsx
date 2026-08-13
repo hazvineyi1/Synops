@@ -250,9 +250,12 @@ function VideoLessonCreator({ tenantId, tenantName, onDone, onCancel }: {
             </div>
             <input value={c.stem} onChange={(e) => setCp(i, { stem: e.target.value })} placeholder="Question…" className="h-8 w-full rounded border px-2 text-sm bg-background" />
             {c.opts.map((o, oi) => (
-              <div key={oi} className="flex items-center gap-2">
-                <input type="radio" name={`c${i}`} checked={c.correct === oi} onChange={() => setCp(i, { correct: oi })} title="Correct" />
-                <input value={o} onChange={(e) => setCp(i, { opts: c.opts.map((x, j) => j === oi ? e.target.value : x) })} placeholder={`Option ${oi + 1}${oi === c.correct ? " (correct)" : ""}`} className="h-8 flex-1 rounded border px-2 text-sm bg-background" />
+              <div key={oi} className={`flex items-center gap-2 rounded-md p-1 ${c.correct === oi ? "bg-emerald-500/10 ring-1 ring-emerald-500/40" : ""}`}>
+                <input value={o} onChange={(e) => setCp(i, { opts: c.opts.map((x, j) => j === oi ? e.target.value : x) })} placeholder={`Option ${oi + 1}`} className="h-8 flex-1 rounded border px-2 text-sm bg-background" />
+                <label className="flex items-center gap-1 text-[11px] cursor-pointer shrink-0 px-1" title="Mark this option as the correct answer">
+                  <input type="radio" name={`c${i}`} checked={c.correct === oi} onChange={() => setCp(i, { correct: oi })} />
+                  <span className={c.correct === oi ? "text-emerald-600 font-medium" : "text-muted-foreground"}>Correct</span>
+                </label>
               </div>
             ))}
             <input value={c.fb} onChange={(e) => setCp(i, { fb: e.target.value })} placeholder="Feedback when correct (optional)" className="h-8 w-full rounded border px-2 text-sm bg-background" />

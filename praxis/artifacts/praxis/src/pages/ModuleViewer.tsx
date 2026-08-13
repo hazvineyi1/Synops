@@ -3312,10 +3312,14 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
               <input value={ts} onChange={(e) => setTs(e.target.value.replace(/[^0-9:]/g, ''))} placeholder="2:55" className="mt-0.5 h-8 w-24 rounded border border-input bg-background px-2 text-sm" /></label>
           </div>
           <input value={stem} onChange={(e) => setStem(e.target.value)} placeholder="Question…" className="h-8 w-full rounded border border-input bg-background px-2 text-sm" />
+          <div className="text-[11px] text-muted-foreground">Type each option, then click <span className="font-medium text-emerald-600">Correct</span> on the right of the right answer.</div>
           {opts.map((o, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} title="Correct answer" />
-              <input value={o} onChange={(e) => setOpts((p) => p.map((x, j) => j === i ? e.target.value : x))} placeholder={`Option ${i + 1}${i === correct ? ' (correct)' : ''}`} className="h-8 flex-1 rounded border border-input bg-background px-2 text-sm" />
+            <div key={i} className={cn('flex items-center gap-2 rounded-md p-1', correct === i && 'bg-emerald-500/10 ring-1 ring-emerald-500/40')}>
+              <input value={o} onChange={(e) => setOpts((p) => p.map((x, j) => j === i ? e.target.value : x))} placeholder={`Option ${i + 1}`} className="h-8 flex-1 rounded border border-input bg-background px-2 text-sm" />
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer shrink-0 px-1" title="Mark this option as the correct answer">
+                <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} />
+                <span className={correct === i ? 'text-emerald-600 font-medium' : 'text-muted-foreground'}>Correct</span>
+              </label>
             </div>
           ))}
           <input value={fb} onChange={(e) => setFb(e.target.value)} placeholder="Feedback when correct (optional)" className="h-8 w-full rounded border border-input bg-background px-2 text-sm" />
