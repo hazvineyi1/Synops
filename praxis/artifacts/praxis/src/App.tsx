@@ -31,6 +31,7 @@ import { DevLogin } from '@/pages/DevLogin';
 import { ModuleViewer } from '@/pages/ModuleViewer';
 import { Assess } from '@/pages/Assess';
 import { Credentials } from '@/pages/Credentials';
+import { Portfolio } from '@/pages/Portfolio';
 import { Verify } from '@/pages/Verify';
 import { CoachLearners } from '@/pages/CoachLearners';
 import { CoachingMatching } from '@/pages/CoachingMatching';
@@ -318,6 +319,7 @@ function Routes() {
         <ProtectedRoute path="/security" component={AccountSecurity} />
         <ProtectedRoute path="/assess/:assessmentId" component={Assess} />
         <ProtectedRoute path="/credentials" component={Credentials} />
+        <ProtectedRoute path="/portfolio" component={Portfolio} />
         <ProtectedRoute path="/coach/submissions" component={CoachSubmissions} />
         <ProtectedRoute path="/coaching/health" component={CoachingHealth} />
         <ProtectedRoute path="/coaching/sections" component={CoachingMatching} />

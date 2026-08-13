@@ -31,6 +31,7 @@ import {
   ClipboardList,
   GraduationCap,
   NotebookPen,
+  Briefcase,
   Wallet,
   Palette,
   Megaphone,
@@ -271,6 +272,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.jotter', 'Jotter'), href: '/jotter', icon: NotebookPen },
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
           { label: t('nav.credentials'), href: '/credentials', icon: Award },
+          { label: t('nav.portfolio', 'Portfolio'), href: '/portfolio', icon: Briefcase },
           { label: t('nav.help', 'Help'), href: '/support', icon: LifeBuoy },
         ],
       }];

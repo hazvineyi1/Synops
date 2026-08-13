@@ -57,6 +57,7 @@ function toCourseResponse(c: typeof coursesTable.$inferSelect, completeness?: Co
     overviewConfig: (c as { overviewConfig?: string | null }).overviewConfig ?? null,
     tocConfig: (c as { tocConfig?: string | null }).tocConfig ?? null,
     sectionPolicies: (c as { sectionPolicies?: string | null }).sectionPolicies ?? null,
+    syllabus: (c as { syllabus?: string | null }).syllabus ?? null,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
     // Course completeness gate: complete == catalogue-eligible. incompleteReasons lists, per blocking
@@ -881,6 +882,36 @@ router.post("/courses/:courseId/modules/dedupe", requireAuth, requireRole("super
   res.json({ removed: toRemove.length, remaining });
 });
 
+// POST /courses/:courseId/syllabus/generate -- draft a full syllabus (basics + standard sections)
+// from the course and its modules, returned as JSON the author reviews and saves. Staff-only.
+router.post("/courses/:courseId/syllabus/generate", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
+  const courseId = req.params.courseId;
+  if (!(await canStaffActOnCourse(req.dbUser!, courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
+  if (!course) { res.status(404).json({ error: "Course not found" }); return; }
+  const mods = await db.select({ title: modulesTable.title, order: modulesTable.order, objectives: modulesTable.objectives })
+    .from(modulesTable).where(eq(modulesTable.courseId, courseId));
+  mods.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const moduleList = mods.map((m, i) => `${i + 1}. ${m.title}${(m.objectives?.length ? ` — ${m.objectives.slice(0, 3).join("; ")}` : "")}`).join("\n").slice(0, 4000);
+  const objectives = (course.objectives ?? []).join("\n- ");
+  const prompt = `You are writing a clear, professional course SYLLABUS. Use the course details and module list below. For fields you cannot know (instructor name, contact, meeting times/locations, course number), leave them as empty strings — do not invent them. Write the narrative sections as clean HTML (use <p>, <ul><li>, <strong>). The schedule should map the modules to a sensible week-by-week outline.\n\nReturn ONLY strict JSON with exactly these keys:\n{\n "basics": { "number":"", "name":"${(course.title ?? "").replace(/"/g, "'")}", "instructor":"", "contact":"", "times":"", "locations":"", "description":"<a 2-3 sentence course description>" },\n "objectivesHtml":"<overall + per-module objectives as HTML>",\n "scheduleHtml":"<week-by-week schedule mapping the modules, with placeholders for readings/deadlines/exams/holidays>",\n "assessmentHtml":"<assignments, projects, exams and how they are graded>",\n "responsibilitiesHtml":"<participation, homework, late/make-up policy, prerequisites>",\n "materialsHtml":"<required texts and resources and how to access them>",\n "communicationHtml":"<how to contact the instructor, office hours, where to find support>"\n}\n\nCOURSE: ${course.title}\nDESCRIPTION: ${course.description ?? ""}\nOBJECTIVES:\n- ${objectives}\n\nMODULES:\n${moduleList || "(none yet)"}`;
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6", max_tokens: 3000,
+      messages: [{ role: "user", content: prompt }, { role: "assistant", content: "{" }],
+    }, { timeout: 120000, maxRetries: 1 });
+    const c = message.content[0];
+    const raw = "{" + (c && c.type === "text" ? c.text : "");
+    let parsed: any = {};
+    try { parsed = JSON.parse(raw); } catch { const m = raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+    res.json({ syllabus: parsed });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("syllabus gen failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: "Could not generate a syllabus. Please try again." });
+  }
+});
+
 /**
  * POST /courses/setup-platform (super admin), one-time: make the assignment table exist and
  * bring EVERY existing course under super-admin ownership (tenantId "platform") so the whole
@@ -1015,7 +1046,7 @@ router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "part
   // requireRole proves staff SOMEWHERE, not staff on THIS course, so a coach/admin of one
   // org could edit another org's course metadata. Add the course-scoped check.
   if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
-  const { title, description, catalogDescription, status, competencyTags, nqfLevel, thumbnailUrl, objectives, overviewConfig, tocConfig, sectionPolicies } = req.body;
+  const { title, description, catalogDescription, status, competencyTags, nqfLevel, thumbnailUrl, objectives, overviewConfig, tocConfig, sectionPolicies, syllabus } = req.body;
   const [updated] = await db
     .update(coursesTable)
     .set({
@@ -1025,6 +1056,7 @@ router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "part
       ...(overviewConfig !== undefined ? { overviewConfig } as Record<string, unknown> : {}),
       ...(tocConfig !== undefined ? { tocConfig } as Record<string, unknown> : {}),
       ...(sectionPolicies !== undefined ? { sectionPolicies } as Record<string, unknown> : {}),
+      ...(syllabus !== undefined ? { syllabus } as Record<string, unknown> : {}),
       updatedAt: new Date(),
     } as any)
     .where(eq(coursesTable.id, req.params.courseId))

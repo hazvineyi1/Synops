@@ -36,6 +36,8 @@ export const coursesTable = pgTable("courses", {
   tocConfig: text("toc_config"),
   // Editable policy / how-to text per course section (activities, cases, discussions, reflection, alignment).
   sectionPolicies: text("section_policies"),
+  // The course syllabus (JSON): basics + the standard syllabus sections, editable by instructors.
+  syllabus: text("syllabus"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

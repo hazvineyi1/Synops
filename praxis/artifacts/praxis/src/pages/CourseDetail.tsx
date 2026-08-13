@@ -16,7 +16,7 @@ import {
   Calendar, FileText, Users, UsersRound, Plus, ChevronRight, ChevronLeft, ChevronDown, Pin,
   CheckCircle, Clock, AlertCircle, AlertTriangle, XCircle, Play, Target, Save, Pencil, PenTool, Trash2, Layers, Image as ImageIcon, Upload, Lightbulb,
   Bold, Italic, Underline, List, ListOrdered, Link2,
-  Strikethrough, AlignLeft, AlignCenter, AlignRight, Eraser, Circle, Square, Star, Check
+  Strikethrough, AlignLeft, AlignCenter, AlignRight, Eraser, Circle, Square, Star, Check, ScrollText, Sparkles
 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -728,6 +728,7 @@ function CourseCasesTab({ courseId, isInstructor }: { courseId: string; isInstru
 const TABS = [
   { id: 'overview', label: 'Overview', icon: BookOpen },
   { id: 'build', label: 'Build', icon: PenTool },
+  { id: 'syllabus', label: 'Syllabus', icon: ScrollText },
   { id: 'modules', label: 'Modules', icon: BookOpen },
   { id: 'assignments', label: 'Assignments', icon: ClipboardList },
   { id: 'activities', label: 'Activities', icon: Play },
@@ -2109,6 +2110,103 @@ function SectionPolicy({ title, html, isInstructor, onSave, saving, icon, banner
   );
 }
 
+/* ── Syllabus tab: the standard course syllabus, editable by instructors, read by learners. ── */
+const SYL_BASICS: { key: string; label: string; wide?: boolean }[] = [
+  { key: 'number', label: 'Course number' }, { key: 'name', label: 'Course name' },
+  { key: 'instructor', label: 'Instructor' }, { key: 'contact', label: 'Contact' },
+  { key: 'times', label: 'Meeting times' }, { key: 'locations', label: 'Location(s)' },
+];
+const SYL_SECTIONS: { key: string; title: string }[] = [
+  { key: 'objectivesHtml', title: 'Learning Objectives' },
+  { key: 'scheduleHtml', title: 'Course Schedule' },
+  { key: 'assessmentHtml', title: 'Assignments & Assessment' },
+  { key: 'responsibilitiesHtml', title: 'Student Responsibilities' },
+  { key: 'materialsHtml', title: 'Course Materials' },
+  { key: 'communicationHtml', title: 'Communication & Support' },
+];
+const EMPTY_SYL = { basics: { number: '', name: '', instructor: '', contact: '', times: '', locations: '', description: '' }, objectivesHtml: '', scheduleHtml: '', assessmentHtml: '', responsibilitiesHtml: '', materialsHtml: '', communicationHtml: '' };
+
+function SyllabusTab({ courseId, syllabusJson, isInstructor, onSave, saving, bannerUrl, onBannerSave }: {
+  courseId: string; syllabusJson: string | null; isInstructor: boolean; onSave: (json: string) => void; saving: boolean; bannerUrl?: string | null; onBannerSave?: (url: string) => void;
+}) {
+  const parse = (j: string | null) => { try { const p = JSON.parse(j || '{}'); return { ...EMPTY_SYL, ...p, basics: { ...EMPTY_SYL.basics, ...(p.basics || {}) } }; } catch { return EMPTY_SYL; } };
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<any>(() => parse(syllabusJson));
+  const [genBusy, setGenBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => { if (!editing) setDraft(parse(syllabusJson)); }, [syllabusJson, editing]);
+  const syl = parse(syllabusJson);
+  const hasAny = SYL_BASICS.some((f) => (syl.basics as any)[f.key]) || syl.basics.description || SYL_SECTIONS.some((s) => (syl as any)[s.key]);
+
+  const generate = async () => {
+    setGenBusy(true); setErr(null);
+    try { const r = await apiFetch<{ syllabus: any }>(`/courses/${courseId}/syllabus/generate`, { method: 'POST', body: JSON.stringify({}) }); setDraft({ ...EMPTY_SYL, ...r.syllabus, basics: { ...EMPTY_SYL.basics, ...(r.syllabus?.basics || {}) } }); setEditing(true); }
+    catch (e) { setErr(e instanceof Error ? e.message : 'Could not generate a syllabus.'); }
+    finally { setGenBusy(false); }
+  };
+
+  return (
+    <div className="space-y-5">
+      <SectionBanner title="Syllabus" icon={ScrollText} bannerUrl={bannerUrl} isInstructor={isInstructor} onBannerSave={onBannerSave} />
+      {isInstructor && (
+        <div className="flex flex-wrap justify-end gap-2">
+          {!editing && <Button size="sm" variant="outline" className="gap-1.5" disabled={genBusy} onClick={generate}><Sparkles className="h-3.5 w-3.5" /> {genBusy ? 'Writing…' : 'Generate from this course'}</Button>}
+          {!editing && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setDraft(parse(syllabusJson)); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /> Edit syllabus</Button>}
+        </div>
+      )}
+      {err && <p className="text-xs text-rose-600">{err}</p>}
+
+      {editing ? (
+        <div className="max-w-3xl space-y-6">
+          <section className="space-y-3">
+            <h3 className="font-serif font-bold text-lg flex items-center gap-2"><span className="h-4 w-1 rounded-full bg-orange-500" /> Course Basics</h3>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {SYL_BASICS.map((f) => (
+                <label key={f.key} className="text-sm"><span className="mb-1 block text-muted-foreground">{f.label}</span>
+                  <Input value={draft.basics[f.key] ?? ''} onChange={(e) => setDraft((d: any) => ({ ...d, basics: { ...d.basics, [f.key]: e.target.value } }))} /></label>
+              ))}
+            </div>
+            <label className="text-sm block"><span className="mb-1 block text-muted-foreground">Course description</span>
+              <Textarea value={draft.basics.description ?? ''} onChange={(e) => setDraft((d: any) => ({ ...d, basics: { ...d.basics, description: e.target.value } }))} className="min-h-[70px]" /></label>
+          </section>
+          {SYL_SECTIONS.map((s) => (
+            <section key={s.key} className="space-y-2">
+              <h3 className="font-serif font-bold text-lg flex items-center gap-2"><span className="h-4 w-1 rounded-full bg-orange-500" /> {s.title}</h3>
+              <RichTextEditor value={draft[s.key] ?? ''} onChange={(h) => setDraft((d: any) => ({ ...d, [s.key]: h }))} />
+            </section>
+          ))}
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button size="sm" disabled={saving} onClick={() => { onSave(JSON.stringify(draft)); setEditing(false); }}>{saving ? 'Saving…' : 'Save syllabus'}</Button>
+          </div>
+        </div>
+      ) : !hasAny ? (
+        <div className="max-w-3xl rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          {isInstructor ? 'No syllabus yet. Click "Generate from this course" to draft one, or "Edit syllabus" to write it.' : 'The syllabus for this course has not been published yet.'}
+        </div>
+      ) : (
+        <div className="max-w-3xl space-y-6">
+          <section>
+            <h3 className="font-serif font-bold text-lg flex items-center gap-2 mb-2"><span className="h-4 w-1 rounded-full bg-orange-500" /> Course Basics</h3>
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+              {SYL_BASICS.filter((f) => (syl.basics as any)[f.key]).map((f) => (
+                <div key={f.key}><span className="text-muted-foreground">{f.label}: </span><span className="font-medium">{(syl.basics as any)[f.key]}</span></div>
+              ))}
+            </div>
+            {syl.basics.description && <p className="text-sm text-foreground/85 leading-relaxed mt-2 whitespace-pre-line">{syl.basics.description}</p>}
+          </section>
+          {SYL_SECTIONS.filter((s) => (syl as any)[s.key]).map((s) => (
+            <section key={s.key}>
+              <h3 className="font-serif font-bold text-lg flex items-center gap-2 mb-2"><span className="h-4 w-1 rounded-full bg-orange-500" /> {s.title}</h3>
+              <div className="prose prose-sm max-w-none text-foreground/85 leading-relaxed [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: (syl as any)[s.key] }} />
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
   const search = useSearch();
@@ -3123,6 +3221,12 @@ export function CourseDetail() {
 
         {activeTab === 'discussions' && (
           <SectionPolicy icon={MessageSquare} bannerUrl={sectionBannerUrl('discussions')} onBannerSave={(u) => saveSectionBanner('discussions', u)} title={DEFAULT_POLICIES.discussions.title} html={policies.discussions ?? DEFAULT_POLICIES.discussions.html} isInstructor={isInstructor} onSave={(h) => savePolicy('discussions', h)} saving={saveCourse.isPending} />
+        )}
+
+        {activeTab === 'syllabus' && (
+          <SyllabusTab courseId={courseId} syllabusJson={(course as { syllabus?: string | null }).syllabus ?? null} isInstructor={isInstructor}
+            onSave={(j) => saveCourse.mutate({ syllabus: j })} saving={saveCourse.isPending}
+            bannerUrl={sectionBannerUrl('syllabus')} onBannerSave={(u) => saveSectionBanner('syllabus', u)} />
         )}
 
         {/* ANNOUNCEMENTS */}
