@@ -31,6 +31,7 @@ import { activitiesApi } from '@/lib/activitiesApi';
 import { RichTextEditor, BulletStyleBar, BulletIcon, objectivesHtmlToItems, itemsToPlain, escapeHtml } from '@/components/RichTextEditor';
 import { renderActivity, type InteractionType, type ActivitySpec } from '@/lib/activityTemplates';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
+import { ActivityPlayer, type ActivityPlayerHandleResult } from '@/components/ActivityPlayer';
 import {
   ChevronLeft, ChevronRight, ChevronDown, CheckCircle, BookOpen, List, Sparkles, Pencil,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
@@ -2941,6 +2942,54 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
   );
 }
 
+// An activity played INLINE inside the module (no navigation to a separate page). Shows the cover
+// image, instructions, the interactive player, and — if attached — the rubric, all in one card.
+function EmbeddedActivity({ a }: { a: any }) {
+  const [openState, setOpenState] = useState(true);
+  const [done, setDone] = useState(false);
+  const [score, setScore] = useState<number | null>(null);
+  const submit = useMutation({
+    mutationFn: (r: ActivityPlayerHandleResult) => activitiesApi.submit(a.id, r.payload, r.score),
+    onSuccess: (s: any) => { setDone(true); setScore(s?.score ?? null); },
+  });
+  const { data: rubric } = useQuery({
+    queryKey: ['rubric', a.rubricId],
+    queryFn: () => apiFetch<{ title: string; criteria: { name: string; descriptor: string; points: number }[]; totalPoints: number }>(`/rubrics/${a.rubricId}`),
+    enabled: !!a.rubricId,
+  });
+  return (
+    <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-500/5 overflow-hidden">
+      <button onClick={() => setOpenState((v) => !v)} className="w-full flex items-center gap-3 p-4 text-left">
+        <span className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center shrink-0"><Zap className="h-5 w-5" /></span>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm truncate flex items-center gap-2">{a.title}{done && <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle className="h-3.5 w-3.5" /> {score != null ? `${score}%` : 'Done'}</span>}</div>
+          <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}{a.difficulty ? ` · ${a.difficulty}` : ''}</div>
+        </div>
+        <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', openState ? '' : '-rotate-90')} />
+      </button>
+      {openState && (
+        <div className="px-4 pb-4 space-y-3">
+          {a.imageUrl && <img src={a.imageUrl} alt="" className="w-full max-h-52 object-cover rounded-lg border border-border" />}
+          {a.instructions && <p className="text-sm text-muted-foreground">{a.instructions}</p>}
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <ActivityPlayer html={a.html} embedUrl={a.embedUrl} onSubmit={(r) => submit.mutate(r)} />
+          </div>
+          {rubric && (
+            <details className="rounded-lg border border-border bg-card p-3 text-sm">
+              <summary className="cursor-pointer font-medium">How this is graded — {rubric.title} <span className="text-xs font-normal text-muted-foreground">· {rubric.totalPoints} pts</span></summary>
+              <div className="mt-2 divide-y divide-border/60">
+                {rubric.criteria.map((c, i) => (
+                  <div key={i} className="flex items-start gap-3 py-1.5"><span className="min-w-0 flex-1">{c.name}{c.descriptor && <span className="block text-xs text-muted-foreground">{c.descriptor}</span>}</span><span className="text-muted-foreground shrink-0">{c.points} pts</span></div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // A module case-study card: learners start it; instructors can edit its content or delete it.
 function ModuleCaseCard({ moduleId, c, isInstructor, onStart, starting }: { moduleId: string; c: any; isInstructor: boolean; onStart: () => void; starting: boolean }) {
   const qc = useQueryClient();
@@ -4311,17 +4360,9 @@ function ModuleHubView({
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 )}
-                {/* Standalone activities assigned to this module (played full-screen). */}
+                {/* Standalone activities assigned to this module — embedded and played inline. */}
                 {(moduleActivities ?? []).map((a) => (
-                  <button key={a.id} onClick={() => navigate(`/activities/${a.id}/play`)}
-                    className="w-full flex items-center gap-4 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-500/5 p-4 text-left hover:shadow-sm transition-shadow">
-                    <span className="h-10 w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 flex items-center justify-center shrink-0"><Zap className="h-5 w-5" /></span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-sm truncate">{a.title}</div>
-                      <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}{a.difficulty ? ` · ${a.difficulty}` : ''}</div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </button>
+                  <EmbeddedActivity key={a.id} a={a} />
                 ))}
               </>
             ) : (
