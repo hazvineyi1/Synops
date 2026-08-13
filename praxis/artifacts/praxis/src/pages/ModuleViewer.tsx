@@ -3493,6 +3493,7 @@ function ModuleHubView({
     queryFn: () => apiFetch<HubDiscussion[]>(`/courses/${courseId}/discussions?moduleId=${moduleId}`),
     enabled: !!courseId,
   });
+  const delDiscussion = useMutation({ mutationFn: (id: string) => apiFetch(`/discussions/${id}`, { method: 'DELETE' }), onSuccess: () => qc.invalidateQueries({ queryKey: ['discussions', courseId, moduleId] }) });
   // Per-module completion across the course, to drive Next-module / course-complete nav.
   const { data: courseProg } = useQuery({
     queryKey: ['course-progress', courseId],
@@ -4420,12 +4421,20 @@ function ModuleHubView({
             {(discussions && discussions.length > 0) ? (
               <div className="space-y-2">
                 {discussions.map((d) => (
-                  <button key={d.id} onClick={() => navigate(`/courses/${courseId}/discussions/${d.id}`)}
-                    className="w-full flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
-                    <MessageSquare className="h-4 w-4 text-blue-600 shrink-0" />
-                    <span className="flex-1 text-sm font-medium truncate">{d.title}</span>
-                    <span className="text-xs text-muted-foreground shrink-0">{d.replyCount ?? 0} repl{(d.replyCount ?? 0) === 1 ? 'y' : 'ies'}</span>
-                  </button>
+                  <div key={d.id} className="flex items-center gap-2">
+                    <button onClick={() => navigate(`/courses/${courseId}/discussions/${d.id}`)}
+                      className="flex-1 min-w-0 flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
+                      <MessageSquare className="h-4 w-4 text-blue-600 shrink-0" />
+                      <span className="flex-1 text-sm font-medium truncate">{d.title}</span>
+                      <span className="text-xs text-muted-foreground shrink-0">{d.replyCount ?? 0} repl{(d.replyCount ?? 0) === 1 ? 'y' : 'ies'}</span>
+                    </button>
+                    {isInstructor && (
+                      <Button size="sm" variant="ghost" className="text-rose-500 shrink-0" title="Delete discussion"
+                        onClick={() => { if (window.confirm(`Delete "${d.title}" and all its replies? This cannot be undone.`)) delDiscussion.mutate(d.id); }}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
