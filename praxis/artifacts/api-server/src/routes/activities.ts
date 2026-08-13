@@ -117,6 +117,7 @@ function activityResponse(a: typeof interactiveActivitiesTable.$inferSelect) {
     title: a.title,
     instructions: a.instructions,
     imageUrl: (a as { imageUrl?: string | null }).imageUrl ?? null,
+    spec: (a as { spec?: unknown }).spec ?? null,
     html: a.html,
     source: a.source,
     embedUrl: a.embedUrl,
@@ -225,6 +226,7 @@ router.post("/activities", requireAuth, requireAuthor, async (req, res) => {
       title,
       instructions: b.instructions ?? null,
       imageUrl: b.imageUrl ?? null,
+      spec: b.spec ?? null,
       html: String(b.html ?? ""),
       source: SOURCES.includes(b.source) ? b.source : "html",
       embedUrl: b.embedUrl ?? null,
@@ -297,6 +299,7 @@ router.patch("/activities/:id", requireAuth, requireAuthor, async (req, res) => 
   if (b.title !== undefined) patch.title = String(b.title);
   if (b.instructions !== undefined) patch.instructions = b.instructions;
   if (b.imageUrl !== undefined) patch.imageUrl = b.imageUrl || null;
+  if (b.spec !== undefined) patch.spec = b.spec ?? null;
   if (b.html !== undefined) patch.html = String(b.html);
   if (b.source !== undefined && SOURCES.includes(b.source)) patch.source = b.source;
   if (b.embedUrl !== undefined) patch.embedUrl = b.embedUrl;

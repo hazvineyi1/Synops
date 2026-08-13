@@ -34,6 +34,9 @@ export const interactiveActivitiesTable = pgTable("interactive_activities", {
   instructions: text("instructions"),
   /** Optional cover image (pasted URL or AI-generated photorealistic image). */
   imageUrl: text("image_url"),
+  /** For no-code interaction types (quiz/flashcards/…): the editable spec, so it can be re-edited
+   *  later with rich text instead of only the baked HTML. */
+  spec: jsonb("spec"),
   // The author-supplied HTML document body. Rendered inside a sandboxed iframe.
   html: text("html").notNull().default(""),
   /**

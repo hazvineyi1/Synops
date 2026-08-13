@@ -24,6 +24,7 @@ export interface Activity {
   title: string;
   instructions: string | null;
   imageUrl: string | null;
+  spec: unknown | null;
   html: string;
   source: "html" | "embed" | "ai";
   embedUrl: string | null;
@@ -95,6 +96,7 @@ export interface ActivityInput {
   title?: string;
   instructions?: string | null;
   imageUrl?: string | null;
+  spec?: unknown | null;
   html?: string;
   source?: "html" | "embed" | "ai";
   embedUrl?: string | null;

@@ -5,12 +5,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ActivityPlayer } from "@/components/ActivityPlayer";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { activitiesApi, type Activity } from "@/lib/activitiesApi";
 import {
   TEMPLATES, emptySpec, validateSpec, renderActivity,
   type InteractionType, type ActivitySpec,
 } from "@/lib/activityTemplates";
 import { X, Plus, Trash2, Eye, Check } from "lucide-react";
+
+const TYPE_KEYS: InteractionType[] = ["quiz", "flashcards", "matching", "order", "categorize"];
+const isType = (k: unknown): k is InteractionType => typeof k === "string" && (TYPE_KEYS as string[]).includes(k);
 
 const BLOOMS = ["Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"];
 const DIFFS = ["foundational", "intermediate", "advanced"];
@@ -20,17 +24,19 @@ const DIFFS = ["foundational", "intermediate", "advanced"];
  * and it generates the self-contained gamified HTML via the shared template engine. This is
  * the same renderer the AI generator and the library use, one spec, many interactives.
  */
-export function ActivityBuilder({ onClose, onCreated }: { onClose: () => void; onCreated: (a: Activity) => void }) {
+export function ActivityBuilder({ onClose, onCreated, activity }: { onClose: () => void; onCreated: (a: Activity) => void; activity?: Activity | null }) {
   const qc = useQueryClient();
   const { toast } = useToast();
-  const [type, setType] = useState<InteractionType>("quiz");
-  const [title, setTitle] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [bloom, setBloom] = useState("Understand");
-  const [difficulty, setDifficulty] = useState("foundational");
-  const [published, setPublished] = useState(true);
-  // Spec is edited loosely then validated/cleaned by the engine on save.
-  const [spec, setSpec] = useState<any>(() => emptySpec("quiz"));
+  const initialType: InteractionType = activity && isType(activity.kind) ? activity.kind : "quiz";
+  const [type, setType] = useState<InteractionType>(initialType);
+  const [title, setTitle] = useState(activity?.title ?? "");
+  const [instructions, setInstructions] = useState(activity?.instructions ?? "");
+  const [bloom, setBloom] = useState(activity?.bloomsLevel ?? "Understand");
+  const [difficulty, setDifficulty] = useState(activity?.difficulty ?? "foundational");
+  const [published, setPublished] = useState(activity?.published ?? true);
+  // Spec is edited loosely then validated/cleaned by the engine on save. When editing an existing
+  // no-code activity we load its saved spec so every field is editable again (with rich text).
+  const [spec, setSpec] = useState<any>(() => (activity?.spec ? JSON.parse(JSON.stringify(activity.spec)) : emptySpec(initialType)));
 
   const pickType = (t: InteractionType) => {
     setType(t); setSpec(emptySpec(t));
@@ -48,14 +54,16 @@ export function ActivityBuilder({ onClose, onCreated }: { onClose: () => void; o
       const err = validateSpec(type, spec as ActivitySpec);
       if (err) throw new Error(err);
       if (!title.trim()) throw new Error("Give the activity a title.");
-      return activitiesApi.create({
+      const input = {
         title: title.trim(), instructions: instructions.trim() || null,
         html: renderActivity(type, spec as ActivitySpec),
-        source: "html", kind: type, bloomsLevel: bloom, difficulty, published,
-      });
+        source: "html" as const, kind: type, bloomsLevel: bloom, difficulty, published,
+        spec, imageUrl: activity?.imageUrl ?? null,
+      };
+      return activity ? activitiesApi.update(activity.id, input) : activitiesApi.create(input);
     },
-    onSuccess: (a) => { toast({ title: "Activity created" }); qc.invalidateQueries({ queryKey: ["activities"] }); onCreated(a); },
-    onError: (e) => toast({ title: "Could not create", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+    onSuccess: (a) => { toast({ title: activity ? "Activity saved" : "Activity created" }); qc.invalidateQueries({ queryKey: ["activities"] }); onCreated(a); },
+    onError: (e) => toast({ title: "Could not save", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
   return (
@@ -63,9 +71,9 @@ export function ActivityBuilder({ onClose, onCreated }: { onClose: () => void; o
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full max-w-4xl max-h-[90vh] overflow-auto rounded-xl bg-white shadow-xl border">
         <div className="sticky top-0 bg-white border-b px-5 py-3 flex items-center justify-between z-10">
-          <h2 className="font-semibold">Build an interactive</h2>
+          <h2 className="font-semibold">{activity ? "Edit interactive" : "Build an interactive"}</h2>
           <div className="flex items-center gap-2">
-            <Button size="sm" onClick={() => create.mutate()} disabled={create.isPending}>{create.isPending ? "Creating…" : "Create activity"}</Button>
+            <Button size="sm" onClick={() => create.mutate()} disabled={create.isPending}>{create.isPending ? "Saving…" : activity ? "Save changes" : "Create activity"}</Button>
             <button onClick={onClose} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"><X className="h-4 w-4" /></button>
           </div>
         </div>
@@ -95,7 +103,7 @@ export function ActivityBuilder({ onClose, onCreated }: { onClose: () => void; o
 
             <div className="border-t pt-3">
               {type === "quiz" && <QuizForm spec={spec} patch={patch} />}
-              {type === "flashcards" && <PairForm spec={spec} patch={patch} field="cards" a="front" b="back" labelA="Front (prompt)" labelB="Back (answer)" addLabel="card" />}
+              {type === "flashcards" && <PairForm spec={spec} patch={patch} field="cards" a="front" b="back" labelA="Front (prompt)" labelB="Back (answer)" addLabel="card" rich />}
               {type === "matching" && <PairForm spec={spec} patch={patch} field="pairs" a="left" b="right" labelA="Item" labelB="Its match" addLabel="pair" />}
               {type === "order" && <OrderForm spec={spec} patch={patch} />}
               {type === "categorize" && <CategorizeForm spec={spec} patch={patch} />}
@@ -129,19 +137,22 @@ const AddBtn = ({ onClick, label }: { onClick: () => void; label: string }) => (
 );
 
 function QuizForm({ spec, patch }: { spec: any; patch: (fn: (s: any) => void) => void }) {
+  const nQ = spec.questions.length;
   return (
     <div className="space-y-4">
       {spec.questions.map((q: any, qi: number) => (
         <div key={qi} className="rounded-lg border p-3 space-y-2">
           <Row onRemove={spec.questions.length > 1 ? () => patch((s) => s.questions.splice(qi, 1)) : undefined}>
-            <Input value={q.q} placeholder={`Question ${qi + 1}`} onChange={(e) => patch((s) => { s.questions[qi].q = e.target.value; })} />
+            <Label className="text-xs text-muted-foreground">Question {qi + 1}</Label>
+            <RichTextEditor key={`q${nQ}:${qi}`} value={q.q} onChange={(h) => patch((s) => { s.questions[qi].q = h; })} />
           </Row>
-          <div className="pl-1 space-y-1.5">
+          <div className="pl-1 space-y-2">
+            <Label className="text-xs text-muted-foreground">Answers (select the correct one)</Label>
             {q.options.map((o: any, oi: number) => (
-              <div key={oi} className="flex items-center gap-2">
-                <input type="radio" name={`c${qi}`} checked={!!o.correct} onChange={() => patch((s) => s.questions[qi].options.forEach((x: any, k: number) => x.correct = k === oi))} title="Correct answer" />
-                <Input value={o.t} placeholder={`Option ${oi + 1}`} onChange={(e) => patch((s) => { s.questions[qi].options[oi].t = e.target.value; })} />
-                {q.options.length > 2 && <button onClick={() => patch((s) => s.questions[qi].options.splice(oi, 1))} className="p-1 text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
+              <div key={oi} className="flex items-start gap-2">
+                <input type="radio" className="mt-2.5 shrink-0" name={`c${qi}`} checked={!!o.correct} onChange={() => patch((s) => s.questions[qi].options.forEach((x: any, k: number) => x.correct = k === oi))} title="Correct answer" />
+                <div className="flex-1 min-w-0"><RichTextEditor key={`o${q.options.length}:${qi}:${oi}`} value={o.t} onChange={(h) => patch((s) => { s.questions[qi].options[oi].t = h; })} /></div>
+                {q.options.length > 2 && <button onClick={() => patch((s) => s.questions[qi].options.splice(oi, 1))} className="mt-2 p-1 text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>}
               </div>
             ))}
             <Input className="text-xs" value={q.options.find((o: any) => o.correct)?.why ?? ""} placeholder="Why the correct answer is right (feedback)"
@@ -155,16 +166,23 @@ function QuizForm({ spec, patch }: { spec: any; patch: (fn: (s: any) => void) =>
   );
 }
 
-function PairForm({ spec, patch, field, a, b, labelA, labelB, addLabel }: { spec: any; patch: (fn: (s: any) => void) => void; field: string; a: string; b: string; labelA: string; labelB: string; addLabel: string }) {
+function PairForm({ spec, patch, field, a, b, labelA, labelB, addLabel, rich }: { spec: any; patch: (fn: (s: any) => void) => void; field: string; a: string; b: string; labelA: string; labelB: string; addLabel: string; rich?: boolean }) {
   const rows = spec[field] as any[];
   return (
-    <div className="space-y-2">
+    <div className={rich ? "space-y-4" : "space-y-2"}>
       {rows.map((row: any, i: number) => (
         <Row key={i} onRemove={rows.length > 1 ? () => patch((s) => s[field].splice(i, 1)) : undefined}>
-          <div className="grid grid-cols-2 gap-2">
-            <Input value={row[a]} placeholder={labelA} onChange={(e) => patch((s) => { s[field][i][a] = e.target.value; })} />
-            <Input value={row[b]} placeholder={labelB} onChange={(e) => patch((s) => { s[field][i][b] = e.target.value; })} />
-          </div>
+          {rich ? (
+            <div className="space-y-2 rounded-lg border p-3">
+              <div><Label className="text-xs text-muted-foreground">{labelA}</Label><RichTextEditor key={`${field}${rows.length}:a:${i}`} value={row[a]} onChange={(h) => patch((s) => { s[field][i][a] = h; })} /></div>
+              <div><Label className="text-xs text-muted-foreground">{labelB}</Label><RichTextEditor key={`${field}${rows.length}:b:${i}`} value={row[b]} onChange={(h) => patch((s) => { s[field][i][b] = h; })} /></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={row[a]} placeholder={labelA} onChange={(e) => patch((s) => { s[field][i][a] = e.target.value; })} />
+              <Input value={row[b]} placeholder={labelB} onChange={(e) => patch((s) => { s[field][i][b] = e.target.value; })} />
+            </div>
+          )}
         </Row>
       ))}
       <AddBtn onClick={() => patch((s) => s[field].push({ [a]: "", [b]: "" }))} label={addLabel} />

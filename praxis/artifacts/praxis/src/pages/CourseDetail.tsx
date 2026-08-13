@@ -1884,7 +1884,7 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
               try {
                 const html = renderActivity(a.type as InteractionType, a.spec as ActivitySpec);
                 if (!html) continue;
-                await activitiesApi.create({ title: a.title, instructions: a.instructions || undefined, source: 'html', html, kind: 'game', bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null, published: true, courseId, moduleId: m.id });
+                await activitiesApi.create({ title: a.title, instructions: a.instructions || undefined, source: 'html', html, kind: a.type, spec: a.spec, bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null, published: true, courseId, moduleId: m.id });
                 made++;
               } catch { /* skip one */ }
             }

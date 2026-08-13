@@ -778,6 +778,8 @@ export function ActivitiesAdmin() {
   const [bandFilter, setBandFilter] = useState("");
   const [gameQuery, setGameQuery] = useState("");
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [builderEdit, setBuilderEdit] = useState<Activity | null>(null);
+  const isNoCode = (k?: string | null) => ["quiz", "flashcards", "matching", "order", "categorize"].includes(String(k));
   const [assignFor, setAssignFor] = useState<Activity | null>(null);
   const [courseFor, setCourseFor] = useState<Activity | null>(null);
   const [, navigate] = useLocation();
@@ -846,7 +848,7 @@ export function ActivitiesAdmin() {
           {preModuleId ? 'New and AI-generated activities here will be attached to the module you came from.' : 'New activities you create here will be linked to the course you came from.'}
         </div>
       )}
-      {builderOpen && <ActivityBuilder onClose={() => setBuilderOpen(false)} onCreated={(a) => { setBuilderOpen(false); setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} />}
+      {builderOpen && <ActivityBuilder activity={builderEdit} onClose={() => { setBuilderOpen(false); setBuilderEdit(null); }} onCreated={(a) => { setBuilderOpen(false); setBuilderEdit(null); setCreating(false); setSelectedId(a.id); setRightTab("preview"); }} />}
       {assignFor && <ActivityAssignDialog activityId={assignFor.id} activityTitle={assignFor.title} onClose={() => setAssignFor(null)} />}
       {courseFor && <AddActivityToCourseDialog activity={courseFor} onClose={() => setCourseFor(null)} />}
       {gameStudioOpen && <GameStudioDialog onClose={() => setGameStudioOpen(false)} onSaved={() => { setGameStudioOpen(false); qc.invalidateQueries({ queryKey: ["activities"] }); }} />}
@@ -910,6 +912,9 @@ export function ActivitiesAdmin() {
                     </AddToGradebookDialog>
                   )}
                   {selected.published && <Button variant="outline" size="sm" onClick={() => window.open(`/activities/${selected.id}/play`, "_blank")}><ExternalLink className="h-4 w-4 mr-1" />Open as learner</Button>}
+                  {selected.spec != null && isNoCode(selected.kind) && (
+                    <Button variant="outline" size="sm" onClick={() => { setBuilderEdit(selected); setBuilderOpen(true); }}><Pencil className="h-4 w-4 mr-1" />Edit content</Button>
+                  )}
                   <Button variant="ghost" size="sm" className="text-red-600" onClick={() => del.mutate(selected.id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               </div>
@@ -924,6 +929,7 @@ export function ActivitiesAdmin() {
 
               {rightTab === "preview" ? (
                 <div className="space-y-2">
+                  {selected.imageUrl && <img src={selected.imageUrl} alt="" className="w-full max-h-56 object-cover rounded-lg border border-border" />}
                   {selected.instructions && <p className="text-sm text-muted-foreground">{selected.instructions}</p>}
                   <ActivityPlayer html={selected.html} embedUrl={selected.embedUrl} disabled />
                   <p className="text-xs text-muted-foreground">Preview, submissions here are not recorded.</p>

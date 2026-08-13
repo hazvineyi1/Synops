@@ -2535,7 +2535,7 @@ function ReadingCoursework({ courseId, moduleId, readings }: { courseId: string;
           if (!html) continue;
           await activitiesApi.create({
             title: a.title, instructions: a.instructions || undefined, source: 'html', html,
-            kind: 'game', bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null,
+            kind: type, spec: a.spec, bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null,
             published: true, courseId, moduleId,
           });
           madeTitles.push(a.title);
