@@ -20,6 +20,17 @@ const TEMPLATES: Record<string, { name: string; cover: string; accent: string; d
   warm: { name: 'Warm', cover: 'from-orange-500 via-amber-500 to-rose-500', accent: 'bg-orange-600' },
 };
 
+// A comprehensive, grounding rubric the learner builds their portfolio toward — the same standard
+// across every course, so the portfolio stays coherent and rigorous.
+const PORTFOLIO_RUBRIC: { name: string; descriptor: string }[] = [
+  { name: 'Breadth & relevance of evidence', descriptor: 'A range of artifacts (work, projects, media) that clearly connect to your learning goals.' },
+  { name: 'Depth of reflection', descriptor: 'Thoughtful reflection on what you learned, how you grew, and what challenged you — not just what you did.' },
+  { name: 'Demonstration of growth', descriptor: 'Evidence of progress and increasing sophistication over time, course to course.' },
+  { name: 'Quality & craft', descriptor: 'The work itself is accurate, complete, and well-executed.' },
+  { name: 'Presentation & professionalism', descriptor: 'Clear, well-organised, visually coherent, and free of errors.' },
+  { name: 'Goal alignment', descriptor: 'The collection makes a coherent case toward your stated goals and aspirations.' },
+];
+
 const fileToBase64 = (f: File) => new Promise<string>((res, rej) => {
   const r = new FileReader();
   r.onload = () => res(String(r.result).split(',')[1] || '');
@@ -181,6 +192,20 @@ export function Portfolio() {
           <p className="text-sm text-muted-foreground">Tell people who you are and what you're working towards — or click "Generate intro from my work".</p>
         )}
       </section>
+
+      {/* Grounding rubric */}
+      <details className="rounded-2xl border border-border bg-card p-5 group">
+        <summary className="flex items-center gap-2 cursor-pointer list-none font-serif font-bold text-lg"><span className="h-4 w-1 rounded-full bg-primary" /> What makes a strong portfolio <span className="ml-auto text-xs font-normal text-muted-foreground group-open:hidden">show</span></summary>
+        <p className="text-sm text-muted-foreground mt-2 mb-3">Build toward these — they hold across every course.</p>
+        <div className="divide-y divide-border/60">
+          {PORTFOLIO_RUBRIC.map((c, i) => (
+            <div key={i} className="py-2.5">
+              <p className="text-sm font-medium">{c.name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{c.descriptor}</p>
+            </div>
+          ))}
+        </div>
+      </details>
 
       {/* Add toolbar */}
       <div className="flex flex-wrap items-center gap-2">

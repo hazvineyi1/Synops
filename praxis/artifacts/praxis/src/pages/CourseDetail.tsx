@@ -1844,6 +1844,7 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
   const [discCount, setDiscCount] = useState(2);
   const [gameCount, setGameCount] = useState(0);
   const [gameTypes, setGameTypes] = useState<Set<string>>(() => new Set(GAME_TYPES.map((t) => t.id)));
+  const [attachRubrics, setAttachRubrics] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -1886,7 +1887,8 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
               try {
                 const html = renderActivity(a.type as InteractionType, a.spec as ActivitySpec);
                 if (!html) continue;
-                await activitiesApi.create({ title: a.title, instructions: a.instructions || undefined, source: 'html', html, kind: a.type, spec: a.spec, bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null, published: true, courseId, moduleId: m.id });
+                const created = await activitiesApi.create({ title: a.title, instructions: a.instructions || undefined, source: 'html', html, kind: a.type, spec: a.spec, bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null, published: true, courseId, moduleId: m.id });
+                if (attachRubrics && created?.id) { try { await apiFetch(`/activities/${created.id}/rubric/generate`, { method: 'POST', body: JSON.stringify({}) }); } catch { /* rubric optional */ } }
                 made++;
               } catch { /* skip one */ }
             }
@@ -1928,6 +1930,7 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
         }
       }
     }
+    if (attachRubrics) qc.invalidateQueries({ queryKey: ['rubrics', courseId] });
     setLog(notes);
     setProgress(notes.length ? `Done, with ${notes.length} item(s) to review below.` : `Done. Coursework generated across ${mods.length} module${mods.length === 1 ? '' : 's'}.`);
     setRunning(false);
@@ -1994,6 +1997,10 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
         )}
       </div>
 
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <input type="checkbox" checked={attachRubrics} disabled={running} onChange={(e) => setAttachRubrics(e.target.checked)} />
+        Also generate and attach a grading rubric to each activity (slower).
+      </label>
       {progress && <p className="text-xs text-muted-foreground">{progress}</p>}
       {error && <p className="text-xs text-rose-600">{error}</p>}
       {log.length > 0 && <ul className="text-xs text-amber-600 list-disc pl-4 space-y-0.5">{log.map((l, i) => <li key={i}>{l}</li>)}</ul>}
@@ -2186,23 +2193,33 @@ function SyllabusTab({ courseId, syllabusJson, isInstructor, onSave, saving, ban
           {isInstructor ? 'No syllabus yet. Click "Generate from this course" to draft one, or "Edit syllabus" to write it.' : 'The syllabus for this course has not been published yet.'}
         </div>
       ) : (
-        <div className="max-w-3xl space-y-6">
-          <section>
-            <h3 className="font-serif font-bold text-lg flex items-center gap-2 mb-2"><span className="h-4 w-1 rounded-full bg-orange-500" /> Course Basics</h3>
-            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-              {SYL_BASICS.filter((f) => (syl.basics as any)[f.key]).map((f) => (
-                <div key={f.key}><span className="text-muted-foreground">{f.label}: </span><span className="font-medium">{(syl.basics as any)[f.key]}</span></div>
+        <article className="max-w-3xl mx-auto rounded-2xl border border-border bg-card shadow-sm px-6 sm:px-12 py-9">
+          <header className="text-center border-b border-border pb-6 mb-7">
+            <h1 className="font-serif text-3xl sm:text-4xl font-bold leading-tight">{syl.basics.name || 'Course Syllabus'}</h1>
+            {syl.basics.number && <p className="text-sm font-medium tracking-wide text-muted-foreground mt-1.5">{syl.basics.number}</p>}
+            {syl.basics.description && <p className="text-[15px] text-foreground/80 mt-4 max-w-xl mx-auto leading-relaxed">{syl.basics.description}</p>}
+          </header>
+          {SYL_BASICS.filter((f) => ['instructor', 'contact', 'times', 'locations'].includes(f.key) && (syl.basics as any)[f.key]).length > 0 && (
+            <dl className="grid sm:grid-cols-2 gap-x-10 gap-y-2.5 text-sm mb-9">
+              {SYL_BASICS.filter((f) => ['instructor', 'contact', 'times', 'locations'].includes(f.key) && (syl.basics as any)[f.key]).map((f) => (
+                <div key={f.key} className="flex gap-2">
+                  <dt className="font-semibold text-muted-foreground shrink-0">{f.label}</dt>
+                  <dd className="text-foreground">{(syl.basics as any)[f.key]}</dd>
+                </div>
               ))}
-            </div>
-            {syl.basics.description && <p className="text-sm text-foreground/85 leading-relaxed mt-2 whitespace-pre-line">{syl.basics.description}</p>}
-          </section>
-          {SYL_SECTIONS.filter((s) => (syl as any)[s.key]).map((s) => (
-            <section key={s.key}>
-              <h3 className="font-serif font-bold text-lg flex items-center gap-2 mb-2"><span className="h-4 w-1 rounded-full bg-orange-500" /> {s.title}</h3>
-              <div className="prose prose-sm max-w-none text-foreground/85 leading-relaxed [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: (syl as any)[s.key] }} />
-            </section>
-          ))}
-        </div>
+            </dl>
+          )}
+          <div className="space-y-9">
+            {SYL_SECTIONS.filter((s) => (syl as any)[s.key]).map((s, idx) => (
+              <section key={s.key}>
+                <h2 className="font-serif text-xl font-bold flex items-baseline gap-2.5 mb-2.5 pb-1.5 border-b border-border/60">
+                  <span className="text-primary tabular-nums">{idx + 1}.</span> {s.title}
+                </h2>
+                <div className="prose prose-sm max-w-none text-foreground/85 leading-relaxed [&_h3]:font-serif [&_ul]:my-2 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: (syl as any)[s.key] }} />
+              </section>
+            ))}
+          </div>
+        </article>
       )}
     </div>
   );
@@ -2223,6 +2240,7 @@ function RubricsTab({ courseId, isInstructor, bannerUrl, onBannerSave }: { cours
     onSuccess: () => { setEditing(null); qc.invalidateQueries({ queryKey: ['rubrics', courseId] }); },
   });
   const del = useMutation({ mutationFn: (id: string) => apiFetch(`/rubrics/${id}`, { method: 'DELETE' }), onSuccess: () => qc.invalidateQueries({ queryKey: ['rubrics', courseId] }) });
+  const gen = useMutation({ mutationFn: () => apiFetch(`/courses/${courseId}/rubrics/generate`, { method: 'POST', body: JSON.stringify({}) }), onSuccess: () => qc.invalidateQueries({ queryKey: ['rubrics', courseId] }) });
   const list = rubrics ?? [];
 
   return (
@@ -2231,7 +2249,10 @@ function RubricsTab({ courseId, isInstructor, bannerUrl, onBannerSave }: { cours
       <div className="max-w-3xl space-y-4">
         <p className="text-sm text-muted-foreground">Reusable rubrics for this course. Attach a rubric to any activity so learners see exactly how it's judged. (Case studies carry their own rubric on the case.)</p>
         {isInstructor && !editing && (
-          <Button size="sm" className="gap-1.5" onClick={() => setEditing({ title: '', criteria: [{ name: '', descriptor: '', points: 10 }] })}><Plus className="h-3.5 w-3.5" /> New rubric</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" className="gap-1.5" onClick={() => setEditing({ title: '', criteria: [{ name: '', descriptor: '', points: 10 }] })}><Plus className="h-3.5 w-3.5" /> New rubric</Button>
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={gen.isPending} onClick={() => gen.mutate()}><Sparkles className="h-3.5 w-3.5" /> {gen.isPending ? 'Generating…' : 'Generate from content'}</Button>
+          </div>
         )}
 
         {editing && (

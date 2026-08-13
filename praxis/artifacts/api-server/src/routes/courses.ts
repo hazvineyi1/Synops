@@ -889,10 +889,22 @@ router.post("/courses/:courseId/syllabus/generate", requireAuth, requireRole("su
   if (!(await canStaffActOnCourse(req.dbUser!, courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
   const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, courseId) });
   if (!course) { res.status(404).json({ error: "Course not found" }); return; }
-  const mods = await db.select({ title: modulesTable.title, order: modulesTable.order, objectives: modulesTable.objectives })
+  const mods = await db.select({ id: modulesTable.id, title: modulesTable.title, order: modulesTable.order, objectives: modulesTable.objectives })
     .from(modulesTable).where(eq(modulesTable.courseId, courseId));
   mods.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const moduleList = mods.map((m, i) => `${i + 1}. ${m.title}${(m.objectives?.length ? ` — ${m.objectives.slice(0, 3).join("; ")}` : "")}`).join("\n").slice(0, 4000);
+  // Pull the actual activities + cases per module so the syllabus's assessment/schedule reflects what
+  // has been generated (regenerating the syllabus picks up newly created coursework).
+  const acts = await db.select({ moduleId: interactiveActivitiesTable.moduleId, title: interactiveActivitiesTable.title, kind: interactiveActivitiesTable.kind }).from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.courseId, courseId));
+  const cases = await db.select({ moduleId: caseScenariosTable.moduleId, title: caseScenariosTable.title }).from(caseScenariosTable);
+  const actsByMod = new Map<string, string[]>();
+  for (const a of acts) { if (!a.moduleId) continue; const arr = actsByMod.get(a.moduleId) ?? []; arr.push(`${a.title} (${a.kind})`); actsByMod.set(a.moduleId, arr); }
+  const casesByMod = new Map<string, string[]>();
+  for (const c of cases) { if (!c.moduleId) continue; const arr = casesByMod.get(c.moduleId) ?? []; arr.push(c.title); casesByMod.set(c.moduleId, arr); }
+  const moduleList = mods.map((m, i) => {
+    const a = actsByMod.get(m.id) ?? []; const cs = casesByMod.get(m.id) ?? [];
+    const extras = [a.length ? `activities: ${a.slice(0, 6).join(", ")}` : "", cs.length ? `case studies: ${cs.slice(0, 4).join(", ")}` : ""].filter(Boolean).join("; ");
+    return `${i + 1}. ${m.title}${(m.objectives?.length ? ` — ${m.objectives.slice(0, 3).join("; ")}` : "")}${extras ? ` [${extras}]` : ""}`;
+  }).join("\n").slice(0, 6000);
   const objectives = (course.objectives ?? []).join("\n- ");
   const prompt = `You are writing a clear, professional course SYLLABUS. Use the course details and module list below. For fields you cannot know (instructor name, contact, meeting times/locations, course number), leave them as empty strings — do not invent them. Write the narrative sections as clean HTML (use <p>, <ul><li>, <strong>). The schedule should map the modules to a sensible week-by-week outline.\n\nReturn ONLY strict JSON with exactly these keys:\n{\n "basics": { "number":"", "name":"${(course.title ?? "").replace(/"/g, "'")}", "instructor":"", "contact":"", "times":"", "locations":"", "description":"<a 2-3 sentence course description>" },\n "objectivesHtml":"<overall + per-module objectives as HTML>",\n "scheduleHtml":"<week-by-week schedule mapping the modules, with placeholders for readings/deadlines/exams/holidays>",\n "assessmentHtml":"<assignments, projects, exams and how they are graded>",\n "responsibilitiesHtml":"<participation, homework, late/make-up policy, prerequisites>",\n "materialsHtml":"<required texts and resources and how to access them>",\n "communicationHtml":"<how to contact the instructor, office hours, where to find support>"\n}\n\nCOURSE: ${course.title}\nDESCRIPTION: ${course.description ?? ""}\nOBJECTIVES:\n- ${objectives}\n\nMODULES:\n${moduleList || "(none yet)"}`;
   try {

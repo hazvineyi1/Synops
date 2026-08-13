@@ -37,6 +37,8 @@ const SPEC_SHAPE: Record<ActivityType, string> = {
 
 const SYSTEM = `You are an expert instructional designer. You turn course content into a SHORT, engaging interactive activity of a specified type, grounded strictly in the provided content.
 
+Every activity must ASSESS GENUINE MASTERY of the material's key concepts and align tightly to the learning objectives the content implies — target understanding and application, not superficial recall. Questions/items should make a learner reason with the material (why, how, which-is-best, apply-to-a-case), and distractors should be plausible.
+
 Set an honest Bloom's level (Remember, Understand, Apply, Analyze, Evaluate, or Create) and difficulty (foundational, intermediate, advanced), and briefly justify the rigor in "rationale". Write clear, learner-friendly text. Keep it focused and on-topic.
 
 Return ONLY a single strict JSON object (no prose, no code fences) with EXACTLY these keys:

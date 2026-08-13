@@ -2868,6 +2868,7 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
   const remove = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ moduleId: null }) }), onSuccess: done });
   const { data: rubrics } = useQuery({ queryKey: ['rubrics', courseId], queryFn: () => apiFetch<{ id: string; title: string; totalPoints: number }[]>(`/courses/${courseId}/rubrics`), enabled: !!courseId });
   const setRubric = useMutation({ mutationFn: ({ id, rubricId }: { id: string; rubricId: string }) => apiFetch(`/activities/${id}`, { method: 'PATCH', body: JSON.stringify({ rubricId: rubricId || null }) }), onSuccess: done });
+  const genRubric = useMutation({ mutationFn: (id: string) => apiFetch(`/activities/${id}/rubric/generate`, { method: 'POST', body: JSON.stringify({}) }), onSuccess: () => { done(); qc.invalidateQueries({ queryKey: ['rubrics', courseId] }); } });
   const list = (inModule ?? []) as any[];
   const candidates = ((all ?? []) as any[]).filter((a) => a.moduleId !== moduleId);
 
@@ -2922,6 +2923,7 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
                       <option value="">None</option>
                       {(rubrics ?? []).map((r) => <option key={r.id} value={r.id}>{r.title} ({r.totalPoints}pts)</option>)}
                     </select>
+                    {!a.rubricId && <button title="Generate a rubric from this activity" disabled={genRubric.isPending} onClick={() => genRubric.mutate(a.id)} className="text-primary hover:underline">{genRubric.isPending ? '…' : 'AI'}</button>}
                   </span>
                 </div>
               </div>
@@ -2936,6 +2938,61 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// A module case-study card: learners start it; instructors can edit its content or delete it.
+function ModuleCaseCard({ moduleId, c, isInstructor, onStart, starting }: { moduleId: string; c: any; isInstructor: boolean; onStart: () => void; starting: boolean }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [full, setFull] = useState<any>(null);
+  const [busy, setBusy] = useState(false);
+  const refresh = () => qc.invalidateQueries({ queryKey: ['module-cases', moduleId] });
+  const del = useMutation({ mutationFn: () => apiFetch(`/cases/${c.id}`, { method: 'DELETE' }), onSuccess: refresh });
+  const save = useMutation({ mutationFn: (b: Record<string, unknown>) => apiFetch(`/cases/${c.id}`, { method: 'PUT', body: JSON.stringify(b) }), onSuccess: () => { setEditing(false); refresh(); } });
+  const openEdit = async () => { setBusy(true); try { const f = await apiFetch<any>(`/cases/${c.id}`); setFull(f); setEditing(true); } finally { setBusy(false); } };
+
+  if (editing && full) {
+    return (
+      <div className="rounded-2xl border border-primary/30 bg-card p-5 space-y-2">
+        <label className="text-sm block"><span className="mb-1 block text-muted-foreground">Title</span>
+          <input value={full.title ?? ''} onChange={(e) => setFull({ ...full, title: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm font-medium" /></label>
+        <label className="text-sm block"><span className="mb-1 block text-muted-foreground">Learning objective</span>
+          <input value={full.learningObjective ?? ''} onChange={(e) => setFull({ ...full, learningObjective: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+        <label className="text-sm block"><span className="mb-1 block text-muted-foreground">Scenario / context</span>
+          <textarea value={full.contextBlock ?? ''} onChange={(e) => setFull({ ...full, contextBlock: e.target.value })} className="w-full min-h-[140px] rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed" /></label>
+        <label className="text-sm block"><span className="mb-1 block text-muted-foreground">Opening question</span>
+          <textarea value={full.openingQuestion ?? ''} onChange={(e) => setFull({ ...full, openingQuestion: e.target.value })} className="w-full min-h-[60px] rounded-md border border-input bg-background px-3 py-2 text-sm" /></label>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+          <Button size="sm" disabled={save.isPending} onClick={() => save.mutate({ title: full.title, learningObjective: full.learningObjective, contextBlock: full.contextBlock, openingQuestion: full.openingQuestion })}>{save.isPending ? 'Saving…' : 'Save case'}</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-teal-200 dark:border-teal-800 bg-teal-500/5 p-5">
+      <div className="flex items-start gap-3">
+        <span className="h-11 w-11 rounded-xl bg-teal-100 dark:bg-teal-900/40 text-teal-600 flex items-center justify-center shrink-0"><Layers className="h-6 w-6" /></span>
+        <div className="flex-1 min-w-0">
+          <div className="font-serif font-bold text-lg leading-tight">{c.title}</div>
+          <div className="text-xs text-muted-foreground capitalize mt-0.5">{c.difficulty ?? 'foundational'} case study · guided by an AI coach</div>
+        </div>
+        {isInstructor && (
+          <div className="flex gap-1 shrink-0">
+            <Button size="sm" variant="ghost" disabled={busy} onClick={openEdit} title="Edit case"><Pencil className="h-3.5 w-3.5" /></Button>
+            <Button size="sm" variant="ghost" className="text-rose-500" onClick={() => { if (window.confirm(`Delete "${c.title}"? This cannot be undone.`)) del.mutate(); }} title="Delete case"><Trash2 className="h-3.5 w-3.5" /></Button>
+          </div>
+        )}
+      </div>
+      <p className="text-sm text-foreground/85 leading-relaxed mt-3">
+        {c.openingQuestion || 'Work through a realistic scenario. The AI coach guides you with questions, not answers — reason it through like an entrepreneur.'}
+      </p>
+      <Button className="mt-4 h-11 gap-2 bg-teal-600 hover:bg-teal-700 text-white" disabled={starting} onClick={onStart}>
+        <Play className="h-4 w-4" /> {starting ? 'Starting…' : 'Start case study'}
+      </Button>
     </div>
   );
 }
@@ -4298,22 +4355,8 @@ function ModuleHubView({
             {(moduleCases && moduleCases.length > 0) ? (
               <div className="space-y-4">
                 {moduleCases.map((c) => (
-                  <div key={c.id} className="rounded-2xl border border-teal-200 dark:border-teal-800 bg-teal-500/5 p-5">
-                    <div className="flex items-start gap-3">
-                      <span className="h-11 w-11 rounded-xl bg-teal-100 dark:bg-teal-900/40 text-teal-600 flex items-center justify-center shrink-0"><Layers className="h-6 w-6" /></span>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-serif font-bold text-lg leading-tight">{c.title}</div>
-                        <div className="text-xs text-muted-foreground capitalize mt-0.5">{c.difficulty ?? 'foundational'} case study · guided by an AI coach</div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-foreground/85 leading-relaxed mt-3">
-                      {c.openingQuestion || 'Work through a realistic scenario. The AI coach guides you with questions, not answers - reason it through like an entrepreneur.'}
-                    </p>
-                    <Button className="mt-4 h-11 gap-2 bg-teal-600 hover:bg-teal-700 text-white" disabled={startCase.isPending}
-                      onClick={() => { setCaseErr(null); startCase.mutate(c.id); }}>
-                      <Play className="h-4 w-4" /> {startCase.isPending ? 'Starting…' : 'Start case study'}
-                    </Button>
-                  </div>
+                  <ModuleCaseCard key={c.id} moduleId={moduleId} c={c} isInstructor={isInstructor}
+                    starting={startCase.isPending} onStart={() => { setCaseErr(null); startCase.mutate(c.id); }} />
                 ))}
               </div>
             ) : (
@@ -4325,8 +4368,8 @@ function ModuleHubView({
         {/* PARTICIPATE */}
         {tab === 'participate' && (
           <div className="space-y-4">
-            <SectionHead title="Join the discussion" sub="Learning is social. Share your thinking and respond to others." />
-            <Instruction>Be respectful and constructive. Add value with each post, reference the material, and disagree with ideas, not people.</Instruction>
+            <SectionHead title="Discuss with your coach" sub="Think out loud with an AI facilitator that pushes your reasoning." />
+            <Instruction>Post your thinking and the coach will respond, challenge it, and extend it. Reference the material and back up your claims.</Instruction>
             {(discussions && discussions.length > 0) ? (
               <div className="space-y-2">
                 {discussions.map((d) => (
