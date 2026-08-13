@@ -1,7 +1,7 @@
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { db } from "@workspace/db";
-import { modulesTable, coursesTable, moduleReadingsTable, gradebookAlertsTable, usersTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { modulesTable, coursesTable, moduleReadingsTable, gradebookAlertsTable, usersTable, interactiveActivitiesTable, activitySubmissionsTable } from "@workspace/db";
+import { eq, and, inArray } from "drizzle-orm";
 import { REASON_LABEL } from "./gradebookEngine";
 
 /**
@@ -35,6 +35,8 @@ export interface LessonCoachContext {
   persona: string;
   learningStyle: string | null;
   accommodations: string[];
+  performance: string[];     // per-activity result lines for THIS module
+  weakSpot: string | null;   // the single most useful place to start (an activity or a gap)
 }
 
 /** Assemble everything the coach needs about this learner + this lesson. */
@@ -61,6 +63,33 @@ export async function buildLessonCoachContext(moduleId: string, userId: string):
     }
   } catch { /* no gradebook data yet -> coach probes to find the starting point */ }
 
+  // The learner's ACTUAL work in this module: how they scored on each interactive activity. This is
+  // what lets the coach pinpoint concrete gaps ("you scored 40% on the cash-flow quiz") instead of
+  // guessing. The lowest attempted score becomes the weak spot the coach opens on.
+  const performance: string[] = [];
+  let weakSpot: string | null = null;
+  try {
+    const acts = await db.select({ id: interactiveActivitiesTable.id, title: interactiveActivitiesTable.title, maxScore: interactiveActivitiesTable.maxScore })
+      .from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.moduleId, moduleId));
+    if (acts.length) {
+      const subs = await db.select({ activityId: activitySubmissionsTable.activityId, score: activitySubmissionsTable.score, status: activitySubmissionsTable.status })
+        .from(activitySubmissionsTable)
+        .where(and(eq(activitySubmissionsTable.userId, userId), inArray(activitySubmissionsTable.activityId, acts.map((a) => a.id))));
+      const byAct = new Map(subs.map((s) => [s.activityId, s]));
+      let worst = 101;
+      for (const a of acts) {
+        const s = byAct.get(a.id);
+        if (!s) { performance.push(`"${a.title}": not attempted yet`); continue; }
+        const max = Number(a.maxScore) || 100;
+        const sc = s.score != null ? Number(s.score) : null;
+        const pct = sc != null && max > 0 ? Math.round((sc / max) * 100) : null;
+        performance.push(`"${a.title}": ${pct != null ? pct + "%" : String(s.status)}`);
+        if (pct != null && pct < worst) { worst = pct; if (pct < 70) weakSpot = `their ${pct}% on "${a.title}"`; }
+      }
+    }
+  } catch { /* activity data optional */ }
+  if (!weakSpot && gaps.length) weakSpot = gaps[0].toLowerCase();
+
   const nameParts = [user?.firstName, user?.lastName].filter(Boolean) as string[];
   return {
     learnerName: nameParts.length ? nameParts.join(" ") : "there",
@@ -73,6 +102,8 @@ export async function buildLessonCoachContext(moduleId: string, userId: string):
     persona: (user?.coachPersonality as string) ?? "warm_encourager",
     learningStyle: user?.learningStyle ?? null,
     accommodations: user?.accommodations ?? [],
+    performance: performance.slice(0, 10),
+    weakSpot,
   };
 }
 
@@ -93,6 +124,7 @@ function systemPrompt(c: LessonCoachContext): string {
     `Be warm and genuinely human; never shame the learner. Keep replies short (2–5 sentences). End most replies with ONE focused question or a single concrete next step. Never dump the whole lesson at once.`,
     masteryLine,
     gapsLine,
+    c.performance.length ? `The learner's actual results on this lesson's activities (use these to pinpoint gaps precisely — refer to real scores, don't guess):\n- ${c.performance.join("\n- ")}` : "",
     c.objectives.length ? `This lesson's objectives:\n- ${c.objectives.join("\n- ")}` : "",
     `\n=== LESSON CONTENT ===\n${c.lessonText || "(No lesson text is available yet; coach from the objectives and the learner's questions.)"}`,
   ].filter(Boolean).join("\n\n");
@@ -110,9 +142,10 @@ export async function coachReply(c: LessonCoachContext, messages: { role: "user"
   return txt || "Let's take it one step at a time — which part of this lesson feels least clear right now?";
 }
 
-/** A friendly opener when the panel first opens (deterministic, so it never fails to load). */
+/** A friendly, proactive opener when the panel first opens (deterministic, so it never fails to load). */
 export function deterministicOpener(c: LessonCoachContext): string {
   const first = c.learnerName.split(" ")[0];
-  const gap = c.gaps.length ? ` From your progress, it looks like a good place to focus is: ${c.gaps[0].toLowerCase()}.` : "";
-  return `Hi ${first} — I'm your coach for "${c.moduleTitle}", and I know this lesson inside out.${gap} Tell me what you'd like help with, or say "not sure" and I'll ask a couple of quick questions to find your best starting point.`;
+  const focus = c.weakSpot ? ` Looking at your work here, I'd suggest we start with ${c.weakSpot} — I think a little time there will pay off.` : "";
+  const invite = c.weakSpot ? ` Want to dig into that, or is there something else on your mind?` : ` Tell me what you'd like help with, or say "not sure" and I'll ask a couple of quick questions to find your best starting point.`;
+  return `Hi ${first} — I'm your coach for "${c.moduleTitle}", and I know this lesson inside out.${focus}${invite}`;
 }

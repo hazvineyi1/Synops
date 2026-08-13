@@ -2252,8 +2252,12 @@ function CoachDock({ moduleId }: { moduleId: string }) {
   useEffect(() => {
     if (!open || loaded) return;
     setLoaded(true);
-    apiFetch<{ opener: string; gaps: string[] }>(`/modules/${moduleId}/coach`)
-      .then((r) => { setMsgs([{ role: 'assistant', content: r.opener }]); setGaps(r.gaps ?? []); })
+    apiFetch<{ opener: string; gaps: string[]; history: CoachMsg[] }>(`/modules/${moduleId}/coach`)
+      .then((r) => {
+        setGaps(r.gaps ?? []);
+        // Resume the saved conversation if there is one; otherwise greet with the proactive opener.
+        setMsgs(r.history && r.history.length ? r.history : [{ role: 'assistant', content: r.opener }]);
+      })
       .catch(() => setMsgs([{ role: 'assistant', content: "Hi — I'm your coach for this lesson. What would you like to work on?" }]));
   }, [open, loaded, moduleId]);
   useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' }); }, [msgs, busy]);
@@ -2261,10 +2265,10 @@ function CoachDock({ moduleId }: { moduleId: string }) {
   const send = async () => {
     const text = input.trim();
     if (!text || busy) return;
-    const next: CoachMsg[] = [...msgs, { role: 'user', content: text }];
-    setMsgs(next); setInput(''); setBusy(true);
+    setMsgs((m) => [...m, { role: 'user', content: text }]); setInput(''); setBusy(true);
     try {
-      const r = await apiFetch<{ reply: string }>(`/modules/${moduleId}/coach`, { method: 'POST', body: JSON.stringify({ messages: next }) });
+      // The server keeps the conversation memory, so we only send the new message.
+      const r = await apiFetch<{ reply: string }>(`/modules/${moduleId}/coach`, { method: 'POST', body: JSON.stringify({ message: text }) });
       setMsgs((m) => [...m, { role: 'assistant', content: r.reply }]);
     } catch {
       setMsgs((m) => [...m, { role: 'assistant', content: "I'm having trouble reaching you right now — please try again in a moment." }]);
