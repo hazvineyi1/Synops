@@ -84,7 +84,7 @@ export async function buildLessonCoachContext(moduleId: string, userId: string):
         const sc = s.score != null ? Number(s.score) : null;
         const pct = sc != null && max > 0 ? Math.round((sc / max) * 100) : null;
         performance.push(`"${a.title}": ${pct != null ? pct + "%" : String(s.status)}`);
-        if (pct != null && pct < worst) { worst = pct; if (pct < 70) weakSpot = `their ${pct}% on "${a.title}"`; }
+        if (pct != null && pct < worst) { worst = pct; if (pct < 70) weakSpot = `your ${pct}% on "${a.title}"`; }
       }
     }
   } catch { /* activity data optional */ }

@@ -2219,9 +2219,26 @@ function CoachDock({ moduleId }: { moduleId: string }) {
   const [gaps, setGaps] = useState<string[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [nudge, setNudge] = useState<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
+  const nudgeKey = `coach-nudge-dismissed:${moduleId}`;
 
   useEffect(() => { setLoaded(false); setMsgs([]); setGaps([]); }, [moduleId]);
+
+  // Proactive nudge: on load, if the learner has a concrete weak spot and hasn't dismissed it, the
+  // coach reaches out on its own with a small teaser above the closed button.
+  useEffect(() => {
+    setNudge(null);
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(nudgeKey) === '1'; } catch { /* ignore */ }
+    if (dismissed) return;
+    let alive = true;
+    apiFetch<{ nudge: string | null }>(`/modules/${moduleId}/coach/nudge`)
+      .then((r) => { if (alive && r.nudge) setNudge(r.nudge); })
+      .catch(() => { /* no nudge */ });
+    return () => { alive = false; };
+  }, [moduleId, nudgeKey]);
+  const dismissNudge = () => { setNudge(null); try { localStorage.setItem(nudgeKey, '1'); } catch { /* ignore */ } };
   useEffect(() => {
     if (!open || loaded) return;
     setLoaded(true);
@@ -2251,9 +2268,23 @@ function CoachDock({ moduleId }: { moduleId: string }) {
   return (
     <>
       <style>{COACH_ANIM_CSS}</style>
+      {!open && nudge && (
+        <div className="fixed bottom-44 right-4 z-50 w-[min(78vw,264px)] rounded-2xl border border-border bg-card p-3 shadow-xl md:bottom-40">
+          <button onClick={dismissNudge} aria-label="Dismiss" className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+          <div className="flex items-start gap-2 pr-3">
+            <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-inner shrink-0"><CoachAvatar size={22} /></span>
+            <p className="text-xs leading-snug text-foreground/90">{nudge}</p>
+          </div>
+          <button onClick={() => { setNudge(null); setOpen(true); }}
+            className="mt-2 w-full rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-105">
+            Work on it with the coach
+          </button>
+        </div>
+      )}
       {!open && (
-        <button onClick={() => setOpen(true)} aria-label="Open your coach"
+        <button onClick={() => { setNudge(null); setOpen(true); }} aria-label="Open your coach"
           className="group fixed bottom-28 right-4 z-50 flex items-center gap-2 rounded-full bg-primary/95 py-1.5 pl-1.5 pr-4 text-primary-foreground shadow-lg transition-all hover:brightness-105 hover:shadow-xl md:bottom-24">
+          {nudge && <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75" /><span className="relative inline-flex h-3 w-3 rounded-full bg-pink-500" /></span>}
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-inner"><CoachAvatar size={38} /></span>
           <span className="text-sm font-semibold">Coach</span>
         </button>

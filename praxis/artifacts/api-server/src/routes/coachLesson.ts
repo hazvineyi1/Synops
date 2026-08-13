@@ -64,6 +64,18 @@ router.get("/modules/:moduleId/coach", requireAuth, async (req, res) => {
   res.json({ opener: deterministicOpener(ctx), gaps: ctx.gaps, masteryPct: ctx.masteryPct, learnerName: ctx.learnerName, history });
 });
 
+// GET /modules/:moduleId/coach/nudge -- a short PROACTIVE message the coach surfaces without being
+// opened, ONLY when there is a concrete reason (a low activity score or a real gap). Null otherwise,
+// so the coach never nags. Cheap: no AI call, just the learner's signals.
+router.get("/modules/:moduleId/coach/nudge", requireAuth, async (req, res) => {
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
+  if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
+  if (!(await canParticipateInCourse(req.dbUser!, mod.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const ctx = await buildLessonCoachContext(req.params.moduleId, req.userId!);
+  const nudge = ctx?.weakSpot ? `I noticed ${ctx.weakSpot}. Want to work through it together?` : null;
+  res.json({ nudge });
+});
+
 // POST /modules/:moduleId/coach -- one coaching turn. Body: { message: string } (preferred) or
 // { messages: [...] }. Uses stored history for memory, and persists both sides of the exchange.
 router.post("/modules/:moduleId/coach", requireAuth, async (req, res) => {
