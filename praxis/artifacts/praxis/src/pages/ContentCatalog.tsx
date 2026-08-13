@@ -190,6 +190,14 @@ export default function ContentCatalog() {
   );
 }
 
+/** Parse a timestamp typed as m:ss, h:mm:ss, or plain seconds into total seconds. */
+function parseClock(v: string): number {
+  const s = (v || "").trim();
+  if (!s) return 0;
+  if (s.includes(":")) return s.split(":").reduce((acc, p) => acc * 60 + (parseInt(p, 10) || 0), 0);
+  return parseInt(s, 10) || 0;
+}
+
 interface Checkpoint { t: string; stem: string; opts: string[]; correct: number; fb: string }
 
 /** Create a video lesson (link/upload + optional interactive checkpoints) into a tenant's catalog. */
@@ -203,7 +211,7 @@ function VideoLessonCreator({ tenantId, tenantName, onDone, onCancel }: {
   const [err, setErr] = useState<string | null>(null);
   const v = resolveVideo(videoUrl);
 
-  const addCp = () => setCps((p) => [...p, { t: "30", stem: "", opts: ["", "", "", ""], correct: 0, fb: "" }]);
+  const addCp = () => setCps((p) => [...p, { t: "0:30", stem: "", opts: ["", "", "", ""], correct: 0, fb: "" }]);
   const setCp = (i: number, patch: Partial<Checkpoint>) => setCps((p) => p.map((c, j) => j === i ? { ...c, ...patch } : c));
   const delCp = (i: number) => setCps((p) => p.filter((_, j) => j !== i));
 
@@ -213,7 +221,7 @@ function VideoLessonCreator({ tenantId, tenantName, onDone, onCancel }: {
     try {
       const questions = cps.filter((c) => c.stem.trim() && c.opts.filter((o) => o.trim()).length >= 2).map((c, qi) => {
         const options = c.opts.map((t, i) => ({ id: `o${i}`, text: t.trim() })).filter((o) => o.text);
-        return { id: `q${qi}`, videoTimestamp: Number(c.t) || 0, questionType: "multiple_choice", stem: c.stem.trim(), options, correctOptionIds: [`o${c.correct}`], feedbackCorrect: c.fb || undefined, pauseOnReach: true, points: 1 };
+        return { id: `q${qi}`, videoTimestamp: parseClock(c.t), questionType: "multiple_choice", stem: c.stem.trim(), options, correctOptionIds: [`o${c.correct}`], feedbackCorrect: c.fb || undefined, pauseOnReach: true, points: 1 };
       });
       await apiFetch("/admin/catalog/activity", { method: "POST", body: JSON.stringify({
         targetTenantId: tenantId, title: title.trim(), kind: "video", source: "html",
@@ -237,7 +245,7 @@ function VideoLessonCreator({ tenantId, tenantName, onDone, onCancel }: {
         {cps.map((c, i) => (
           <div key={i} className="rounded-lg border bg-background p-2.5 space-y-2">
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-muted-foreground">At (s)<input value={c.t} onChange={(e) => setCp(i, { t: e.target.value.replace(/[^0-9]/g, "") })} className="ml-1 h-7 w-16 rounded border px-2 text-sm bg-background" /></label>
+              <label className="text-[11px] text-muted-foreground">At (m:ss)<input value={c.t} onChange={(e) => setCp(i, { t: e.target.value.replace(/[^0-9:]/g, "") })} placeholder="2:55" className="ml-1 h-7 w-16 rounded border px-2 text-sm bg-background" /></label>
               <button onClick={() => delCp(i)} className="ml-auto text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
             <input value={c.stem} onChange={(e) => setCp(i, { stem: e.target.value })} placeholder="Question…" className="h-8 w-full rounded border px-2 text-sm bg-background" />

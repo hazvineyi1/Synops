@@ -3236,13 +3236,21 @@ function ModuleVideoAdmin({ moduleId, videoBeats, suggestedQuery }: { moduleId: 
  * Make a clip interactive: add checkpoint questions that pop at a timestamp while the video plays.
  * Available on any saved video (YouTube/Khan/file). Backed by /beats/:id/interactive-questions.
  */
+/** Parse a timestamp typed as m:ss, h:mm:ss, or plain seconds into total seconds. */
+function parseClock(v: string): number {
+  const s = (v || '').trim();
+  if (!s) return 0;
+  if (s.includes(':')) return s.split(':').reduce((acc, p) => acc * 60 + (parseInt(p, 10) || 0), 0);
+  return parseInt(s, 10) || 0;
+}
+
 function CheckpointEditor({ beatId }: { beatId: string }) {
   const qc = useQueryClient();
   const { data: questions = [] } = useQuery<{ id: string; videoTimestamp: number; stem: string }[]>({
     queryKey: ['iv-questions', beatId], queryFn: () => apiFetch(`/beats/${beatId}/interactive-questions`), enabled: !!beatId,
   });
   const [open, setOpen] = useState(false);
-  const [ts, setTs] = useState('30');
+  const [ts, setTs] = useState('0:30');
   const [stem, setStem] = useState('');
   const [opts, setOpts] = useState(['', '', '', '']);
   const [correct, setCorrect] = useState(0);
@@ -3250,7 +3258,7 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
   const [busy, setBusy] = useState(false);
   const [genBusy, setGenBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const reset = () => { setTs('30'); setStem(''); setOpts(['', '', '', '']); setCorrect(0); setFb(''); };
+  const reset = () => { setTs('0:30'); setStem(''); setOpts(['', '', '', '']); setCorrect(0); setFb(''); };
   const refresh = () => qc.invalidateQueries({ queryKey: ['iv-questions', beatId] });
 
   const add = async () => {
@@ -3262,7 +3270,7 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
     setBusy(true);
     try {
       await apiFetch(`/beats/${beatId}/interactive-questions`, { method: 'POST', body: JSON.stringify({
-        videoTimestamp: Number(ts) || 0, questionType: 'multiple_choice', stem: stem.trim(),
+        videoTimestamp: parseClock(ts), questionType: 'multiple_choice', stem: stem.trim(),
         options: filled, correctOptionIds: [`o${correct}`], feedbackCorrect: fb || null, pauseOnReach: true, points: 1,
       }) });
       reset(); setOpen(false); refresh();
@@ -3300,8 +3308,8 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
       ) : (
         <div className="space-y-2 bg-background rounded-lg border p-2.5">
           <div className="flex gap-2">
-            <label className="text-[11px] text-muted-foreground">At (seconds)
-              <input value={ts} onChange={(e) => setTs(e.target.value.replace(/[^0-9]/g, ''))} className="mt-0.5 h-8 w-24 rounded border border-input bg-background px-2 text-sm" /></label>
+            <label className="text-[11px] text-muted-foreground">At (m:ss)
+              <input value={ts} onChange={(e) => setTs(e.target.value.replace(/[^0-9:]/g, ''))} placeholder="2:55" className="mt-0.5 h-8 w-24 rounded border border-input bg-background px-2 text-sm" /></label>
           </div>
           <input value={stem} onChange={(e) => setStem(e.target.value)} placeholder="Question…" className="h-8 w-full rounded border border-input bg-background px-2 text-sm" />
           {opts.map((o, i) => (
