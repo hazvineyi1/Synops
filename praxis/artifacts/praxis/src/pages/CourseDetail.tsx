@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearch, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, API } from '@/lib/api';
@@ -2011,6 +2011,144 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
   );
 }
 
+// Per-module build controls: see what each module has, and regenerate/replace/remove its readings
+// and activities (choosing types + count, or letting AI choose the best fit for the content).
+type ModStatus = { hasReading: boolean; actCount: number; hasCase: boolean };
+function ModuleBuildPanel({ courseId, mod, onStatus }: { courseId: string; mod: { id: string; title: string }; onStatus: (id: string, s: ModStatus) => void }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const { data: readings } = useQuery({ queryKey: ['module-readings', mod.id], queryFn: () => apiFetch<{ id: string; hasContent: boolean }[]>(`/modules/${mod.id}/readings`) });
+  const { data: acts } = useQuery({ queryKey: ['module-activities', mod.id], queryFn: () => activitiesApi.list({ moduleId: mod.id }) });
+  const { data: cases } = useQuery({ queryKey: ['module-cases', mod.id], queryFn: () => apiFetch<{ id: string }[]>(`/modules/${mod.id}/cases`) });
+  const hasReading = (readings ?? []).some((r) => r.hasContent);
+  const actCount = (acts ?? []).length;
+  const hasCase = (cases ?? []).length > 0;
+  useEffect(() => { onStatus(mod.id, { hasReading, actCount, hasCase }); }, [hasReading, actCount, hasCase, mod.id]);
+
+  const [count, setCount] = useState(3);
+  const [types, setTypes] = useState<Set<string>>(() => new Set(ACT_TYPES.map((t) => t.id)));
+  const [aiChoose, setAiChoose] = useState(true);
+  const [busy, setBusy] = useState('');
+  const [msg, setMsg] = useState('');
+  const toggleType = (id: string) => setTypes((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const gather = async () => {
+    const parts: string[] = [];
+    for (const r of (readings ?? []).filter((x) => x.hasContent)) {
+      try { const full = await apiFetch<{ content: string }>(`/readings/${r.id}`); if (full.content) parts.push(full.content); } catch { /* skip */ }
+    }
+    return parts.join('\n\n').trim();
+  };
+
+  const genActivities = async (replace: boolean) => {
+    setBusy('act'); setMsg('');
+    try {
+      if (replace) { for (const a of acts ?? []) { try { await apiFetch(`/activities/${a.id}`, { method: 'DELETE' }); } catch { /* skip */ } } }
+      const content = await gather();
+      if (content.length < 80) { setMsg('No reading content — reset & regenerate the reading first.'); return; }
+      const body: Record<string, unknown> = { content: content.slice(0, 12000), count };
+      if (!aiChoose && types.size) body.types = [...types];
+      const { activities } = await apiFetch<{ activities: { type: string; title: string; instructions: string; bloomsLevel: string; difficulty: string; spec: unknown }[] }>(`/activities/generate`, { method: 'POST', body: JSON.stringify(body) });
+      let made = 0;
+      for (const a of activities ?? []) {
+        try { const html = renderActivity(a.type as InteractionType, a.spec as ActivitySpec); if (!html) continue;
+          await activitiesApi.create({ title: a.title, instructions: a.instructions || undefined, source: 'html', html, kind: a.type, spec: a.spec, bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null, published: true, courseId, moduleId: mod.id }); made++;
+        } catch { /* skip one */ }
+      }
+      qc.invalidateQueries({ queryKey: ['module-activities', mod.id] });
+      setMsg(made ? `${replace ? 'Replaced with' : 'Added'} ${made} ${made === 1 ? 'activity' : 'activities'}.` : 'Could not generate — try again.');
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Failed.'); }
+    finally { setBusy(''); }
+  };
+  const removeAll = async () => {
+    setBusy('rm'); setMsg('');
+    try { for (const a of acts ?? []) { try { await apiFetch(`/activities/${a.id}`, { method: 'DELETE' }); } catch { /* skip */ } } qc.invalidateQueries({ queryKey: ['module-activities', mod.id] }); setMsg('Removed all activities.'); }
+    finally { setBusy(''); }
+  };
+  const resetReading = async () => {
+    setBusy('read'); setMsg('');
+    try {
+      for (const r of readings ?? []) { try { await apiFetch(`/readings/${r.id}`, { method: 'DELETE' }); } catch { /* skip */ } }
+      await apiFetch(`/modules/${mod.id}/readings/generate`, { method: 'POST', body: JSON.stringify({}) });
+      qc.invalidateQueries({ queryKey: ['module-readings', mod.id] });
+      setMsg('Reading reset & regenerated from the source.');
+    } catch (e) { setMsg(e instanceof Error ? e.message : 'Failed.'); }
+    finally { setBusy(''); }
+  };
+
+  const Chip = ({ ok, label }: { ok: boolean; label: string }) => (
+    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] border', ok ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700' : 'border-border text-muted-foreground')}>
+      {ok ? <Check className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}{label}
+    </span>
+  );
+
+  return (
+    <div className="rounded-xl border border-border bg-card">
+      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-3 px-4 py-3 text-left">
+        <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open ? '' : '-rotate-90')} />
+        <span className="font-medium text-sm flex-1 min-w-0 truncate">{mod.title}</span>
+        <span className="flex flex-wrap gap-1 justify-end">
+          <Chip ok={hasReading} label="Reading" />
+          <Chip ok={actCount > 0} label={`${actCount} ${actCount === 1 ? 'activity' : 'activities'}`} />
+          <Chip ok={hasCase} label="Case" />
+        </span>
+      </button>
+      {open && (
+        <div className="border-t border-border px-4 py-3 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium">Reading:</span>
+            <Button size="sm" variant="outline" disabled={!!busy} onClick={resetReading}>{busy === 'read' ? 'Working…' : (hasReading ? 'Reset & regenerate' : 'Generate reading')}</Button>
+          </div>
+          <div className="space-y-2 rounded-md bg-muted/40 p-2.5">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-medium">Activities:</span>
+              <span className="text-muted-foreground">How many</span>
+              <select value={count} onChange={(e) => setCount(Number(e.target.value))} disabled={!!busy} className="rounded border border-input bg-background px-1.5 py-1">{[1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}</select>
+              <label className="flex items-center gap-1"><input type="checkbox" checked={aiChoose} onChange={(e) => setAiChoose(e.target.checked)} /> Let AI choose the best types</label>
+            </div>
+            {!aiChoose && (
+              <div className="flex flex-wrap gap-1">
+                {ACT_TYPES.map((t) => <button key={t.id} type="button" onClick={() => toggleType(t.id)} className={cn('rounded-full px-2 py-0.5 text-[11px] border', types.has(t.id) ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground')}>{t.label}</button>)}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled={!!busy} onClick={() => genActivities(false)}>{busy === 'act' ? 'Generating…' : 'Generate & add'}</Button>
+              <Button size="sm" variant="outline" disabled={!!busy || actCount === 0} onClick={() => { if (window.confirm('Replace all activities in this module?')) genActivities(true); }}>Replace all</Button>
+              <Button size="sm" variant="ghost" className="text-rose-500" disabled={!!busy || actCount === 0} onClick={() => { if (window.confirm('Remove all activities in this module?')) removeAll(); }}>Remove all</Button>
+            </div>
+          </div>
+          {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModuleBuildSection({ courseId, modules }: { courseId: string; modules?: { id: string; title: string }[] }) {
+  const [statuses, setStatuses] = useState<Record<string, ModStatus>>({});
+  const onStatus = useCallback((id: string, s: ModStatus) => setStatuses((prev) => (prev[id] && prev[id].hasReading === s.hasReading && prev[id].actCount === s.actCount && prev[id].hasCase === s.hasCase ? prev : { ...prev, [id]: s })), []);
+  const mods = modules ?? [];
+  const known = mods.filter((m) => statuses[m.id]);
+  const withReading = known.filter((m) => statuses[m.id].hasReading).length;
+  const withActs = known.filter((m) => statuses[m.id].actCount > 0).length;
+  const withCase = known.filter((m) => statuses[m.id].hasCase).length;
+  const pct = mods.length ? Math.round(((withReading + withActs) / (mods.length * 2)) * 100) : 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-border bg-muted/30 p-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium">Build progress</span>
+          <span className="text-muted-foreground">{pct}% built</span>
+        </div>
+        <div className="mt-1.5 h-2 rounded-full bg-border overflow-hidden"><div className="h-full bg-primary transition-all" style={{ width: `${pct}%` }} /></div>
+        <p className="text-xs text-muted-foreground mt-2">{withReading}/{mods.length} modules have a reading · {withActs}/{mods.length} have activities · {withCase}/{mods.length} have a case study. Expand a module to build or refine its parts.</p>
+      </div>
+      {mods.map((m) => <ModuleBuildPanel key={m.id} courseId={courseId} mod={m} onStatus={onStatus} />)}
+    </div>
+  );
+}
+
 function HeadingStyleBar({ style, onChange }: { style: { color?: string; size?: string }; onChange: (s: { color?: string; size?: string }) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1.5">
@@ -3065,13 +3203,24 @@ export function CourseDetail() {
               </section>
             )}
 
+            {/* Build & refine each module: see what's there and what's missing, regenerate/replace. */}
+            {(modules?.length ?? 0) > 0 && (
+              <section className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 6 · Build & refine modules</p>
+                  <p className="text-sm text-muted-foreground">See how far each module is built and regenerate, replace or remove its readings and activities — module by module.</p>
+                </div>
+                <ModuleBuildSection courseId={courseId} modules={modules} />
+              </section>
+            )}
+
             {/* Publish, THEN assign. Publishing places the course in the catalog; assignment to a
                 partner is a separate, subsequent step. */}
             {role === 'super_admin' && (
               <>
                 <section className="space-y-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 6 · Publish</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 7 · Publish</p>
                     <p className="text-sm text-muted-foreground">Publish the course to place it in the course catalog. You assign it to partners in the next step.</p>
                   </div>
                   <div className="rounded-lg border border-dashed border-primary/30 p-4 flex flex-wrap items-center justify-between gap-3">
@@ -3099,7 +3248,7 @@ export function CourseDetail() {
 
                 <section className="space-y-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 7 · Assign to partners</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 8 · Assign to partners</p>
                     <p className="text-sm text-muted-foreground">
                       {course.status === 'published'
                         ? 'Choose which partners deliver this course from the catalog.'
