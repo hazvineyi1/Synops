@@ -2201,6 +2201,44 @@ function ReadingBody({ text }: { text: string }) {
 // surfaces their current gaps, and holds an adaptive coaching conversation grounded in the lesson
 // content (backed by GET/POST /modules/:id/coach). Available to learners and to staff previewing.
 type CoachMsg = { role: 'user' | 'assistant'; content: string };
+
+// A friendly cartoon coach head that gently bobs and blinks — the face of the in-lesson coach.
+function CoachAvatar({ size = 40 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" className="coach-bob" aria-hidden="true">
+      {/* headset band */}
+      <path d="M15 32 A17 17 0 0 1 49 32" fill="none" stroke="#111827" strokeWidth="3" strokeLinecap="round" />
+      {/* hair */}
+      <path d="M15 31 Q15 13 32 13 Q49 13 49 31 Q43 22 32 22 Q21 22 15 31 Z" fill="#3B3550" />
+      {/* face */}
+      <circle cx="32" cy="35" r="17" fill="#F7C6A0" />
+      {/* ears / ear-cups */}
+      <rect x="11" y="31" width="6" height="10" rx="3" fill="#111827" />
+      <rect x="47" y="31" width="6" height="10" rx="3" fill="#111827" />
+      {/* mic */}
+      <path d="M50 39 Q50 47 40 47" fill="none" stroke="#111827" strokeWidth="2.5" strokeLinecap="round" />
+      <circle cx="38" cy="47" r="2.2" fill="#F97316" />
+      {/* cheeks */}
+      <circle cx="23" cy="40" r="3" fill="#F98C7A" opacity="0.45" />
+      <circle cx="41" cy="40" r="3" fill="#F98C7A" opacity="0.45" />
+      {/* eyes (blink) */}
+      <g className="coach-blink">
+        <circle cx="26" cy="34" r="2.6" fill="#1F2937" />
+        <circle cx="38" cy="34" r="2.6" fill="#1F2937" />
+      </g>
+      {/* smile */}
+      <path d="M25 41 Q32 46 39 41" fill="none" stroke="#7A3B2E" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+const COACH_ANIM_CSS = `
+@keyframes coachBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+@keyframes coachBlink { 0%,90%,100%{transform:scaleY(1)} 95%{transform:scaleY(0.1)} }
+.coach-bob{ animation: coachBob 2.6s ease-in-out infinite; }
+.coach-blink{ transform-origin:center; transform-box:fill-box; animation: coachBlink 4.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce){ .coach-bob,.coach-blink{ animation:none } }
+`;
+
 function CoachDock({ moduleId }: { moduleId: string }) {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -2235,17 +2273,19 @@ function CoachDock({ moduleId }: { moduleId: string }) {
 
   return (
     <>
+      <style>{COACH_ANIM_CSS}</style>
       {!open && (
         <button onClick={() => setOpen(true)} aria-label="Open your coach"
-          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-primary-foreground shadow-lg transition-all hover:brightness-105 hover:shadow-xl">
-          <GraduationCap className="h-5 w-5" /><span className="text-sm font-semibold">Coach</span>
+          className="group fixed bottom-28 right-4 z-50 flex items-center gap-2 rounded-full bg-primary/95 py-1.5 pl-1.5 pr-4 text-primary-foreground shadow-lg transition-all hover:brightness-105 hover:shadow-xl md:bottom-24">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-inner"><CoachAvatar size={38} /></span>
+          <span className="text-sm font-semibold">Coach</span>
         </button>
       )}
       {open && (
-        <div className="fixed bottom-5 right-5 z-40 flex w-[min(92vw,384px)] h-[min(80vh,560px)] flex-col rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="fixed bottom-24 right-4 z-50 flex w-[min(92vw,384px)] h-[min(74vh,560px)] flex-col rounded-2xl border border-border bg-card shadow-2xl md:bottom-6">
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary"><GraduationCap className="h-4 w-4" /></span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-inner"><CoachAvatar size={32} /></span>
               <div className="leading-tight">
                 <p className="font-serif font-semibold text-sm">Your Coach</p>
                 <p className="text-[11px] text-muted-foreground">Expert on this lesson · adapts to you</p>
@@ -2276,6 +2316,99 @@ function CoachDock({ moduleId }: { moduleId: string }) {
         </div>
       )}
     </>
+  );
+}
+
+// Guided reflection — the module's reflective "assignment". The learner works through a few
+// AI-generated, content-grounded prompts; on save an AI coach responds with a warm synthesis. The
+// reflection is saved per learner (GET/POST /modules/:id/reflection) so they can revisit it.
+type ReflectionData = { moduleTitle: string; prompts: string[]; saved: { answers: { prompt: string; answer: string }[]; feedback: string | null; createdAt?: string } | null };
+function ReflectionPanel({ moduleId }: { moduleId: string }) {
+  const [data, setData] = useState<ReflectionData | null>(null);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setData(null); setFeedback(null); setAnswers({}); setErr(null); setEditing(true);
+    apiFetch<ReflectionData>(`/modules/${moduleId}/reflection`).then((d) => {
+      if (!alive) return;
+      setData(d);
+      if (d.saved) {
+        const seed: Record<number, string> = {};
+        d.prompts.forEach((p, i) => { const m = d.saved!.answers.find((a) => a.prompt === p); if (m) seed[i] = m.answer; });
+        // Fall back positionally if prompts changed since the save.
+        if (Object.keys(seed).length === 0) d.saved.answers.forEach((a, i) => { seed[i] = a.answer; });
+        setAnswers(seed);
+        setFeedback(d.saved.feedback ?? null);
+        setEditing(false);
+      }
+    }).catch(() => { if (alive) setErr('Could not load the reflection.'); });
+    return () => { alive = false; };
+  }, [moduleId]);
+
+  const save = async () => {
+    if (!data) return;
+    const payload = data.prompts.map((p, i) => ({ prompt: p, answer: (answers[i] ?? '').trim() })).filter((a) => a.answer);
+    if (!payload.length) { setErr('Write at least one reflection before saving.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await apiFetch<{ feedback: string }>(`/modules/${moduleId}/reflection`, { method: 'POST', body: JSON.stringify({ answers: payload }) });
+      setFeedback(r.feedback); setEditing(false);
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save your reflection.'); }
+    finally { setBusy(false); }
+  };
+
+  if (!data) return null;
+  const answeredCount = data.prompts.filter((_, i) => (answers[i] ?? '').trim()).length;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">
+      <div className="flex items-center gap-2 mb-1">
+        <Sparkles className="h-5 w-5 text-primary" />
+        <h3 className="font-serif font-bold text-xl">Reflect on this module</h3>
+      </div>
+      <p className="text-sm text-muted-foreground mb-5">A guided reflection — there are no wrong answers. Your coach will read what you write and respond.</p>
+
+      {editing ? (
+        <div className="space-y-5">
+          {data.prompts.map((p, i) => (
+            <div key={i}>
+              <label className="block text-sm font-medium mb-1.5">{p}</label>
+              <textarea value={answers[i] ?? ''} onChange={(e) => setAnswers((s) => ({ ...s, [i]: e.target.value }))}
+                className="w-full min-h-[84px] rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed"
+                placeholder="Write as much or as little as feels true…" />
+            </div>
+          ))}
+          {err && <p className="text-xs text-rose-600">{err}</p>}
+          <div className="flex items-center gap-3">
+            <Button disabled={busy || answeredCount === 0} onClick={save}>{busy ? 'Sending to your coach…' : 'Save reflection'}</Button>
+            <span className="text-xs text-muted-foreground">{answeredCount} of {data.prompts.length} answered</span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <div className="space-y-4">
+            {data.prompts.map((p, i) => (answers[i] ?? '').trim() ? (
+              <div key={i}>
+                <p className="text-sm font-medium text-foreground/90">{p}</p>
+                <p className="text-sm text-muted-foreground mt-0.5 whitespace-pre-wrap">{answers[i]}</p>
+              </div>
+            ) : null)}
+          </div>
+          {feedback && (
+            <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4">
+              <div className="flex items-center gap-2 mb-1.5"><GraduationCap className="h-4 w-4 text-primary" /><span className="text-sm font-semibold">From your coach</span></div>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">{feedback}</p>
+            </div>
+          )}
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(true)}><Pencil className="h-3.5 w-3.5" /> Reflect again</Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -4273,6 +4406,13 @@ function ModuleHubView({
             </Button>
           </div>
         )}
+      </div>
+
+      {/* Guided reflection — the module's reflective assignment, at the end of the page. */}
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        <div className="max-w-3xl mx-auto">
+          <ReflectionPanel moduleId={moduleId} />
+        </div>
       </div>
 
       {/* Always-available in-lesson coach (learners + staff preview). */}
