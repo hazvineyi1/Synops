@@ -44,9 +44,9 @@ export default function SupportChat() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Open support chat"
-          className="fixed bottom-20 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg md:bottom-6"
+          className="fixed bottom-20 right-4 z-50 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg md:bottom-6"
         >
-          <MessageCircle className="h-6 w-6" />
+          <MessageCircle className="h-4 w-4" />
         </button>
       )}
 

@@ -2269,10 +2269,10 @@ function CoachDock({ moduleId }: { moduleId: string }) {
     <>
       <style>{COACH_ANIM_CSS}</style>
       {!open && nudge && (
-        <div className="fixed bottom-44 right-4 z-50 w-[min(78vw,264px)] rounded-2xl border border-border bg-card p-3 shadow-xl md:bottom-40">
+        <div className="fixed bottom-20 left-4 z-50 w-[min(78vw,264px)] rounded-2xl border border-border bg-card p-3 shadow-xl">
           <button onClick={dismissNudge} aria-label="Dismiss" className="absolute top-1.5 right-1.5 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
           <div className="flex items-start gap-2 pr-3">
-            <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-inner shrink-0"><CoachAvatar size={22} /></span>
+            <span className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-inner shrink-0"><CoachAvatar size={20} /></span>
             <p className="text-xs leading-snug text-foreground/90">{nudge}</p>
           </div>
           <button onClick={() => { setNudge(null); setOpen(true); }}
@@ -2282,15 +2282,14 @@ function CoachDock({ moduleId }: { moduleId: string }) {
         </div>
       )}
       {!open && (
-        <button onClick={() => { setNudge(null); setOpen(true); }} aria-label="Open your coach"
-          className="group fixed bottom-28 right-4 z-50 flex items-center gap-2 rounded-full bg-primary/95 py-1.5 pl-1.5 pr-4 text-primary-foreground shadow-lg transition-all hover:brightness-105 hover:shadow-xl md:bottom-24">
+        <button onClick={() => { setNudge(null); setOpen(true); }} aria-label="Open your coach" title="Coach"
+          className="group fixed bottom-6 left-4 z-50 flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-lg transition-all hover:shadow-xl">
           {nudge && <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-pink-400 opacity-75" /><span className="relative inline-flex h-3 w-3 rounded-full bg-pink-500" /></span>}
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-inner"><CoachAvatar size={38} /></span>
-          <span className="text-sm font-semibold">Coach</span>
+          <CoachAvatar size={26} />
         </button>
       )}
       {open && (
-        <div className="fixed bottom-24 right-4 z-50 flex w-[min(92vw,384px)] h-[min(74vh,560px)] flex-col rounded-2xl border border-border bg-card shadow-2xl md:bottom-6">
+        <div className="fixed bottom-6 left-4 z-50 flex w-[min(92vw,384px)] h-[min(74vh,560px)] flex-col rounded-2xl border border-border bg-card shadow-2xl">
           <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-inner"><CoachAvatar size={32} /></span>
