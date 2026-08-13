@@ -729,6 +729,7 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: BookOpen },
   { id: 'build', label: 'Build', icon: PenTool },
   { id: 'syllabus', label: 'Syllabus', icon: ScrollText },
+  { id: 'schedule', label: 'Schedule', icon: Calendar },
   { id: 'modules', label: 'Modules', icon: BookOpen },
   { id: 'assignments', label: 'Assignments', icon: ClipboardList },
   { id: 'activities', label: 'Activities', icon: Play },
@@ -2256,109 +2257,111 @@ function SectionPolicy({ title, html, isInstructor, onSave, saving, icon, banner
   );
 }
 
-/* ── Syllabus tab: the standard course syllabus, editable by instructors, read by learners. ── */
-const SYL_BASICS: { key: string; label: string; wide?: boolean }[] = [
-  { key: 'number', label: 'Course number' }, { key: 'name', label: 'Course name' },
-  { key: 'instructor', label: 'Instructor' }, { key: 'contact', label: 'Contact' },
-  { key: 'times', label: 'Meeting times' }, { key: 'locations', label: 'Location(s)' },
+/* ── Syllabus: each section is a collapsible, always-editable block. Schedule is its own tab. ── */
+const SYL_SECTIONS: { key: string; title: string; placeholder: string }[] = [
+  { key: 'objectivesHtml', title: 'Learning Objectives', placeholder: "What learners will be able to do by the end of the course." },
+  { key: 'assessmentHtml', title: 'Assignments & Assessment', placeholder: 'Assignments, projects and exams, and how they are graded.' },
+  { key: 'responsibilitiesHtml', title: 'Student Responsibilities', placeholder: 'Participation, homework, late/make-up policy, prerequisites.' },
+  { key: 'materialsHtml', title: 'Course Materials', placeholder: 'Required texts and resources and how to access them.' },
+  { key: 'communicationHtml', title: 'Communication & Support', placeholder: 'How to reach the instructor, office hours, and where to find support.' },
 ];
-const SYL_SECTIONS: { key: string; title: string }[] = [
-  { key: 'objectivesHtml', title: 'Learning Objectives' },
-  { key: 'scheduleHtml', title: 'Course Schedule' },
-  { key: 'assessmentHtml', title: 'Assignments & Assessment' },
-  { key: 'responsibilitiesHtml', title: 'Student Responsibilities' },
-  { key: 'materialsHtml', title: 'Course Materials' },
-  { key: 'communicationHtml', title: 'Communication & Support' },
-];
-const EMPTY_SYL = { basics: { number: '', name: '', instructor: '', contact: '', times: '', locations: '', description: '' }, objectivesHtml: '', scheduleHtml: '', assessmentHtml: '', responsibilitiesHtml: '', materialsHtml: '', communicationHtml: '' };
+const EMPTY_SYL: Record<string, any> = { descriptionHtml: '', objectivesHtml: '', scheduleHtml: '', assessmentHtml: '', responsibilitiesHtml: '', materialsHtml: '', communicationHtml: '', basics: {} };
+const parseSyl = (j: string | null): Record<string, any> => { try { return { ...EMPTY_SYL, ...(JSON.parse(j || '{}')) }; } catch { return { ...EMPTY_SYL }; } };
+
+// A collapsible section that instructors can edit inline with rich text.
+function EditableBlock({ title, html, isInstructor, onSave, saving, placeholder, defaultOpen = true }: { title: string; html: string; isInstructor: boolean; onSave: (html: string) => void; saving: boolean; placeholder?: string; defaultOpen?: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(html);
+  useEffect(() => { if (!editing) setDraft(html); }, [html, editing]);
+  return (
+    <details open={defaultOpen} className="rounded-2xl border border-border bg-card group [&_summary::-webkit-details-marker]:hidden">
+      <summary className="flex items-center gap-2 px-5 py-3 cursor-pointer list-none">
+        <ChevronRight className="h-4 w-4 text-primary shrink-0 transition-transform group-open:rotate-90" />
+        <h3 className="font-serif font-bold text-base sm:text-lg flex-1 min-w-0">{title}</h3>
+        {isInstructor && !editing && (
+          <button onClick={(e) => { e.preventDefault(); setDraft(html); setEditing(true); }} className="flex items-center gap-1 text-xs text-primary hover:underline shrink-0"><Pencil className="h-3.5 w-3.5" /> Edit</button>
+        )}
+      </summary>
+      <div className="px-5 pb-5">
+        {isInstructor && editing ? (
+          <div className="space-y-2">
+            <RichTextEditor value={draft} onChange={setDraft} />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+              <Button size="sm" disabled={saving} onClick={() => { onSave(draft); setEditing(false); }}>{saving ? 'Saving…' : 'Save'}</Button>
+            </div>
+          </div>
+        ) : html && html.replace(/<[^>]+>/g, '').trim() ? (
+          <div className="prose prose-sm max-w-none text-foreground/85 leading-relaxed [&_h3]:font-serif [&_ul]:my-2 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: html }} />
+        ) : (
+          <p className="text-sm text-muted-foreground">{placeholder ?? 'Nothing here yet.'}{isInstructor ? ' Click Edit to add it.' : ''}</p>
+        )}
+      </div>
+    </details>
+  );
+}
 
 function SyllabusTab({ courseId, syllabusJson, isInstructor, onSave, saving, bannerUrl, onBannerSave }: {
   courseId: string; syllabusJson: string | null; isInstructor: boolean; onSave: (json: string) => void; saving: boolean; bannerUrl?: string | null; onBannerSave?: (url: string) => void;
 }) {
-  const parse = (j: string | null) => { try { const p = JSON.parse(j || '{}'); return { ...EMPTY_SYL, ...p, basics: { ...EMPTY_SYL.basics, ...(p.basics || {}) } }; } catch { return EMPTY_SYL; } };
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<any>(() => parse(syllabusJson));
   const [genBusy, setGenBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (!editing) setDraft(parse(syllabusJson)); }, [syllabusJson, editing]);
-  const syl = parse(syllabusJson);
-  const hasAny = SYL_BASICS.some((f) => (syl.basics as any)[f.key]) || syl.basics.description || SYL_SECTIONS.some((s) => (syl as any)[s.key]);
+  const syl = parseSyl(syllabusJson);
+  const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const descHtml = syl.descriptionHtml || (syl.basics?.description ? `<p>${esc(syl.basics.description)}</p>` : '');
+  const saveField = (key: string, html: string) => onSave(JSON.stringify({ ...parseSyl(syllabusJson), [key]: html }));
 
   const generate = async () => {
     setGenBusy(true); setErr(null);
-    try { const r = await apiFetch<{ syllabus: any }>(`/courses/${courseId}/syllabus/generate`, { method: 'POST', body: JSON.stringify({}) }); setDraft({ ...EMPTY_SYL, ...r.syllabus, basics: { ...EMPTY_SYL.basics, ...(r.syllabus?.basics || {}) } }); setEditing(true); }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Could not generate a syllabus.'); }
+    try {
+      const r = await apiFetch<{ syllabus: any }>(`/courses/${courseId}/syllabus/generate`, { method: 'POST', body: JSON.stringify({}) });
+      const g = r.syllabus || {};
+      const cur = parseSyl(syllabusJson);
+      onSave(JSON.stringify({
+        ...cur,
+        descriptionHtml: g.basics?.description ? `<p>${esc(g.basics.description)}</p>` : cur.descriptionHtml,
+        objectivesHtml: g.objectivesHtml ?? cur.objectivesHtml,
+        scheduleHtml: g.scheduleHtml ?? cur.scheduleHtml,
+        assessmentHtml: g.assessmentHtml ?? cur.assessmentHtml,
+        responsibilitiesHtml: g.responsibilitiesHtml ?? cur.responsibilitiesHtml,
+        materialsHtml: g.materialsHtml ?? cur.materialsHtml,
+        communicationHtml: g.communicationHtml ?? cur.communicationHtml,
+      }));
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not generate a syllabus.'); }
     finally { setGenBusy(false); }
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <SectionBanner title="Syllabus" icon={ScrollText} bannerUrl={bannerUrl} isInstructor={isInstructor} onBannerSave={onBannerSave} />
       {isInstructor && (
-        <div className="flex flex-wrap justify-end gap-2">
-          {!editing && <Button size="sm" variant="outline" disabled={genBusy} onClick={generate}>{genBusy ? 'Writing…' : 'Generate from this course'}</Button>}
-          {!editing && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setDraft(parse(syllabusJson)); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /> Edit syllabus</Button>}
+        <div className="flex justify-end">
+          <Button size="sm" variant="outline" disabled={genBusy} onClick={generate}>{genBusy ? 'Writing…' : 'Generate from this course'}</Button>
         </div>
       )}
       {err && <p className="text-xs text-rose-600">{err}</p>}
+      <div className="max-w-3xl mx-auto space-y-3">
+        <EditableBlock title="Course description" html={descHtml} isInstructor={isInstructor} onSave={(h) => saveField('descriptionHtml', h)} saving={saving} placeholder="Describe the course in a few sentences." />
+        {SYL_SECTIONS.map((s) => (
+          <EditableBlock key={s.key} title={s.title} html={syl[s.key] ?? ''} isInstructor={isInstructor} onSave={(h) => saveField(s.key, h)} saving={saving} placeholder={s.placeholder} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-      {editing ? (
-        <div className="max-w-3xl space-y-6">
-          <section className="space-y-3">
-            <h3 className="font-serif font-bold text-lg flex items-center gap-2"><span className="h-4 w-1 rounded-full bg-orange-500" /> Course Basics</h3>
-            <div className="grid sm:grid-cols-2 gap-3">
-              {SYL_BASICS.map((f) => (
-                <label key={f.key} className="text-sm"><span className="mb-1 block text-muted-foreground">{f.label}</span>
-                  <Input value={draft.basics[f.key] ?? ''} onChange={(e) => setDraft((d: any) => ({ ...d, basics: { ...d.basics, [f.key]: e.target.value } }))} /></label>
-              ))}
-            </div>
-            <label className="text-sm block"><span className="mb-1 block text-muted-foreground">Course description</span>
-              <Textarea value={draft.basics.description ?? ''} onChange={(e) => setDraft((d: any) => ({ ...d, basics: { ...d.basics, description: e.target.value } }))} className="min-h-[70px]" /></label>
-          </section>
-          {SYL_SECTIONS.map((s) => (
-            <section key={s.key} className="space-y-2">
-              <h3 className="font-serif font-bold text-lg flex items-center gap-2"><span className="h-4 w-1 rounded-full bg-orange-500" /> {s.title}</h3>
-              <RichTextEditor value={draft[s.key] ?? ''} onChange={(h) => setDraft((d: any) => ({ ...d, [s.key]: h }))} />
-            </section>
-          ))}
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
-            <Button size="sm" disabled={saving} onClick={() => { onSave(JSON.stringify(draft)); setEditing(false); }}>{saving ? 'Saving…' : 'Save syllabus'}</Button>
-          </div>
-        </div>
-      ) : !hasAny ? (
-        <div className="max-w-3xl rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          {isInstructor ? 'No syllabus yet. Click "Generate from this course" to draft one, or "Edit syllabus" to write it.' : 'The syllabus for this course has not been published yet.'}
-        </div>
-      ) : (
-        <article className="max-w-3xl mx-auto rounded-2xl border border-border bg-card shadow-sm px-6 sm:px-12 py-9">
-          <header className="text-center border-b border-border pb-6 mb-7">
-            <h1 className="font-serif text-3xl sm:text-4xl font-bold leading-tight">{syl.basics.name || 'Course Syllabus'}</h1>
-            {syl.basics.number && <p className="text-sm font-medium tracking-wide text-muted-foreground mt-1.5">{syl.basics.number}</p>}
-            {syl.basics.description && <p className="text-[15px] text-foreground/80 mt-4 max-w-xl mx-auto leading-relaxed">{syl.basics.description}</p>}
-          </header>
-          {SYL_BASICS.filter((f) => ['instructor', 'contact', 'times', 'locations'].includes(f.key) && (syl.basics as any)[f.key]).length > 0 && (
-            <dl className="grid sm:grid-cols-2 gap-x-10 gap-y-2.5 text-sm mb-9">
-              {SYL_BASICS.filter((f) => ['instructor', 'contact', 'times', 'locations'].includes(f.key) && (syl.basics as any)[f.key]).map((f) => (
-                <div key={f.key} className="flex gap-2">
-                  <dt className="font-semibold text-muted-foreground shrink-0">{f.label}</dt>
-                  <dd className="text-foreground">{(syl.basics as any)[f.key]}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-          <div className="space-y-9">
-            {SYL_SECTIONS.filter((s) => (syl as any)[s.key]).map((s, idx) => (
-              <section key={s.key}>
-                <h2 className="font-serif text-xl font-bold flex items-baseline gap-2.5 mb-2.5 pb-1.5 border-b border-border/60">
-                  <span className="text-primary tabular-nums">{idx + 1}.</span> {s.title}
-                </h2>
-                <div className="prose prose-sm max-w-none text-foreground/85 leading-relaxed [&_h3]:font-serif [&_ul]:my-2 [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: (syl as any)[s.key] }} />
-              </section>
-            ))}
-          </div>
-        </article>
-      )}
+// Course Schedule lives on its own tab, editable.
+function ScheduleTab({ syllabusJson, isInstructor, onSave, saving, bannerUrl, onBannerSave }: {
+  syllabusJson: string | null; isInstructor: boolean; onSave: (json: string) => void; saving: boolean; bannerUrl?: string | null; onBannerSave?: (url: string) => void;
+}) {
+  const syl = parseSyl(syllabusJson);
+  const saveField = (key: string, html: string) => onSave(JSON.stringify({ ...parseSyl(syllabusJson), [key]: html }));
+  return (
+    <div className="space-y-4">
+      <SectionBanner title="Course Schedule" icon={Calendar} bannerUrl={bannerUrl} isInstructor={isInstructor} onBannerSave={onBannerSave} />
+      <div className="max-w-3xl mx-auto">
+        <EditableBlock title="Course Schedule" html={syl.scheduleHtml ?? ''} isInstructor={isInstructor} onSave={(h) => saveField('scheduleHtml', h)} saving={saving} placeholder="Outline topics, readings, deadlines, exams and holidays — week by week." />
+      </div>
     </div>
   );
 }
@@ -3482,6 +3485,12 @@ export function CourseDetail() {
           <SyllabusTab courseId={courseId} syllabusJson={(course as { syllabus?: string | null }).syllabus ?? null} isInstructor={isInstructor}
             onSave={(j) => saveCourse.mutate({ syllabus: j })} saving={saveCourse.isPending}
             bannerUrl={sectionBannerUrl('syllabus')} onBannerSave={(u) => saveSectionBanner('syllabus', u)} />
+        )}
+
+        {activeTab === 'schedule' && (
+          <ScheduleTab syllabusJson={(course as { syllabus?: string | null }).syllabus ?? null} isInstructor={isInstructor}
+            onSave={(j) => saveCourse.mutate({ syllabus: j })} saving={saveCourse.isPending}
+            bannerUrl={sectionBannerUrl('schedule')} onBannerSave={(u) => saveSectionBanner('schedule', u)} />
         )}
 
         {activeTab === 'rubrics' && (
