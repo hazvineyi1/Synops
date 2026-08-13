@@ -3061,13 +3061,13 @@ function EmbeddedDiscussion({ courseId, d, isInstructor, onDelete }: { courseId:
         </button>
         {isInstructor && <Button size="sm" variant="ghost" className="text-rose-500 shrink-0" title="Delete discussion" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>}
       </div>
-      {open && <div className="border-t border-border px-4 py-4"><DiscussionThread courseId={courseId} discussionId={d.id} embedded /></div>}
+      {open && <div className="border-t border-border px-4 py-4"><DiscussionThread courseId={courseId} discussionId={d.id} embedded staffOverride={isInstructor} /></div>}
     </div>
   );
 }
 
 // An assessment embedded inline in the module: expand to complete it without navigating away.
-function EmbeddedAssessment({ courseId, a }: { courseId: string; a: any }) {
+function EmbeddedAssessment({ courseId, a, isInstructor }: { courseId: string; a: any; isInstructor: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -3080,7 +3080,7 @@ function EmbeddedAssessment({ courseId, a }: { courseId: string; a: any }) {
         <span className="text-xs text-muted-foreground shrink-0">{a.pointsPossible ?? 0} pts</span>
         <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', open ? '' : '-rotate-90')} />
       </button>
-      {open && <div className="border-t border-border px-4 py-4"><AssignmentDetail courseId={courseId} assignmentId={a.id} embedded /></div>}
+      {open && <div className="border-t border-border px-4 py-4"><AssignmentDetail courseId={courseId} assignmentId={a.id} embedded staffOverride={isInstructor} /></div>}
     </div>
   );
 }
@@ -4572,7 +4572,7 @@ function ModuleHubView({
                 <Instruction>Open an assessment to read the full brief, then type your response or upload a file. You'll see your grade and feedback here once it's marked.</Instruction>
                 <div className="space-y-2">
                   {moduleAssignments.map((a) => (
-                    <EmbeddedAssessment key={a.id} courseId={courseId} a={a} />
+                    <EmbeddedAssessment key={a.id} courseId={courseId} a={a} isInstructor={isInstructor} />
                   ))}
                 </div>
               </>

@@ -31,7 +31,7 @@ const LANGS: { code: string; label: string }[] = [
   { code: 'af', label: 'Afrikaans' },
 ];
 
-export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embedded }: { courseId?: string; discussionId?: string; embedded?: boolean } = {}) {
+export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embedded, staffOverride }: { courseId?: string; discussionId?: string; embedded?: boolean; staffOverride?: boolean } = {}) {
   const params = useParams<{ courseId: string; discussionId: string }>();
   const courseId = pCourseId ?? params.courseId;
   const discussionId = pId ?? params.discussionId;
@@ -74,7 +74,8 @@ export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embed
     onError: (e) => setError(e instanceof Error ? e.message : 'Could not post that reply.'),
   });
 
-  const isInstructor = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(user?.role ?? '');
+  // When embedded in a module previewed "as student", staffOverride=false hides all instructor controls.
+  const isInstructor = staffOverride !== undefined ? staffOverride : ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(user?.role ?? '');
 
   // Module list for the scope picker. Only fetched for staff, who are the only people who
   // can change it.

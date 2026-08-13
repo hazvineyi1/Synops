@@ -837,14 +837,15 @@ function StaffGradingPanel({ assignmentId, pointsPossible }: { assignmentId: str
 const FileCheckIcon = () => <CheckCircle className="h-4 w-4 text-primary" />;
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embedded }: { courseId?: string; assignmentId?: string; embedded?: boolean } = {}) {
+export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embedded, staffOverride }: { courseId?: string; assignmentId?: string; embedded?: boolean; staffOverride?: boolean } = {}) {
   const params = useParams<{ courseId?: string; assignmentId: string }>();
   const routeCourseId = pCourseId ?? params.courseId;
   const assignmentId = pId ?? params.assignmentId;
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const { data: me } = useGetMe();
-  const isStaff = !!me && STAFF_ROLES.includes(me.role);
+  // staffOverride=false (module previewed as student) hides all staff/grading controls.
+  const isStaff = staffOverride !== undefined ? staffOverride : (!!me && STAFF_ROLES.includes(me.role));
 
   // Generic text state (essay / discussion / file notes)
   const [essay, setEssay] = useState('');
