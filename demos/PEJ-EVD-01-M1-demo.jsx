@@ -4,7 +4,7 @@
  * =============================================================================
  * COURSE CODE:   PEJ-EVD-01
  * COURSE TITLE:  Evidence at the conflict-related crime scene
- * MODULE:        Module 1 — Documenting the scene
+ * MODULE:        Module 1, Documenting the scene
  * VERSION:       0.1-demo (2026-08-13)
  * SME SIGN-OFF:  PENDING. No legal content in this build is settled. Article
  *                numbers marked "confirm" are placeholders for SME verification
@@ -13,7 +13,7 @@
  * PRIMARY LEARNERS:   Prosecutors and investigators in the four frontline
  *                     oblasts, working files under Criminal Code art. 438.
  *                     Experienced, formally educated, carrying live files.
- * SECONDARY LEARNERS: Investigating judges (via Bench view — not in this demo).
+ * SECONDARY LEARNERS: Investigating judges (via Bench view, not in this demo).
  *
  * THE PROFESSIONAL TASK (verb phrase):
  *   Document a conflict-related crime scene under field conditions so that the
@@ -39,7 +39,7 @@
  *                   which every tainted item is flagged, discharged by the
  *                   artifact (uploaded to the coach).
  *
- * DESIGN COMMITMENTS (Parts C–J of the master build prompt):
+ * DESIGN COMMITMENTS (Parts C-J of the master build prompt):
  *   - Task first, law second. Every lesson opens with a decision (C1).
  *   - Consequence, not correctness. A poor early move persists and costs the
  *     participant later; there is no "correct answer" button (C3).
@@ -51,11 +51,11 @@
  *     quiz (C6).
  *   - Every legal claim is tagged to an authority and shown as unsigned (C7).
  *   - Assessment: two equally weighted streams (Skills / Application of
- *     procedure or law), banded A–F per criterion, partly conjunctive on the
+ *     procedure or law), banded A-F per criterion, partly conjunctive on the
  *     non-negotiables (Part D).
  *   - Nothing here is reported to the participant's institution (Part D).
  *
- * AI BOUNDARIES (Part J — stated so they survive handover):
+ * AI BOUNDARIES (Part J, stated so they survive handover):
  *   - No real case material is ever sent to a model. Composites only, as an
  *     architectural boundary, not merely a policy. Names are initials.
  *   - The model never plays a survivor or victim. Counterpart lines are read
@@ -84,32 +84,32 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
  * ------------------------------------------------------------------------- */
 const AUTHORITIES = {
   CPC_INSPECTION: {
-    ref: "CPC of Ukraine — inspection & register entry",
+    ref: "CPC of Ukraine, inspection & register entry",
     note: "Article numbers to be confirmed against current text.",
     status: "confirm",
   },
   CPC_615: {
-    ref: "CPC of Ukraine, art. 615 — regime under martial law",
+    ref: "CPC of Ukraine, art. 615, regime under martial law",
     note: "Amended repeatedly during the full-scale invasion. Confirm current text.",
     status: "confirm",
   },
   CPC_225: {
-    ref: "CPC of Ukraine, art. 225 — preservation of evidence before the investigating judge",
+    ref: "CPC of Ukraine, art. 225, preservation of evidence before the investigating judge",
     note: "Confirm, including known practice limitations.",
     status: "confirm",
   },
   BERKELEY: {
-    ref: "Berkeley Protocol on Digital Open Source Investigations — seizure, isolation, hashing",
+    ref: "Berkeley Protocol on Digital Open Source Investigations, seizure, isolation, hashing",
     note: "Stable.",
     status: "stable",
   },
   MINNESOTA: {
-    ref: "Minnesota Protocol — examination of a body",
+    ref: "Minnesota Protocol, examination of a body",
     note: "Confirm the corresponding domestic articles before use.",
     status: "confirm",
   },
   CUSTODY_PRACTICE: {
-    ref: "Domestic evidential practice — contemporaneous record & chain of custody",
+    ref: "Domestic evidential practice, contemporaneous record & chain of custody",
     note: "Practice layer. Must come from the SME; not settled here.",
     status: "practice",
   },
@@ -124,7 +124,7 @@ const REVIEW_TRIGGERS = [
 /* ---------------------------------------------------------------------------
  * ASSESSMENT MODEL (Part D)
  * Criteria carry a stream, whether they are non-negotiable (partly conjunctive),
- * and the published indicators shown to the participant. Bands A–F map 5..0.
+ * and the published indicators shown to the participant. Bands A-F map 5..0.
  * ------------------------------------------------------------------------- */
 const BAND_VALUE = { A: 5, B: 4, C: 3, D: 2, E: 1, F: 0 };
 const qualityToBand = (q) =>
@@ -132,7 +132,7 @@ const qualityToBand = (q) =>
 
 const CRITERIA = {
   X1: {
-    label: "Safety floor — no action on a suspected hazard before clearance",
+    label: "Safety floor, no action on a suspected hazard before clearance",
     stream: "Application of procedure or law",
     nonNegotiable: true,
     indicators: {
@@ -188,12 +188,12 @@ const CRITERIA = {
 };
 
 /* ---------------------------------------------------------------------------
- * LESSON DATA (authored beats — content model from the kit, section 5)
+ * LESSON DATA (authored beats, content model from the kit, section 5)
  * Each interactive lesson declares its interaction type so the module can prove
  * it uses at least four different types and never the same type twice in a row.
  * ------------------------------------------------------------------------- */
 
-// L1 — Routing decision per item (all presented at once, to reproduce the real
+// L1, Routing decision per item (all presented at once, to reproduce the real
 // cognitive condition of load). Objective O1. Non-negotiable X1 lives here.
 const L1_ITEMS = [
   {
@@ -222,16 +222,16 @@ const L1_ITEMS = [
         response: "You mark a wide cordon, photograph from distance with a scale, and note it for EOD. You do not go near it.",
         feedback: "The safety floor is not a documentation choice. Suspected ordnance is live until EOD says otherwise." },
       photo_close: { quality: "not", crit: "X1", band: "F", effect: { safetyBreach: true },
-        response: "You step in for a scale photograph. — This is the one move that ends the exercise in a real scene. It is recorded as a safety-floor breach.",
+        response: "You step in for a scale photograph.  This is the one move that ends the exercise in a real scene. It is recorded as a safety-floor breach.",
         feedback: "No image is worth standing over unexploded ordnance." },
       move: { quality: "not", crit: "X1", band: "F", effect: { safetyBreach: true },
-        response: "You reposition it for a cleaner shot. — Recorded as a safety-floor breach.",
+        response: "You reposition it for a cleaner shot.  Recorded as a safety-floor breach.",
         feedback: "Never handle suspected ordnance. This is irreversible." },
     },
   },
   {
     id: "grain",
-    label: "The emptied grain store — the substance of the alleged offence (art. 438)",
+    label: "The emptied grain store, the substance of the alleged offence (art. 438)",
     best: "document",
     options: {
       document: { quality: "sound", crit: null, band: "B", effect: { sceneDocumented: true },
@@ -257,12 +257,12 @@ const L1_ITEMS = [
   },
 ];
 
-// L3 — Branching decision beats (live interaction). Objective O3. Hidden fact
+// L3, Branching decision beats (live interaction). Objective O3. Hidden fact
 // ledger; a leading question taints and the taint PERSISTS. Non-negotiable S2.
 const L3 = {
   stage:
     "A farm worker, Ms K., stayed through the occupation and is standing at the loading door. She is willing to talk and clearly wants to help. Your interpreter is beside you. You have perhaps ten minutes before the light goes.",
-  constraint: "Time is short and she is eager — the two conditions under which good interviewers lead a witness.",
+  constraint: "Time is short and she is eager, the two conditions under which good interviewers lead a witness.",
   theory:
     "An account taken by a leading question is not weak evidence; in this file it is unusable evidence, and it stays in the file marked so. Open before closed; record her words, not your inference.",
   authorities: ["CUSTODY_PRACTICE", "CPC_225"],
@@ -280,11 +280,11 @@ const L3 = {
       id: "preserve",
       // Correct in substance, WRONG IN TIMING/REGISTER (the C4 teaching option).
       label:
-        '"Before we speak — I can arrange to have your testimony preserved before an investigating judge under article 225. Shall we do that now?"',
+        '"Before we speak, I can arrange to have your testimony preserved before an investigating judge under article 225. Shall we do that now?"',
       quality: "partly", crit: "S2", band: "C",
       effect: { account: "delayed" },
       response:
-        "Right instrument, wrong moment. She does not know what article 225 is; she came to tell you something and now feels processed. She gives you less, and the light goes. Preservation is a real and important step — after the account, not as the opening move, and not in that register.",
+        "Right instrument, wrong moment. She does not know what article 225 is; she came to tell you something and now feels processed. She gives you less, and the light goes. Preservation is a real and important step, after the account, not as the opening move, and not in that register.",
       feedback:
         "The most dangerous wrong answer is the correct one delivered too early, in language the person cannot use. Right law, wrong timing.",
     },
@@ -296,12 +296,12 @@ const L3 = {
       response:
         "She agrees, because you offered her the words and she wants to help. You now have a confirmation you put in her mouth. This fact is given to you, marked UNUSABLE, and it will appear flagged in the record you build in Lesson 6.",
       feedback:
-        "A leading question does not just weaken an answer — it manufactures one. This is irreversible for this account.",
+        "A leading question does not just weaken an answer, it manufactures one. This is irreversible for this account.",
     },
     {
       id: "detail",
       // Tempting shortcut under time pressure: chase vivid detail the file does not need.
-      label: '"Describe the soldiers — their faces, exactly what each one did to people here."',
+      label: '"Describe the soldiers, their faces, exactly what each one did to people here."',
       quality: "not", crit: "S2", band: "E",
       effect: { account: "overreach" },
       response:
@@ -311,40 +311,40 @@ const L3 = {
   ],
 };
 
-// L4 — Chain audit (all-but-one step properly executed). Objective O4.
+// L4, Chain audit (all-but-one step properly executed). Objective O4.
 // Non-negotiable P2. Conduct sits inside the task, unflagged (C5).
 const L4 = {
   stage:
-    "A colleague, Investigator D., hands you his completed seizure log for the phone and a ledger taken from the store, and asks you to co-sign it before it goes to the case file. You read it as competent work. Find the one step that breaks integrity — co-sign only if it holds.",
+    "A colleague, Investigator D., hands you his completed seizure log for the phone and a ledger taken from the store, and asks you to co-sign it before it goes to the case file. You read it as competent work. Find the one step that breaks integrity, co-sign only if it holds.",
   constraint: "He is senior to you, the log looks professional, and he is waiting.",
   theory:
     "In a chain audit the defect is never the untidy line. It is the single break that makes the exhibit unusable while everything around it looks correct.",
   authorities: ["CUSTODY_PRACTICE", "BERKELEY"],
   steps: [
-    { id: 1, text: "09:12 — Phone photographed in place, time recorded, placed in flight mode. Bagged, sealed, seal no. A-0447.", defect: false },
-    { id: 2, text: "09:20 — Ledger photographed, each page, with scale. Bagged, sealed, seal no. A-0448. Register entry made.", defect: false },
-    { id: 3, text: "10:05 — At the vehicle, phone bag reopened to confirm the model for the log, resealed under a new seal A-0461. (No register entry for the reopening.)", defect: true,
-      why: "The reseal has no register entry. The bag was opened and closed with nothing recording who did it or why — that is the break in the chain, and it is the exhibit that matters most." },
-    { id: 4, text: "10:40 — Digital hash of the phone image taken and recorded against seal A-0447.", defect: false },
-    { id: 5, text: "11:15 — Exhibits logged into the register; custody transferred to the exhibits officer with signatures.", defect: false },
+    { id: 1, text: "09:12, Phone photographed in place, time recorded, placed in flight mode. Bagged, sealed, seal no. A-0447.", defect: false },
+    { id: 2, text: "09:20, Ledger photographed, each page, with scale. Bagged, sealed, seal no. A-0448. Register entry made.", defect: false },
+    { id: 3, text: "10:05, At the vehicle, phone bag reopened to confirm the model for the log, resealed under a new seal A-0461. (No register entry for the reopening.)", defect: true,
+      why: "The reseal has no register entry. The bag was opened and closed with nothing recording who did it or why, that is the break in the chain, and it is the exhibit that matters most." },
+    { id: 4, text: "10:40, Digital hash of the phone image taken and recorded against seal A-0447.", defect: false },
+    { id: 5, text: "11:15, Exhibits logged into the register; custody transferred to the exhibits officer with signatures.", defect: false },
   ],
   // A distractor that is conduct-adjacent but not the integrity break:
   decoyId: 4,
   decoyNote:
-    "Step 4 references the original seal A-0447 after the reseal to A-0461 — untidy, worth a note, but not the break. The integrity failure is the unrecorded reopening at step 3.",
+    "Step 4 references the original seal A-0447 after the reseal to A-0461, untidy, worth a note, but not the break. The integrity failure is the unrecorded reopening at step 3.",
 };
 
-// L5 — Socratic checkpoint (Part F). Placed immediately after the highest-stakes
+// L5, Socratic checkpoint (Part F). Placed immediately after the highest-stakes
 // decision (L3 / L4). Model answer is AUTHORED. AI, if reached, supplies only the
 // single probing question, constrained; falls back to an authored question.
 const L5 = {
   prompt:
     "Justify, in your own words, the decision you took with Ms K. at the loading door. What did it cost you, and what did it gain?",
   authoredProbe:
-    "You have named what you gained — what did the moment cost the person in front of you, and did the file need that cost?",
-  // AUTHORED model reasoning — one competent answer, not the answer:
+    "You have named what you gained, what did the moment cost the person in front of you, and did the file need that cost?",
+  // AUTHORED model reasoning, one competent answer, not the answer:
   modelReasoning:
-    "One competent answer, not the answer. The opening move here is almost never about evidence law in the first instance; it is about not spending the witness. A wide opener costs nothing and keeps every later option open — preservation under article 225, a fuller interview, a referral. A leading question or a premature procedural move both spend something you cannot get back: the first the usability of the account, the second the person's willingness. Where your own reasoning went further than this — for instance if you weighed her safety or displacement risk before anything else — keep yours.",
+    "One competent answer, not the answer. The opening move here is almost never about evidence law in the first instance; it is about not spending the witness. A wide opener costs nothing and keeps every later option open, preservation under article 225, a fuller interview, a referral. A leading question or a premature procedural move both spend something you cannot get back: the first the usability of the account, the second the person's willingness. Where your own reasoning went further than this, for instance if you weighed her safety or displacement risk before anything else, keep yours.",
   note:
     "Your written answers here are read by your coach and are never scored by the platform.",
 };
@@ -374,7 +374,7 @@ function AuthorityLine({ keys }) {
           return (
             <li key={k}>
               <span className="auth-ref">{a.ref}</span> <StatusTag status={a.status} />
-              <span className="auth-note"> — {a.note}</span>
+              <span className="auth-note">, {a.note}</span>
             </li>
           );
         })}
@@ -555,7 +555,7 @@ function Warning({ onStart }) {
 }
 
 /* ===========================================================================
- * LESSON 1 — ROUTING DECISION PER ITEM
+ * LESSON 1, ROUTING DECISION PER ITEM
  * ========================================================================= */
 function LessonRouting({ world, apply, score, onDone }) {
   const [choices, setChoices] = useState({}); // itemId -> optionKey
@@ -575,7 +575,7 @@ function LessonRouting({ world, apply, score, onDone }) {
         type="Routing decision · every item at once"
       >
         Dusk, a farmstead outside a recently de-occupied village. The grain store
-        has been emptied — this is the substance of the file under Criminal Code
+        has been emptied, this is the substance of the file under Criminal Code
         art. 438. EOD has been called but has not arrived. Light is going. Decide
         what you do with each item below. You are choosing an <em>action</em> for
         each, including what not to touch, and you cannot revisit a decision once
@@ -618,7 +618,7 @@ function LessonRouting({ world, apply, score, onDone }) {
         <div className="row">
           <p className="carry">
             {world.safetyBreach
-              ? "A safety-floor breach has been recorded. It will fail the station regardless of everything else you do — that is what a non-negotiable means. Continue to see how the rest plays out."
+              ? "A safety-floor breach has been recorded. It will fail the station regardless of everything else you do, that is what a non-negotiable means. Continue to see how the rest plays out."
               : "Your sequencing is recorded and carries forward."}
           </p>
           <button className="btn" onClick={onDone}>Continue →</button>
@@ -629,7 +629,7 @@ function LessonRouting({ world, apply, score, onDone }) {
 }
 function optionText(itemId, k) {
   const map = {
-    device: { isolate: "Isolate it now — flight mode, photograph in place, bag for hashing", later: "Note it and come back after the walk-through", examine: "Open it to see what is on it" },
+    device: { isolate: "Isolate it now, flight mode, photograph in place, bag for hashing", later: "Note it and come back after the walk-through", examine: "Open it to see what is on it" },
     ordnance: { leave: "Cordon wide, photograph from distance, note for EOD", photo_close: "Step in for a close scale photograph", move: "Reposition it for a cleaner shot" },
     grain: { document: "Photograph the emptied bays now, with scale", wait: "Wait until the device and ordnance are handled" },
     body: { specialist: "Secure, do not disturb, refer for medico-legal examination", photograph: "Document it yourself in full detail" },
@@ -638,12 +638,12 @@ function optionText(itemId, k) {
 }
 
 /* ===========================================================================
- * LESSON 2 — FIELD / COMPONENT SELECTION (constructing a compliant product)
+ * LESSON 2, FIELD / COMPONENT SELECTION (constructing a compliant product)
  * Traps that feel helpful; a trap is weighted heavier than an omission.
  * ========================================================================= */
 const L2_COMPONENTS = [
   { id: "register", label: "Enter the inspection in the register at the point it begins", correct: true, weight: 2,
-    note: "Required — the entry is what makes the inspection an act on the file rather than a visit." },
+    note: "Required, the entry is what makes the inspection an act on the file rather than a visit." },
   { id: "regime615", label: "Apply the martial-law regime for investigative actions (art. 615)", correct: true, weight: 2,
     note: "Correct for a site in a zone under martial law; it is the regime that governs the timing and authorisation here." },
   { id: "judge225", label: "Plan preservation of perishable evidence before the investigating judge (art. 225)", correct: true, weight: 1,
@@ -688,7 +688,7 @@ function LessonSelection({ score, onDone }) {
             <span className="check-label">
               {c.label}
               {submitted && (
-                <span className="check-note"> — {c.correct ? "Belongs. " : (c.trap ? "Trap. " : "Omission. ")}{c.note}</span>
+                <span className="check-note">, {c.correct ? "Belongs. " : (c.trap ? "Trap. " : "Omission. ")}{c.note}</span>
               )}
             </span>
           </label>
@@ -701,7 +701,7 @@ function LessonSelection({ score, onDone }) {
         <div className="row"><button className="btn" onClick={submit} disabled={Object.values(picked).every((v) => !v)}>Constitute the inspection</button></div>
       ) : (
         <div className="row">
-          <p className="carry">A component chosen wrongly (a trap) costs you more than one left out — because a wrong basis travels into everything you document next.</p>
+          <p className="carry">A component chosen wrongly (a trap) costs you more than one left out, because a wrong basis travels into everything you document next.</p>
           <button className="btn" onClick={onDone}>Continue →</button>
         </div>
       )}
@@ -710,7 +710,7 @@ function LessonSelection({ score, onDone }) {
 }
 
 /* ===========================================================================
- * LESSON 3 — BRANCHING DECISION BEAT (the account; taint persists)
+ * LESSON 3, BRANCHING DECISION BEAT (the account; taint persists)
  * ========================================================================= */
 function LessonBranch({ world, apply, score, onDone }) {
   const [chosen, setChosen] = useState(null);
@@ -756,7 +756,7 @@ function LessonBranch({ world, apply, score, onDone }) {
 }
 
 /* ===========================================================================
- * LESSON 4 (shown as checkpoint step 4 in the rail) — SOCRATIC CHECKPOINT
+ * LESSON 4 (shown as checkpoint step 4 in the rail), SOCRATIC CHECKPOINT
  * ========================================================================= */
 function LessonSocratic({ onDone }) {
   const [a1, setA1] = useState("");
@@ -827,7 +827,7 @@ function LessonSocratic({ onDone }) {
 
       {phase === 3 && (
         <div className="model">
-          <div className="model-h">One competent answer — not the answer</div>
+          <div className="model-h">One competent answer, not the answer</div>
           <p className="serif">{L5.modelReasoning}</p>
           <p className="fb">Where your reasoning is better than this, keep yours.</p>
           <p className="a11y-note">{L5.note}</p>
@@ -839,7 +839,7 @@ function LessonSocratic({ onDone }) {
 }
 
 /* ===========================================================================
- * LESSON 5 (rail step 5) — CHAIN AUDIT
+ * LESSON 5 (rail step 5), CHAIN AUDIT
  * ========================================================================= */
 function LessonChainAudit({ world, apply, score, onDone }) {
   const [pick, setPick] = useState(null);
@@ -878,13 +878,13 @@ function LessonChainAudit({ world, apply, score, onDone }) {
       <AuthorityLine keys={L4.authorities} />
 
       {!committed ? (
-        <div className="row"><button className="btn" onClick={commit} disabled={pick == null}>Commit — this is the step I will not co-sign</button></div>
+        <div className="row"><button className="btn" onClick={commit} disabled={pick == null}>Commit, this is the step I will not co-sign</button></div>
       ) : (
         <div className="row">
           <p className="carry">
             {chosenStep.defect
               ? "You found the break: an unrecorded reopening of the most important exhibit. Withheld from co-sign, it can be cured by a supplementary entry. Missed, it fails at trial."
-              : "You co-signed over the break. The unrecorded reopening at step 3 travels to the case file and surfaces as a chain-of-custody challenge — a non-negotiable failure."}
+              : "You co-signed over the break. The unrecorded reopening at step 3 travels to the case file and surfaces as a chain-of-custody challenge, a non-negotiable failure."}
           </p>
           <button className="btn" onClick={onDone}>Continue →</button>
         </div>
@@ -894,39 +894,39 @@ function LessonChainAudit({ world, apply, score, onDone }) {
 }
 
 /* ===========================================================================
- * LESSON 6 — ARTIFACT (Does). Built from decisions; tainted items flagged.
+ * LESSON 6, ARTIFACT (Does). Built from decisions; tainted items flagged.
  * ========================================================================= */
 function LessonArtifact({ world, score, onDone }) {
   const [ack, setAck] = useState(false);
   const accountLine = {
-    clean: { txt: "Initial account of Ms K. — taken by open question, recorded in her words. USABLE.", flag: false },
-    delayed: { txt: "Initial account of Ms K. — partial; opening spent on procedure before the account. Usable but thin.", flag: false },
-    tainted: { txt: "Initial account of Ms K. — obtained by a leading question. MARKED UNUSABLE.", flag: true },
-    overreach: { txt: "Initial account of Ms K. — includes detail beyond the file's need. Review for proportionality.", flag: true },
-    null: { txt: "Initial account — not taken.", flag: true },
+    clean: { txt: "Initial account of Ms K.  taken by open question, recorded in her words. USABLE.", flag: false },
+    delayed: { txt: "Initial account of Ms K.  partial; opening spent on procedure before the account. Usable but thin.", flag: false },
+    tainted: { txt: "Initial account of Ms K.  obtained by a leading question. MARKED UNUSABLE.", flag: true },
+    overreach: { txt: "Initial account of Ms K.  includes detail beyond the file's need. Review for proportionality.", flag: true },
+    null: { txt: "Initial account, not taken.", flag: true },
   }[world.account ?? "null"];
 
   const lines = [
     { txt: world.deviceHashed
-        ? "Exhibit 1 (mobile phone) — isolated in flight mode, photographed in place, hashed and sealed."
-        : (world.deviceHandled ? "Exhibit 1 (mobile phone) — examined in place; last-access metadata compromised." : "Exhibit 1 (mobile phone) — not secured before it changed state."),
+        ? "Exhibit 1 (mobile phone), isolated in flight mode, photographed in place, hashed and sealed."
+        : (world.deviceHandled ? "Exhibit 1 (mobile phone), examined in place; last-access metadata compromised." : "Exhibit 1 (mobile phone), not secured before it changed state."),
       flag: !world.deviceHashed },
     { txt: world.safetyBreach
-        ? "Suspected ordnance — APPROACHED/HANDLED before EOD. Safety-floor breach recorded."
-        : "Suspected ordnance — cordoned and documented from distance; left for EOD.",
+        ? "Suspected ordnance, APPROACHED/HANDLED before EOD. Safety-floor breach recorded."
+        : "Suspected ordnance, cordoned and documented from distance; left for EOD.",
       flag: world.safetyBreach },
     { txt: world.sceneDocumented
-        ? "Crime base (emptied grain store) — photographed with scale and orientation."
-        : "Crime base — documentation incomplete.",
+        ? "Crime base (emptied grain store), photographed with scale and orientation."
+        : "Crime base, documentation incomplete.",
       flag: !world.sceneDocumented },
     { txt: world.remainsReferred
-        ? "Human remains — secured and referred for medico-legal examination."
-        : "Human remains — handling not compliant with the specialist pathway.",
+        ? "Human remains, secured and referred for medico-legal examination."
+        : "Human remains, handling not compliant with the specialist pathway.",
       flag: !world.remainsReferred },
     accountLine,
     { txt: world.chainDefectFound === 3
-        ? "Chain of custody — reopening of Exhibit 1 caught before co-sign; supplementary entry required."
-        : "Chain of custody — unrecorded reopening of Exhibit 1 NOT caught. Integrity challenge live.",
+        ? "Chain of custody, reopening of Exhibit 1 caught before co-sign; supplementary entry required."
+        : "Chain of custody, unrecorded reopening of Exhibit 1 NOT caught. Integrity challenge live.",
       flag: world.chainDefectFound !== 3 },
   ];
 
@@ -935,7 +935,7 @@ function LessonArtifact({ world, score, onDone }) {
       <SceneHead n="Lesson 6" title="Produce the record you would actually file"
         type="Artifact · transfers to your live caseload">
         This is the one page that leaves the module. It is assembled from the
-        decisions you took — nothing is added. Items you compromised are flagged;
+        decisions you took, nothing is added. Items you compromised are flagged;
         they are flagged for you, not hidden from you. In the live version you
         upload a redacted version to your coach. No case material is stored on
         the platform.
@@ -968,7 +968,7 @@ function LessonArtifact({ world, score, onDone }) {
 }
 
 /* ===========================================================================
- * STATION RESULT — computed from decisions (Part D). + one-page job aid.
+ * STATION RESULT, computed from decisions (Part D). + one-page job aid.
  * ========================================================================= */
 function StationResult({ record, world, onRestart }) {
   const rows = Object.keys(CRITERIA).map((key) => {
@@ -985,17 +985,17 @@ function StationResult({ record, world, onRestart }) {
     <section className="card">
       <SceneHead n="Station result" title="Computed from the decisions you took"
         type="No separate quiz · two streams, weighted equally">
-        Each criterion is banded on its own and reported on its own — a single
+        Each criterion is banded on its own and reported on its own, a single
         overall number would hide the thing that decides your next step. Bands:
         A=5 … F=0; C is the marginal pass.
       </SceneHead>
 
       <div className={"verdict " + (stationPass ? "pass" : "fail")}>
         {stationPass
-          ? "STATION PASSED — every non-negotiable held and both streams reached the marginal pass."
+          ? "STATION PASSED, every non-negotiable held and both streams reached the marginal pass."
           : (failedNN.length
-              ? "STATION NOT PASSED — a non-negotiable failed. It does not compensate: it fails the station regardless of every other band."
-              : "STATION NOT PASSED — a stream fell below the marginal pass.")}
+              ? "STATION NOT PASSED, a non-negotiable failed. It does not compensate: it fails the station regardless of every other band."
+              : "STATION NOT PASSED, a stream fell below the marginal pass.")}
       </div>
 
       {failedNN.length > 0 && (
@@ -1026,10 +1026,10 @@ function StationResult({ record, world, onRestart }) {
 
       {/* One-page field job aid generated at the end of every module (Part I) */}
       <div className="jobaid">
-        <div className="jobaid-h">Job aid — first hour at a conflict-related scene (one page, no theory)</div>
+        <div className="jobaid-h">Job aid, first hour at a conflict-related scene (one page, no theory)</div>
         <ol>
           <li><strong>Safety floor first.</strong> Suspected ordnance is live until EOD clears it. Cordon wide, photograph from distance, never handle or move it.</li>
-          <li><strong>Order by decay, not by walking route.</strong> A live connected device changes by the second — isolate (flight mode), photograph in place, seal for a hash — before it changes.</li>
+          <li><strong>Order by decay, not by walking route.</strong> A live connected device changes by the second, isolate (flight mode), photograph in place, seal for a hash, before it changes.</li>
           <li><strong>Make the inspection lawful before it is anything else.</strong> Register entry at the point it begins; the martial-law regime (art. 615, confirm) governs; plan art. 225 preservation for perishable evidence. Owner's consent is not your basis.</li>
           <li><strong>Open wide, then narrow.</strong> "Tell me in your own words." Record the witness's words, not your inference. A leading question makes the account unusable. Take only what the file needs.</li>
           <li><strong>Every reopening gets an entry.</strong> No reseal, move, or handover without a register line. The exhibit that matters most is the one to check twice.</li>
@@ -1046,27 +1046,27 @@ function StationResult({ record, world, onRestart }) {
 }
 
 /* ===========================================================================
- * ALIGNMENT PANEL (Part G) — objective / how tested / success threshold / why
+ * ALIGNMENT PANEL (Part G), objective / how tested / success threshold / why
  * ========================================================================= */
 const ALIGNMENT = [
   { o: "O1 [Knows how] Given a de-occupied site with a suspected hazard, sequence first actions so no action is taken on the hazard before EOD clearance.",
-    tested: "Lesson 1 — routing decision per item, all items presented at once.",
+    tested: "Lesson 1, routing decision per item, all items presented at once.",
     success: "Hazard item resolved as 'cordon & document from distance'; zero safety-floor breaches (binary).",
     why: "Routing-under-load presents everything at once, reproducing the real condition in which the safety error is actually made; a sequencing test with items shown one at a time would test recall, not triage." },
   { o: "O2 [Knows how] Given inspection under martial law, select the components that make it lawful so the record survives an admissibility challenge.",
-    tested: "Lesson 2 — component selection with helpful-feeling traps.",
+    tested: "Lesson 2, component selection with helpful-feeling traps.",
     success: "Both required components selected AND zero traps selected; a trap is weighted heavier than an omission.",
     why: "Component selection tests construction of a compliant product, not recognition of a definition; weighting the trap tests the specific failure (a plausible wrong basis) rather than mere completeness." },
   { o: "O3 [Shows how] Given a cooperative witness at the scene, elicit an initial account so no fact enters the file through a leading question.",
-    tested: "Lesson 3 — branching decision beat; consequence persists into the Lesson 6 artifact.",
+    tested: "Lesson 3, branching decision beat; consequence persists into the Lesson 6 artifact.",
     success: "Opening move is the wide opener (band A); any leading move marks the account UNUSABLE and flags it in the artifact (binary taint).",
     why: "A live branching beat is the only type that can make the account's usability depend on the participant's own words in the moment, which is exactly what the objective is about; a multiple-choice item could not carry the taint forward." },
   { o: "O4 [Shows how] Given a colleague's seizure log, identify the single defect so the exhibit's integrity is preserved.",
-    tested: "Lesson 5 — chain audit; all steps competent but one.",
+    tested: "Lesson 5, chain audit; all steps competent but one.",
     success: "The unrecorded reopening (step 3) identified before co-sign; identifying a cosmetic step instead scores C or below.",
     why: "A chain audit is the only type that tests discrimination of a defect inside otherwise-competent work; a knowledge question about chain-of-custody rules would test the rule, not the eye for the break." },
   { o: "O5 [Does] Produce a one-page contemporaneous record & chain-of-custody memo in which every tainted item is flagged.",
-    tested: "Lesson 6 — artifact assembled from prior decisions; uploaded to coach in the live module.",
+    tested: "Lesson 6, artifact assembled from prior decisions; uploaded to coach in the live module.",
     success: "Artifact filed with every compromised item carrying a visible flag; nothing added beyond the decisions taken.",
     why: "The Does objective can only be discharged by a produced artifact carrying the consequences of earlier choices; assessing it any other way would test intention rather than performance." },
 ];
@@ -1109,7 +1109,7 @@ function SceneHead({ n, title, type, children }) {
   );
 }
 function QGlyph({ q }) {
-  // No information by colour alone — a glyph + word carry the state (Part I).
+  // No information by colour alone, a glyph + word carry the state (Part I).
   const g = q === "sound" ? "●" : q === "partly" ? "◐" : "▲";
   return <span className={"qglyph q-" + q} aria-hidden="true">{g}</span>;
 }
@@ -1118,8 +1118,8 @@ function qualityWord(q) {
 }
 
 /* ===========================================================================
- * STYLE — single block, CSS custom properties, no utility framework.
- * Serif for stage-setting prose, sans for interface. 4–6 palette values.
+ * STYLE, single block, CSS custom properties, no utility framework.
+ * Serif for stage-setting prose, sans for interface. 4-6 palette values.
  * ========================================================================= */
 const CSS = `
 .pej{

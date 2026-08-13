@@ -1,6 +1,6 @@
 /*
  * =============================================================================
- * DecisionStation — native, spec-driven runtime for justice-sector "stations"
+ * DecisionStation, native, spec-driven runtime for justice-sector "stations"
  * =============================================================================
  * A Decision Station is a task-first rehearsal: a sequence of lessons, each
  * opening with a decision under realistic constraints, where poor decisions
@@ -11,16 +11,16 @@
  * instructional designer authors a StationSpec (stored as interactive_activities.spec),
  * and this component renders it. It is rendered by branching on
  * activity.kind === "decision_station" at the call sites (ModuleViewer inline,
- * ActivityPlay full-screen) — the sandboxed HTML ActivityPlayer is untouched.
+ * ActivityPlay full-screen), the sandboxed HTML ActivityPlayer is untouched.
  *
  * Interaction types supported (build-prompt Part E):
- *   routing         — routing decision per item (all items at once)
- *   branching       — branching decision beat (live interaction; consequence persists)
- *   select          — field/component selection (build a compliant product)
- *   chainAudit      — discriminate one defect inside competent work
- *   matching        — choose between mutually exclusive mechanisms
- *   socratic        — Socratic checkpoint (authored model answer; AI probe optional)
- *   artifact        — the Does artifact, assembled from prior decisions
+ *   routing, routing decision per item (all items at once)
+ *   branching, branching decision beat (live interaction; consequence persists)
+ *   select, field/component selection (build a compliant product)
+ *   chainAudit, discriminate one defect inside competent work
+ *   matching, choose between mutually exclusive mechanisms
+ *   socratic, Socratic checkpoint (authored model answer; AI probe optional)
+ *   artifact, the Does artifact, assembled from prior decisions
  * A computed station-result step is appended automatically.
  *
  * AI boundary: the only model call is the Socratic probing question, constrained
@@ -133,7 +133,7 @@ function Authorities({ keys, dict }: { keys?: string[]; dict: Record<string, Aut
   return (
     <div className="ds-auth" aria-label="Source authorities for this lesson">
       <span className="ds-auth-h">Authorities</span>
-      <ul>{keys.map((k) => { const a = dict[k]; if (!a) return null; return (<li key={k}><span className="ds-auth-ref">{a.ref}</span> <StatusTag status={a.status} /><span className="ds-auth-note"> — {a.note}</span></li>); })}</ul>
+      <ul>{keys.map((k) => { const a = dict[k]; if (!a) return null; return (<li key={k}><span className="ds-auth-ref">{a.ref}</span> <StatusTag status={a.status} /><span className="ds-auth-note">, {a.note}</span></li>); })}</ul>
     </div>
   );
 }
@@ -235,7 +235,7 @@ function SelectView({ l, dict, apply, score, onDone }: { l: SelectLesson; dict: 
           <label key={c.id} className={"ds-check " + (submitted ? (c.correct ? "ds-good" : (picked[c.id] ? "ds-bad" : "ds-muted")) : "")}>
             <input type="checkbox" checked={!!picked[c.id]} onChange={() => toggle(c.id)} disabled={submitted} />
             <span className="ds-check-box" aria-hidden="true">{picked[c.id] ? "✓" : ""}</span>
-            <span className="ds-check-label">{c.label}{submitted && (<span className="ds-check-note"> — {c.correct ? "Belongs. " : (c.trap ? "Trap. " : "Not required. ")}{c.note}</span>)}</span>
+            <span className="ds-check-label">{c.label}{submitted && (<span className="ds-check-note">, {c.correct ? "Belongs. " : (c.trap ? "Trap. " : "Not required. ")}{c.note}</span>)}</span>
           </label>
         ))}
       </div>
@@ -346,7 +346,7 @@ function SocraticView({ l, onDone }: { l: SocraticLesson; onDone: () => void; })
           {phase === 1 && (<><textarea className="ds-ta" rows={3} value={a2} onChange={(e) => setA2(e.target.value)} placeholder="Answer again…" /><div className="ds-row"><button className="ds-btn" onClick={() => setPhase(3)} disabled={a2.trim().length < 4}>Submit</button></div></>)}
         </div>
       )}
-      {phase === 3 && (<div className="ds-model"><div className="ds-model-h">One competent answer — not the answer</div><p className="ds-serif">{l.modelReasoning}</p><p className="ds-fb">Where your reasoning is better than this, keep yours.</p><p className="ds-a11y-note">{l.note}</p><div className="ds-row"><button className="ds-btn" onClick={onDone}>Continue →</button></div></div>)}
+      {phase === 3 && (<div className="ds-model"><div className="ds-model-h">One competent answer, not the answer</div><p className="ds-serif">{l.modelReasoning}</p><p className="ds-fb">Where your reasoning is better than this, keep yours.</p><p className="ds-a11y-note">{l.note}</p><div className="ds-row"><button className="ds-btn" onClick={onDone}>Continue →</button></div></div>)}
     </section>
   );
 }
@@ -392,7 +392,7 @@ function ResultView({ spec, record, onRestart, onSubmit }: { spec: StationSpec; 
   return (
     <section className="ds-card">
       <SceneHead n="Station result" title="Computed from the decisions you took" type="No separate quiz · two streams, weighted equally">Each criterion is banded and reported on its own. Bands: A=5 … F=0; C is the marginal pass.</SceneHead>
-      <div className={"ds-verdict " + (pass ? "ds-pass" : "ds-fail")}>{pass ? "STATION PASSED — every non-negotiable held and both streams reached the marginal pass." : (failedNN.length ? "STATION NOT PASSED — a non-negotiable failed. It does not compensate: it fails the station regardless of every other band." : "STATION NOT PASSED — a stream fell below the marginal pass.")}</div>
+      <div className={"ds-verdict " + (pass ? "ds-pass" : "ds-fail")}>{pass ? "STATION PASSED, every non-negotiable held and both streams reached the marginal pass." : (failedNN.length ? "STATION NOT PASSED, a non-negotiable failed. It does not compensate: it fails the station regardless of every other band." : "STATION NOT PASSED, a stream fell below the marginal pass.")}</div>
       {failedNN.length > 0 && <ul className="ds-nn-list">{failedNN.map((r) => <li key={r.key}><strong>Non-negotiable failed:</strong> {r.label}</li>)}</ul>}
       {streams.map(([name, arr]) => (
         <div key={name} className="ds-stream">

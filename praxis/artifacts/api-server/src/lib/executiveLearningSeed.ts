@@ -107,19 +107,24 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
     await db.update(modulesTable).set({ beatCount: 4 }).where(eq(modulesTable.id, mod.id));
   }
 
-  // Find-or-create the native Decision Station activity for this module.
+  // Upsert the native Decision Station activity for this module. Updating (not just find-or-create)
+  // so re-provisioning refreshes the stored spec when the authored station content changes.
+  const title = `Interactive station: ${m.title.replace(/^Module \d+ · /, "")}`;
+  const instructions = "A task-first rehearsal. Every lesson opens with a decision under realistic constraints; your choices carry consequences and produce a computed station result.";
   const existing = await db.select({ id: interactiveActivitiesTable.id })
     .from(interactiveActivitiesTable)
     .where(and(eq(interactiveActivitiesTable.moduleId, mod.id), eq(interactiveActivitiesTable.kind, "decision_station")));
   if (existing.length === 0) {
     await db.insert(interactiveActivitiesTable).values({
-      organisationId: orgId, courseId, moduleId: mod.id,
-      title: `Interactive station: ${m.title.replace(/^Module \d+ · /, "")}`,
-      instructions: "A task-first rehearsal. Every lesson opens with a decision under realistic constraints; your choices carry consequences and produce a computed station result.",
+      organisationId: orgId, courseId, moduleId: mod.id, title, instructions,
       spec: m.spec, kind: "decision_station", source: "html", html: "",
       bloomsLevel: "Evaluate", difficulty: "advanced",
       published: true, isLibrary: false, createdByUserId: authorId,
     });
+  } else {
+    await db.update(interactiveActivitiesTable)
+      .set({ title, instructions, spec: m.spec, updatedAt: new Date() })
+      .where(eq(interactiveActivitiesTable.id, existing[0].id));
   }
 }
 

@@ -906,7 +906,7 @@ const DEMOS: DemoEntry[] = [
     bullets: [
       "Task-first rehearsal: six lessons, each opening with a decision under field constraints.",
       "Routing-under-load, component selection, branching beat, chain audit, Socratic checkpoint, artifact.",
-      "Consequence persists — a leading question taints the account and reappears flagged in the artifact.",
+      "Consequence persists, a leading question taints the account and reappears flagged in the artifact.",
       "Station result computed from decisions; two equally-weighted streams, partly conjunctive on non-negotiables.",
     ],
   },

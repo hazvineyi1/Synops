@@ -2,7 +2,7 @@
  * =============================================================================
  * Synops Praxis · Justice-sector training module (DEMO, in-platform port)
  * =============================================================================
- * COURSE CODE:   PEJ-EVD-01   MODULE 2 — Getting the account
+ * COURSE CODE:   PEJ-EVD-01   MODULE 2, Getting the account
  * VERSION:       0.1-demo      SME SIGN-OFF: PENDING
  *
  * THE PROFESSIONAL TASK (verb phrase):
@@ -27,13 +27,13 @@
  *      request in which every consent/proportionality issue is flagged.
  *
  * DESIGN COMMITMENTS: task-first (C1); observable objectives (C2); consequence
- * not correctness — a leading question or a pressed disclosure persists into the
+ * not correctness, a leading question or a pressed disclosure persists into the
  * artifact (C3); distractors are real field failures, each lesson carries one
  * option right in substance but wrong in timing/register (C4); conduct sits
  * inside ordinary tasks, unflagged (C5); the station is computed from decisions
  * already taken (C6); every legal claim is tagged and shown unsigned (C7).
  *
- * AI BOUNDARIES (Part J): the model never plays Mr H. — every witness line is
+ * AI BOUNDARIES (Part J): the model never plays Mr H.  every witness line is
  * authored below. No real case material leaves the browser. The single Socratic
  * probing-question call is constrained and degrades to an authored fallback; the
  * model answer is AUTHORED. Nothing here affects institutional standing.
@@ -78,11 +78,11 @@ interface Move { id: string; label: string; quality: Quality; crit?: CritKey | n
  * AUTHORED AUTHORITY LEDGER (Part C7)
  * ------------------------------------------------------------------------- */
 const AUTHORITIES: Record<string, { ref: string; note: string; status: "stable" | "confirm" | "practice" }> = {
-  MURAD: { ref: "Murad Code — informed consent, proportionality, do no harm", note: "Stable.", status: "stable" },
-  INTERVIEW: { ref: "Investigative interviewing evidence base — open before closed", note: "Stable, general.", status: "stable" },
-  ISTANBUL: { ref: "Istanbul Protocol — where ill-treatment is disclosed", note: "Stable.", status: "stable" },
-  CPC_225: { ref: "CPC of Ukraine, art. 225 — preservation of testimony before the investigating judge", note: "Confirm current text, including known practice limitations.", status: "confirm" },
-  RECORD: { ref: "Domestic evidential practice — record in the witness's words, exclude inference", note: "Practice layer. Must come from the SME.", status: "practice" },
+  MURAD: { ref: "Murad Code, informed consent, proportionality, do no harm", note: "Stable.", status: "stable" },
+  INTERVIEW: { ref: "Investigative interviewing evidence base, open before closed", note: "Stable, general.", status: "stable" },
+  ISTANBUL: { ref: "Istanbul Protocol, where ill-treatment is disclosed", note: "Stable.", status: "stable" },
+  CPC_225: { ref: "CPC of Ukraine, art. 225, preservation of testimony before the investigating judge", note: "Confirm current text, including known practice limitations.", status: "confirm" },
+  RECORD: { ref: "Domestic evidential practice, record in the witness's words, exclude inference", note: "Practice layer. Must come from the SME.", status: "practice" },
   REFERRAL: { ref: "Local referral / support pathways", note: "Sourced locally; changes often. Verify before each deployment.", status: "practice" },
 };
 const REVIEW_TRIGGERS = [
@@ -101,7 +101,7 @@ const CRITERIA: Record<CritKey, Criterion> = {
     indicators: { competent: "Explains use and the right to stop; private space and interpreter set; no covert recording or promised outcome.", not: "Records covertly, promises an outcome, or opens the account before consent is established." } },
   S_OPEN: { label: "Non-suggestive opening of the account", stream: "Skills", nonNegotiable: false,
     indicators: { competent: "Opens wide; lets the witness narrate in their own words before any closed question.", not: "Leads the witness, or funnels into closed questions before the account exists." } },
-  S_PROP: { label: "Proportionality — only detail the file needs", stream: "Skills", nonNegotiable: false,
+  S_PROP: { label: "Proportionality, only detail the file needs", stream: "Skills", nonNegotiable: false,
     indicators: { competent: "Asks what bears on reliability and linkage; leaves graphic and personal detail the file does not need.", not: "Takes graphic or personal detail beyond the file's need." } },
   S_DISC: { label: "Disclosure of ill-treatment handled without harm; consent renewed", stream: "Skills", nonNegotiable: true,
     indicators: { competent: "Acknowledges, checks he wants to continue, defers detail to the specialist pathway, offers support.", not: "Presses for detail, gives a false assurance, or ignores the disclosure." } },
@@ -114,46 +114,46 @@ const CRITERIA: Record<CritKey, Criterion> = {
 /* ---------------------------------------------------------------------------
  * LESSON DATA (authored beats)
  * ------------------------------------------------------------------------- */
-// L1 — consent & setup: component selection
+// L1, consent & setup: component selection
 interface L2Component { id: string; label: string; correct: boolean; trap?: boolean; note: string; }
 const L1_COMPONENTS: L2Component[] = [
   { id: "explain_use", label: "Explain plainly what the account is for, who may see it, and that he can stop or withdraw at any time", correct: true, note: "The heart of informed, continuous consent (Murad Code). Without it, the account is neither informed nor freely given." },
   { id: "interpreter_private", label: "Confirm a private space and a trained interpreter he is comfortable with", correct: true, note: "Conditions for a safe, accurate account." },
-  { id: "referral_ready", label: "Have the support / referral pathway to hand before you start", correct: true, note: "Do no harm — you do not open this conversation without knowing where to send him." },
+  { id: "referral_ready", label: "Have the support / referral pathway to hand before you start", correct: true, note: "Do no harm, you do not open this conversation without knowing where to send him." },
   { id: "record_covert", label: "Begin recording quietly without mentioning it, so he speaks naturally", correct: false, trap: true, note: "TRAP. Covert recording destroys informed consent. It feels like it protects the account; it taints it and breaches the Murad Code." },
   { id: "promise_outcome", label: "Reassure him that his account will lead to a prosecution and justice", correct: false, trap: true, note: "TRAP. A promised outcome you cannot guarantee is a false assurance (do no harm). Never trade a conviction for an account." },
   { id: "full_history", label: "Take his full personal and family history first, to build rapport", correct: false, trap: false, note: "Overreach. Rapport does not require detail the file will never use. Proportionality starts before the first question." },
 ];
 
-// L2 — opening: branching beat
+// L2, opening: branching beat
 const L2_OPEN = {
   stage: "Mr H., a displaced farmer, is sitting across from you at a reception centre. Consent is done; the interpreter is ready. He looks at you, waiting. Your first move sets whether his account can be used.",
-  constraint: "He is willing and a little anxious — he wants to give you what you need, which is exactly when a witness will take your words instead of finding his own.",
+  constraint: "He is willing and a little anxious, he wants to give you what you need, which is exactly when a witness will take your words instead of finding his own.",
   theory: "Open before closed. The account must exist in his words before you structure it; a fact you supply is a fact you cannot later rely on.",
   authorities: ["INTERVIEW", "RECORD", "MURAD"],
   moves: [
     { id: "open", label: '"Take me to that morning. Start wherever feels right, and tell me what you saw, in your own words."', quality: "sound" as Quality, crit: "S_OPEN" as CritKey, band: "A" as Band, effect: { account: "clean" } as Effect,
       response: "He begins with the sound of engines before dawn and works forward at his own pace. It is his account, in his words, and it is usable.", feedback: "The widest opener costs nothing and protects everything you build on it." },
-    { id: "funnel", label: '"Let\'s get the facts down first — what time did the vehicles arrive, how many, and what colour were they?"', quality: "partly" as Quality, crit: "S_OPEN" as CritKey, band: "C" as Band, effect: { account: "narrowed" } as Effect,
-      response: "Structured questioning is right — later. As the opener it forecloses his narrative; he answers your three questions and stops, and you never hear the two things you did not know to ask. Right technique, wrong moment.", feedback: "Closed questions have their place after the free account, not instead of it. Right in substance, wrong in timing." },
+    { id: "funnel", label: '"Let\'s get the facts down first, what time did the vehicles arrive, how many, and what colour were they?"', quality: "partly" as Quality, crit: "S_OPEN" as CritKey, band: "C" as Band, effect: { account: "narrowed" } as Effect,
+      response: "Structured questioning is right, later. As the opener it forecloses his narrative; he answers your three questions and stops, and you never hear the two things you did not know to ask. Right technique, wrong moment.", feedback: "Closed questions have their place after the free account, not instead of it. Right in substance, wrong in timing." },
     { id: "lead", label: '"They forced you off your land at gunpoint, didn\'t they?"', quality: "not" as Quality, crit: "S_OPEN" as CritKey, band: "F" as Band, effect: { account: "led" } as Effect,
-      response: "He agrees — you offered him the words and he is trying to help. The core of his account is now something you put in his mouth, and it is marked unusable. It will appear flagged in the record you build in Lesson 7.", feedback: "A leading question manufactures the answer. This is irreversible for that fact." },
-    { id: "detail", label: '"Describe exactly what they did to your neighbours — everything you saw, in as much detail as you can."', quality: "not" as Quality, crit: "S_OPEN" as CritKey, band: "E" as Band, effect: { account: "overreach" } as Effect,
+      response: "He agrees, you offered him the words and he is trying to help. The core of his account is now something you put in his mouth, and it is marked unusable. It will appear flagged in the record you build in Lesson 7.", feedback: "A leading question manufactures the answer. This is irreversible for that fact." },
+    { id: "detail", label: '"Describe exactly what they did to your neighbours, everything you saw, in as much detail as you can."', quality: "not" as Quality, crit: "S_OPEN" as CritKey, band: "E" as Band, effect: { account: "overreach" } as Effect,
       response: "He relives detail your file does not require and is visibly distressed. You have harmed him to collect what you will never use.", feedback: "Proportionality is not only about time; opening on graphic detail is a harm, not thoroughness." },
   ] as Move[],
 };
 
-// L3 — proportionality: routing decision per item (Ask / Don't ask), all at once
+// L3, proportionality: routing decision per item (Ask / Don't ask), all at once
 interface L3Item { id: string; label: string; best: "ask" | "skip"; options: { ask: { quality: Quality; band: Band; response: string; feedback: string; overreach?: boolean }; skip: { quality: Quality; band: Band; response: string; feedback: string } }; }
 const L3_ITEMS: L3Item[] = [
   { id: "location", label: "Where exactly was he standing when he saw the vehicles?", best: "ask",
     options: {
-      ask: { quality: "sound", band: "A", response: "Asked. It bears directly on what he could and could not have seen — reliability.", feedback: "Ask what tests the account's reliability." },
+      ask: { quality: "sound", band: "A", response: "Asked. It bears directly on what he could and could not have seen, reliability.", feedback: "Ask what tests the account's reliability." },
       skip: { quality: "partly", band: "C", response: "Skipped. You lose a cheap, important reliability anchor.", feedback: "Vantage point is core, not optional." },
     } },
   { id: "markings", label: "Any markings, letters or insignia on the vehicles?", best: "ask",
     options: {
-      ask: { quality: "sound", band: "A", response: "Asked. Markings go to linkage — whose vehicles, under whose control.", feedback: "Ask what bears on linkage." },
+      ask: { quality: "sound", band: "A", response: "Asked. Markings go to linkage, whose vehicles, under whose control.", feedback: "Ask what bears on linkage." },
       skip: { quality: "partly", band: "C", response: "Skipped. You may have lost the one detail that ties the act to a unit.", feedback: "Linkage detail is worth asking for." },
     } },
   { id: "injuries", label: "Ask him to describe, in detail, the injuries to the bodies he mentioned.", best: "skip",
@@ -173,37 +173,37 @@ const L3_ITEMS: L3Item[] = [
     } },
 ];
 
-// L4 — disclosure: branching beat
+// L4, disclosure: branching beat
 const L4_DISC = {
   stage: "Partway through, Mr H. says quietly that when they held him for two days, he was beaten. He had not mentioned it before. This is not what you came for, and he has just handed you something heavy.",
   constraint: "He is mid-account, he trusts you enough to have said it, and the clock and the file are both pulling you elsewhere.",
   theory: "Consent is continuous, not a form signed once. A disclosure of ill-treatment changes what he is consenting to; it is acknowledged and routed, never mined on the spot.",
   authorities: ["ISTANBUL", "MURAD", "RECORD"],
   moves: [
-    { id: "handle", label: 'Pause, acknowledge it, check he wants to continue, remind him he can stop, note it for the specialist pathway (Istanbul Protocol) — do not take the detail now.', quality: "sound" as Quality, crit: "S_DISC" as CritKey, band: "A" as Band, effect: { disclosure: "handled", reconsented: true } as Effect,
+    { id: "handle", label: 'Pause, acknowledge it, check he wants to continue, remind him he can stop, note it for the specialist pathway (Istanbul Protocol), do not take the detail now.', quality: "sound" as Quality, crit: "S_DISC" as CritKey, band: "A" as Band, effect: { disclosure: "handled", reconsented: true } as Effect,
       response: "He exhales. He stays in control of what happens next, the disclosure is safely routed to where it can be handled properly, and your account continues on his terms.", feedback: "Acknowledge, re-consent, route. You are not the right place for that examination and you do not need to be." },
-    { id: "press", label: '"That\'s important — tell me exactly what they did, while it\'s fresh. Describe the beating in detail."', quality: "not" as Quality, crit: "S_DISC" as CritKey, band: "F" as Band, effect: { disclosure: "pressed", reconsented: false } as Effect,
+    { id: "press", label: '"That\'s important, tell me exactly what they did, while it\'s fresh. Describe the beating in detail."', quality: "not" as Quality, crit: "S_DISC" as CritKey, band: "F" as Band, effect: { disclosure: "pressed", reconsented: false } as Effect,
       response: "You mine the detail. He gives it and leaves the room worse than he entered, and the account he did consent to is now tangled with one he did not. This is recorded as harm.", feedback: "Never convert a disclosure into an interrogation. The harm is irreversible." },
     { id: "redirect", label: '"I understand. Let\'s keep to the vehicles and the grain for now."', quality: "partly" as Quality, crit: "S_DISC" as CritKey, band: "C" as Band, effect: { disclosure: "redirected", reconsented: false } as Effect,
-      response: "Proportionality says do not chase the detail — and you are half right. But steering straight past it, without acknowledging what he just trusted you with, tells him the hardest thing he said did not matter. Right instinct on scope, wrong in register.", feedback: "Not taking the detail is correct. Not acknowledging the person is not. Right substance, wrong register." },
+      response: "Proportionality says do not chase the detail, and you are half right. But steering straight past it, without acknowledging what he just trusted you with, tells him the hardest thing he said did not matter. Right instinct on scope, wrong in register.", feedback: "Not taking the detail is correct. Not acknowledging the person is not. Right substance, wrong register." },
     { id: "assure", label: '"I promise you the men who did this will be punished for it."', quality: "not" as Quality, crit: "S_DISC" as CritKey, band: "E" as Band, effect: { disclosure: "pressed", reconsented: false } as Effect,
       response: "A promise you cannot keep, offered to comfort. If it does not come true he learns his account bought nothing, and your credibility with the next witness goes with it.", feedback: "Never trade an outcome you do not control for a moment's comfort (do no harm)." },
   ] as Move[],
 };
 
-// L5 — Socratic checkpoint
+// L5, Socratic checkpoint
 const L5 = {
   prompt: "You have just handled Mr H.'s disclosure that he was beaten in detention. Justify what you did and did not do, and why.",
-  authoredProbe: "You have described what you did for the file — what did your response do for the man, and how would he know he was still in control of this?",
-  modelReasoning: "One competent answer, not the answer. The disclosure is not a windfall to be worked; it is a moment where the person has to be kept in control of his own account. The task is to acknowledge it plainly so he knows it landed, to renew consent because what he is agreeing to has just changed, to route the detail to the pathway built to hold it, and to offer support — without extracting anything the file did not come for. The failure that looks like diligence is pressing for detail; the failure that looks like discipline is steering past it as if it were noise. Where your reasoning weighed his safety or his control more finely than this, keep yours.",
+  authoredProbe: "You have described what you did for the file, what did your response do for the man, and how would he know he was still in control of this?",
+  modelReasoning: "One competent answer, not the answer. The disclosure is not a windfall to be worked; it is a moment where the person has to be kept in control of his own account. The task is to acknowledge it plainly so he knows it landed, to renew consent because what he is agreeing to has just changed, to route the detail to the pathway built to hold it, and to offer support, without extracting anything the file did not come for. The failure that looks like diligence is pressing for detail; the failure that looks like discipline is steering past it as if it were noise. Where your reasoning weighed his safety or his control more finely than this, keep yours.",
   note: "Your written answers here are read by your coach and are never scored by the platform.",
 };
 
-// L6 — preservation before displacement: matching between mutually exclusive mechanisms
+// L6, preservation before displacement: matching between mutually exclusive mechanisms
 interface L6Option { id: string; label: string; quality: Quality; band: Band; preserve: World["preserve"]; response: string; }
 const L6 = {
   stage: "At the end, Mr H. tells you he is being relocated tomorrow to an oblast in the west. You may not see him again, and his account is not yet preserved in any form that will survive his leaving.",
-  constraint: "You have this evening. Choose the mechanism — they are mutually exclusive in practice, and the wrong one does not delay the material, it loses it.",
+  constraint: "You have this evening. Choose the mechanism, they are mutually exclusive in practice, and the wrong one does not delay the material, it loses it.",
   authorities: ["CPC_225"],
   options: [
     { id: "art225", label: "Apply this evening to have his testimony taken and preserved before the investigating judge (art. 225), before he leaves.", quality: "sound" as Quality, band: "A" as Band, preserve: "art225" as World["preserve"],
@@ -211,7 +211,7 @@ const L6 = {
     { id: "written", label: "Have him sign a written statement now and place it in the file.", quality: "partly" as Quality, band: "C" as Band, preserve: "written" as World["preserve"],
       response: "Better than nothing, but a signed statement is not preservation before the investigating judge; its evidential weight if he never returns is far weaker, and you had the time to do it properly." },
     { id: "reinterview", label: "Plan to re-interview him by phone once he has relocated and settled.", quality: "not" as Quality, band: "E" as Band, preserve: "wrong" as World["preserve"],
-      response: "The number changes, the line does not connect, the moment passes. This does not delay the testimony — it loses it." },
+      response: "The number changes, the line does not connect, the moment passes. This does not delay the testimony, it loses it." },
     { id: "recording", label: "Rely on your interview recording as the preserved record.", quality: "not" as Quality, band: "E" as Band, preserve: "wrong" as World["preserve"],
       response: "An interview recording is not a preservation mechanism before the court. If he is gone, you are left with something that may never be admitted." },
   ] as L6Option[],
@@ -230,7 +230,7 @@ function AuthorityLine({ keys }: { keys?: string[] }) {
   return (
     <div className="authorities" aria-label="Source authorities for this lesson">
       <span className="authorities-h">Authorities</span>
-      <ul>{keys.map((k) => { const a = AUTHORITIES[k]; if (!a) return null; return (<li key={k}><span className="auth-ref">{a.ref}</span> <StatusTag status={a.status} /><span className="auth-note"> — {a.note}</span></li>); })}</ul>
+      <ul>{keys.map((k) => { const a = AUTHORITIES[k]; if (!a) return null; return (<li key={k}><span className="auth-ref">{a.ref}</span> <StatusTag status={a.status} /><span className="auth-note">, {a.note}</span></li>); })}</ul>
     </div>
   );
 }
@@ -327,14 +327,14 @@ function Warning({ onStart }: { onStart: () => void }) {
     <section className="card lead">
       <h2>Before you begin</h2>
       <p className="serif">This module composes an interview from the full-scale invasion of Ukraine that began in February 2022, recognising that the armed conflict began in 2014. Mr H. and everything he says are a composite: no real person, place or unit is used, and names are given as initials.</p>
-      <p>The material includes a disclosure of ill-treatment. You may leave any scenario at any point without losing your progress. Nothing you do here is reported to your institution, and no model ever speaks in the witness's voice — every line he says is authored.</p>
+      <p>The material includes a disclosure of ill-treatment. You may leave any scenario at any point without losing your progress. Nothing you do here is reported to your institution, and no model ever speaks in the witness's voice, every line he says is authored.</p>
       <div className="row"><button className="btn big-btn" onClick={onStart}>Start the module</button></div>
     </section>
   );
 }
 
 /* ===========================================================================
- * L1 — CONSENT & SETUP (component selection)
+ * L1, CONSENT & SETUP (component selection)
  * ========================================================================= */
 function LessonConsent({ world, apply, score, onDone }: { world: World; apply: (e: Effect) => void; score: (c: CritKey | null | undefined, b: Band) => void; onDone: () => void }) {
   const [picked, setPicked] = useState<Record<string, boolean>>({});
@@ -362,7 +362,7 @@ function LessonConsent({ world, apply, score, onDone }: { world: World; apply: (
           <label key={c.id} className={"check " + (submitted ? (c.correct ? "good" : (picked[c.id] ? "bad" : "muted")) : "")}>
             <input type="checkbox" checked={!!picked[c.id]} onChange={() => toggle(c.id)} disabled={submitted} />
             <span className="check-box" aria-hidden="true">{picked[c.id] ? "✓" : ""}</span>
-            <span className="check-label">{c.label}{submitted && (<span className="check-note"> — {c.correct ? "Belongs. " : (c.trap ? "Trap. " : "Overreach. ")}{c.note}</span>)}</span>
+            <span className="check-label">{c.label}{submitted && (<span className="check-note">, {c.correct ? "Belongs. " : (c.trap ? "Trap. " : "Overreach. ")}{c.note}</span>)}</span>
           </label>
         ))}
       </div>
@@ -370,7 +370,7 @@ function LessonConsent({ world, apply, score, onDone }: { world: World; apply: (
       {!submitted ? (
         <div className="row"><button className="btn" onClick={submit} disabled={Object.values(picked).every((v) => !v)}>Establish consent</button></div>
       ) : (
-        <div className="row"><p className="carry">{world.consentTrap ? "A consent trap taints everything the interview produces — a non-negotiable failure regardless of how well the rest goes." : "Consent is recorded as informed and revocable, and carries forward."}</p><button className="btn" onClick={onDone}>Continue →</button></div>
+        <div className="row"><p className="carry">{world.consentTrap ? "A consent trap taints everything the interview produces, a non-negotiable failure regardless of how well the rest goes." : "Consent is recorded as informed and revocable, and carries forward."}</p><button className="btn" onClick={onDone}>Continue →</button></div>
       )}
     </section>
   );
@@ -404,7 +404,7 @@ function LessonBranch({ beat, label, apply, score, onDone }: { beat: { stage: st
 }
 
 /* ===========================================================================
- * L3 — PROPORTIONALITY (routing per item: Ask / Don't ask)
+ * L3, PROPORTIONALITY (routing per item: Ask / Don't ask)
  * ========================================================================= */
 function LessonProportionality({ world, apply, score, onDone }: { world: World; apply: (e: Effect) => void; score: (c: CritKey | null | undefined, b: Band) => void; onDone: () => void }) {
   const [choices, setChoices] = useState<Record<string, "ask" | "skip">>({});
@@ -423,7 +423,7 @@ function LessonProportionality({ world, apply, score, onDone }: { world: World; 
   };
   return (
     <section className="card">
-      <SceneHead n="Lesson 3" title="His account is running — decide what you ask and what you leave" type="Routing decision · every question at once">
+      <SceneHead n="Lesson 3" title="His account is running, decide what you ask and what you leave" type="Routing decision · every question at once">
         Below are questions you could ask next. They are shown together, the way they occur to you in the moment. For each, decide whether to ask it or leave it. Taking more than the file needs costs you here.
       </SceneHead>
       <div className="items">
@@ -456,7 +456,7 @@ function LessonProportionality({ world, apply, score, onDone }: { world: World; 
 }
 
 /* ===========================================================================
- * L5 — SOCRATIC CHECKPOINT
+ * L5, SOCRATIC CHECKPOINT
  * ========================================================================= */
 function LessonSocratic({ onDone }: { onDone: () => void }) {
   const [a1, setA1] = useState("");
@@ -491,7 +491,7 @@ function LessonSocratic({ onDone }: { onDone: () => void }) {
       )}
       {phase === 3 && (
         <div className="model">
-          <div className="model-h">One competent answer — not the answer</div>
+          <div className="model-h">One competent answer, not the answer</div>
           <p className="serif">{L5.modelReasoning}</p>
           <p className="fb">Where your reasoning is better than this, keep yours.</p>
           <p className="a11y-note">{L5.note}</p>
@@ -503,7 +503,7 @@ function LessonSocratic({ onDone }: { onDone: () => void }) {
 }
 
 /* ===========================================================================
- * L6 — PRESERVATION (matching between mutually exclusive mechanisms)
+ * L6, PRESERVATION (matching between mutually exclusive mechanisms)
  * ========================================================================= */
 function LessonPreservation({ apply, score, onDone }: { apply: (e: Effect) => void; score: (c: CritKey | null | undefined, b: Band) => void; onDone: () => void }) {
   const [pick, setPick] = useState<string | null>(null);
@@ -518,7 +518,7 @@ function LessonPreservation({ apply, score, onDone }: { apply: (e: Effect) => vo
   const chosen = committed ? L6.options.find((o) => o.id === pick) : null;
   return (
     <section className="card">
-      <SceneHead n="Lesson 6" title="He leaves tomorrow — preserve the testimony or lose it" type="Matching · mutually exclusive mechanisms">{L6.stage}</SceneHead>
+      <SceneHead n="Lesson 6" title="He leaves tomorrow, preserve the testimony or lose it" type="Matching · mutually exclusive mechanisms">{L6.stage}</SceneHead>
       <p className="constraint"><strong>What is scarce:</strong> {L6.constraint}</p>
       <ol className="chain" role="radiogroup" aria-label="Choose the preservation mechanism">
         {L6.options.map((o) => (
@@ -535,48 +535,48 @@ function LessonPreservation({ apply, score, onDone }: { apply: (e: Effect) => vo
       {!committed ? (
         <div className="row"><button className="btn" onClick={commit} disabled={!pick}>Commit to this mechanism</button></div>
       ) : (
-        <div className="row"><p className="carry">{chosen && chosen.quality === "sound" ? "The testimony is preserved before he leaves." : "The mechanism you chose does not survive his displacement — the testimony is at risk of being lost, not merely delayed. This is a non-negotiable failure."}</p><button className="btn" onClick={onDone}>Continue →</button></div>
+        <div className="row"><p className="carry">{chosen && chosen.quality === "sound" ? "The testimony is preserved before he leaves." : "The mechanism you chose does not survive his displacement, the testimony is at risk of being lost, not merely delayed. This is a non-negotiable failure."}</p><button className="btn" onClick={onDone}>Continue →</button></div>
       )}
     </section>
   );
 }
 
 /* ===========================================================================
- * L7 — ARTIFACT (Does)
+ * L7, ARTIFACT (Does)
  * ========================================================================= */
 function LessonArtifact({ world, score, onDone }: { world: World; score: (c: CritKey | null | undefined, b: Band) => void; onDone: () => void }) {
   const [ack, setAck] = useState(false);
   const consentLine = world.consentTrap
-    ? { txt: "Consent — compromised (covert recording or promised outcome). Account obtained under it is UNUSABLE.", flag: true }
-    : world.consentInformed ? { txt: "Consent — informed and revocable; use explained, right to stop recorded.", flag: false }
-    : { txt: "Consent — incomplete; the account was opened before consent was fully established.", flag: true };
+    ? { txt: "Consent, compromised (covert recording or promised outcome). Account obtained under it is UNUSABLE.", flag: true }
+    : world.consentInformed ? { txt: "Consent, informed and revocable; use explained, right to stop recorded.", flag: false }
+    : { txt: "Consent, incomplete; the account was opened before consent was fully established.", flag: true };
   const accountMap: Record<string, { txt: string; flag: boolean }> = {
-    clean: { txt: "Account — taken open, in his own words. USABLE.", flag: false },
-    narrowed: { txt: "Account — funnelled into closed questions early; narrower than it should be. Usable but thin.", flag: false },
-    led: { txt: "Account — core fact obtained by a leading question. MARKED UNUSABLE.", flag: true },
-    overreach: { txt: "Account — opened on graphic detail beyond the file's need. Review for proportionality and harm.", flag: true },
-    null: { txt: "Account — not taken.", flag: true },
+    clean: { txt: "Account, taken open, in his own words. USABLE.", flag: false },
+    narrowed: { txt: "Account, funnelled into closed questions early; narrower than it should be. Usable but thin.", flag: false },
+    led: { txt: "Account, core fact obtained by a leading question. MARKED UNUSABLE.", flag: true },
+    overreach: { txt: "Account, opened on graphic detail beyond the file's need. Review for proportionality and harm.", flag: true },
+    null: { txt: "Account, not taken.", flag: true },
   };
   const disclosureMap: Record<string, { txt: string; flag: boolean }> = {
-    handled: { txt: "Disclosure of ill-treatment — acknowledged, consent renewed, routed to the specialist pathway.", flag: false },
-    redirected: { txt: "Disclosure of ill-treatment — steered past without acknowledgement. Review: continuous consent / do-no-harm.", flag: true },
-    pressed: { txt: "Disclosure of ill-treatment — pressed for detail or met with a false assurance. Harm recorded.", flag: true },
-    null: { txt: "Disclosure of ill-treatment — none recorded in this run.", flag: false },
+    handled: { txt: "Disclosure of ill-treatment, acknowledged, consent renewed, routed to the specialist pathway.", flag: false },
+    redirected: { txt: "Disclosure of ill-treatment, steered past without acknowledgement. Review: continuous consent / do-no-harm.", flag: true },
+    pressed: { txt: "Disclosure of ill-treatment, pressed for detail or met with a false assurance. Harm recorded.", flag: true },
+    null: { txt: "Disclosure of ill-treatment, none recorded in this run.", flag: false },
   };
   const lines: { txt: string; flag: boolean }[] = [
     consentLine,
     accountMap[world.account ?? "null"],
-    { txt: world.propOverreach ? "Proportionality — detail beyond the file's need was taken. Flag for review." : "Proportionality — only file-relevant detail taken.", flag: world.propOverreach },
+    { txt: world.propOverreach ? "Proportionality, detail beyond the file's need was taken. Flag for review." : "Proportionality, only file-relevant detail taken.", flag: world.propOverreach },
     disclosureMap[world.disclosure ?? "null"],
-    { txt: world.referralOffered ? "Support — referral pathway offered." : "Support — no referral pathway offered. Flag.", flag: !world.referralOffered },
-    world.preserve === "art225" ? { txt: "Preservation — art. 225 request lodged before displacement.", flag: false }
-      : world.preserve === "written" ? { txt: "Preservation — signed statement only; weaker if he does not return. Review.", flag: true }
-      : { txt: "Preservation — testimony NOT preserved before displacement. At risk of being lost.", flag: true },
+    { txt: world.referralOffered ? "Support, referral pathway offered." : "Support, no referral pathway offered. Flag.", flag: !world.referralOffered },
+    world.preserve === "art225" ? { txt: "Preservation, art. 225 request lodged before displacement.", flag: false }
+      : world.preserve === "written" ? { txt: "Preservation, signed statement only; weaker if he does not return. Review.", flag: true }
+      : { txt: "Preservation, testimony NOT preserved before displacement. At risk of being lost.", flag: true },
   ];
   return (
     <section className="card">
       <SceneHead n="Lesson 7" title="Produce the record you would actually file" type="Artifact · transfers to your live caseload">
-        The one page that leaves the module, assembled from your decisions — nothing added. Compromised items are flagged for you, not hidden from you. In the live module a redacted version uploads to your coach; no case material is stored on the platform.
+        The one page that leaves the module, assembled from your decisions, nothing added. Compromised items are flagged for you, not hidden from you. In the live module a redacted version uploads to your coach; no case material is stored on the platform.
       </SceneHead>
       <div className="artifact" aria-label="Interview record and consent log">
         <div className="artifact-h"><div>Interview record & consent log</div><div className="artifact-sub">PEJ-EVD-01 · composite witness · initials only · no real case data</div></div>
@@ -607,7 +607,7 @@ function StationResult({ record, onRestart }: { record: Partial<Record<CritKey, 
       <SceneHead n="Station result" title="Computed from the decisions you took" type="No separate quiz · two streams, weighted equally">
         Each criterion is banded and reported on its own. Bands: A=5 … F=0; C is the marginal pass.
       </SceneHead>
-      <div className={"verdict " + (stationPass ? "pass" : "fail")}>{stationPass ? "STATION PASSED — every non-negotiable held and both streams reached the marginal pass." : (failedNN.length ? "STATION NOT PASSED — a non-negotiable failed. It does not compensate: it fails the station regardless of every other band." : "STATION NOT PASSED — a stream fell below the marginal pass.")}</div>
+      <div className={"verdict " + (stationPass ? "pass" : "fail")}>{stationPass ? "STATION PASSED, every non-negotiable held and both streams reached the marginal pass." : (failedNN.length ? "STATION NOT PASSED, a non-negotiable failed. It does not compensate: it fails the station regardless of every other band." : "STATION NOT PASSED, a stream fell below the marginal pass.")}</div>
       {failedNN.length > 0 && (<ul className="nn-list">{failedNN.map((r) => <li key={r.key}><strong>Non-negotiable failed:</strong> {r.label}</li>)}</ul>)}
       {([["Skills", skills], ["Application of procedure or law", proc]] as const).map(([name, arr]) => (
         <div key={name} className="stream">
@@ -620,11 +620,11 @@ function StationResult({ record, onRestart }: { record: Partial<Record<CritKey, 
       ))}
       <p className="a11y-note">Nothing on this page is reported to your institution.</p>
       <div className="jobaid">
-        <div className="jobaid-h">Job aid — taking a witness's account (one page, no theory)</div>
+        <div className="jobaid-h">Job aid, taking a witness's account (one page, no theory)</div>
         <ol>
           <li><strong>Consent before the account.</strong> Explain the use, who sees it, and the right to stop at any time. Private space, trusted interpreter, referral to hand. Never record covertly. Never promise an outcome.</li>
           <li><strong>Open before closed.</strong> "Take me to that morning, in your own words." Let the free account exist before you structure it. A fact you supply is a fact you cannot rely on.</li>
-          <li><strong>Take only what the file needs.</strong> Ask what bears on reliability and linkage. Leave graphic and personal detail — that is the referral's job, not the interview's.</li>
+          <li><strong>Take only what the file needs.</strong> Ask what bears on reliability and linkage. Leave graphic and personal detail, that is the referral's job, not the interview's.</li>
           <li><strong>A disclosure is not a windfall.</strong> Acknowledge it, renew consent, route the detail to the specialist pathway (Istanbul Protocol), offer support. Do not press. Do not steer past it as if unheard.</li>
           <li><strong>Preserve before displacement.</strong> If the witness may leave, lodge the art. 225 request before they go. A plan to re-interview later loses the testimony, it does not delay it.</li>
           <li><strong>Record in his words.</strong> His account, not your inference. Flag anything obtained under compromised consent.</li>
@@ -640,12 +640,12 @@ function StationResult({ record, onRestart }: { record: Partial<Record<CritKey, 
  * ALIGNMENT PANEL (Part G)
  * ========================================================================= */
 const ALIGNMENT = [
-  { o: "O1 [Knows how] Establish informed, revocable consent before any account is taken.", tested: "Lesson 1 — component selection with consent-destroying traps.", success: "'Explain use / right to stop' selected AND zero traps; missing the explain-use component or selecting any trap scores E.", why: "Consent is a constructed product, not a fact to recognise; selecting components (and rejecting traps that feel protective) tests the construction, which a definition question could not." },
-  { o: "O2 [Shows how] Open the account so no fact enters through a leading question.", tested: "Lesson 2 — branching decision beat; the opening persists into the Lesson 7 record.", success: "Wide opener (band A); any leading move marks the account UNUSABLE and flags it in the artifact (binary taint).", why: "Only a live branching beat can make usability depend on the participant's own words in the moment and carry the taint forward; a multiple-choice item cannot." },
-  { o: "O3 [Shows how] Take only the detail the file needs.", tested: "Lesson 3 — routing decision per item; all questions shown at once.", success: "Neither graphic-injury nor family-trauma question asked; asking either sets overreach and scores E.", why: "Presenting every question at once reproduces the real cognitive condition in which overreach happens; the questions not asked are scored as heavily as those asked, which is what proportionality is." },
-  { o: "O4 [Shows how] Handle a disclosure of ill-treatment without harm; renew consent.", tested: "Lesson 4 — branching decision beat.", success: "Acknowledge + renew consent + route to specialist (band A); pressing for detail or a false assurance scores F/E.", why: "The competence is a live interpersonal judgment under a duty of care; only a branching beat with authored consequences can test acknowledging-and-routing versus mining-the-detail." },
-  { o: "O5 [Knows how] Choose the mechanism that preserves the testimony before displacement.", tested: "Lesson 6 — matching between mutually exclusive mechanisms.", success: "art. 225 before the investigating judge chosen (band A); a re-interview or recording loses the material and scores E.", why: "The objective is choosing between mutually exclusive mechanisms where the wrong one loses the material; a matching/selection between them tests exactly that, not knowledge of what art. 225 says." },
-  { o: "O6 [Does] Produce an interview record & consent log in which every consent/proportionality issue is flagged.", tested: "Lesson 7 — artifact assembled from prior decisions.", success: "Artifact filed with every compromised item visibly flagged; nothing added beyond the decisions taken.", why: "A Does objective can only be discharged by a produced artifact that carries the consequences of earlier choices; any other test measures intention, not performance." },
+  { o: "O1 [Knows how] Establish informed, revocable consent before any account is taken.", tested: "Lesson 1, component selection with consent-destroying traps.", success: "'Explain use / right to stop' selected AND zero traps; missing the explain-use component or selecting any trap scores E.", why: "Consent is a constructed product, not a fact to recognise; selecting components (and rejecting traps that feel protective) tests the construction, which a definition question could not." },
+  { o: "O2 [Shows how] Open the account so no fact enters through a leading question.", tested: "Lesson 2, branching decision beat; the opening persists into the Lesson 7 record.", success: "Wide opener (band A); any leading move marks the account UNUSABLE and flags it in the artifact (binary taint).", why: "Only a live branching beat can make usability depend on the participant's own words in the moment and carry the taint forward; a multiple-choice item cannot." },
+  { o: "O3 [Shows how] Take only the detail the file needs.", tested: "Lesson 3, routing decision per item; all questions shown at once.", success: "Neither graphic-injury nor family-trauma question asked; asking either sets overreach and scores E.", why: "Presenting every question at once reproduces the real cognitive condition in which overreach happens; the questions not asked are scored as heavily as those asked, which is what proportionality is." },
+  { o: "O4 [Shows how] Handle a disclosure of ill-treatment without harm; renew consent.", tested: "Lesson 4, branching decision beat.", success: "Acknowledge + renew consent + route to specialist (band A); pressing for detail or a false assurance scores F/E.", why: "The competence is a live interpersonal judgment under a duty of care; only a branching beat with authored consequences can test acknowledging-and-routing versus mining-the-detail." },
+  { o: "O5 [Knows how] Choose the mechanism that preserves the testimony before displacement.", tested: "Lesson 6, matching between mutually exclusive mechanisms.", success: "art. 225 before the investigating judge chosen (band A); a re-interview or recording loses the material and scores E.", why: "The objective is choosing between mutually exclusive mechanisms where the wrong one loses the material; a matching/selection between them tests exactly that, not knowledge of what art. 225 says." },
+  { o: "O6 [Does] Produce an interview record & consent log in which every consent/proportionality issue is flagged.", tested: "Lesson 7, artifact assembled from prior decisions.", success: "Artifact filed with every compromised item visibly flagged; nothing added beyond the decisions taken.", why: "A Does objective can only be discharged by a produced artifact that carries the consequences of earlier choices; any other test measures intention, not performance." },
 ];
 function AlignmentPanel() {
   return (
@@ -671,7 +671,7 @@ function AlignmentPanel() {
 }
 
 /* ===========================================================================
- * STYLE — single block, CSS custom properties, no utility framework.
+ * STYLE, single block, CSS custom properties, no utility framework.
  * (Shared visual system with Module 1.)
  * ========================================================================= */
 const CSS = `
