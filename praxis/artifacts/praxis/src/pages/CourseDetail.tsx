@@ -1550,13 +1550,14 @@ function NewModule({ courseId, nextOrder }: { courseId: string; nextOrder: numbe
  * by name. Instructors can Customize which sections appear (saved per course in the browser). This
  * replaces the old horizontal tab bar for instructors and visitors.
  */
-function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigate }: {
+function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigate, savedConfig }: {
   courseId: string;
   activeTab: string;
   setTab: (t: string) => void;
   isInstructor: boolean;
   modules?: { id: string; title: string }[];
   navigate: (to: string) => void;
+  savedConfig?: string | null;
 }) {
   const STORAGE = `toc-hidden:${courseId}`;
   const [hidden, setHidden] = useState<Set<string>>(() => {
@@ -1590,13 +1591,27 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
   const [labels, setLabels] = useState<Record<string, string>>(() => { try { return JSON.parse(localStorage.getItem(LABELS_KEY) || '{}'); } catch { return {}; } });
   const labelOf = (id: string, fallback: string) => (labels[id] && labels[id].trim() ? labels[id] : fallback);
   const setLabel = (id: string, v: string) => setLabels((m) => { const n = { ...m, [id]: v }; try { localStorage.setItem(LABELS_KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
+  // Server-saved config applies to EVERY viewer. Load it when the course arrives; persist on "Done".
+  useEffect(() => {
+    if (!savedConfig) return;
+    try {
+      const s = JSON.parse(savedConfig);
+      if (Array.isArray(s.order)) setOrder(s.order);
+      if (Array.isArray(s.hidden)) setHidden(new Set(s.hidden));
+      if (s.labels && typeof s.labels === 'object') setLabels(s.labels);
+    } catch { /* ignore */ }
+  }, [savedConfig]);
+  const persistConfig = () => {
+    const cfg = JSON.stringify({ order, hidden: [...hidden], labels });
+    apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify({ tocConfig: cfg }) }).catch(() => { /* non-fatal */ });
+  };
   const hasModules = (modules?.length ?? 0) > 0;
   return (
     <aside className="lg:w-full shrink-0 lg:sticky lg:top-4 self-start mb-6 lg:mb-0 lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
       <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-border">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Table of contents</span>
         {isInstructor && (
-          <button onClick={() => setCustomizing((c) => !c)} className="text-xs text-primary hover:underline">
+          <button onClick={() => setCustomizing((c) => { if (c) persistConfig(); return !c; })} className="text-xs text-primary hover:underline">
             {customizing ? 'Done' : 'Customize'}
           </button>
         )}
@@ -2224,7 +2239,7 @@ export function CourseDetail() {
   return (
     <div className={cn('space-y-0', !isLearnerView && 'lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start')}>
       {!isLearnerView && (
-        <CourseToc courseId={courseId} activeTab={activeTab} setTab={setTab} isInstructor={isInstructor} modules={modules} navigate={navigate} />
+        <CourseToc courseId={courseId} activeTab={activeTab} setTab={setTab} isInstructor={isInstructor} modules={modules} navigate={navigate} savedConfig={(course as { tocConfig?: string | null } | undefined)?.tocConfig ?? null} />
       )}
       <div className="min-w-0 space-y-0">
       {/* Breadcrumb + View-as-student toggle (staff only) */}

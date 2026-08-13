@@ -3604,6 +3604,22 @@ function ModuleHubView({
     [ids[idx], ids[j]] = [ids[j], ids[idx]];
     setRailOrder(ids); try { localStorage.setItem(`module-toc-order:${moduleId}`, JSON.stringify(ids)); } catch { /* ignore */ }
   };
+  // Server-saved rail config applies to EVERY viewer of this module. Load it when the module arrives;
+  // persist it when the instructor clicks "Done".
+  const savedRail = (mod as { railConfig?: string | null } | undefined)?.railConfig ?? null;
+  useEffect(() => {
+    if (!savedRail) return;
+    try {
+      const s = JSON.parse(savedRail);
+      if (Array.isArray(s.order)) setRailOrder(s.order);
+      if (Array.isArray(s.hidden)) setRailHidden(new Set(s.hidden));
+      if (s.labels && typeof s.labels === 'object') setRailLabels(s.labels);
+    } catch { /* ignore */ }
+  }, [savedRail]);
+  const persistRail = () => {
+    const cfg = JSON.stringify({ order: railOrder, hidden: [...railHidden], labels: railLabels });
+    apiFetch(`/modules/${moduleId}`, { method: 'PATCH', body: JSON.stringify({ railConfig: cfg }) }).catch(() => { /* non-fatal */ });
+  };
 
   // ── Guided linear progression ──────────────────────────────────────────────
   // Every deliverable that exists, in the order the module should be worked through.
@@ -3797,7 +3813,7 @@ function ModuleHubView({
           <div className="hidden lg:flex items-center justify-between px-1 pb-2 mb-1 border-b border-border">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contents</span>
             {isInstructor && (
-              <button onClick={() => setRailCustomizing((c) => !c)} className="text-xs text-primary hover:underline">{railCustomizing ? 'Done' : 'Customize'}</button>
+              <button onClick={() => setRailCustomizing((c) => { if (c) persistRail(); return !c; })} className="text-xs text-primary hover:underline">{railCustomizing ? 'Done' : 'Customize'}</button>
             )}
           </div>
           <ol className="flex lg:flex-col gap-2 lg:gap-0.5 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">

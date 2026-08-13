@@ -32,6 +32,8 @@ export const modulesTable = pgTable("modules", {
   bannerUrl: text("banner_url"),
   // Small JSON of overview customisations (rich HTML for overview/objectives/how-to, styling).
   overviewConfig: text("overview_config"),
+  // Section-menu (rail) customisations that apply to EVERY viewer: { order, hidden, labels }.
+  railConfig: text("rail_config"),
   status: moduleStatusEnum("module_status").notNull().default("draft"),
   lessonType: lessonTypeEnum("lesson_type").notNull().default("socratic"),
   // Learner-facing module-level learning objectives (what you will be able to do).

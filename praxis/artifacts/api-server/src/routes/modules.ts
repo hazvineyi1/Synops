@@ -37,6 +37,7 @@ function toModuleResponse(m: typeof modulesTable.$inferSelect) {
     description: m.description,
     bannerUrl: m.bannerUrl ?? null,
     overviewConfig: (m as { overviewConfig?: string | null }).overviewConfig ?? null,
+    railConfig: (m as { railConfig?: string | null }).railConfig ?? null,
     status: m.status,
     lessonType: m.lessonType ?? 'socratic',
     objectives: m.objectives ?? [],
@@ -120,7 +121,7 @@ router.patch("/modules/:moduleId", requireAuth, requireRole("super_admin", "part
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!(await staffOn(req, res, existing.courseId))) return;
 
-  const { title, description, status, lessonType, estimatedMinutes, order, objectives, modality, bannerUrl, overviewConfig } = req.body;
+  const { title, description, status, lessonType, estimatedMinutes, order, objectives, modality, bannerUrl, overviewConfig, railConfig } = req.body;
   const [updated] = await db
     .update(modulesTable)
     .set({
@@ -130,6 +131,7 @@ router.patch("/modules/:moduleId", requireAuth, requireRole("super_admin", "part
       ...(modality !== undefined ? { modality } : {}),
       ...(bannerUrl !== undefined ? { bannerUrl: bannerUrl || null } : {}),
       ...(overviewConfig !== undefined ? { overviewConfig } as Record<string, unknown> : {}),
+      ...(railConfig !== undefined ? { railConfig } as Record<string, unknown> : {}),
       updatedAt: new Date(),
     } as any)
     .where(eq(modulesTable.id, req.params.moduleId))

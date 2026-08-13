@@ -32,6 +32,8 @@ export const coursesTable = pgTable("courses", {
   // The source material uploaded/pasted into the AI architect, kept so module readings can be
   // generated from the actual content later.
   sourceMaterial: text("source_material"),
+  // Table-of-contents customisations that apply to EVERY viewer: { order, hidden, labels }.
+  tocConfig: text("toc_config"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
