@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { casesApi, streamCaseTurn, LANGUAGES, type CaseMessage, type CaseSessionRow } from "@/lib/casesApi";
 import { TutorAvatar, tutorGender } from "@/components/TutorAvatar";
 import { useSpeech } from "@/lib/speech";
-import { ArrowLeft, Send, CheckCircle2, TrendingUp, BookOpen, Settings2, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, CheckCircle2, TrendingUp, BookOpen, Settings2, Loader2, MessageCircle, Maximize2, Minimize2, ChevronDown } from "lucide-react";
 import { useSession } from "@/context/SessionContext";
 import { personaByEmail } from "@/lib/k12Personas";
 
@@ -60,6 +60,9 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const [factsObj, setFactsObj] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
   const [factsOpen, setFactsOpen] = useState(true);
+  // Layout E (adult): the situation is the reading document, the coach is a docked panel.
+  const [coachMin, setCoachMin] = useState(false);
+  const [coachBig, setCoachBig] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [animate, setAnimateState] = useState<boolean>(() => { try { return localStorage.getItem("tutorAnimate") !== "0"; } catch { return true; } });
   const setAnimate = (v: boolean) => { setAnimateState(v); try { localStorage.setItem("tutorAnimate", v ? "1" : "0"); } catch { /* ignore */ } };
@@ -197,6 +200,80 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     </div>
   );
 
+  const messagesList = (
+    <div className="space-y-4">
+      {messages.map((m, i) =>
+        m.role === "learner" ? (
+          <div key={i} className="flex justify-end">
+            <div className={young ? "max-w-[82%] rounded-3xl rounded-br-md px-5 py-3 text-base leading-relaxed text-white shadow-sm" : "max-w-[85%] rounded-2xl rounded-br-sm px-3.5 py-2.5 text-sm leading-relaxed bg-[hsl(222_47%_20%)] text-white"} style={young ? { background: kidAccent } : undefined}>{m.content}</div>
+          </div>
+        ) : (
+          <div key={i} className="flex justify-start items-end gap-2">
+            <TutorAvatar avatar={tutorAvatar} size={young ? 40 : 26} speaking={speaking && animate && i === messages.length - 1} />
+            <div className={young ? "max-w-[82%] rounded-3xl rounded-bl-md px-5 py-3 text-base leading-relaxed bg-white shadow-sm" : "max-w-[85%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm leading-relaxed bg-white border"} style={young ? { border: `2px solid ${kidAccent}33` } : undefined}>
+              {m.content || <span className="animate-pulse">●</span>}
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  );
+
+  const budgetBanner = budgetReached ? (
+    <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border bg-emerald-500/5 border-emerald-500/30 px-3 py-2">
+      <p className="text-xs text-emerald-800">{T("You've reached the planned depth. Keep going, or finish for your reasoning analysis.", "Great job! You can keep chatting, or tap the button when you're all done. 🎉")}</p>
+      <Button size="sm" onClick={finish} disabled={analysing} style={young ? { background: kidAccent } : undefined}>{analysing ? T("Analysing…", "One sec…") : T("Finish & analyse", "I'm done!")}</Button>
+    </div>
+  ) : null;
+
+  const adultInput = (
+    <>
+      {budgetBanner}
+      <div className="flex gap-2 items-end">
+        <textarea
+          className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm max-h-32"
+          rows={1}
+          placeholder="Type your reasoning…"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
+          disabled={streaming}
+        />
+        <Button onClick={() => void send()} disabled={streaming || !input.trim()}><Send className="h-4 w-4" /></Button>
+      </div>
+      {!budgetReached && messages.length > 2 && (
+        <button onClick={finish} disabled={analysing} className="mt-2 text-xs text-muted-foreground hover:text-foreground">Finish early &amp; get analysis</button>
+      )}
+    </>
+  );
+
+  const youngInput = (
+    <div className="space-y-3">
+      {budgetBanner}
+      <div className="flex justify-center">
+        <button onClick={replayLast} disabled={streaming}
+          className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-base font-bold text-white shadow-md active:scale-95 disabled:opacity-50"
+          style={{ background: kidAccent }}>🔊 {L("Hear it again", "Escúchalo otra vez")}</button>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2.5">
+        {tiles.map((Ltr) => (
+          <button key={Ltr} disabled={streaming}
+            onClick={() => { say(`/${Ltr.toLowerCase()}/`); void send(`It's the letter ${Ltr}, ${Ltr} says /${Ltr.toLowerCase()}/.`); }}
+            className="h-16 w-16 rounded-2xl text-3xl font-extrabold text-white shadow-md active:scale-90 disabled:opacity-50"
+            style={{ background: kidAccent }}>{Ltr}</button>
+        ))}
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        <button onClick={() => { replayLast(); void send("I said it!"); }} disabled={streaming}
+          className="rounded-full px-5 py-2.5 text-base font-bold border-2 bg-white active:scale-95 disabled:opacity-50"
+          style={{ borderColor: kidAccent, color: kidAccent }}>🗣️ {L("I said it!", "¡Lo dije!")}</button>
+        <button onClick={() => void send("Can you help me?")} disabled={streaming}
+          className="rounded-full px-5 py-2.5 text-base font-bold border-2 bg-white active:scale-95 disabled:opacity-50"
+          style={{ borderColor: kidAccent, color: kidAccent }}>🙋 {L("Help", "Ayuda")}</button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="h-screen flex flex-col" style={{ background: young ? `${kidAccent}12` : "hsl(43 30% 97%)" }}>
       <header className="flex items-center justify-between gap-2 px-3 sm:px-4 h-16 border-b bg-white/85 backdrop-blur shrink-0" style={young ? { borderColor: `${kidAccent}33` } : undefined}>
@@ -211,9 +288,11 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
         </div>
 
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setFactsOpen((o) => !o)} title="Case facts" className={`inline-flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border transition-colors ${factsOpen ? "bg-muted border-transparent" : "hover:bg-muted"}`}>
-            <BookOpen className="h-3.5 w-3.5" /><span className="hidden sm:inline">Facts</span>
-          </button>
+          {young && (
+            <button onClick={() => setFactsOpen((o) => !o)} title="Case facts" className={`inline-flex items-center gap-1 text-xs px-2 py-1.5 rounded-md border transition-colors ${factsOpen ? "bg-muted border-transparent" : "hover:bg-muted"}`}>
+              <BookOpen className="h-3.5 w-3.5" /><span className="hidden sm:inline">Facts</span>
+            </button>
+          )}
           <div className="relative inline-flex items-center">
             <select value={lang} onChange={(e) => void changeLanguage(e.target.value)} disabled={switching || streaming} title="Language, switches the whole conversation" className="text-xs rounded-md border border-input bg-background px-1.5 py-1.5 disabled:opacity-60">
               {langOptions.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
@@ -242,94 +321,56 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
         </div>
       </header>
 
-      <div className="flex-1 flex min-h-0">
-        <main className="flex-1 flex flex-col min-w-0">
-          <div className="h-1 bg-muted shrink-0"><div className="h-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "hsl(145 45% 42%)" : "hsl(222 47% 30%)" }} /></div>
-
-          <div ref={scrollRef} className="flex-1 overflow-auto">
-            <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
-              {/* Inline facts card on mobile (side panel handles desktop) */}
-              {factsOpen && <div className="md:hidden rounded-xl border bg-white">{facts}</div>}
-
-              {messages.map((m, i) =>
-                m.role === "learner" ? (
-                  <div key={i} className="flex justify-end">
-                    <div className={young ? "max-w-[82%] rounded-3xl rounded-br-md px-5 py-3 text-base leading-relaxed text-white shadow-sm" : "max-w-[82%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed bg-[hsl(222_47%_20%)] text-white"} style={young ? { background: kidAccent } : undefined}>{m.content}</div>
-                  </div>
-                ) : (
-                  <div key={i} className="flex justify-start items-end gap-2">
-                    <TutorAvatar avatar={tutorAvatar} size={young ? 40 : 28} speaking={speaking && animate && i === messages.length - 1} />
-                    <div className={young ? "max-w-[82%] rounded-3xl rounded-bl-md px-5 py-3 text-base leading-relaxed bg-white shadow-sm" : "max-w-[82%] rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm leading-relaxed bg-white border"} style={young ? { border: `2px solid ${kidAccent}33` } : undefined}>
-                      {m.content || <span className="animate-pulse">●</span>}
-                    </div>
-                  </div>
-                )
-              )}
+      {young ? (
+        <div className="flex-1 flex min-h-0">
+          <main className="flex-1 flex flex-col min-w-0">
+            <div className="h-1 bg-muted shrink-0"><div className="h-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "hsl(145 45% 42%)" : "hsl(222 47% 30%)" }} /></div>
+            <div ref={scrollRef} className="flex-1 overflow-auto">
+              <div className="max-w-2xl mx-auto px-4 py-6">
+                {factsOpen && <div className="rounded-xl border bg-white mb-4">{facts}</div>}
+                {messagesList}
+              </div>
             </div>
+            <div className="border-t bg-white shrink-0">
+              <div className="max-w-2xl mx-auto px-4 py-3">{youngInput}</div>
+            </div>
+          </main>
+        </div>
+      ) : (
+        <div className="flex-1 relative min-h-0">
+          <div className="h-1 bg-muted"><div className="h-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "hsl(145 45% 42%)" : "hsl(222 47% 30%)" }} /></div>
+          <div className={`absolute inset-0 top-1 overflow-auto ${coachMin ? "" : "lg:pr-[420px]"}`}>
+            <article className="mx-auto max-w-3xl px-5 sm:px-8 py-10 pb-[48vh] sm:pb-44">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5 mb-3"><BookOpen className="h-3.5 w-3.5" /> The situation</p>
+              {factsObj && <div className="mb-6"><span className="text-sm rounded-md px-3 py-1.5 inline-block" style={{ background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>Goal: {factsObj}</span></div>}
+              <div className={`font-serif text-[1.05rem] leading-8 whitespace-pre-wrap text-foreground/90 transition-opacity ${switching ? "opacity-40" : ""}`}>{factsCtx || "No background was provided for this case."}</div>
+              {switching && <p className="text-[11px] text-muted-foreground pt-4 flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Switching into {LANGUAGES.find((l) => l.code === lang)?.name}…</p>}
+            </article>
           </div>
 
-          <div className="border-t bg-white shrink-0">
-            <div className="max-w-2xl mx-auto px-4 py-3">
-              {budgetReached && (
-                <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border bg-emerald-500/5 border-emerald-500/30 px-3 py-2">
-                  <p className="text-xs text-emerald-800">{T("You've reached the planned depth. Keep going, or finish for your reasoning analysis.", "Great job! You can keep chatting, or tap the button when you're all done. 🎉")}</p>
-                  <Button size="sm" onClick={finish} disabled={analysing} style={young ? { background: kidAccent } : undefined}>{analysing ? T("Analysing…", "One sec…") : T("Finish & analyse", "I'm done!")}</Button>
+          {coachMin ? (
+            <button onClick={() => setCoachMin(false)} className="fixed z-30 right-4 bottom-4 inline-flex items-center gap-2 rounded-full border bg-white shadow-lg pl-2 pr-4 py-2 hover:bg-muted">
+              <TutorAvatar avatar={tutorAvatar} size={30} speaking={speaking && animate} />
+              <span className="text-sm font-medium">{tutorName}</span>
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            </button>
+          ) : (
+            <div className={`fixed z-30 bg-white border shadow-xl flex flex-col overflow-hidden inset-x-0 bottom-0 rounded-t-2xl h-[72vh] sm:inset-x-auto sm:bottom-4 sm:right-4 sm:rounded-2xl ${coachBig ? "sm:w-[560px] sm:h-[85vh]" : "sm:w-[400px] sm:h-[70vh]"}`}>
+              <div className="flex items-center gap-2 px-3 h-12 border-b shrink-0">
+                <TutorAvatar avatar={tutorAvatar} size={30} speaking={speaking && animate} ring />
+                <div className="leading-tight min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{tutorName}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{speaking ? "speaking…" : "your case coach"}</p>
                 </div>
-              )}
-              {young ? (
-                /* Tap to answer: hear the prompt, tap a big letter (which plays its sound), or a quick reply.
-                   No typing or reading required, right for a 6-year-old. */
-                <div className="space-y-3">
-                  <div className="flex justify-center">
-                    <button onClick={replayLast} disabled={streaming}
-                      className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-base font-bold text-white shadow-md active:scale-95 disabled:opacity-50"
-                      style={{ background: kidAccent }}>🔊 {L("Hear it again", "Escúchalo otra vez")}</button>
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-2.5">
-                    {tiles.map((L) => (
-                      <button key={L} disabled={streaming}
-                        onClick={() => { say(`/${L.toLowerCase()}/`); void send(`It's the letter ${L}, ${L} says /${L.toLowerCase()}/.`); }}
-                        className="h-16 w-16 rounded-2xl text-3xl font-extrabold text-white shadow-md active:scale-90 disabled:opacity-50"
-                        style={{ background: kidAccent }}>{L}</button>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <button onClick={() => { replayLast(); void send("I said it!"); }} disabled={streaming}
-                      className="rounded-full px-5 py-2.5 text-base font-bold border-2 bg-white active:scale-95 disabled:opacity-50"
-                      style={{ borderColor: kidAccent, color: kidAccent }}>🗣️ {L("I said it!", "¡Lo dije!")}</button>
-                    <button onClick={() => void send("Can you help me?")} disabled={streaming}
-                      className="rounded-full px-5 py-2.5 text-base font-bold border-2 bg-white active:scale-95 disabled:opacity-50"
-                      style={{ borderColor: kidAccent, color: kidAccent }}>🙋 {L("Help", "Ayuda")}</button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex gap-2 items-end">
-                    <textarea
-                      className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm max-h-32"
-                      rows={1}
-                      placeholder="Type your reasoning…"
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }}
-                      disabled={streaming}
-                    />
-                    <Button onClick={() => void send()} disabled={streaming || !input.trim()}><Send className="h-4 w-4" /></Button>
-                  </div>
-                  {!budgetReached && messages.length > 2 && (
-                    <button onClick={finish} disabled={analysing} className="mt-2 text-xs text-muted-foreground hover:text-foreground">Finish early &amp; get analysis</button>
-                  )}
-                </>
-              )}
+                <button onClick={() => setCoachBig((b) => !b)} title={coachBig ? "Shrink" : "Expand"} className="hidden sm:inline-flex p-1.5 rounded-md hover:bg-muted text-muted-foreground">{coachBig ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
+                <button onClick={() => setCoachMin(true)} title="Minimise" className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"><ChevronDown className="h-4 w-4" /></button>
+              </div>
+              <div ref={scrollRef} className="flex-1 overflow-auto px-3 py-3">{messagesList}</div>
+              <div className="border-t bg-white shrink-0 px-3 py-2.5">{adultInput}</div>
             </div>
-          </div>
-        </main>
-
-        {/* Desktop facts side panel */}
-        {factsOpen && (
-          <aside className="hidden md:block w-80 border-l bg-white/70 overflow-auto shrink-0">{facts}</aside>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
