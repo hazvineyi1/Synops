@@ -1,10 +1,11 @@
 import { db } from "@workspace/db";
 import {
   partnersTable, organisationsTable, usersTable,
-  coursesTable, modulesTable, beatsTable, interactiveActivitiesTable,
+  coursesTable, modulesTable, beatsTable, interactiveActivitiesTable, moduleReadingsTable,
 } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { PEJ_M1_SPEC, PEJ_M2_SPEC } from "./stations";
+import { PEJ_M1_READING, PEJ_M2_READING } from "./stationReadings";
 
 /**
  * Seed for the partner "Executive Learning" and its Project Expedite Justice demo course.
@@ -33,6 +34,7 @@ interface SeedModule {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   spec: any;
   stationBlurb: string;
+  reading: string;
 }
 
 const MODULES: SeedModule[] = [
@@ -41,6 +43,7 @@ const MODULES: SeedModule[] = [
     order: 0,
     minutes: 35,
     spec: PEJ_M1_SPEC,
+    reading: PEJ_M1_READING,
     stationBlurb:
       "A task-first rehearsal of the first hour at a conflict-related crime scene: sequencing under field conditions, the lawful basis for the inspection under martial law, taking a witness's initial account without leading, and auditing a colleague's chain of custody. The station result is computed from the decisions you take, across two equally-weighted streams, with a partly-conjunctive safety and evidential floor.",
     objectives: [
@@ -56,6 +59,7 @@ const MODULES: SeedModule[] = [
     order: 1,
     minutes: 35,
     spec: PEJ_M2_SPEC,
+    reading: PEJ_M2_READING,
     stationBlurb:
       "Taking a witness's account so consent is informed and continuous, the account is in the witness's own words, only proportionate detail is taken, a mid-interview disclosure of ill-treatment is handled without harm, and the testimony is preserved before the witness is displaced. Non-negotiables are informed consent, disclosure handled without harm, and preservation before displacement.",
     objectives: [
@@ -125,6 +129,25 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
     await db.update(interactiveActivitiesTable)
       .set({ title, instructions, spec: m.spec, updatedAt: new Date() })
       .where(eq(interactiveActivitiesTable.id, existing[0].id));
+  }
+
+  // Upsert the companion reading. Match any non-link reading on the module (updates one that already
+  // exists, e.g. built in the platform) so the section content is populated; otherwise create it.
+  if (m.reading) {
+    const readingTitle = `${m.title}: Reading`;
+    const existingReading = await db.select({ id: moduleReadingsTable.id })
+      .from(moduleReadingsTable)
+      .where(and(eq(moduleReadingsTable.moduleId, mod.id), ne(moduleReadingsTable.kind, "link")));
+    if (existingReading.length === 0) {
+      await db.insert(moduleReadingsTable).values({
+        moduleId: mod.id, courseId, title: readingTitle, kind: "note",
+        content: m.reading, chars: m.reading.length, order: 0, published: true, createdBy: authorId,
+      });
+    } else {
+      await db.update(moduleReadingsTable)
+        .set({ title: readingTitle, kind: "note", content: m.reading, chars: m.reading.length, published: true, updatedAt: new Date() })
+        .where(eq(moduleReadingsTable.id, existingReading[0].id));
+    }
   }
 }
 
