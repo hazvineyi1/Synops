@@ -23,6 +23,7 @@ export interface Activity {
   moduleId: string | null;
   title: string;
   instructions: string | null;
+  imageUrl: string | null;
   html: string;
   source: "html" | "embed" | "ai";
   embedUrl: string | null;
@@ -93,6 +94,7 @@ export interface ActivitySubmission {
 export interface ActivityInput {
   title?: string;
   instructions?: string | null;
+  imageUrl?: string | null;
   html?: string;
   source?: "html" | "embed" | "ai";
   embedUrl?: string | null;

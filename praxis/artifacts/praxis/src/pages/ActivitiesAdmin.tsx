@@ -79,6 +79,8 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
   const source = activity?.source ?? seed?.source ?? (newMode === "embed" ? "embed" : "html");
   const [title, setTitle] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [imgBusy, setImgBusy] = useState(false);
   const [html, setHtml] = useState(STARTER_HTML);
   const [embedRaw, setEmbedRaw] = useState("");
   const [kind, setKind] = useState("custom");
@@ -104,6 +106,7 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
   useEffect(() => {
     setTitle(activity?.title ?? seed?.title ?? "");
     setInstructions(activity?.instructions ?? seed?.instructions ?? "");
+    setImageUrl(activity?.imageUrl ?? seed?.imageUrl ?? "");
     setHtml(activity?.html || seed?.html || (newMode === "embed" ? "" : STARTER_HTML));
     setEmbedRaw(activity?.embedUrl || (activity?.source === "embed" ? activity?.html ?? "" : ""));
     setKind(activity?.kind ?? seed?.kind ?? (newMode === "embed" ? "embed" : "custom"));
@@ -122,6 +125,7 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
     mutationFn: () => {
       const input = {
         title, instructions,
+        imageUrl: imageUrl || null,
         source,
         html: isEmbed ? parsed.html : html,
         embedUrl: isEmbed ? parsed.embedUrl : null,
@@ -157,6 +161,32 @@ function Editor({ activity, newMode, seed, onSaved }: { activity: Activity | nul
           <div>
             <Label className="text-sm">Instructions (optional)</Label>
             <Input value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Shown above the activity" />
+          </div>
+
+          {/* Cover image: paste a URL or generate a photorealistic one from the title/instructions. */}
+          <div>
+            <Label className="text-sm">Cover image (optional)</Label>
+            {imageUrl && (
+              <div className="relative mt-1 mb-2 h-32 w-full overflow-hidden rounded-lg border border-border">
+                <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                <button type="button" onClick={() => setImageUrl("")} className="absolute top-1.5 right-1.5 rounded-md bg-black/50 px-2 py-0.5 text-xs text-white hover:bg-black/70">Clear</button>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="Paste an image URL, or generate one →" />
+              <Button type="button" size="sm" variant="outline" disabled={imgBusy || (!title.trim() && !instructions.trim())}
+                onClick={async () => {
+                  setImgBusy(true);
+                  try {
+                    const r = await apiFetch<{ imageUrl: string }>("/activities/generate-image", { method: "POST", body: JSON.stringify({ title, description: instructions }) });
+                    if (r.imageUrl) setImageUrl(r.imageUrl);
+                  } catch (e) { toast({ title: "Could not generate image", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
+                  finally { setImgBusy(false); }
+                }}>
+                {imgBusy ? "Generating…" : "Generate"}
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">A photorealistic cover, generated from the title. Shown at the top when the activity opens.</p>
           </div>
 
           {isEmbed ? (

@@ -25,8 +25,47 @@ import { logAudit } from "../lib/audit";
 import { generateActivities } from "../lib/activityEngine";
 import { extractFromBuffer, extractFromUrl } from "../lib/extractText";
 import { onGradeEvent } from "../lib/gradebookAlerts";
+import { uploadObject, storageEnabled } from "../lib/supabaseStorage";
 
 const router = Router();
+
+const requireAuthorImg = requireRole("coach", "org_admin", "partner_admin", "super_admin", "instructional_designer");
+
+// POST /activities/generate-image -- generate a photorealistic cover image for an activity/flashcards/
+// game from its title + a short description, using OpenAI's image model. Stores it (Supabase if
+// configured, else a data URL) and returns the url. Requires OPENAI_API_KEY on the server.
+router.post("/activities/generate-image", requireAuth, requireAuthorImg, async (req, res) => {
+  const apiKey = process.env["OPENAI_API_KEY"];
+  if (!apiKey) { res.status(503).json({ error: "Image generation is not configured. Set OPENAI_API_KEY on the server." }); return; }
+  const title = String(req.body?.title ?? "").trim();
+  const description = String(req.body?.description ?? "").trim();
+  if (!title && !description) { res.status(400).json({ error: "Provide a title or description to generate an image." }); return; }
+  const prompt = `A photorealistic, professional cover image for a learning activity. Subject: ${title}. ${description}. Cinematic composition, natural lighting, high detail, editorial photography style, relevant real-world scene. Absolutely no text, no letters, no words, no logos, no watermarks in the image.`;
+  try {
+    const r = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1536x1024", n: 1 }),
+    });
+    if (!r.ok) { const d = await r.text().catch(() => ""); throw new Error(`Image API error (${r.status}) ${d.slice(0, 200)}`); }
+    const data = (await r.json()) as { data?: Array<{ b64_json?: string }> };
+    const b64 = data?.data?.[0]?.b64_json;
+    if (!b64) throw new Error("The image service returned no image.");
+    const buf = Buffer.from(b64, "base64");
+    let imageUrl: string;
+    if (storageEnabled()) {
+      const up = await uploadObject(`activity-images/${Date.now()}.png`, buf, "image/png");
+      imageUrl = up.url;
+    } else {
+      imageUrl = `data:image/png;base64,${b64}`;
+    }
+    res.json({ imageUrl });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("activity image gen failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: "Could not generate an image. Please try again." });
+  }
+});
 
 type U = { id: string; role: string; organisationId?: string | null; partnerId?: string | null; firstName?: string | null; lastName?: string | null; email: string };
 
@@ -77,6 +116,7 @@ function activityResponse(a: typeof interactiveActivitiesTable.$inferSelect) {
     moduleId: a.moduleId,
     title: a.title,
     instructions: a.instructions,
+    imageUrl: (a as { imageUrl?: string | null }).imageUrl ?? null,
     html: a.html,
     source: a.source,
     embedUrl: a.embedUrl,
@@ -184,6 +224,7 @@ router.post("/activities", requireAuth, requireAuthor, async (req, res) => {
       organisationId,
       title,
       instructions: b.instructions ?? null,
+      imageUrl: b.imageUrl ?? null,
       html: String(b.html ?? ""),
       source: SOURCES.includes(b.source) ? b.source : "html",
       embedUrl: b.embedUrl ?? null,
@@ -255,6 +296,7 @@ router.patch("/activities/:id", requireAuth, requireAuthor, async (req, res) => 
   const patch: Record<string, unknown> = { updatedAt: new Date() };
   if (b.title !== undefined) patch.title = String(b.title);
   if (b.instructions !== undefined) patch.instructions = b.instructions;
+  if (b.imageUrl !== undefined) patch.imageUrl = b.imageUrl || null;
   if (b.html !== undefined) patch.html = String(b.html);
   if (b.source !== undefined && SOURCES.includes(b.source)) patch.source = b.source;
   if (b.embedUrl !== undefined) patch.embedUrl = b.embedUrl;

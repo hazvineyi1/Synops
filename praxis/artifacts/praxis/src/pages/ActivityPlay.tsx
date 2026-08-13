@@ -103,6 +103,10 @@ export function ActivityPlay({ params }: { params: { activityId: string } }) {
               )}
             </div>
 
+            {(activity as { imageUrl?: string | null }).imageUrl && (
+              <img src={(activity as { imageUrl?: string | null }).imageUrl!} alt="" className="w-full max-h-64 object-cover rounded-2xl border border-border" />
+            )}
+
             {(activity as { kind?: string }).kind === "video" ? (() => {
               let vid = ""; let qs: IVQuestion[] = [];
               try { const p = JSON.parse(activity.html || "{}"); vid = p.videoUrl || activity.embedUrl || ""; qs = Array.isArray(p.questions) ? p.questions : []; }

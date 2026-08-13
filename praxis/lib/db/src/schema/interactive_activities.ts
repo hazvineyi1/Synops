@@ -32,6 +32,8 @@ export const interactiveActivitiesTable = pgTable("interactive_activities", {
   moduleId: text("module_id"),
   title: text("title").notNull(),
   instructions: text("instructions"),
+  /** Optional cover image (pasted URL or AI-generated photorealistic image). */
+  imageUrl: text("image_url"),
   // The author-supplied HTML document body. Rendered inside a sandboxed iframe.
   html: text("html").notNull().default(""),
   /**
