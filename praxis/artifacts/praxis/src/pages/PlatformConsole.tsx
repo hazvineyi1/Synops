@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Redirect } from "wouter";
+import { Redirect, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Search,
@@ -42,6 +42,7 @@ const TABS = [
   { id: "access", label: "Access requests" },
   { id: "prompts", label: "Prompt templates" },
   { id: "keys", label: "API keys" },
+  { id: "demos", label: "Demos" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -883,6 +884,83 @@ function ApiKeysTab() {
   );
 }
 
+/* ───────────────────────────── Demos ───────────────────────────── */
+
+interface DemoEntry {
+  id: string;
+  code: string;
+  title: string;
+  subtitle: string;
+  status: string;
+  path: string;
+  bullets: string[];
+}
+const DEMOS: DemoEntry[] = [
+  {
+    id: "pej-evd-01",
+    code: "PEJ-EVD-01 · Module 1",
+    title: "Documenting the scene",
+    subtitle: "Justice-sector training · Project Expedite Justice",
+    status: "v0.1-demo · SME sign-off pending",
+    path: "/platform/demos/pej-evd-01",
+    bullets: [
+      "Task-first rehearsal: six lessons, each opening with a decision under field constraints.",
+      "Routing-under-load, component selection, branching beat, chain audit, Socratic checkpoint, artifact.",
+      "Consequence persists — a leading question taints the account and reappears flagged in the artifact.",
+      "Station result computed from decisions; two equally-weighted streams, partly conjunctive on non-negotiables.",
+    ],
+  },
+  {
+    id: "pej-evd-02",
+    code: "PEJ-EVD-01 · Module 2",
+    title: "Getting the account",
+    subtitle: "Justice-sector training · Project Expedite Justice",
+    status: "v0.1-demo · SME sign-off pending",
+    path: "/platform/demos/pej-evd-02",
+    bullets: [
+      "Seven lessons on taking a witness's account: consent, opening, proportionality, disclosure, preservation.",
+      "Component selection, branching beats, routing, Socratic checkpoint, mechanism-matching, artifact.",
+      "A mid-interview disclosure of ill-treatment must be handled without harm and consent renewed.",
+      "Non-negotiables: informed consent, disclosure handled without harm, testimony preserved before displacement.",
+    ],
+  },
+];
+
+function DemosTab() {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm" style={{ color: "hsl(43 10% 45%)" }}>
+        Interactive demonstration modules. These are self-contained showcases for client and SME review, not tenant courses. Legal content is unverified until SME sign-off.
+      </p>
+      <div className="grid gap-4 md:grid-cols-2">
+        {DEMOS.map((d) => (
+          <Card key={d.id}>
+            <CardHeader>
+              <div className="text-xs font-medium" style={{ color: "hsl(43 10% 45%)" }}>{d.code}</div>
+              <CardTitle className="font-serif">{d.title}</CardTitle>
+              <div className="text-sm" style={{ color: "hsl(43 10% 50%)" }}>{d.subtitle}</div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Badge variant="secondary" className="w-fit">{d.status}</Badge>
+              <ul className="text-sm space-y-1.5" style={{ color: "hsl(43 10% 40%)" }}>
+                {d.bullets.map((b, i) => (
+                  <li key={i} className="flex gap-2">
+                    <span aria-hidden="true" style={{ color: "hsl(222 30% 45%)" }}>•</span>
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href={d.path}>
+                <Button className="w-full">Launch demo →</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ───────────────────────────── Page ───────────────────────────── */
 
 const SECTION_SUBTITLE: Record<TabId, string> = {
@@ -893,6 +971,7 @@ const SECTION_SUBTITLE: Record<TabId, string> = {
   access: "Review and approve inbound access requests.",
   prompts: "Reusable Socratic system-prompt snippets, per organisation.",
   keys: "Programmatic API keys for partner integrations.",
+  demos: "Interactive demonstration modules for client and SME review.",
 };
 
 export function PlatformConsole() {
@@ -940,6 +1019,7 @@ export function PlatformConsole() {
       {tab === "access" && <AccessRequestsTab />}
       {tab === "prompts" && <PromptTemplatesTab />}
       {tab === "keys" && <ApiKeysTab />}
+      {tab === "demos" && <DemosTab />}
 
       <UserDialog user={selected} onClose={() => setSelected(null)} />
     </div>

@@ -61,6 +61,8 @@ import DemoLanding from '@/pages/DemoLanding';
 import K12Landing from '@/pages/K12Landing';
 import { K12Adaptation } from '@/components/K12Adaptation';
 import { PlatformConsole } from '@/pages/PlatformConsole';
+import DemoPEJ from '@/pages/DemoPEJ';
+import DemoPEJ2 from '@/pages/DemoPEJ2';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
 import { CaseBegin } from '@/pages/CaseBegin';
@@ -257,6 +259,9 @@ function Routes() {
         <FocusRoute path="/activities/:activityId/play" component={ActivityPlay} />
         <FocusRoute path="/math-coach/:activityId" component={MathCoach} />
         <FocusRoute path="/live-host/:code" component={LiveHost} />
+        {/* Super-admin demo: PEJ-EVD-01 justice-sector training module (launched from /platform → Demos). */}
+        <FocusRoute path="/platform/demos/pej-evd-01" component={DemoPEJ} />
+        <FocusRoute path="/platform/demos/pej-evd-02" component={DemoPEJ2} />
 
         {/* App layout routes */}
         <ProtectedRoute path="/dashboard" component={Dashboard} />
