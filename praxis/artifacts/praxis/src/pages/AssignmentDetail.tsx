@@ -837,8 +837,10 @@ function StaffGradingPanel({ assignmentId, pointsPossible }: { assignmentId: str
 const FileCheckIcon = () => <CheckCircle className="h-4 w-4 text-primary" />;
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function AssignmentDetail() {
-  const { courseId: routeCourseId, assignmentId } = useParams<{ courseId?: string; assignmentId: string }>();
+export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embedded }: { courseId?: string; assignmentId?: string; embedded?: boolean } = {}) {
+  const params = useParams<{ courseId?: string; assignmentId: string }>();
+  const routeCourseId = pCourseId ?? params.courseId;
+  const assignmentId = pId ?? params.assignmentId;
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const { data: me } = useGetMe();
@@ -969,39 +971,56 @@ export function AssignmentDetail() {
   const MetaIcon = meta.icon;
 
   return (
-    <div className="space-y-6 max-w-3xl mx-auto">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
-        <button onClick={() => navigate('/courses')} className="hover:text-foreground transition-colors">Courses</button>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <button onClick={() => navigate(`/courses/${courseId}?tab=assignments`)} className="hover:text-foreground transition-colors">{course?.title ?? 'Course'}</button>
-        <ChevronRight className="h-3.5 w-3.5" />
-        <span className="text-foreground font-medium">{assignment.title}</span>
-      </div>
-
-      {/* Header */}
-      <div className="flex items-start gap-4">
-        <div className={cn('h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0', 'bg-primary/10')}>
-          <MetaIcon className={cn('h-6 w-6', meta.color)} />
+    <div className={embedded ? 'space-y-5' : 'space-y-6 max-w-3xl mx-auto'}>
+      {/* Breadcrumb (hidden when embedded inside a module) */}
+      {!embedded && (
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground flex-wrap">
+          <button onClick={() => navigate('/courses')} className="hover:text-foreground transition-colors">Courses</button>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <button onClick={() => navigate(`/courses/${courseId}?tab=assignments`)} className="hover:text-foreground transition-colors">{course?.title ?? 'Course'}</button>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span className="text-foreground font-medium">{assignment.title}</span>
         </div>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold">{assignment.title}</h1>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <Badge variant="outline" className="gap-1.5">
-              <MetaIcon className={cn('h-3 w-3', meta.color)} /> {meta.label}
+      )}
+
+      {/* Header. Embedded in a module the card already shows the title, so show only a compact meta row. */}
+      {embedded ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="gap-1.5"><MetaIcon className={cn('h-3 w-3', meta.color)} /> {meta.label}</Badge>
+          <Badge variant="outline">{assignment.pointsPossible} pts</Badge>
+          {assignment.dueDate && (
+            <Badge variant={overdue ? 'destructive' : 'outline'} className="gap-1">
+              {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+              {overdue ? 'Overdue · ' : 'Due '}{formatDate(assignment.dueDate)}
             </Badge>
-            <Badge variant="outline">{assignment.pointsPossible} pts</Badge>
-            {assignment.dueDate && (
-              <Badge variant={overdue ? 'destructive' : 'outline'} className="gap-1">
-                {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
-                {overdue ? 'Overdue · ' : 'Due '}{formatDate(assignment.dueDate)}
+          )}
+          {graded && <Badge className="bg-emerald-600">Graded</Badge>}
+          {submitted && <Badge variant="secondary">Submitted · Awaiting grade</Badge>}
+        </div>
+      ) : (
+        <div className="flex items-start gap-4">
+          <div className={cn('h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0', 'bg-primary/10')}>
+            <MetaIcon className={cn('h-6 w-6', meta.color)} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold">{assignment.title}</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <Badge variant="outline" className="gap-1.5">
+                <MetaIcon className={cn('h-3 w-3', meta.color)} /> {meta.label}
               </Badge>
-            )}
-            {graded && <Badge className="bg-emerald-600">Graded</Badge>}
-            {submitted && <Badge variant="secondary">Submitted · Awaiting grade</Badge>}
+              <Badge variant="outline">{assignment.pointsPossible} pts</Badge>
+              {assignment.dueDate && (
+                <Badge variant={overdue ? 'destructive' : 'outline'} className="gap-1">
+                  {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                  {overdue ? 'Overdue · ' : 'Due '}{formatDate(assignment.dueDate)}
+                </Badge>
+              )}
+              {graded && <Badge className="bg-emerald-600">Graded</Badge>}
+              {submitted && <Badge variant="secondary">Submitted · Awaiting grade</Badge>}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/*
         Single-column flow. The task (description + instructions, both short) sits at the top;
@@ -1012,7 +1031,7 @@ export function AssignmentDetail() {
       <div className="space-y-5">
           {/* Task: description + instructions, compact and side by side on wide screens */}
           {(assignment.description || (assignment.instructions && !config)) && (
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className={cn('grid gap-4', !embedded && 'md:grid-cols-2')}>
               {assignment.description && (
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-base">Description</CardTitle></CardHeader>

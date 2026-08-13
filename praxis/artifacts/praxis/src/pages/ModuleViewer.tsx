@@ -32,6 +32,8 @@ import { RichTextEditor, BulletStyleBar, BulletIcon, objectivesHtmlToItems, item
 import { renderActivity, type InteractionType, type ActivitySpec } from '@/lib/activityTemplates';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { ActivityPlayer, type ActivityPlayerHandleResult } from '@/components/ActivityPlayer';
+import { DiscussionThread } from '@/pages/DiscussionThread';
+import { AssignmentDetail } from '@/pages/AssignmentDetail';
 import {
   ChevronLeft, ChevronRight, ChevronDown, CheckCircle, BookOpen, List, Pencil,
   MessageSquare, LayoutGrid, BarChart2, Play, HelpCircle,
@@ -3001,7 +3003,7 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
 // An activity played INLINE inside the module (no navigation to a separate page). Shows the cover
 // image, instructions, the interactive player, and — if attached — the rubric, all in one card.
 function EmbeddedActivity({ a }: { a: any }) {
-  const [openState, setOpenState] = useState(true);
+  const [openState, setOpenState] = useState(false);
   const [done, setDone] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const submit = useMutation({
@@ -3041,6 +3043,44 @@ function EmbeddedActivity({ a }: { a: any }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// A discussion embedded inline in the module: expand to read + take part with the AI coach, no page nav.
+function EmbeddedDiscussion({ courseId, d, isInstructor, onDelete }: { courseId: string; d: any; isInstructor: boolean; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center gap-2 p-4">
+        <button onClick={() => setOpen((v) => !v)} className="flex-1 min-w-0 flex items-center gap-3 text-left">
+          <MessageSquare className="h-4 w-4 text-blue-600 shrink-0" />
+          <span className="flex-1 text-sm font-medium truncate">{d.title}</span>
+          <span className="text-xs text-muted-foreground shrink-0">{d.replyCount ?? 0} repl{(d.replyCount ?? 0) === 1 ? 'y' : 'ies'}</span>
+          <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', open ? '' : '-rotate-90')} />
+        </button>
+        {isInstructor && <Button size="sm" variant="ghost" className="text-rose-500 shrink-0" title="Delete discussion" onClick={onDelete}><Trash2 className="h-4 w-4" /></Button>}
+      </div>
+      {open && <div className="border-t border-border px-4 py-4"><DiscussionThread courseId={courseId} discussionId={d.id} embedded /></div>}
+    </div>
+  );
+}
+
+// An assessment embedded inline in the module: expand to complete it without navigating away.
+function EmbeddedAssessment({ courseId, a }: { courseId: string; a: any }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-3 p-4 text-left">
+        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium truncate">{a.title}</div>
+          {a.dueDate && <div className="text-xs text-muted-foreground">Due {new Date(a.dueDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</div>}
+        </div>
+        <span className="text-xs text-muted-foreground shrink-0">{a.pointsPossible ?? 0} pts</span>
+        <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', open ? '' : '-rotate-90')} />
+      </button>
+      {open && <div className="border-t border-border px-4 py-4"><AssignmentDetail courseId={courseId} assignmentId={a.id} embedded /></div>}
     </div>
   );
 }
@@ -4497,20 +4537,8 @@ function ModuleHubView({
             {(discussions && discussions.length > 0) ? (
               <div className="space-y-2">
                 {discussions.map((d) => (
-                  <div key={d.id} className="flex items-center gap-2">
-                    <button onClick={() => navigate(`/courses/${courseId}/discussions/${d.id}`)}
-                      className="flex-1 min-w-0 flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
-                      <MessageSquare className="h-4 w-4 text-blue-600 shrink-0" />
-                      <span className="flex-1 text-sm font-medium truncate">{d.title}</span>
-                      <span className="text-xs text-muted-foreground shrink-0">{d.replyCount ?? 0} repl{(d.replyCount ?? 0) === 1 ? 'y' : 'ies'}</span>
-                    </button>
-                    {isInstructor && (
-                      <Button size="sm" variant="ghost" className="text-rose-500 shrink-0" title="Delete discussion"
-                        onClick={() => { if (window.confirm(`Delete "${d.title}" and all its replies? This cannot be undone.`)) delDiscussion.mutate(d.id); }}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                  <EmbeddedDiscussion key={d.id} courseId={courseId} d={d} isInstructor={isInstructor}
+                    onDelete={() => { if (window.confirm(`Delete "${d.title}" and all its replies? This cannot be undone.`)) delDiscussion.mutate(d.id); }} />
                 ))}
               </div>
             ) : (
@@ -4544,16 +4572,7 @@ function ModuleHubView({
                 <Instruction>Open an assessment to read the full brief, then type your response or upload a file. You'll see your grade and feedback here once it's marked.</Instruction>
                 <div className="space-y-2">
                   {moduleAssignments.map((a) => (
-                    <button key={a.id} onClick={() => navigate(`/courses/${courseId}/assignments/${a.id}`)}
-                      className="w-full flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
-                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{a.title}</div>
-                        {a.dueDate && <div className="text-xs text-muted-foreground">Due {new Date(a.dueDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</div>}
-                      </div>
-                      <span className="text-xs text-muted-foreground shrink-0">{a.pointsPossible ?? 0} pts</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </button>
+                    <EmbeddedAssessment key={a.id} courseId={courseId} a={a} />
                   ))}
                 </div>
               </>

@@ -31,8 +31,10 @@ const LANGS: { code: string; label: string }[] = [
   { code: 'af', label: 'Afrikaans' },
 ];
 
-export function DiscussionThread() {
-  const { courseId, discussionId } = useParams<{ courseId: string; discussionId: string }>();
+export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embedded }: { courseId?: string; discussionId?: string; embedded?: boolean } = {}) {
+  const params = useParams<{ courseId: string; discussionId: string }>();
+  const courseId = pCourseId ?? params.courseId;
+  const discussionId = pId ?? params.discussionId;
   // useLocation was imported but never destructured here; navigate is needed after a delete.
   const [, navigate] = useLocation();
   const [replyText, setReplyText] = useState('');
@@ -109,15 +111,17 @@ export function DiscussionThread() {
   const okToPost = words >= minW && words <= maxW;
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <a href="/courses" className="hover:text-foreground">Courses</a>
-        <ChevronRight className="h-4 w-4" />
-        <a href={`/courses/${courseId}?tab=discussions`} className="hover:text-foreground">{course?.title ?? 'Course'}</a>
-        <ChevronRight className="h-4 w-4" />
-        <span className="text-foreground truncate max-w-xs">{discussion.title}</span>
-      </div>
+    <div className={embedded ? 'space-y-5' : 'space-y-6 max-w-4xl'}>
+      {/* Breadcrumb (hidden when embedded inside a module) */}
+      {!embedded && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <a href="/courses" className="hover:text-foreground">Courses</a>
+          <ChevronRight className="h-4 w-4" />
+          <a href={`/courses/${courseId}?tab=discussions`} className="hover:text-foreground">{course?.title ?? 'Course'}</a>
+          <ChevronRight className="h-4 w-4" />
+          <span className="text-foreground truncate max-w-xs">{discussion.title}</span>
+        </div>
+      )}
 
       {/* Original post */}
       <Card>

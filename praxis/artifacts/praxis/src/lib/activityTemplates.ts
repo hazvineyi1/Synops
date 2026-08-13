@@ -93,8 +93,8 @@ const BASE = `<style>
   .ax-chip{font-size:13px;background:#f1f5f9;border-radius:999px;padding:4px 10px}
   .ax-bar{height:8px;background:#e2e8f0;border-radius:6px;overflow:hidden;margin:10px 0}
   .ax-bar>i{display:block;height:100%;background:#4f46e5;width:0;transition:width .3s}
-  .ax-q{font-weight:600;font-size:17px;margin:8px 0 10px}
-  .ax-btn{display:block;width:100%;text-align:left;margin:6px 0;padding:9px 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;font-size:15px;cursor:pointer}
+  .ax-q{font-weight:600;font-size:16px;margin:6px 0 8px}
+  .ax-btn{display:block;width:100%;text-align:left;margin:5px 0;padding:8px 10px;border:1px solid #cbd5e1;border-radius:9px;background:#fff;font-size:14px;line-height:1.35;cursor:pointer}
   .ax-btn:hover{border-color:#94a3b8}
   .ax-btn.ok{border-color:#16a34a;background:#f0fdf4}
   .ax-btn.no{border-color:#dc2626;background:#fef2f2}
