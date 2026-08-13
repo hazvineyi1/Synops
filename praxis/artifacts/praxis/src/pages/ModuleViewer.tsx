@@ -3246,7 +3246,7 @@ function parseClock(v: string): number {
 
 function CheckpointEditor({ beatId }: { beatId: string }) {
   const qc = useQueryClient();
-  const { data: questions = [] } = useQuery<{ id: string; videoTimestamp: number; stem: string }[]>({
+  const { data: questions = [] } = useQuery<{ id: string; videoTimestamp: number; stem: string; options?: { id: string; text: string }[]; correctOptionIds?: string[]; feedbackCorrect?: string | null }[]>({
     queryKey: ['iv-questions', beatId], queryFn: () => apiFetch(`/beats/${beatId}/interactive-questions`), enabled: !!beatId,
   });
   const [open, setOpen] = useState(false);
@@ -3258,8 +3258,20 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
   const [busy, setBusy] = useState(false);
   const [genBusy, setGenBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const reset = () => { setTs('0:30'); setStem(''); setOpts(['', '', '', '']); setCorrect(0); setFb(''); };
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const reset = () => { setTs('0:30'); setStem(''); setOpts(['', '', '', '']); setCorrect(0); setFb(''); setEditingId(null); };
   const refresh = () => qc.invalidateQueries({ queryKey: ['iv-questions', beatId] });
+  const startEdit = (q: { id: string; videoTimestamp: number; stem: string; options?: { id: string; text: string }[]; correctOptionIds?: string[]; feedbackCorrect?: string | null }) => {
+    setTs(`${Math.floor(q.videoTimestamp / 60)}:${String(Math.floor(q.videoTimestamp % 60)).padStart(2, '0')}`);
+    setStem(q.stem);
+    const texts = (q.options ?? []).map((o) => o.text);
+    while (texts.length < 4) texts.push('');
+    setOpts(texts);
+    const ci = q.correctOptionIds?.[0] ? (q.options ?? []).findIndex((o) => o.id === q.correctOptionIds![0]) : 0;
+    setCorrect(ci >= 0 ? ci : 0);
+    setFb(q.feedbackCorrect ?? '');
+    setEditingId(q.id); setErr(null); setOpen(true);
+  };
 
   const add = async () => {
     setErr(null);
@@ -3268,11 +3280,16 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
     if (filled.length < 2) { setErr('Add at least two options.'); return; }
     if (!opts[correct]?.trim()) { setErr('The option marked correct is empty — fill it in or pick another as correct.'); return; }
     setBusy(true);
+    const payload = {
+      videoTimestamp: parseClock(ts), questionType: 'multiple_choice', stem: stem.trim(),
+      options: filled, correctOptionIds: [`o${correct}`], feedbackCorrect: fb || null, pauseOnReach: true, points: 1,
+    };
     try {
-      await apiFetch(`/beats/${beatId}/interactive-questions`, { method: 'POST', body: JSON.stringify({
-        videoTimestamp: parseClock(ts), questionType: 'multiple_choice', stem: stem.trim(),
-        options: filled, correctOptionIds: [`o${correct}`], feedbackCorrect: fb || null, pauseOnReach: true, points: 1,
-      }) });
+      if (editingId) {
+        await apiFetch(`/interactive-questions/${editingId}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      } else {
+        await apiFetch(`/beats/${beatId}/interactive-questions`, { method: 'POST', body: JSON.stringify(payload) });
+      }
       reset(); setOpen(false); refresh();
     } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save the checkpoint.'); }
     finally { setBusy(false); }
@@ -3291,9 +3308,10 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
       {questions.length > 0 && (
         <ul className="space-y-1">
           {questions.sort((a, b) => a.videoTimestamp - b.videoTimestamp).map((q) => (
-            <li key={q.id} className="flex items-center gap-2 text-xs bg-background rounded px-2 py-1.5 border">
+            <li key={q.id} className={cn("flex items-center gap-2 text-xs bg-background rounded px-2 py-1.5 border", editingId === q.id && "ring-1 ring-primary")}>
               <span className="font-mono text-[11px] text-primary shrink-0">{Math.floor(q.videoTimestamp / 60)}:{String(Math.floor(q.videoTimestamp % 60)).padStart(2, '0')}</span>
               <span className="flex-1 truncate">{q.stem}</span>
+              <button onClick={() => startEdit(q)} className="text-primary hover:underline shrink-0">Edit</button>
               <button onClick={() => del(q.id)} className="text-red-500 hover:text-red-700 shrink-0">Remove</button>
             </li>
           ))}
@@ -3307,6 +3325,7 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
         </div>
       ) : (
         <div className="space-y-2 bg-background rounded-lg border p-2.5">
+          {editingId && <div className="text-[11px] font-medium text-primary">Editing checkpoint</div>}
           <div className="flex gap-2">
             <label className="text-[11px] text-muted-foreground">At (m:ss)
               <input value={ts} onChange={(e) => setTs(e.target.value.replace(/[^0-9:]/g, ''))} placeholder="2:55" className="mt-0.5 h-8 w-24 rounded border border-input bg-background px-2 text-sm" /></label>
@@ -3324,7 +3343,7 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
           ))}
           <input value={fb} onChange={(e) => setFb(e.target.value)} placeholder="Feedback when correct (optional)" className="h-8 w-full rounded border border-input bg-background px-2 text-sm" />
           <div className="flex gap-2">
-            <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={add}>Save checkpoint</Button>
+            <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={add}>{editingId ? 'Save changes' : 'Save checkpoint'}</Button>
             <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setOpen(false); reset(); }}>Cancel</Button>
           </div>
         </div>
