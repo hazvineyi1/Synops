@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ActivityPlayer } from "@/components/ActivityPlayer";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { apiFetch } from "@/lib/api";
 import { activitiesApi, type Activity } from "@/lib/activitiesApi";
 import {
   TEMPLATES, emptySpec, validateSpec, renderActivity,
@@ -103,8 +104,8 @@ export function ActivityBuilder({ onClose, onCreated, activity }: { onClose: () 
 
             <div className="border-t pt-3">
               {type === "quiz" && <QuizForm spec={spec} patch={patch} />}
-              {type === "flashcards" && <PairForm spec={spec} patch={patch} field="cards" a="front" b="back" labelA="Front (prompt)" labelB="Back (answer)" addLabel="card" rich />}
-              {type === "matching" && <PairForm spec={spec} patch={patch} field="pairs" a="left" b="right" labelA="Item" labelB="Its match" addLabel="pair" />}
+              {type === "flashcards" && <PairForm spec={spec} patch={patch} field="cards" a="front" b="back" labelA="Front (prompt)" labelB="Back (answer)" addLabel="card" rich imageField="img" />}
+              {type === "matching" && <PairForm spec={spec} patch={patch} field="pairs" a="left" b="right" labelA="Item" labelB="Its match" addLabel="pair" rich />}
               {type === "order" && <OrderForm spec={spec} patch={patch} />}
               {type === "categorize" && <CategorizeForm spec={spec} patch={patch} />}
             </div>
@@ -122,6 +123,34 @@ export function ActivityBuilder({ onClose, onCreated, activity }: { onClose: () 
     </div>
   );
 }
+
+/* ── Per-item image control: paste a URL or generate a photorealistic one from a prompt. ── */
+function ItemImage({ url, onChange, prompt }: { url?: string; onChange: (u: string) => void; prompt: string }) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="rounded-md border border-dashed p-2 space-y-1.5">
+      {url ? (
+        <div className="relative">
+          <img src={url} alt="" className="h-20 w-full object-cover rounded" />
+          <button type="button" onClick={() => onChange("")} className="absolute top-1 right-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white">Clear</button>
+        </div>
+      ) : null}
+      <div className="flex gap-1.5">
+        <Input value={url ?? ""} onChange={(e) => onChange(e.target.value)} placeholder="Image URL, or generate →" className="h-8 text-xs" />
+        <Button type="button" size="sm" variant="outline" className="h-8 shrink-0" disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            try { const r = await apiFetch<{ imageUrl: string }>("/activities/generate-image", { method: "POST", body: JSON.stringify({ title: prompt }) }); if (r.imageUrl) onChange(r.imageUrl); }
+            catch (e) { toast({ title: "Could not generate image", description: e instanceof Error ? e.message : "", variant: "destructive" }); }
+            finally { setBusy(false); }
+          }}>{busy ? "…" : "Generate"}</Button>
+      </div>
+    </div>
+  );
+}
+
+const stripTags = (h?: string) => (h ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
 /* ── Per-type content forms ── */
 function Row({ children, onRemove }: { children: React.ReactNode; onRemove?: () => void }) {
@@ -145,6 +174,7 @@ function QuizForm({ spec, patch }: { spec: any; patch: (fn: (s: any) => void) =>
           <Row onRemove={spec.questions.length > 1 ? () => patch((s) => s.questions.splice(qi, 1)) : undefined}>
             <Label className="text-xs text-muted-foreground">Question {qi + 1}</Label>
             <RichTextEditor key={`q${nQ}:${qi}`} value={q.q} onChange={(h) => patch((s) => { s.questions[qi].q = h; })} />
+            <div className="mt-1"><ItemImage url={q.img} prompt={stripTags(q.q) || "quiz question"} onChange={(u) => patch((s) => { s.questions[qi].img = u || undefined; })} /></div>
           </Row>
           <div className="pl-1 space-y-2">
             <Label className="text-xs text-muted-foreground">Answers (select the correct one)</Label>
@@ -166,7 +196,7 @@ function QuizForm({ spec, patch }: { spec: any; patch: (fn: (s: any) => void) =>
   );
 }
 
-function PairForm({ spec, patch, field, a, b, labelA, labelB, addLabel, rich }: { spec: any; patch: (fn: (s: any) => void) => void; field: string; a: string; b: string; labelA: string; labelB: string; addLabel: string; rich?: boolean }) {
+function PairForm({ spec, patch, field, a, b, labelA, labelB, addLabel, rich, imageField }: { spec: any; patch: (fn: (s: any) => void) => void; field: string; a: string; b: string; labelA: string; labelB: string; addLabel: string; rich?: boolean; imageField?: string }) {
   const rows = spec[field] as any[];
   return (
     <div className={rich ? "space-y-4" : "space-y-2"}>
@@ -176,6 +206,9 @@ function PairForm({ spec, patch, field, a, b, labelA, labelB, addLabel, rich }: 
             <div className="space-y-2 rounded-lg border p-3">
               <div><Label className="text-xs text-muted-foreground">{labelA}</Label><RichTextEditor key={`${field}${rows.length}:a:${i}`} value={row[a]} onChange={(h) => patch((s) => { s[field][i][a] = h; })} /></div>
               <div><Label className="text-xs text-muted-foreground">{labelB}</Label><RichTextEditor key={`${field}${rows.length}:b:${i}`} value={row[b]} onChange={(h) => patch((s) => { s[field][i][b] = h; })} /></div>
+              {imageField && (
+                <div><Label className="text-xs text-muted-foreground">Image (optional)</Label><ItemImage url={row[imageField]} prompt={stripTags(row[a]) || "flashcard"} onChange={(u) => patch((s) => { s[field][i][imageField] = u || undefined; })} /></div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
@@ -196,8 +229,8 @@ function OrderForm({ spec, patch }: { spec: any; patch: (fn: (s: any) => void) =
       <p className="text-xs text-muted-foreground">Enter the steps in the CORRECT order, learners will see them shuffled.</p>
       {spec.items.map((it: string, i: number) => (
         <Row key={i} onRemove={spec.items.length > 2 ? () => patch((s) => s.items.splice(i, 1)) : undefined}>
-          <div className="flex items-center gap-2"><span className="text-xs w-5 text-muted-foreground">{i + 1}.</span>
-            <Input value={it} placeholder={`Step ${i + 1}`} onChange={(e) => patch((s) => { s.items[i] = e.target.value; })} /></div>
+          <div className="flex items-start gap-2"><span className="text-xs w-5 mt-2 text-muted-foreground">{i + 1}.</span>
+            <div className="flex-1"><RichTextEditor key={`step${spec.items.length}:${i}`} value={it} onChange={(h) => patch((s) => { s.items[i] = h; })} /></div></div>
         </Row>
       ))}
       <AddBtn onClick={() => patch((s) => s.items.push(""))} label="step" />
@@ -225,11 +258,11 @@ function CategorizeForm({ spec, patch }: { spec: any; patch: (fn: (s: any) => vo
         <div className="space-y-1.5 mt-1">
           {spec.items.map((it: any, i: number) => (
             <Row key={i} onRemove={spec.items.length > 1 ? () => patch((s) => s.items.splice(i, 1)) : undefined}>
-              <div className="grid grid-cols-2 gap-2">
-                <Input value={it.text} placeholder="Item" onChange={(e) => patch((s) => { s.items[i].text = e.target.value; })} />
-                <select value={it.bucket} onChange={(e) => patch((s) => { s.items[i].bucket = e.target.value; })} className="rounded-md border border-input bg-background px-2 py-2 text-sm">
-                  <option value="">Bucket…</option>
-                  {buckets.filter((b) => b.trim()).map((b, k) => <option key={k} value={b}>{b}</option>)}
+              <div className="space-y-1.5">
+                <RichTextEditor key={`item${spec.items.length}:${i}`} value={it.text} onChange={(h) => patch((s) => { s.items[i].text = h; })} />
+                <select value={it.bucket} onChange={(e) => patch((s) => { s.items[i].bucket = e.target.value; })} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm">
+                  <option value="">Which bucket?…</option>
+                  {buckets.filter((b) => b.trim()).map((b, k) => <option key={k} value={b}>{stripTags(b) || b}</option>)}
                 </select>
               </div>
             </Row>
