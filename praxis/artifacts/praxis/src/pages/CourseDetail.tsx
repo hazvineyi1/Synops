@@ -25,6 +25,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ObjectivesEditor } from '@/components/ObjectivesEditor';
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { ActivityPlayer } from '@/components/ActivityPlayer';
+import { activitiesApi } from '@/lib/activitiesApi';
+import { renderActivity, type InteractionType, type ActivitySpec } from '@/lib/activityTemplates';
 
 /**
  * Shared shell for the small instructor "create X" forms on this page.
@@ -1801,6 +1803,143 @@ function GenerateAllReadings({ modules }: { modules?: { id: string; title: strin
   );
 }
 
+// Build page: bulk-generate coursework from each module's content. The instructor sets how many
+// activities / case studies / discussions per module, picks interaction types and rigor for the
+// activities, and one click generates them across every module (grounded in that module's readings).
+const ACT_TYPES: { id: string; label: string }[] = [
+  { id: 'quiz', label: 'Quiz' }, { id: 'flashcards', label: 'Flashcards' }, { id: 'matching', label: 'Matching' },
+  { id: 'order', label: 'Ordering' }, { id: 'categorize', label: 'Categorize' },
+];
+const BLOOMS = ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create'];
+function GenerateCoursework({ courseId, modules }: { courseId: string; modules?: { id: string; title: string }[] }) {
+  const qc = useQueryClient();
+  const [actCount, setActCount] = useState(2);
+  const [types, setTypes] = useState<Set<string>>(() => new Set(ACT_TYPES.map((t) => t.id)));
+  const [bloom, setBloom] = useState('mixed');
+  const [difficulty, setDifficulty] = useState('mixed');
+  const [caseCount, setCaseCount] = useState(1);
+  const [discCount, setDiscCount] = useState(2);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [log, setLog] = useState<string[]>([]);
+  const toggleType = (id: string) => setTypes((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const gather = async (moduleId: string) => {
+    const list = await apiFetch<{ id: string; hasContent: boolean }[]>(`/modules/${moduleId}/readings`).catch(() => []);
+    const parts: string[] = [];
+    for (const r of (list ?? []).filter((x) => x.hasContent)) {
+      try { const full = await apiFetch<{ content: string }>(`/readings/${r.id}`); if (full.content) parts.push(full.content); } catch { /* skip */ }
+    }
+    return parts.join('\n\n').trim();
+  };
+
+  const run = async () => {
+    const mods = modules ?? [];
+    if (!mods.length) { setError('This course has no modules yet.'); return; }
+    if (actCount === 0 && caseCount === 0 && discCount === 0) { setError('Choose at least one thing to generate.'); return; }
+    if (actCount > 0 && types.size === 0) { setError('Pick at least one activity type.'); return; }
+    setRunning(true); setError(null); setLog([]);
+    const notes: string[] = [];
+    for (let i = 0; i < mods.length; i++) {
+      const m = mods[i];
+      setProgress(`Module ${i + 1} of ${mods.length}: ${m.title}`);
+      const content = await gather(m.id);
+      // Activities (from the module's readings) -> rendered interactive, attached + published.
+      if (actCount > 0) {
+        if (content.length < 80) { notes.push(`${m.title}: no reading content for activities`); }
+        else {
+          try {
+            const body: Record<string, unknown> = { content: content.slice(0, 12000), count: actCount, types: [...types] };
+            if (bloom !== 'mixed') body.targetBloom = bloom;
+            if (difficulty !== 'mixed') body.targetDifficulty = difficulty;
+            const { activities } = await apiFetch<{ activities: { type: string; title: string; instructions: string; bloomsLevel: string; difficulty: string; spec: unknown }[] }>(`/activities/generate`, { method: 'POST', body: JSON.stringify(body) });
+            let made = 0;
+            for (const a of activities ?? []) {
+              try {
+                const html = renderActivity(a.type as InteractionType, a.spec as ActivitySpec);
+                if (!html) continue;
+                await activitiesApi.create({ title: a.title, instructions: a.instructions || undefined, source: 'html', html, kind: 'game', bloomsLevel: a.bloomsLevel || null, difficulty: a.difficulty || null, published: true, courseId, moduleId: m.id });
+                made++;
+              } catch { /* skip one */ }
+            }
+            qc.invalidateQueries({ queryKey: ['module-activities', m.id] });
+            if (!made) notes.push(`${m.title}: activities failed`);
+          } catch { notes.push(`${m.title}: activities failed`); }
+        }
+      }
+      // Case studies -> one draft per requested count.
+      for (let c = 0; c < caseCount; c++) {
+        try { await apiFetch(`/modules/${m.id}/cases/generate`, { method: 'POST', body: JSON.stringify({}) }); }
+        catch { notes.push(`${m.title}: case ${c + 1} failed`); }
+      }
+      if (caseCount > 0) qc.invalidateQueries({ queryKey: ['module-cases', m.id] });
+      // Discussions.
+      if (discCount > 0) {
+        try { await apiFetch(`/modules/${m.id}/discussions/generate`, { method: 'POST', body: JSON.stringify({ count: discCount }) }); }
+        catch { notes.push(`${m.title}: discussions failed`); }
+      }
+    }
+    setLog(notes);
+    setProgress(notes.length ? `Done, with ${notes.length} item(s) to review below.` : `Done. Coursework generated across ${mods.length} module${mods.length === 1 ? '' : 's'}.`);
+    setRunning(false);
+  };
+
+  const Num = ({ value, set, max }: { value: number; set: (n: number) => void; max: number }) => (
+    <select value={value} onChange={(e) => set(Number(e.target.value))} disabled={running}
+      className="rounded-md border border-input bg-background px-2 py-1.5 text-sm">
+      {Array.from({ length: max + 1 }, (_, n) => <option key={n} value={n}>{n}</option>)}
+    </select>
+  );
+
+  return (
+    <div className="rounded-lg border border-dashed border-primary/30 p-4 space-y-4">
+      <div>
+        <p className="text-sm font-semibold">Generate coursework for every module</p>
+        <p className="text-xs text-muted-foreground">Builds activities, case studies and discussions from each module's own reading content. Runs one module at a time.</p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm font-medium"><Play className="h-3.5 w-3.5 text-primary" /> Activities / module <Num value={actCount} set={setActCount} max={4} /></label>
+          {actCount > 0 && (
+            <div className="space-y-2 rounded-md bg-muted/40 p-2">
+              <div className="flex flex-wrap gap-1">
+                {ACT_TYPES.map((t) => (
+                  <button key={t.id} type="button" onClick={() => toggleType(t.id)} disabled={running}
+                    className={cn('rounded-full px-2 py-0.5 text-[11px] border', types.has(t.id) ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground')}>{t.label}</button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="text-muted-foreground">Rigor</span>
+                <select value={bloom} onChange={(e) => setBloom(e.target.value)} disabled={running} className="rounded border border-input bg-background px-1.5 py-1">
+                  <option value="mixed">Mixed Bloom's</option>
+                  {BLOOMS.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} disabled={running} className="rounded border border-input bg-background px-1.5 py-1">
+                  <option value="mixed">Mixed difficulty</option>
+                  <option value="foundational">Foundational</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+        <label className="flex items-start gap-2 text-sm font-medium"><FileText className="h-3.5 w-3.5 text-primary mt-1" /> Case studies / module <Num value={caseCount} set={setCaseCount} max={3} /></label>
+        <label className="flex items-start gap-2 text-sm font-medium"><MessageSquare className="h-3.5 w-3.5 text-primary mt-1" /> Discussions / module <Num value={discCount} set={setDiscCount} max={5} /></label>
+      </div>
+
+      {progress && <p className="text-xs text-muted-foreground">{progress}</p>}
+      {error && <p className="text-xs text-rose-600">{error}</p>}
+      {log.length > 0 && <ul className="text-xs text-amber-600 list-disc pl-4 space-y-0.5">{log.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+      <div className="flex justify-end">
+        <Button size="sm" disabled={running} onClick={run}>{running ? 'Generating…' : 'Generate coursework for all modules'}</Button>
+      </div>
+    </div>
+  );
+}
+
 function HeadingStyleBar({ style, onChange }: { style: { color?: string; size?: string }; onChange: (s: { color?: string; size?: string }) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2 py-1.5">
@@ -2566,13 +2705,24 @@ export function CourseDetail() {
               </section>
             )}
 
+            {/* Generate activities, case studies and discussions for every module from its content. */}
+            {(modules?.length ?? 0) > 0 && (
+              <section className="space-y-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 5 · Coursework</p>
+                  <p className="text-sm text-muted-foreground">Choose how many activities, case studies and discussions each module should have, and generate them from the content.</p>
+                </div>
+                <GenerateCoursework courseId={courseId} modules={modules} />
+              </section>
+            )}
+
             {/* Publish -- assign to partners, only relevant at the end. (The Modules/Activities/
                 Assignments/Cases/Pages tabs at the top of the page are the build surface, so a
                 duplicate row of buttons here was redundant and has been removed.) */}
             {role === 'super_admin' && (
               <section className="space-y-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 5 · Publish</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 6 · Publish</p>
                   <p className="text-sm text-muted-foreground">When the course is ready, assign it to the partners who should deliver it.</p>
                 </div>
                 <AssignPartnersCard courseId={courseId} />

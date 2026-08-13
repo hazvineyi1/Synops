@@ -123,6 +123,8 @@ router.post("/modules/:moduleId/discussions/generate", requireAuth, requireCoFac
     return;
   }
 
+  const wantRaw = Number((req.body as { count?: number } | undefined)?.count);
+  const want = Number.isFinite(wantRaw) ? Math.max(1, Math.min(6, Math.round(wantRaw))) : 4;
   const topic = `${mod.title}. ${mod.description ?? ""}`.slice(0, 400);
   try {
     const message = await anthropic.messages.create({
@@ -130,7 +132,7 @@ router.post("/modules/:moduleId/discussions/generate", requireAuth, requireCoFac
       max_tokens: 1600,
       messages: [{
         role: "user",
-        content: `You are curating DISCUSSION questions for an online course module from its reading.\n\nModule: ${topic}\n\nFrom the reading below, pull out the reflective / open-ended / opinion / "explain why" / "which would you choose" style questions that make good peer DISCUSSION (not quiz questions with one right answer, and not self-rating checklists). Rewrite each as a clear, engaging discussion prompt of 1-2 sentences. Return 2 to 5 of the best.\n\nReply with ONLY strict JSON, no prose:\n{ "discussions": [ { "title": "short thread title (<=8 words)", "prompt": "the discussion prompt" } ] }\n\n=== READING ===\n${corpus.slice(0, 40000)}`,
+        content: `You are curating DISCUSSION questions for an online course module from its reading.\n\nModule: ${topic}\n\nFrom the reading below, pull out the reflective / open-ended / opinion / "explain why" / "which would you choose" style questions that make good peer DISCUSSION (not quiz questions with one right answer, and not self-rating checklists). Rewrite each as a clear, engaging discussion prompt of 1-2 sentences. Return the ${want} best.\n\nReply with ONLY strict JSON, no prose:\n{ "discussions": [ { "title": "short thread title (<=8 words)", "prompt": "the discussion prompt" } ] }\n\n=== READING ===\n${corpus.slice(0, 40000)}`,
       }],
     }, { timeout: 90000, maxRetries: 1 });
     const text = (message.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
@@ -140,7 +142,7 @@ router.post("/modules/:moduleId/discussions/generate", requireAuth, requireCoFac
     const clean = items
       .map((x: any) => ({ title: String(x?.title ?? "").trim().slice(0, 120), prompt: String(x?.prompt ?? "").trim().slice(0, 1000) }))
       .filter((x: any) => x.title && x.prompt)
-      .slice(0, 5);
+      .slice(0, want);
     if (!clean.length) { res.status(422).json({ error: "No discussion questions were found in this module's reading." }); return; }
 
     const created = [];
