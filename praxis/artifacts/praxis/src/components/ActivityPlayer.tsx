@@ -71,8 +71,23 @@ const BASE_STYLES = `
   button { font: inherit; cursor: pointer; }
 </style>`;
 
+// Compact overrides applied AFTER the activity's own baked-in <style>, so they win (later wins) and
+// tighten EXISTING activities too — the templates' CSS is baked into stored HTML at generation time,
+// so changing the template alone never updates activities that were already created. Uses the full
+// iframe width (max-width:100%) so matching/columns get wider → fewer wrapped lines → less scrolling.
+const OVERRIDE_STYLES = `
+<style>
+  .ax{max-width:100%!important}
+  .ax-q{font-size:16px!important;margin:6px 0 8px!important}
+  .ax-btn{font-size:14px!important;line-height:1.35!important;padding:7px 10px!important;margin:5px 0!important}
+  .ax-card{padding:18px 16px!important;min-height:84px!important;font-size:17px!important}
+  .ax-cols{gap:12px!important}
+  .ax-bucket{min-height:56px!important}
+  .ax-inst{margin:0 0 8px!important}
+</style>`;
+
 function buildDoc(html: string): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${BASE_STYLES}${BRIDGE}</head><body>${html}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">${BASE_STYLES}${BRIDGE}</head><body>${html}${OVERRIDE_STYLES}</body></html>`;
 }
 
 export function ActivityPlayer({ html, embedUrl, onSubmit, disabled, className }: Props) {
