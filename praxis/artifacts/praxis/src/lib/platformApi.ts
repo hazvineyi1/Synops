@@ -154,6 +154,12 @@ export type Role =
 export const platformApi = {
   overview: () => req<PlatformOverview>("/platform/overview"),
 
+  seedExecutiveLearning: () =>
+    req<{ created: boolean; partnerId: string; courseId: string; message: string }>(
+      "/platform/seed-executive-learning",
+      { method: "POST" },
+    ),
+
   listUsers: (q = "") =>
     req<PlatformUserRow[]>(`/platform/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
 

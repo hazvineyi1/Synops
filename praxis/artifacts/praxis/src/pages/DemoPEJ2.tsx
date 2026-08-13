@@ -41,7 +41,13 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "wouter";
+
+function exitStation() {
+  if (typeof window !== "undefined") {
+    if (window.history.length > 1) window.history.back();
+    else window.location.href = "/dashboard";
+  }
+}
 
 /* ---------------------------------------------------------------------------
  * TYPES
@@ -268,7 +274,7 @@ export default function DemoPEJ2() {
       <header className="mod-head">
         <div className="mod-head-row">
           <div>
-            <div className="mod-id"><Link href="/platform" className="back-lnk">← Super admin</Link><span className="mod-id-code">PEJ-EVD-01 · Module 2</span></div>
+            <div className="mod-id"><button type="button" className="back-lnk" onClick={exitStation}>← Exit station</button><span className="mod-id-code">PEJ-EVD-01 · Module 2</span></div>
             <h1 className="mod-title">Getting the account</h1>
           </div>
           <div className="mod-meta">
@@ -687,7 +693,7 @@ const CSS = `
 .mod-head{ border:1px solid var(--line); background:var(--card); border-radius:10px; padding:var(--sp); margin-bottom:12px; }
 .mod-head-row{ display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start; }
 .mod-id{ font-size:.8em; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-.back-lnk{ color:var(--accent); text-decoration:none; border:1px solid var(--line); border-radius:6px; padding:2px 8px; text-transform:none; letter-spacing:0; }
+.back-lnk{ color:var(--accent); background:none; font:inherit; cursor:pointer; text-decoration:none; border:1px solid var(--line); border-radius:6px; padding:2px 8px; text-transform:none; letter-spacing:0; }
 .mod-title{ font-family:var(--serif); font-size:1.7em; margin:.1em 0 0; }
 .mod-meta{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
 .mod-task{ margin:.8em 0 0; }

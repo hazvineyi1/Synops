@@ -34,6 +34,7 @@ import { seedGameLibrary } from "../lib/gameLibrarySeed";
 import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
+import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
@@ -1193,6 +1194,22 @@ router.post("/platform/seed-flagship-courses", requireAuth, requireSuperAdmin, a
   try {
     const r = await seedFlagshipCourses();
     await audit(req, "platform.seed_flagship_courses", "partner", "enza", { created: r.created, assigned: r.assigned });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * POST /platform/seed-executive-learning - provisions the partner "Executive Learning" and houses the
+ * Project Expedite Justice interactive training course (PEJ-EVD-01) under it: a partner-owned, published
+ * course with two modules (Documenting the scene, Getting the account), each launching its self-contained
+ * interactive station at /demos/pej-evd-01 and /demos/pej-evd-02. Idempotent - safe to click more than once.
+ */
+router.post("/platform/seed-executive-learning", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await seedExecutiveLearning();
+    await audit(req, "platform.seed_executive_learning", "partner", r.partnerId, { created: r.created, courseId: r.courseId });
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });

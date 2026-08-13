@@ -262,6 +262,9 @@ function Routes() {
         {/* Super-admin demo: PEJ-EVD-01 justice-sector training module (launched from /platform → Demos). */}
         <FocusRoute path="/platform/demos/pej-evd-01" component={DemoPEJ} />
         <FocusRoute path="/platform/demos/pej-evd-02" component={DemoPEJ2} />
+        {/* Neutral paths used by the Executive Learning course modules (launch links). */}
+        <FocusRoute path="/demos/pej-evd-01" component={DemoPEJ} />
+        <FocusRoute path="/demos/pej-evd-02" component={DemoPEJ2} />
 
         {/* App layout routes */}
         <ProtectedRoute path="/dashboard" component={Dashboard} />

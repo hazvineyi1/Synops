@@ -926,12 +926,43 @@ const DEMOS: DemoEntry[] = [
   },
 ];
 
+function ProvisionExecutiveLearning() {
+  const { toast } = useToast();
+  const [result, setResult] = useState<{ partnerId: string; courseId: string; message: string } | null>(null);
+  const seed = useMutation({
+    mutationFn: () => platformApi.seedExecutiveLearning(),
+    onSuccess: (r) => { setResult(r); toast({ title: "Executive Learning provisioned", description: r.message }); },
+    onError: (e: unknown) => toast({ title: "Could not provision", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+  return (
+    <Card className="p-4 space-y-3" style={{ borderColor: "hsl(222 30% 80%)" }}>
+      <div>
+        <p className="font-medium">House these under the <span className="font-serif">Executive Learning</span> partner</p>
+        <p className="text-sm" style={{ color: "hsl(43 10% 45%)" }}>
+          Creates the partner "Executive Learning" (if it does not exist) and a partner-owned, published course
+          "PEJ-EVD-01 · Evidence at the conflict-related crime scene" with both modules housed under it. Each module launches its interactive station. Idempotent.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button onClick={() => seed.mutate()} disabled={seed.isPending}>{seed.isPending ? "Provisioning…" : "Provision under Executive Learning"}</Button>
+        {result && (
+          <Link href={`/courses/${result.courseId}`}>
+            <Button variant="outline">Open the course →</Button>
+          </Link>
+        )}
+      </div>
+      {result && <p className="text-sm" style={{ color: "hsl(145 45% 32%)" }}>{result.message}</p>}
+    </Card>
+  );
+}
+
 function DemosTab() {
   return (
     <div className="space-y-4">
       <p className="text-sm" style={{ color: "hsl(43 10% 45%)" }}>
-        Interactive demonstration modules. These are self-contained showcases for client and SME review, not tenant courses. Legal content is unverified until SME sign-off.
+        Interactive demonstration modules. Provision them under the Executive Learning partner to see them as a real course, or launch a station directly below. Legal content is unverified until SME sign-off.
       </p>
+      <ProvisionExecutiveLearning />
       <div className="grid gap-4 md:grid-cols-2">
         {DEMOS.map((d) => (
           <Card key={d.id}>
