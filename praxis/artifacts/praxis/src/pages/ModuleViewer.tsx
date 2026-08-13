@@ -2197,6 +2197,88 @@ function ReadingBody({ text }: { text: string }) {
   );
 }
 
+// The in-lesson Coach: a floating, always-available guide for this module. It greets the learner,
+// surfaces their current gaps, and holds an adaptive coaching conversation grounded in the lesson
+// content (backed by GET/POST /modules/:id/coach). Available to learners and to staff previewing.
+type CoachMsg = { role: 'user' | 'assistant'; content: string };
+function CoachDock({ moduleId }: { moduleId: string }) {
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [msgs, setMsgs] = useState<CoachMsg[]>([]);
+  const [gaps, setGaps] = useState<string[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setLoaded(false); setMsgs([]); setGaps([]); }, [moduleId]);
+  useEffect(() => {
+    if (!open || loaded) return;
+    setLoaded(true);
+    apiFetch<{ opener: string; gaps: string[] }>(`/modules/${moduleId}/coach`)
+      .then((r) => { setMsgs([{ role: 'assistant', content: r.opener }]); setGaps(r.gaps ?? []); })
+      .catch(() => setMsgs([{ role: 'assistant', content: "Hi — I'm your coach for this lesson. What would you like to work on?" }]));
+  }, [open, loaded, moduleId]);
+  useEffect(() => { scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' }); }, [msgs, busy]);
+
+  const send = async () => {
+    const text = input.trim();
+    if (!text || busy) return;
+    const next: CoachMsg[] = [...msgs, { role: 'user', content: text }];
+    setMsgs(next); setInput(''); setBusy(true);
+    try {
+      const r = await apiFetch<{ reply: string }>(`/modules/${moduleId}/coach`, { method: 'POST', body: JSON.stringify({ messages: next }) });
+      setMsgs((m) => [...m, { role: 'assistant', content: r.reply }]);
+    } catch {
+      setMsgs((m) => [...m, { role: 'assistant', content: "I'm having trouble reaching you right now — please try again in a moment." }]);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <>
+      {!open && (
+        <button onClick={() => setOpen(true)} aria-label="Open your coach"
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-primary px-4 py-3 text-primary-foreground shadow-lg transition-all hover:brightness-105 hover:shadow-xl">
+          <GraduationCap className="h-5 w-5" /><span className="text-sm font-semibold">Coach</span>
+        </button>
+      )}
+      {open && (
+        <div className="fixed bottom-5 right-5 z-40 flex w-[min(92vw,384px)] h-[min(80vh,560px)] flex-col rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary"><GraduationCap className="h-4 w-4" /></span>
+              <div className="leading-tight">
+                <p className="font-serif font-semibold text-sm">Your Coach</p>
+                <p className="text-[11px] text-muted-foreground">Expert on this lesson · adapts to you</p>
+              </div>
+            </div>
+            <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground" aria-label="Close coach"><X className="h-4 w-4" /></button>
+          </div>
+          {gaps.length > 0 && (
+            <div className="px-4 py-2 border-b border-border/60">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Where you are</p>
+              <div className="flex flex-wrap gap-1">
+                {gaps.map((g, i) => <span key={i} className="rounded-full bg-amber-500/10 text-amber-700 border border-amber-500/30 px-2 py-0.5 text-[11px]">{g}</span>)}
+              </div>
+            </div>
+          )}
+          <div ref={scroller} className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5">
+            {msgs.map((m, i) => (
+              <div key={i} className={cn('max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap',
+                m.role === 'user' ? 'ml-auto bg-primary text-primary-foreground' : 'bg-muted text-foreground')}>{m.content}</div>
+            ))}
+            {busy && <div className="bg-muted rounded-2xl px-3 py-2 text-sm text-muted-foreground w-fit">Thinking…</div>}
+          </div>
+          <div className="border-t border-border p-2 flex items-center gap-2">
+            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+              placeholder="Ask your coach…" className="flex-1 rounded-full border border-input bg-background px-3.5 py-2 text-sm" />
+            <Button size="sm" className="rounded-full px-4" disabled={busy || !input.trim()} onClick={send}>Send</Button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // Instructor: find current videos and articles online (web search) relevant to this module, and add
 // them directly. A video becomes a video lesson; an article becomes a reading whose text is pulled in.
 type WebHit = { title: string; url: string; note: string };
@@ -4193,6 +4275,8 @@ function ModuleHubView({
         )}
       </div>
 
+      {/* Always-available in-lesson coach (learners + staff preview). */}
+      <CoachDock moduleId={moduleId} />
     </div>
   );
 }
