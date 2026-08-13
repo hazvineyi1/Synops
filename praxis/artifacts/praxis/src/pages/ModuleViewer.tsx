@@ -2149,24 +2149,45 @@ function MarkdownView({ text }: { text: string }) {
 // anything before the first ## is the always-visible intro, and each ## becomes its own collapsible
 // panel. A section rail lets the reader jump straight to a part, and Expand/Collapse all is one click.
 // If the reading has no ## sections we fall back to the plain flowing reader.
-function ReadingBody({ text }: { text: string }) {
-  const src = text ?? '';
+// Split a reading into sections: prefer explicit ## headings; otherwise chunk long prose into a
+// handful of "Part N" pieces so it reads as bite-size chunks, not one wall of text.
+function buildReadingSections(src: string): { intro: string; sections: { title: string; body: string }[] } {
   const lines = src.split('\n');
   const firstIdx = lines.findIndex((l) => /^##\s+/.test(l) && !/^\d+\.\s/.test(l.replace(/^##\s+/, '')));
-  if (firstIdx < 0) return <MarkdownView text={src} />;
-
-  const intro = lines.slice(0, firstIdx).join('\n').trim();
-  const sections: { title: string; body: string }[] = [];
-  let cur: { title: string; body: string[] } | null = null;
-  for (const l of lines.slice(firstIdx)) {
-    const m = l.match(/^##\s+(.*)$/);
-    if (m && !/^\d+\.\s/.test(m[1])) { if (cur) sections.push({ title: cur.title, body: cur.body.join('\n') }); cur = { title: m[1].trim(), body: [] }; }
-    else if (cur) cur.body.push(l);
+  if (firstIdx >= 0) {
+    const intro = lines.slice(0, firstIdx).join('\n').trim();
+    const sections: { title: string; body: string }[] = [];
+    let cur: { title: string; body: string[] } | null = null;
+    for (const l of lines.slice(firstIdx)) {
+      const m = l.match(/^##\s+(.*)$/);
+      if (m && !/^\d+\.\s/.test(m[1])) { if (cur) sections.push({ title: cur.title, body: cur.body.join('\n') }); cur = { title: m[1].trim(), body: [] }; }
+      else if (cur) cur.body.push(l);
+    }
+    if (cur) sections.push({ title: cur.title, body: cur.body.join('\n') });
+    if (sections.length >= 2) return { intro, sections };
   }
-  if (cur) sections.push({ title: cur.title, body: cur.body.join('\n') });
-  if (sections.length < 2) return <MarkdownView text={src} />;
+  // Fallback: chunk long unstructured prose into ~4-paragraph parts.
+  const paras = src.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean);
+  if (paras.length > 6) {
+    const chunkCount = Math.min(6, Math.max(2, Math.round(paras.length / 4)));
+    const per = Math.ceil(paras.length / chunkCount);
+    const sections: { title: string; body: string }[] = [];
+    for (let i = 0; i < paras.length; i += per) {
+      const group = paras.slice(i, i + per);
+      const words = group[0].replace(/^#+\s*/, '').replace(/[*_`>[\]]/g, '').trim().split(/\s+/).filter(Boolean).slice(0, 7).join(' ');
+      sections.push({ title: `Part ${sections.length + 1}${words ? ` — ${words}…` : ''}`, body: group.join('\n\n') });
+    }
+    return { intro: '', sections };
+  }
+  return { intro: '', sections: [] };
+}
 
+function ReadingBody({ text }: { text: string }) {
+  const src = text ?? '';
+  const { intro, sections } = buildReadingSections(src);
   const [open, setOpen] = useState<Set<number>>(() => new Set());
+  useEffect(() => { setOpen(new Set()); }, [text]);
+  if (sections.length < 2) return <MarkdownView text={src} />;
   const allOpen = open.size === sections.length;
   const toggle = (i: number) => setOpen((s) => { const n = new Set(s); n.has(i) ? n.delete(i) : n.add(i); return n; });
   const setAll = (on: boolean) => setOpen(on ? new Set(sections.map((_, i) => i)) : new Set());
@@ -2195,6 +2216,26 @@ function ReadingBody({ text }: { text: string }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// A reading that is an outside LINK is embedded in an iframe so the learner stays on the page.
+function embeddableUrl(url: string): string {
+  try {
+    const u = new URL(url.startsWith('http') ? url : `https://${url}`);
+    if (u.hostname.includes('docs.google.com')) return url.replace(/\/(edit|view)(\?[^#]*)?(#.*)?$/, '/preview');
+    return u.href;
+  } catch { return url; }
+}
+function EmbeddedLink({ url }: { url: string }) {
+  return (
+    <div className="space-y-2">
+      <div className="w-full overflow-hidden rounded-xl border border-border bg-white" style={{ height: 'min(72vh, 720px)' }}>
+        <iframe src={embeddableUrl(url)} title="Embedded reading" className="h-full w-full" loading="lazy"
+          sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation" referrerPolicy="no-referrer" />
+      </div>
+      <p className="text-xs text-muted-foreground">Some sites block embedding — if it doesn't load above, <a href={url} target="_blank" rel="noreferrer" className="text-primary underline">open it in a new tab</a>.</p>
     </div>
   );
 }
@@ -2724,7 +2765,21 @@ function ReadingsSection({ courseId, moduleId, isInstructor }: { courseId: strin
             <div className="mt-4"><LangChips value={tLang} busy={tBusy} onPick={translateReading} /></div>
             {/* Read-aloud always uses the original English text - only the written content is translated. */}
             <div className="mt-4 border-t border-border/60 pt-5">
-              <ReadingBody text={tReading?.content ?? reader?.content ?? ''} />
+              {reader?.kind === 'link' && reader?.sourceUrl ? (
+                <>
+                  <EmbeddedLink url={reader.sourceUrl} />
+                  {((reader?.content ?? '').trim().length > 60) && (
+                    <details className="mt-4 rounded-xl border border-border bg-card p-4 group [&_summary::-webkit-details-marker]:hidden">
+                      <summary className="flex items-center gap-2 cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" /> Read the text version
+                      </summary>
+                      <div className="mt-3"><ReadingBody text={tReading?.content ?? reader?.content ?? ''} /></div>
+                    </details>
+                  )}
+                </>
+              ) : (
+                <ReadingBody text={tReading?.content ?? reader?.content ?? ''} />
+              )}
             </div>
             {(reader?.chars ?? 0) >= 200000 && (
               <p className="mt-4 text-xs text-amber-600">This document was long and has been truncated.</p>

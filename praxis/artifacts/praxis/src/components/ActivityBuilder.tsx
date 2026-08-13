@@ -39,11 +39,25 @@ export function ActivityBuilder({ onClose, onCreated, activity }: { onClose: () 
   // no-code activity we load its saved spec so every field is editable again (with rich text).
   const [spec, setSpec] = useState<any>(() => (activity?.spec ? JSON.parse(JSON.stringify(activity.spec)) : emptySpec(initialType)));
 
+  const [genAllImg, setGenAllImg] = useState(false);
   const pickType = (t: InteractionType) => {
     setType(t); setSpec(emptySpec(t));
     const meta = TEMPLATES.find((m) => m.type === t); if (meta) setBloom(meta.defaultBloom);
   };
   const patch = (fn: (s: any) => void) => setSpec((prev: any) => { const n = JSON.parse(JSON.stringify(prev)); fn(n); return n; });
+
+  // Generate a photorealistic image for every flashcard (from its front text), so flip cards are visual.
+  const genAllCardImages = async () => {
+    const cards = (spec as any).cards ?? [];
+    if (!cards.length) return;
+    setGenAllImg(true);
+    try {
+      for (let i = 0; i < cards.length; i++) {
+        const prompt = ((cards[i].front ?? '') as string).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() || 'flashcard concept';
+        try { const r = await apiFetch<{ imageUrl: string }>('/activities/generate-image', { method: 'POST', body: JSON.stringify({ title: prompt }) }); if (r.imageUrl) patch((s) => { s.cards[i].img = r.imageUrl; }); } catch { /* skip one */ }
+      }
+    } finally { setGenAllImg(false); }
+  };
 
   const previewHtml = useMemo(() => {
     try { return validateSpec(type, spec as ActivitySpec) ? "" : renderActivity(type, spec as ActivitySpec); }
@@ -104,7 +118,14 @@ export function ActivityBuilder({ onClose, onCreated, activity }: { onClose: () 
 
             <div className="border-t pt-3">
               {type === "quiz" && <QuizForm spec={spec} patch={patch} />}
-              {type === "flashcards" && <PairForm spec={spec} patch={patch} field="cards" a="front" b="back" labelA="Front (prompt)" labelB="Back (answer)" addLabel="card" rich imageField="img" />}
+              {type === "flashcards" && (
+                <>
+                  <div className="mb-2 flex justify-end">
+                    <Button type="button" size="sm" variant="outline" disabled={genAllImg} onClick={genAllCardImages}>{genAllImg ? 'Generating images…' : 'Generate an image for every card'}</Button>
+                  </div>
+                  <PairForm spec={spec} patch={patch} field="cards" a="front" b="back" labelA="Front (prompt)" labelB="Back (answer)" addLabel="card" rich imageField="img" />
+                </>
+              )}
               {type === "matching" && <PairForm spec={spec} patch={patch} field="pairs" a="left" b="right" labelA="Item" labelB="Its match" addLabel="pair" rich />}
               {type === "order" && <OrderForm spec={spec} patch={patch} />}
               {type === "categorize" && <CategorizeForm spec={spec} patch={patch} />}

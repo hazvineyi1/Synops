@@ -66,7 +66,8 @@ const BASE_STYLES = `
 <style>
   :root { color-scheme: light; }
   html, body { margin:0; }
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#0f172a; background:#ffffff; padding:20px; line-height:1.5; }
+  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color:#0f172a; background:#ffffff; padding:12px 14px; line-height:1.45; }
+  body > *:last-child { margin-bottom:0 !important; }
   button { font: inherit; cursor: pointer; }
 </style>`;
 
@@ -76,7 +77,7 @@ function buildDoc(html: string): string {
 
 export function ActivityPlayer({ html, embedUrl, onSubmit, disabled, className }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [height, setHeight] = useState(480);
+  const [height, setHeight] = useState(320);
   const doc = useMemo(() => buildDoc(html), [html]);
 
   useEffect(() => {
@@ -95,8 +96,8 @@ export function ActivityPlayer({ html, embedUrl, onSubmit, disabled, className }
       if (data.__synops !== true) return;
 
       if (data.type === "resize" && typeof data.height === "number" && data.height > 0) {
-        // Clamp so a malicious/broken activity can't blow the layout to millions of px.
-        setHeight(Math.min(Math.max(data.height + 24, 240), 4000));
+        // Fit the content tightly (small buffer). Clamp so a broken activity can't blow the layout.
+        setHeight(Math.min(Math.max(data.height + 8, 160), 4000));
         return;
       }
       if (data.type === "submit" && !disabled) {
