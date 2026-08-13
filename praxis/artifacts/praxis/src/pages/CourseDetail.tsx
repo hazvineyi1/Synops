@@ -2823,17 +2823,56 @@ export function CourseDetail() {
               </section>
             )}
 
-            {/* Publish -- assign to partners, only relevant at the end. (The Modules/Activities/
-                Assignments/Cases/Pages tabs at the top of the page are the build surface, so a
-                duplicate row of buttons here was redundant and has been removed.) */}
+            {/* Publish, THEN assign. Publishing places the course in the catalog; assignment to a
+                partner is a separate, subsequent step. */}
             {role === 'super_admin' && (
-              <section className="space-y-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 6 · Publish</p>
-                  <p className="text-sm text-muted-foreground">When the course is ready, assign it to the partners who should deliver it.</p>
-                </div>
-                <AssignPartnersCard courseId={courseId} />
-              </section>
+              <>
+                <section className="space-y-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 6 · Publish</p>
+                    <p className="text-sm text-muted-foreground">Publish the course to place it in the course catalog. You assign it to partners in the next step.</p>
+                  </div>
+                  <div className="rounded-lg border border-dashed border-primary/30 p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      {course.status === 'published' ? (
+                        <p className="text-sm font-semibold flex items-center gap-2 text-emerald-700"><CheckCircle className="h-4 w-4" /> Published — in the course catalog</p>
+                      ) : (
+                        <p className="text-sm font-semibold flex items-center gap-2">Not published yet
+                          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] capitalize text-muted-foreground">{course.status ?? 'draft'}</span>
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {course.status === 'published'
+                          ? 'It can now be assigned to partners below. You can unpublish to take it back to draft.'
+                          : 'While in draft the course is only visible to you. Publish it when the build is ready.'}
+                      </p>
+                    </div>
+                    {course.status === 'published' ? (
+                      <Button size="sm" variant="outline" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ status: 'draft' })}>{saveCourse.isPending ? 'Saving…' : 'Unpublish'}</Button>
+                    ) : (
+                      <Button size="sm" disabled={saveCourse.isPending} onClick={() => saveCourse.mutate({ status: 'published' })}>{saveCourse.isPending ? 'Publishing…' : 'Publish to catalog'}</Button>
+                    )}
+                  </div>
+                </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-primary">Step 7 · Assign to partners</p>
+                    <p className="text-sm text-muted-foreground">
+                      {course.status === 'published'
+                        ? 'Choose which partners deliver this course from the catalog.'
+                        : 'Publish the course first (Step 6) to place it in the catalog, then assign it to the partners who should deliver it.'}
+                    </p>
+                  </div>
+                  {course.status === 'published' ? (
+                    <AssignPartnersCard courseId={courseId} />
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                      Assignment unlocks once the course is published.
+                    </div>
+                  )}
+                </section>
+              </>
             )}
           </div>
         )}
