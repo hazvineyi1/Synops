@@ -2046,18 +2046,31 @@ const DEFAULT_POLICIES: Record<string, { title: string; html: string }> = {
   alignment: { title: 'How alignment works', html: `<p>This map shows how each course learning objective is covered by the assessments and activities across the modules. Use it to confirm every objective is both taught and assessed, and to spot gaps or over-assessment before the course goes out.</p>` },
 };
 
-function SectionPolicy({ title, html, isInstructor, onSave, saving }: { title: string; html: string; isInstructor: boolean; onSave: (html: string) => void; saving: boolean }) {
+function SectionPolicy({ title, html, isInstructor, onSave, saving, icon: Icon, bannerUrl }: { title: string; html: string; isInstructor: boolean; onSave: (html: string) => void; saving: boolean; icon?: React.ElementType; bannerUrl?: string | null }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(html);
   useEffect(() => { if (!editing) setDraft(html); }, [html, editing]);
   return (
-    <div className="max-w-3xl space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-serif font-bold text-lg flex items-center gap-2"><span className="h-4 w-1 rounded-full bg-orange-500" />{title}</h2>
-        {isInstructor && !editing && (
-          <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setDraft(html); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+    <div className="space-y-4">
+      {/* Banner header for the section page. Uses the course banner image if set, else a gradient. */}
+      <div className="relative h-36 sm:h-44 w-full overflow-hidden rounded-2xl">
+        {bannerUrl ? (
+          <img src={bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary/90 to-orange-500" />
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/25 to-black/5" />
+        <div className="absolute inset-x-0 bottom-0 p-5 flex items-center gap-2.5 text-white">
+          {Icon && <Icon className="h-6 w-6 drop-shadow-sm shrink-0" />}
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold drop-shadow-sm">{title}</h2>
+        </div>
       </div>
+      <div className="max-w-3xl space-y-3">
+      {isInstructor && !editing && (
+        <div className="flex justify-end">
+          <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setDraft(html); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+        </div>
+      )}
       {isInstructor && editing ? (
         <div className="space-y-2">
           <RichTextEditor value={draft} onChange={setDraft} />
@@ -2070,6 +2083,7 @@ function SectionPolicy({ title, html, isInstructor, onSave, saving }: { title: s
       ) : (
         <div className="prose prose-sm max-w-none text-foreground/80 leading-relaxed [&_h2]:font-serif [&_h2]:text-foreground [&_h3]:font-serif [&_h3]:text-foreground [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: html }} />
       )}
+      </div>
     </div>
   );
 }
@@ -3072,19 +3086,19 @@ export function CourseDetail() {
         {/* These course-level tabs are POLICY / how-to pages: the real content lives in the modules,
             so here we explain how learners complete each kind of work as they meet it. */}
         {activeTab === 'assignments' && (
-          <SectionPolicy title={DEFAULT_POLICIES.reflection.title} html={policies.reflection ?? DEFAULT_POLICIES.reflection.html} isInstructor={isInstructor} onSave={(h) => savePolicy('reflection', h)} saving={saveCourse.isPending} />
+          <SectionPolicy icon={ClipboardList} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.reflection.title} html={policies.reflection ?? DEFAULT_POLICIES.reflection.html} isInstructor={isInstructor} onSave={(h) => savePolicy('reflection', h)} saving={saveCourse.isPending} />
         )}
 
         {activeTab === 'activities' && (
-          <SectionPolicy title={DEFAULT_POLICIES.activities.title} html={policies.activities ?? DEFAULT_POLICIES.activities.html} isInstructor={isInstructor} onSave={(h) => savePolicy('activities', h)} saving={saveCourse.isPending} />
+          <SectionPolicy icon={Play} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.activities.title} html={policies.activities ?? DEFAULT_POLICIES.activities.html} isInstructor={isInstructor} onSave={(h) => savePolicy('activities', h)} saving={saveCourse.isPending} />
         )}
 
         {activeTab === 'cases' && (
-          <SectionPolicy title={DEFAULT_POLICIES.cases.title} html={policies.cases ?? DEFAULT_POLICIES.cases.html} isInstructor={isInstructor} onSave={(h) => savePolicy('cases', h)} saving={saveCourse.isPending} />
+          <SectionPolicy icon={FileText} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.cases.title} html={policies.cases ?? DEFAULT_POLICIES.cases.html} isInstructor={isInstructor} onSave={(h) => savePolicy('cases', h)} saving={saveCourse.isPending} />
         )}
 
         {activeTab === 'discussions' && (
-          <SectionPolicy title={DEFAULT_POLICIES.discussions.title} html={policies.discussions ?? DEFAULT_POLICIES.discussions.html} isInstructor={isInstructor} onSave={(h) => savePolicy('discussions', h)} saving={saveCourse.isPending} />
+          <SectionPolicy icon={MessageSquare} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.discussions.title} html={policies.discussions ?? DEFAULT_POLICIES.discussions.html} isInstructor={isInstructor} onSave={(h) => savePolicy('discussions', h)} saving={saveCourse.isPending} />
         )}
 
         {/* ANNOUNCEMENTS */}
@@ -3174,7 +3188,7 @@ export function CourseDetail() {
         {/* ALIGNMENT (staff-only): objective coverage + assessment + WCAG accessibility */}
         {activeTab === 'alignment' && isInstructor && (
           <div className="space-y-6">
-            <SectionPolicy title={DEFAULT_POLICIES.alignment.title} html={policies.alignment ?? DEFAULT_POLICIES.alignment.html} isInstructor={isInstructor} onSave={(h) => savePolicy('alignment', h)} saving={saveCourse.isPending} />
+            <SectionPolicy icon={Target} bannerUrl={course.thumbnailUrl} title={DEFAULT_POLICIES.alignment.title} html={policies.alignment ?? DEFAULT_POLICIES.alignment.html} isInstructor={isInstructor} onSave={(h) => savePolicy('alignment', h)} saving={saveCourse.isPending} />
             {alignmentLoading && (
               <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">Running the alignment pass. This can take a few seconds.</div>
