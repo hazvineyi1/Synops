@@ -56,6 +56,7 @@ function toCourseResponse(c: typeof coursesTable.$inferSelect, completeness?: Co
     thumbnailUrl: c.thumbnailUrl,
     overviewConfig: (c as { overviewConfig?: string | null }).overviewConfig ?? null,
     tocConfig: (c as { tocConfig?: string | null }).tocConfig ?? null,
+    sectionPolicies: (c as { sectionPolicies?: string | null }).sectionPolicies ?? null,
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
     // Course completeness gate: complete == catalogue-eligible. incompleteReasons lists, per blocking
@@ -1014,7 +1015,7 @@ router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "part
   // requireRole proves staff SOMEWHERE, not staff on THIS course, so a coach/admin of one
   // org could edit another org's course metadata. Add the course-scoped check.
   if (!(await canStaffActOnCourse(req.dbUser!, req.params.courseId))) { res.status(403).json({ error: "Forbidden" }); return; }
-  const { title, description, catalogDescription, status, competencyTags, nqfLevel, thumbnailUrl, objectives, overviewConfig, tocConfig } = req.body;
+  const { title, description, catalogDescription, status, competencyTags, nqfLevel, thumbnailUrl, objectives, overviewConfig, tocConfig, sectionPolicies } = req.body;
   const [updated] = await db
     .update(coursesTable)
     .set({
@@ -1023,6 +1024,7 @@ router.patch("/courses/:courseId", requireAuth, requireRole("super_admin", "part
       ...(objectives !== undefined ? { objectives } : {}),
       ...(overviewConfig !== undefined ? { overviewConfig } as Record<string, unknown> : {}),
       ...(tocConfig !== undefined ? { tocConfig } as Record<string, unknown> : {}),
+      ...(sectionPolicies !== undefined ? { sectionPolicies } as Record<string, unknown> : {}),
       updatedAt: new Date(),
     } as any)
     .where(eq(coursesTable.id, req.params.courseId))

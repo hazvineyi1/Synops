@@ -34,6 +34,8 @@ export const coursesTable = pgTable("courses", {
   sourceMaterial: text("source_material"),
   // Table-of-contents customisations that apply to EVERY viewer: { order, hidden, labels }.
   tocConfig: text("toc_config"),
+  // Editable policy / how-to text per course section (activities, cases, discussions, reflection, alignment).
+  sectionPolicies: text("section_policies"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

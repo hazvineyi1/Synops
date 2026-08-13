@@ -1990,6 +1990,43 @@ function BulletStyleBar({ bullet, onChange }: { bullet: { shape?: string; color?
   );
 }
 
+// Default policy / how-to copy for each course-level section tab. Instructors can edit these.
+const DEFAULT_POLICIES: Record<string, { title: string; html: string }> = {
+  activities: { title: 'Activities', html: `<p>Activities are the short, interactive practice pieces inside each module — quizzes, flashcards, matching, ordering and small games. You'll meet them in a module's <strong>Complete</strong> section.</p><p>Work through <strong>every</strong> activity in a module before moving on. They're built to help the learning stick, not to catch you out, so you can retry them as often as you like. Your attempts feed your progress and help your coach see where to support you.</p>` },
+  cases: { title: 'Case studies', html: `<p>Case studies are realistic, decision-based scenarios you work through with the AI tutor inside the relevant module's <strong>Case studies</strong> section.</p><p>Read the scenario carefully, then reason out loud with the tutor — there's rarely one right answer. Take a position, justify it with what you've learned, and stay open to being challenged. This is where you turn knowledge into judgement.</p>` },
+  discussions: { title: 'Discussions', html: `<p>Discussions are where you think alongside your peers. You'll find them in a module's <strong>Participate</strong> section.</p><p>Post your own initial response first, then reply to at least the number of classmates the module asks for. Be specific, build on others' ideas, and keep it respectful. Meaningful participation — not just posting — is what counts.</p>` },
+  reflection: { title: 'Reflection', html: `<p>Each module ends with a guided <strong>Reflection</strong>. There are no wrong answers — it's your space to make sense of what you've learned.</p><p>Answer the prompts honestly and in your own words. Your coach reads every reflection and responds personally. Completing it consolidates the module and helps the coach tailor its support to you.</p>` },
+  alignment: { title: 'How alignment works', html: `<p>This map shows how each course learning objective is covered by the assessments and activities across the modules. Use it to confirm every objective is both taught and assessed, and to spot gaps or over-assessment before the course goes out.</p>` },
+};
+
+function SectionPolicy({ title, html, isInstructor, onSave, saving }: { title: string; html: string; isInstructor: boolean; onSave: (html: string) => void; saving: boolean }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(html);
+  useEffect(() => { if (!editing) setDraft(html); }, [html, editing]);
+  return (
+    <div className="max-w-3xl space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-serif font-bold text-lg flex items-center gap-2"><span className="h-4 w-1 rounded-full bg-orange-500" />{title}</h2>
+        {isInstructor && !editing && (
+          <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => { setDraft(html); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+        )}
+      </div>
+      {isInstructor && editing ? (
+        <div className="space-y-2">
+          <RichTextEditor value={draft} onChange={setDraft} />
+          <p className="text-xs text-muted-foreground">This is the policy and how-to learners see for this section. Keep it clear and practical.</p>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="ghost" disabled={saving} onClick={() => setEditing(false)}>Cancel</Button>
+            <Button size="sm" disabled={saving} onClick={() => { onSave(draft); setEditing(false); }}>{saving ? 'Saving…' : 'Save'}</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="prose prose-sm max-w-none text-foreground/80 leading-relaxed [&_h2]:font-serif [&_h2]:text-foreground [&_h3]:font-serif [&_h3]:text-foreground [&_a]:text-primary [&_a]:underline" dangerouslySetInnerHTML={{ __html: html }} />
+      )}
+    </div>
+  );
+}
+
 export function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
   const search = useSearch();
@@ -2235,6 +2272,14 @@ export function CourseDetail() {
   const objectivesHeading = ovCfg.objectivesHeading || "What you'll be able to do";
   const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
   const stripHtml = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Editable policy / how-to text for the course-level section tabs (activities, cases, discussions,
+  // reflection, alignment). These tabs explain how to complete those sections as they appear in the
+  // modules, rather than duplicating the module content. Persisted per course, seen by every viewer.
+  const policies: Record<string, string> = (() => {
+    try { return JSON.parse((course as { sectionPolicies?: string | null } | undefined)?.sectionPolicies || '{}'); } catch { return {}; }
+  })();
+  const savePolicy = (key: string, html: string) => saveCourse.mutate({ sectionPolicies: JSON.stringify({ ...policies, [key]: html }) });
 
   return (
     <div className={cn('space-y-0', !isLearnerView && 'lg:grid lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-6 lg:items-start')}>
@@ -2938,77 +2983,22 @@ export function CourseDetail() {
         )}
 
         {/* ASSIGNMENTS */}
+        {/* These course-level tabs are POLICY / how-to pages: the real content lives in the modules,
+            so here we explain how learners complete each kind of work as they meet it. */}
         {activeTab === 'assignments' && (
-          <div className="space-y-3">
-            {isInstructor && <NewAssignment courseId={courseId} />}
-            {assignmentsLoading && <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>}
-            {!assignmentsLoading && !assignments && <div className="text-center text-muted-foreground py-12">{enrolment ? 'Could not load assignments. Please refresh.' : 'Enrol in this course to view its assignments.'}</div>}
-            {assignments?.length === 0 && <div className="text-center text-muted-foreground py-12">No assignments yet.</div>}
-            {assignments?.map((a) => (
-              isInstructor ? (
-                <InstructorAssignmentCard key={a.id} courseId={courseId} a={a} onOpen={() => navigate(`/courses/${courseId}/assignments/${a.id}`)} />
-              ) : (
-                <Card key={a.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/courses/${courseId}/assignments/${a.id}`)}>
-                  <CardContent className="py-4 flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-foreground">{a.title}</div>
-                      {a.description && <div className="text-sm text-muted-foreground truncate">{a.description}</div>}
-                    </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className="text-sm text-muted-foreground">{a.pointsPossible} pts</span>
-                      {a.dueDate && (
-                        <Badge variant={isOverdue(a.dueDate) ? 'destructive' : 'outline'} className="text-xs">
-                          {isOverdue(a.dueDate) ? 'OVERDUE' : formatDate(a.dueDate)}
-                        </Badge>
-                      )}
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            ))}
-          </div>
+          <SectionPolicy title={DEFAULT_POLICIES.reflection.title} html={policies.reflection ?? DEFAULT_POLICIES.reflection.html} isInstructor={isInstructor} onSave={(h) => savePolicy('reflection', h)} saving={saveCourse.isPending} />
         )}
 
-        {/* ACTIVITIES (interactives linked to this course) */}
         {activeTab === 'activities' && (
-          <CourseActivitiesTab courseId={courseId} isInstructor={isInstructor} />
+          <SectionPolicy title={DEFAULT_POLICIES.activities.title} html={policies.activities ?? DEFAULT_POLICIES.activities.html} isInstructor={isInstructor} onSave={(h) => savePolicy('activities', h)} saving={saveCourse.isPending} />
         )}
 
-        {/* CASE STUDIES attached to this course */}
         {activeTab === 'cases' && (
-          <CourseCasesTab courseId={courseId} isInstructor={isInstructor} />
+          <SectionPolicy title={DEFAULT_POLICIES.cases.title} html={policies.cases ?? DEFAULT_POLICIES.cases.html} isInstructor={isInstructor} onSave={(h) => savePolicy('cases', h)} saving={saveCourse.isPending} />
         )}
 
-        {/* DISCUSSIONS */}
         {activeTab === 'discussions' && (
-          <div className="space-y-3">
-            {isInstructor && (
-              <NewDiscussion courseId={courseId} modules={modules ?? []} />
-            )}
-            {discussionsLoading && <div className="space-y-2">{[1,2,3].map(i => <Skeleton key={i} className="h-20" />)}</div>}
-            {!discussionsLoading && !discussions && <div className="text-center text-muted-foreground py-12">{enrolment ? 'Could not load discussions. Please refresh.' : 'Enrol in this course to join its discussions.'}</div>}
-            {discussions?.length === 0 && <div className="text-center text-muted-foreground py-12">No discussions yet.</div>}
-            {discussions?.map((d) => (
-              <Card key={d.id} className="cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate(`/courses/${courseId}/discussions/${d.id}`)}>
-                <CardContent className="py-4 flex items-center gap-4">
-                  {d.isPinned && <Pin className="h-4 w-4 text-amber-500 flex-shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground">{d.title}</div>
-                    <div className="text-sm text-muted-foreground truncate mt-0.5">{d.body.slice(0, 100)}</div>
-                    <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
-                      {d.author && <span>{d.author.firstName} {d.author.lastName}</span>}
-                      <span>•</span>
-                      <span>{d.replyCount} replies</span>
-                      <span>•</span>
-                      <span>{formatDate(d.createdAt)}</span>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <SectionPolicy title={DEFAULT_POLICIES.discussions.title} html={policies.discussions ?? DEFAULT_POLICIES.discussions.html} isInstructor={isInstructor} onSave={(h) => savePolicy('discussions', h)} saving={saveCourse.isPending} />
         )}
 
         {/* ANNOUNCEMENTS */}
@@ -3098,6 +3088,7 @@ export function CourseDetail() {
         {/* ALIGNMENT (staff-only): objective coverage + assessment + WCAG accessibility */}
         {activeTab === 'alignment' && isInstructor && (
           <div className="space-y-6">
+            <SectionPolicy title={DEFAULT_POLICIES.alignment.title} html={policies.alignment ?? DEFAULT_POLICIES.alignment.html} isInstructor={isInstructor} onSave={(h) => savePolicy('alignment', h)} saving={saveCourse.isPending} />
             {alignmentLoading && (
               <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">Running the alignment pass. This can take a few seconds.</div>

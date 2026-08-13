@@ -13,6 +13,7 @@ export async function ensureCourseColumns(): Promise<void> {
     await db.execute(sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS overview_config text`);
     await db.execute(sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS source_material text`);
     await db.execute(sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS toc_config text`);
+    await db.execute(sql`ALTER TABLE courses ADD COLUMN IF NOT EXISTS section_policies text`);
     await db.execute(sql`ALTER TABLE modules ADD COLUMN IF NOT EXISTS banner_url text`);
     await db.execute(sql`ALTER TABLE modules ADD COLUMN IF NOT EXISTS overview_config text`);
     await db.execute(sql`ALTER TABLE modules ADD COLUMN IF NOT EXISTS rail_config text`);
