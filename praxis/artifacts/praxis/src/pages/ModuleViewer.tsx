@@ -3532,7 +3532,7 @@ function ModuleHubView({
     { id: 'complete',    label: 'Complete',    icon: Zap,           count: practiceCount },
     { id: 'cases',       label: 'Case studies', icon: Layers,       count: moduleCases?.length ?? 0 },
     { id: 'participate', label: 'Participate', icon: MessageSquare, count: discussions?.length ?? 0 },
-    { id: 'assignments', label: 'Assignments', icon: FileText,      count: moduleAssignments.length },
+    { id: 'assignments', label: 'Reflection',  icon: Sparkles },
     { id: 'workshop',    label: 'Workshop',    icon: Users,         count: moduleWorkshops?.length ?? 0 },
   ];
 
@@ -3567,7 +3567,7 @@ function ModuleHubView({
     complete:    { has: practiceCount > 0,                 done: practiceDone },
     cases:       { has: (moduleCases?.length ?? 0) > 0,    done: (moduleCases?.length ?? 0) > 0 },
     participate: { has: (discussions?.length ?? 0) > 0,    done: discussionsDone },
-    assignments: { has: moduleAssignments.length > 0,      done: assignmentsDone },
+    assignments: { has: true,                              done: assignmentsDone },
     workshop:    { has: (moduleWorkshops?.length ?? 0) > 0, done: workshopsDone },
   };
 
@@ -3575,7 +3575,7 @@ function ModuleHubView({
   // real steps that have content, in order, each opening in one click, with plain-language labels.
   const K12_LABELS: Partial<Record<HubTab, string>> = {
     video: 'Watch', readings: 'Read', complete: 'Practice', cases: 'Talk to your tutor',
-    participate: 'Share', assignments: 'Show what you know', workshop: 'Class time',
+    participate: 'Share', assignments: 'Reflect', workshop: 'Class time',
   };
   // "Structure" is removed from the rail: the module Overview already lays out how to complete it.
   const railTabs = (isK12
@@ -3633,7 +3633,7 @@ function ModuleHubView({
     { id: 'complete', label: 'Activities' },
     { id: 'cases', label: 'Case studies' },
     { id: 'participate', label: 'Discussion' },
-    { id: 'assignments', label: 'Assignments' },
+    { id: 'assignments', label: 'Reflection' },
     { id: 'workshop', label: 'Workshop' },
   ];
   const flow = DELIVERABLES.filter((d) => tabState[d.id].has);
@@ -4333,42 +4333,7 @@ function ModuleHubView({
 
         {/* ASSIGNMENTS */}
         {tab === 'assignments' && (
-          <div className="space-y-4">
-            <SectionHead title="Assignments" sub="Submit your work. Grades and feedback flow into your gradebook." />
-            {isInstructor && (
-              <div className="rounded-xl border border-dashed border-primary/30 p-4 flex flex-wrap items-center gap-3">
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold">Develop an assessment from this module</p>
-                  <p className="text-xs text-muted-foreground">Drafts a summative assessment aligned to this module's objectives and content. Created as a draft you review and publish.</p>
-                  {asmtErr && <p className="text-xs text-rose-600 mt-1">{asmtErr}</p>}
-                </div>
-                <Button size="sm" disabled={genAssessment.isPending} onClick={() => genAssessment.mutate()}>
-                  {genAssessment.isPending ? 'Generating…' : 'Generate assessment'}
-                </Button>
-              </div>
-            )}
-            {moduleAssignments.length > 0 ? (
-              <>
-                <Instruction>Open an assignment to read the full brief, then type your response or upload a file. You'll see your grade and feedback here once it's marked.</Instruction>
-                <div className="space-y-2">
-                  {moduleAssignments.map((a) => (
-                    <button key={a.id} onClick={() => navigate(`/courses/${courseId}/assignments/${a.id}`)}
-                      className="w-full flex items-center gap-3 rounded-xl border border-border bg-card p-4 text-left hover:bg-muted/40 transition-colors">
-                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium truncate">{a.title}</div>
-                        {a.dueDate && <div className="text-xs text-muted-foreground">Due {new Date(a.dueDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</div>}
-                      </div>
-                      <span className="text-xs text-muted-foreground shrink-0">{a.pointsPossible ?? 0} pts</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <NothingHere icon={FileText} title="No assignments for this module" next={nextStep} />
-            )}
-          </div>
+          <ReflectionPanel moduleId={moduleId} />
         )}
 
         {/* WORKSHOP */}
@@ -4430,13 +4395,6 @@ function ModuleHubView({
             </Button>
           </div>
         )}
-      </div>
-
-      {/* Guided reflection — the module's reflective assignment, at the end of the page. */}
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        <div className="max-w-3xl mx-auto">
-          <ReflectionPanel moduleId={moduleId} />
-        </div>
       </div>
 
       {/* Always-available in-lesson coach (learners + staff preview). */}
