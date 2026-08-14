@@ -535,7 +535,7 @@ export default DecisionStationPlayer;
 const CSS = `
 .ds{ --ink:#1c2430; --paper:#f6f4ef; --card:#fff; --line:#d8d2c6; --accent:#2f5d63; --accent-2:#7a3b2e; --muted:#6b7280; --ok:#2f5d63; --warn:#7a3b2e;
   --serif: Georgia,'Iowan Old Style','Times New Roman',serif; --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; --fs:16px; --sp:16px;
-  color:var(--ink); background:var(--paper); font-family:var(--sans); font-size:var(--fs); line-height:1.5; margin:0 auto; padding:16px; max-width:900px; border-radius:12px; }
+  color:var(--ink); background:var(--paper); font-family:var(--sans); font-size:var(--fs); line-height:1.5; margin:0 auto; padding:16px; width:100%; max-width:900px; border-radius:12px; }
 .ds.ds-big{ --fs:19px; } .ds.ds-sp{ --sp:24px; line-height:1.7; }
 .ds.ds-hc{ --paper:#fff; --ink:#000; --card:#fff; --line:#000; --accent:#003b46; --accent-2:#6a1b00; --muted:#333; }
 .ds *{ box-sizing:border-box; } .ds-serif{ font-family:var(--serif); }
