@@ -3098,7 +3098,7 @@ function EmbeddedDiscussion({ courseId, d, isInstructor, onDelete }: { courseId:
 }
 
 // An assessment embedded inline in the module: expand to complete it without navigating away.
-function EmbeddedAssessment({ courseId, a, isInstructor }: { courseId: string; a: any; isInstructor: boolean }) {
+function EmbeddedAssessment({ courseId, a, isInstructor, passFail }: { courseId: string; a: any; isInstructor: boolean; passFail?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -3108,7 +3108,7 @@ function EmbeddedAssessment({ courseId, a, isInstructor }: { courseId: string; a
           <div className="text-sm font-medium truncate">{a.title}</div>
           {a.dueDate && <div className="text-xs text-muted-foreground">Due {new Date(a.dueDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}</div>}
         </div>
-        <span className="text-xs text-muted-foreground shrink-0">{a.pointsPossible ?? 0} pts</span>
+        {!passFail && <span className="text-xs text-muted-foreground shrink-0">{a.pointsPossible ?? 0} pts</span>}
         <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', open ? '' : '-rotate-90')} />
       </button>
       {open && <div className="border-t border-border px-4 py-4"><AssignmentDetail courseId={courseId} assignmentId={a.id} embedded staffOverride={isInstructor} /></div>}
@@ -4074,6 +4074,8 @@ function ModuleHubView({
   // the platform default. Ukrainian is machine-assisted and flagged Beta on the chip.
   const courseTitleForLang = `${course?.title ?? ''} ${courseFull?.title ?? ''} ${mod?.title ?? ''}`;
   const courseTagsForLang = ((courseFull as { competencyTags?: string[] } | undefined)?.competencyTags ?? []).join(' ');
+  // Pass/resubmit programmes (e.g. the MRB Zambian leadership course) show no points anywhere.
+  const coursePassFail = /MRB-CLP|Leading with Purpose|Zambian Clinician|Manchester Review Board/i.test(`${courseTitleForLang} ${courseTagsForLang}`);
   const isPEJCourse = /PEJ-EVD|Project Expedite Justice/i.test(`${courseTitleForLang} ${courseTagsForLang}`);
   const courseReadingLangs: [string, string][] | null = isPEJCourse
     ? [['en', 'English'], ['uk', 'Ukrainian']]
@@ -4704,7 +4706,7 @@ function ModuleHubView({
                 <Instruction>Open an assessment to read the full brief, then type your response or upload a file. You'll see your grade and feedback here once it's marked.</Instruction>
                 <div className="space-y-2">
                   {moduleAssignments.map((a) => (
-                    <EmbeddedAssessment key={a.id} courseId={courseId} a={a} isInstructor={isInstructor} />
+                    <EmbeddedAssessment key={a.id} courseId={courseId} a={a} isInstructor={isInstructor} passFail={coursePassFail} />
                   ))}
                 </div>
               </>
