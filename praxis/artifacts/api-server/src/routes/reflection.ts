@@ -7,7 +7,7 @@ import { canParticipateInCourse } from "../lib/scope";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 
 /**
- * Guided reflection — the module's "assignment" as a reflective experience rather than a graded task.
+ * Guided reflection, the module's "assignment" as a reflective experience rather than a graded task.
  *
  * The learner is walked through a few AI-generated, content-grounded reflection prompts; on submit an
  * AI coach synthesises their reflection warmly, names their growth, and points to one next step. The
@@ -31,11 +31,37 @@ async function ensureTable() {
       created_at timestamptz NOT NULL DEFAULT now()
     )`);
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS module_reflections_user_module_uidx ON module_reflections (user_id, module_id)`);
+  // Cache the AI-generated prompts per module so they are generated ONCE, not on every open
+  // (the prior version hit the model on every reflection-tab load, which is what made it slow).
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS module_reflection_prompts (
+      module_id text PRIMARY KEY,
+      prompts jsonb NOT NULL DEFAULT '[]'::jsonb,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`);
   ensured = true;
 }
 
 function rowsOf(res: any): any[] {
   return Array.isArray(res) ? res : (res?.rows ?? []);
+}
+
+async function getCachedPrompts(moduleId: string): Promise<string[] | null> {
+  try {
+    const r = rowsOf(await db.execute(sql`SELECT prompts FROM module_reflection_prompts WHERE module_id = ${moduleId} LIMIT 1`));
+    const p = r[0]?.prompts;
+    const arr = Array.isArray(p) ? p.map((x: any) => String(x)).filter(Boolean) : [];
+    return arr.length >= 3 ? arr : null;
+  } catch { return null; }
+}
+
+async function setCachedPrompts(moduleId: string, prompts: string[]): Promise<void> {
+  try {
+    await db.execute(sql`
+      INSERT INTO module_reflection_prompts (module_id, prompts, created_at)
+      VALUES (${moduleId}, ${JSON.stringify(prompts)}::jsonb, now())
+      ON CONFLICT (module_id) DO UPDATE SET prompts = EXCLUDED.prompts, created_at = now()`);
+  } catch { /* non-fatal */ }
 }
 
 async function moduleCorpus(moduleId: string, mod: { title: string; description: string | null; objectives: string[] | null }): Promise<string> {
@@ -53,9 +79,9 @@ async function generatePrompts(corpus: string, title: string): Promise<string[]>
   try {
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 700,
-      messages: [{ role: "user", content: `Write 4 short, guided REFLECTION prompts for a learner who has just finished the module "${title}". They should invite honest personal reflection on what was learned, how it connects to the learner's own goals/experience, what was challenging, and how they'll apply it — grounded in the module content below. Warm and open-ended, not quiz questions. Reply ONLY as JSON: { "prompts": ["...","...","...","..."] }\n\n=== MODULE ===\n${corpus.slice(0, 12000)}` }],
-    }, { timeout: 60000, maxRetries: 1 });
+      max_tokens: 450,
+      messages: [{ role: "user", content: `Write 4 short, guided REFLECTION prompts for a learner who has just finished the module "${title}". They should invite honest personal reflection on what was learned, how it connects to the learner's own goals/experience, what was challenging, and how they'll apply it, grounded in the module content below. Warm and open-ended, not quiz questions. Reply ONLY as JSON: { "prompts": ["...","...","...","..."] }\n\n=== MODULE ===\n${corpus.slice(0, 9000)}` }],
+    }, { timeout: 25000, maxRetries: 1 });
     const t = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     const parsed = (() => { try { return JSON.parse(t); } catch { const m = t.match(/\{[\s\S]*\}/); return m ? JSON.parse(m[0]) : {}; } })();
     const prompts = Array.isArray(parsed.prompts) ? parsed.prompts.map((p: any) => String(p).trim()).filter(Boolean).slice(0, 5) : [];
@@ -80,8 +106,13 @@ router.get("/modules/:moduleId/reflection", requireAuth, async (req, res) => {
     const r = rowsOf(await db.execute(sql`SELECT answers, feedback, created_at FROM module_reflections WHERE user_id = ${req.userId} AND module_id = ${mod.id} LIMIT 1`));
     if (r[0]) saved = { answers: r[0].answers ?? [], feedback: r[0].feedback ?? null, createdAt: r[0].created_at };
   } catch { /* table empty/new */ }
-  const corpus = await moduleCorpus(mod.id, mod);
-  const prompts = await generatePrompts(corpus, mod.title);
+  // Cached-first: only call the model the first time this module's reflection is opened.
+  let prompts = await getCachedPrompts(mod.id);
+  if (!prompts) {
+    const corpus = await moduleCorpus(mod.id, mod);
+    prompts = await generatePrompts(corpus, mod.title);
+    await setCachedPrompts(mod.id, prompts);
+  }
   res.json({ moduleTitle: mod.title, prompts, saved });
 });
 
@@ -106,7 +137,7 @@ router.post("/modules/:moduleId/reflection", requireAuth, async (req, res) => {
       messages: [{ role: "user", content: `You are a warm, insightful learning coach responding to a learner's written reflection on the module "${mod.title}". In 3 short paragraphs: (1) reflect back what you notice in their thinking and affirm a genuine strength, (2) gently surface one insight or blind spot to consider, (3) offer one specific, encouraging next step. Speak directly to them ("you"). Warm, human, never generic or shaming. No headings.\n\n=== THEIR REFLECTION ===\n${body}` }],
     }, { timeout: 60000, maxRetries: 1 });
     feedback = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-  } catch { feedback = "Thank you for reflecting so honestly. Sit with what you noticed here, and carry your one next step into the coming week — that is where real learning takes hold."; }
+  } catch { feedback = "Thank you for reflecting so honestly. Sit with what you noticed here, and carry your one next step into the coming week, that is where real learning takes hold."; }
 
   const id = `refl_${req.userId}_${mod.id}`.slice(0, 120);
   try {

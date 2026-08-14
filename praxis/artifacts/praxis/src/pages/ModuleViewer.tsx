@@ -3867,6 +3867,7 @@ function ModuleHubView({
   };
   // Customisable module Table of Contents (instructor can show/hide sections), saved per module.
   const [railCustomizing, setRailCustomizing] = useState(false);
+  const [completedNow, setCompletedNow] = useState(false);
   const [railHidden, setRailHidden] = useState<Set<string>>(() => { try { return new Set<string>(JSON.parse(localStorage.getItem(`module-toc-hidden:${moduleId}`) || '[]')); } catch { return new Set<string>(); } });
   const toggleRailHidden = (id: string) => setRailHidden((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); try { localStorage.setItem(`module-toc-hidden:${moduleId}`, JSON.stringify([...n])); } catch { /* ignore */ } return n; });
   const [railOrder, setRailOrder] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem(`module-toc-order:${moduleId}`) || '[]'); } catch { return []; } });
@@ -3898,17 +3899,13 @@ function ModuleHubView({
 
   // ── Guided linear progression ──────────────────────────────────────────────
   // Every deliverable that exists, in the order the module should be worked through.
-  const DELIVERABLES: { id: HubTab; label: string }[] = [
-    { id: 'video', label: 'Video' },
-    { id: 'readings', label: 'Readings' },
-    { id: 'complete', label: 'Activities' },
-    { id: 'cases', label: 'Case studies' },
-    { id: 'participate', label: 'Discussion' },
-    { id: 'assignments', label: 'Reflection' },
-    { id: 'assessment', label: 'Assessment' },
-    { id: 'workshop', label: 'Workshop' },
-  ];
-  const flow = DELIVERABLES.filter((d) => tabState[d.id].has);
+  // Navigation follows the MENU (rail) order exactly, including any instructor reordering, so
+  // "Next" always walks through the sections in the same order the learner sees in the list.
+  // Overview and Structure are meta, not deliverables.
+  const DELIVERABLE_IDS = new Set<HubTab>(['video', 'readings', 'complete', 'cases', 'participate', 'assignments', 'assessment', 'workshop']);
+  const flow = orderedRailTabs
+    .filter((t) => DELIVERABLE_IDS.has(t.id) && tabState[t.id].has)
+    .map((t) => ({ id: t.id, label: labelFor(t) }));
 
   /**
    * What still stands between the learner and mastery.
@@ -3967,6 +3964,7 @@ function ModuleHubView({
 
   let continueLabel: string;
   let continueAction: () => void;
+  // Set true when the learner clicks "Complete module" on the final section, to reveal the wrap-up.
   // K-12: the "Next" button jumps straight into a single-item section (no chooser), and uses kid labels.
   const k12OpenSection = (id: HubTab): boolean => {
     if (!isK12) return false;
@@ -3977,12 +3975,10 @@ function ModuleHubView({
   if (nextFlow) {
     continueLabel = `${tab === 'overview' || tab === 'structure' ? 'Start' : 'Next'}: ${isK12 ? (K12_LABELS[nextFlow.id] ?? nextFlow.label) : nextFlow.label}`;
     continueAction = () => { if (!k12OpenSection(nextFlow.id)) setTab(nextFlow.id); };
-  } else if (nextMod) {
-    continueLabel = 'Next module';
-    continueAction = () => navigate(`/courses/${courseId}/modules/${nextMod.id}`);
   } else {
-    continueLabel = 'Back to the course';
-    continueAction = () => navigate(`/courses/${courseId}`);
+    // End of the module's sections (after the last tab, e.g. Workshop): an explicit completion step.
+    continueLabel = 'Complete module';
+    continueAction = () => { setCompletedNow(true); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch { /* ignore */ } };
   }
 
   /** The forward step an empty section points at, so a section with nothing still guides the learner. */
@@ -4641,26 +4637,28 @@ function ModuleHubView({
               <Button variant="outline" onClick={() => navigate(`/courses/${courseId}`)}>Back to course</Button>
             </div>
           </div>
-        ) : moduleComplete ? (
+        ) : (moduleComplete || completedNow) ? (
           // Module complete "page": a full celebration with a recap and the forward path.
           <div className="rounded-2xl border-2 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 p-8 text-center">
             <div className="h-14 w-14 rounded-full bg-emerald-500/15 text-emerald-600 flex items-center justify-center mx-auto mb-3">
               <CheckCircle className="h-7 w-7" />
             </div>
-            <p className="font-serif font-bold text-xl text-emerald-800 dark:text-emerald-300">Module complete</p>
+            <p className="font-serif font-bold text-xl text-emerald-800 dark:text-emerald-300">
+              {nextMod ? 'Module complete' : 'Thank you for completing the course'}
+            </p>
             <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto">
-              You've finished {mod?.title ?? 'this module'}.{' '}
-              {nextMod ? `Up next: ${nextMod.title}.` : 'That was the final module in this course — nice work.'}
+              Thank you for completing {mod?.title ?? 'this module'}.{' '}
+              {nextMod ? `Up next: ${nextMod.title}.` : 'That was the final module in this course. Nice work.'}
             </p>
             <div className="flex flex-wrap gap-2 justify-center mt-5">
               {nextMod ? (
                 <Button onClick={() => navigate(`/courses/${courseId}/modules/${nextMod.id}`)}>
-                  Next module <ChevronRight className="h-4 w-4 ml-1" />
+                  Next module: {nextMod.title} <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               ) : (
                 <Button onClick={() => navigate(`/courses/${courseId}`)}>Back to course</Button>
               )}
-              <Button variant="outline" onClick={() => setTab('overview')}>Review this module</Button>
+              <Button variant="outline" onClick={() => { setCompletedNow(false); setTab('overview'); }}>Review this module</Button>
             </div>
           </div>
         ) : (
