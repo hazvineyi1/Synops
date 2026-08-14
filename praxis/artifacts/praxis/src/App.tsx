@@ -63,6 +63,7 @@ import { K12Adaptation } from '@/components/K12Adaptation';
 import { PlatformConsole } from '@/pages/PlatformConsole';
 import DemoPEJ from '@/pages/DemoPEJ';
 import DemoPEJ2 from '@/pages/DemoPEJ2';
+import DemoPEJLanding from '@/pages/DemoPEJLanding';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
 import { CaseBegin } from '@/pages/CaseBegin';
@@ -262,9 +263,11 @@ function Routes() {
         {/* Super-admin demo: PEJ-EVD-01 justice-sector training module (launched from /platform → Demos). */}
         <FocusRoute path="/platform/demos/pej-evd-01" component={DemoPEJ} />
         <FocusRoute path="/platform/demos/pej-evd-02" component={DemoPEJ2} />
-        {/* Neutral paths used by the Executive Learning course modules (launch links). */}
-        <FocusRoute path="/demos/pej-evd-01" component={DemoPEJ} />
-        <FocusRoute path="/demos/pej-evd-02" component={DemoPEJ2} />
+        {/* Public demo links, shareable with reviewers/partners without an account. The landing
+            introduces both modules; each module page is self-contained and needs no session. */}
+        <PublicRoute path="/demos/pej" component={DemoPEJLanding} />
+        <PublicRoute path="/demos/pej-evd-01" component={DemoPEJ} />
+        <PublicRoute path="/demos/pej-evd-02" component={DemoPEJ2} />
 
         {/* App layout routes */}
         <ProtectedRoute path="/dashboard" component={Dashboard} />
