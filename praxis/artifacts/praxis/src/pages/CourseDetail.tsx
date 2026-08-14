@@ -3048,36 +3048,8 @@ export function CourseDetail() {
                 )}
               </section>
 
-              {/* 3. Course structure (summary) */}
-              <section>
-                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">Course structure</h2>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { icon: BookOpen, value: String(publishedModules.length), label: publishedModules.length === 1 ? 'Module' : 'Modules' },
-                    { icon: Clock, value: String(totalMinutes), label: 'Minutes' },
-                    { icon: Play, value: 'Self-paced', label: 'Delivery' },
-                    { icon: CheckCircle, value: 'Credential', label: 'On mastery' },
-                  ].map((s) => (
-                    <div key={s.label} className="rounded-xl border border-border bg-card p-4">
-                      <s.icon className="h-5 w-5 text-muted-foreground mb-2" />
-                      <div className="text-base font-serif font-bold leading-none">{s.value}</div>
-                      <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* 4. What you'll learn (skills) */}
-              <section>
-                <h2 className="text-lg font-serif font-semibold tracking-tight mb-3">What you'll learn</h2>
-                {course.competencyTags && course.competencyTags.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {course.competencyTags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">The skills you'll build will be listed here.</p>
-                )}
-              </section>
+              {/* Course structure facts and skills now live in the slim "About this course" sidebar
+                  card, so the main column leads with the objectives and the module list. */}
               </>)}
 
               {/* 5. Start here -> pick a module */}
@@ -3128,37 +3100,39 @@ export function CourseDetail() {
               </section>
             </div>
 
-            {/* Side column: Calendar + Announcements, hidden for the youngest (too much) */}
+            {/* Side column: a slim "About this course" card (facts + skills) and Announcements. The
+                month calendar was removed here: a self-paced, asynchronous course has no dated
+                deadlines, so a full calendar was weight without function. */}
             {!isYoungBand && (
             <aside className="mt-10 lg:mt-0 space-y-6 lg:sticky lg:top-20 lg:self-start">
-              <div className="rounded-2xl border border-border bg-card p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="flex items-center gap-2 font-serif font-semibold text-sm"><Calendar className="h-4 w-4 text-primary" /> Calendar</span>
-                  <div className="flex items-center rounded-lg border border-border p-0.5 text-[11px]">
-                    {(['month', 'list'] as const).map((v) => (
-                      <button key={v} onClick={() => setCalendarView(v)}
-                        className={cn('px-2 py-0.5 rounded-md font-medium capitalize transition-colors',
-                          calendarView === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{v}</button>
-                    ))}
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <h2 className="font-serif font-semibold text-sm mb-3">About this course</h2>
+                <dl className="space-y-2.5 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">Modules</dt>
+                    <dd className="font-medium tabular-nums">{publishedModules.length}</dd>
                   </div>
-                </div>
-                {!events ? (
-                  <Skeleton className="h-48" />
-                ) : calendarView === 'month' ? (
-                  <MonthGrid compact events={events} cursor={calCursor} onCursor={setCalCursor} />
-                ) : events.length === 0 ? (
-                  <p className="text-xs text-muted-foreground py-6 text-center">No events scheduled.</p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {events.slice().sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).slice(0, 8).map((e) => (
-                      <div key={e.id} className="flex items-start gap-2">
-                        <div className="h-2.5 w-2.5 rounded-full mt-1 shrink-0" style={{ backgroundColor: e.color ?? '#6366f1' }} />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-medium leading-snug">{e.title}</div>
-                          <div className="text-[11px] text-muted-foreground">{formatDate(e.startDate)}</div>
-                        </div>
-                      </div>
-                    ))}
+                  {totalMinutes > 0 && (
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-muted-foreground">Time</dt>
+                      <dd className="font-medium tabular-nums">{totalMinutes} min</dd>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">Delivery</dt>
+                    <dd className="font-medium">Self-paced</dd>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-muted-foreground">Credential</dt>
+                    <dd className="font-medium">On mastery</dd>
+                  </div>
+                </dl>
+                {course.competencyTags && course.competencyTags.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">What you'll learn</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {course.competencyTags.map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
+                    </div>
                   </div>
                 )}
               </div>
