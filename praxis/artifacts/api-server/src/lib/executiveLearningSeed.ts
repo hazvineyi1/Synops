@@ -2,7 +2,7 @@ import { db } from "@workspace/db";
 import {
   partnersTable, organisationsTable, usersTable,
   coursesTable, modulesTable, beatsTable, interactiveActivitiesTable, moduleReadingsTable, caseScenariosTable,
-  enrolmentsTable,
+  enrolmentsTable, assignmentsTable, discussionsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { PEJ_M1_SPEC, PEJ_M2_SPEC } from "./stations";
@@ -41,6 +41,10 @@ interface SeedModule {
   stationBlurb: string;
   reading: string;
   coach: CoachCase;
+  assignmentTitle: string;
+  assignmentBrief: string;
+  discussionTitle: string;
+  discussionPrompt: string;
 }
 
 const MODULES: SeedModule[] = [
@@ -60,6 +64,12 @@ const MODULES: SeedModule[] = [
       "Identify the single defect in a colleague's chain of custody before co-signing it.",
       "Produce a one-page contemporaneous scene record in which every tainted item is flagged.",
     ],
+    assignmentTitle: "Scene record: your one-page contemporaneous account",
+    assignmentBrief:
+      "Produce a one-page contemporaneous record of the scene you documented in the station: what you found, in what order you acted, the register entry that constitutes the inspection, and every item whose integrity is in doubt, each clearly flagged. Use composite facts only; introduce no real case material.",
+    discussionTitle: "Co-signing a flawed chain of custody",
+    discussionPrompt:
+      "A trusted colleague asks you to co-sign a chain-of-custody form that has a temporal gap they explain to you verbally but cannot formally document. What factors would shape your decision, and what does your answer reveal about how you balance professional loyalty against individual accountability?",
   },
   {
     title: "Module 2 · Getting the account",
@@ -77,6 +87,12 @@ const MODULES: SeedModule[] = [
       "Handle a disclosure of ill-treatment without harm and renew consent (Istanbul Protocol / do no harm).",
       "Choose the mechanism that preserves the testimony before the witness is displaced.",
     ],
+    assignmentTitle: "Account plan: consent, sequence, and preservation",
+    assignmentBrief:
+      "Draft a short plan for taking a witness's account: how you establish informed, revocable consent; how you open the account so no fact enters through a leading question; how you keep detail proportionate; and the mechanism you would use to preserve the testimony before the witness is displaced. Composite scenario only.",
+    discussionTitle: "When a witness discloses mid-interview",
+    discussionPrompt:
+      "Partway through an account, a witness discloses ill-treatment you did not ask about. How do you handle the disclosure without causing harm, and how do you decide whether and how to renew consent before continuing? Ground your reasoning in do-no-harm and the Istanbul Protocol.",
   },
 ];
 
@@ -174,6 +190,30 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
     } else {
       await db.update(caseScenariosTable).set(coachFields).where(eq(caseScenariosTable.id, existingCase[0].id));
     }
+  }
+
+  // A published assignment for this module. The completeness gate needs at least one PUBLISHED
+  // assignment; create one only when the module has none published, so re-running never duplicates.
+  const publishedAsg = await db.select({ id: assignmentsTable.id })
+    .from(assignmentsTable)
+    .where(and(eq(assignmentsTable.moduleId, mod.id), eq(assignmentsTable.published, true)));
+  if (publishedAsg.length === 0) {
+    await db.insert(assignmentsTable).values({
+      courseId, moduleId: mod.id, title: m.assignmentTitle,
+      description: m.assignmentBrief, instructions: m.assignmentBrief,
+      submissionType: "file_upload", pointsPossible: "100", published: true,
+    });
+  }
+
+  // A discussion for this module. Existence alone satisfies the gate; create one only when the module
+  // has no thread yet (so an author-created thread is never duplicated).
+  const existingDisc = await db.select({ id: discussionsTable.id })
+    .from(discussionsTable).where(eq(discussionsTable.moduleId, mod.id));
+  if (existingDisc.length === 0) {
+    await db.insert(discussionsTable).values({
+      courseId, moduleId: mod.id, authorId, title: m.discussionTitle, body: m.discussionPrompt,
+      aiFacilitated: true, language: "en",
+    });
   }
 }
 

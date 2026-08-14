@@ -3023,7 +3023,7 @@ function ModuleActivitiesAdmin({ courseId, moduleId, navigate }: { courseId: str
 
 // An activity played INLINE inside the module (no navigation to a separate page). Shows the cover
 // image, instructions, the interactive player, and — if attached — the rubric, all in one card.
-function EmbeddedActivity({ a }: { a: any }) {
+function EmbeddedActivity({ a, onMoveUp, onMoveDown, canMoveUp, canMoveDown }: { a: any; onMoveUp?: () => void; onMoveDown?: () => void; canMoveUp?: boolean; canMoveDown?: boolean }) {
   const [openState, setOpenState] = useState(false);
   const [done, setDone] = useState(false);
   const [score, setScore] = useState<number | null>(null);
@@ -3038,13 +3038,21 @@ function EmbeddedActivity({ a }: { a: any }) {
   });
   return (
     <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-500/5 overflow-hidden">
-      <button onClick={() => setOpenState((v) => !v)} className="w-full flex items-center gap-3 p-4 text-left">
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-sm truncate flex items-center gap-2">{a.title}{done && <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle className="h-3.5 w-3.5" /> {score != null ? `${score}%` : 'Done'}</span>}</div>
-          <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}{a.difficulty ? ` · ${a.difficulty}` : ''}</div>
-        </div>
-        <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', openState ? '' : '-rotate-90')} />
-      </button>
+      <div className="flex items-stretch">
+        {(onMoveUp || onMoveDown) && (
+          <div className="flex flex-col justify-center border-r border-emerald-200/60 dark:border-emerald-800/60 px-1">
+            <button onClick={onMoveUp} disabled={!canMoveUp} aria-label="Move up" className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-25"><ChevronDown className="h-3.5 w-3.5 rotate-180" /></button>
+            <button onClick={onMoveDown} disabled={!canMoveDown} aria-label="Move down" className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-25"><ChevronDown className="h-3.5 w-3.5" /></button>
+          </div>
+        )}
+        <button onClick={() => setOpenState((v) => !v)} className="flex-1 min-w-0 flex items-center gap-3 p-4 text-left">
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-sm truncate flex items-center gap-2">{a.title}{done && <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"><CheckCircle className="h-3.5 w-3.5" /> {score != null ? `${score}%` : 'Done'}</span>}</div>
+            <div className="text-xs text-muted-foreground capitalize">{(a.kind || 'activity').replace(/_/g, ' ')}{a.difficulty ? ` · ${a.difficulty}` : ''}</div>
+          </div>
+          <ChevronDown className={cn('h-4 w-4 text-muted-foreground shrink-0 transition-transform', openState ? '' : '-rotate-90')} />
+        </button>
+      </div>
       {openState && (
         <div className="px-4 pb-4 space-y-3">
           {a.imageUrl && <img src={a.imageUrl} alt="" className="w-full max-h-52 object-cover rounded-lg border border-border" />}
@@ -3793,6 +3801,24 @@ function ModuleHubView({
   const quizBeats         = allBeats.filter(b => !!b.visualData?.quiz);
   const moduleAssignments = (assignments ?? []).filter(a => a.moduleId === moduleId);
   const activityCount     = moduleActivities?.length ?? 0;
+
+  // Instructor-orderable activity list: persisted per module in overviewConfig (no schema change).
+  // Activities named in activityOrder come first in that order; any new/unlisted ones keep natural order.
+  const activityOrder = modCfg.activityOrder ?? [];
+  const orderedActivities = [...(moduleActivities ?? [])].sort((a, b) => {
+    const ia = activityOrder.indexOf(a.id); const ib = activityOrder.indexOf(b.id);
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+  const moveActivity = (id: string, dir: -1 | 1) => {
+    const ids = orderedActivities.map((x) => x.id);
+    const i = ids.indexOf(id); const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    saveModule.mutate({ overviewConfig: JSON.stringify({ ...modCfg, activityOrder: ids }) });
+  };
   const practiceCount     = interactiveBeats.length + quizBeats.length + activityCount;
   // Readings tab counts the actual reading DOCUMENTS when there are any (the numbered lesson slides
   // are the lesson, shown in Structure/Video/mastery - counting them here inflated the badge to "10").
@@ -3809,7 +3835,7 @@ function ModuleHubView({
     : (allBeats.find(b => b.type === 'close')?.bulletPoints ?? []);
 
   // Parsed module overview customisations (rich HTML + bullet styling), persisted on the module.
-  const modCfg: { overviewHtml?: string; objectivesHtml?: string; howToHtml?: string; bulletShape?: string; bulletColor?: string; tabBanners?: Record<string, string> } = (() => {
+  const modCfg: { overviewHtml?: string; objectivesHtml?: string; howToHtml?: string; bulletShape?: string; bulletColor?: string; tabBanners?: Record<string, string>; activityOrder?: string[] } = (() => {
     try { return mod?.overviewConfig ? JSON.parse(mod.overviewConfig) : {}; } catch { return {}; }
   })();
   // The banner shown for the CURRENT section, if the instructor set one; otherwise the module's own
@@ -4553,9 +4579,17 @@ function ModuleHubView({
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 )}
-                {/* Standalone activities assigned to this module — embedded and played inline. */}
-                {(moduleActivities ?? []).map((a) => (
-                  <EmbeddedActivity key={a.id} a={a} />
+                {/* Standalone activities assigned to this module — embedded and played inline.
+                    Instructors get up/down controls to reorder them; the order persists per module. */}
+                {orderedActivities.map((a, idx) => (
+                  <EmbeddedActivity
+                    key={a.id}
+                    a={a}
+                    onMoveUp={isInstructor ? () => moveActivity(a.id, -1) : undefined}
+                    onMoveDown={isInstructor ? () => moveActivity(a.id, 1) : undefined}
+                    canMoveUp={idx > 0}
+                    canMoveDown={idx < orderedActivities.length - 1}
+                  />
                 ))}
               </>
             ) : (

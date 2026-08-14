@@ -3038,7 +3038,9 @@ export function CourseDetail() {
                   <ul className="space-y-2.5">
                     {course.objectives.map((o, i) => (
                       <li key={i} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-                        <Target className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                        {/* Honour the instructor's saved bullet shape/colour instead of a hardcoded
+                            Target icon, so style changes actually show in the learner view. */}
+                        <span className="mt-0.5"><BulletIcon shape={ovCfg.bulletShape} color={ovCfg.bulletColor} /></span>
                         <span className="text-sm leading-relaxed">{o}</span>
                       </li>
                     ))}
