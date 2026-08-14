@@ -7,17 +7,10 @@
  * Secondary: the two self-contained interactive stations, for a quick preview without the full shell.
  */
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { useSession } from "@/context/SessionContext";
 import { apiFetch } from "@/lib/api";
 
-const STATIONS = [
-  { href: "/demos/pej-evd-01", code: "Module 1", title: "Documenting the scene" },
-  { href: "/demos/pej-evd-02", code: "Module 2", title: "Getting the account" },
-];
-
 export default function DemoPEJLanding() {
-  const [, navigate] = useLocation();
   const { demoSignIn } = useSession();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,39 +77,7 @@ export default function DemoPEJLanding() {
           {error && <p style={{ fontSize: 13, color: "#b42318", marginTop: 8 }}>{error}</p>}
         </div>
 
-        <div style={{ marginTop: 36, borderTop: "1px solid #e3ddd2", paddingTop: 22 }}>
-          <p style={{ fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: "#6b7280", margin: "0 0 12px" }}>
-            Or preview an interactive station on its own
-          </p>
-          <div style={{ display: "grid", gap: 12 }}>
-            {STATIONS.map((m) => (
-              <button
-                key={m.href}
-                onClick={() => navigate(m.href)}
-                style={{
-                  textAlign: "left",
-                  background: "#ffffff",
-                  border: "1px solid #e3ddd2",
-                  borderRadius: 14,
-                  padding: "14px 18px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "baseline",
-                  justifyContent: "space-between",
-                  gap: 12,
-                }}
-              >
-                <span>
-                  <span style={{ fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase", color: "#6b7280" }}>{m.code}</span>
-                  <span style={{ display: "block", fontFamily: "Georgia, serif", fontSize: 17, marginTop: 2 }}>{m.title}</span>
-                </span>
-                <span style={{ color: "#122a45", fontWeight: 600, fontSize: 14 }}>Preview →</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <p style={{ fontSize: 13, color: "#6b7280", marginTop: 28, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 13, color: "#6b7280", marginTop: 40, lineHeight: 1.6 }}>
           Demo build v0.1 · legal content is illustrative and pending subject-matter-expert sign-off.
         </p>
       </div>
