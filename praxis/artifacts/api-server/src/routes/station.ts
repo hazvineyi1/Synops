@@ -62,7 +62,9 @@ router.post("/station/probe", requireAuth, async (req, res) => {
       system: lines.join("\n"),
       messages: [{ role: "user", content: "Their answer:\n\"" + answer + "\"\n\nWrite your single probing question." }],
     });
-    const txt = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
+    // No em dashes or en dashes in learner-facing text: replace with a comma / hyphen.
+    const txt = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim()
+      .replace(/\s*—\s*/g, ", ").replace(/–/g, "-").trim();
     res.json({ probe: txt || null });
   } catch {
     res.json({ probe: null });

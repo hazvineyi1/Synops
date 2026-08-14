@@ -95,7 +95,7 @@ async function generatePrompts(corpus: string, title: string): Promise<string[]>
     }, { timeout: 25000, maxRetries: 1 });
     const t = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
     const parsed = (() => { try { return JSON.parse(t); } catch { const m = t.match(/\{[\s\S]*\}/); return m ? JSON.parse(m[0]) : {}; } })();
-    const prompts = Array.isArray(parsed.prompts) ? parsed.prompts.map((p: any) => String(p).trim()).filter(Boolean).slice(0, 5) : [];
+    const prompts = Array.isArray(parsed.prompts) ? parsed.prompts.map((p: any) => String(p).replace(/\s*—\s*/g, ", ").replace(/–/g, "-").trim()).filter(Boolean).slice(0, 5) : [];
     if (prompts.length >= 3) return prompts;
   } catch { /* fall through to defaults */ }
   return defaultPrompts(title);
@@ -150,7 +150,8 @@ router.post("/modules/:moduleId/reflection", requireAuth, async (req, res) => {
       max_tokens: 700,
       messages: [{ role: "user", content: `You are a warm, insightful learning coach responding to a learner's written reflection on the module "${mod.title}". In 3 short paragraphs: (1) reflect back what you notice in their thinking and affirm a genuine strength, (2) gently surface one insight or blind spot to consider, (3) offer one specific, encouraging next step. Speak directly to them ("you"). Warm, human, never generic or shaming. No headings.\n\n=== THEIR REFLECTION ===\n${body}` }],
     }, { timeout: 60000, maxRetries: 1 });
-    feedback = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
+    feedback = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim()
+      .replace(/\s*—\s*/g, ", ").replace(/–/g, "-").trim();
   } catch { feedback = "Thank you for reflecting so honestly. Sit with what you noticed here, and carry your one next step into the coming week, that is where real learning takes hold."; }
 
   const id = `refl_${req.userId}_${mod.id}`.slice(0, 120);

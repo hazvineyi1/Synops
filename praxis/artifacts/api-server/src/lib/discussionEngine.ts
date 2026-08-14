@@ -97,7 +97,9 @@ export async function generateFacilitatorQuestion(c: FacilitatorContext): Promis
       }],
     });
     const text = msg.content.map((b) => (b.type === "text" ? b.text : "")).join("").trim();
-    return text || null;
+    // No em dashes or en dashes in learner-facing text: replace with a comma / hyphen.
+    const clean = text.replace(/\s*—\s*/g, ", ").replace(/–/g, "-").trim();
+    return clean || null;
   } catch {
     return null;
   }
