@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, type CSSProperties } from 'react';
 import { useRoute, useLocation, useSearch } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -2004,12 +2004,12 @@ const LANGS: [string, string][] = [['en', 'English'], ['zu', 'isiZulu'], ['xh', 
 const K12_LANGS: [string, string][] = [['en', 'English'], ['es', 'Español']];
 // Per-course override for the offered reading/translation languages. A course can set its own list
 // (e.g. the justice course offers English + Ukrainian only); null = use the platform default above.
-const ReadingLangsContext = React.createContext<[string, string][] | null>(null);
+const ReadingLangsContext = createContext<[string, string][] | null>(null);
 
 // A distinct, deterministic default banner per module (derived from its id/title), so modules that
 // have no uploaded banner still look individual rather than sharing one identical gradient. A soft
 // pastel so the dark hero text stays readable.
-function moduleHeroStyle(seed: string): React.CSSProperties {
+function moduleHeroStyle(seed: string): CSSProperties {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
   const s = h >>> 0;
@@ -2023,7 +2023,7 @@ function moduleHeroStyle(seed: string): React.CSSProperties {
 function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onPick: (code: string) => void }) {
   const { user } = useSession();
   const esUi = personaByEmail(user?.email)?.defaultLang === 'es';
-  const scoped = React.useContext(ReadingLangsContext);
+  const scoped = useContext(ReadingLangsContext);
   const langs = scoped ?? (isK12DemoEmail(user?.email) ? K12_LANGS : LANGS);
   return (
     <div className="flex flex-wrap items-center gap-1.5">
