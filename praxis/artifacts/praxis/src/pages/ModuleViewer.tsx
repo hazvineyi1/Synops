@@ -1141,6 +1141,7 @@ export function ModuleViewer() {
     }
     return (
       <ModuleHubView
+        key={moduleId ?? ''}
         mod={mod}
         allBeats={allBeats}
         course={course}
@@ -2004,6 +2005,19 @@ const K12_LANGS: [string, string][] = [['en', 'English'], ['es', 'Español']];
 // Per-course override for the offered reading/translation languages. A course can set its own list
 // (e.g. the justice course offers English + Ukrainian only); null = use the platform default above.
 const ReadingLangsContext = React.createContext<[string, string][] | null>(null);
+
+// A distinct, deterministic default banner per module (derived from its id/title), so modules that
+// have no uploaded banner still look individual rather than sharing one identical gradient. A soft
+// pastel so the dark hero text stays readable.
+function moduleHeroStyle(seed: string): React.CSSProperties {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+  const s = h >>> 0;
+  const h1 = s % 360;
+  const h2 = (h1 + 45) % 360;
+  const ang = (s >> 3) % 360;
+  return { backgroundImage: `linear-gradient(${ang}deg, hsl(${h1} 70% 96%), hsl(${h2} 60% 91%))` };
+}
 
 /** A row of language chips. The parent runs the actual translation for the content it owns. */
 function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onPick: (code: string) => void }) {
@@ -4018,6 +4032,7 @@ function ModuleHubView({
   }
 
   return (
+    <ReadingLangsContext.Provider value={courseReadingLangs}>
     <div className="min-h-screen bg-background">
       {/* Top bar (not sticky, so it does not slide over the banner as you scroll). */}
       <header className="border-b border-border bg-card relative z-10 shadow-sm">
@@ -4180,7 +4195,7 @@ function ModuleHubView({
             )}
           </div>
         ) : (
-          <div className="relative mb-4 rounded-xl border border-border bg-gradient-to-b from-primary/5 to-transparent p-6">
+          <div className="relative mb-4 rounded-xl border border-border p-6" style={moduleHeroStyle(mod?.id ?? mod?.title ?? '')}>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{course?.title ?? courseFull?.title}</p>
             <h2 className="text-2xl sm:text-3xl font-bold mb-2">{mod?.title}</h2>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2 text-xs text-muted-foreground">
@@ -4424,7 +4439,7 @@ function ModuleHubView({
                       <EmptyState icon={PlayCircle} title="Video file not uploaded yet"
                         note="This lesson is marked as a video but no file is attached yet. It can be added in the Studio editor." />
                     )}
-                    <details open className="rounded-xl border border-border bg-card p-4 group [&_summary::-webkit-details-marker]:hidden">
+                    <details className="rounded-xl border border-border bg-card p-4 group [&_summary::-webkit-details-marker]:hidden">
                       <summary className="flex items-center gap-2 cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
                         {realTranscript ? 'Transcript' : 'Lesson notes'}
