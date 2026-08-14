@@ -35,6 +35,9 @@ interface SeedModule {
   stationBlurb: string;
   reading: string;
   coach: CoachCase;
+  videoUrl: string;
+  videoTitle: string;
+  videoNotes: string;
   assignmentTitle: string;
   assignmentIntro: string;
   // Structured case-study config stored in assignments.instructions (JSON with __type), so the
@@ -56,6 +59,9 @@ const MODULES: SeedModule[] = [
     spec: MRB_M1_SPEC,
     reading: MRB_M1_READING,
     coach: MRB_M1_COACH,
+    videoUrl: "https://www.youtube.com/watch?v=ulWkN0k0MVE",
+    videoTitle: "Doing core values",
+    videoNotes: "Bob Keiller's TEDxGlasgow talk on making an organisation's values real in everyday decisions rather than a poster on the wall. As you watch, hold your own facility in mind: where do the stated values and what actually happens under pressure part company, and what would it take to close that gap in the first 48 hours? (External clip, a placeholder until MRB selects its own video.)",
     stationBlurb:
       "A decision-first rehearsal of values and ethical leadership at the point of decision. As Acting Clinical Lead in a resource-scarcity crisis, you sequence your first actions before applying the allocation criteria, make a defensible allocation under pressure, elicit a colleague's hesitant disclosure without leading, catch a favouritism defect before co-signing, and produce an honest contemporaneous record. The result is computed from your decisions across two equally-weighted streams with a conjunctive floor, and resolves to pass or resubmit, not a percentage.",
     objectives: [
@@ -90,6 +96,9 @@ const MODULES: SeedModule[] = [
     spec: MRB_M2_SPEC,
     reading: MRB_M2_READING,
     coach: MRB_M2_COACH,
+    videoUrl: "https://www.youtube.com/watch?v=vZ0gave2WJc",
+    videoTitle: "Servant leadership: how to lead with the heart",
+    videoNotes: "Liz Theophille's TEDxSaclay talk on leading through listening and psychological safety rather than fear and blame. As you watch, connect it to the overloaded ward: what does asking 'what's really going on?' before reassigning work actually change about the trust you can later draw on? (External clip, a placeholder until MRB selects its own video.)",
     stationBlurb:
       "A decision-first rehearsal of servant, transformational and social-value leadership. Leading a short-staffed ward, you hear a team member's real constraint before reallocating, share the work on a transparent criterion, pitch a change whose buy-in rests on trust you actually earned, catch an equity-excluding flaw in a colleague's proposal before co-endorsing, and write a 90-day plan that flags its own equity gaps. Two equally-weighted streams plus a conjunctive floor; pass or resubmit, not a percentage.",
     objectives: [
@@ -155,6 +164,18 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
     ]);
     await db.update(modulesTable).set({ beatCount: 4 }).where(eq(modulesTable.id, mod.id));
   }
+
+  // Authoritative single video lesson so the Video tab plays a real clip (and the completeness gate's
+  // "A video lesson" reads complete). Remove any stray or architect-generated video beats first. The
+  // clips are reputable external talks, placeholders until MRB selects its own. Runs every provision.
+  await db.delete(beatsTable).where(and(eq(beatsTable.moduleId, mod.id), eq(beatsTable.type, "video")));
+  if (m.videoUrl) {
+    await db.insert(beatsTable).values({
+      moduleId: mod.id, type: "video", order: 1, title: m.videoTitle, videoUrl: m.videoUrl, narration: m.videoNotes,
+    });
+  }
+  const beatRows = await db.select({ id: beatsTable.id }).from(beatsTable).where(eq(beatsTable.moduleId, mod.id));
+  await db.update(modulesTable).set({ beatCount: beatRows.length }).where(eq(modulesTable.id, mod.id));
 
   const title = `Interactive station: ${m.title.replace(/^Module \d+ · /, "")}`;
   const instructions = "A task-first rehearsal. Every case study opens with a decision under realistic constraints; your choices carry consequences and produce a computed pass-or-resubmit result across two equally-weighted leadership streams.";
