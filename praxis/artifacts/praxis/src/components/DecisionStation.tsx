@@ -519,7 +519,10 @@ export function DecisionStationPlayer({ spec, onSubmit }: { spec: StationSpec; o
             <div className="ds-row"><button className="ds-btn ds-big-btn" onClick={() => go(1)}>{spec.warning.startLabel}</button></div>
           </section>
         )}
-        {typeof cur === "number" && renderLesson(cur)}
+        {/* Key by step so each lesson mounts fresh. Without this, React reuses a same-typed lesson
+            component (e.g. one multi-select after another) and its local picked/submitted state bleeds
+            across lessons, so a later lesson appears already answered. */}
+        {typeof cur === "number" && <React.Fragment key={`lesson-${cur}`}>{renderLesson(cur)}</React.Fragment>}
         {cur === "result" && <ResultView spec={spec} record={record} onRestart={restart} onSubmit={onSubmit} />}
       </main>
 
