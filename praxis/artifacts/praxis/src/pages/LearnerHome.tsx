@@ -322,23 +322,20 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
         </Card>
       ))}
 
-      {/* At-a-glance stat strip, hidden for K-12 (their gamification bar already shows streak/badges,
-          and it pushed the courses down the page). */}
-      {!isK12 && (
+      {/* At-a-glance stat strip. Shown only once the learner has real activity: an all-zeros row
+          ("0 / 0 / 0 / 0m") reads as broken for a new learner, so we hide it until there is something
+          to celebrate. Also hidden for K-12 (their gamification bar already shows streak/badges). */}
+      {!isK12 && !progLoading && (
+        (prog?.streak ?? 0) > 0 || inProgress.length > 0 || (credentials?.length ?? 0) > 0 || (prog?.totalMinutes ?? 0) > 0
+      ) && (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {progLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[76px] rounded-xl" />)
-        ) : (
-          <>
-            <StatCard icon={Flame} label={prog?.streak ? L("Day streak", "Días seguidos") : L("Start a streak today", "Empieza tu racha hoy")} value={prog?.streak ?? 0} tint="bg-amber-500/10 text-amber-600" />
-            {/* Counted from the same list the cards below render, so the number and the list
-                can never disagree. The server's coursesInProgress uses a percent-only rule
-                and drifts from the enrolment status shown on each card. */}
-            <StatCard icon={BookOpen} label={L("Courses in progress", "Cursos en progreso")} value={inProgress.length} tint="bg-indigo-500/10 text-indigo-600" />
-            <StatCard icon={Award} label={L("Credentials earned", "Insignias ganadas")} value={credentials?.length ?? 0} tint="bg-emerald-500/10 text-emerald-600" />
-            <StatCard icon={Clock} label={L("Learning time", "Tiempo de aprendizaje")} value={formatHours(prog?.totalMinutes ?? 0)} tint="bg-sky-500/10 text-sky-600" />
-          </>
-        )}
+        <StatCard icon={Flame} label={prog?.streak ? L("Day streak", "Días seguidos") : L("Start a streak today", "Empieza tu racha hoy")} value={prog?.streak ?? 0} tint="bg-amber-500/10 text-amber-600" />
+        {/* Counted from the same list the cards below render, so the number and the list
+            can never disagree. The server's coursesInProgress uses a percent-only rule
+            and drifts from the enrolment status shown on each card. */}
+        <StatCard icon={BookOpen} label={L("Courses in progress", "Cursos en progreso")} value={inProgress.length} tint="bg-indigo-500/10 text-indigo-600" />
+        <StatCard icon={Award} label={L("Credentials earned", "Insignias ganadas")} value={credentials?.length ?? 0} tint="bg-emerald-500/10 text-emerald-600" />
+        <StatCard icon={Clock} label={L("Learning time", "Tiempo de aprendizaje")} value={formatHours(prog?.totalMinutes ?? 0)} tint="bg-sky-500/10 text-sky-600" />
       </div>
       )}
 
