@@ -6,6 +6,7 @@ export const LANGUAGES: { code: string; name: string; bcp47: string }[] = [
   { code: "zu", name: "isiZulu", bcp47: "zu-ZA" },
   { code: "xh", name: "isiXhosa", bcp47: "xh-ZA" },
   { code: "af", name: "Afrikaans", bcp47: "af-ZA" },
+  { code: "uk", name: "Ukrainian", bcp47: "uk-UA" },
 ];
 export const bcp47 = (code?: string | null) => LANGUAGES.find((l) => l.code === code)?.bcp47 ?? "en-ZA";
 

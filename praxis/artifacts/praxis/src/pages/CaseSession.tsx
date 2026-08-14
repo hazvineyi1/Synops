@@ -40,8 +40,8 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const young = !!persona && (persona.band === "early" || persona.band === "elementary");
   const kidAccent = persona?.accent ?? "#4F46E5";
   const T = (adult: string, kid: string) => (young ? kid : adult);
-  // K-12 (any band) is US-only: English + Español. Non-K-12 keeps the full platform list.
-  const langOptions = persona ? [{ code: "en", name: "English" }, { code: "es", name: "Español" }] : LANGUAGES;
+  // K-12 (any band) is US-only: English + Español. The full langOptions is computed below, once the
+  // case facts have loaded, so this course can be scoped to English + Ukrainian.
 
   const qc = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ["case-session", sessionId], queryFn: () => casesApi.getSession(sessionId), enabled: !!sessionId, retry: false });
@@ -59,6 +59,14 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const [factsCtx, setFactsCtx] = useState<string>("");
   const [factsObj, setFactsObj] = useState<string | null>(null);
   const [switching, setSwitching] = useState(false);
+  // This course (PEJ / Project Expedite Justice) offers English + Ukrainian only. Detect it from the
+  // loaded case facts (Ukraine / PEJ context); every other case keeps the full platform list.
+  const isPEJCase = /Project Expedite Justice|Ukraine|oblast|martial law|art\. (?:615|225)|Berkeley Protocol/i.test(`${factsObj ?? ""} ${factsCtx ?? ""}`);
+  const langOptions = persona
+    ? [{ code: "en", name: "English" }, { code: "es", name: "Español" }]
+    : isPEJCase
+      ? [{ code: "en", name: "English" }, { code: "uk", name: "Ukrainian (Beta)" }]
+      : LANGUAGES;
   const [factsOpen, setFactsOpen] = useState(true);
   // Layout E (adult): the situation is the reading document, the coach is a docked panel.
   const [coachMin, setCoachMin] = useState(false);

@@ -2001,12 +2001,16 @@ function ReadAloudBar({ text, rate, pitch, lang = 'en' }: { text: string; rate?:
 const LANGS: [string, string][] = [['en', 'English'], ['zu', 'isiZulu'], ['xh', 'isiXhosa'], ['af', 'Afrikaans']];
 // US / K-12 learners translate between English and Spanish only (no South African languages).
 const K12_LANGS: [string, string][] = [['en', 'English'], ['es', 'Español']];
+// Per-course override for the offered reading/translation languages. A course can set its own list
+// (e.g. the justice course offers English + Ukrainian only); null = use the platform default above.
+const ReadingLangsContext = React.createContext<[string, string][] | null>(null);
 
 /** A row of language chips. The parent runs the actual translation for the content it owns. */
 function LangChips({ value, busy, onPick }: { value: string; busy?: boolean; onPick: (code: string) => void }) {
   const { user } = useSession();
   const esUi = personaByEmail(user?.email)?.defaultLang === 'es';
-  const langs = isK12DemoEmail(user?.email) ? K12_LANGS : LANGS;
+  const scoped = React.useContext(ReadingLangsContext);
+  const langs = scoped ?? (isK12DemoEmail(user?.email) ? K12_LANGS : LANGS);
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-xs text-muted-foreground inline-flex items-center gap-1"><Languages className="h-3.5 w-3.5" /> {esUi ? 'Leer en:' : 'Read in:'}</span>
@@ -3989,6 +3993,14 @@ function ModuleHubView({
         ? { label: 'Next module', onClick: () => navigate(`/courses/${courseId}/modules/${nextMod.id}`), note: `Up next: ${nextMod.title}.` }
         : { label: 'Back to the course', onClick: () => navigate(`/courses/${courseId}`), note: 'You have reached the end of this module.' };
 
+  // This course (PEJ / Project Expedite Justice) offers English + Ukrainian only; other courses keep
+  // the platform default. Ukrainian is machine-assisted and flagged Beta on the chip.
+  const courseTitleForLang = course?.title ?? courseFull?.title ?? '';
+  const courseReadingLangs: [string, string][] | null =
+    /PEJ-EVD|Project Expedite Justice/i.test(courseTitleForLang)
+      ? [['en', 'English'], ['uk', 'Ukrainian']]
+      : null;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -4678,5 +4690,6 @@ function ModuleHubView({
       {/* Always-available in-lesson coach (learners + staff preview). */}
       <CoachDock moduleId={moduleId} />
     </div>
+    </ReadingLangsContext.Provider>
   );
 }

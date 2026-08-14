@@ -20,6 +20,7 @@ export const LANG_NAMES: Record<string, string> = {
   zu: "isiZulu",
   xh: "isiXhosa",
   af: "Afrikaans",
+  uk: "Ukrainian",
 };
 export function languageName(code?: string | null): string {
   return LANG_NAMES[code ?? "en"] ?? "English";
@@ -32,7 +33,7 @@ export function languageName(code?: string | null): string {
  * the reply mid-sentence. Afrikaans runs a little longer than English too. Scaling
  * the budget by language is what stops the non-English case turns cutting off.
  */
-const LANG_TOKEN_MULTIPLIER: Record<string, number> = { zu: 1.8, xh: 1.8, af: 1.25 };
+const LANG_TOKEN_MULTIPLIER: Record<string, number> = { zu: 1.8, xh: 1.8, af: 1.25, uk: 1.3 };
 export function maxTokensForLang(base: number, langCode?: string | null): number {
   const m = LANG_TOKEN_MULTIPLIER[langCode ?? "en"] ?? 1;
   return Math.round(base * m);
