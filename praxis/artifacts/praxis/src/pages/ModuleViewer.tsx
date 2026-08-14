@@ -3801,24 +3801,6 @@ function ModuleHubView({
   const quizBeats         = allBeats.filter(b => !!b.visualData?.quiz);
   const moduleAssignments = (assignments ?? []).filter(a => a.moduleId === moduleId);
   const activityCount     = moduleActivities?.length ?? 0;
-
-  // Instructor-orderable activity list: persisted per module in overviewConfig (no schema change).
-  // Activities named in activityOrder come first in that order; any new/unlisted ones keep natural order.
-  const activityOrder = modCfg.activityOrder ?? [];
-  const orderedActivities = [...(moduleActivities ?? [])].sort((a, b) => {
-    const ia = activityOrder.indexOf(a.id); const ib = activityOrder.indexOf(b.id);
-    if (ia === -1 && ib === -1) return 0;
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
-  });
-  const moveActivity = (id: string, dir: -1 | 1) => {
-    const ids = orderedActivities.map((x) => x.id);
-    const i = ids.indexOf(id); const j = i + dir;
-    if (i < 0 || j < 0 || j >= ids.length) return;
-    [ids[i], ids[j]] = [ids[j], ids[i]];
-    saveModule.mutate({ overviewConfig: JSON.stringify({ ...modCfg, activityOrder: ids }) });
-  };
   const practiceCount     = interactiveBeats.length + quizBeats.length + activityCount;
   // Readings tab counts the actual reading DOCUMENTS when there are any (the numbered lesson slides
   // are the lesson, shown in Structure/Video/mastery - counting them here inflated the badge to "10").
@@ -3841,6 +3823,24 @@ function ModuleHubView({
   // The banner shown for the CURRENT section, if the instructor set one; otherwise the module's own
   // banner, otherwise a generated gradient. This is what makes each tab able to carry its own image.
   const sectionBanner = (modCfg.tabBanners?.[tab] || mod?.bannerUrl || '').trim();
+
+  // Instructor-orderable activity list: persisted per module in overviewConfig (no schema change).
+  // Activities named in activityOrder come first in that order; any new/unlisted ones keep natural order.
+  const activityOrder = modCfg.activityOrder ?? [];
+  const orderedActivities = [...(moduleActivities ?? [])].sort((a, b) => {
+    const ia = activityOrder.indexOf(a.id); const ib = activityOrder.indexOf(b.id);
+    if (ia === -1 && ib === -1) return 0;
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+  const moveActivity = (id: string, dir: -1 | 1) => {
+    const ids = orderedActivities.map((x) => x.id);
+    const i = ids.indexOf(id); const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    saveModule.mutate({ overviewConfig: JSON.stringify({ ...modCfg, activityOrder: ids }) });
+  };
 
   // The course architect folds a "Suggested video: <phrase>" line into the module description.
   // Surface it in the instructor video panel as a one-click search so the author can find and
