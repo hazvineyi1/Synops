@@ -178,7 +178,11 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQues
         )}
 
         {activeQuestion && (
-          <div className="absolute inset-0 bg-black/85 flex items-center justify-center p-4 z-10">
+          // Scrollable overlay: the question card can be taller than the 16/9 video box, and the box
+          // clips overflow, so make the overlay itself scroll. min-h-full keeps the card centred when
+          // short and lets it grow (scroll) when tall, so Submit/Continue are never clipped away.
+          <div className="absolute inset-0 bg-black/85 z-10 overflow-y-auto">
+            <div className="min-h-full flex items-center justify-center p-4">
             <div className="bg-background rounded-xl shadow-2xl p-6 max-w-lg w-full space-y-4">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">Checkpoint · {activeQuestion.points} pt{activeQuestion.points !== 1 ? 's' : ''}</Badge>
@@ -210,6 +214,7 @@ export function InteractiveVideoPlayer({ beatId, videoUrl, questions: inlineQues
                 {!response && <Button size="sm" onClick={handleSubmit} disabled={selectedOptions.length === 0 || respondMutation.isPending}>{respondMutation.isPending ? 'Checking…' : 'Submit'}</Button>}
                 {response && <Button size="sm" onClick={handleContinue}>Continue →</Button>}
               </div>
+            </div>
             </div>
           </div>
         )}
