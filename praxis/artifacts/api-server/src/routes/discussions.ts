@@ -6,6 +6,7 @@ import { requireAuth, requireCoFacilitatorOrAbove } from "../middlewares/require
 import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 import { generateFacilitatorQuestion, countWords } from "../lib/discussionEngine";
 import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS } from "../lib/stationCoach";
+import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
 import { translateTexts } from "../lib/caseEngine";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 
@@ -352,9 +353,14 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
     ))).length;
   if (discussion.aiFacilitated && myPostCount <= facilitatorLimit) {
     try {
-      // Justice-sector courses get the PEJ coach as moderator; other courses keep the default voice.
+      // Each programme gets its own coach as moderator: the PEJ justice mentor, or Mutale for the
+      // Zambian clinical-leadership course. Other courses keep the default facilitator voice.
       const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, discussion.courseId) });
-      const isPEJ = /PEJ-EVD|Project Expedite Justice/i.test(`${course?.title ?? ""} ${(course?.competencyTags ?? []).join(" ")}`);
+      const hay = `${course?.title ?? ""} ${(course?.competencyTags ?? []).join(" ")}`;
+      const isPEJ = /PEJ-EVD|Project Expedite Justice/i.test(hay);
+      const isMRB = /MRB-CLP|Leading with Purpose|Zambian Clinician/i.test(hay);
+      const moderatorPersona = isPEJ ? PEJ_COACH_PERSONA : isMRB ? MUTALE_PERSONA : null;
+      const moderatorConstraints = isPEJ ? PEJ_COACH_CONSTRAINTS : isMRB ? MUTALE_CONSTRAINTS : null;
       const all = await db
         .select({ reply: discussionRepliesTable, author: usersTable })
         .from(discussionRepliesTable)
@@ -367,8 +373,8 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
         prompt: discussion.body,
         langCode: discussion.language,
         courseTitle: course?.title ?? null,
-        persona: isPEJ ? PEJ_COACH_PERSONA : null,
-        constraints: isPEJ ? PEJ_COACH_CONSTRAINTS : null,
+        persona: moderatorPersona,
+        constraints: moderatorConstraints,
         turns: all.map((r) => ({
           author: r.author?.firstName ?? "Learner",
           body: r.reply.body,

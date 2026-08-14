@@ -381,16 +381,18 @@ function ArtifactView({ l, world, score, onDone }: { l: ArtifactLesson; world: W
 function ResultView({ spec, record, onRestart, onSubmit }: { spec: StationSpec; record: Rec; onRestart: () => void; onSubmit?: (r: { payload: unknown; score: number }) => void; }) {
   const rows = spec.criteria.map((c) => { const band = (record[c.key] || "F") as Band; return { ...c, band, value: BAND_VALUE[band] }; });
   const failedNN = rows.filter((r) => r.nonNegotiable && r.value < 3);
-  const skills = rows.filter((r) => r.stream === "Skills");
-  const proc = rows.filter((r) => r.stream === "Application of procedure or law");
   const mean = (arr: typeof rows) => (arr.length ? arr.reduce((a, r) => a + r.value, 0) / arr.length : 0);
-  const pass = failedNN.length === 0 && mean(skills) >= 3 && mean(proc) >= 3;
+  // Derive the streams from the spec itself (in first-appearance order) rather than hardcoding two
+  // fixed names, so a spec with its own two stream labels (e.g. the leadership programme's
+  // "Values & Integrity" / "Ethical Decision Compliance") reports and gates correctly.
+  const streamNames = Array.from(new Set(rows.map((r) => r.stream)));
+  const streams: [string, typeof rows][] = streamNames.map((s) => [s, rows.filter((r) => r.stream === s)]);
+  const pass = failedNN.length === 0 && streams.every(([, arr]) => mean(arr) >= 3);
   const overall = rows.length ? Math.round((rows.reduce((a, r) => a + r.value, 0) / (rows.length * 5)) * 100) : 0;
   const submitted = useRef(false);
   useEffect(() => {
     if (!submitted.current && onSubmit) { submitted.current = true; onSubmit({ payload: { record, pass, bands: rows.map((r) => ({ key: r.key, band: r.band })) }, score: pass ? Math.max(overall, 50) : Math.min(overall, 49) }); }
   }, [onSubmit, overall, pass, record, rows]);
-  const streams: [string, typeof rows][] = [["Skills", skills], ["Application of procedure or law", proc]];
   return (
     <section className="ds-card">
       <SceneHead n="Station result" title="Computed from the decisions you took" type="No separate quiz · two streams, weighted equally">Each criterion is banded and reported on its own. Bands: A=5 … F=0; C is the marginal pass.</SceneHead>

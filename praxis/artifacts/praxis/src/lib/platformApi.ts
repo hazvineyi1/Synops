@@ -160,6 +160,12 @@ export const platformApi = {
       { method: "POST" },
     ),
 
+  seedZambianLeadership: () =>
+    req<{ created: boolean; partnerId: string; courseId: string; message: string }>(
+      "/platform/seed-zambian-leadership",
+      { method: "POST" },
+    ),
+
   listUsers: (q = "") =>
     req<PlatformUserRow[]>(`/platform/users${q ? `?q=${encodeURIComponent(q)}` : ""}`),
 

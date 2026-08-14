@@ -301,6 +301,8 @@ const DEMO_TENANTS: Record<string, DemoTenant> = {
   "synops-demo": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
   // Justice-sector demo: the public /demos/pej link enters the full PEJ course as this enrolled learner.
   "executive-learning": { slug: "executive-learning", student: "demo.learner@exec-learning.test", admin: "demo.admin@exec-learning.test", adminRole: "partner_admin" },
+  // Zambian clinician leadership demo: the public /demos/mrb link enters the full "Leading with Purpose" course.
+  "zambian-leadership": { slug: "zambian-leadership", student: "demo.learner@zcl.test", admin: "demo.admin@zcl.test", adminRole: "partner_admin" },
   "synops-k12": {
     slug: "synops-k12", student: "maya.k12@synops-demo.test", studentAlt: "leo.k12@synops-demo.test",
     admin: "teacher.k12@synops-demo.test", adminRole: "partner_admin",

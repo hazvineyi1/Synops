@@ -956,13 +956,45 @@ function ProvisionExecutiveLearning() {
   );
 }
 
+function ProvisionZambianLeadership() {
+  const { toast } = useToast();
+  const [result, setResult] = useState<{ partnerId: string; courseId: string; message: string } | null>(null);
+  const seed = useMutation({
+    mutationFn: () => platformApi.seedZambianLeadership(),
+    onSuccess: (r) => { setResult(r); toast({ title: "Zambian Clinician Leadership provisioned", description: r.message }); },
+    onError: (e: unknown) => toast({ title: "Could not provision", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+  return (
+    <Card className="p-4 space-y-3" style={{ borderColor: "hsl(222 30% 80%)" }}>
+      <div>
+        <p className="font-medium">House these under the <span className="font-serif">Zambian Clinician Leadership</span> partner</p>
+        <p className="text-sm" style={{ color: "hsl(43 10% 45%)" }}>
+          Creates the partner "Zambian Clinician Leadership" (if it does not exist) and a partner-owned, published course
+          "Leading with Purpose" with both modules housed under it, each with a decision station, reading, the Mutale coach,
+          an assignment and a discussion, plus a demo learner. Public demo link: <span className="font-mono">/demos/mrb</span>. Idempotent.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 flex-wrap">
+        <Button onClick={() => seed.mutate()} disabled={seed.isPending}>{seed.isPending ? "Provisioning…" : "Provision under Zambian Clinician Leadership"}</Button>
+        {result && (
+          <Link href={`/courses/${result.courseId}`}>
+            <Button variant="outline">Open the course →</Button>
+          </Link>
+        )}
+      </div>
+      {result && <p className="text-sm" style={{ color: "hsl(145 45% 32%)" }}>{result.message}</p>}
+    </Card>
+  );
+}
+
 function DemosTab() {
   return (
     <div className="space-y-4">
       <p className="text-sm" style={{ color: "hsl(43 10% 45%)" }}>
-        Interactive demonstration modules. Provision them under the Executive Learning partner to see them as a real course, or launch a station directly below. Legal content is unverified until SME sign-off.
+        Interactive demonstration modules. Provision them under a partner to see them as a real course, or launch a station directly below. Content is unverified until SME sign-off.
       </p>
       <ProvisionExecutiveLearning />
+      <ProvisionZambianLeadership />
       <div className="grid gap-4 md:grid-cols-2">
         {DEMOS.map((d) => (
           <Card key={d.id}>

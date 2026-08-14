@@ -35,6 +35,7 @@ import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
 import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
+import { seedZambianLeadership } from "../lib/mrbSeed";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
@@ -1210,6 +1211,23 @@ router.post("/platform/seed-executive-learning", requireAuth, requireSuperAdmin,
   try {
     const r = await seedExecutiveLearning();
     await audit(req, "platform.seed_executive_learning", "partner", r.partnerId, { created: r.created, courseId: r.courseId });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+/**
+ * POST /platform/seed-zambian-leadership - provisions the partner "Zambian Clinician Leadership" and
+ * houses the "Leading with Purpose" demo course under it: a partner-owned, published course with two
+ * decision-first modules (The first 48 hours; The overloaded team and the next 90 days), each with a
+ * Decision Station, reading, the Mutale AI coach, a published assignment and a discussion, plus a demo
+ * learner enrolled. Idempotent - safe to click more than once.
+ */
+router.post("/platform/seed-zambian-leadership", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await seedZambianLeadership();
+    await audit(req, "platform.seed_zambian_leadership", "partner", r.partnerId, { created: r.created, courseId: r.courseId });
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });

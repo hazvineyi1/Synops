@@ -2,6 +2,7 @@ import { Router } from "express";
 import { anthropic, isAiConfigured } from "@workspace/integrations-anthropic-ai";
 import { requireAuth } from "../middlewares/requireAuth";
 import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS } from "../lib/stationCoach";
+import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
 
 /**
  * Socratic checkpoint probe for the interactive Decision Station.
@@ -24,11 +25,16 @@ router.post("/station/probe", requireAuth, async (req, res) => {
   const code = String(req.body?.code ?? "");
   if (!answer || !isAiConfigured()) { res.json({ probe: null }); return; }
 
+  // Carry the course's own coach persona into the checkpoint: PEJ's justice-sector mentor, or Mutale
+  // for the Zambian clinical-leadership programme. Any other course keeps a neutral Socratic voice.
   const isPEJ = /PEJ-EVD|Project Expedite Justice/i.test(code);
+  const isMRB = /MRB-CLP|Leading with Purpose|Zambian Clinician/i.test(code);
+  const persona = isPEJ ? PEJ_COACH_PERSONA : isMRB ? MUTALE_PERSONA : null;
+  const constraints = isPEJ ? PEJ_COACH_CONSTRAINTS : isMRB ? MUTALE_CONSTRAINTS : null;
   const lines: string[] = [];
-  if (isPEJ) {
+  if (persona) {
     lines.push(
-      PEJ_COACH_PERSONA.trim(),
+      persona.trim(),
       "",
       "You are that coach, running a short Socratic checkpoint inside a training station. Bring that expertise and register.",
     );
@@ -46,7 +52,7 @@ router.post("/station/probe", requireAuth, async (req, res) => {
     "4. If they wrote almost nothing, said 'I don't know', or gave up, do NOT fire a generic question: offer ONE small, concrete foothold, a single narrow sub-question that helps them make a start.",
     "5. Plain, warm, direct. Never use em dashes or en dashes.",
   );
-  if (isPEJ && PEJ_COACH_CONSTRAINTS) lines.push("", "STAY IN CONTEXT: " + PEJ_COACH_CONSTRAINTS.trim());
+  if (constraints) lines.push("", "STAY IN CONTEXT: " + constraints.trim());
   if (prompt) lines.push("", "The checkpoint prompt they answered was: " + prompt);
 
   try {

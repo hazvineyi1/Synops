@@ -61,12 +61,18 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   const [switching, setSwitching] = useState(false);
   // This course (PEJ / Project Expedite Justice) offers English + Ukrainian only. Detect it from the
   // loaded case facts (Ukraine / PEJ context); every other case keeps the full platform list.
-  const isPEJCase = /Project Expedite Justice|Ukraine|oblast|martial law|art\. (?:615|225)|Berkeley Protocol/i.test(`${factsObj ?? ""} ${factsCtx ?? ""}`);
+  const caseHay = `${factsObj ?? ""} ${factsCtx ?? ""}`;
+  const isPEJCase = /Project Expedite Justice|Ukraine|oblast|martial law|art\. (?:615|225)|Berkeley Protocol/i.test(caseHay);
+  // The Zambian clinical-leadership case coach is English-only for now (a local-language toggle is
+  // pending confirmation with MRB), so it does not offer the South African language list.
+  const isMRBCase = /Acting Clinical Lead|Zambian|district-level facility|servant leadership|outreach clinic|overloaded (?:team|ward)/i.test(caseHay);
   const langOptions = persona
     ? [{ code: "en", name: "English" }, { code: "es", name: "Español" }]
     : isPEJCase
       ? [{ code: "en", name: "English" }, { code: "uk", name: "Ukrainian (Beta)" }]
-      : LANGUAGES;
+      : isMRBCase
+        ? [{ code: "en", name: "English" }]
+        : LANGUAGES;
   const [factsOpen, setFactsOpen] = useState(true);
   // Layout E (adult): the situation is the reading document, the coach is a docked panel.
   const [coachMin, setCoachMin] = useState(false);

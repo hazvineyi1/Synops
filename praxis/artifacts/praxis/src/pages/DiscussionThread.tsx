@@ -119,8 +119,12 @@ export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embed
 
   // The justice-sector course is international: drop the SA languages and offer only English plus
   // Ukrainian (Beta), matching the case coach. Every other course keeps the full SA language set.
-  const isPEJ = /PEJ-EVD|Project Expedite Justice/i.test(`${course?.title ?? ''} ${((course?.competencyTags as string[]) ?? []).join(' ')}`);
-  const langOptions = isPEJ ? [{ code: 'en', label: 'English' }, { code: 'uk', label: 'Ukrainian (Beta)' }] : LANGS;
+  const courseHay = `${course?.title ?? ''} ${((course?.competencyTags as string[]) ?? []).join(' ')}`;
+  const isPEJ = /PEJ-EVD|Project Expedite Justice/i.test(courseHay);
+  const isMRB = /MRB-CLP|Leading with Purpose|Zambian Clinician/i.test(courseHay);
+  const langOptions = isPEJ
+    ? [{ code: 'en', label: 'English' }, { code: 'uk', label: 'Ukrainian (Beta)' }]
+    : isMRB ? [{ code: 'en', label: 'English' }] : LANGS;
 
   return (
     <div className={embedded ? 'space-y-5' : 'space-y-6 max-w-4xl'}>
