@@ -1,11 +1,12 @@
 import { db } from "@workspace/db";
 import {
   partnersTable, organisationsTable, usersTable,
-  coursesTable, modulesTable, beatsTable, interactiveActivitiesTable, moduleReadingsTable,
+  coursesTable, modulesTable, beatsTable, interactiveActivitiesTable, moduleReadingsTable, caseScenariosTable,
 } from "@workspace/db";
 import { eq, and, ne } from "drizzle-orm";
 import { PEJ_M1_SPEC, PEJ_M2_SPEC } from "./stations";
 import { PEJ_M1_READING, PEJ_M2_READING } from "./stationReadings";
+import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS, PEJ_M1_COACH, PEJ_M2_COACH, type CoachCase } from "./stationCoach";
 
 /**
  * Seed for the partner "Executive Learning" and its Project Expedite Justice demo course.
@@ -35,6 +36,7 @@ interface SeedModule {
   spec: any;
   stationBlurb: string;
   reading: string;
+  coach: CoachCase;
 }
 
 const MODULES: SeedModule[] = [
@@ -44,6 +46,7 @@ const MODULES: SeedModule[] = [
     minutes: 35,
     spec: PEJ_M1_SPEC,
     reading: PEJ_M1_READING,
+    coach: PEJ_M1_COACH,
     stationBlurb:
       "A task-first rehearsal of the first hour at a conflict-related crime scene: sequencing under field conditions, the lawful basis for the inspection under martial law, taking a witness's initial account without leading, and auditing a colleague's chain of custody. The station result is computed from the decisions you take, across two equally-weighted streams, with a partly-conjunctive safety and evidential floor.",
     objectives: [
@@ -60,6 +63,7 @@ const MODULES: SeedModule[] = [
     minutes: 35,
     spec: PEJ_M2_SPEC,
     reading: PEJ_M2_READING,
+    coach: PEJ_M2_COACH,
     stationBlurb:
       "Taking a witness's account so consent is informed and continuous, the account is in the witness's own words, only proportionate detail is taken, a mid-interview disclosure of ill-treatment is handled without harm, and the testimony is preserved before the witness is displaced. Non-negotiables are informed consent, disclosure handled without harm, and preservation before displacement.",
     objectives: [
@@ -147,6 +151,29 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
       await db.update(moduleReadingsTable)
         .set({ title: readingTitle, kind: "note", content: m.reading, chars: m.reading.length, published: true, updatedAt: new Date() })
         .where(eq(moduleReadingsTable.id, existingReading[0].id));
+    }
+  }
+
+  // Upsert the AI case coach for this module, tuned to the PEJ / Ukraine persona. Scoped to this
+  // class only (the persona lives on the case record, not the global default). Matches an existing
+  // case on the module so a coach built in the platform is retuned rather than duplicated.
+  if (m.coach) {
+    const coachFields = {
+      title: m.coach.title, learningObjective: m.coach.objective, contextBlock: m.coach.context,
+      openingQuestion: m.coach.opener, focusAreas: m.coach.focus,
+      aiPersona: PEJ_COACH_PERSONA, aiConstraints: PEJ_COACH_CONSTRAINTS, guidingInstructions: m.coach.guiding,
+      tutorName: "PEJ field coach", difficulty: "advanced" as const, bloomsLevel: "Evaluate",
+      status: "published" as const, isLibrary: false, tags: ["justice", "Ukraine", "Project Expedite Justice"],
+      updatedAt: new Date(),
+    };
+    const existingCase = await db.select({ id: caseScenariosTable.id })
+      .from(caseScenariosTable).where(eq(caseScenariosTable.moduleId, mod.id));
+    if (existingCase.length === 0) {
+      await db.insert(caseScenariosTable).values({
+        organisationId: orgId, moduleId: mod.id, createdBy: authorId, createdByName: "PEJ Faculty", ...coachFields,
+      });
+    } else {
+      await db.update(caseScenariosTable).set(coachFields).where(eq(caseScenariosTable.id, existingCase[0].id));
     }
   }
 }
