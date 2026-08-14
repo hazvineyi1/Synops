@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -79,6 +79,8 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
 
   const tutorName = data?.tutorName || "Your coach";
   const tutorAvatar = data?.tutorAvatar || "f1";
+  // Justice-sector coach uses the Lady Justice silhouette instead of a face.
+  const coachAvatar = isPEJCase ? "justice" : tutorAvatar;
   const gender = tutorGender(tutorAvatar);
   const spokeOpening = useRef(false);
 
@@ -217,7 +219,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
           </div>
         ) : (
           <div key={i} className="flex justify-start items-end gap-2">
-            <TutorAvatar avatar={tutorAvatar} size={young ? 40 : 26} speaking={speaking && animate && i === messages.length - 1} />
+            <TutorAvatar avatar={coachAvatar} size={young ? 40 : 26} speaking={speaking && animate && i === messages.length - 1} />
             <div className={young ? "max-w-[82%] rounded-3xl rounded-bl-md px-5 py-3 text-base leading-relaxed bg-white shadow-sm" : "max-w-[85%] rounded-2xl rounded-bl-sm px-3.5 py-2.5 text-sm leading-relaxed bg-white border"} style={young ? { border: `2px solid ${kidAccent}33` } : undefined}>
               {m.content || <span className="animate-pulse">●</span>}
             </div>
@@ -285,10 +287,13 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   return (
     <div className="h-screen flex flex-col" style={{ background: young ? `${kidAccent}12` : "hsl(43 30% 97%)" }}>
       <header className="flex items-center justify-between gap-2 px-3 sm:px-4 h-16 border-b bg-white/85 backdrop-blur shrink-0" style={young ? { borderColor: `${kidAccent}33` } : undefined}>
-        <Link href="/cases"><Button variant="ghost" size="sm" style={young ? { color: kidAccent, fontWeight: 700 } : undefined}><ArrowLeft className="h-4 w-4 mr-1" /> {T("Exit", "Back")}</Button></Link>
+        <Button variant="ghost" size="sm" style={young ? { color: kidAccent, fontWeight: 700 } : undefined}
+          onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) window.history.back(); else navigate("/cases"); }}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> {T("Exit", "Back")}
+        </Button>
 
         <div className="flex items-center gap-2.5 min-w-0">
-          <TutorAvatar avatar={tutorAvatar} size={young ? 48 : 40} speaking={speaking && animate} ring />
+          <TutorAvatar avatar={coachAvatar} size={young ? 48 : 40} speaking={speaking && animate} ring />
           <div className="leading-tight min-w-0">
             <p className={young ? "text-base font-bold truncate" : "text-sm font-medium truncate"} style={young ? { color: kidAccent } : undefined}>{young ? "Your helper 🤖" : tutorName}</p>
             <p className="text-[11px] text-muted-foreground truncate">{speaking ? T("speaking…", "talking…") : T("your case coach", "here to help you!")}</p>
@@ -358,14 +363,14 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
 
           {coachMin ? (
             <button onClick={() => setCoachMin(false)} className="fixed z-30 right-4 bottom-4 inline-flex items-center gap-2 rounded-full border bg-white shadow-lg pl-2 pr-4 py-2 hover:bg-muted">
-              <TutorAvatar avatar={tutorAvatar} size={30} speaking={speaking && animate} />
+              <TutorAvatar avatar={coachAvatar} size={30} speaking={speaking && animate} />
               <span className="text-sm font-medium">{tutorName}</span>
               <MessageCircle className="h-4 w-4 text-muted-foreground" />
             </button>
           ) : (
             <div className={`fixed z-30 bg-white border shadow-xl flex flex-col overflow-hidden inset-x-0 bottom-0 rounded-t-2xl h-[72vh] sm:inset-x-auto sm:bottom-4 sm:right-4 sm:rounded-2xl ${coachBig ? "sm:w-[560px] sm:h-[85vh]" : "sm:w-[400px] sm:h-[70vh]"}`}>
               <div className="flex items-center gap-2 px-3 h-12 border-b shrink-0">
-                <TutorAvatar avatar={tutorAvatar} size={30} speaking={speaking && animate} ring />
+                <TutorAvatar avatar={coachAvatar} size={30} speaking={speaking && animate} ring />
                 <div className="leading-tight min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{tutorName}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{speaking ? "speaking…" : `Exchange ${Math.min(promptCount + 1, promptLimit)} of ~${promptLimit}`}</p>

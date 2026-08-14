@@ -49,6 +49,31 @@ export function TutorAvatar({ avatar, size = 56, speaking = false, ring = false 
     );
   }
 
+  // Lady Justice silhouette: a robed figure holding balance scales. Used for the justice-sector
+  // coach (a face would be wrong for that context).
+  if (avatar === "justice") {
+    return (
+      <span style={{ display: "inline-block", width: size, height: size, borderRadius: "50%", overflow: "hidden", ...ringStyle }}>
+        <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+          <rect width="100" height="100" fill="#122a45" />
+          <g fill="#eaeef5">
+            <circle cx="50" cy="20" r="7.5" />
+            <path d="M50 28 c7 0 11.5 5 13 15.5 L69 88 H31 l5-44.5 C37.5 33 43 28 50 28 Z" />
+            <rect x="23" y="42.5" width="54" height="3" rx="1.5" />
+            <rect x="48.7" y="29" width="2.6" height="14.5" />
+            <circle cx="26" cy="44" r="2" />
+            <circle cx="74" cy="44" r="2" />
+            <path d="M20 55 a6 3.2 0 0 0 12 0 z" />
+            <path d="M68 55 a6 3.2 0 0 0 12 0 z" />
+          </g>
+          <g stroke="#eaeef5" strokeWidth="1.1" fill="none">
+            <path d="M26 45 L26 55 M74 45 L74 55" />
+          </g>
+        </svg>
+      </span>
+    );
+  }
+
   const p = presetById(avatar) ?? AVATAR_PRESETS[0];
   const mouthStyle: React.CSSProperties = speaking
     ? { animation: "tutor-talk 0.26s ease-in-out infinite", transformOrigin: "center", transformBox: "fill-box" }
