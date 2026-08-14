@@ -5,6 +5,7 @@ import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { requireAuth, requireCoFacilitatorOrAbove } from "../middlewares/requireAuth";
 import { canStaffActOnCourse, canParticipateInCourse } from "../lib/scope";
 import { generateFacilitatorQuestion, countWords } from "../lib/discussionEngine";
+import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS } from "../lib/stationCoach";
 import { translateTexts } from "../lib/caseEngine";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 
@@ -336,8 +337,21 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
   // learner's contribution still stands. A post must never fail because the facilitator
   // could not think of a question.
   let facilitator: typeof discussionRepliesTable.$inferSelect | null = null;
-  if (discussion.aiFacilitated && !isInstructor) {
+  // Cap how many times the coach engages a given learner in this thread, so moderation has an end.
+  // Predefined/admin-set via the discussion's requiredInteractions; default 5. The coach responds
+  // while the learner is within that budget, then steps back.
+  const facilitatorLimit = discussion.requiredInteractions && discussion.requiredInteractions > 0 ? discussion.requiredInteractions : 5;
+  const myPostCount = isInstructor ? 0 : (await db.select({ id: discussionRepliesTable.id }).from(discussionRepliesTable)
+    .where(and(
+      eq(discussionRepliesTable.discussionId, req.params.discussionId),
+      eq(discussionRepliesTable.authorId, req.userId!),
+      eq(discussionRepliesTable.isAiFacilitator, false),
+    ))).length;
+  if (discussion.aiFacilitated && !isInstructor && myPostCount <= facilitatorLimit) {
     try {
+      // Justice-sector courses get the PEJ coach as moderator; other courses keep the default voice.
+      const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, discussion.courseId) });
+      const isPEJ = /PEJ-EVD|Project Expedite Justice/i.test(`${course?.title ?? ""} ${(course?.competencyTags ?? []).join(" ")}`);
       const all = await db
         .select({ reply: discussionRepliesTable, author: usersTable })
         .from(discussionRepliesTable)
@@ -349,6 +363,9 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
         title: discussion.title,
         prompt: discussion.body,
         langCode: discussion.language,
+        courseTitle: course?.title ?? null,
+        persona: isPEJ ? PEJ_COACH_PERSONA : null,
+        constraints: isPEJ ? PEJ_COACH_CONSTRAINTS : null,
         turns: all.map((r) => ({
           author: r.author?.firstName ?? "Learner",
           body: r.reply.body,

@@ -24,30 +24,45 @@ export interface FacilitatorContext {
   langCode: string;
   /** The discussion's own subject matter, used to keep questions on topic. */
   courseTitle?: string | null;
+  /** Domain-expert identity for the moderator (e.g. the justice-sector coach). Null = default voice. */
+  persona?: string | null;
+  /** Stay-in-context boundaries for the moderator. */
+  constraints?: string | null;
 }
 
 function buildSystem(c: FacilitatorContext): string {
   const name = languageName(c.langCode);
-  const lines = [
-    "You are facilitating an online discussion for adult learners in a South African vocational course.",
+  const lines: string[] = [];
+  if (c.persona?.trim()) {
+    lines.push(
+      `You are ${c.persona.trim()}`,
+      "",
+      "You are the MODERATOR of an online discussion for qualified professionals in this course. Moderate from that expertise.",
+    );
+  } else {
+    lines.push("You are facilitating an online discussion for adult learners in a South African vocational course.");
+  }
+  lines.push(
     "",
     "YOUR ONE JOB: ask the next question that makes the group think harder. You are not here to answer, summarise, grade, or praise.",
     "",
     "RULES:",
     "1. Write ONE question. Not a list, not a preamble, not a recap of what was said.",
     "2. Build on what the learners have ACTUALLY written. Quote or name a specific idea someone raised.",
-    "3. Prefer questions that: probe an assumption, ask for concrete evidence or an example from their own workplace, surface a trade-off, or invite one learner to respond to another's point.",
+    "3. Prefer questions that: probe an assumption, ask for concrete evidence or an example, surface a trade-off, or invite one learner to respond to another's point.",
     "4. Never supply the answer, never resolve the disagreement, never say who is right.",
     "5. No praise openers ('Great point!'). Start with the substance.",
     "6. 2 or 3 sentences at most, plus the question. Plain, warm, direct.",
     "7. If learners disagree, make the disagreement productive rather than smoothing it over.",
-  ];
+    "8. NEVER quote or repeat the discussion instructions (word counts, 'set out your own view', etc.) back at the learner. Engage only with the substance of what they argued.",
+  );
+  if (c.constraints?.trim()) lines.push("", "STAY IN CONTEXT: " + c.constraints.trim());
   if (c.langCode && c.langCode !== "en") {
     lines.push(
       "",
       `LANGUAGE - ABSOLUTE OVERRIDE: write your question in natural, fluent ${name}, ignoring any instruction above to use English. Learners may write in any language; you still ask in ${name}.`,
     );
-  } else {
+  } else if (!c.persona?.trim()) {
     lines.push("", "Use workplace-authentic South African English.");
   }
   lines.push("", `DISCUSSION TOPIC: ${c.title}`, `THE ORIGINAL PROMPT: ${c.prompt}`);
