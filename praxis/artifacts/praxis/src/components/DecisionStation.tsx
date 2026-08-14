@@ -583,8 +583,8 @@ const CSS = `
 .ds-auth-h{ font-weight:700; text-transform:uppercase; letter-spacing:.06em; font-size:.82em; color:var(--muted); }
 .ds-auth ul{ margin:6px 0 0; padding-left:16px; } .ds-auth li{ margin:4px 0; } .ds-auth-ref{ font-weight:600; } .ds-auth-note{ color:var(--muted); }
 .ds-checks{ display:flex; flex-direction:column; gap:8px; }
-.ds-check{ display:flex; gap:10px; align-items:flex-start; border:1px solid var(--line); border-radius:8px; padding:10px 12px; cursor:pointer; } .ds-check.ds-standalone{ margin-top:12px; }
-.ds-check input{ position:absolute; opacity:0; width:1px; height:1px; }
+.ds-check{ position:relative; display:flex; gap:10px; align-items:flex-start; border:1px solid var(--line); border-radius:8px; padding:10px 12px; cursor:pointer; } .ds-check.ds-standalone{ margin-top:12px; }
+.ds-check input{ position:absolute; top:0; left:0; opacity:0; width:1px; height:1px; }
 .ds-check-box{ flex:0 0 auto; width:20px; height:20px; border:2px solid var(--accent); border-radius:5px; display:inline-flex; align-items:center; justify-content:center; font-weight:700; color:var(--accent); }
 .ds-check.ds-good{ background:#eef4f1; border-color:var(--accent); } .ds-check.ds-bad{ background:#f7ece8; border-color:var(--accent-2); } .ds-check.ds-muted{ opacity:.7; }
 .ds-check-note{ color:var(--muted); font-size:.9em; }
