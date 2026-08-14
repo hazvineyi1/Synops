@@ -2836,6 +2836,42 @@ export function CourseDetail() {
           {/* Standards/skill tags are jargon for K-12 learners, hidden so the page stays short. */}
           {!isK12Learner && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
         </div>
+
+        {/* Instructor: once every module is built and published, move the course into the learner
+            catalogue in one click (or confirm it is already live). The completeness verdict comes
+            straight from the course response. */}
+        {isInstructor && (() => {
+          const comp = course as unknown as { complete?: boolean; moduleCount?: number; incompleteReasons?: unknown[] };
+          const reasons = Array.isArray(comp.incompleteReasons) ? comp.incompleteReasons : [];
+          const modulesReady = reasons.length === 0 && (comp.moduleCount ?? 0) > 0;
+          if (comp.complete) {
+            return (
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-300">
+                <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>This course is live in the course catalogue.</span>
+                <Button size="sm" variant="outline" className="ml-auto" onClick={() => navigate('/courses')}>View in catalogue</Button>
+              </div>
+            );
+          }
+          if (modulesReady && course.status !== 'published') {
+            return (
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-300">
+                <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span>Every module is built and published. Move this course to the catalogue to make it available to learners.</span>
+                <Button
+                  size="sm"
+                  className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={saveCourse.isPending}
+                  onClick={() => saveCourse.mutate({ status: 'published' })}
+                >
+                  <BookOpen className="mr-1.5 h-4 w-4" /> {saveCourse.isPending ? 'Moving...' : 'Move to course catalogue'}
+                </Button>
+              </div>
+            );
+          }
+          return null;
+        })()}
+
         {role === 'learner' && !enrolment && (
           <div className="mt-3 max-w-md rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             Enrolment is managed by your organisation. Ask your admin to assign this course to you.
