@@ -279,10 +279,11 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
       {!isK12 && <AccommodationsPanel />}
       {!isK12 && <K12Gamification />}
 
-      {/* Attention strip. A flagged learner sees their off-track status + a route to the plan
-          and their AI Coach, front and centre. A learner who is on track sees a positive green
-          confirmation rather than a blank space -- reassurance, not silence. */}
-      {!isK12 && (flagged.length > 0 ? (
+      {/* Attention strip. A flagged learner sees their off-track status + a route to the plan and
+          their AI Coach, front and centre. A learner who is on track sees NOTHING here: a big green
+          "nice work" banner reads as consumer-app filler in a professional tool, so we lead straight
+          with the work instead. */}
+      {!isK12 && flagged.length > 0 && (
         <Card className={cn("p-4 sm:p-5", offTrack ? "border-red-200 bg-red-50/70 dark:bg-red-950/20" : "border-amber-200 bg-amber-50/70 dark:bg-amber-950/20")}>
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className={cn("h-11 w-11 shrink-0 rounded-xl flex items-center justify-center", offTrack ? "bg-red-500/15 text-red-600" : "bg-amber-500/15 text-amber-600")}>
@@ -306,21 +307,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
             </div>
           </div>
         </Card>
-      ) : (
-        <Card className="p-4 sm:p-5 border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/20">
-          <div className="flex items-center gap-4">
-            <div className="h-11 w-11 shrink-0 rounded-xl flex items-center justify-center bg-emerald-500/15 text-emerald-600">
-              <CheckCircle2 className="h-6 w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">You're on track, nice work.</p>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Nothing is overdue. Keep your streak going with what's next below.
-              </p>
-            </div>
-          </div>
-        </Card>
-      ))}
+      )}
 
       {/* At-a-glance stat strip. Shown only once the learner has real activity: an all-zeros row
           ("0 / 0 / 0 / 0m") reads as broken for a new learner, so we hide it until there is something
@@ -385,7 +372,14 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                 <Button onClick={() => navigate("/courses")}>Browse courses</Button>
               </Card>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className={cn(
+                "grid gap-4",
+                // One course should own the row rather than sit as a half-width card beside empty
+                // space; two or more lay out in the usual two-up grid.
+                (isK12 ? myCourses.filter((c) => c.courseId !== nextCourse?.courseId) : myCourses).slice(0, 4).length === 1
+                  ? "grid-cols-1"
+                  : "sm:grid-cols-2",
+              )}>
                 {(isK12 ? myCourses.filter((c) => c.courseId !== nextCourse?.courseId) : myCourses).slice(0, 4).map((c) => {
                   const a = courseAccent(c.courseId);
                   return (
@@ -429,15 +423,13 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
             )}
           </section>
 
-          {/* Due soon */}
+          {/* Due soon -- only rendered when something is actually due. An empty "nothing due" card is
+              filler that pads the page; hiding it keeps the layout tight and purposeful. */}
+          {upcoming.length > 0 && (
           <section>
             <SectionTitle>{L("Due soon", "Para pronto")}</SectionTitle>
             <Card className="divide-y divide-border">
-              {upcoming.length === 0 ? (
-                <div className="p-6 text-center text-sm text-muted-foreground">
-                  {L("Nothing due right now. Nice and clear.", "Nada pendiente por ahora. ¡Todo al día!")}
-                </div>
-              ) : (
+              {
                 upcoming.map((e) => {
                   const overdue = new Date(e.startDate).getTime() < Date.now();
                   return (
@@ -462,9 +454,10 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
                     </button>
                   );
                 })
-              )}
+              }
             </Card>
           </section>
+          )}
         </div>
 
         {/* Right column, adult chrome (coach path, announcements, credentials) with English/generated
@@ -474,7 +467,7 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
           {/* Coach next session for on-track learners. Off-track learners already get the attention
               banner above (which opens the Coach hub), so we do not duplicate a catch-up card here. */}
           {!plan?.catchUp?.active && (
-            <Card className="p-5 bg-gradient-to-br from-primary/5 to-transparent border-primary/20">
+            <Card className="p-5">
               <div className="flex items-center gap-2 mb-3">
                 <h2 className="font-serif font-semibold">Your coach</h2>
               </div>
@@ -500,26 +493,25 @@ export function LearnerHome({ firstName }: { firstName?: string | null }) {
             </Card>
           )}
 
-          {/* What's new */}
+          {/* What's new -- only when there are real announcements; an empty "no announcements" card
+              is filler, so it is hidden otherwise. */}
+          {news.length > 0 && (
           <Card className="p-5">
             <div className="flex items-center gap-2 mb-3">
               <Megaphone className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-serif font-semibold">What's new</h2>
             </div>
-            {news.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No announcements yet.</p>
-            ) : (
-              <div className="space-y-3.5">
-                {news.map((n) => (
-                  <div key={n.id} className="text-sm">
-                    <div className="font-medium leading-snug">{n.title}</div>
-                    <p className="text-muted-foreground line-clamp-2 mt-0.5">{n.body}</p>
-                    <div className="text-xs text-muted-foreground/70 mt-1">{timeAgo(n.publishedAt ?? n.createdAt)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="space-y-3.5">
+              {news.map((n) => (
+                <div key={n.id} className="text-sm">
+                  <div className="font-medium leading-snug">{n.title}</div>
+                  <p className="text-muted-foreground line-clamp-2 mt-0.5">{n.body}</p>
+                  <div className="text-xs text-muted-foreground/70 mt-1">{timeAgo(n.publishedAt ?? n.createdAt)}</div>
+                </div>
+              ))}
+            </div>
           </Card>
+          )}
 
           {/* Recent credentials */}
           {recentCreds.length > 0 && (
