@@ -117,6 +117,11 @@ export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embed
   const words = countWords(replyText);
   const okToPost = words >= minW && words <= maxW;
 
+  // The justice-sector course is international: drop the SA languages and offer only English plus
+  // Ukrainian (Beta), matching the case coach. Every other course keeps the full SA language set.
+  const isPEJ = /PEJ-EVD|Project Expedite Justice/i.test(`${course?.title ?? ''} ${((course?.competencyTags as string[]) ?? []).join(' ')}`);
+  const langOptions = isPEJ ? [{ code: 'en', label: 'English' }, { code: 'uk', label: 'Ukrainian (Beta)' }] : LANGS;
+
   return (
     <div className={embedded ? 'space-y-5' : 'space-y-6 max-w-4xl'}>
       {/* Breadcrumb (hidden when embedded inside a module) */}
@@ -203,7 +208,7 @@ export function DiscussionThread({ courseId: pCourseId, discussionId: pId, embed
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="off">No translation</SelectItem>
-              {LANGS.map((l) => <SelectItem key={l.code} value={l.code}>Read in {l.label}</SelectItem>)}
+              {langOptions.map((l) => <SelectItem key={l.code} value={l.code}>Read in {l.label}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
