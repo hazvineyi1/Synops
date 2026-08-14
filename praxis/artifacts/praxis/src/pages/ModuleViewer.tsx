@@ -4289,7 +4289,7 @@ function ModuleHubView({
                 <h2 className="font-serif text-lg font-bold">How to complete this module</h2>
                 {isInstructor && !modHowEditing && (
                   <Button size="sm" variant="ghost" className="gap-1.5 text-muted-foreground" onClick={() => {
-                    const steps = DELIVERABLES.filter((d) => tabState[d.id].has);
+                    const steps = flow;
                     const fallback = steps.length
                       ? `<p>Work through each part in order using the menu on the left. Your progress saves automatically; complete every part to finish the module.</p><ol>${steps.map((d) => `<li>${labelFor({ id: d.id, label: d.label })}</li>`).join('')}</ol>`
                       : '<p>Describe how a learner should work through this module.</p>';
@@ -4312,7 +4312,7 @@ function ModuleHubView({
               ) : modCfg.howToHtml ? (
                 <div className="prose prose-sm max-w-none text-muted-foreground leading-relaxed [&_h2]:font-serif [&_h2]:text-foreground [&_h3]:font-serif [&_h3]:text-foreground [&_a]:text-primary" dangerouslySetInnerHTML={{ __html: modCfg.howToHtml }} />
               ) : (() => {
-                const steps = DELIVERABLES.filter((d) => tabState[d.id].has);
+                const steps = flow;
                 if (steps.length === 0) return <p className="text-sm text-muted-foreground">This module does not have any content yet.{isInstructor ? ' Add content from the sections on the left.' : ' Check back soon.'}</p>;
                 return (
                   <>
@@ -4338,7 +4338,7 @@ function ModuleHubView({
               <SectionHead title="How this module is built"
                 sub={`What is inside, in the order you should work through it.${(mod?.estimatedMinutes ?? 0) > 0 ? ` About ${mod?.estimatedMinutes} minutes in total.` : ''}`} />
               <div className="space-y-1.5">
-                {DELIVERABLES.filter((d) => tabState[d.id].has).map((d, i) => {
+                {flow.map((d, i) => {
                   const meta = TABS.find((t) => t.id === d.id);
                   const st = tabState[d.id];
                   return (
