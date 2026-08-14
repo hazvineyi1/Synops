@@ -29,6 +29,7 @@
  */
 
 import React, { useState, useRef, useEffect } from "react";
+import { apiFetch } from "@/lib/api";
 
 /* ----------------------------------------------------------------- spec types */
 export type Quality = "sound" | "partly" | "not";
@@ -315,7 +316,7 @@ function MatchingView({ l, dict, apply, score, onDone }: { l: MatchingLesson; di
   );
 }
 
-function SocraticView({ l, onDone }: { l: SocraticLesson; onDone: () => void; }) {
+function SocraticView({ l, code, onDone }: { l: SocraticLesson; code?: string; onDone: () => void; }) {
   const [a1, setA1] = useState("");
   const [phase, setPhase] = useState(0);
   const [probe, setProbe] = useState(l.authoredProbe);
@@ -324,13 +325,14 @@ function SocraticView({ l, onDone }: { l: SocraticLesson; onDone: () => void; })
   const askProbe = async () => {
     setLoading(true);
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST", headers: { "content-type": "application/json", "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 1000, messages: [{ role: "user", content: "You are a Socratic coach for a qualified professional. Read their written justification and return EXACTLY ONE probing question. Constraints: never say whether they were right; never contain the answer or the principle; introduce no new fact about the case; no praise; no moralising; one sentence; under 30 words; press on the least-examined part of what they wrote.\n\nTheir justification:\n" + a1 }] }),
+      // Route through the server, which holds the AI key and the course's coach persona, and reads
+      // the learner's actual answer. A browser-direct Anthropic call cannot work (no key, CORS), which
+      // is why this always fell back to one canned question before. Keep the authored probe on failure.
+      const r = await apiFetch<{ probe: string | null }>("/station/probe", {
+        method: "POST",
+        body: JSON.stringify({ answer: a1, prompt: l.prompt, code: code ?? "" }),
       });
-      const data = await res.json();
-      const txt = data && data.content && data.content[0] && data.content[0].text;
-      if (txt && String(txt).trim()) setProbe(String(txt).trim());
+      if (r.probe && r.probe.trim()) setProbe(r.probe.trim());
     } catch { /* authored fallback */ } finally { setLoading(false); setPhase(1); }
   };
   return (
@@ -471,7 +473,7 @@ export function DecisionStationPlayer({ spec, onSubmit }: { spec: StationSpec; o
       case "select": return <SelectView l={l} dict={spec.authorities} apply={apply} score={score} onDone={() => go(1)} />;
       case "chainAudit": return <ChainView l={l} dict={spec.authorities} apply={apply} score={score} onDone={() => go(1)} />;
       case "matching": return <MatchingView l={l} dict={spec.authorities} apply={apply} score={score} onDone={() => go(1)} />;
-      case "socratic": return <SocraticView l={l} onDone={() => go(1)} />;
+      case "socratic": return <SocraticView l={l} code={spec.meta.code} onDone={() => go(1)} />;
       case "artifact": return <ArtifactView l={l} world={world} score={score} onDone={() => go(1)} />;
       default: return null;
     }
