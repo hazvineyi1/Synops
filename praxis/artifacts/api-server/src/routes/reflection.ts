@@ -75,6 +75,17 @@ async function moduleCorpus(moduleId: string, mod: { title: string; description:
   ].filter(Boolean).join("\n\n");
 }
 
+/** Strong, warm reflection prompts that reference the module by name. Used instantly while the
+ * content-grounded set generates in the background, and as the fallback if generation fails. */
+function defaultPrompts(title: string): string[] {
+  return [
+    `What is the most important thing you took from "${title}", and why does it matter to you?`,
+    "Where does this connect to your own experience, work, or goals?",
+    "What felt unclear or challenging, and what would help you master it?",
+    "What is one concrete way you will apply this in the next two weeks?",
+  ];
+}
+
 async function generatePrompts(corpus: string, title: string): Promise<string[]> {
   try {
     const msg = await anthropic.messages.create({
@@ -87,12 +98,7 @@ async function generatePrompts(corpus: string, title: string): Promise<string[]>
     const prompts = Array.isArray(parsed.prompts) ? parsed.prompts.map((p: any) => String(p).trim()).filter(Boolean).slice(0, 5) : [];
     if (prompts.length >= 3) return prompts;
   } catch { /* fall through to defaults */ }
-  return [
-    `What is the most important thing you took from "${title}", and why does it matter to you?`,
-    "Where does this connect to your own experience, work, or goals?",
-    "What felt unclear or challenging, and what would help you master it?",
-    "What is one concrete way you will apply this in the next two weeks?",
-  ];
+  return defaultPrompts(title);
 }
 
 // GET /modules/:moduleId/reflection -- guided prompts + this learner's saved reflection (if any).
@@ -106,12 +112,20 @@ router.get("/modules/:moduleId/reflection", requireAuth, async (req, res) => {
     const r = rowsOf(await db.execute(sql`SELECT answers, feedback, created_at FROM module_reflections WHERE user_id = ${req.userId} AND module_id = ${mod.id} LIMIT 1`));
     if (r[0]) saved = { answers: r[0].answers ?? [], feedback: r[0].feedback ?? null, createdAt: r[0].created_at };
   } catch { /* table empty/new */ }
-  // Cached-first: only call the model the first time this module's reflection is opened.
+  // Never block the tab on the model. If prompts are cached, use them; otherwise respond INSTANTLY
+  // with strong default prompts and generate the content-grounded set in the background so the next
+  // open is tailored. This removes the first-open delay entirely.
   let prompts = await getCachedPrompts(mod.id);
   if (!prompts) {
-    const corpus = await moduleCorpus(mod.id, mod);
-    prompts = await generatePrompts(corpus, mod.title);
-    await setCachedPrompts(mod.id, prompts);
+    prompts = defaultPrompts(mod.title);
+    const modForBg = { title: mod.title, description: mod.description, objectives: mod.objectives };
+    void (async () => {
+      try {
+        const corpus = await moduleCorpus(mod.id, modForBg);
+        const generated = await generatePrompts(corpus, mod.title);
+        await setCachedPrompts(mod.id, generated);
+      } catch { /* non-fatal: defaults already served */ }
+    })();
   }
   res.json({ moduleTitle: mod.title, prompts, saved });
 });
