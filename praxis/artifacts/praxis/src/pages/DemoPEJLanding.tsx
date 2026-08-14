@@ -20,15 +20,18 @@ export default function DemoPEJLanding() {
     setError(null);
     try {
       await demoSignIn("student", "executive-learning");
-      let courseId: string | null = null;
+      let dest = "/dashboard";
       try {
-        const r = await apiFetch<{ courseId: string }>("/auth/demo-course?tenant=executive-learning");
-        courseId = r.courseId;
+        const r = await apiFetch<{ courseId: string; moduleId: string | null }>("/auth/demo-course?tenant=executive-learning");
+        // Land directly in the first module (the full content experience: readings, video, activities,
+        // case, discussion), falling back to the course home, then the dashboard.
+        if (r.courseId && r.moduleId) dest = `/courses/${r.courseId}/modules/${r.moduleId}`;
+        else if (r.courseId) dest = `/courses/${r.courseId}`;
       } catch {
         /* fall back to the dashboard if the resolver is unavailable */
       }
       // Full reload so the app boots cleanly under the demo identity.
-      window.location.href = courseId ? `/courses/${courseId}` : "/dashboard";
+      window.location.href = dest;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the demo. Please try again.");
       setBusy(false);

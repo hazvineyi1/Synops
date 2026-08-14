@@ -5,12 +5,13 @@ import {
   organisationsTable,
   partnersTable,
   coursesTable,
+  modulesTable,
   authSessionsTable,
   passwordResetsTable,
   loginEventsTable,
   mfaFactorsTable,
 } from "@workspace/db";
-import { eq, and, isNull, gt, desc } from "drizzle-orm";
+import { eq, and, isNull, gt, desc, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import {
@@ -459,7 +460,15 @@ router.get("/auth/demo-course", async (req, res) => {
     .orderBy(desc(coursesTable.createdAt))
     .limit(1);
   if (!course) { res.status(404).json({ error: "No published course for this demo tenant yet." }); return; }
-  res.json({ courseId: course.id, title: course.title });
+  // Also return the first published module so the demo can drop the visitor straight into the module
+  // experience (readings, video, activities, case, discussion) rather than the course-home page.
+  const [firstModule] = await db
+    .select({ id: modulesTable.id })
+    .from(modulesTable)
+    .where(and(eq(modulesTable.courseId, course.id), eq(modulesTable.status, "published")))
+    .orderBy(asc(modulesTable.order))
+    .limit(1);
+  res.json({ courseId: course.id, moduleId: firstModule?.id ?? null, title: course.title });
 });
 
 /** POST /auth/logout, revokes THIS session only. */
