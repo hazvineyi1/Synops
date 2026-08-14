@@ -203,24 +203,16 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
     }
   }
 
-  const publishedAsg = await db.select({ id: assignmentsTable.id })
-    .from(assignmentsTable)
-    .where(and(eq(assignmentsTable.moduleId, mod.id), eq(assignmentsTable.published, true)));
-  if (publishedAsg.length === 0) {
-    // Structured case-study assignment: the config lives in `instructions` as JSON with __type, so the
-    // Assessment tab renders each case as its own on-page question with an input (plus an upload option).
-    await db.insert(assignmentsTable).values({
-      courseId, moduleId: mod.id, title: m.assignmentTitle,
-      description: m.assignmentIntro, instructions: JSON.stringify(m.assignmentConfig),
-      submissionType: "essay", pointsPossible: "100", published: true,
-    });
-  } else {
-    // Keep an already-seeded assignment's structured config current on re-provision (e.g. upgrading a
-    // plain file_upload brief to the case-study layout).
-    await db.update(assignmentsTable)
-      .set({ title: m.assignmentTitle, description: m.assignmentIntro, instructions: JSON.stringify(m.assignmentConfig), submissionType: "essay", published: true, updatedAt: new Date() })
-      .where(eq(assignmentsTable.id, publishedAsg[0].id));
-  }
+  // Authoritative single assessment per module: replace ALL of the module's assignments with one
+  // structured case-study assignment (config in `instructions` as JSON with __type), so the Assessment
+  // tab renders each case as its own on-page, editable question with an input plus an upload option, and
+  // no stray earlier/architect-generated assignment is left behind. Idempotent.
+  await db.delete(assignmentsTable).where(eq(assignmentsTable.moduleId, mod.id));
+  await db.insert(assignmentsTable).values({
+    courseId, moduleId: mod.id, title: m.assignmentTitle,
+    description: m.assignmentIntro, instructions: JSON.stringify(m.assignmentConfig),
+    submissionType: "essay", pointsPossible: "100", published: true,
+  });
 
   const existingDisc = await db.select({ id: discussionsTable.id })
     .from(discussionsTable).where(eq(discussionsTable.moduleId, mod.id));

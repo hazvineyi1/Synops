@@ -134,7 +134,7 @@ function ReflectionForm({ prompts, value, onChange }: {
 // Every case is shown expanded, with its prompt and its own answer box, so a multi-part assessment
 // reads as question-then-input down the page rather than a collapsed accordion. A document/voice
 // upload is offered as an equal alternative to typing. Instructors can edit each question inline.
-function CaseStudyForm({ sections, value, onChange, upload, onUploadChange, canEdit, onEditSection }: {
+function CaseStudyForm({ sections, value, onChange, upload, onUploadChange, canEdit, onEditSection, onMoveSection, onDeleteSection, onAddSection }: {
   sections: { id: string; title: string; prompt: string }[];
   value: Record<string, string>;
   onChange: (v: Record<string, string>) => void;
@@ -142,6 +142,9 @@ function CaseStudyForm({ sections, value, onChange, upload, onUploadChange, canE
   onUploadChange: (f: { filename: string; dataBase64: string } | null) => void;
   canEdit?: boolean;
   onEditSection?: (id: string, patch: { title?: string; prompt?: string }) => void;
+  onMoveSection?: (id: string, dir: -1 | 1) => void;
+  onDeleteSection?: (id: string) => void;
+  onAddSection?: () => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   return (
@@ -161,9 +164,12 @@ function CaseStudyForm({ sections, value, onChange, upload, onUploadChange, canE
                   : <div className="font-medium text-sm">{sec.title}</div>}
               </div>
               {canEdit && (
-                <button type="button" onClick={() => setEditingId(editing ? null : sec.id)} className="text-xs text-muted-foreground hover:text-foreground shrink-0">
-                  {editing ? 'Done' : 'Edit'}
-                </button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button type="button" title="Move up" aria-label="Move up" disabled={i === 0} onClick={() => onMoveSection?.(sec.id, -1)} className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-25"><ChevronUp className="h-3.5 w-3.5" /></button>
+                  <button type="button" title="Move down" aria-label="Move down" disabled={i === sections.length - 1} onClick={() => onMoveSection?.(sec.id, 1)} className="p-1 text-muted-foreground hover:text-foreground disabled:opacity-25"><ChevronDown className="h-3.5 w-3.5" /></button>
+                  <button type="button" onClick={() => setEditingId(editing ? null : sec.id)} className="text-xs text-muted-foreground hover:text-foreground px-1.5">{editing ? 'Done' : 'Edit'}</button>
+                  <button type="button" title="Delete question" aria-label="Delete question" onClick={() => onDeleteSection?.(sec.id)} className="p-1 text-muted-foreground hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
+                </div>
               )}
             </div>
             {editing
@@ -184,6 +190,11 @@ function CaseStudyForm({ sections, value, onChange, upload, onUploadChange, canE
           </div>
         );
       })}
+      {canEdit && (
+        <button type="button" onClick={() => onAddSection?.()} className="w-full rounded-xl border border-dashed border-border py-2.5 text-sm text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors">
+          + Add a question
+        </button>
+      )}
       <div className="rounded-xl border border-dashed border-border p-3">
         <p className="text-xs text-muted-foreground mb-1.5">Prefer to submit a document, or record your answer and attach it? Attach a file instead of typing, either is accepted equally.</p>
         <AttachFile file={upload} onFileChange={onUploadChange} />
@@ -1242,6 +1253,18 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
                     onUploadChange={setUpload}
                     canEdit={isStaff}
                     onEditSection={(id, patch) => setDraftSections((prev) => (prev ?? []).map((s) => s.id === id ? { ...s, ...patch } : s))}
+                    onMoveSection={(id, dir) => setDraftSections((prev) => {
+                      const arr = [...(prev ?? [])]; const idx = arr.findIndex((s) => s.id === id); const j = idx + dir;
+                      if (idx < 0 || j < 0 || j >= arr.length) return arr;
+                      [arr[idx], arr[j]] = [arr[j], arr[idx]]; return arr;
+                    })}
+                    onDeleteSection={(id) => setDraftSections((prev) => (prev ?? []).filter((s) => s.id !== id))}
+                    onAddSection={() => setDraftSections((prev) => {
+                      const arr = [...(prev ?? [])];
+                      const id = `q${Date.now().toString(36)}`;
+                      arr.push({ id, title: `Question ${arr.length + 1}`, prompt: 'Write the prompt for this question.' });
+                      return arr;
+                    })}
                   />
                 )}
 
