@@ -33,6 +33,7 @@ import { renderActivity, type InteractionType, type ActivitySpec } from '@/lib/a
 import { InteractiveVideoPlayer } from '@/components/InteractiveVideoPlayer';
 import { ActivityPlayer, type ActivityPlayerHandleResult } from '@/components/ActivityPlayer';
 import { DecisionStationPlayer } from '@/components/DecisionStation';
+import { useToast } from '@/hooks/use-toast';
 import { DiscussionThread } from '@/pages/DiscussionThread';
 import { AssignmentDetail } from '@/pages/AssignmentDetail';
 import {
@@ -3742,10 +3743,12 @@ function ModuleHubView({
   const [modHowEditing, setModHowEditing] = useState(false);
   const [modHowDraft, setModHowDraft] = useState('');
   const qc = useQueryClient();
+  const { toast } = useToast();
   const saveModule = useMutation({
     mutationFn: (patch: Record<string, unknown>) =>
       apiFetch(`/modules/${moduleId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['module-detail', moduleId] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['module-detail', moduleId] }); toast({ title: 'Saved' }); },
+    onError: (e) => toast({ title: 'Could not save', description: e instanceof Error ? e.message : undefined, variant: 'destructive' }),
   });
 
   // Instructor-only: set the module banner from an image URL, with the same page-URL resolver the
@@ -3755,7 +3758,7 @@ function ModuleHubView({
   const [modBannerPreview, setModBannerPreview] = useState<'idle' | 'ok' | 'error'>('idle');
   const [modBannerBusy, setModBannerBusy] = useState(false);
   const [modBannerErr, setModBannerErr] = useState<string | null>(null);
-  const openModBanner = () => { setModBannerUrl(mod?.bannerUrl ?? ''); setModBannerErr(null); setModBannerPreview(mod?.bannerUrl ? 'ok' : 'idle'); setModBannerOpen(true); };
+  const openModBanner = () => { const cur = (modCfg.tabBanners?.[tab] || mod?.bannerUrl || ''); setModBannerUrl(cur); setModBannerErr(null); setModBannerPreview(cur ? 'ok' : 'idle'); setModBannerOpen(true); };
   const resolveModBanner = async (): Promise<string | null> => {
     const url = modBannerUrl.trim();
     if (!url) return null;
@@ -3772,9 +3775,14 @@ function ModuleHubView({
     try {
       let url = modBannerUrl.trim();
       if (url && modBannerPreview !== 'ok') { const r = await resolveModBanner(); if (!r) { setModBannerBusy(false); return; } url = r; }
-      await apiFetch(`/modules/${moduleId}`, { method: 'PATCH', body: JSON.stringify({ bannerUrl: url || null }) });
+      // Save the banner for THIS section only (per-tab), preserving the module's other config. An
+      // empty value clears this section's banner, so it falls back to the module banner/gradient.
+      const nextBanners = { ...(modCfg.tabBanners ?? {}) };
+      if (url) nextBanners[tab] = url; else delete nextBanners[tab];
+      await apiFetch(`/modules/${moduleId}`, { method: 'PATCH', body: JSON.stringify({ overviewConfig: JSON.stringify({ ...modCfg, tabBanners: nextBanners }) }) });
       await qc.invalidateQueries({ queryKey: ['module-detail', moduleId] });
       setModBannerOpen(false);
+      toast({ title: url ? 'Banner saved for this section' : 'Banner cleared for this section' });
     } catch (e) { setModBannerErr(e instanceof Error ? e.message : 'Could not save the banner.'); }
     finally { setModBannerBusy(false); }
   };
@@ -3801,9 +3809,12 @@ function ModuleHubView({
     : (allBeats.find(b => b.type === 'close')?.bulletPoints ?? []);
 
   // Parsed module overview customisations (rich HTML + bullet styling), persisted on the module.
-  const modCfg: { overviewHtml?: string; objectivesHtml?: string; howToHtml?: string; bulletShape?: string; bulletColor?: string } = (() => {
+  const modCfg: { overviewHtml?: string; objectivesHtml?: string; howToHtml?: string; bulletShape?: string; bulletColor?: string; tabBanners?: Record<string, string> } = (() => {
     try { return mod?.overviewConfig ? JSON.parse(mod.overviewConfig) : {}; } catch { return {}; }
   })();
+  // The banner shown for the CURRENT section, if the instructor set one; otherwise the module's own
+  // banner, otherwise a generated gradient. This is what makes each tab able to carry its own image.
+  const sectionBanner = (modCfg.tabBanners?.[tab] || mod?.bannerUrl || '').trim();
 
   // The course architect folds a "Suggested video: <phrase>" line into the module description.
   // Surface it in the instructor video panel as a one-click search so the author can find and
@@ -4071,8 +4082,8 @@ function ModuleHubView({
       {isInstructor && modBannerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !modBannerBusy && setModBannerOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold mb-1">Module banner</h3>
-            <p className="text-sm text-muted-foreground mb-3">Paste an image URL, or a photo page link (Unsplash, Pexels) and it will fetch the image. Leave empty to remove.</p>
+            <h3 className="text-lg font-semibold mb-1">Banner for this section</h3>
+            <p className="text-sm text-muted-foreground mb-3">Sets the banner for the <span className="font-medium text-foreground">{TABS.find((t) => t.id === tab)?.label ?? 'current'}</span> section only. Paste an image URL, or a photo page link (Unsplash, Pexels) and it will fetch the image. Leave empty to remove and fall back to the module banner.</p>
             <input
               value={modBannerUrl}
               onChange={(e) => { setModBannerUrl(e.target.value); setModBannerPreview('idle'); }}
@@ -4180,10 +4191,11 @@ function ModuleHubView({
         {/* Tab content */}
         <div className="flex-1 min-w-0">
 
-        {/* Module banner hero, top of the content column, aligned with the section rail. */}
-        {mod?.bannerUrl ? (
+        {/* Section banner hero: the current tab's own banner if set, else the module banner, else a
+            generated gradient (the non-image branch below). Aligned with the section rail. */}
+        {sectionBanner ? (
           <div className="relative mb-4 h-52 sm:h-64 w-full overflow-hidden rounded-xl">
-            <img src={mod.bannerUrl} alt={`Banner for ${mod?.title ?? 'this module'}`} className="absolute inset-0 h-full w-full object-cover" />
+            <img key={sectionBanner} src={sectionBanner} alt={`Banner for ${mod?.title ?? 'this module'}`} className="absolute inset-0 h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
             <div className="absolute inset-x-0 bottom-0 p-5 text-white">
               <p className="text-xs font-semibold uppercase tracking-wider text-white/80 mb-1.5">{course?.title ?? courseFull?.title}</p>
