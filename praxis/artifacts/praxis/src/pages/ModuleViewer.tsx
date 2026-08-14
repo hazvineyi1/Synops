@@ -2647,7 +2647,7 @@ function ReadingCoursework({ courseId, moduleId, readings }: { courseId: string;
   );
 }
 
-function ReadingsSection({ courseId, moduleId, isInstructor }: { courseId: string; moduleId: string; isInstructor: boolean }) {
+function ReadingsSection({ courseId, moduleId, isInstructor, onPrevSection }: { courseId: string; moduleId: string; isInstructor: boolean; onPrevSection?: () => void }) {
   const qc = useQueryClient();
   const { data: readings } = useQuery({
     queryKey: ['module-readings', moduleId],
@@ -2810,7 +2810,8 @@ function ReadingsSection({ courseId, moduleId, isInstructor }: { courseId: strin
         )}
         {/* Navigate between readings without going back to the list each time. */}
         <div className="flex items-center justify-between gap-3 max-w-3xl mx-auto pt-1">
-          <Button variant="outline" size="sm" disabled={!prevR} onClick={() => prevR && setReaderId(prevR.id)} className="gap-1.5">
+          <Button variant="outline" size="sm" disabled={!prevR && !onPrevSection}
+            onClick={() => { if (prevR) setReaderId(prevR.id); else onPrevSection?.(); }} className="gap-1.5">
             <ChevronLeft className="h-4 w-4" /> Previous
           </Button>
           {nextR ? (
@@ -3979,6 +3980,9 @@ function ModuleHubView({
   // module. This removes the confusing "jump back to an unfinished earlier tab" behaviour.
   const curFlowIdx = flow.findIndex((d) => d.id === tab);
   const nextFlow = curFlowIdx >= 0 ? flow[curFlowIdx + 1] : flow.find((d) => d.id !== tab);
+  const prevFlow = curFlowIdx > 0 ? flow[curFlowIdx - 1] : null;
+  const goPrev = () => setTab(prevFlow ? prevFlow.id : 'overview');
+  const canGoPrev = tab !== 'overview';
 
   let continueLabel: string;
   let continueAction: () => void;
@@ -4499,7 +4503,7 @@ function ModuleHubView({
             )}
 
             {/* Uploaded documents / links (+ the staff uploader). */}
-            <ReadingsSection courseId={courseId} moduleId={moduleId} isInstructor={isInstructor} />
+            <ReadingsSection courseId={courseId} moduleId={moduleId} isInstructor={isInstructor} onPrevSection={goPrev} />
 
             {readingCount === 0 && !isInstructor && (
               <NothingHere icon={BookOpen} title="No readings for this module" next={nextStep} />
@@ -4695,6 +4699,11 @@ function ModuleHubView({
               <p className="font-semibold text-sm">{tab === 'overview' ? 'Ready to begin' : 'Keep going'}</p>
               <p className="text-sm text-muted-foreground">{tab === 'overview' ? 'Start with the first section of this module.' : 'Work through each learning experience in order.'}</p>
             </div>
+            {canGoPrev && (
+              <Button variant="outline" className="shrink-0" onClick={goPrev}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+              </Button>
+            )}
             <Button className="shrink-0" onClick={continueAction}>
               {continueLabel}
               <ChevronRight className="h-4 w-4 ml-1" />

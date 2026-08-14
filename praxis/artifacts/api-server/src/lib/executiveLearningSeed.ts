@@ -3,7 +3,7 @@ import {
   partnersTable, organisationsTable, usersTable,
   coursesTable, modulesTable, beatsTable, interactiveActivitiesTable, moduleReadingsTable, caseScenariosTable,
 } from "@workspace/db";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { PEJ_M1_SPEC, PEJ_M2_SPEC } from "./stations";
 import { PEJ_M1_READING, PEJ_M2_READING } from "./stationReadings";
 import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS, PEJ_M1_COACH, PEJ_M2_COACH, type CoachCase } from "./stationCoach";
@@ -139,23 +139,14 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
   // exists, e.g. built in the platform) so the section content is populated; otherwise create it.
   if (m.reading) {
     const readingTitle = `${m.title}: Reading`;
-    // Remove any stray legacy "link" reading (older seeds attached a /demos launch link). The station
-    // is now a native activity, so the module's reading should be the authored note only, not an
-    // empty link the learner would open first.
-    await db.delete(moduleReadingsTable).where(and(eq(moduleReadingsTable.moduleId, mod.id), eq(moduleReadingsTable.kind, "link")));
-    const existingReading = await db.select({ id: moduleReadingsTable.id })
-      .from(moduleReadingsTable)
-      .where(and(eq(moduleReadingsTable.moduleId, mod.id), ne(moduleReadingsTable.kind, "link")));
-    if (existingReading.length === 0) {
-      await db.insert(moduleReadingsTable).values({
-        moduleId: mod.id, courseId, title: readingTitle, kind: "note",
-        content: m.reading, chars: m.reading.length, order: 0, published: true, createdBy: authorId,
-      });
-    } else {
-      await db.update(moduleReadingsTable)
-        .set({ title: readingTitle, kind: "note", content: m.reading, chars: m.reading.length, published: true, updatedAt: new Date() })
-        .where(eq(moduleReadingsTable.id, existingReading[0].id));
-    }
+    // Authoritative: replace ALL readings on the module (stray link readings, earlier architect-
+    // generated readings with empty sections, etc.) with the single authored note, so a re-provision
+    // always leaves exactly one populated reading. Re-running is safe and idempotent.
+    await db.delete(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, mod.id));
+    await db.insert(moduleReadingsTable).values({
+      moduleId: mod.id, courseId, title: readingTitle, kind: "note",
+      content: m.reading, chars: m.reading.length, order: 0, published: true, createdBy: authorId,
+    });
   }
 
   // Upsert the AI case coach for this module, tuned to the PEJ / Ukraine persona. Scoped to this
