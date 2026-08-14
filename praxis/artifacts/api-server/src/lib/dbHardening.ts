@@ -164,6 +164,12 @@ export async function ensureIntegrityConstraints(): Promise<void> {
       sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS ended_reason text`,
       sql`ALTER TABLE sessions ADD COLUMN IF NOT EXISTS analysis jsonb`,
     ]],
+    // Case-study session analysis now carries recommendations. The column is in the Drizzle schema,
+    // so EVERY full-row select of case_sessions references it - it MUST exist before any case read,
+    // or the whole case surface 500s. Additive/nullable; existing sessions are untouched.
+    ["case_sessions", [
+      sql`ALTER TABLE case_sessions ADD COLUMN IF NOT EXISTS recommendations text[]`,
+    ]],
     // Per-organisation grading overrides (course default + org override).
     ["gradebook_org_overrides", [
       sql`CREATE TABLE IF NOT EXISTS gradebook_org_overrides (
