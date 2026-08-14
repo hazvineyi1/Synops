@@ -3287,6 +3287,8 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
   const [genBusy, setGenBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState('');
+  const [showTranscript, setShowTranscript] = useState(false);
   const reset = () => { setTs('0:30'); setStem(''); setOpts(['', '', '', '']); setCorrect(0); setFb(''); setEditingId(null); };
   const refresh = () => qc.invalidateQueries({ queryKey: ['iv-questions', beatId] });
   const startEdit = (q: { id: string; videoTimestamp: number; stem: string; options?: { id: string; text: string }[]; correctOptionIds?: string[]; feedbackCorrect?: string | null }) => {
@@ -3322,10 +3324,15 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
     } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save the checkpoint.'); }
     finally { setBusy(false); }
   };
-  const generate = async () => {
+  const generate = async (useTranscript: boolean) => {
     setErr(null); setGenBusy(true);
-    try { await apiFetch(`/beats/${beatId}/interactive-questions/generate`, { method: 'POST', body: JSON.stringify({ count: 3 }) }); refresh(); }
-    catch (e) { setErr(e instanceof Error ? e.message : 'Could not generate checkpoints.'); }
+    try {
+      await apiFetch(`/beats/${beatId}/interactive-questions/generate`, {
+        method: 'POST',
+        body: JSON.stringify({ count: useTranscript ? 5 : 3, transcript: useTranscript ? transcript : undefined }),
+      });
+      refresh();
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Could not generate checkpoints.'); }
     finally { setGenBusy(false); }
   };
   const del = async (id: string) => { await apiFetch(`/interactive-questions/${id}`, { method: 'DELETE' }); refresh(); };
@@ -3347,9 +3354,24 @@ function CheckpointEditor({ beatId }: { beatId: string }) {
       )}
       {err && <p className="text-xs text-rose-600">{err}</p>}
       {!open ? (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setOpen(true)}>+ Add checkpoint</Button>
-          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={genBusy} onClick={generate}>{genBusy ? 'Generating…' : 'Generate from lesson'}</Button>
+        <div className="space-y-2">
+          {showTranscript && (
+            <div className="space-y-1">
+              <textarea value={transcript} onChange={(e) => setTranscript(e.target.value)} rows={5}
+                placeholder="Paste the video transcript here (include timestamps if you have them, e.g. 0:45 …). Checkpoints are generated from what the video actually says, at the right moments."
+                className="w-full rounded border border-input bg-background px-2 py-1.5 text-xs leading-relaxed" />
+              <p className="text-[11px] text-muted-foreground">Tip: on YouTube, open the transcript panel (⋯ → Show transcript) and paste it in. Timestamps let each checkpoint land at the exact moment.</p>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setOpen(true)}>+ Add checkpoint</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setShowTranscript((s) => !s)}>{showTranscript ? 'Hide transcript' : 'Paste transcript'}</Button>
+            {transcript.trim().length >= 60 ? (
+              <Button size="sm" className="h-7 text-xs" disabled={genBusy} onClick={() => generate(true)}>{genBusy ? 'Generating…' : 'Generate from transcript'}</Button>
+            ) : (
+              <Button size="sm" variant="outline" className="h-7 text-xs" disabled={genBusy} onClick={() => generate(false)}>{genBusy ? 'Generating…' : 'Generate from lesson'}</Button>
+            )}
+          </div>
         </div>
       ) : (
         <div className="space-y-2 bg-background rounded-lg border p-2.5">

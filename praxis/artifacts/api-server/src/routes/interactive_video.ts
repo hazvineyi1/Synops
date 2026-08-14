@@ -85,22 +85,38 @@ router.post("/beats/:beatId/interactive-questions/generate", requireAuth, async 
   if (!beat) { res.status(404).json({ error: "Not found" }); return; }
   const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, beat.moduleId) });
   const readings = await db.select().from(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, beat.moduleId));
-  const content = [
+  // Prefer a pasted transcript (persisted on the beat) so checkpoints come from what the video
+  // ACTUALLY says, keyed to real timestamps, rather than the lesson notes at fixed spacing.
+  const bodyTranscript = String((req.body as { transcript?: string } | undefined)?.transcript ?? "").trim();
+  const storedTranscript = ((beat as { transcript?: string }).transcript ?? "").trim();
+  const transcript = bodyTranscript || storedTranscript;
+  if (bodyTranscript && bodyTranscript !== storedTranscript) {
+    await db.update(beatsTable).set({ transcript: bodyTranscript }).where(eq(beatsTable.id, beat.id));
+  }
+  const fromTranscript = transcript.length >= 60;
+
+  const lessonContent = [
     `Module: ${mod?.title ?? ""}`,
     mod?.objectives?.length ? `Objectives: ${mod.objectives.join("; ")}` : "",
     beat.title ? `Video: ${beat.title}` : "",
     beat.narration ? `Video notes: ${beat.narration}` : "",
-    (beat as { transcript?: string }).transcript ? `Transcript: ${(beat as { transcript?: string }).transcript}` : "",
     readings.map((r) => r.content ?? "").filter(Boolean).join("\n\n"),
-  ].filter(Boolean).join("\n\n").slice(0, 12000);
-  if (content.trim().length < 60) { res.status(400).json({ error: "Not enough lesson content to generate checkpoints from." }); return; }
+  ].filter(Boolean).join("\n\n").slice(0, 6000);
+  const content = fromTranscript ? transcript.slice(0, 12000) : lessonContent;
+  if (content.trim().length < 60) {
+    res.status(400).json({ error: fromTranscript ? "The transcript is too short to generate checkpoints from." : "Not enough content to generate checkpoints. Paste the video transcript to generate from what the video actually says." });
+    return;
+  }
 
   const wantRaw = Number((req.body as { count?: number } | undefined)?.count);
-  const want = Number.isFinite(wantRaw) ? Math.max(1, Math.min(6, Math.round(wantRaw))) : 3;
+  const want = Number.isFinite(wantRaw) ? Math.max(1, Math.min(8, Math.round(wantRaw))) : (fromTranscript ? 5 : 3);
+  const prompt = fromTranscript
+    ? `You are given the TRANSCRIPT of a video. Write ${want} multiple-choice CHECKPOINT questions that pop up while a learner watches it. Each question must check understanding of a specific point the speaker actually makes in the transcript (not trivia), phrased so a learner who has just watched that part can answer it. Give 4 options, one correct, and one line of feedback for the correct answer.\nFor EACH question set "timestampSeconds" to the moment the point is made: if the transcript contains timestamps (e.g. 0:45, [01:20], 1:03:12), convert the relevant one to seconds; if it has none, estimate an increasing, sensibly spaced value. Order the questions by timestamp.\nReturn ONLY strict JSON: { "questions": [ { "stem": "…", "options": ["A","B","C","D"], "correctIndex": 0, "feedback": "…", "timestampSeconds": 45 } ] }\n\n=== TRANSCRIPT ===\n${content}\n\nReturn ONLY the JSON object.`
+    : `Write ${want} multiple-choice CHECKPOINT questions to pop up while a learner watches a video on this topic. Each checks understanding of a key idea (not trivia), with 4 options and one correct answer, plus one line of feedback for the correct answer. Ground them in the content below.\n\nReturn ONLY strict JSON: { "questions": [ { "stem": "…", "options": ["A","B","C","D"], "correctIndex": 0, "feedback": "…" } ] }\n\n=== CONTENT ===\n${content}\n\nReturn ONLY the JSON object.`;
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6", max_tokens: 1800,
-      messages: [{ role: "user", content: `Write ${want} multiple-choice CHECKPOINT questions to pop up while a learner watches a video on this topic. Each checks understanding of a key idea (not trivia), with 4 options and one correct answer, plus one line of feedback for the correct answer. Ground them in the content below.\n\nReturn ONLY strict JSON: { "questions": [ { "stem": "…", "options": ["A","B","C","D"], "correctIndex": 0, "feedback": "…" } ] }\n\n=== CONTENT ===\n${content}\n\nReturn ONLY the JSON object.` }],
+      model: "claude-sonnet-4-6", max_tokens: 2400,
+      messages: [{ role: "user", content: prompt }],
     }, { timeout: 90000, maxRetries: 1 });
     const text = (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
     let parsed: any = {}; try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
@@ -111,7 +127,11 @@ router.post("/beats/:beatId/interactive-questions/generate", requireAuth, async 
       const opts = Array.isArray(q?.options) ? q.options.map((t: any, k: number) => ({ id: `o${k}`, text: String(t).slice(0, 300) })).filter((o: any) => o.text.trim()) : [];
       const ci = Math.max(0, Math.min(opts.length - 1, Number(q?.correctIndex) || 0));
       if (!q?.stem || opts.length < 2) continue;
-      const ts = 45 + i * 75; // spaced checkpoints; the author can adjust each one
+      // From a transcript, place the checkpoint at the moment the point is made; otherwise space them.
+      const tsModel = Number(q?.timestampSeconds);
+      const ts = fromTranscript && Number.isFinite(tsModel) && tsModel > 0
+        ? Math.min(Math.round(tsModel), 6 * 3600)
+        : 45 + i * 75;
       const [row] = await db.insert(interactiveVideoQuestionsTable).values({
         beatId: req.params.beatId, videoTimestamp: String(ts), questionType: "multiple_choice",
         stem: String(q.stem).slice(0, 500), options: opts, correctOptionIds: [`o${ci}`],
