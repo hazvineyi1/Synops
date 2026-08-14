@@ -74,6 +74,29 @@ export function TutorAvatar({ avatar, size = 56, speaking = false, ring = false 
     );
   }
 
+  // Mutale: a Black female clinician (white coat, stethoscope) for the Zambian clinical-leadership coach.
+  if (avatar === "mutale") {
+    return (
+      <span style={{ display: "inline-block", width: size, height: size, borderRadius: "50%", overflow: "hidden", ...ringStyle }}>
+        <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true">
+          <rect width="100" height="100" fill="#e6efe9" />
+          <path d="M18 100 V86 c0-12 14-20 32-20 s32 8 32 20 V100 Z" fill="#ffffff" />
+          <path d="M50 66 L41 100 M50 66 L59 100" stroke="#dbe4dd" strokeWidth="2" fill="none" />
+          <g stroke="#2f6f5e" strokeWidth="2.2" fill="none">
+            <path d="M42 68 c-4 8 -3 16 4 20 M58 68 c4 8 3 16 -4 20" />
+          </g>
+          <circle cx="46" cy="92" r="3" fill="#2f6f5e" />
+          <rect x="44" y="57" width="12" height="13" rx="4" fill="#8a5a34" />
+          <ellipse cx="50" cy="42" rx="17" ry="19" fill="#9c6b3f" />
+          <path d="M31 45 c-2-18 12-28 19-28 s21 10 19 28 c-3-6 -6-9 -6-9 c-2 6 -9 8 -13 8 s-11-2 -13-8 c0 0 -3 3 -6 9 Z" fill="#241a13" />
+          <circle cx="43.5" cy="42" r="1.8" fill="#241a13" />
+          <circle cx="56.5" cy="42" r="1.8" fill="#241a13" />
+          <path d="M45 49 q5 4 10 0" stroke="#5b3a20" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+        </svg>
+      </span>
+    );
+  }
+
   const p = presetById(avatar) ?? AVATAR_PRESETS[0];
   const mouthStyle: React.CSSProperties = speaking
     ? { animation: "tutor-talk 0.26s ease-in-out infinite", transformOrigin: "center", transformBox: "fill-box" }

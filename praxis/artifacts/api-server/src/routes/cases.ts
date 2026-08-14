@@ -609,11 +609,15 @@ router.get("/case-sessions/:id", requireAuth, async (req, res) => {
   if (s.userId !== u.id) {
     if (!cs || !canManageCase(u, cs)) { res.status(404).json({ error: "Not found" }); return; }
   }
+  // Where this case lives, so Exit can return the learner to the module's Case studies tab.
+  const mod = cs?.moduleId ? await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, cs.moduleId) }) : null;
   res.json({
     ...sessionResponse(s),
     tutorName: cs?.tutorName ?? null,
     tutorAvatar: cs?.tutorAvatar ?? null,
     caseTitle: cs?.title ?? null,
+    moduleId: cs?.moduleId ?? null,
+    courseId: mod?.courseId ?? null,
     contextBlock: s.translatedContext ?? cs?.contextBlock ?? null,
     learningObjective: s.translatedObjective ?? cs?.learningObjective ?? null,
   });

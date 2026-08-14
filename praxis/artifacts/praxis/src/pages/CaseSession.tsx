@@ -85,9 +85,18 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
 
   const tutorName = data?.tutorName || "Your coach";
   const tutorAvatar = data?.tutorAvatar || "f1";
-  // Justice-sector coach uses the Lady Justice silhouette instead of a face.
-  const coachAvatar = isPEJCase ? "justice" : tutorAvatar;
+  // Justice-sector coach uses the Lady Justice silhouette; the Zambian leadership coach (Mutale) uses
+  // a Black female doctor avatar. Every other course keeps its configured tutor face.
+  const coachAvatar = isPEJCase ? "justice" : isMRBCase ? "mutale" : tutorAvatar;
   const gender = tutorGender(tutorAvatar);
+
+  // Exit returns the learner to the case study they are working on: the module's Case studies tab.
+  // Falls back to browser history, then the cases list, when the module is unknown.
+  const exitToCase = () => {
+    if (data?.courseId && data?.moduleId) { navigate(`/courses/${data.courseId}/modules/${data.moduleId}?tab=cases`); return; }
+    if (typeof window !== "undefined" && window.history.length > 1) { window.history.back(); return; }
+    navigate("/cases");
+  };
   const spokeOpening = useRef(false);
 
   // Young learners get audio ON by default (a phonics lesson makes no sense silent), and a
@@ -182,7 +191,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     </div>;
   }
 
-  if (analysis) return <AnalysisView a={analysis} onDone={() => navigate("/cases")} />;
+  if (analysis) return <AnalysisView a={analysis} onDone={exitToCase} />;
 
   const pct = Math.min(100, Math.round((promptCount / promptLimit) * 100));
 
@@ -294,7 +303,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     <div className="h-screen flex flex-col" style={{ background: young ? `${kidAccent}12` : "hsl(43 30% 97%)" }}>
       <header className="flex items-center justify-between gap-2 px-3 sm:px-4 h-16 border-b bg-white/85 backdrop-blur shrink-0" style={young ? { borderColor: `${kidAccent}33` } : undefined}>
         <Button variant="ghost" size="sm" style={young ? { color: kidAccent, fontWeight: 700 } : undefined}
-          onClick={() => { if (typeof window !== "undefined" && window.history.length > 1) window.history.back(); else navigate("/cases"); }}>
+          onClick={exitToCase}>
           <ArrowLeft className="h-4 w-4 mr-1" /> {T("Exit", "Back")}
         </Button>
 
@@ -358,7 +367,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
       ) : (
         <div className="flex-1 relative min-h-0">
           <div className="h-1 bg-muted"><div className="h-full transition-all" style={{ width: `${pct}%`, background: pct >= 100 ? "hsl(145 45% 42%)" : "hsl(222 47% 30%)" }} /></div>
-          <div className={`absolute inset-0 top-1 overflow-auto ${coachMin ? "" : "lg:pr-[420px]"}`}>
+          <div className={`absolute inset-0 top-1 overflow-auto ${coachMin ? "" : coachBig ? "sm:pr-[600px]" : "sm:pr-[420px]"}`}>
             <article className="mx-auto max-w-3xl px-5 sm:px-8 py-10 pb-[48vh] sm:pb-44">
               <p className="text-[11px] uppercase tracking-wide text-muted-foreground flex items-center gap-1.5 mb-3"><BookOpen className="h-3.5 w-3.5" /> The situation</p>
               {factsObj && <div className="mb-6"><span className="text-sm rounded-md px-3 py-1.5 inline-block" style={{ background: "hsl(222 47% 96%)", color: "hsl(222 30% 35%)" }}>Goal: {factsObj}</span></div>}

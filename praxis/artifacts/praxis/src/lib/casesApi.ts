@@ -84,6 +84,9 @@ export interface CaseSessionRow {
   language?: string | null;
   contextBlock?: string | null;
   learningObjective?: string | null;
+  // Where this case lives, so Exit returns the learner to the module's Case studies tab.
+  moduleId?: string | null;
+  courseId?: string | null;
 }
 
 export interface EmbedLink {
