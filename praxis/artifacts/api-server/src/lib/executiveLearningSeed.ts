@@ -2,6 +2,7 @@ import { db } from "@workspace/db";
 import {
   partnersTable, organisationsTable, usersTable,
   coursesTable, modulesTable, beatsTable, interactiveActivitiesTable, moduleReadingsTable, caseScenariosTable,
+  enrolmentsTable,
 } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { PEJ_M1_SPEC, PEJ_M2_SPEC } from "./stations";
@@ -26,6 +27,9 @@ import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS, PEJ_M1_COACH, PEJ_M2_COACH, t
 
 const SLUG = "executive-learning";
 const COURSE_TITLE = "PEJ-EVD-01 · Evidence at the conflict-related crime scene";
+// Fixed demo learner for the one-click public demo link (/demos/pej). Kept in sync with the
+// "executive-learning" entry in DEMO_TENANTS (auth.ts). Reachable only via the demo-login button.
+export const EXEC_DEMO_LEARNER_EMAIL = "demo.learner@exec-learning.test";
 
 interface SeedModule {
   title: string;
@@ -230,6 +234,22 @@ export async function seedExecutiveLearning(): Promise<{
 
   // 4. Course + modules, owned by the partner tenant
   const { courseId, created: createdCourse } = await ensureCourseAndModules(partner.id, org.id, faculty.id);
+
+  // 5. Demo learner (find-or-create) enrolled in the course, so the public /demos/pej link can drop a
+  //    visitor straight into the FULL published course as an enrolled learner (readings, video, case,
+  //    discussion, all tabs), not just the standalone interactive station.
+  let demoLearner = await firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, EXEC_DEMO_LEARNER_EMAIL)));
+  if (!demoLearner) {
+    [demoLearner] = await db.insert(usersTable).values({
+      email: EXEC_DEMO_LEARNER_EMAIL, firstName: "Demo", lastName: "Learner",
+      role: "learner", status: "active", partnerId: partner.id, organisationId: org.id,
+    }).returning();
+  }
+  const enrolled = await db.select().from(enrolmentsTable)
+    .where(and(eq(enrolmentsTable.userId, demoLearner.id), eq(enrolmentsTable.courseId, courseId)));
+  if (!enrolled.length) {
+    await db.insert(enrolmentsTable).values({ userId: demoLearner.id, courseId, status: "active" });
+  }
 
   return {
     created: createdPartner || createdCourse,

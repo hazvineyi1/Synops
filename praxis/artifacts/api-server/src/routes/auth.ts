@@ -4,12 +4,13 @@ import {
   usersTable,
   organisationsTable,
   partnersTable,
+  coursesTable,
   authSessionsTable,
   passwordResetsTable,
   loginEventsTable,
   mfaFactorsTable,
 } from "@workspace/db";
-import { eq, and, isNull, gt } from "drizzle-orm";
+import { eq, and, isNull, gt, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import {
@@ -297,6 +298,8 @@ type DemoTenant = { slug: string; student: string; studentAlt?: string; admin: s
 const DEMO_TENANTS: Record<string, DemoTenant> = {
   "enza-global": { slug: "enza-global", student: "enza@student1.test", admin: "demo.admin@enzaglobalmedia.co.za", adminRole: "partner_admin" },
   "synops-demo": { slug: "synops-demo", student: "demo.learner@synops-demo.test", admin: "demo.admin@synops-demo.test", adminRole: "partner_admin" },
+  // Justice-sector demo: the public /demos/pej link enters the full PEJ course as this enrolled learner.
+  "executive-learning": { slug: "executive-learning", student: "demo.learner@exec-learning.test", admin: "demo.admin@exec-learning.test", adminRole: "partner_admin" },
   "synops-k12": {
     slug: "synops-k12", student: "maya.k12@synops-demo.test", studentAlt: "leo.k12@synops-demo.test",
     admin: "teacher.k12@synops-demo.test", adminRole: "partner_admin",
@@ -426,6 +429,37 @@ router.post("/auth/demo-login", async (req, res) => {
 
   res.cookie(SESSION_COOKIE, token, cookieOptions());
   res.json({ user: publicUser(user) });
+});
+
+/**
+ * GET /auth/demo-course?tenant=executive-learning
+ *
+ * Public, host-locked (same allow-list as demo-login): returns the newest published course owned by
+ * the named demo tenant's partner. A public demo landing calls this to deep-link a visitor straight
+ * into the FULL course after the one-click demo sign-in, rather than dropping them at the dashboard.
+ */
+router.get("/auth/demo-course", async (req, res) => {
+  if (process.env.ENABLE_DEMO_LOGIN === "0") { res.status(404).json({ error: "Not found." }); return; }
+  const configured = (process.env.DEMO_LOGIN_HOSTS || "")
+    .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const allowHosts = configured.length ? configured : DEFAULT_DEMO_HOSTS;
+  const host = String(req.headers.host || "").toLowerCase().split(":")[0];
+  if (!allowHosts.includes(host)) { res.status(404).json({ error: "Not found." }); return; }
+
+  const requested = String(req.query?.tenant ?? "").trim();
+  const tenantKey = (requested && DEMO_TENANTS[requested]) ? requested : (HOST_DEFAULT_TENANT[host] ?? "synops-demo");
+  const tenant = DEMO_TENANTS[tenantKey] ?? DEMO_TENANTS["synops-demo"];
+
+  const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, tenant.slug)).limit(1);
+  if (!partner) { res.status(404).json({ error: "Demo tenant is not provisioned yet." }); return; }
+  const [course] = await db
+    .select()
+    .from(coursesTable)
+    .where(and(eq(coursesTable.tenantId, partner.id), eq(coursesTable.status, "published")))
+    .orderBy(desc(coursesTable.createdAt))
+    .limit(1);
+  if (!course) { res.status(404).json({ error: "No published course for this demo tenant yet." }); return; }
+  res.json({ courseId: course.id, title: course.title });
 });
 
 /** POST /auth/logout, revokes THIS session only. */
