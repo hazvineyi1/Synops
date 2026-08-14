@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useParams, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -131,67 +131,63 @@ function ReflectionForm({ prompts, value, onChange }: {
 }
 
 // ─── Case study submission ────────────────────────────────────────────────────
-function CaseStudyForm({ scenario, sections, value, onChange }: {
-  scenario?: string;
+// Every case is shown expanded, with its prompt and its own answer box, so a multi-part assessment
+// reads as question-then-input down the page rather than a collapsed accordion. A document/voice
+// upload is offered as an equal alternative to typing. Instructors can edit each question inline.
+function CaseStudyForm({ sections, value, onChange, upload, onUploadChange, canEdit, onEditSection }: {
   sections: { id: string; title: string; prompt: string }[];
   value: Record<string, string>;
   onChange: (v: Record<string, string>) => void;
+  upload: { filename: string; dataBase64: string } | null;
+  onUploadChange: (f: { filename: string; dataBase64: string } | null) => void;
+  canEdit?: boolean;
+  onEditSection?: (id: string, patch: { title?: string; prompt?: string }) => void;
 }) {
-  const [open, setOpen] = useState<string>(sections[0]?.id ?? '');
+  const [editingId, setEditingId] = useState<string | null>(null);
   return (
-    <div className="space-y-3">
-      {scenario && (
-        <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-sm leading-relaxed">
-          <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-2">Scenario</div>
-          <p className="text-foreground">{scenario}</p>
-        </div>
-      )}
+    <div className="space-y-4">
       {sections.map((sec, i) => {
-        const isOpen = open === sec.id;
         const filled = (value[sec.id] ?? '').trim().length > 0;
+        const editing = canEdit && editingId === sec.id;
         return (
-          <div key={sec.id} className={cn('rounded-xl border transition-all', isOpen ? 'border-primary/30 shadow-sm' : 'border-border')}>
-            <button
-              type="button"
-              onClick={() => setOpen(isOpen ? '' : sec.id)}
-              className="w-full flex items-center justify-between px-4 py-3 text-left gap-3"
-            >
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  'h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0',
-                  filled ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground',
-                )}>
-                  {filled ? <CheckCircle className="h-3.5 w-3.5" /> : i + 1}
-                </div>
-                <span className="font-medium text-sm">{sec.title}</span>
+          <div key={sec.id} className="rounded-xl border border-border bg-card p-4 space-y-2.5">
+            <div className="flex items-start gap-3">
+              <div className={cn('h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5', filled ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground')}>
+                {filled ? <CheckCircle className="h-3.5 w-3.5" /> : i + 1}
               </div>
-              {isOpen ? <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />}
-            </button>
-            <AnimatePresence>
-              {isOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
-                >
-                  <div className="px-4 pb-4 space-y-2">
-                    <p className="text-xs text-muted-foreground italic">{sec.prompt}</p>
-                    <Textarea
-                      placeholder="Your response…"
-                      value={value[sec.id] ?? ''}
-                      onChange={e => onChange({ ...value, [sec.id]: e.target.value })}
-                      className="min-h-[120px] text-sm resize-none"
-                    />
-                    <div className="text-xs text-muted-foreground">{wordCount(value[sec.id] ?? '')} words</div>
-                  </div>
-                </motion.div>
+              <div className="flex-1 min-w-0">
+                {editing
+                  ? <input value={sec.title} onChange={(e) => onEditSection?.(sec.id, { title: e.target.value })} className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm font-medium" aria-label="Question title" />
+                  : <div className="font-medium text-sm">{sec.title}</div>}
+              </div>
+              {canEdit && (
+                <button type="button" onClick={() => setEditingId(editing ? null : sec.id)} className="text-xs text-muted-foreground hover:text-foreground shrink-0">
+                  {editing ? 'Done' : 'Edit'}
+                </button>
               )}
-            </AnimatePresence>
+            </div>
+            {editing
+              ? <textarea value={sec.prompt} onChange={(e) => onEditSection?.(sec.id, { prompt: e.target.value })} className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs leading-relaxed min-h-[64px] ml-9" style={{ width: 'calc(100% - 2.25rem)' }} aria-label="Question prompt" />
+              : <p className="text-xs text-muted-foreground leading-relaxed pl-9">{sec.prompt}</p>}
+            <div className="pl-9 space-y-1">
+              <Textarea
+                placeholder="Your response…"
+                value={value[sec.id] ?? ''}
+                onChange={e => onChange({ ...value, [sec.id]: e.target.value })}
+                className="min-h-[130px] text-sm leading-relaxed resize-y"
+              />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <VoiceInputButton onTranscript={(t) => onChange({ ...value, [sec.id]: (value[sec.id] ? `${value[sec.id]} ` : '') + t })} />
+                <span>{wordCount(value[sec.id] ?? '')} words</span>
+              </div>
+            </div>
           </div>
         );
       })}
+      <div className="rounded-xl border border-dashed border-border p-3">
+        <p className="text-xs text-muted-foreground mb-1.5">Prefer to submit a document, or record your answer and attach it? Attach a file instead of typing, either is accepted equally.</p>
+        <AttachFile file={upload} onFileChange={onUploadChange} />
+      </div>
     </div>
   );
 }
@@ -880,6 +876,26 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
     enabled: !!courseId,
   });
 
+  // Instructor-editable copy of a case-study assignment's questions (title/prompt/scenario). Synced
+  // from the saved config; edits are held here and saved with the button below.
+  const [draftSections, setDraftSections] = useState<{ id: string; title: string; prompt: string }[] | null>(null);
+  const [draftScenario, setDraftScenario] = useState<string>('');
+  useEffect(() => {
+    if (!assignment) return;
+    const c = parseConfig(assignment.instructions);
+    if (c && c.__type === 'case_study') {
+      setDraftSections(Array.isArray(c.sections) ? c.sections : []);
+      setDraftScenario(typeof c.scenario === 'string' ? c.scenario : '');
+    } else {
+      setDraftSections(null);
+    }
+  }, [assignment]);
+  const saveConfig = useMutation({
+    mutationFn: (cfg: Record<string, unknown>) =>
+      apiFetch(`/assignments/${assignmentId}`, { method: 'PATCH', body: JSON.stringify({ instructions: JSON.stringify(cfg) }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['assignment', assignmentId] }),
+  });
+
   const submitMutation = useMutation({
     mutationFn: (body: string) =>
       apiFetch(`/assignments/${assignmentId}/submit`, {
@@ -932,10 +948,12 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
     submissionBody = JSON.stringify({ type: 'reflection', answers: reflectionAnswers });
     canSubmit = allFilled;
   } else if (subType === 'case_study') {
-    const sections: any[] = config?.sections ?? [];
+    const sections: any[] = (draftSections ?? config?.sections ?? []);
     const allFilled = sections.length > 0 && sections.every((s: any) => caseStudyAnswers[s.id]?.trim());
     submissionBody = JSON.stringify({ type: 'case_study', sections: caseStudyAnswers });
-    canSubmit = allFilled;
+    // An attached document (or transcribed voice note) is an equally valid submission, so it also
+    // satisfies the requirement, the learner does not have to fill every box AND upload.
+    canSubmit = allFilled || !!upload;
   } else if (subType === 'quiz') {
     submissionBody = JSON.stringify({ type: 'quiz', answers: quizAnswers, ...quizScore });
     canSubmit = quizSubmitted;
@@ -1056,8 +1074,22 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
           {subType === 'case_study' && config?.scenario && !submitted && !graded && (
             <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-sm leading-relaxed">
               <div className="text-xs font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 mb-2">Scenario</div>
-              <p>{config.scenario}</p>
+              {isStaff
+                ? <textarea value={draftScenario} onChange={(e) => setDraftScenario(e.target.value)} className="w-full rounded-md border border-amber-300 bg-background px-2.5 py-2 text-sm leading-relaxed min-h-[80px]" aria-label="Scenario" />
+                : <p>{draftScenario || config.scenario}</p>}
             </div>
+          )}
+          {/* Instructor: persist edits to the case questions and scenario. Shown only when something changed. */}
+          {isStaff && subType === 'case_study' && draftSections && (
+            (JSON.stringify(draftSections) !== JSON.stringify(config?.sections ?? []) || draftScenario !== (config?.scenario ?? '')) && (
+              <div className="flex items-center justify-end gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+                <span className="text-muted-foreground mr-auto">You've edited the assessment questions.</span>
+                <Button size="sm" variant="ghost" onClick={() => { setDraftSections(config?.sections ?? []); setDraftScenario(config?.scenario ?? ''); }}>Discard</Button>
+                <Button size="sm" disabled={saveConfig.isPending} onClick={() => saveConfig.mutate({ __type: 'case_study', scenario: draftScenario, sections: draftSections })}>
+                  {saveConfig.isPending ? 'Saving…' : 'Save questions'}
+                </Button>
+              </div>
+            )
           )}
 
           {/* Graded */}
@@ -1199,13 +1231,17 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
                 {/* ── Case study ── */}
                 {subType === 'case_study' && (
                   <CaseStudyForm
-                    sections={config?.sections ?? [
+                    sections={draftSections ?? config?.sections ?? [
                       { id: 'situation', title: 'Situation Analysis', prompt: 'What are the key issues or challenges in this scenario?' },
                       { id: 'actions', title: 'Recommended Actions', prompt: 'What would you do, and why?' },
                       { id: 'reflection', title: 'Personal Reflection', prompt: 'How does this connect to your own work context?' },
                     ]}
                     value={caseStudyAnswers}
                     onChange={setCaseStudyAnswers}
+                    upload={upload}
+                    onUploadChange={setUpload}
+                    canEdit={isStaff}
+                    onEditSection={(id, patch) => setDraftSections((prev) => (prev ?? []).map((s) => s.id === id ? { ...s, ...patch } : s))}
                   />
                 )}
 

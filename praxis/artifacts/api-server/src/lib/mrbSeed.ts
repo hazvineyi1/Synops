@@ -36,7 +36,14 @@ interface SeedModule {
   reading: string;
   coach: CoachCase;
   assignmentTitle: string;
-  assignmentBrief: string;
+  assignmentIntro: string;
+  // Structured case-study config stored in assignments.instructions (JSON with __type), so the
+  // assessment renders each case as its own on-page question with an input, plus an upload option.
+  assignmentConfig: {
+    __type: "case_study";
+    scenario: string;
+    sections: { id: string; title: string; prompt: string }[];
+  };
   discussionTitle: string;
   discussionPrompt: string;
 }
@@ -59,8 +66,19 @@ const MODULES: SeedModule[] = [
       "Produce a one-page contemporaneous decision record in which every ethically-conflicted call, including your own, is flagged.",
     ],
     assignmentTitle: "Your 48-hour decision record",
-    assignmentBrief:
-      "Produce the one-page contemporaneous record of your last 48 hours as Acting Clinical Lead, told as a story a junior colleague could follow, flagging every ethically conflicted call, including your own, not only other people's. You may submit in writing, as an audio recording, or as a diagram with a spoken walkthrough; the format does not affect the pass-or-resubmit decision. Composite scenario only.",
+    assignmentIntro:
+      "Work through the five cases below. Write your response in each box, or attach a document (or audio) instead; the format does not affect the pass-or-resubmit decision. A human reviewer makes the final decision. Composite scenario only.",
+    assignmentConfig: {
+      __type: "case_study",
+      scenario: "You are the Acting Clinical Lead at a district-level facility. Overnight a critical medicine ran out as patient load surged. A well-connected family is pressing staff for priority for a relative. A junior colleague keeps starting to tell you something, then stopping. A peer's triage decision awaits your co-signature. Everyone and the facility are composites.",
+      sections: [
+        { id: "A", title: "Case A · Sequence your first actions", prompt: "Write your sequence of first leadership actions as Acting Clinical Lead, showing clearly that no prioritisation is made before the facility's allocation criteria are applied. State each step and your reason for its position in the sequence." },
+        { id: "B", title: "Case B · Your allocation decision", prompt: "Write your allocation of the scarce medicine and identify every component that makes it defensible and fair, referencing the three criteria from the module reading." },
+        { id: "C", title: "Case C · Eliciting the disclosure", prompt: "Write the exact questions or statements you would use to elicit your colleague's hesitant disclosure. You must not use leading or dismissive language. Briefly explain why each prompt avoids those two failure modes." },
+        { id: "D", title: "Case D · The co-sign defect", prompt: "Identify the single defect in the peer's triage decision, and state what you would do before co-signing." },
+        { id: "E", title: "Case E · Your one-page decision record", prompt: "Produce a one-page contemporaneous decision record covering every ethically conflicted call from Cases A through D, including your own decisions. Flag every conflicted call explicitly, with a brief justification." },
+      ],
+    },
     discussionTitle: "Where does fairness end and rigid rule-following begin?",
     discussionPrompt:
       "Set out your own view: where does defensible fairness end and rigid rule-following begin when you are allocating a scarce medicine under pressure, and what do you owe a colleague who hesitates but doesn't finish their sentence? Ground it in a real decision you have faced.",
@@ -82,8 +100,19 @@ const MODULES: SeedModule[] = [
       "Produce a 90-day leadership action plan in which every equity gap, including your own, is explicitly flagged.",
     ],
     assignmentTitle: "Your 90-day leadership action plan",
-    assignmentBrief:
-      "Produce a 90-day leadership action plan for your ward, told as the story of who benefits and who was nearly left out. Name at least one equity gap in your own design and what you will do about it, not only the gap you caught in someone else's proposal. Written, spoken, or scribe-assisted submissions are equally accepted. Composite only.",
+    assignmentIntro:
+      "Work through the five cases below. Write your response in each box, or attach a document (or audio) instead; the format does not affect the pass-or-resubmit decision. A human reviewer makes the final decision. Composite scenario only.",
+    assignmentConfig: {
+      __type: "case_study",
+      scenario: "You lead a short-staffed ward. A team member says she cannot take on anything more; the work still has to be shared. You then design a change to stop the overload recurring, and pressure-test it against who it might leave out, for example outreach clinics serving the poorest catchment. Everyone is a composite.",
+      sections: [
+        { id: "A", title: "Case A · Hear the constraint", prompt: "Write how you respond when the team member says she can't take on anything more, showing that you hear her real constraint before reassigning any task." },
+        { id: "B", title: "Case B · Transparent reallocation", prompt: "Write how you reallocate the work, and identify what makes your criterion transparent and legitimate rather than arbitrary." },
+        { id: "C", title: "Case C · Pitching the change", prompt: "Write how you pitch your change idea so buy-in rests on trust you have actually earned. If trust is thin, include the specific step you would take to rebuild it first." },
+        { id: "D", title: "Case D · The equity-excluding flaw", prompt: "Identify the single equity-excluding flaw in your colleague's proposed change, and state what you would require before co-endorsing it." },
+        { id: "E", title: "Case E · Your 90-day plan", prompt: "Produce a 90-day action plan, told as the story of who benefits and who was nearly left out. Explicitly flag every equity gap, including in your own design, with what you will do about it." },
+      ],
+    },
     discussionTitle: "Pitching a vision to a team that doesn't trust you yet",
     discussionPrompt:
       "Set out your own view: how do you pitch a change to a team that doesn't yet fully trust you, and who gets to decide which catchment areas count as 'the community' in a hospital-wide initiative? Anchor it in a change you have actually tried to lead.",
@@ -178,11 +207,19 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
     .from(assignmentsTable)
     .where(and(eq(assignmentsTable.moduleId, mod.id), eq(assignmentsTable.published, true)));
   if (publishedAsg.length === 0) {
+    // Structured case-study assignment: the config lives in `instructions` as JSON with __type, so the
+    // Assessment tab renders each case as its own on-page question with an input (plus an upload option).
     await db.insert(assignmentsTable).values({
       courseId, moduleId: mod.id, title: m.assignmentTitle,
-      description: m.assignmentBrief, instructions: m.assignmentBrief,
-      submissionType: "file_upload", pointsPossible: "100", published: true,
+      description: m.assignmentIntro, instructions: JSON.stringify(m.assignmentConfig),
+      submissionType: "essay", pointsPossible: "100", published: true,
     });
+  } else {
+    // Keep an already-seeded assignment's structured config current on re-provision (e.g. upgrading a
+    // plain file_upload brief to the case-study layout).
+    await db.update(assignmentsTable)
+      .set({ title: m.assignmentTitle, description: m.assignmentIntro, instructions: JSON.stringify(m.assignmentConfig), submissionType: "essay", published: true, updatedAt: new Date() })
+      .where(eq(assignmentsTable.id, publishedAsg[0].id));
   }
 
   const existingDisc = await db.select({ id: discussionsTable.id })
