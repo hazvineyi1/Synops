@@ -127,6 +127,14 @@ export function buildCaseSystemPrompt(c: CaseContext, isOpening: boolean): strin
       `CALIBRATED OPENING - begin with EXACTLY this question (you may only adjust it to address the learner by name): "${c.openingQuestion.trim()}"`
     );
   }
+
+  // WIND-DOWN: an end must be in sight. Consolidate near the cap, and never trap a struggling
+  // learner in an endless loop, wind down gracefully if they are clearly stuck.
+  const limit = c.promptLimit ?? 8;
+  extra.push(
+    `WIND-DOWN AND CLOSE - this coaching has an end in sight. You are at exchange ${c.turnCount} of about ${limit}. As you approach that number, stop opening new lines of inquiry and consolidate: ask the learner to pull their reasoning together in one move, then close warmly and tell them they can finish to see their analysis. ALSO wind down EARLY if the learner is clearly stuck: if they give up, repeatedly say "I don't know" or go quiet across two exchanges, get confused or distressed, or ask to stop, do NOT keep drilling the same point. Acknowledge it, offer a short supportive scaffold, and give ONE brief orienting hint to unblock them (this is the only time you may state a point rather than ask, and it is a hint, never the full answer), then invite them either to make their best attempt or to finish and see their analysis. A struggling learner should always feel a way out, not a trap.`
+  );
+
   if (extra.length) prompt += "\n\n" + extra.join("\n\n");
   return prompt;
 }
@@ -162,6 +170,7 @@ export interface CaseAnalysis {
   conceptsAddressed: string[];
   reasoningStrengths: string[];
   developmentAreas: string[];
+  recommendations: string[]; // concrete next steps for the learner
   rubricScores: CaseRubricScore[];
 }
 
@@ -201,10 +210,11 @@ ${c.focusAreas?.length ? "Focus areas the case targets: " + c.focusAreas.join(";
 Assess ONLY the learner's demonstrated reasoning across the whole dialogue, not writing length, tone or confidence.
 Return a SINGLE strict JSON object, no prose around it:
 {
-  "engagementNarrative": "2-3 sentences on how the learner reasoned through the case",
+  "engagementNarrative": "3-4 sentences on how the learner reasoned through the case, what they grasped and where they hesitated",
   "conceptsAddressed": [string],
   "reasoningStrengths": [string],
   "developmentAreas": [string],
+  "recommendations": [string, 2-4 concrete, specific next steps the learner should take to improve, grounded in what this dialogue showed - each an actionable instruction, not a restatement of a weakness],
   "engagementScore": number (1-10, 10 = expert-level reasoning fully applied to the facts)${rubricShape}
 }${rubricBlock}${langLine}`;
 
@@ -240,6 +250,7 @@ Return a SINGLE strict JSON object, no prose around it:
         conceptsAddressed: arr(p.conceptsAddressed),
         reasoningStrengths: arr(p.reasoningStrengths),
         developmentAreas: arr(p.developmentAreas),
+        recommendations: arr(p.recommendations),
         rubricScores: scores,
       };
     }
@@ -252,6 +263,7 @@ Return a SINGLE strict JSON object, no prose around it:
     conceptsAddressed: [],
     reasoningStrengths: [],
     developmentAreas: [],
+    recommendations: [],
     rubricScores: [],
   };
 }

@@ -164,7 +164,7 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
       aiPersona: PEJ_COACH_PERSONA, aiConstraints: PEJ_COACH_CONSTRAINTS, guidingInstructions: m.coach.guiding,
       tutorName: "PEJ field coach", difficulty: "advanced" as const, bloomsLevel: "Evaluate",
       status: "published" as const, isLibrary: false, tags: ["justice", "Ukraine", "Project Expedite Justice"],
-      updatedAt: new Date(),
+      promptLimit: 10, updatedAt: new Date(),
     };
     const existingCase = await db.select({ id: caseScenariosTable.id })
       .from(caseScenariosTable).where(eq(caseScenariosTable.moduleId, mod.id));

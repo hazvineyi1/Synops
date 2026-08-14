@@ -221,7 +221,7 @@ export function CaseBuilder({ params }: { params?: { caseId?: string } }) {
                 <option value="advanced">Advanced</option>
               </select>
             </Field>
-            <Field label="Prompt budget" hint="Soft target number of exchanges (3–20).">
+            <Field label="Coaching exchanges" hint="How many back-and-forth exchanges before the coach winds down and the session can be analysed (3–20).">
               <Input type="number" min={3} max={20} value={form.promptLimit ?? 8} onChange={(e) => set("promptLimit", Number(e.target.value))} />
             </Field>
           </div>

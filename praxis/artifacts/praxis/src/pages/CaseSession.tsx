@@ -360,7 +360,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
                 <TutorAvatar avatar={tutorAvatar} size={30} speaking={speaking && animate} ring />
                 <div className="leading-tight min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{tutorName}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{speaking ? "speaking…" : "your case coach"}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{speaking ? "speaking…" : `Exchange ${Math.min(promptCount + 1, promptLimit)} of ~${promptLimit}`}</p>
                 </div>
                 <button onClick={() => setCoachBig((b) => !b)} title={coachBig ? "Shrink" : "Expand"} className="hidden sm:inline-flex p-1.5 rounded-md hover:bg-muted text-muted-foreground">{coachBig ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</button>
                 <button onClick={() => setCoachMin(true)} title="Minimise" className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"><ChevronDown className="h-4 w-4" /></button>
@@ -409,6 +409,13 @@ export function AnalysisView({ a, onDone }: { a: CaseSessionRow; onDone: () => v
             <ul className="space-y-1.5 text-sm text-muted-foreground list-disc pl-4">{a.developmentAreas.map((s, i) => <li key={i}>{s}</li>)}</ul>
           </div>
         </div>
+
+        {a.recommendations.length > 0 && (
+          <div className="rounded-xl bg-white border p-5">
+            <p className="text-sm font-medium mb-2 flex items-center gap-1.5"><TrendingUp className="h-4 w-4" /> Recommended next steps</p>
+            <ol className="space-y-1.5 text-sm text-muted-foreground list-decimal pl-5">{a.recommendations.map((s, i) => <li key={i}>{s}</li>)}</ol>
+          </div>
+        )}
 
         {a.rubricScores.length > 0 && (
           <div className="rounded-xl bg-white border p-5">

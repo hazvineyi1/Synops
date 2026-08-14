@@ -22,7 +22,7 @@ import {
   type RubricCriterion,
   type CaseMessage,
 } from "@workspace/db";
-import { eq, and, or, isNull, ne, inArray, desc, type SQL } from "drizzle-orm";
+import { eq, and, or, isNull, ne, inArray, desc, sql, type SQL } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { canParticipateInCourse } from "../lib/scope";
 import { isSuperAdmin, hasHubAccess, canAdministerOrg, isInstructionalDesigner } from "../lib/roles";
@@ -503,6 +503,7 @@ function sessionResponse(s: typeof caseSessionsTable.$inferSelect) {
     conceptsAddressed: s.conceptsAddressed ?? [],
     reasoningStrengths: s.reasoningStrengths ?? [],
     developmentAreas: s.developmentAreas ?? [],
+    recommendations: s.recommendations ?? [],
     rubricScores: s.rubricScores ?? [],
     createdAt: s.createdAt.toISOString(),
     completedAt: s.completedAt?.toISOString() ?? null,
@@ -753,6 +754,9 @@ router.post("/case-sessions/:id/complete", requireAuth, async (req, res) => {
     rubric ? { criteria: rubric.criteria } : null
   );
 
+  // Self-heal: older deploys created case_sessions before the recommendations column existed.
+  await db.execute(sql`ALTER TABLE case_sessions ADD COLUMN IF NOT EXISTS recommendations text[]`).catch(() => {});
+
   const [updated] = await db
     .update(caseSessionsTable)
     .set({
@@ -763,6 +767,7 @@ router.post("/case-sessions/:id/complete", requireAuth, async (req, res) => {
       conceptsAddressed: analysis.conceptsAddressed,
       reasoningStrengths: analysis.reasoningStrengths,
       developmentAreas: analysis.developmentAreas,
+      recommendations: analysis.recommendations,
       rubricScores: analysis.rubricScores,
     })
     .where(eq(caseSessionsTable.id, s.id))

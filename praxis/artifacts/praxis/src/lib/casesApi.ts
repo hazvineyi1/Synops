@@ -72,6 +72,7 @@ export interface CaseSessionRow {
   conceptsAddressed: string[];
   reasoningStrengths: string[];
   developmentAreas: string[];
+  recommendations: string[];
   rubricScores: CaseRubricScore[];
   createdAt: string;
   completedAt: string | null;

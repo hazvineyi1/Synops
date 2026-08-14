@@ -111,6 +111,7 @@ export const caseSessionsTable = pgTable("case_sessions", {
   conceptsAddressed: text("concepts_addressed").array(),
   reasoningStrengths: text("reasoning_strengths").array(),
   developmentAreas: text("development_areas").array(),
+  recommendations: text("recommendations").array(),
   rubricScores: jsonb("rubric_scores").$type<CaseRubricScore[]>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
