@@ -191,7 +191,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
     </div>;
   }
 
-  if (analysis) return <AnalysisView a={analysis} onDone={exitToCase} />;
+  if (analysis) return <AnalysisView a={analysis} onDone={exitToCase} hideScore={isMRBCase} />;
 
   const pct = Math.min(100, Math.round((promptCount / promptLimit) * 100));
 
@@ -403,7 +403,7 @@ export function CaseSession({ params }: { params?: { sessionId?: string } }) {
   );
 }
 
-export function AnalysisView({ a, onDone }: { a: CaseSessionRow; onDone: () => void }) {
+export function AnalysisView({ a, onDone, hideScore }: { a: CaseSessionRow; onDone: () => void; hideScore?: boolean }) {
   const score = a.engagementScore ?? 0;
   return (
     <div className="min-h-screen py-10 px-4" style={{ background: "hsl(43 30% 97%)" }}>
@@ -415,7 +415,9 @@ export function AnalysisView({ a, onDone }: { a: CaseSessionRow; onDone: () => v
 
         <div className="rounded-xl bg-white border p-6 flex items-center gap-5">
           <div className="flex items-center justify-center h-20 w-20 rounded-full shrink-0" style={{ background: "hsl(222 47% 11%)" }}>
-            <span className="text-2xl font-serif text-white">{score}<span className="text-sm opacity-60">/10</span></span>
+            {hideScore
+              ? <CheckCircle2 className="h-9 w-9 text-white" />
+              : <span className="text-2xl font-serif text-white">{score}<span className="text-sm opacity-60">/10</span></span>}
           </div>
           <div><p className="text-sm font-medium mb-1 flex items-center gap-1.5"><TrendingUp className="h-4 w-4" /> Engagement</p><p className="text-sm text-muted-foreground">{a.engagementNarrative}</p></div>
         </div>

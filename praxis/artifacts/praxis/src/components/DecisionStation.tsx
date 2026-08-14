@@ -381,6 +381,9 @@ function ArtifactView({ l, world, score, onDone }: { l: ArtifactLesson; world: W
 function ResultView({ spec, record, onRestart, onSubmit }: { spec: StationSpec; record: Rec; onRestart: () => void; onSubmit?: (r: { payload: unknown; score: number }) => void; }) {
   const rows = spec.criteria.map((c) => { const band = (record[c.key] || "F") as Band; return { ...c, band, value: BAND_VALUE[band] }; });
   const failedNN = rows.filter((r) => r.nonNegotiable && r.value < 3);
+  // Pass/resubmit programmes (e.g. the MRB Zambian leadership course) show no numeric points: the
+  // result is Pass or Resubmit, and the per-stream numeric mean is hidden.
+  const passFail = /^MRB/i.test(spec.meta?.code ?? "");
   const mean = (arr: typeof rows) => (arr.length ? arr.reduce((a, r) => a + r.value, 0) / arr.length : 0);
   // Derive the streams from the spec itself (in first-appearance order) rather than hardcoding two
   // fixed names, so a spec with its own two stream labels (e.g. the leadership programme's
@@ -395,12 +398,12 @@ function ResultView({ spec, record, onRestart, onSubmit }: { spec: StationSpec; 
   }, [onSubmit, overall, pass, record, rows]);
   return (
     <section className="ds-card">
-      <SceneHead n="Station result" title="Computed from the decisions you took" type="No separate quiz · two streams, weighted equally">Each criterion is banded and reported on its own. Bands: A=5 … F=0; C is the marginal pass.</SceneHead>
-      <div className={"ds-verdict " + (pass ? "ds-pass" : "ds-fail")}>{pass ? "STATION PASSED, every non-negotiable held and both streams reached the marginal pass." : (failedNN.length ? "STATION NOT PASSED, a non-negotiable failed. It does not compensate: it fails the station regardless of every other band." : "STATION NOT PASSED, a stream fell below the marginal pass.")}</div>
+      <SceneHead n="Station result" title="Computed from the decisions you took" type="No separate quiz · two streams, weighted equally">{passFail ? "Each criterion is reported on its own as a band, and C is the marginal pass. The result is Pass or Resubmit, decided by a human reviewer." : "Each criterion is banded and reported on its own. Bands: A=5 … F=0; C is the marginal pass."}</SceneHead>
+      <div className={"ds-verdict " + (pass ? "ds-pass" : "ds-fail")}>{pass ? (passFail ? "PASS, every non-negotiable held and both streams reached the marginal pass." : "STATION PASSED, every non-negotiable held and both streams reached the marginal pass.") : (failedNN.length ? `${passFail ? "RESUBMIT" : "STATION NOT PASSED"}, a non-negotiable failed. It does not compensate: it fails the station regardless of every other band.` : `${passFail ? "RESUBMIT" : "STATION NOT PASSED"}, a stream fell below the marginal pass.`)}</div>
       {failedNN.length > 0 && <ul className="ds-nn-list">{failedNN.map((r) => <li key={r.key}><strong>Non-negotiable failed:</strong> {r.label}</li>)}</ul>}
       {streams.map(([name, arr]) => (
         <div key={name} className="ds-stream">
-          <h3>{name} <span className="ds-stream-mean">mean {mean(arr).toFixed(1)}/5</span></h3>
+          <h3>{name}{!passFail && <span className="ds-stream-mean"> mean {mean(arr).toFixed(1)}/5</span>}</h3>
           <table className="ds-bands">
             <thead><tr><th>Criterion</th><th>Band</th><th>Indicator you met / missed</th></tr></thead>
             <tbody>{arr.map((r) => (<tr key={r.key} className={r.value < 3 ? "ds-low" : ""}><td>{r.label}{r.nonNegotiable && <span className="ds-nn"> · non-negotiable</span>}</td><td><span className={"ds-band ds-b-" + r.band}>{r.band}</span></td><td className="ds-ind">{r.value >= 3 ? r.indicators.competent : r.indicators.not}</td></tr>))}</tbody>

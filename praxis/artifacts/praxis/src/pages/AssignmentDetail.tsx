@@ -945,6 +945,9 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
 
   const config = parseConfig(assignment.instructions);
   const subType: string = config?.__type ?? assignment.submissionType ?? 'essay';
+  // Pass/resubmit courses (e.g. the MRB Zambian leadership programme) show no points or scores: the
+  // outcome is Pass or Resubmit with developmental feedback, decided by a human reviewer.
+  const passFail = /MRB-CLP|Leading with Purpose|Zambian Clinician|Manchester Review Board/i.test(`${(course as { title?: string })?.title ?? ''} ${(((course as { competencyTags?: string[] })?.competencyTags) ?? []).join(' ')}`);
   const overdue = isOverdue(assignment.dueDate);
   const graded = submission?.status === 'graded';
   const submitted = !!submission && submission.status !== 'graded';
@@ -1017,7 +1020,7 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
       {embedded ? (
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline" className="gap-1.5"><MetaIcon className={cn('h-3 w-3', meta.color)} /> {meta.label}</Badge>
-          <Badge variant="outline">{assignment.pointsPossible} pts</Badge>
+          {passFail ? <Badge variant="outline">Pass / resubmit</Badge> : <Badge variant="outline">{assignment.pointsPossible} pts</Badge>}
           {assignment.dueDate && (
             <Badge variant={overdue ? 'destructive' : 'outline'} className="gap-1">
               {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
@@ -1038,7 +1041,7 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
               <Badge variant="outline" className="gap-1.5">
                 <MetaIcon className={cn('h-3 w-3', meta.color)} /> {meta.label}
               </Badge>
-              <Badge variant="outline">{assignment.pointsPossible} pts</Badge>
+              {passFail ? <Badge variant="outline">Pass / resubmit</Badge> : <Badge variant="outline">{assignment.pointsPossible} pts</Badge>}
               {assignment.dueDate && (
                 <Badge variant={overdue ? 'destructive' : 'outline'} className="gap-1">
                   {overdue ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
@@ -1113,10 +1116,14 @@ export function AssignmentDetail({ courseId: pCourseId, assignmentId: pId, embed
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="text-4xl font-black">
-                  {submission.score}
-                  <span className="text-xl font-normal text-muted-foreground"> / {assignment.pointsPossible}</span>
-                </div>
+                {passFail ? (
+                  <div className="text-3xl font-black">{(submission.score ?? 0) >= 50 ? 'Pass' : 'Resubmit'}</div>
+                ) : (
+                  <div className="text-4xl font-black">
+                    {submission.score}
+                    <span className="text-xl font-normal text-muted-foreground"> / {assignment.pointsPossible}</span>
+                  </div>
+                )}
                 {submission.letterGrade && (
                   <Badge variant="outline" className="text-lg px-3 py-1">{submission.letterGrade}</Badge>
                 )}
