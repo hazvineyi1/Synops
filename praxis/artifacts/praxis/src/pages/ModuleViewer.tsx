@@ -4009,11 +4009,12 @@ function ModuleHubView({
 
   // This course (PEJ / Project Expedite Justice) offers English + Ukrainian only; other courses keep
   // the platform default. Ukrainian is machine-assisted and flagged Beta on the chip.
-  const courseTitleForLang = course?.title ?? courseFull?.title ?? '';
-  const courseReadingLangs: [string, string][] | null =
-    /PEJ-EVD|Project Expedite Justice/i.test(courseTitleForLang)
-      ? [['en', 'English'], ['uk', 'Ukrainian']]
-      : null;
+  const courseTitleForLang = `${course?.title ?? ''} ${courseFull?.title ?? ''} ${mod?.title ?? ''}`;
+  const courseTagsForLang = ((courseFull as { competencyTags?: string[] } | undefined)?.competencyTags ?? []).join(' ');
+  const isPEJCourse = /PEJ-EVD|Project Expedite Justice/i.test(`${courseTitleForLang} ${courseTagsForLang}`);
+  const courseReadingLangs: [string, string][] | null = isPEJCourse
+    ? [['en', 'English'], ['uk', 'Ukrainian']]
+    : null;
 
   if (isLoading) {
     return (

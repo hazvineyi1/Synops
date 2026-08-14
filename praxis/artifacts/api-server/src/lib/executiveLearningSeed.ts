@@ -139,6 +139,10 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
   // exists, e.g. built in the platform) so the section content is populated; otherwise create it.
   if (m.reading) {
     const readingTitle = `${m.title}: Reading`;
+    // Remove any stray legacy "link" reading (older seeds attached a /demos launch link). The station
+    // is now a native activity, so the module's reading should be the authored note only, not an
+    // empty link the learner would open first.
+    await db.delete(moduleReadingsTable).where(and(eq(moduleReadingsTable.moduleId, mod.id), eq(moduleReadingsTable.kind, "link")));
     const existingReading = await db.select({ id: moduleReadingsTable.id })
       .from(moduleReadingsTable)
       .where(and(eq(moduleReadingsTable.moduleId, mod.id), ne(moduleReadingsTable.kind, "link")));
