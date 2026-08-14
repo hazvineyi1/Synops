@@ -21,6 +21,11 @@ export function CoachSettings() {
   const update = useUpdateCoachProfile();
   const { toast } = useToast();
 
+  // Local draft of the WhatsApp number so the learner can register/change the number the coach
+  // messages them on. The inbound webhook matches on this exact number, so it must be theirs.
+  const [phone, setPhone] = React.useState("");
+  React.useEffect(() => { if (profile) setPhone(profile.phone ?? ""); }, [profile]);
+
   // When arrived from the "Coach on WhatsApp" hub card (?focus=whatsapp), jump straight to the
   // WhatsApp section instead of landing at the top of the settings page.
   React.useEffect(() => {
@@ -147,22 +152,58 @@ export function CoachSettings() {
       {/* WhatsApp */}
       <section id="coach-whatsapp" className="space-y-3 scroll-mt-4">
         <SectionHeading icon={MessageCircle} title="WhatsApp coaching" hint="Opt in to answer your coach's questions from WhatsApp and get nudges before your credentials expire." />
-        <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="font-medium">Use WhatsApp coaching</p>
               <p className="text-sm text-muted-foreground">
                 {profile.whatsappOptIn
                   ? waStatus?.configured
-                    ? "You're opted in. Send START on WhatsApp to begin a session. Messages go to the number registered when you enrolled."
+                    ? "You're opted in. Save your WhatsApp number below, then send START on WhatsApp to begin a session."
                     : "You're opted in. WhatsApp activates once it is connected for your organisation."
-                  : "Chat with your coach on the WhatsApp number your organisation registered when you enrolled."}
+                  : "Chat with your coach on WhatsApp. Turn this on, then save the WhatsApp number you'll message from."}
               </p>
             </div>
             <Switch
               checked={profile.whatsappOptIn}
               onCheckedChange={(v) => save({ whatsappOptIn: v }, v ? "WhatsApp coaching on" : "WhatsApp coaching off")}
             />
+          </div>
+
+          {/* Number registration: the coach only recognises the exact number saved here. */}
+          <div className="border-t border-border pt-4">
+            <label htmlFor="wa-number" className="text-sm font-medium">Your WhatsApp number</label>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+              Use the full international format, including your country code, e.g. +27 82 123 4567.
+            </p>
+            <div className="flex gap-2">
+              <input
+                id="wa-number"
+                type="tel"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+27821234567"
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+              <button
+                onClick={() => save({ phone: phone.trim() }, phone.trim() ? "WhatsApp number saved" : "WhatsApp number cleared")}
+                disabled={update.isPending || phone.trim() === (profile.phone ?? "").trim()}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-sm font-medium transition-colors",
+                  update.isPending || phone.trim() === (profile.phone ?? "").trim()
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                )}
+              >
+                Save
+              </button>
+            </div>
+            {profile.phone && (
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <Check className="h-3 w-3 text-emerald-600" /> Coaching messages go to {profile.phone}.
+              </p>
+            )}
           </div>
         </div>
       </section>

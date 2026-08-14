@@ -341,13 +341,16 @@ router.post("/courses/:courseId/discussions/:discussionId/replies", requireAuth,
   // Predefined/admin-set via the discussion's requiredInteractions; default 5. The coach responds
   // while the learner is within that budget, then steps back.
   const facilitatorLimit = discussion.requiredInteractions && discussion.requiredInteractions > 0 ? discussion.requiredInteractions : 5;
-  const myPostCount = isInstructor ? 0 : (await db.select({ id: discussionRepliesTable.id }).from(discussionRepliesTable)
+  // Count THIS poster's own human (non-AI) posts in the thread, regardless of role. The coach
+  // moderates every substantive contribution -- including a staff member's -- so an admin or
+  // instructor demoing the thread also gets moderated, not just learners. The cap still applies.
+  const myPostCount = (await db.select({ id: discussionRepliesTable.id }).from(discussionRepliesTable)
     .where(and(
       eq(discussionRepliesTable.discussionId, req.params.discussionId),
       eq(discussionRepliesTable.authorId, req.userId!),
       eq(discussionRepliesTable.isAiFacilitator, false),
     ))).length;
-  if (discussion.aiFacilitated && !isInstructor && myPostCount <= facilitatorLimit) {
+  if (discussion.aiFacilitated && myPostCount <= facilitatorLimit) {
     try {
       // Justice-sector courses get the PEJ coach as moderator; other courses keep the default voice.
       const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, discussion.courseId) });
