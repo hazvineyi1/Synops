@@ -4399,12 +4399,14 @@ function ModuleHubView({
             </div>
 
             {courseFull?.description && (
-              <div>
-                <SectionHead title="Syllabus" />
-                <div className="rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground leading-relaxed">
+              <details className="group rounded-xl border border-border bg-card p-4 [&_summary::-webkit-details-marker]:hidden">
+                <summary className="flex items-center gap-2 cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" /> Syllabus
+                </summary>
+                <div className="mt-3 text-sm text-muted-foreground leading-relaxed">
                   {courseFull.description}
                 </div>
-              </div>
+              </details>
             )}
           </div>
         )}
