@@ -85,6 +85,10 @@ export function CoachHub() {
   const coachProfile = useCoachProfile();
   const updateProfile = useUpdateCoachProfile();
   const waStatus = useWhatsappStatus();
+  // Draft of the learner's WhatsApp number. The inbound webhook matches on this exact number, so
+  // opting in isn't enough -- they must register the number they'll message from.
+  const [waPhone, setWaPhone] = useState("");
+  useEffect(() => { if (coachProfile.data) setWaPhone(coachProfile.data.phone ?? ""); }, [coachProfile.data]);
 
   const startSession = useMutation({
     mutationFn: (v: { moduleId: string; remedialFocus?: string | null }) =>
@@ -248,25 +252,57 @@ export function CoachHub() {
         )}
       </section>
 
-      {/* Coach on WhatsApp, opt in/out right here, no separate settings page. */}
+      {/* Coach on WhatsApp, opt in/out and register a number right here, no separate settings page. */}
       {coachProfile.data && (
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/60 p-4 dark:bg-emerald-950/15">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600"><MessageSquare className="h-5 w-5" /></span>
-          <div className="min-w-0 flex-1">
-            <p className="font-medium text-foreground">Coach on WhatsApp</p>
-            <p className="text-sm text-muted-foreground">
-              {coachProfile.data.whatsappOptIn
-                ? (waStatus.data?.configured
-                    ? "You're opted in. Your coach can reach you on WhatsApp with questions and nudges."
-                    : "You're opted in. WhatsApp activates once it's connected for your organisation.")
-                : "Answer your coach's questions and get nudges right in WhatsApp."}
-            </p>
+        <div className="rounded-2xl border border-emerald-300/60 bg-emerald-50/60 p-4 dark:bg-emerald-950/15 space-y-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600"><MessageSquare className="h-5 w-5" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-foreground">Coach on WhatsApp</p>
+              <p className="text-sm text-muted-foreground">
+                {coachProfile.data.whatsappOptIn
+                  ? (waStatus.data?.configured
+                      ? "You're opted in. Save your number below, then send START on WhatsApp to begin a session."
+                      : "You're opted in. WhatsApp activates once it's connected for your organisation.")
+                  : "Answer your coach's questions and get nudges right in WhatsApp."}
+              </p>
+            </div>
+            <Switch
+              checked={coachProfile.data.whatsappOptIn}
+              disabled={updateProfile.isPending}
+              onCheckedChange={(v) => updateProfile.mutate({ whatsappOptIn: v })}
+            />
           </div>
-          <Switch
-            checked={coachProfile.data.whatsappOptIn}
-            disabled={updateProfile.isPending}
-            onCheckedChange={(v) => updateProfile.mutate({ whatsappOptIn: v })}
-          />
+
+          {/* Number registration appears once opted in. The coach only recognises the exact number saved here. */}
+          {coachProfile.data.whatsappOptIn && (
+            <div className="border-t border-emerald-300/50 pt-3">
+              <label htmlFor="wa-number" className="text-sm font-medium text-foreground">Your WhatsApp number</label>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-2">Full international format with country code, e.g. +27 82 123 4567.</p>
+              <div className="flex gap-2">
+                <input
+                  id="wa-number"
+                  type="tel"
+                  inputMode="tel"
+                  value={waPhone}
+                  onChange={(e) => setWaPhone(e.target.value)}
+                  placeholder="+27821234567"
+                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <Button
+                  onClick={() => updateProfile.mutate({ phone: waPhone.trim() })}
+                  disabled={updateProfile.isPending || waPhone.trim() === (coachProfile.data.phone ?? "").trim()}
+                >
+                  Save
+                </Button>
+              </div>
+              {coachProfile.data.phone && (
+                <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                  <Check className="h-3 w-3 text-emerald-600" /> Coaching messages go to {coachProfile.data.phone}.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

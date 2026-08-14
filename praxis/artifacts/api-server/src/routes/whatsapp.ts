@@ -7,6 +7,7 @@ import {
   dialogueTurnsTable,
   beatsTable,
   modulesTable,
+  coursesTable,
   enrolmentsTable,
   conceptMasteryTable,
   whatsappConversationsTable,
@@ -16,6 +17,7 @@ import { eq, and, asc, desc, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { twiml, sendWhatsApp, twilioConfigured, validateTwilioSignature } from "../lib/twilio";
 import { generateSocraticTurn, type SocraticContext } from "../lib/socraticEngine";
+import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS } from "../lib/stationCoach";
 import { applyCheckpoint } from "../lib/mastery";
 import { isDue } from "../lib/sm2";
 
@@ -26,10 +28,26 @@ function normalizePhone(raw: string): string {
   return raw.replace(/^whatsapp:/i, "").trim();
 }
 
+// The justice-sector course carries a specialist coach persona. Detect it from the module's course
+// so the WhatsApp coach speaks with the same PEJ expertise as the case and discussion coaches, and
+// stays scoped to that context. Any other course keeps the default Socratic voice.
+async function pejPersonaForModule(
+  moduleId: string | null | undefined
+): Promise<{ persona: string | null; constraints: string | null }> {
+  if (!moduleId) return { persona: null, constraints: null };
+  const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, moduleId) });
+  if (!mod) return { persona: null, constraints: null };
+  const course = await db.query.coursesTable.findFirst({ where: eq(coursesTable.id, mod.courseId) });
+  const hay = `${course?.title ?? ""} ${(course?.competencyTags ?? []).join(" ")}`;
+  const isPEJ = /PEJ-EVD|Project Expedite Justice/i.test(hay);
+  return isPEJ ? { persona: PEJ_COACH_PERSONA, constraints: PEJ_COACH_CONSTRAINTS } : { persona: null, constraints: null };
+}
+
 async function socraticCtxFor(
   user: typeof usersTable.$inferSelect,
   beat: typeof beatsTable.$inferSelect | null | undefined,
-  turnCount: number
+  turnCount: number,
+  persona?: { persona: string | null; constraints: string | null }
 ): Promise<SocraticContext> {
   return {
     beatTitle: beat?.title,
@@ -43,6 +61,8 @@ async function socraticCtxFor(
     accommodations: user.accommodations,
     turnCount,
     promptBudget: PROMPT_BUDGET,
+    persona: persona?.persona ?? null,
+    constraints: persona?.constraints ?? null,
   };
 }
 
@@ -88,7 +108,8 @@ async function startSession(
     .values({ moduleId, userId: user.id, status: "active", masteryScore: "0", currentBeatId: firstBeat?.id ?? null })
     .returning();
 
-  const ctx = await socraticCtxFor(user, firstBeat, 0);
+  const persona = await pejPersonaForModule(moduleId);
+  const ctx = await socraticCtxFor(user, firstBeat, 0, persona);
   const opening = await generateSocraticTurn(ctx, [
     { role: "user", content: "I'm ready to begin. Ask me the first question." },
   ], true);
@@ -252,7 +273,8 @@ router.post(
       });
 
       const exchangeCount = Math.floor(Number(session.turnCount) / 2);
-      const ctx = await socraticCtxFor(user, beat, exchangeCount);
+      const persona = await pejPersonaForModule(convo.currentModuleId ?? session.moduleId);
+      const ctx = await socraticCtxFor(user, beat, exchangeCount, persona);
       const chat: { role: "user" | "assistant"; content: string }[] = [
         ...historyOrdered.map((t) => ({
           role: t.role === "tutor" ? ("assistant" as const) : ("user" as const),

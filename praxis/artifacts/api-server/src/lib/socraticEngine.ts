@@ -17,6 +17,8 @@ export interface SocraticContext {
   promptBudget?: number; // soft budget of exchanges
   remedialFocus?: string | null; // when the learner is catching up: the weak area to rebuild
   recentPerformance?: "struggling" | "steady" | "thriving"; // drives adaptive cadence
+  persona?: string | null; // domain-expert identity (e.g. the PEJ justice-sector coach). Null = default voice.
+  constraints?: string | null; // stay-in-context boundaries that go with the persona.
 }
 
 // ── Coach personalities (Coach-inspired), voice & pressure only.
@@ -135,6 +137,19 @@ export function buildSocraticSystemPrompt(ctx: SocraticContext, isOpening: boole
   );
   parts.push(PERSONALITIES[ctx.personality ?? "socratic_mentor"] ?? PERSONALITIES.socratic_mentor);
   parts.push(baseRules(ctx.turnCount, budget));
+
+  // Domain-expert persona (e.g. the PEJ justice-sector coach). It layers ON TOP of the Socratic
+  // rules: still question-only, still never gives the answer, but from this expertise and register.
+  if (ctx.persona?.trim()) {
+    parts.push(
+      "DOMAIN EXPERTISE - you are also the following, and every question must come from this expertise:\n" +
+        ctx.persona.trim() +
+        "\n\nREGISTER OVERRIDE: ignore the South African English instruction above. Use professional, trauma-informed international English appropriate to this domain and these learners."
+    );
+  }
+  if (ctx.constraints?.trim()) {
+    parts.push("STAY IN CONTEXT: " + ctx.constraints.trim());
+  }
 
   // Adaptive cadence: react to how the learner is actually doing on recent turns, not just the
   // static "simplify if they struggle" instruction. This genuinely changes pace and grain size.
