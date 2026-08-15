@@ -3,10 +3,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { useGetMe } from '@workspace/api-client-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, BookOpen, ArrowRight, CheckCircle2, FileWarning, Trash2, Library } from 'lucide-react';
+import { AlertTriangle, BookOpen, ArrowRight, CheckCircle2, FileWarning, Trash2, Library, Search, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 /** One component of the nine a module needs, with the label the author sees. */
 type MissingComponent = { key: string; label: string };
@@ -60,7 +61,17 @@ export function IncompleteCourses() {
   const qc = useQueryClient();
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [publishingId, setPublishingId] = React.useState<string | null>(null);
+  const [query, setQuery] = React.useState('');
+  const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
   const isHub = user?.role === 'super_admin' || user?.role === 'instructional_designer';
+
+  const toggle = (id: string) =>
+    setExpanded((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const remove = async (id: string, title: string) => {
     if (!window.confirm(`Delete "${title}" and everything in it? This cannot be undone.`)) return;
@@ -143,137 +154,224 @@ export function IncompleteCourses() {
         </Card>
       )}
 
-      {courses && courses.length > 0 && (
-        <div className="space-y-4">
-          {courses.map((course) => {
-            const modules = course.modules ?? [];
-            const doneCount = modules.filter((m) => m.complete && m.published).length;
-            // Every module is fully built and published; the only thing left is to publish the
-            // course itself. That is when we offer the one-click move to the catalogue.
-            const readyForCatalogue = modules.length > 0 && doneCount === modules.length && course.status !== 'published';
-            return (
-              <Card key={course.id} className="overflow-hidden">
-                <CardHeader className="flex flex-row items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="truncate">{course.title}</span>
-                      <Badge variant="outline" className="text-[10px] capitalize shrink-0">{course.status}</Badge>
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      {course.moduleCount} {course.moduleCount === 1 ? 'module' : 'modules'}
-                      {modules.length > 0 && (
-                        <> - {doneCount} of {modules.length} ready</>
-                      )}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => remove(course.id, course.title)}
-                      disabled={deletingId === course.id}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      {deletingId === course.id ? 'Deleting...' : 'Delete'}
-                    </Button>
-                    {readyForCatalogue ? (
-                      <Button
-                        size="sm"
-                        onClick={() => publishToCatalogue(course.id)}
-                        disabled={publishingId === course.id}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                      >
-                        <Library className="mr-1.5 h-4 w-4" />
-                        {publishingId === course.id ? 'Moving...' : 'Move to course catalogue'}
-                      </Button>
-                    ) : (
-                      <Button size="sm" onClick={() => navigate(`/courses/${course.id}`)}>
-                        Open to finish <ArrowRight className="ml-1.5 h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Course is fully built; a single flag left to flip. */}
-                  {readyForCatalogue && (
-                    <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-800">
-                      <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-600" />
-                      <span>Every module is built and published. Move it to the course catalogue to make it available to learners.</span>
-                    </div>
-                  )}
+      {courses && courses.length > 0 && (() => {
+        // Decorate each course with readiness so we can sort and summarise.
+        const decorated = courses.map((course) => {
+          const modules = course.modules ?? [];
+          const doneCount = modules.filter((m) => m.complete && m.published).length;
+          const total = modules.length;
+          // Every module is fully built and published; the only thing left is to publish the
+          // course itself. That is when we offer the one-click move to the catalogue.
+          const readyForCatalogue = total > 0 && doneCount === total && course.status !== 'published';
+          const ratio = total > 0 ? doneCount / total : 0;
+          return { course, modules, doneCount, total, readyForCatalogue, ratio };
+        });
 
-                  {/* Course-wide blockers (no modules). Shown only when the course is not yet catalogue-ready. */}
-                  {!readyForCatalogue && course.courseIssues.length > 0 && (
-                    <ul className="flex flex-wrap gap-2">
-                      {course.courseIssues.map((issue, i) => (
-                        <li key={i}>
-                          <Badge variant="secondary" className="font-normal text-amber-700 bg-amber-500/10">{issue}</Badge>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+        const q = query.trim().toLowerCase();
+        const visible = decorated
+          .filter(({ course }) => !q || course.title.toLowerCase().includes(q))
+          // Catalogue-ready first, then closest-to-done, then alphabetical: least work surfaces on top.
+          .sort((a, b) => {
+            if (a.readyForCatalogue !== b.readyForCatalogue) return a.readyForCatalogue ? -1 : 1;
+            if (b.ratio !== a.ratio) return b.ratio - a.ratio;
+            return a.course.title.localeCompare(b.course.title);
+          });
 
-                  {/* Per-module: every component, green check when present, red warning when missing. */}
-                  {modules.length > 0 ? (
-                    <div className="space-y-3">
-                      {modules.map((m) => {
-                        const missingKeys = new Set(m.missing.map((x) => x.key));
-                        const moduleReady = m.complete && m.published;
-                        return (
-                          <div key={m.moduleId} className="rounded-xl border border-border bg-muted/30 p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-sm font-medium text-foreground truncate">{m.moduleTitle || 'Untitled module'}</span>
-                              {moduleReady ? (
-                                <Badge className="text-[10px] gap-1 border-transparent bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15">
-                                  <CheckCircle2 className="h-3 w-3" /> Ready
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline" className="text-[10px] capitalize">{m.status}</Badge>
-                              )}
-                            </div>
-                            <ul className="flex flex-wrap gap-1.5">
-                              {ALL_COMPONENTS.map((c) => {
-                                const missing = missingKeys.has(c.key);
-                                return (
-                                  <li
-                                    key={c.key}
-                                    className={
-                                      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ' +
-                                      (missing
-                                        ? 'bg-rose-500/10 text-rose-700'
-                                        : 'bg-emerald-500/10 text-emerald-700')
-                                    }
-                                  >
-                                    {missing
-                                      ? <AlertTriangle className="h-3 w-3" />
-                                      : <CheckCircle2 className="h-3 w-3" />}
-                                    {c.label}
-                                  </li>
-                                );
-                              })}
-                              {!m.published && (
-                                <li className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700">
-                                  <AlertTriangle className="h-3 w-3" /> Module not published yet
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    course.courseIssues.length === 0 && (
-                      <p className="text-sm text-muted-foreground">All modules are complete; this course is not catalogue-ready yet.</p>
-                    )
-                  )}
+        const readyCount = decorated.filter((d) => d.readyForCatalogue).length;
+        const allIds = visible.map((d) => d.course.id);
+        const allOpen = allIds.length > 0 && allIds.every((id) => expanded.has(id));
+
+        return (
+          <div className="space-y-4">
+            {/* Toolbar: search + counts + expand-all. Keeps the list scannable without scrolling. */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search courses..."
+                  className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span>
+                  {decorated.length} {decorated.length === 1 ? 'course' : 'courses'}
+                  {readyCount > 0 && <span className="text-emerald-700"> - {readyCount} ready to publish</span>}
+                </span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setExpanded(allOpen ? new Set() : new Set(allIds))}
+                >
+                  {allOpen ? 'Collapse all' : 'Expand all'}
+                </Button>
+              </div>
+            </div>
+
+            {visible.length === 0 && (
+              <Card>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  No courses match "{query}".
                 </CardContent>
               </Card>
-            );
-          })}
-        </div>
-      )}
+            )}
+
+            <div className="space-y-3">
+              {visible.map(({ course, modules, doneCount, total, readyForCatalogue, ratio }) => {
+                const isOpen = expanded.has(course.id);
+                return (
+                  <Card key={course.id} className="overflow-hidden">
+                    {/* Compact, always-visible summary row. Click anywhere on the left to expand. */}
+                    <div className="flex items-center gap-3 p-4">
+                      <button
+                        type="button"
+                        onClick={() => toggle(course.id)}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        aria-expanded={isOpen}
+                      >
+                        <ChevronDown
+                          className={cn(
+                            'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                            isOpen ? '' : '-rotate-90',
+                          )}
+                        />
+                        <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate font-medium text-foreground">{course.title}</span>
+                            {readyForCatalogue ? (
+                              <Badge className="shrink-0 gap-1 border-transparent bg-emerald-500/15 text-[10px] text-emerald-700 hover:bg-emerald-500/15">
+                                <CheckCircle2 className="h-3 w-3" /> Ready
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="shrink-0 text-[10px] capitalize">{course.status}</Badge>
+                            )}
+                          </div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            {total > 0
+                              ? <>{doneCount} of {total} {total === 1 ? 'module' : 'modules'} ready</>
+                              : <>{course.moduleCount} {course.moduleCount === 1 ? 'module' : 'modules'}</>}
+                          </div>
+                        </div>
+                        {/* Readiness bar - a quick visual of how close the course is. */}
+                        {total > 0 && (
+                          <div className="hidden w-24 shrink-0 sm:block">
+                            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className={cn('h-full rounded-full', readyForCatalogue ? 'bg-emerald-500' : 'bg-amber-500')}
+                                style={{ width: `${Math.round(ratio * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => remove(course.id, course.title)}
+                          disabled={deletingId === course.id}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">{deletingId === course.id ? 'Deleting...' : 'Delete'}</span>
+                        </Button>
+                        {readyForCatalogue ? (
+                          <Button
+                            size="sm"
+                            onClick={() => publishToCatalogue(course.id)}
+                            disabled={publishingId === course.id}
+                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                          >
+                            <Library className="mr-1.5 h-4 w-4" />
+                            {publishingId === course.id ? 'Moving...' : 'Move to catalogue'}
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" onClick={() => navigate(`/courses/${course.id}`)}>
+                            Open <ArrowRight className="ml-1.5 h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Details only when expanded - this is what removes the endless scroll. */}
+                    {isOpen && (
+                      <CardContent className="space-y-4 border-t border-border pt-4">
+                        {readyForCatalogue && (
+                          <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-800">
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                            <span>Every module is built and published. Move it to the course catalogue to make it available to learners.</span>
+                          </div>
+                        )}
+
+                        {!readyForCatalogue && course.courseIssues.length > 0 && (
+                          <ul className="flex flex-wrap gap-2">
+                            {course.courseIssues.map((issue, i) => (
+                              <li key={i}>
+                                <Badge variant="secondary" className="bg-amber-500/10 font-normal text-amber-700">{issue}</Badge>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {modules.length > 0 ? (
+                          <div className="space-y-3">
+                            {modules.map((m) => {
+                              const missingKeys = new Set(m.missing.map((x) => x.key));
+                              const moduleReady = m.complete && m.published;
+                              return (
+                                <div key={m.moduleId} className="rounded-xl border border-border bg-muted/30 p-3">
+                                  <div className="mb-2 flex items-center gap-2">
+                                    <span className="truncate text-sm font-medium text-foreground">{m.moduleTitle || 'Untitled module'}</span>
+                                    {moduleReady ? (
+                                      <Badge className="gap-1 border-transparent bg-emerald-500/15 text-[10px] text-emerald-700 hover:bg-emerald-500/15">
+                                        <CheckCircle2 className="h-3 w-3" /> Ready
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-[10px] capitalize">{m.status}</Badge>
+                                    )}
+                                  </div>
+                                  <ul className="flex flex-wrap gap-1.5">
+                                    {ALL_COMPONENTS.map((c) => {
+                                      const missing = missingKeys.has(c.key);
+                                      return (
+                                        <li
+                                          key={c.key}
+                                          className={
+                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ' +
+                                            (missing ? 'bg-rose-500/10 text-rose-700' : 'bg-emerald-500/10 text-emerald-700')
+                                          }
+                                        >
+                                          {missing ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+                                          {c.label}
+                                        </li>
+                                      );
+                                    })}
+                                    {!m.published && (
+                                      <li className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                        <AlertTriangle className="h-3 w-3" /> Module not published yet
+                                      </li>
+                                    )}
+                                  </ul>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          course.courseIssues.length === 0 && (
+                            <p className="text-sm text-muted-foreground">All modules are complete; this course is not catalogue-ready yet.</p>
+                          )
+                        )}
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
