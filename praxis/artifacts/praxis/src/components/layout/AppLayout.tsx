@@ -223,12 +223,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         heading: t('nav.groups.partnerPlatform', 'Partner Admin Platform'),
         items: [
           { label: t('nav.accountsRoles', 'Accounts & Roles'), href: '/partner/accounts', icon: Users },
-          { label: t('nav.communications', 'Communications'), href: '/partner/comms', icon: Megaphone },
           { label: t('nav.branding', 'Branding'), href: '/partner/theme', icon: Palette },
           { label: t('nav.partnerSettings', 'Settings'), href: '/partner/settings', icon: Settings },
         ],
       },
-      { items: [{ label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy }] },
     ];
 
     // Super admin INSIDE a specific partner's hub: the focused partner nav, plus an escape back to
@@ -251,7 +249,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             { label: t('nav.k12Lessons', 'My lessons'), href: '/dashboard', icon: LayoutDashboard },
             { label: t('nav.k12Classes', 'My classes'), href: '/courses', icon: BookOpen },
             { label: t('nav.k12Badges', 'My badges'), href: '/credentials', icon: Award },
-            { label: t('nav.k12Help', 'Get help'), href: '/support', icon: LifeBuoy },
           ],
         }];
       }
@@ -269,7 +266,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
           { label: t('nav.credentials'), href: '/credentials', icon: Award },
           { label: t('nav.portfolio', 'Portfolio'), href: '/portfolio', icon: Briefcase },
-          { label: t('nav.help', 'Help'), href: '/support', icon: LifeBuoy },
         ],
       }];
     }
@@ -284,7 +280,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
-          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],
       }];
     }
@@ -301,7 +296,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
           { label: t('nav.reports'), href: '/reports', icon: FileText },
-          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],
       }];
     }
@@ -357,7 +351,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.platformConsole', 'Platform Console'), href: '/platform', icon: ShieldCheck },
             { label: t('nav.reports'), href: '/reports', icon: FileText },
-            { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
           ],
         },
         {
@@ -384,7 +377,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.incompleteCourses', 'Incomplete courses'), href: '/incomplete-courses', icon: FileWarning },
           { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
           { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
-          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
         ],
       }];
     }

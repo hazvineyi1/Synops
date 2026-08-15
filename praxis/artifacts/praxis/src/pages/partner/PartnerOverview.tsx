@@ -50,7 +50,6 @@ export function PartnerOverview() {
         {[
           { label: 'Organisations', icon: Building, href: '/partner/organisations' },
           { label: 'Accounts & Roles', icon: Users, href: '/partner/accounts' },
-          { label: 'Communications', icon: Megaphone, href: '/partner/comms' },
           { label: 'Branding', icon: Palette, href: '/partner/theme' },
         ].map((q) => (
           <button key={q.href} onClick={() => navigate(q.href)}

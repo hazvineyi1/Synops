@@ -90,10 +90,8 @@ import { PlatformOverview } from '@/pages/partner/PlatformOverview';
 import { LearningHub } from '@/pages/partner/LearningHub';
 import { CourseDevelopmentSuite } from '@/pages/partner/CourseDevelopmentSuite';
 import { PartnerAccounts } from '@/pages/partner/PartnerAccounts';
-import { PartnerComms } from '@/pages/partner/PartnerComms';
 import { PartnerSettings } from '@/pages/partner/PartnerSettings';
 import { GradebookBrowser } from '@/pages/GradebookBrowser';
-import { Support } from '@/pages/Support';
 
 // Layout
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -302,7 +300,6 @@ function Routes() {
         <ProtectedRoute path="/partner/org/:orgId/:section" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/org/:orgId" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/accounts" component={PartnerAccounts} />
-        <ProtectedRoute path="/partner/comms" component={PartnerComms} />
         <ProtectedRoute path="/partner/settings" component={PartnerSettings} />
         <ProtectedRoute path="/coach-hub" component={CoachHub} />
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />
@@ -328,8 +325,6 @@ function Routes() {
         <ProtectedRoute path="/delivery" component={Delivery} />
         <ProtectedRoute path="/my-attendance" component={MyAttendance} />
         <ProtectedRoute path="/activities" component={ActivitiesAdmin} />
-        <ProtectedRoute path="/support/:ticketId" component={Support} />
-        <ProtectedRoute path="/support" component={Support} />
         <ProtectedRoute path="/platform" component={PlatformConsole} />
         <ProtectedRoute path="/partner/theme" component={PartnerTheme} />
         <ProtectedRoute path="/reports" component={Reports} />
