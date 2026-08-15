@@ -192,18 +192,15 @@ async function ensureModule(courseId: string, orgId: string, m: SeedModule, auth
     }
   }
 
-  // A published assignment for this module. The completeness gate needs at least one PUBLISHED
-  // assignment; create one only when the module has none published, so re-running never duplicates.
-  const publishedAsg = await db.select({ id: assignmentsTable.id })
-    .from(assignmentsTable)
-    .where(and(eq(assignmentsTable.moduleId, mod.id), eq(assignmentsTable.published, true)));
-  if (publishedAsg.length === 0) {
-    await db.insert(assignmentsTable).values({
-      courseId, moduleId: mod.id, title: m.assignmentTitle,
-      description: m.assignmentBrief, instructions: m.assignmentBrief,
-      submissionType: "file_upload", pointsPossible: "100", published: true,
-    });
-  }
+  // Authoritative single PUBLISHED assignment per module: replace ALL of the module's assignments with
+  // one published assignment so the completeness gate always recognises it and no stray draft (which
+  // the gate ignores) is left behind blocking the "published assignment" check. Idempotent.
+  await db.delete(assignmentsTable).where(eq(assignmentsTable.moduleId, mod.id));
+  await db.insert(assignmentsTable).values({
+    courseId, moduleId: mod.id, title: m.assignmentTitle,
+    description: m.assignmentBrief, instructions: m.assignmentBrief,
+    submissionType: "file_upload", pointsPossible: "100", published: true,
+  });
 
   // A discussion for this module. Existence alone satisfies the gate; create one only when the module
   // has no thread yet (so an author-created thread is never duplicated).
