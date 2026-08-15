@@ -45,7 +45,7 @@ import {
   Home,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getPartnerHub, findHubByOrgId, orgDetail, getActivePartnerId } from '@/lib/partnerHubData';
+import { getPartnerHub, findHubByOrgId, orgDetail, getActivePartnerId, setActivePartner } from '@/lib/partnerHubData';
 import { personaByEmail } from '@/lib/k12Personas';
 import { cn } from '@/lib/utils';
 
@@ -514,8 +514,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {role === 'super_admin' && (
           <div className="px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide"
             style={{ color: '#ffffff', background: 'rgba(255,255,255,0.08)', borderBottom: `1px solid ${HAIRLINE}` }}>
-            <span className="h-2 w-2 rounded-full" style={{ background: isSuperPlatform ? '#c4b5fd' : '#fbbf24' }} />
-            {isSuperPlatform ? t('nav.superAdminPlatform', 'Super Admin · Platform') : `${t('nav.insidePartner', 'Inside partner')} · ${activePartnerName ?? ''}`}
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: isSuperPlatform ? '#c4b5fd' : '#fbbf24' }} />
+            <span className="truncate">{isSuperPlatform ? t('nav.superAdminPlatform', 'Super Admin · Platform') : `${t('nav.insidePartner', 'Inside partner')} · ${activePartnerName ?? ''}`}</span>
+            {/* Clear exit back to the super-admin platform: drops the active-partner selection and
+                returns to the all-partners overview (violet platform shell). */}
+            {!isSuperPlatform && (
+              <button
+                onClick={() => { setActivePartner(null); navigate('/platform-overview'); }}
+                className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-white transition-colors hover:bg-white/25"
+                title="Exit to the super-admin platform"
+              >
+                <ArrowLeft className="h-3 w-3" /> Exit to platform
+              </button>
+            )}
           </div>
         )}
 

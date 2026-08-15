@@ -9,8 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building, Plus, Palette, Settings2, Upload, Mail, BookOpen, Check, Copy, Loader2, Trash2, Wrench, AlertTriangle } from 'lucide-react';
+import { Building, Plus, Palette, Settings2, Upload, Mail, BookOpen, Check, Copy, Loader2, Trash2, Wrench, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useLocation } from 'wouter';
+import { setActivePartner } from '@/lib/partnerHubData';
 
 interface Partner {
   id: string;
@@ -385,6 +387,11 @@ export function AdminPartners() {
   const { data: partners, isLoading, refetch } = useListPartners();
   const qc = useQueryClient();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+
+  // Master key: a super admin enters a partner's hub by selecting it as the active partner and
+  // navigating to /partner. The selection persists (localStorage), so the hub stays put on refresh.
+  const enterPartner = (id: string) => { setActivePartner(id); navigate('/partner'); };
 
   const [createOpen, setCreateOpen] = useState(false);
   const [showDevTools, setShowDevTools] = useState(false);
@@ -622,6 +629,9 @@ export function AdminPartners() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button size="sm" className="gap-1.5" onClick={() => enterPartner(partner.id)} title={`Open ${partner.name}'s hub as super admin`}>
+                          Enter hub <ArrowRight className="h-3.5 w-3.5" />
+                        </Button>
                         <a href={partner.slug === 'enza-global' ? '/enzaglobalmedia' : `/p/${partner.slug}`} target="_blank" rel="noreferrer">
                           <Button variant="outline" size="sm" className="gap-1.5"><Building className="h-3.5 w-3.5" />Landing</Button>
                         </a>
