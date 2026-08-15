@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
   Building, ChevronRight, Wallet, Users, Landmark, Receipt, ShieldCheck, GraduationCap, Mail,
-  Plus, CheckCircle2,
+  Plus, CheckCircle2, Trash2,
 } from 'lucide-react';
 import { ZAR, getActivePartnerId } from '@/lib/partnerHubData';
 
@@ -103,6 +103,19 @@ export function PartnerOrganisations() {
     onError: (e: any) => setFlash(e?.message ?? 'Could not create the organisation.'),
   });
 
+  // Delete an organisation and everything scoped to it (members, learners, classes, delivery). Uses
+  // ?force=true so a seeded, non-empty org can actually be removed. Guarded by an explicit confirm.
+  const deleteOrg = useMutation({
+    mutationFn: (id: string) => apiFetch(`/organisations/${id}?force=true`, { method: 'DELETE' }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['organisations'] }); setFlash('Organisation deleted.'); },
+    onError: (e: any) => setFlash(e?.message ?? 'Could not delete the organisation.'),
+  });
+  const confirmDelete = (o: OrgRow) => {
+    if (window.confirm(`Delete "${o.name}" and ALL of its members, learners, classes and delivery data? This cannot be undone. (Partner courses are not affected.)`)) {
+      deleteOrg.mutate(o.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -131,8 +144,8 @@ export function PartnerOrganisations() {
         {orgs.map((o) => {
           const d = perOrg(o.id);
           return (
-            <button key={o.id} onClick={() => navigate(`/partner/org/${o.id}`)}
-              className="rounded-xl border border-border bg-card p-5 text-left hover:border-primary/40 hover:bg-muted/30 transition-colors">
+            <div key={o.id} onClick={() => navigate(`/partner/org/${o.id}`)}
+              className="cursor-pointer rounded-xl border border-border bg-card p-5 text-left hover:border-primary/40 hover:bg-muted/30 transition-colors">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0"><Building className="h-5 w-5" /></span>
@@ -148,8 +161,20 @@ export function PartnerOrganisations() {
                 {d.delegated > 0 && <span className="flex items-center gap-1.5 text-violet-600"><ShieldCheck className="h-3.5 w-3.5" />{d.delegated} delegated</span>}
                 {d.openInvoices > 0 && <span className="flex items-center gap-1.5 text-amber-600"><Receipt className="h-3.5 w-3.5" />{d.openInvoices} open invoice{d.openInvoices === 1 ? '' : 's'}</span>}
               </div>
-              <div className={cn('mt-3 text-xs font-medium text-primary')}>Open organisation →</div>
-            </button>
+              <div className="mt-3 flex items-center justify-between">
+                <span className={cn('text-xs font-medium text-primary')}>Open organisation →</span>
+                {canManage && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); confirmDelete(o); }}
+                    disabled={deleteOrg.isPending}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                    title={`Delete ${o.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </button>
+                )}
+              </div>
+            </div>
           );
         })}
         {orgs.length === 0 && (

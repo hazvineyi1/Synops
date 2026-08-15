@@ -118,11 +118,61 @@ router.patch("/organisations/:orgId", requireAuth, async (req, res) => {
 // DELETE /organisations/:orgId, remove an EMPTY org (super admin only).
 // Guarded: refuses unless the org has zero members and none of its classes have learners, so a
 // populated tenant can never be deleted by mistake. Cascades only the org's own class scaffolding.
+// Remove one organisation and EVERYTHING scoped to it: its members (users), their learner records,
+// its classes and delivery, org-scoped activities/cases/branding. Mirrors deletePartnerCascade but
+// for a single org. Does NOT touch partner-owned courses or partner-level billing/funding - those
+// belong to the partner, not this org. Best-effort per statement so column/table drift never aborts.
+async function deleteOrganisationCascade(orgId: string): Promise<void> {
+  const usersSub = sql`(SELECT id FROM users WHERE organisation_id = ${orgId})`;
+  const classSub = sql`(SELECT id FROM org_classes WHERE org_id = ${orgId})`;
+  const statements = [
+    sql`DELETE FROM enrolments WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM beat_progress WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM assignment_submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM activity_submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM case_sessions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_entries WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_cells WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_alerts WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM coach_plans WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM attendance_records WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM notifications WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM auth_sessions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM password_resets WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM login_events WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM org_class_learners WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_class_courses WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_class_staff WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM class_join_codes WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_classes WHERE org_id = ${orgId}`,
+    sql`DELETE FROM delivery_sessions WHERE tenant_id = ${orgId}`,
+    sql`DELETE FROM interactive_activities WHERE organisation_id = ${orgId}`,
+    sql`DELETE FROM case_scenarios WHERE organisation_id = ${orgId}`,
+    sql`DELETE FROM brand_themes WHERE tenant_id = ${orgId}`,
+    sql`DELETE FROM users WHERE organisation_id = ${orgId}`,
+    sql`DELETE FROM organisations WHERE id = ${orgId}`,
+  ];
+  for (const s of statements) {
+    try { await db.execute(s); } catch { /* table absent or column drift - skip, others still run */ }
+  }
+}
+
 router.delete("/organisations/:orgId", requireAuth, async (req, res) => {
   const actor = req.dbUser!;
   if (actor.role !== "super_admin") { res.status(403).json({ error: "Forbidden" }); return; }
   const org = await db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, req.params.orgId) });
   if (!org) { res.status(404).json({ error: "Not found" }); return; }
+
+  // ?force=true wipes the org AND its members/learners/classes/content in one go (used by the
+  // "Delete organisation" button after an explicit confirm). Without it, we keep the safe behaviour:
+  // refuse to delete an org that still has people in it.
+  if (req.query.force === "true") {
+    await deleteOrganisationCascade(org.id);
+    await logAudit(req, "organisation.delete", "organisation", org.id, { name: org.name, forced: true });
+    res.status(204).send();
+    return;
+  }
 
   const memberCount = await orgMemberCount(org.id);
   const classes = await db.select({ id: orgClassesTable.id }).from(orgClassesTable).where(eq(orgClassesTable.orgId, org.id));
