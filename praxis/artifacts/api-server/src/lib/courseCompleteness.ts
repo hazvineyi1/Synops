@@ -23,8 +23,8 @@ import { and, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
  *   3 readings      - >=1 module_readings (published)
  *   4 videos        - >=1 beats of type 'video' with a video_url
  *   5 interactives  - >=1 interactive_activities (published)
- *   6 case study    - >=1 case_scenarios (status 'published')
- *   7 assignment    - >=1 assignments (published)
+ *   6 case study    - >=1 case_scenarios (exists; publishing the module publishes it)
+ *   7 assignment    - >=1 assignments (exists; publishing the module publishes it)
  *   8 discussion    - >=1 discussions (existence counts; the table has no published flag)
  *   9 structure     - modules.beatCount > 0 (ordered beats exist)
  *
@@ -60,8 +60,8 @@ export const COMPONENT_LABELS: Record<ComponentKey, string> = {
   readings: "A published reading",
   videos: "A video lesson",
   interactives: "A published interactive activity",
-  caseStudy: "A published case study",
-  assignment: "A published assignment",
+  caseStudy: "A case study",
+  assignment: "An assignment",
   discussion: "A discussion",
   structure: "Lesson structure (ordered beats)",
 };
@@ -250,31 +250,36 @@ export async function loadCourseCompleteness(courseInfos: { id: string; status: 
             .groupBy(interactiveActivitiesTable.moduleId),
         )
       : Promise.resolve(empty),
+    // A case study counts once the author has built one for the module. There is no separate author
+    // step to "publish" a case scenario (unlike readings/interactives), so requiring published status
+    // deadlocked every authored course. Publishing the module pushes its case studies live (see the
+    // module publish route), so an existing case study is the right completeness signal here.
     moduleIds.length
       ? groupedCounts(
           db
             .select({ key: caseScenariosTable.moduleId, n: sql<number>`count(*)::int` })
             .from(caseScenariosTable)
-            .where(and(inArray(caseScenariosTable.moduleId, moduleIds), eq(caseScenariosTable.status, "published")))
+            .where(inArray(caseScenariosTable.moduleId, moduleIds))
             .groupBy(caseScenariosTable.moduleId),
         )
       : Promise.resolve(empty),
+    // Likewise an assignment counts once it exists on the module; publishing the module publishes it.
     moduleIds.length
       ? groupedCounts(
           db
             .select({ key: assignmentsTable.moduleId, n: sql<number>`count(*)::int` })
             .from(assignmentsTable)
-            .where(and(inArray(assignmentsTable.moduleId, moduleIds), eq(assignmentsTable.published, true)))
+            .where(inArray(assignmentsTable.moduleId, moduleIds))
             .groupBy(assignmentsTable.moduleId),
         )
       : Promise.resolve(empty),
-    // Course-level assignment fallback: a published assignment with module_id NULL satisfies every
-    // module of that course.
+    // Course-level assignment fallback: an assignment with module_id NULL satisfies every module of
+    // that course.
     groupedCounts(
       db
         .select({ key: assignmentsTable.courseId, n: sql<number>`count(*)::int` })
         .from(assignmentsTable)
-        .where(and(inArray(assignmentsTable.courseId, courseIds), isNull(assignmentsTable.moduleId), eq(assignmentsTable.published, true)))
+        .where(and(inArray(assignmentsTable.courseId, courseIds), isNull(assignmentsTable.moduleId)))
         .groupBy(assignmentsTable.courseId),
     ),
     moduleIds.length

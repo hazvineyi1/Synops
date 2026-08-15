@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { modulesTable, beatsTable, coursesTable } from "@workspace/db";
-import { eq, asc, sql } from "drizzle-orm";
+import { modulesTable, beatsTable, coursesTable, caseScenariosTable, assignmentsTable } from "@workspace/db";
+import { eq, asc, sql, and, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/requireAuth";
 import { canStaffActOnCourse, canParticipateInCourse, canViewCourseCatalog } from "../lib/scope";
 
@@ -158,6 +158,17 @@ router.post("/modules/:moduleId/publish", requireAuth, async (req, res) => {
     .set({ status: "published", updatedAt: new Date() })
     .where(eq(modulesTable.id, req.params.moduleId))
     .returning();
+  // Publishing a module pushes its coursework live too: any draft case studies and unpublished
+  // assignments authored for this module become visible to learners. Authors build these inside the
+  // module; there is no separate publish step for them, so the module publish is where they go live.
+  await db
+    .update(caseScenariosTable)
+    .set({ status: "published", updatedAt: new Date() })
+    .where(and(eq(caseScenariosTable.moduleId, req.params.moduleId), ne(caseScenariosTable.status, "published")));
+  await db
+    .update(assignmentsTable)
+    .set({ published: true, updatedAt: new Date() })
+    .where(and(eq(assignmentsTable.moduleId, req.params.moduleId), eq(assignmentsTable.published, false)));
   res.json(toModuleResponse(updated));
 });
 

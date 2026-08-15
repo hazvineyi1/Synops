@@ -42,8 +42,8 @@ const ALL_COMPONENTS: MissingComponent[] = [
   { key: 'readings', label: 'A published reading' },
   { key: 'videos', label: 'A video lesson' },
   { key: 'interactives', label: 'A published interactive activity' },
-  { key: 'caseStudy', label: 'A published case study' },
-  { key: 'assignment', label: 'A published assignment' },
+  { key: 'caseStudy', label: 'A case study' },
+  { key: 'assignment', label: 'An assignment' },
   { key: 'discussion', label: 'A discussion' },
   { key: 'structure', label: 'Lesson structure (ordered beats)' },
 ];
