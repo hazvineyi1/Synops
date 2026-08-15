@@ -23,8 +23,7 @@ import { startImpersonation } from '@/lib/impersonationStore';
 import { renameOrg, useOrgOverrides } from '@/lib/orgOverridesStore';
 import {
   getPartnerHub, findHubByOrgId, orgDetail, orgLearners, orgCoaching, orgGradebook,
-  getActivePartnerId,
-  DELEGATABLE_POWERS, ZAR, VAT_RATE, type Invoice, type PartnerDoc, type DocCategory,
+  getActivePartnerId, DELEGATABLE_POWERS,
 } from '@/lib/partnerHubData';
 import { useLearningHub } from '@/lib/learningHubStore';
 import { PartnerClassDetail } from './PartnerClassDetail';
@@ -38,9 +37,6 @@ const SECTION_META: Record<string, { title: string; icon: React.ComponentType<{ 
   courses: { title: 'Courses', icon: BookOpen },
   coaching: { title: 'Coaching', icon: GraduationCap },
   gradebook: { title: 'Gradebook', icon: ClipboardList },
-  funding: { title: 'Funding', icon: Landmark },
-  documents: { title: 'Documents', icon: FileText },
-  billing: { title: 'Billing', icon: Wallet },
   settings: { title: 'Settings', icon: Settings },
 };
 
@@ -54,11 +50,6 @@ const roleBadge = (r: OrgRole) =>
   r === 'org_admin' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300'
     : r === 'coach' ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300'
       : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300';
-
-const invoicePill = (s: Invoice['status']) =>
-  s === 'paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
-    : s === 'overdue' ? 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300'
-      : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300';
 
 function ProfileRow({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
   return (
@@ -218,10 +209,6 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
     onSuccess: (r) => { setCredResult(r); drawerNote(r.password ? 'Temporary password set. Copy it below to share.' : r.emailed ? `Reset link emailed to ${r.email}.` : 'Reset link created. Copy it below to share.'); },
     onError: (e: any) => drawerNote(e?.message ?? 'Could not complete that. Please try again.'),
   });
-  const { data: billing } = useQuery({ queryKey: ['partner-billing', partnerId], queryFn: () => apiFetch<{ subscriptions: any[]; invoices: any[] }>(`/partners/${partnerId}/billing`), enabled: !!partnerId });
-  const { data: fundingRows = [] } = useQuery({ queryKey: ['partner-funding', partnerId], queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/funding`), enabled: !!partnerId });
-  const { data: docRows = [] } = useQuery({ queryKey: ['partner-documents', partnerId], queryFn: () => apiFetch<any[]>(`/partners/${partnerId}/documents`), enabled: !!partnerId });
-
   // Real roster for THIS org (the partner members endpoint returns every account under the partner;
   // filter to this organisation and to the three org roles this hub manages).
   const { data: memberRows = [] } = useQuery({
@@ -236,39 +223,6 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
     setMembers(rows);
     // Re-sync whenever the server roster changes.
   }, [memberRows, orgId]);
-
-  const orgSub = (billing?.subscriptions ?? []).find((s) => s.orgId === orgId) ?? null;
-  const orgPlan = orgSub ? { name: orgSub.planName as string, pricePerSeat: Number(orgSub.pricePerSeat) } : null;
-  const invoices = (billing?.invoices ?? []).filter((i) => i.orgId === orgId);
-  const openInvoiceCount = invoices.filter((i) => (i.status ?? 'due') !== 'paid').length;
-  // Map real funding/doc field names onto what the render expects (funder<-funderName, uploadedAt<-createdAt).
-  const orgFunders = fundingRows.filter((f) => f.orgId === orgId).map((f) => ({ ...f, funder: f.funderName, expiry: f.expiry ?? new Date().toISOString() }));
-  const orgAllocations: { id: string; funder: string; used: number; allocated: number }[] = [];
-  const docs = docRows.filter((dd) => dd.orgId === orgId).map((dd) => ({ ...dd, uploadedAt: dd.createdAt }));
-
-  const [uploadCat, setUploadCat] = useState<DocCategory>('invoice');
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const markPaidM = useMutation({
-    mutationFn: (id: string) => apiFetch(`/partners/${partnerId}/invoices/${id}`, { method: 'PATCH', body: JSON.stringify({ status: 'paid' }) }),
-    onSuccess: () => { qcHub.invalidateQueries({ queryKey: ['partner-billing', partnerId] }); flashMsg('Invoice marked paid.'); },
-    onError: () => flashMsg('Could not update the invoice.'),
-  });
-  const markPaid = (id: string) => markPaidM.mutate(id);
-
-  const uploadDocM = useMutation({
-    mutationFn: (body: any) => apiFetch(`/partners/${partnerId}/documents`, { method: 'POST', body: JSON.stringify(body) }),
-    onSuccess: () => { qcHub.invalidateQueries({ queryKey: ['partner-documents', partnerId] }); flashMsg('Document filed for this organisation.'); },
-    onError: () => flashMsg('Could not file the document.'),
-  });
-  const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0 || !partnerId) return;
-    Array.from(files).forEach((f) => uploadDocM.mutate({
-      name: f.name, category: uploadCat, orgId, orgName: realOrg?.name ?? d.org?.name ?? d.name, status: 'filed',
-      size: f.size > 1_000_000 ? `${(f.size / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1024))} KB`,
-    }));
-    if (fileRef.current) fileRef.current.value = '';
-  };
 
   // Resolve the org identity from REAL data. A real org id isn't in the client mock, so orgDetail's
   // d.org would be undefined and the page would 404 "not found" even though the org exists, which
@@ -295,7 +249,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         title={orgObj.name}
         icon={meta.icon}
         subtitle={`${meta.title} - scoped entirely to ${orgObj.name}.`}
-        action={<div className="flex items-center gap-2">{orgPlan && <Badge variant="outline" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> {orgPlan.name}</Badge>}<Button size="sm" className="gap-1.5" onClick={() => setWizardOpen(true)} title="Guided flow: pick learners, choose a class, assign courses and enrol"><UserPlus className="h-3.5 w-3.5" /> Assign learners</Button></div>}
+        action={<Button size="sm" className="gap-1.5" onClick={() => setWizardOpen(true)} title="Guided flow: pick learners, choose a class, assign courses and enrol"><UserPlus className="h-3.5 w-3.5" /> Assign learners</Button>}
       />
 
       {flash && (
@@ -307,11 +261,10 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
       {/* ── OVERVIEW ── */}
       {section === 'overview' && (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCard icon={Users} label="Seats (active)" value={orgSub ? `${orgSub.activeSeats}/${orgSub.seats}` : '-'} tint="bg-indigo-500/10 text-indigo-600" />
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <StatCard icon={Users} label="People" value={counts.all} tint="bg-indigo-500/10 text-indigo-600" />
             <StatCard icon={BookOpen} label="Courses" value={courses.length} tint="bg-emerald-500/10 text-emerald-600" />
             <StatCard icon={TrendingUp} label="Coaching health" value={`${coaching.avgHealth}%`} tint="bg-violet-500/10 text-violet-600" />
-            <StatCard icon={Receipt} label="Open invoices" value={openInvoiceCount} tint={openInvoiceCount ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground'} />
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {[
@@ -320,7 +273,6 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
               { label: 'Courses', href: `${base}/courses`, icon: BookOpen, sub: `${courses.length} courses` },
               { label: 'Coaching', href: `${base}/coaching`, icon: GraduationCap, sub: `${coaching.atRisk} at risk` },
               { label: 'Gradebook', href: `${base}/gradebook`, icon: ClipboardList, sub: `avg ${gradebook.avgScore}%` },
-              { label: 'Documents', href: `${base}/documents`, icon: FileText, sub: `${docs.length} filed` },
             ].map((c) => (
               <button key={c.href} onClick={() => navigate(c.href)}
                 className="rounded-xl border border-border bg-card p-4 text-left hover:border-primary/40 hover:bg-muted/30 transition-colors">
@@ -523,116 +475,6 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         </div>
       )}
 
-      {/* ── FUNDING ── */}
-      {section === 'funding' && (
-        <div className="space-y-4">
-          <Card className="overflow-hidden">
-            <div className="p-3 text-sm font-semibold border-b border-border flex items-center gap-2"><Landmark className="h-4 w-4 text-primary" /> Funding agreements</div>
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="text-left p-3">Funder</th><th className="text-right p-3">Seats</th><th className="text-right p-3">Value</th><th className="text-left p-3">Expiry</th><th className="text-left p-3">Status</th></tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {orgFunders.map((f) => (
-                  <tr key={f.id}>
-                    <td className="p-3 font-medium">{f.funder}</td>
-                    <td className="p-3 text-right tabular-nums">{f.seatsFunded}</td>
-                    <td className="p-3 text-right tabular-nums font-medium">{ZAR(f.value)}</td>
-                    <td className="p-3 text-muted-foreground">{new Date(f.expiry).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                    <td className="p-3"><Badge className={cn('text-[10px]', f.status === 'expiring' ? 'bg-amber-500' : f.status === 'pending' ? 'bg-muted text-muted-foreground' : 'bg-emerald-600')}>{f.status}</Badge></td>
-                  </tr>
-                ))}
-                {orgFunders.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No funder agreements scoped to this organisation.</td></tr>}
-              </tbody>
-            </table>
-          </Card>
-          {orgAllocations.length > 0 && (
-            <Card className="p-5">
-              <h3 className="text-sm font-semibold mb-3">Seat allocation</h3>
-              <div className="space-y-3">
-                {orgAllocations.map((a) => (
-                  <div key={a.id}>
-                    <div className="flex items-center justify-between text-sm"><span>{a.funder}</span><span className="text-muted-foreground tabular-nums">{a.used}/{a.allocated} used</span></div>
-                    <Progress value={(a.used / a.allocated) * 100} className="h-1.5 mt-1" />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* ── DOCUMENTS ── */}
-      {section === 'documents' && (
-        <div className="space-y-4">
-          <Card className="p-5">
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="text-xs">
-                <span className="mb-1 block font-medium text-muted-foreground">Category</span>
-                <select value={uploadCat} onChange={(e) => setUploadCat(e.target.value as DocCategory)} className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                  <option value="invoice">Invoices</option><option value="contract">Contracts</option>
-                  <option value="funder">Funder agreements</option><option value="compliance">Compliance</option><option value="other">Other</option>
-                </select>
-              </label>
-              <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-              <Button className="gap-2" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> Upload to {orgObj.name}</Button>
-            </div>
-          </Card>
-          <Card className="overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="text-left p-3">Document</th><th className="text-left p-3">Category</th><th className="text-left p-3">Status</th><th className="text-left p-3">Uploaded</th><th className="text-right p-3">Size</th></tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {docs.map((doc) => (
-                  <tr key={doc.id}>
-                    <td className="p-3 font-medium truncate max-w-[260px]">{doc.name}</td>
-                    <td className="p-3 text-muted-foreground capitalize">{doc.category}</td>
-                    <td className="p-3"><Badge variant="outline" className="capitalize text-[10px]">{doc.status.replace('-', ' ')}</Badge></td>
-                    <td className="p-3 text-muted-foreground whitespace-nowrap">{new Date(doc.uploadedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                    <td className="p-3 text-right tabular-nums text-muted-foreground">{doc.size}</td>
-                  </tr>
-                ))}
-                {docs.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No documents filed for this organisation yet.</td></tr>}
-              </tbody>
-            </table>
-          </Card>
-        </div>
-      )}
-
-      {/* ── BILLING ── */}
-      {section === 'billing' && (
-        <div className="space-y-4">
-          <div className="grid sm:grid-cols-3 gap-3">
-            <StatCard icon={Wallet} label="Plan" value={orgPlan?.name ?? '-'} tint="bg-indigo-500/10 text-indigo-600" />
-            <StatCard icon={Users} label="Seats" value={orgSub ? `${orgSub.activeSeats}/${orgSub.seats}` : '-'} tint="bg-emerald-500/10 text-emerald-600" />
-            <StatCard icon={Receipt} label="Monthly (excl. VAT)" value={orgPlan && orgSub ? ZAR(orgPlan.pricePerSeat * orgSub.seats) : '-'} tint="bg-violet-500/10 text-violet-600" />
-          </div>
-          <Card className="overflow-hidden">
-            <div className="p-3 text-sm font-semibold border-b border-border">Invoices</div>
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="text-left p-3">Invoice</th><th className="text-left p-3">Period</th><th className="text-right p-3">Net</th><th className="text-right p-3">Total</th><th className="text-left p-3">Status</th><th className="p-3"></th></tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {invoices.map((i) => (
-                  <tr key={i.id}>
-                    <td className="p-3 font-mono text-xs">{i.number}</td>
-                    <td className="p-3 text-muted-foreground">{i.period}</td>
-                    <td className="p-3 text-right tabular-nums">{ZAR(i.net)}</td>
-                    <td className="p-3 text-right tabular-nums font-medium">{ZAR(i.net * (1 + VAT_RATE))}</td>
-                    <td className="p-3"><span className={cn('rounded px-2 py-0.5 text-xs font-medium', invoicePill(i.status))}>{i.status}</span></td>
-                    <td className="p-3 text-right">{i.status !== 'paid' && <Button size="sm" variant="outline" onClick={() => markPaid(i.id)}>Mark paid</Button>}</td>
-                  </tr>
-                ))}
-                {invoices.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No invoices for this organisation.</td></tr>}
-              </tbody>
-            </table>
-          </Card>
-          <p className="text-xs text-muted-foreground">This is {orgObj.name}'s billing slice. The partner-wide consolidated Financial Hub lives in the Partner Admin Platform, outside any organisation.</p>
-        </div>
-      )}
-
       {/* ── SETTINGS ── */}
       {section === 'settings' && (() => {
         const nameValue = orgNameDraft ?? orgObj.name;
@@ -657,10 +499,6 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                   className={cn('h-10 w-full rounded-md border border-input px-3 text-sm', canManageOrg ? 'bg-background' : 'bg-muted/40 text-muted-foreground')} /></label>
               <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Primary admin</span>
                 <input key={members.find((m) => m.role === 'org_admin')?.email ?? 'none'} defaultValue={members.find((m) => m.role === 'org_admin')?.email ?? ''} readOnly={!canManageOrg} className={cn('h-10 w-full rounded-md border border-input px-3 text-sm', canManageOrg ? 'bg-background' : 'bg-muted/40 text-muted-foreground')} /></label>
-              <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Plan</span>
-                <input defaultValue={orgPlan?.name ?? ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
-              <label className="text-xs"><span className="mb-1 block font-medium text-muted-foreground">Seats</span>
-                <input defaultValue={orgSub ? String(orgSub.seats) : ''} readOnly className="h-10 w-full rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground" /></label>
             </div>
             {canManageOrg && (
               <div className="flex items-center gap-3">
@@ -668,7 +506,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                 {nameChanged && <span className="text-xs text-muted-foreground">Renaming will update the organisation everywhere and log the change.</span>}
               </div>
             )}
-            <p className="text-xs text-muted-foreground">Renaming the organisation updates it across the hub and records what it was, who changed it and when in the Audit activity log. Plan and seat changes are handled from the partner-wide Financial Hub.</p>
+            <p className="text-xs text-muted-foreground">Renaming the organisation updates it across the hub and records the change in the activity log.</p>
           </Card>
         );
       })()}

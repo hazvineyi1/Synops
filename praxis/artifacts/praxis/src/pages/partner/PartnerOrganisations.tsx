@@ -12,22 +12,15 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import {
-  Building, ChevronRight, Wallet, Users, Landmark, Receipt, ShieldCheck, GraduationCap, Mail,
-  Plus, CheckCircle2, Trash2,
+  Building, ChevronRight, Users, GraduationCap, Mail, Plus, CheckCircle2, Trash2,
 } from 'lucide-react';
-import { ZAR, getActivePartnerId } from '@/lib/partnerHubData';
+import { getActivePartnerId } from '@/lib/partnerHubData';
 
 /**
- * Organisations (selector), now backed by REAL data. Every card's plan/seats/funders/coaches/
- * delegated/open-invoices is computed from the same partner-scoped endpoints the individual Hub
- * pages use (/organisations, /partners/:id/billing, /funding, /delegated-admins, /members), so the
- * overview agrees with the hubs instead of showing fabricated figures from the old client mock.
+ * Organisations selector (learning-only). Shows each organisation with its people and coaches, and
+ * lets an admin open, create or delete one. No billing/funding/paperwork surfaces.
  */
 type OrgRow = { id: string; name: string; industry?: string | null; memberCount?: number };
-type Sub = { orgId?: string | null; planName?: string; seats?: number; activeSeats?: number; pricePerSeat?: number };
-type Invoice = { orgId?: string | null; status?: string; net?: number };
-type Funding = { orgId?: string | null };
-type Delegate = { orgId?: string | null };
 type Member = { role?: string; organisationId?: string | null };
 
 export function PartnerOrganisations() {
@@ -44,47 +37,19 @@ export function PartnerOrganisations() {
     queryFn: () => apiFetch<OrgRow[]>(`/organisations${partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : ''}`),
     enabled: !!partnerId,
   });
-  const { data: billing } = useQuery({
-    queryKey: ['partner-billing', partnerId],
-    queryFn: () => apiFetch<{ subscriptions: Sub[]; invoices: Invoice[] }>(`/partners/${partnerId}/billing`),
-    enabled: !!partnerId,
-  });
-  const { data: funding = [] } = useQuery({
-    queryKey: ['partner-funding', partnerId],
-    queryFn: () => apiFetch<Funding[]>(`/partners/${partnerId}/funding`),
-    enabled: !!partnerId,
-  });
-  const { data: delegated = [] } = useQuery({
-    queryKey: ['partner-delegated', partnerId],
-    queryFn: () => apiFetch<Delegate[]>(`/partners/${partnerId}/delegated-admins`),
-    enabled: !!partnerId,
-  });
   const { data: members = [] } = useQuery({
     queryKey: ['partner-members', partnerId],
     queryFn: () => apiFetch<Member[]>(`/partners/${partnerId}/members`),
     enabled: !!partnerId,
   });
 
-  const subs = billing?.subscriptions ?? [];
-  const invoices = billing?.invoices ?? [];
+  const totals = useMemo(() => {
+    const people = orgs.reduce((a, o) => a + (o.memberCount ?? 0), 0);
+    const coaches = members.filter((m) => m.role === 'coach').length;
+    return { people, coaches };
+  }, [orgs, members]);
 
-  const fin = useMemo(() => {
-    const totalSeats = subs.reduce((a, s) => a + (s.seats ?? 0), 0);
-    const openInvoices = invoices.filter((i) => (i.status ?? 'due') !== 'paid');
-    const outstanding = openInvoices.reduce((a, i) => a + (i.net ?? 0), 0);
-    return { totalSeats, outstanding, overdue: openInvoices.length > 0 };
-  }, [subs, invoices]);
-
-  const perOrg = (orgId: string) => {
-    const sub = subs.find((s) => s.orgId === orgId) ?? null;
-    return {
-      sub,
-      funders: funding.filter((f) => f.orgId === orgId).length,
-      coaches: members.filter((m) => m.role === 'coach' && m.organisationId === orgId).length,
-      delegated: delegated.filter((d) => d.orgId === orgId).length,
-      openInvoices: invoices.filter((i) => i.orgId === orgId && (i.status ?? 'due') !== 'paid').length,
-    };
-  };
+  const coachesFor = (orgId: string) => members.filter((m) => m.role === 'coach' && m.organisationId === orgId).length;
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
@@ -133,50 +98,42 @@ export function PartnerOrganisations() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         <StatCard icon={Building} label="Organisations" value={orgs.length} tint="bg-indigo-500/10 text-indigo-600" />
-        <StatCard icon={Users} label="Total seats" value={fin.totalSeats} tint="bg-emerald-500/10 text-emerald-600" />
-        <StatCard icon={ShieldCheck} label="Delegated admins" value={delegated.length} tint="bg-violet-500/10 text-violet-600" />
-        <StatCard icon={Receipt} label="Outstanding" value={ZAR(fin.outstanding)} tint={fin.overdue ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground'} />
+        <StatCard icon={Users} label="People" value={totals.people} tint="bg-emerald-500/10 text-emerald-600" />
+        <StatCard icon={GraduationCap} label="Coaches" value={totals.coaches} tint="bg-violet-500/10 text-violet-600" />
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
-        {orgs.map((o) => {
-          const d = perOrg(o.id);
-          return (
-            <div key={o.id} onClick={() => navigate(`/partner/org/${o.id}`)}
-              className="cursor-pointer rounded-xl border border-border bg-card p-5 text-left hover:border-primary/40 hover:bg-muted/30 transition-colors">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0"><Building className="h-5 w-5" /></span>
-                  <span className="font-semibold truncate">{o.name}</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        {orgs.map((o) => (
+          <div key={o.id} onClick={() => navigate(`/partner/org/${o.id}`)}
+            className="cursor-pointer rounded-xl border border-border bg-card p-5 text-left hover:border-primary/40 hover:bg-muted/30 transition-colors">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0"><Building className="h-5 w-5" /></span>
+                <span className="font-semibold truncate">{o.name}</span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-y-2 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" />{d.sub?.planName ?? 'No plan'}</span>
-                <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{d.sub ? `${d.sub.activeSeats ?? 0}/${d.sub.seats ?? 0} seats` : '-'}</span>
-                <span className="flex items-center gap-1.5"><Landmark className="h-3.5 w-3.5" />{d.funders} funder{d.funders === 1 ? '' : 's'}</span>
-                <span className="flex items-center gap-1.5"><GraduationCap className="h-3.5 w-3.5" />{d.coaches} coach{d.coaches === 1 ? '' : 'es'}</span>
-                {d.delegated > 0 && <span className="flex items-center gap-1.5 text-violet-600"><ShieldCheck className="h-3.5 w-3.5" />{d.delegated} delegated</span>}
-                {d.openInvoices > 0 && <span className="flex items-center gap-1.5 text-amber-600"><Receipt className="h-3.5 w-3.5" />{d.openInvoices} open invoice{d.openInvoices === 1 ? '' : 's'}</span>}
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <span className={cn('text-xs font-medium text-primary')}>Open organisation →</span>
-                {canManage && (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); confirmDelete(o); }}
-                    disabled={deleteOrg.isPending}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
-                    title={`Delete ${o.name}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete
-                  </button>
-                )}
-              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
             </div>
-          );
-        })}
+            <div className="mt-3 grid grid-cols-2 gap-y-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" />{o.memberCount ?? 0} {o.memberCount === 1 ? 'person' : 'people'}</span>
+              <span className="flex items-center gap-1.5"><GraduationCap className="h-3.5 w-3.5" />{coachesFor(o.id)} coach{coachesFor(o.id) === 1 ? '' : 'es'}</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between">
+              <span className={cn('text-xs font-medium text-primary')}>Open organisation →</span>
+              {canManage && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); confirmDelete(o); }}
+                  disabled={deleteOrg.isPending}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                  title={`Delete ${o.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
         {orgs.length === 0 && (
           <Card className="p-6 text-center text-sm text-muted-foreground sm:col-span-2 border-dashed">
             No organisations yet.{canManage ? ' Create one to get started.' : ''}
@@ -196,7 +153,7 @@ export function PartnerOrganisations() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">New organisation</DialogTitle>
-            <DialogDescription>Provision a new organisation under this partner. It gets its own hub and reporting immediately.</DialogDescription>
+            <DialogDescription>Provision a new organisation under this partner. It gets its own hub immediately.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Organisation name</span>
@@ -205,7 +162,6 @@ export function PartnerOrganisations() {
             <label className="text-xs block"><span className="mb-1 block font-medium text-muted-foreground">Industry (optional)</span>
               <input value={industry} onChange={(e) => setIndustry(e.target.value)} placeholder="e.g. Enterprise & Supplier Development"
                 className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
-            <p className="text-xs text-muted-foreground">Seats, plan and admins are configured inside the organisation's own hub after it is created.</p>
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button className="gap-1.5" disabled={!name.trim() || createOrg.isPending} onClick={() => createOrg.mutate()}><Plus className="h-4 w-4" /> {createOrg.isPending ? 'Creating…' : 'Create organisation'}</Button>

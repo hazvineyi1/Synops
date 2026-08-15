@@ -130,7 +130,6 @@ export function PartnerSettings() {
             <Card className="p-4 flex items-start gap-3"><ShieldCheck className="h-5 w-5 text-primary shrink-0" /><div><div className="text-sm font-medium">Role provisioning</div><div className="text-xs text-muted-foreground">A Partner can only mint Coach and Org-admin accounts - enforced server-side.</div></div></Card>
             <Card className="p-4 flex items-start gap-3"><ShieldCheck className="h-5 w-5 text-primary shrink-0" /><div><div className="text-sm font-medium">Audit retention</div><div className="text-xs text-muted-foreground">Financial entries carry stricter, append-only retention.</div></div></Card>
           </div>
-          <Button variant="outline" className="gap-1.5" onClick={() => navigate('/partner/audit')}><ShieldCheck className="h-4 w-4" /> Open Audit &amp; Impersonation</Button>
         </TabsContent>
 
         {/* Data */}

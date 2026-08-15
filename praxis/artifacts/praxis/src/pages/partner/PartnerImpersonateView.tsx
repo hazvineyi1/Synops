@@ -37,7 +37,7 @@ export function PartnerImpersonateView({ params }: { params?: { orgId?: string; 
   const role = targetMeta?.role ?? (learner ? 'Learner' : 'Account');
   const name = targetMeta?.name ?? learner?.name ?? active?.name ?? 'User';
 
-  const exit = () => { stopImpersonation(); navigate('/partner/audit'); };
+  const exit = () => { stopImpersonation(); navigate('/partner/organisations'); };
 
   const banner = (
     <Card className="p-3 border-amber-300 bg-amber-50/80 dark:bg-amber-950/30 flex items-center justify-between gap-3 sticky top-0 z-10">

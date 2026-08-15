@@ -38,7 +38,6 @@ import { CoachingMatching } from '@/pages/CoachingMatching';
 import { CoachingHealth } from '@/pages/CoachingHealth';
 import { CoachSubmissions } from '@/pages/CoachSubmissions';
 import { AdminPartners } from '@/pages/AdminPartners';
-import { AdminDocumentTemplates } from '@/pages/AdminDocumentTemplates';
 import { PartnerTheme } from '@/pages/PartnerTheme';
 import { Reports } from '@/pages/Reports';
 import { CoachHub } from '@/pages/CoachHub';
@@ -70,11 +69,8 @@ import { CaseBuilder } from '@/pages/CaseBuilder';
 import { CaseBegin } from '@/pages/CaseBegin';
 import { CaseSession } from '@/pages/CaseSession';
 import { CaseEmbed } from '@/pages/CaseEmbed';
-import { AdminFunders } from '@/pages/AdminFunders';
 import { Delivery } from '@/pages/Delivery';
 import { MyAttendance } from '@/pages/MyAttendance';
-import { Compliance } from '@/pages/Compliance';
-import { Accreditation } from '@/pages/Accreditation';
 import { ActivitiesAdmin } from '@/pages/ActivitiesAdmin';
 import { ClassInsights } from '@/pages/ClassInsights';
 import ContentCatalog from '@/pages/ContentCatalog';
@@ -93,14 +89,9 @@ import { PartnerPartners } from '@/pages/partner/PartnerPartners';
 import { PlatformOverview } from '@/pages/partner/PlatformOverview';
 import { LearningHub } from '@/pages/partner/LearningHub';
 import { CourseDevelopmentSuite } from '@/pages/partner/CourseDevelopmentSuite';
-import { PlatformFinance } from '@/pages/partner/PlatformFinance';
-import { PartnerFinance } from '@/pages/partner/PartnerFinance';
-import { PartnerFunders } from '@/pages/partner/PartnerFunders';
-import { PartnerDocuments } from '@/pages/partner/PartnerDocuments';
 import { PartnerAccounts } from '@/pages/partner/PartnerAccounts';
 import { PartnerComms } from '@/pages/partner/PartnerComms';
 import { PartnerSettings } from '@/pages/partner/PartnerSettings';
-import { PartnerAudit } from '@/pages/partner/PartnerAudit';
 import { GradebookBrowser } from '@/pages/GradebookBrowser';
 import { Support } from '@/pages/Support';
 
@@ -304,20 +295,15 @@ function Routes() {
         <ProtectedRoute path="/platform-overview" component={PlatformOverview} />
         <ProtectedRoute path="/learning/develop" component={CourseDevelopmentSuite} />
         <ProtectedRoute path="/learning" component={LearningHub} />
-        <ProtectedRoute path="/platform-finance" component={PlatformFinance} />
         <ProtectedRoute path="/partner/partners" component={PartnerPartners} />
         <ProtectedRoute path="/partner/organisations" component={PartnerOrganisations} />
         <ProtectedRoute path="/partner/impersonate/:orgId/:userId" component={PartnerImpersonateView} />
         <ProtectedRoute path="/partner/org/:orgId/classes/:classId" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/org/:orgId/:section" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/org/:orgId" component={PartnerOrgHub} />
-        <ProtectedRoute path="/partner/finance" component={PartnerFinance} />
-        <ProtectedRoute path="/partner/funders" component={PartnerFunders} />
-        <ProtectedRoute path="/partner/documents" component={PartnerDocuments} />
         <ProtectedRoute path="/partner/accounts" component={PartnerAccounts} />
         <ProtectedRoute path="/partner/comms" component={PartnerComms} />
         <ProtectedRoute path="/partner/settings" component={PartnerSettings} />
-        <ProtectedRoute path="/partner/audit" component={PartnerAudit} />
         <ProtectedRoute path="/coach-hub" component={CoachHub} />
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />
@@ -339,12 +325,8 @@ function Routes() {
         <ProtectedRoute path="/coach" component={CoachLearners} />
         <ProtectedRoute path="/org/members" component={OrgMembers} />
         <ProtectedRoute path="/admin/partners" component={AdminPartners} />
-        <ProtectedRoute path="/admin/document-templates" component={AdminDocumentTemplates} />
-        <ProtectedRoute path="/admin/funders" component={AdminFunders} />
         <ProtectedRoute path="/delivery" component={Delivery} />
         <ProtectedRoute path="/my-attendance" component={MyAttendance} />
-        <ProtectedRoute path="/compliance" component={Compliance} />
-        <ProtectedRoute path="/accreditation" component={Accreditation} />
         <ProtectedRoute path="/activities" component={ActivitiesAdmin} />
         <ProtectedRoute path="/support/:ticketId" component={Support} />
         <ProtectedRoute path="/support" component={Support} />

@@ -224,11 +224,11 @@ function InstructionalDesignerDashboard() {
           </CardHeader>
         </Card>
       </Link>
-      <Link href="/compliance">
+      <Link href="/incomplete-courses">
         <Card className="hover:bg-muted/30 transition-colors cursor-pointer h-full">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />Compliance &amp; standards</CardTitle>
-            <CardDescription>Define QCTO/SETA unit standards and map them to content.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Award className="h-5 w-5 text-primary" />Course catalogue</CardTitle>
+            <CardDescription>Track courses in build and move finished ones to the catalogue.</CardDescription>
           </CardHeader>
         </Card>
       </Link>

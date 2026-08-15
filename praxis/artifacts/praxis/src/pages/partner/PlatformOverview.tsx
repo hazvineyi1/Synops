@@ -95,7 +95,6 @@ export function PlatformOverview() {
     { title: 'Partners', stat: `${partnerCount} active`, icon: Building, href: '/admin/partners' },
     { title: 'Learning', stat: `${courseCount} course${courseCount === 1 ? '' : 's'}`, icon: BookOpen, href: '/learning' },
     { title: 'Delivery', stat: `${learnerTotal} learner${learnerTotal === 1 ? '' : 's'}`, icon: Users, href: '/delivery' },
-    { title: 'Finance', stat: `${ZAR(finTotals.mrrGross)} / mo`, icon: Wallet, href: '/platform-finance' },
     { title: 'Platform', stat: openAlerts.length ? `${openAlerts.length} to review` : 'All clear', icon: ShieldCheck, href: '/platform' },
     { title: 'Operations', stat: errorRate >= 5 ? `${errorRate}% errors` : 'System healthy', icon: HeartPulse, href: '/admin/health' },
   ];
@@ -191,9 +190,9 @@ export function PlatformOverview() {
                 </div>
 
                 {isOpen && (
-                  <div className="border-t border-border p-4 grid lg:grid-cols-3 gap-4 bg-muted/20">
+                  <div className="border-t border-border p-4 bg-muted/20">
                     {/* Organisations (REAL) */}
-                    <div className="lg:col-span-2">
+                    <div>
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5"><Building className="h-3.5 w-3.5" /> Organisations</div>
                       <div className="grid sm:grid-cols-2 gap-1.5">
                         {pOrgs.map((o) => (
@@ -205,16 +204,6 @@ export function PlatformOverview() {
                         ))}
                         {pOrgs.length === 0 && <div className="text-xs text-muted-foreground">No organisations yet.</div>}
                       </div>
-                    </div>
-
-                    {/* Commercials (REAL) */}
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5"><Wallet className="h-3.5 w-3.5" /> Commercials</div>
-                      <div className="space-y-1.5 text-sm">
-                        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"><span className="text-muted-foreground">Monthly (incl. VAT)</span><span className="font-medium tabular-nums">{ZAR(finByPartner.get(p.id)?.mrrGross ?? 0)}</span></div>
-                        <div className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2"><span className="text-muted-foreground">Funding value</span><span className="font-medium tabular-nums">{ZAR(finByPartner.get(p.id)?.funderValue ?? 0)}</span></div>
-                      </div>
-                      <Button size="sm" variant="outline" className="mt-2 gap-1.5 w-full" onClick={() => { setActivePartner(p.id); navigate('/partner/finance'); }}><Wallet className="h-3.5 w-3.5" /> Open Financial Hub</Button>
                     </div>
                   </div>
                 )}
