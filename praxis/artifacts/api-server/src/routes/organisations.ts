@@ -44,7 +44,13 @@ router.get("/organisations", requireAuth, async (req, res) => {
   // branches (implicit any[]), which silently disabled type checking on the rows.
   let orgs: (typeof organisationsTable.$inferSelect)[];
   if (user.role === "super_admin") {
-    orgs = await db.select().from(organisationsTable);
+    // A super admin acting inside a partner hub passes ?partnerId=... (their persisted active
+    // partner). Scope to that partner so one partner's hub never shows another partner's orgs.
+    // Without the param (the platform-level view) they still see every org.
+    const scopeId = typeof req.query.partnerId === "string" && req.query.partnerId ? req.query.partnerId : null;
+    orgs = scopeId
+      ? await db.select().from(organisationsTable).where(eq(organisationsTable.partnerId, scopeId))
+      : await db.select().from(organisationsTable);
   } else if (user.partnerId) {
     orgs = await db
       .select()
@@ -68,7 +74,13 @@ router.post("/organisations", requireAuth, async (req, res) => {
   }
   if (!validateBody(req, res, { name: { required: true, maxLength: 200 }, industry: { maxLength: 200 } })) return;
   const { name, industry } = req.body;
-  const partnerId = user.partnerId!;
+  // A super admin has no partnerId of their own; the new org attaches to the partner they are acting
+  // as (passed in the body). A partner_admin always uses their own partner. Never null -> that would
+  // orphan the org so it shows in every partner's hub.
+  const partnerId = user.role === "super_admin"
+    ? (typeof req.body.partnerId === "string" && req.body.partnerId ? req.body.partnerId : null)
+    : user.partnerId!;
+  if (!partnerId) { res.status(400).json({ error: "No partner selected. Open a partner hub first, then create the organisation there." }); return; }
   const [org] = await db
     .insert(organisationsTable)
     .values({ name, industry, partnerId })

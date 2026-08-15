@@ -58,7 +58,7 @@ export function PartnerFinance() {
   });
   const { data: funding } = useQuery({ queryKey: ['partner-funding', partnerId], queryFn: () => apiFetch<Agreement[]>(`/partners/${partnerId}/funding`), enabled: !!partnerId });
   const { data: seatUsage } = useQuery({ queryKey: ['partner-seat-usage', partnerId], queryFn: () => apiFetch<SeatSummary>(`/partners/${partnerId}/seat-usage`), enabled: !!partnerId });
-  const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
+  const { data: orgsData } = useQuery({ queryKey: ['organisations', partnerId], queryFn: () => apiFetch<OrgLite[]>(`/organisations${partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : ''}`) });
   const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
 
   const [subs, setSubs] = useState<Sub[]>([]);

@@ -53,7 +53,7 @@ export function PartnerDocuments() {
     queryFn: () => apiFetch<Doc[]>(`/partners/${partnerId}/documents`),
     enabled: !!partnerId,
   });
-  const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
+  const { data: orgsData } = useQuery({ queryKey: ['organisations', partnerId], queryFn: () => apiFetch<OrgLite[]>(`/organisations${partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : ''}`) });
   const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
   const list = docs ?? [];
 

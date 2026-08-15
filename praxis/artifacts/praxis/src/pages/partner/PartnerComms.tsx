@@ -37,7 +37,7 @@ export function PartnerComms() {
   const qc = useQueryClient();
 
   const { data: members } = useQuery({ queryKey: ['partner-members', partnerId], queryFn: () => apiFetch<Member[]>(`/partners/${partnerId}/members`), enabled: !!partnerId });
-  const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
+  const { data: orgsData } = useQuery({ queryKey: ['organisations', partnerId], queryFn: () => apiFetch<OrgLite[]>(`/organisations${partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : ''}`) });
   const { data: sent } = useQuery({ queryKey: ['partner-announcements', partnerId], queryFn: () => apiFetch<Announcement[]>(`/partners/${partnerId}/announcements`), enabled: !!partnerId });
   const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
   const mem = members ?? [];

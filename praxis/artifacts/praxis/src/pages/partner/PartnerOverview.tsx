@@ -36,7 +36,7 @@ export function PartnerOverview() {
   const partnerId = user?.partnerId ?? getActivePartnerId() ?? '';
   const partnerName = brand?.displayName || 'Your organisation';
 
-  const { data: orgs = [] } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgRow[]>('/organisations') });
+  const { data: orgs = [] } = useQuery({ queryKey: ['organisations', partnerId], queryFn: () => apiFetch<OrgRow[]>(`/organisations${partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : ''}`) });
   const { data: billing } = useQuery({ queryKey: ['partner-billing', partnerId], queryFn: () => apiFetch<{ subscriptions: Sub[]; invoices: Invoice[] }>(`/partners/${partnerId}/billing`), enabled: !!partnerId });
   const { data: funding = [] } = useQuery({ queryKey: ['partner-funding', partnerId], queryFn: () => apiFetch<Funding[]>(`/partners/${partnerId}/funding`), enabled: !!partnerId });
   const { data: delegated = [] } = useQuery({ queryKey: ['partner-delegated', partnerId], queryFn: () => apiFetch<Delegate[]>(`/partners/${partnerId}/delegated-admins`), enabled: !!partnerId });

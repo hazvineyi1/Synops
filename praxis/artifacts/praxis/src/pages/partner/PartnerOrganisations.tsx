@@ -37,9 +37,12 @@ export function PartnerOrganisations() {
   const partnerId = user?.partnerId ?? getActivePartnerId() ?? '';
   const canManage = user?.role === 'partner_admin' || user?.role === 'super_admin';
 
+  // Scope the list to THIS partner (keyed by partnerId so switching partners refetches, and a super
+  // admin inside a partner never sees another partner's orgs). Wait for a partner before loading.
   const { data: orgs = [] } = useQuery({
-    queryKey: ['organisations'],
-    queryFn: () => apiFetch<OrgRow[]>('/organisations'),
+    queryKey: ['organisations', partnerId],
+    queryFn: () => apiFetch<OrgRow[]>(`/organisations${partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : ''}`),
+    enabled: !!partnerId,
   });
   const { data: billing } = useQuery({
     queryKey: ['partner-billing', partnerId],
@@ -89,7 +92,7 @@ export function PartnerOrganisations() {
   const [flash, setFlash] = useState<string | null>(null);
 
   const createOrg = useMutation({
-    mutationFn: () => apiFetch<{ id: string }>('/organisations', { method: 'POST', body: JSON.stringify({ name: name.trim(), industry: industry.trim() || null }) }),
+    mutationFn: () => apiFetch<{ id: string }>('/organisations', { method: 'POST', body: JSON.stringify({ name: name.trim(), industry: industry.trim() || null, partnerId: partnerId || undefined }) }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['organisations'] });
       setOpen(false);

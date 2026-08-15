@@ -116,7 +116,7 @@ export function PartnerFunders() {
     queryFn: () => apiFetch<Agreement[]>(`/partners/${partnerId}/funding`),
     enabled: !!partnerId,
   });
-  const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
+  const { data: orgsData } = useQuery({ queryKey: ['organisations', partnerId], queryFn: () => apiFetch<OrgLite[]>(`/organisations${partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : ''}`) });
   const orgs = (orgsData ?? []).filter((o) => o.partnerId === partnerId);
   const { data: membersData } = useQuery({ queryKey: ['partner-members', partnerId], queryFn: () => apiFetch<Member[]>(`/partners/${partnerId}/members`), enabled: !!partnerId });
   const learners = (membersData ?? []).filter((m) => m.role === 'learner');

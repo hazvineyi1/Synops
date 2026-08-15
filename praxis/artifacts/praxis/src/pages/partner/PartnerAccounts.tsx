@@ -85,7 +85,7 @@ export function PartnerAccounts() {
   const hasMore = totalAccounts != null && accounts.length < totalAccounts && limit < 2000;
 
   // Real organisations for the invite / delegate dropdowns.
-  const { data: orgsData } = useQuery({ queryKey: ['organisations'], queryFn: () => apiFetch<OrgLite[]>('/organisations') });
+  const { data: orgsData } = useQuery({ queryKey: ['organisations', partnerId], queryFn: () => apiFetch<OrgLite[]>(`/organisations${partnerId ? `?partnerId=${encodeURIComponent(partnerId)}` : ''}`) });
   // A super admin has no partnerId of their own, so the backend already returns every org they may
   // administer; only a partner-scoped admin needs the extra client-side narrowing. (This was the bug
   // that left the invite dropdown empty for super admins.)
