@@ -21,7 +21,7 @@ interface Announcement { id: string; subject: string; body: string; audienceLabe
 const TEMPLATES = [
   { name: 'Maintenance window', subject: 'Scheduled maintenance', body: 'The platform will be briefly unavailable for scheduled maintenance. No action is needed on your side.' },
   { name: 'New cohort kickoff', subject: 'Your new cohort starts soon', body: 'Welcome! Your programme kicks off shortly. Sign in to complete your profile and review the first module.' },
-  { name: 'Compliance reminder', subject: 'Action needed: outstanding paperwork', body: 'A quick reminder to submit any outstanding compliance documentation so your funding stays on track.' },
+  { name: 'Course reminder', subject: 'Pick up where you left off', body: 'A quick nudge to continue your course. Sign in to complete your next module and keep your progress on track.' },
 ];
 
 /**

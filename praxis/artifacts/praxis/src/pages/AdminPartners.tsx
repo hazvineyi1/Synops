@@ -442,6 +442,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not reset Enza', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Delete every learner-role account and its learning records across the whole platform. Keeps
+  // courses, organisations, coaches and admins.
+  const removeLearners = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; removed?: number }>('/platform/remove-all-learners', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] }); qc.invalidateQueries({ queryKey: ['organisations'] });
+      toast({ title: 'Learners removed', description: `${r.removed ?? 0} learner account${r.removed === 1 ? '' : 's'} deleted across the platform.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not remove learners', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Seed real partner-hub records (billing/funding/documents/delegated admins) for Enza.
   const seedHub = useMutation({
     mutationFn: () => apiFetch<{ ok: boolean; seeded: boolean; message?: string }>('/platform/seed-enza-hub', { method: 'POST' }),
@@ -600,6 +611,12 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('RESET ENZA: permanently delete ALL of Enza\'s organisations, its whole cohort (org admins, coaches, learners), partner-owned courses, and seeded hub data (billing/funding/documents). The partner, its branding and the partner admin login are kept. This cannot be undone. Continue?')) resetEnza.mutate(); }}
                 title="Wipe Enza's seeded content down to an empty branded partner">
                 <Trash2 className="h-4 w-4 mr-2" /> {resetEnza.isPending ? 'Resetting…' : 'Reset Enza (wipe content)'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={removeLearners.isPending}
+                className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400"
+                onClick={() => { if (window.confirm('REMOVE ALL LEARNERS: permanently delete EVERY learner/student account and its progress, submissions and enrolments across the ENTIRE platform (all partners). Courses, organisations, coaches and admins are kept. This cannot be undone. Continue?')) removeLearners.mutate(); }}
+                title="Delete every learner account and its records platform-wide">
+                <Trash2 className="h-4 w-4 mr-2" /> {removeLearners.isPending ? 'Removing…' : 'Remove all learners'}
               </Button>
             </div>
           </CardContent>

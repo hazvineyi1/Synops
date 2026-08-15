@@ -1324,4 +1324,45 @@ router.post("/platform/reset-enza", requireAuth, requireSuperAdmin, async (req, 
   res.json({ ok: true, partner: partner.name });
 });
 
+// POST /platform/remove-all-learners -- delete every learner-role account and its learning records
+// across the whole platform. Keeps courses, organisations, coaches and admins. Optional ?partnerId=
+// scopes the purge to one partner's orgs. Best-effort per statement so column/table drift never aborts.
+router.post("/platform/remove-all-learners", requireAuth, requireSuperAdmin, async (req, res) => {
+  const scope = typeof req.query.partnerId === "string" && req.query.partnerId ? req.query.partnerId : null;
+  // Learners in scope: role 'learner', optionally limited to a partner's organisations.
+  const usersSub = scope
+    ? sql`(SELECT id FROM users WHERE role = 'learner' AND organisation_id IN (SELECT id FROM organisations WHERE partner_id = ${scope}))`
+    : sql`(SELECT id FROM users WHERE role = 'learner')`;
+
+  const countRows = await db.execute(sql`SELECT count(*)::int AS n FROM users WHERE id IN ${usersSub}`);
+  const removed = Number((countRows.rows?.[0] as { n?: number } | undefined)?.n ?? 0);
+
+  const statements = [
+    sql`DELETE FROM org_class_learners WHERE learner_id IN ${usersSub}`,
+    sql`DELETE FROM enrolments WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM beat_progress WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM assignment_submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM activity_submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM case_sessions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_entries WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_cells WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_alerts WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM coach_plans WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM attendance_records WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM notifications WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM auth_sessions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM password_resets WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM login_events WHERE user_id IN ${usersSub}`,
+    scope
+      ? sql`DELETE FROM users WHERE role = 'learner' AND organisation_id IN (SELECT id FROM organisations WHERE partner_id = ${scope})`
+      : sql`DELETE FROM users WHERE role = 'learner'`,
+  ];
+  for (const s of statements) {
+    try { await db.execute(s); } catch { /* table absent or column drift - skip, others still run */ }
+  }
+  await audit(req, "platform.remove_all_learners", "platform", scope ?? "all", { removed, scope });
+  res.json({ ok: true, removed });
+});
+
 export default router;
