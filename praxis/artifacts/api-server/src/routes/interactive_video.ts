@@ -115,11 +115,20 @@ router.post("/beats/:beatId/interactive-questions/generate", requireAuth, async 
     : `Write ${want} multiple-choice CHECKPOINT questions to pop up while a learner watches a video on this topic. Each checks understanding of a key idea (not trivia), with 4 options and one correct answer, plus one line of feedback for the correct answer. Ground them in the content below.\n\nReturn ONLY strict JSON: { "questions": [ { "stem": "…", "options": ["A","B","C","D"], "correctIndex": 0, "feedback": "…" } ] }\n\n=== CONTENT ===\n${content}\n\nReturn ONLY the JSON object.`;
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6", max_tokens: 2400,
+      model: "claude-sonnet-4-6", max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
     }, { timeout: 90000, maxRetries: 1 });
     const text = (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
-    let parsed: any = {}; try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+    // Parse defensively: the model can wrap the JSON in ``` fences or add a stray sentence, and a
+    // truncated response leaves malformed JSON. Try each candidate in turn and NEVER let a parse
+    // error escape -- an unguarded JSON.parse here used to throw and surface as a 502.
+    const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const candidates = [cleaned, cleaned.match(/\{[\s\S]*\}/)?.[0] ?? ""];
+    let parsed: any = {};
+    for (const cand of candidates) {
+      if (!cand) continue;
+      try { parsed = JSON.parse(cand); break; } catch { /* try the next candidate */ }
+    }
     const qs = Array.isArray(parsed.questions) ? parsed.questions : [];
     const created = [];
     let i = 0;
