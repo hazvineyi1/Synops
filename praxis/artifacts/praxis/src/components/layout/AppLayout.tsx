@@ -45,7 +45,7 @@ import {
   Home,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getPartnerHub, findHubByOrgId, orgDetail } from '@/lib/partnerHubData';
+import { getPartnerHub, findHubByOrgId, orgDetail, getActivePartnerId } from '@/lib/partnerHubData';
 import { personaByEmail } from '@/lib/k12Personas';
 import { cn } from '@/lib/utils';
 
@@ -156,7 +156,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const inPartnerContext = location.startsWith('/partner');
   const isSuperPlatform = role === 'super_admin' && !inPartnerContext;
   const sidebarBg = isSuperPlatform ? SUPER_BG : SIDEBAR_BG;
-  const activePartnerName = role === 'super_admin' && inPartnerContext ? getPartnerHub(user.partnerId).partnerName : null;
+  // A super admin has no partnerId of their own; the partner they are "acting as" is the persisted
+  // active-partner selection, so the ribbon names the right partner.
+  const actingPartnerId = user.partnerId ?? getActivePartnerId() ?? '';
+  const activePartnerName = role === 'super_admin' && inPartnerContext ? getPartnerHub(actingPartnerId).partnerName : null;
 
   // Platform-owner branding: a super admin at the platform level is Synops (the platform owner),
   // not the tenant/partner whose white-label brand happens to resolve (which would misleadingly
@@ -186,7 +189,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     if (orgMatch && (role === 'partner_admin' || role === 'super_admin')) {
       const orgId = orgMatch[1];
       const b = `/partner/org/${orgId}`;
-      const orgHub = findHubByOrgId(orgId) ?? getPartnerHub(user.partnerId);
+      const orgHub = findHubByOrgId(orgId) ?? getPartnerHub(user.partnerId ?? getActivePartnerId() ?? '');
       const org = orgDetail(orgHub, orgId).org;
       const orgName = org?.name ?? t('nav.organisation', 'Organisation');
       return [

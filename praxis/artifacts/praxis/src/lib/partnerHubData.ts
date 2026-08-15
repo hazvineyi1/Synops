@@ -234,8 +234,21 @@ void TALENTFORGE; void SKILLBRIDGE;
 // Active-partner override: a super admin has no partnerId of their own, so they can select which
 // partner to view from the Partners list; that selection resolves here. A real partner_admin always
 // has their own partnerId and this override is ignored for them.
-let activePartnerId: string | null = null;
-export function setActivePartner(id: string | null) { activePartnerId = id; }
+//
+// Persisted to localStorage so a super admin's "master key" into a partner hub SURVIVES a page
+// refresh and navigation. Held only in memory before, it reset to null on every reload, which
+// dropped the super admin straight back to the platform console.
+const ACTIVE_PARTNER_KEY = 'praxis_active_partner';
+let activePartnerId: string | null = (() => {
+  try { return localStorage.getItem(ACTIVE_PARTNER_KEY); } catch { return null; }
+})();
+export function setActivePartner(id: string | null) {
+  activePartnerId = id;
+  try {
+    if (id) localStorage.setItem(ACTIVE_PARTNER_KEY, id);
+    else localStorage.removeItem(ACTIVE_PARTNER_KEY);
+  } catch { /* ignore storage errors */ }
+}
 export function getActivePartnerId(): string | null { return activePartnerId; }
 
 /** Resolve the hub bundle for a partner id; a super admin gets the selected partner, else TalentForge. */
