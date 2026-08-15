@@ -49,6 +49,23 @@ router.post("/modules/:moduleId/web-suggestions", requireAuth, requireCoFacilita
   const mod = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, req.params.moduleId) });
   if (!mod) { res.status(404).json({ error: "Module not found" }); return; }
   const topic = `${mod.title}. ${mod.description ?? ""} Objectives: ${(mod.objectives ?? []).join("; ")}`.slice(0, 1200);
+
+  // Parse defensively. Web search replies often wrap the JSON in prose or citations, and the model
+  // can add ``` fences -- an unguarded JSON.parse on that used to throw and surface as a 502.
+  const parseHits = (text: string) => {
+    const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const candidates = [cleaned, cleaned.match(/\{[\s\S]*\}/)?.[0] ?? ""];
+    let parsed: any = {};
+    for (const cand of candidates) { if (!cand) continue; try { parsed = JSON.parse(cand); break; } catch { /* try next */ } }
+    const clean = (arr: any) => Array.isArray(arr)
+      ? arr.map((x: any) => ({ title: String(x?.title ?? "").slice(0, 200), url: String(x?.url ?? ""), note: String(x?.note ?? "").slice(0, 200) }))
+          .filter((x: any) => /^https?:\/\//.test(x.url)).slice(0, 6)
+      : [];
+    return { videos: clean(parsed.videos), articles: clean(parsed.articles) };
+  };
+  const textOf = (m: any) => (m.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
+
+  // 1) Preferred: live web search for real, current URLs. Needs the web_search server tool enabled.
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
@@ -59,18 +76,30 @@ router.post("/modules/:moduleId/web-suggestions", requireAuth, requireCoFacilita
         content: `Find high-quality, current, freely accessible learning resources for this course module.\n\nModule topic: ${topic}\n\nUse web search to find up to 4 YouTube or Khan Academy VIDEOS and up to 4 ARTICLES (reputable, and accessible without a paywall where possible) that directly help teach this module.\n\nThen reply with ONLY a JSON object, no prose:\n{ "videos": [{"title":"...","url":"https://...","note":"one short line on why it fits"}], "articles": [{"title":"...","url":"https://...","note":"one short line on why it fits"}] }\nUse only real URLs you actually found via search.`,
       }],
     }, { timeout: 120000, maxRetries: 1 });
-    const text = (message.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("");
-    let parsed: any = {};
-    try { parsed = JSON.parse(text); } catch { const m = text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
-    const clean = (arr: any) => Array.isArray(arr)
-      ? arr.map((x: any) => ({ title: String(x?.title ?? "").slice(0, 200), url: String(x?.url ?? ""), note: String(x?.note ?? "").slice(0, 200) }))
-          .filter((x: any) => /^https?:\/\//.test(x.url)).slice(0, 6)
-      : [];
-    res.json({ videos: clean(parsed.videos), articles: clean(parsed.articles) });
+    const hits = parseHits(textOf(message));
+    if (hits.videos.length || hits.articles.length) { res.json(hits); return; }
+    // Tool ran but returned nothing usable -- fall through to the knowledge fallback below.
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error("web-suggestions failed:", err instanceof Error ? err.message : err);
-    res.status(502).json({ error: "Could not fetch web suggestions. Web search may not be enabled for this server." });
+    console.error("web-suggestions live search failed, falling back to knowledge:", err instanceof Error ? err.message : err);
+  }
+
+  // 2) Fallback (no server tool): well-known, real resources from the model's own knowledge, so the
+  // feature still works where web search is not enabled. Author previews each link before adding.
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1500,
+      messages: [{
+        role: "user",
+        content: `Suggest well-known, real, freely accessible learning resources for this course module from your knowledge.\n\nModule topic: ${topic}\n\nGive up to 4 VIDEOS as real YouTube or Khan Academy URLs you are confident exist (prefer stable, widely-referenced videos from established educators/channels), and up to 4 reputable ARTICLES. Reply with ONLY a JSON object, no prose:\n{ "videos": [{"title":"...","url":"https://...","note":"why it fits; verify the link before adding"}], "articles": [{"title":"...","url":"https://...","note":"why it fits"}] }\nOnly include URLs you are confident are real.`,
+      }],
+    }, { timeout: 60000, maxRetries: 1 });
+    res.json(parseHits(textOf(message)));
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("web-suggestions fallback failed:", err instanceof Error ? err.message : err);
+    res.status(502).json({ error: "Could not fetch suggestions right now. Please try again." });
   }
 });
 
