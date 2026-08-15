@@ -63,6 +63,7 @@ export function IncompleteCourses() {
   const [publishingId, setPublishingId] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState('');
   const [expanded, setExpanded] = React.useState<Set<string>>(new Set());
+  const [publishingModuleId, setPublishingModuleId] = React.useState<string | null>(null);
   const isHub = user?.role === 'super_admin' || user?.role === 'instructional_designer';
 
   const toggle = (id: string) =>
@@ -97,6 +98,20 @@ export function IncompleteCourses() {
       window.alert('Could not move this course to the catalogue. Please try again.');
     } finally {
       setPublishingId(null);
+    }
+  };
+
+  /** Publish a single module. Modules can go live one at a time as they are finished, rather than
+   * waiting for the whole course. Offered once a module has all nine components built. */
+  const publishModule = async (moduleId: string) => {
+    setPublishingModuleId(moduleId);
+    try {
+      await apiFetch(`/modules/${moduleId}/publish`, { method: 'POST' });
+      await qc.invalidateQueries({ queryKey: ['courses'] });
+    } catch {
+      window.alert('Could not publish this module. Please try again.');
+    } finally {
+      setPublishingModuleId(null);
     }
   };
 
@@ -319,41 +334,77 @@ export function IncompleteCourses() {
                           <div className="space-y-3">
                             {modules.map((m) => {
                               const missingKeys = new Set(m.missing.map((x) => x.key));
+                              const built = ALL_COMPONENTS.length - m.missing.length;
+                              const totalComp = ALL_COMPONENTS.length;
                               const moduleReady = m.complete && m.published;
+                              // All nine built but not yet flipped to published -> ready to publish on its own.
+                              const readyToPublish = m.complete && !m.published;
+                              const pct = Math.round((built / totalComp) * 100);
                               return (
                                 <div key={m.moduleId} className="rounded-xl border border-border bg-muted/30 p-3">
-                                  <div className="mb-2 flex items-center gap-2">
-                                    <span className="truncate text-sm font-medium text-foreground">{m.moduleTitle || 'Untitled module'}</span>
-                                    {moduleReady ? (
-                                      <Badge className="gap-1 border-transparent bg-emerald-500/15 text-[10px] text-emerald-700 hover:bg-emerald-500/15">
-                                        <CheckCircle2 className="h-3 w-3" /> Ready
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="outline" className="text-[10px] capitalize">{m.status}</Badge>
+                                  <div className="mb-2 flex items-center justify-between gap-3">
+                                    <div className="flex min-w-0 items-center gap-2">
+                                      <span className="truncate text-sm font-medium text-foreground">{m.moduleTitle || 'Untitled module'}</span>
+                                      {moduleReady ? (
+                                        <Badge className="gap-1 border-transparent bg-emerald-500/15 text-[10px] text-emerald-700 hover:bg-emerald-500/15">
+                                          <CheckCircle2 className="h-3 w-3" /> Published
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-[10px] capitalize">{m.status}</Badge>
+                                      )}
+                                    </div>
+                                    {/* Publish this one module on its own, as soon as it is fully built. */}
+                                    {readyToPublish && (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => publishModule(m.moduleId)}
+                                        disabled={publishingModuleId === m.moduleId}
+                                        className="h-7 shrink-0 bg-emerald-600 px-2.5 text-xs text-white hover:bg-emerald-700"
+                                      >
+                                        <Library className="mr-1 h-3.5 w-3.5" />
+                                        {publishingModuleId === m.moduleId ? 'Publishing...' : 'Publish module'}
+                                      </Button>
                                     )}
                                   </div>
-                                  <ul className="flex flex-wrap gap-1.5">
-                                    {ALL_COMPONENTS.map((c) => {
-                                      const missing = missingKeys.has(c.key);
-                                      return (
-                                        <li
-                                          key={c.key}
-                                          className={
-                                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ' +
-                                            (missing ? 'bg-rose-500/10 text-rose-700' : 'bg-emerald-500/10 text-emerald-700')
-                                          }
-                                        >
-                                          {missing ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
-                                          {c.label}
-                                        </li>
-                                      );
-                                    })}
-                                    {!m.published && (
-                                      <li className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700">
-                                        <AlertTriangle className="h-3 w-3" /> Module not published yet
-                                      </li>
-                                    )}
-                                  </ul>
+
+                                  {/* How far to completion: built count + bar. */}
+                                  <div className="mb-2 flex items-center gap-2">
+                                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                      <div
+                                        className={cn('h-full rounded-full', m.complete ? 'bg-emerald-500' : 'bg-amber-500')}
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                    </div>
+                                    <span className="shrink-0 text-xs font-medium text-muted-foreground">{built}/{totalComp} built</span>
+                                  </div>
+
+                                  {/* What is still missing, called out first so it is easy to see. */}
+                                  {m.missing.length > 0 ? (
+                                    <div>
+                                      <p className="mb-1 text-xs font-medium text-rose-700">Still needed ({m.missing.length}):</p>
+                                      <ul className="flex flex-wrap gap-1.5">
+                                        {m.missing.map((c) => (
+                                          <li
+                                            key={c.key}
+                                            className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-0.5 text-xs font-medium text-rose-700"
+                                          >
+                                            <AlertTriangle className="h-3 w-3" />
+                                            {c.label}
+                                          </li>
+                                        ))}
+                                        {!m.published && !readyToPublish && (
+                                          <li className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                            <AlertTriangle className="h-3 w-3" /> Not published yet
+                                          </li>
+                                        )}
+                                      </ul>
+                                    </div>
+                                  ) : (
+                                    <p className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                      {m.published ? 'All components built and published.' : 'All components built. Ready to publish.'}
+                                    </p>
+                                  )}
                                 </div>
                               );
                             })}
