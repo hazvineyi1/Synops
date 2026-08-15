@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiFetch } from "@/lib/api";
 import { useSession } from "@/context/SessionContext";
+import { getActivePartnerId } from "@/lib/partnerHubData";
 
 /**
  * App-wide white-label theming. Fetches the caller's tenant brand theme and applies it to the
@@ -28,9 +30,17 @@ export interface BrandTheme {
 /** Shared brand-theme query (react-query dedupes across consumers). */
 export function useBrandTheme() {
   const { user } = useSession();
+  const [location] = useLocation();
+  // A super admin using the master key into a partner hub previews THAT partner's brand while inside
+  // /partner/*; on the platform (and for a real partner_admin) the server resolves the brand from the
+  // caller's own tenant, so no override is sent.
+  const activePartner = getActivePartnerId();
+  const overrideId = user?.role === "super_admin" && location.startsWith("/partner") && activePartner
+    ? activePartner
+    : null;
   return useQuery({
-    queryKey: ["brand-theme"],
-    queryFn: () => apiFetch<BrandTheme>("/brand/theme"),
+    queryKey: ["brand-theme", overrideId],
+    queryFn: () => apiFetch<BrandTheme>(`/brand/theme${overrideId ? `?partnerId=${encodeURIComponent(overrideId)}` : ""}`),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
   });

@@ -107,14 +107,21 @@ router.get("/brand/public", async (req, res) => {
 // GET /brand/theme, the caller's own tenant theme (any authenticated user; used to render branding).
 router.get("/brand/theme", requireAuth, async (req, res) => {
   const user = req.dbUser!;
-  const tenantId = user.partnerId ?? "platform";
-  const theme = await getOrCreateTheme(tenantId, user.partnerId ? "partner" : "platform");
+  // A super admin has no partnerId of their own, so their hub would always render the platform brand
+  // ("Synops Praxis"). When they are acting inside a partner hub they pass ?partnerId=, so the whole
+  // app (name, logo, colours, title) skins to THAT partner - the branded Enza hub reads "Enza", etc.
+  const override = user.role === "super_admin" && typeof req.query.partnerId === "string" && req.query.partnerId
+    ? req.query.partnerId
+    : null;
+  const tenantId = override ?? user.partnerId ?? "platform";
+  const isPartner = !!(override ?? user.partnerId);
+  const theme = await getOrCreateTheme(tenantId, isPartner ? "partner" : "platform");
   // Include the partner slug so the branding page can open a true live preview of the branded
   // sign-in (/sign-in?p=<slug>), which resolves the brand regardless of host or session.
   let slug: string | null = null;
-  if (user.partnerId) {
+  if (isPartner) {
     const partner = await db.query.partnersTable.findFirst({
-      where: eq(partnersTable.id, user.partnerId),
+      where: eq(partnersTable.id, tenantId),
       columns: { slug: true },
     });
     slug = partner?.slug ?? null;
