@@ -3871,16 +3871,18 @@ function ModuleHubView({
 
   const open = (mode: string) => navigate(`/courses/${courseId}/modules/${moduleId}?mode=${mode}`);
 
+  // Canonical section order every module follows:
+  // Overview - Video - Readings - Activities - Case studies - Discussion - Assessment - Reflection - Workshop.
   const TABS: { id: HubTab; label: string; icon: React.ElementType; count?: number }[] = [
     { id: 'overview',    label: 'Overview',    icon: Compass },
     { id: 'structure',   label: 'Structure',   icon: List },
     { id: 'video',       label: 'Video',       icon: PlayCircle,    count: videoBeats.length },
     { id: 'readings',    label: 'Readings',    icon: BookOpen,      count: readingCount },
-    { id: 'complete',    label: 'Complete',    icon: ListChecks,    count: practiceCount },
+    { id: 'complete',    label: 'Activities',  icon: ListChecks,    count: practiceCount },
     { id: 'cases',       label: 'Case studies', icon: Layers,       count: moduleCases?.length ?? 0 },
-    { id: 'participate', label: 'Participate', icon: MessageSquare, count: discussions?.length ?? 0 },
-    { id: 'assignments', label: 'Reflection',  icon: Lightbulb },
+    { id: 'participate', label: 'Discussion',  icon: MessageSquare, count: discussions?.length ?? 0 },
     { id: 'assessment',  label: 'Assessment',  icon: FileText,      count: moduleAssignments.length },
+    { id: 'assignments', label: 'Reflection',  icon: Lightbulb },
     { id: 'workshop',    label: 'Workshop',    icon: Users,         count: moduleWorkshops?.length ?? 0 },
   ];
 
@@ -4196,7 +4198,10 @@ function ModuleHubView({
               const active = tab === t.id;
               const st = tabState[t.id];
               const isDeliverable = t.id !== 'overview';
-              const done = isDeliverable && st.has && st.done;
+              // A section shows the green check when it is complete. For an instructor previewing the
+              // module, "complete" means the section is built (has content). For a learner it means they
+              // have finished that section. Either way, a complete section is green - never a number.
+              const done = isDeliverable && st.has && (isInstructor ? true : st.done);
               return (
                 <li key={t.id} className="shrink-0 lg:shrink flex items-center gap-1">
                   {railCustomizing && isInstructor && (
