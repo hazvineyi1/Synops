@@ -7,7 +7,6 @@ import { Users, BookOpen, Award, TrendingUp, Building, FileText, AlertTriangle }
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { LearnerHome } from '@/pages/LearnerHome';
-import { FunderDashboard } from '@/pages/FunderDashboard';
 
 export function Dashboard() {
   const { data: user } = useGetMe();
@@ -18,11 +17,6 @@ export function Dashboard() {
   // new + the coach as a clear entry point, rather than a coach-only spine page.
   if (user.role === 'learner') {
     return <LearnerHome firstName={user.firstName} />;
-  }
-
-  // Funders get a dedicated read-only, aggregate-only impact view (decision §10.2).
-  if (user.role === 'funder') {
-    return <FunderDashboard firstName={user.firstName} />;
   }
 
   return (

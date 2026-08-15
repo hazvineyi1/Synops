@@ -375,16 +375,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       ];
     }
 
-    // Funder / sponsor: a single read-only impact view (decision §10.2).
-    if (role === 'funder') {
-      return [{
-        items: [
-          { label: t('nav.impact', 'Impact'), href: '/dashboard', icon: TrendingUp },
-          { label: t('nav.support', 'Support'), href: '/support', icon: LifeBuoy },
-        ],
-      }];
-    }
-
     // Instructional Designer: Hub authoring - Studio + standards (decision §3 / §9).
     if (role === 'instructional_designer') {
       return [{

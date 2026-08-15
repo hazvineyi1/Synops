@@ -188,7 +188,7 @@ function OverviewTab() {
 
 /* ───────────────────────────── Users ───────────────────────────── */
 
-const CREATE_ROLES = ["super_admin", "partner_admin", "org_admin", "coach", "learner", "instructional_designer", "funder"] as const;
+const CREATE_ROLES = ["super_admin", "partner_admin", "org_admin", "coach", "learner", "instructional_designer"] as const;
 
 function UsersTab({ onOpen }: { onOpen: (u: PlatformUserRow) => void }) {
   const [q, setQ] = useState("");
