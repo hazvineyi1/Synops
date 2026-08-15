@@ -1250,4 +1250,78 @@ router.post("/platform/enrich-enza", requireAuth, requireSuperAdmin, async (req,
   }
 });
 
+// POST /platform/reset-enza -- wipe Enza's SEEDED CONTENT back to an empty branded partner: remove
+// every organisation, the whole cohort (org-scoped users + their records), partner-owned courses and
+// their content, and the seeded hub data (billing/funding/documents/announcements/delegated). KEEPS
+// the partner row, its branding, and the partner-level admin login(s) so you can build from scratch.
+router.post("/platform/reset-enza", requireAuth, requireSuperAdmin, async (req, res) => {
+  const partner = await db.query.partnersTable.findFirst({ where: eq(partnersTable.slug, "enza-global") });
+  if (!partner) { res.status(404).json({ error: "Enza partner not found." }); return; }
+  const pid = partner.id;
+
+  const orgsSub = sql`(SELECT id FROM organisations WHERE partner_id = ${pid})`;
+  // Cohort = users scoped to Enza's orgs. Partner-level admins (organisation_id NULL) are KEPT.
+  const usersSub = sql`(SELECT id FROM users WHERE organisation_id IN ${orgsSub})`;
+  const classSub = sql`(SELECT id FROM org_classes WHERE org_id IN ${orgsSub})`;
+  const coursesSub = sql`(SELECT id FROM courses WHERE tenant_id = ${pid})`;
+  const modulesSub = sql`(SELECT id FROM modules WHERE course_id IN ${coursesSub})`;
+
+  const statements = [
+    // Cohort learner records.
+    sql`DELETE FROM enrolments WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM beat_progress WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM assignment_submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM activity_submissions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM case_sessions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_entries WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_cells WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM gradebook_alerts WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM coach_plans WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM attendance_records WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM notifications WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM auth_sessions WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM password_resets WHERE user_id IN ${usersSub}`,
+    sql`DELETE FROM login_events WHERE user_id IN ${usersSub}`,
+    // Classes.
+    sql`DELETE FROM org_class_learners WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_class_courses WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_class_staff WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM class_join_codes WHERE class_id IN ${classSub}`,
+    sql`DELETE FROM org_classes WHERE org_id IN ${orgsSub}`,
+    // Org-scoped delivery + content + org-level branding.
+    sql`DELETE FROM delivery_sessions WHERE tenant_id IN ${orgsSub}`,
+    sql`DELETE FROM interactive_activities WHERE organisation_id IN ${orgsSub}`,
+    sql`DELETE FROM case_scenarios WHERE organisation_id IN ${orgsSub}`,
+    sql`DELETE FROM brand_themes WHERE tenant_id IN ${orgsSub}`,
+    // Partner-OWNED courses and their content (platform courses are only unassigned, below).
+    sql`DELETE FROM beats WHERE module_id IN ${modulesSub}`,
+    sql`DELETE FROM module_readings WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM modules WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM assignments WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM discussions WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM gradebook_items WHERE course_id IN ${coursesSub}`,
+    sql`DELETE FROM courses WHERE tenant_id = ${pid}`,
+    // Unassign any platform courses from Enza (keeps the platform course itself).
+    sql`DELETE FROM course_partner_assignments WHERE partner_id = ${pid}`,
+    // Seeded partner hub data.
+    sql`DELETE FROM delegated_admins WHERE partner_id = ${pid}`,
+    sql`DELETE FROM funding_agreements WHERE partner_id = ${pid}`,
+    sql`DELETE FROM funded_seat_assignments WHERE partner_id = ${pid}`,
+    sql`DELETE FROM billing_subscriptions WHERE partner_id = ${pid}`,
+    sql`DELETE FROM billing_invoices WHERE partner_id = ${pid}`,
+    sql`DELETE FROM partner_documents WHERE partner_id = ${pid}`,
+    sql`DELETE FROM partner_announcements WHERE partner_id = ${pid}`,
+    sql`DELETE FROM platform_filings WHERE partner_id = ${pid}`,
+    // Finally the cohort users, then the orgs. Partner row + brand + partner-level admins are kept.
+    sql`DELETE FROM users WHERE organisation_id IN ${orgsSub}`,
+    sql`DELETE FROM organisations WHERE partner_id = ${pid}`,
+  ];
+  for (const s of statements) {
+    try { await db.execute(s); } catch { /* table absent or column drift - skip, others still run */ }
+  }
+  await audit(req, "platform.reset_enza", "partner", pid, { name: partner.name });
+  res.json({ ok: true, partner: partner.name });
+});
+
 export default router;

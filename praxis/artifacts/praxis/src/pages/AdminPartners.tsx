@@ -431,6 +431,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not resync', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Reset Enza back to an empty branded partner: wipe every org, the whole cohort, partner-owned
+  // courses and seeded hub data. Keeps the partner, its branding, and the partner admin login.
+  const resetEnza = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; partner?: string }>('/platform/reset-enza', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] }); qc.invalidateQueries({ queryKey: ['organisations'] }); qc.invalidateQueries({ queryKey: ['courses'] });
+      toast({ title: 'Enza reset', description: `${r.partner ?? 'Enza'} is now an empty branded partner. Start building from here.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not reset Enza', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Seed real partner-hub records (billing/funding/documents/delegated admins) for Enza.
   const seedHub = useMutation({
     mutationFn: () => apiFetch<{ ok: boolean; seeded: boolean; message?: string }>('/platform/seed-enza-hub', { method: 'POST' }),
@@ -583,6 +594,12 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Seed real partner-hub data (billing, funding, documents, delegated admins) for Enza?')) seedHub.mutate(); }}
                 title="Seed billing/funding/documents/delegated-admins for the Enza partner hubs">
                 {seedHub.isPending ? 'Seeding…' : 'Seed Hub Data'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={resetEnza.isPending}
+                className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400"
+                onClick={() => { if (window.confirm('RESET ENZA: permanently delete ALL of Enza\'s organisations, its whole cohort (org admins, coaches, learners), partner-owned courses, and seeded hub data (billing/funding/documents). The partner, its branding and the partner admin login are kept. This cannot be undone. Continue?')) resetEnza.mutate(); }}
+                title="Wipe Enza's seeded content down to an empty branded partner">
+                <Trash2 className="h-4 w-4 mr-2" /> {resetEnza.isPending ? 'Resetting…' : 'Reset Enza (wipe content)'}
               </Button>
             </div>
           </CardContent>
