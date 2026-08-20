@@ -84,6 +84,13 @@ export function PracticeCanvas() {
   const invalidate = useCallback(() => { qc.invalidateQueries({ queryKey: ['practice-reflections', id] }); qc.invalidateQueries({ queryKey: ['practice-evidence', id] }); qc.invalidateQueries({ queryKey: ['practice-me'] }); }, [qc, id]);
   const off = useOffline(id, invalidate);
 
+  // Opening the canvas starts the credential (chosen -> in progress) so it becomes the active one.
+  useEffect(() => {
+    if (cc && cc.status === 'chosen') {
+      apiFetch(`/practice/me/credentials/${id}`, { method: 'PATCH', body: JSON.stringify({ start: true }) }).then(() => invalidate()).catch(() => {});
+    }
+  }, [cc?.status, id, invalidate]);
+
   const submitted = cc?.status === 'submitted' || cc?.status === 'reviewed';
   const readOnly = submitted;
 

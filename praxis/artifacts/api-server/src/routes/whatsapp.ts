@@ -19,7 +19,7 @@ import { twiml, sendWhatsApp, twilioConfigured, validateTwilioSignature } from "
 import { generateSocraticTurn, type SocraticContext } from "../lib/socraticEngine";
 import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS } from "../lib/stationCoach";
 import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
-import { activeCandidateCredential, captureWhatsappReflection, mutaleCoachReply } from "./practice";
+import { activeCandidateCredential, captureWhatsappReflection, mutaleCoachReply, listCandidateCredentials, touchCandidateCredential } from "./practice";
 import { applyCheckpoint } from "../lib/mastery";
 import { isDue } from "../lib/sm2";
 
@@ -212,7 +212,23 @@ router.post(
     const activeCred = await activeCandidateCredential(user.id);
     if (activeCred) {
       if (lower === "help") {
-        await sendReply("This is Mutale, your leadership thinking partner. Tell me about a real leadership moment and I will help you reflect on it. What you write is saved to your credential in the app. Reply STOP to pause.");
+        await sendReply("This is Mutale, your leadership thinking partner. Tell me about a real leadership moment and I will help you reflect on it. What you write is saved to your credential in the app. Reply CREDENTIALS to see your list or SWITCH <number> to change which one you are reflecting on. Reply STOP to pause.");
+        return;
+      }
+      // See or change which credential your reflections attach to.
+      if (lower === "credentials" || lower === "list") {
+        const creds = await listCandidateCredentials(user.id);
+        const list = creds.map((c, i) => `${i + 1}. ${c.title}${c.id === activeCred.id ? " (active)" : ""}`).join("\n");
+        await sendReply(`Your credentials:\n${list || "(none yet, choose some in the app)"}\n\nReply SWITCH <number> to change which one your reflections go to.`);
+        return;
+      }
+      const switchMatch = lower.match(/^(?:switch|use)\s+(\d+)$/);
+      if (switchMatch) {
+        const creds = await listCandidateCredentials(user.id);
+        const pick = creds[parseInt(switchMatch[1], 10) - 1];
+        if (!pick) { await sendReply("I could not find that number. Reply CREDENTIALS to see your list."); return; }
+        await touchCandidateCredential(pick.id);
+        await sendReply(`Now reflecting on: ${pick.title}. Tell me about a moment from your practice with this.`);
         return;
       }
       if (body.length > 12) await captureWhatsappReflection(activeCred.id, body);

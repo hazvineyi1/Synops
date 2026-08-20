@@ -423,6 +423,22 @@ export async function activeCandidateCredential(candidateId: string): Promise<{ 
   }
 }
 
+/** The candidate's choosable credentials (in progress or chosen), in their own order. */
+export async function listCandidateCredentials(candidateId: string): Promise<{ id: string; title: string }[]> {
+  try {
+    return await rows<{ id: string; title: string }>(sql`
+      SELECT cc.id, pc.title FROM candidate_credentials cc JOIN practice_credentials pc ON pc.id = cc.credential_id
+      WHERE cc.candidate_id = ${candidateId} AND cc.status IN ('in_progress','chosen') ORDER BY cc.sort, cc.created_at`);
+  } catch { return []; }
+}
+
+/** Make a credential the active one (newest updated_at wins in activeCandidateCredential) + start it. */
+export async function touchCandidateCredential(id: string): Promise<void> {
+  try {
+    await db.execute(sql`UPDATE candidate_credentials SET updated_at = now(), status = CASE WHEN status = 'chosen' THEN 'in_progress' ELSE status END WHERE id = ${id}`);
+  } catch { /* best effort */ }
+}
+
 /** Capture a WhatsApp reflection message against a candidate credential (stage 'note'). */
 export async function captureWhatsappReflection(candidateCredentialId: string, content: string): Promise<void> {
   try {
