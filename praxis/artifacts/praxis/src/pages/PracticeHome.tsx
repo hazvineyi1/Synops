@@ -70,6 +70,16 @@ export function PracticeHome() {
         action={<Button className="gap-1.5" onClick={() => setPicking((p) => !p)}><Plus className="h-4 w-4" /> Choose a credential</Button>}
       />
 
+      {mine.length > 0 && (
+        <Card className="p-4 flex items-start gap-3 border-dashed">
+          <MessageSquareQuote className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <div className="font-medium">Reflect on WhatsApp</div>
+            <div className="text-xs text-muted-foreground">Once your number is linked to the programme, you can message Mutale on WhatsApp to reflect on the go, on cheap data. What you write there is saved to your active credential here. Ask your programme coordinator to switch it on.</div>
+          </div>
+        </Card>
+      )}
+
       {/* Choose credentials */}
       {(picking || mine.length === 0) && (
         <Card className="p-5 space-y-3 border-primary/30">

@@ -19,6 +19,7 @@ import { twiml, sendWhatsApp, twilioConfigured, validateTwilioSignature } from "
 import { generateSocraticTurn, type SocraticContext } from "../lib/socraticEngine";
 import { PEJ_COACH_PERSONA, PEJ_COACH_CONSTRAINTS } from "../lib/stationCoach";
 import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
+import { activeCandidateCredential, captureWhatsappReflection, mutaleCoachReply } from "./practice";
 import { applyCheckpoint } from "../lib/mastery";
 import { isDue } from "../lib/sm2";
 
@@ -201,6 +202,31 @@ router.post(
         .set({ mode: "idle", currentSessionId: null, currentBeatId: null })
         .where(eq(whatsappConversationsTable.id, convo.id));
       await sendReply("Paused. Reply START anytime to pick up where the Coach left off.");
+      return;
+    }
+
+    // ── Practice Credentials candidates: reflect with Mutale over WhatsApp ──────
+    // Their messages are captured as reflection against their active credential and sync to the app,
+    // so reflection can happen in bits, on the phone, on cheap data. Takes priority over the course
+    // flow for anyone on the practice programme.
+    const activeCred = await activeCandidateCredential(user.id);
+    if (activeCred) {
+      if (lower === "help") {
+        await sendReply("This is Mutale, your leadership thinking partner. Tell me about a real leadership moment and I will help you reflect on it. What you write is saved to your credential in the app. Reply STOP to pause.");
+        return;
+      }
+      if (body.length > 12) await captureWhatsappReflection(activeCred.id, body);
+      const recent = await db
+        .select()
+        .from(whatsappMessagesTable)
+        .where(eq(whatsappMessagesTable.phone, from))
+        .orderBy(desc(whatsappMessagesTable.createdAt))
+        .limit(10);
+      const chat = recent.reverse().map((m) => ({ role: m.direction === "out" ? "assistant" : "user", content: m.body }));
+      let reply = "";
+      try { reply = await mutaleCoachReply(chat, activeCred.title, activeCred.activity_brief ?? undefined); }
+      catch { reply = "I could not think that through just now. Please try me again in a moment."; }
+      await sendReply(reply || "Tell me a bit more about what happened.");
       return;
     }
 

@@ -379,29 +379,60 @@ router.post("/practice/portfolio/:id/review", requireAuth, async (req, res) => {
 });
 
 // ── Socratic coach (Mutale): action-learning / Gibbs thinking-partner ─────────────────────────────
-// POST /practice/coach -- turns a candidate's experience into articulated learning through questions.
-router.post("/practice/coach", requireAuth, async (req, res) => {
-  const { messages, credentialTitle, activityBrief } = req.body ?? {};
+// Shared by the web canvas and the WhatsApp channel so the coach is identical everywhere.
+export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string): Promise<string> {
   const history = Array.isArray(messages) ? messages.slice(-16) : [];
   const system =
     `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
     `You are helping a candidate turn a real leadership experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "leadership"}". ` +
     (activityBrief ? `The activity brief is: ${activityBrief}\n` : "") +
     `Work the reflective cycle (Gibbs) with them, one step at a time, in their own experience: description of what happened, feelings, evaluation (what was good or bad), analysis (bring in a leadership idea only when their decision needs it), then conclusion and next actions. ` +
-    `Never lecture, never hand over the "right" answer or the "correct" leadership style, ask one question at a time, and help them name what they already know from practice. Do not grade; a human reviewer decides reviewed or resubmit. Never use em dashes or en dashes.`;
+    `Never lecture, never hand over the "right" answer or the "correct" leadership style, ask one question at a time, and help them name what they already know from practice. Do not grade; a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. Never use em dashes or en dashes.`;
+  const msg = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 500,
+    system,
+    messages: history.length ? history.map((m) => ({ role: m.role === "assistant" ? "assistant" as const : "user" as const, content: String(m.content ?? "").slice(0, 4000) }))
+      : [{ role: "user" as const, content: "I'm ready to start reflecting on my leadership experience." }],
+  }, { timeout: 60000, maxRetries: 1 });
+  return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("").replace(/[—–]/g, ", ").trim();
+}
+
+// POST /practice/coach -- turns a candidate's experience into articulated learning through questions.
+router.post("/practice/coach", requireAuth, async (req, res) => {
+  const { messages, credentialTitle, activityBrief } = req.body ?? {};
   try {
-    const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 500,
-      system,
-      messages: history.length ? history.map((m: any) => ({ role: m.role === "assistant" ? "assistant" : "user", content: String(m.content ?? "").slice(0, 4000) }))
-        : [{ role: "user", content: "I'm ready to start reflecting on my leadership experience." }],
-    }, { timeout: 60000, maxRetries: 1 });
-    const text = (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("").replace(/[—–]/g, ", ");
-    res.json({ reply: text.trim() });
+    res.json({ reply: await mutaleCoachReply(messages, credentialTitle, activityBrief) });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
   }
 });
+
+/** The candidate's active credential for capturing WhatsApp reflection: their most recently touched
+ * in-progress credential, else their first chosen one. Returns the row id + title + brief, or null. */
+export async function activeCandidateCredential(candidateId: string): Promise<{ id: string; title: string; activity_brief: string | null } | null> {
+  try {
+    const r = await rows<{ id: string; title: string; activity_brief: string | null }>(sql`
+      SELECT cc.id, pc.title, pc.activity_brief
+      FROM candidate_credentials cc JOIN practice_credentials pc ON pc.id = cc.credential_id
+      WHERE cc.candidate_id = ${candidateId} AND cc.status IN ('in_progress','chosen')
+      ORDER BY (cc.status = 'in_progress') DESC, cc.updated_at DESC LIMIT 1`);
+    return r[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Capture a WhatsApp reflection message against a candidate credential (stage 'note'). */
+export async function captureWhatsappReflection(candidateCredentialId: string, content: string): Promise<void> {
+  try {
+    await db.execute(sql`
+      INSERT INTO reflection_entries (candidate_credential_id, stage, content)
+      VALUES (${candidateCredentialId}, 'note', ${content.slice(0, 8000)})`);
+    await db.execute(sql`UPDATE candidate_credentials SET updated_at = now() WHERE id = ${candidateCredentialId}`);
+  } catch {
+    /* best effort */
+  }
+}
 
 export default router;
