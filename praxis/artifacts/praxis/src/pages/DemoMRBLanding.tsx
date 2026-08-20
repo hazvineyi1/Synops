@@ -18,16 +18,10 @@ export default function DemoMRBLanding() {
     setBusy(true);
     setError(null);
     try {
+      // The MRB executive programme is now a Practice Credentials environment (not a course), so the
+      // demo drops the visitor straight into "My Credentials".
       await demoSignIn("student", "zambian-leadership");
-      let dest = "/dashboard";
-      try {
-        const r = await apiFetch<{ courseId: string; moduleId: string | null }>("/auth/demo-course?tenant=zambian-leadership");
-        if (r.courseId && r.moduleId) dest = `/courses/${r.courseId}/modules/${r.moduleId}`;
-        else if (r.courseId) dest = `/courses/${r.courseId}`;
-      } catch {
-        /* fall back to the dashboard if the resolver is unavailable */
-      }
-      window.location.href = dest;
+      window.location.href = "/practice";
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the demo. Please try again.");
       setBusy(false);

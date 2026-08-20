@@ -12,6 +12,8 @@ import {
   LayoutDashboard,
   BookOpen,
   Award,
+  Compass,
+  ClipboardCheck,
   PenTool,
   Users,
   Settings,
@@ -258,6 +260,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       return [{
         items: [
           { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
+          { label: t('nav.practice', 'My Credentials'), href: '/practice', icon: Compass },
           { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
           { label: t('nav.myGrades', 'My grades'), href: '/grades', icon: TrendingUp },
           // K-12 has no AI tutor / case studies; older K-12 learners skip the Coach hub too.
@@ -274,6 +277,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       return [{
         items: [
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
+          { label: t('nav.reviewQueue', 'Review queue'), href: '/practice/review', icon: ClipboardCheck },
           { label: t('nav.learners'), href: '/coach', icon: Users },
           { label: t('nav.submissions'), href: '/coach/submissions', icon: FileText },
           { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
@@ -337,6 +341,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {
           heading: t('nav.groups.delivery', 'Delivery & Coaching'),
           items: [
+            { label: t('nav.reviewQueue', 'Review queue'), href: '/practice/review', icon: ClipboardCheck },
             { label: t('nav.classInsights', 'Class insights'), href: '/class-insights', icon: Activity },
             { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
             { label: t('nav.learners', 'Coaching'), href: '/coach', icon: Users },

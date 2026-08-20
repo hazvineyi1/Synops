@@ -92,6 +92,9 @@ import { CourseDevelopmentSuite } from '@/pages/partner/CourseDevelopmentSuite';
 import { PartnerAccounts } from '@/pages/partner/PartnerAccounts';
 import { PartnerSettings } from '@/pages/partner/PartnerSettings';
 import { GradebookBrowser } from '@/pages/GradebookBrowser';
+import { PracticeHome } from '@/pages/PracticeHome';
+import { PracticeCanvas } from '@/pages/PracticeCanvas';
+import { PracticeReview } from '@/pages/PracticeReview';
 
 // Layout
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -301,6 +304,9 @@ function Routes() {
         <ProtectedRoute path="/partner/org/:orgId" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/accounts" component={PartnerAccounts} />
         <ProtectedRoute path="/partner/settings" component={PartnerSettings} />
+        <ProtectedRoute path="/practice/review" component={PracticeReview} />
+        <ProtectedRoute path="/practice/c/:id" component={PracticeCanvas} />
+        <ProtectedRoute path="/practice" component={PracticeHome} />
         <ProtectedRoute path="/coach-hub" component={CoachHub} />
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />

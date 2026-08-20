@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
+import { uploadObject, storageEnabled } from "../lib/supabaseStorage";
 
 /**
  * Practice Credentials engine (MRB executive programme, "Option 5" blended action-learning system).
@@ -224,6 +225,42 @@ router.delete("/practice/me/evidence/:evidenceId", requireAuth, async (req, res)
     DELETE FROM evidence_items WHERE id = ${req.params.evidenceId}
       AND candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${uid})`);
   res.status(204).send();
+});
+
+const EVIDENCE_MAX_BYTES = 20 * 1024 * 1024;
+const guessType = (name: string) => {
+  const ext = (name.split(".").pop() ?? "").toLowerCase();
+  const map: Record<string, string> = {
+    pdf: "application/pdf", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    doc: "application/msword", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+    webp: "image/webp", heic: "image/heic", mp3: "audio/mpeg", m4a: "audio/mp4", ogg: "audio/ogg", txt: "text/plain",
+  };
+  return map[ext] ?? "application/octet-stream";
+};
+
+// POST /practice/me/credentials/:id/evidence/upload -- attach a file (document, photo of your work,
+// a voice note) as evidence. Low-data friendly: the candidate can prepare offline and upload once.
+router.post("/practice/me/credentials/:id/evidence/upload", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  if (!storageEnabled()) { res.status(503).json({ error: "File uploads are not configured on this server yet. You can add evidence as a note or a link in the meantime." }); return; }
+  const { filename, dataBase64, title } = req.body ?? {};
+  if (!filename || !dataBase64) { res.status(400).json({ error: "filename and dataBase64 are required" }); return; }
+  const buf = Buffer.from(dataBase64, "base64");
+  if (buf.length > EVIDENCE_MAX_BYTES) { res.status(400).json({ error: "That file is too large (20MB maximum). Use a link for anything bigger." }); return; }
+  const safe = String(filename).replace(/[^A-Za-z0-9._-]/g, "_");
+  const path = `practice-evidence/${uid}/${Date.now()}-${safe}`;
+  try {
+    const { url } = await uploadObject(path, buf, guessType(String(filename)));
+    const sizeNote = `${(buf.length / 1024 / 1024).toFixed(1)} MB`;
+    const ins = await rows(sql`
+      INSERT INTO evidence_items (candidate_credential_id, kind, title, body, url)
+      VALUES (${req.params.id}, 'file', ${title || filename}, ${sizeNote}, ${url}) RETURNING *`);
+    res.status(201).json(ins[0]);
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Upload failed" });
+  }
 });
 
 // POST /practice/me/credentials/:id/submit -- send the portfolio to an independent reviewer's queue.
