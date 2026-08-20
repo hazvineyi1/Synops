@@ -35,7 +35,8 @@ import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
 import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
-import { seedZambianLeadership } from "../lib/mrbSeed";
+import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
+import { PRACTICE_DDL } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
@@ -1363,6 +1364,80 @@ router.post("/platform/remove-all-learners", requireAuth, requireSuperAdmin, asy
   }
   await audit(req, "platform.remove_all_learners", "platform", scope ?? "all", { removed, scope });
   res.json({ ok: true, removed });
+});
+
+// The MRB executive Practice Credentials. Practice-first: each names a leadership practice a candidate
+// can evidence from their own work, not a body of content to be taught. Gateway guidance is common
+// (G1 relevant activity, G2 personal contribution, G3 learning from practice); no pass/fail.
+const MRB_GATEWAY =
+  "There is no pass or fail. A reviewer either recognises your portfolio or refers it for resubmission, and both come with developmental feedback. Reviewers look for three things: " +
+  "G1 Relevant activity - you have actually done something substantially relevant to this credential. " +
+  "G2 Personal contribution - your own actions, decisions or contribution can be clearly identified. " +
+  "G3 Learning from practice - your reflection shows what you learned from doing the activity. " +
+  "You may use an activity you completed in the last six months; you do not have to start something new.";
+
+const MRB_PRACTICE_CREDENTIALS = [
+  { code: "ETHICAL-LEADERSHIP", title: "Ethical Leadership in Practice", sort: 1,
+    summary: "Recognise and articulate the ethical principles already underlying how you lead.",
+    brief: "Complete an activity that demonstrates your ability to make and stand behind a leadership decision on ethical grounds, especially where fairness, honesty, accountability or the interests of the vulnerable were at stake." },
+  { code: "TEAM-FORMATION", title: "Team Formation", sort: 2,
+    summary: "Establish or develop an effective team capable of achieving defined objectives.",
+    brief: "You are required to complete an activity that demonstrates your ability to establish or develop an effective team capable of achieving defined objectives. Different professional experiences produce different, valid evidence; a team you built over weeks or an existing team you reshaped both count." },
+  { code: "SERVANT-LEADERSHIP", title: "Servant Leadership", sort: 3,
+    summary: "Lead by listening and removing obstacles before commanding.",
+    brief: "Complete an activity that demonstrates your ability to hear a team member's actual constraint and act on it, putting the team's capacity to do good work ahead of your own standing." },
+  { code: "TRANSFORMATIONAL-LEADERSHIP", title: "Transformational Leadership", sort: 4,
+    summary: "Form a clear vision, test it with others, and grow people through it.",
+    brief: "Complete an activity that demonstrates your ability to develop a vision, test it with the people it affects, and take them with you, earning the trust the change depends on." },
+  { code: "SOCIAL-VALUE-LEADERSHIP", title: "Social-Value & Equity Leadership", sort: 5,
+    summary: "Name who benefits and who risks being left out, and design for the most vulnerable.",
+    brief: "Complete an activity that demonstrates your ability to make a leadership decision that names who benefits and, deliberately, who is at risk of being left out, and to mitigate that gap for the poorest or hardest-to-reach group." },
+  { code: "LEADING-CHANGE", title: "Leading Change", sort: 6,
+    summary: "Design and lead a change that improves outcomes without leaving the vulnerable behind.",
+    brief: "Complete an activity that demonstrates your ability to design and lead a change to improve effectiveness, pressure-tested against who it might exclude, with an honest account of the equity gaps in your own design." },
+];
+
+const MRB_EXAMPLE_ASSIGNMENT =
+  "Example (Team Formation): A service manager establishes a multidisciplinary project team to address a workplace challenge and justifies the team's composition; it takes several weeks and meetings. A surgeon reviews the composition of a constantly changing theatre team and recommends changes to improve effectiveness from one chaired meeting plus preparation. The volume and quality of evidence differ, yet both give strong evidence of Team Formation through different professional experiences. Show what YOU did, and what you learned from doing it.";
+
+// POST /platform/seed-mrb-practice -- provision the MRB executive programme as PRACTICE CREDENTIALS
+// (Option 5), replacing the course-based experience. Idempotent. Ensures the partner + demo candidate
+// exist (reusing the Zambian seed), creates the credential catalogue, and pre-selects two for the demo.
+router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    await db.execute(sql.raw(PRACTICE_DDL));
+    // Reuse the proven Zambian seed to guarantee the partner, org and demo candidate exist.
+    await seedZambianLeadership();
+    const p = await db.execute(sql`SELECT id FROM partners WHERE slug = 'zambian-leadership' LIMIT 1`);
+    const pid = (p.rows?.[0] as { id?: string } | undefined)?.id;
+    if (!pid) throw new Error("Zambian Leadership partner not found after seed.");
+
+    for (const c of MRB_PRACTICE_CREDENTIALS) {
+      await db.execute(sql`
+        INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, sort)
+        VALUES (${pid}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${MRB_GATEWAY}, ${MRB_EXAMPLE_ASSIGNMENT}, ${c.sort})
+        ON CONFLICT (partner_id, code) DO UPDATE SET
+          title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
+          gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, sort = EXCLUDED.sort`);
+    }
+
+    // Pre-select the first two credentials for the demo candidate so the demo opens populated.
+    const dl = await db.execute(sql`SELECT id FROM users WHERE email = ${ZCL_DEMO_LEARNER_EMAIL} LIMIT 1`);
+    const demoId = (dl.rows?.[0] as { id?: string } | undefined)?.id;
+    if (demoId) {
+      const creds = await db.execute(sql`SELECT id, sort FROM practice_credentials WHERE partner_id = ${pid} ORDER BY sort LIMIT 2`);
+      for (const row of (creds.rows ?? []) as { id: string; sort: number }[]) {
+        await db.execute(sql`
+          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status)
+          VALUES (${demoId}, ${row.id}, ${pid}, ${row.sort}, ${"Chosen because it reflects the leadership I already practise day to day."}, 'in_progress')
+          ON CONFLICT (candidate_id, credential_id) DO NOTHING`);
+      }
+    }
+    await audit(_req, "platform.seed_mrb_practice", "partner", pid, { credentials: MRB_PRACTICE_CREDENTIALS.length });
+    res.json({ ok: true, credentials: MRB_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
 });
 
 export default router;

@@ -442,6 +442,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not reset Enza', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Provision the MRB executive programme as PRACTICE CREDENTIALS (Option 5): creates the credential
+  // catalogue + demo candidate, replacing the course-based experience. Runs the table migration too.
+  const seedMrbPractice = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; credentials?: number }>('/platform/seed-mrb-practice', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] });
+      toast({ title: 'Practice Credentials provisioned', description: `${r.credentials ?? 0} credentials created for the MRB programme.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not provision Practice Credentials', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Delete every learner-role account and its learning records across the whole platform. Keeps
   // courses, organisations, coaches and admins.
   const removeLearners = useMutation({
@@ -605,6 +616,11 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Seed real partner-hub data (billing, funding, documents, delegated admins) for Enza?')) seedHub.mutate(); }}
                 title="Seed billing/funding/documents/delegated-admins for the Enza partner hubs">
                 {seedHub.isPending ? 'Seeding…' : 'Seed Hub Data'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedMrbPractice.isPending}
+                onClick={() => { if (window.confirm('Provision the MRB executive programme as PRACTICE CREDENTIALS (Option 5)? Creates the credential catalogue + demo candidate. Safe to re-run.')) seedMrbPractice.mutate(); }}
+                title="Provision the MRB executive programme as Practice Credentials">
+                {seedMrbPractice.isPending ? 'Provisioning…' : 'Provision MRB Practice Credentials'}
               </Button>
               <Button variant="outline" size="sm" disabled={resetEnza.isPending}
                 className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400"
