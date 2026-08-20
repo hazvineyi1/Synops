@@ -225,7 +225,7 @@ function EvidencePanel({ id, evidence, readOnly, onChange }: { id: string; evide
             <div>
               <input ref={fileRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
               <Button size="sm" variant="outline" className="gap-1.5" disabled={uploading} onClick={() => fileRef.current?.click()}>
-                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} {uploading ? 'Uploading...' : 'Choose a file (max 20MB)'}
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} {uploading ? 'Uploading...' : 'Choose a file'}
               </Button>
               {err && <p className="text-xs text-rose-600 mt-1.5">{err}</p>}
             </div>

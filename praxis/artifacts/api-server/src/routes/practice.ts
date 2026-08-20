@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS evidence_items (
   body text,
   url text,
   created_at timestamp NOT NULL DEFAULT now());
+ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS file_data text;
+ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS file_type text;
 
 CREATE TABLE IF NOT EXISTS credential_reviews (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -238,29 +240,62 @@ const guessType = (name: string) => {
   return map[ext] ?? "application/octet-stream";
 };
 
+// Files small enough to keep inline in the database (base64). Supabase, when configured, takes
+// larger files; this keeps uploads working with zero external setup for the common case (photos of
+// documents, short voice notes, PDFs).
+const EVIDENCE_DB_MAX_BYTES = 5 * 1024 * 1024;
+
 // POST /practice/me/credentials/:id/evidence/upload -- attach a file (document, photo of your work,
 // a voice note) as evidence. Low-data friendly: the candidate can prepare offline and upload once.
+// Uses Supabase Storage if configured, otherwise stores the file in the database (up to 5MB).
 router.post("/practice/me/credentials/:id/evidence/upload", requireAuth, async (req, res) => {
   const uid = req.userId!;
   const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
   if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
-  if (!storageEnabled()) { res.status(503).json({ error: "File uploads are not configured on this server yet. You can add evidence as a note or a link in the meantime." }); return; }
   const { filename, dataBase64, title } = req.body ?? {};
   if (!filename || !dataBase64) { res.status(400).json({ error: "filename and dataBase64 are required" }); return; }
   const buf = Buffer.from(dataBase64, "base64");
-  if (buf.length > EVIDENCE_MAX_BYTES) { res.status(400).json({ error: "That file is too large (20MB maximum). Use a link for anything bigger." }); return; }
-  const safe = String(filename).replace(/[^A-Za-z0-9._-]/g, "_");
-  const path = `practice-evidence/${uid}/${Date.now()}-${safe}`;
+  const sizeNote = `${(buf.length / 1024 / 1024).toFixed(1)} MB`;
+  const type = guessType(String(filename));
   try {
-    const { url } = await uploadObject(path, buf, guessType(String(filename)));
-    const sizeNote = `${(buf.length / 1024 / 1024).toFixed(1)} MB`;
-    const ins = await rows(sql`
-      INSERT INTO evidence_items (candidate_credential_id, kind, title, body, url)
-      VALUES (${req.params.id}, 'file', ${title || filename}, ${sizeNote}, ${url}) RETURNING *`);
-    res.status(201).json(ins[0]);
+    if (storageEnabled()) {
+      if (buf.length > EVIDENCE_MAX_BYTES) { res.status(400).json({ error: "That file is too large (20MB maximum). Use a link for anything bigger." }); return; }
+      const safe = String(filename).replace(/[^A-Za-z0-9._-]/g, "_");
+      const { url } = await uploadObject(`practice-evidence/${uid}/${Date.now()}-${safe}`, buf, type);
+      const ins = await rows(sql`
+        INSERT INTO evidence_items (candidate_credential_id, kind, title, body, url) VALUES (${req.params.id}, 'file', ${title || filename}, ${sizeNote}, ${url}) RETURNING *`);
+      res.status(201).json(ins[0]);
+      return;
+    }
+    // Database fallback (no Supabase configured): keep the file inline, served by the download route.
+    if (buf.length > EVIDENCE_DB_MAX_BYTES) { res.status(400).json({ error: "That file is too large (5MB maximum here). Use a link for anything bigger." }); return; }
+    const ins = await rows<{ id: string }>(sql`
+      INSERT INTO evidence_items (candidate_credential_id, kind, title, body, file_data, file_type)
+      VALUES (${req.params.id}, 'file', ${title || filename}, ${sizeNote}, ${dataBase64}, ${type}) RETURNING id`);
+    const newId = ins[0]?.id;
+    await db.execute(sql`UPDATE evidence_items SET url = ${`/api/practice/evidence/${newId}/download`} WHERE id = ${newId}`);
+    const full = await rows(sql`SELECT id, kind, title, body, url, created_at FROM evidence_items WHERE id = ${newId}`);
+    res.status(201).json(full[0]);
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Upload failed" });
   }
+});
+
+// GET /practice/evidence/:id/download -- stream a database-stored evidence file. The owning candidate
+// or any staff reviewer may fetch it. Served as a direct link (cookie auth), so it downloads inline.
+router.get("/practice/evidence/:id/download", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const row = await rows<{ title: string | null; file_data: string | null; file_type: string | null; candidate_id: string }>(sql`
+    SELECT e.title, e.file_data, e.file_type, cc.candidate_id
+    FROM evidence_items e JOIN candidate_credentials cc ON cc.id = e.candidate_credential_id
+    WHERE e.id = ${req.params.id} LIMIT 1`);
+  const r = row[0];
+  if (!r || !r.file_data) { res.status(404).json({ error: "Not found" }); return; }
+  if (r.candidate_id !== uid && !isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const buf = Buffer.from(r.file_data, "base64");
+  res.setHeader("Content-Type", r.file_type || "application/octet-stream");
+  res.setHeader("Content-Disposition", `inline; filename="${(r.title || "evidence").replace(/[^A-Za-z0-9._-]/g, "_")}"`);
+  res.send(buf);
 });
 
 // POST /practice/me/credentials/:id/submit -- send the portfolio to an independent reviewer's queue.
