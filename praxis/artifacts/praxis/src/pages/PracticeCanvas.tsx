@@ -1,13 +1,47 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { getPending, addPending, removePending, loadDraft, saveDraft, type Pending } from '@/lib/offlineStore';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download,
+  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock,
 } from 'lucide-react';
+
+/** Offline capture: pending queue + connection status, flushed automatically when back online. */
+function useOffline(ccId: string, onSynced: () => void) {
+  const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [pending, setPending] = useState<Pending[]>(() => getPending(ccId));
+  const [flushing, setFlushing] = useState(false);
+  const refresh = useCallback(() => setPending(getPending(ccId)), [ccId]);
+  const flush = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    const items = getPending(ccId);
+    if (!items.length) { return; }
+    setFlushing(true);
+    for (const it of items) {
+      try { await apiFetch(it.endpoint, { method: 'POST', body: JSON.stringify(it.payload) }); removePending(it.id); }
+      catch { break; } // likely offline again; stop and try later
+    }
+    setFlushing(false); refresh(); onSynced();
+  }, [ccId, refresh, onSynced]);
+  useEffect(() => {
+    const on = () => { setOnline(true); flush(); };
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    flush();
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, [flush]);
+  const enqueue = useCallback((p: Omit<Pending, 'id' | 'createdAt' | 'ccId'>) => {
+    addPending({ ...p, ccId });
+    refresh();
+    if (typeof navigator === 'undefined' || navigator.onLine) flush();
+  }, [ccId, refresh, flush]);
+  return { online, pending, flushing, flush, enqueue };
+}
 
 /**
  * Evidence Canvas for a single Practice Credential. This is the practice-first workspace: capture the
@@ -47,7 +81,8 @@ export function PracticeCanvas() {
   const { data: reflections = [] } = useQuery({ queryKey: ['practice-reflections', id], queryFn: () => apiFetch<Reflection[]>(`/practice/me/credentials/${id}/reflections`), enabled: !!id });
   const { data: evidence = [] } = useQuery({ queryKey: ['practice-evidence', id], queryFn: () => apiFetch<Evidence[]>(`/practice/me/credentials/${id}/evidence`), enabled: !!id });
 
-  const invalidate = () => { qc.invalidateQueries({ queryKey: ['practice-reflections', id] }); qc.invalidateQueries({ queryKey: ['practice-evidence', id] }); qc.invalidateQueries({ queryKey: ['practice-me'] }); };
+  const invalidate = useCallback(() => { qc.invalidateQueries({ queryKey: ['practice-reflections', id] }); qc.invalidateQueries({ queryKey: ['practice-evidence', id] }); qc.invalidateQueries({ queryKey: ['practice-me'] }); }, [qc, id]);
+  const off = useOffline(id, invalidate);
 
   const submitted = cc?.status === 'submitted' || cc?.status === 'reviewed';
   const readOnly = submitted;
@@ -55,6 +90,24 @@ export function PracticeCanvas() {
   return (
     <div className="max-w-6xl mx-auto space-y-4">
       <button onClick={() => navigate('/practice')} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> My credentials</button>
+
+      {/* Connection + pending-sync status. On expensive, intermittent data, work is saved on the device
+          and uploaded automatically when back online. */}
+      {(!off.online || off.pending.length > 0) && (
+        <div className={`flex items-center justify-between gap-3 rounded-lg border p-3 text-sm ${off.online ? 'border-amber-500/30 bg-amber-500/5 text-amber-800' : 'border-muted bg-muted/40 text-muted-foreground'}`}>
+          <span className="inline-flex items-center gap-2">
+            {off.online ? <Clock className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
+            {off.online
+              ? `${off.pending.length} change${off.pending.length === 1 ? '' : 's'} saved on your device, waiting to upload.`
+              : "You are offline. Keep working, your reflections and notes are saved on this device and will upload when you reconnect."}
+          </span>
+          {off.online && off.pending.length > 0 && (
+            <Button size="sm" variant="outline" disabled={off.flushing} onClick={off.flush} className="gap-1.5 shrink-0">
+              <RefreshCw className={`h-3.5 w-3.5 ${off.flushing ? 'animate-spin' : ''}`} /> {off.flushing ? 'Syncing...' : 'Sync now'}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Header */}
       <Card className="p-5">
@@ -75,8 +128,8 @@ export function PracticeCanvas() {
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
         {/* Left: reflection + evidence + gateway + submit */}
         <div className="space-y-4">
-          <ReflectionPanel id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} />
-          <EvidencePanel id={id} evidence={evidence} readOnly={readOnly} onChange={invalidate} />
+          <ReflectionPanel id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} />
+          <EvidencePanel id={id} evidence={evidence} readOnly={readOnly} onChange={invalidate} off={off} />
           <GatewaySubmit cc={cc} reflections={reflections.length} evidence={evidence.length} onChange={invalidate} />
         </div>
 
@@ -112,25 +165,48 @@ function GuidanceStrip({ cc }: { cc: any }) {
   );
 }
 
-function ReflectionPanel({ id, reflections, readOnly, onChange }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void }) {
+function ReflectionPanel({ id, reflections, readOnly, onChange, off }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline> }) {
+  const draftKey = `refl_${id}`;
   const [stage, setStage] = useState('note');
-  const [content, setContent] = useState('');
-  const add = useMutation({
-    mutationFn: () => apiFetch(`/practice/me/credentials/${id}/reflections`, { method: 'POST', body: JSON.stringify({ stage, content: content.trim() }) }),
-    onSuccess: () => { setContent(''); onChange(); },
-  });
+  const [content, setContent] = useState(() => loadDraft(draftKey));
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { saveDraft(draftKey, content); }, [content, draftKey]);
+  const endpoint = `/practice/me/credentials/${id}/reflections`;
+  const pendingReflections = off.pending.filter((p) => p.kind === 'reflection');
+
+  const submitReflection = async () => {
+    const text = content.trim();
+    if (!text) return;
+    const payload = { stage, content: text };
+    setBusy(true);
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      off.enqueue({ kind: 'reflection', endpoint, payload, display: text, stage });
+      setContent(''); saveDraft(draftKey, ''); setBusy(false); return;
+    }
+    try { await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) }); setContent(''); saveDraft(draftKey, ''); onChange(); }
+    catch { off.enqueue({ kind: 'reflection', endpoint, payload, display: text, stage }); setContent(''); saveDraft(draftKey, ''); }
+    finally { setBusy(false); }
+  };
+
   return (
     <Card className="p-5 space-y-3">
       <div className="flex items-center gap-2 text-sm font-semibold"><Lightbulb className="h-4 w-4 text-primary" /> Reflection</div>
       <p className="text-xs text-muted-foreground">Reflection happens over time and in bits. Capture a thought whenever it comes, and work the stages as you go. Learning becomes visible here.</p>
 
-      {reflections.length > 0 && (
+      {(reflections.length > 0 || pendingReflections.length > 0) && (
         <ol className="space-y-2 border-l-2 border-border pl-4">
           {reflections.map((r) => (
             <li key={r.id} className="relative">
               <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary/60" />
               <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stageLabel(r.stage)} · {new Date(r.created_at).toLocaleDateString()}</div>
               <p className="text-sm whitespace-pre-wrap">{r.content}</p>
+            </li>
+          ))}
+          {pendingReflections.map((p) => (
+            <li key={p.id} className="relative opacity-70">
+              <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-amber-500/70" />
+              <div className="text-[11px] font-medium uppercase tracking-wide text-amber-700 inline-flex items-center gap-1"><Clock className="h-3 w-3" /> {stageLabel(p.stage || 'note')} · saved on device</div>
+              <p className="text-sm whitespace-pre-wrap">{p.payload.content}</p>
             </li>
           ))}
         </ol>
@@ -148,7 +224,7 @@ function ReflectionPanel({ id, reflections, readOnly, onChange }: { id: string; 
           <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} placeholder="Write your reflection..."
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
           <div className="flex justify-end">
-            <Button size="sm" disabled={!content.trim() || add.isPending} onClick={() => add.mutate()} className="gap-1.5"><Plus className="h-4 w-4" /> Add to reflection</Button>
+            <Button size="sm" disabled={!content.trim() || busy} onClick={submitReflection} className="gap-1.5"><Plus className="h-4 w-4" /> Add to reflection</Button>
           </div>
         </div>
       )}
@@ -156,19 +232,30 @@ function ReflectionPanel({ id, reflections, readOnly, onChange }: { id: string; 
   );
 }
 
-function EvidencePanel({ id, evidence, readOnly, onChange }: { id: string; evidence: Evidence[]; readOnly: boolean; onChange: () => void }) {
+function EvidencePanel({ id, evidence, readOnly, onChange, off }: { id: string; evidence: Evidence[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline> }) {
   const [kind, setKind] = useState<'text' | 'link' | 'file'>('text');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [url, setUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const endpoint = `/practice/me/credentials/${id}/evidence`;
+  const pendingEvidence = off.pending.filter((p) => p.kind === 'evidence');
 
-  const add = useMutation({
-    mutationFn: () => apiFetch(`/practice/me/credentials/${id}/evidence`, { method: 'POST', body: JSON.stringify({ kind, title: title.trim() || null, body: kind === 'text' ? body.trim() : null, url: kind === 'link' ? url.trim() : null }) }),
-    onSuccess: () => { setTitle(''); setBody(''); setUrl(''); onChange(); },
-  });
+  // Notes and links can be captured offline and uploaded on reconnect. Files need a connection.
+  const submitEvidence = async () => {
+    const payload = { kind, title: title.trim() || null, body: kind === 'text' ? body.trim() : null, url: kind === 'link' ? url.trim() : null };
+    const display = title.trim() || (kind === 'link' ? url.trim() : body.trim());
+    setBusy(true);
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      off.enqueue({ kind: 'evidence', endpoint, payload, display }); setTitle(''); setBody(''); setUrl(''); setBusy(false); return;
+    }
+    try { await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) }); setTitle(''); setBody(''); setUrl(''); onChange(); }
+    catch { off.enqueue({ kind: 'evidence', endpoint, payload, display }); setTitle(''); setBody(''); setUrl(''); }
+    finally { setBusy(false); }
+  };
   const del = useMutation({ mutationFn: (eid: string) => apiFetch(`/practice/me/evidence/${eid}`, { method: 'DELETE' }), onSuccess: onChange });
 
   const upload = async (file: File) => {
@@ -211,6 +298,21 @@ function EvidencePanel({ id, evidence, readOnly, onChange }: { id: string; evide
         </ul>
       )}
 
+      {pendingEvidence.length > 0 && (
+        <ul className="space-y-2">
+          {pendingEvidence.map((p) => (
+            <li key={p.id} className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 opacity-80">
+              <Clock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-sm font-medium">{p.payload.title || (p.payload.kind === 'link' ? 'Link' : 'Note')} <span className="text-[11px] font-normal text-amber-700">· saved on device</span></div>
+                {p.payload.body && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{p.payload.body}</p>}
+                {p.payload.url && <span className="text-xs text-primary break-all">{p.payload.url}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
       {!readOnly && (
         <div className="space-y-2 rounded-xl border border-border p-3">
           <div className="flex gap-1.5">
@@ -232,7 +334,7 @@ function EvidencePanel({ id, evidence, readOnly, onChange }: { id: string; evide
           )}
           {kind !== 'file' && (
             <div className="flex justify-end">
-              <Button size="sm" disabled={add.isPending || (kind === 'text' ? !body.trim() : !url.trim())} onClick={() => add.mutate()} className="gap-1.5"><Plus className="h-4 w-4" /> Add evidence</Button>
+              <Button size="sm" disabled={busy || (kind === 'text' ? !body.trim() : !url.trim())} onClick={submitEvidence} className="gap-1.5"><Plus className="h-4 w-4" /> Add evidence</Button>
             </div>
           )}
         </div>
