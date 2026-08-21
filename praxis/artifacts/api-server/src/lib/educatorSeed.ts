@@ -14,14 +14,18 @@ import { eq, and } from "drizzle-orm";
  */
 
 const SLUG = "educator-pd";
+// The demo ENTRY learner is a fresh teacher with no portfolio, so /demos/educator starts from the very
+// beginning (welcome, goals, choose your first credential). A separate SHOWCASE learner (Maria Alvarez)
+// carries a worked portfolio so the recognised-credential, verify and program-insights features still demo.
 export const EDU_DEMO_LEARNER_EMAIL = "demo.educator@edupd.test";
+export const EDU_SHOWCASE_LEARNER_EMAIL = "showcase.educator@edupd.test";
 export const EDU_DEMO_ADMIN_EMAIL = "demo.admin@edupd.test";
 
 async function firstOrNull<T>(rows: T[]): Promise<T | null> {
   return rows.length ? rows[0] : null;
 }
 
-export async function seedEducatorPD(): Promise<{ partnerId: string; demoLearnerId: string }> {
+export async function seedEducatorPD(): Promise<{ partnerId: string; demoLearnerId: string; showcaseLearnerId: string }> {
   let partner = await firstOrNull(await db.select().from(partnersTable).where(eq(partnersTable.slug, SLUG)));
   if (!partner) {
     [partner] = await db.insert(partnersTable).values({
@@ -53,16 +57,28 @@ export async function seedEducatorPD(): Promise<{ partnerId: string; demoLearner
     });
   }
 
+  // Fresh entry learner (no portfolio): a teacher just starting out.
   let learner = await firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, EDU_DEMO_LEARNER_EMAIL)));
   if (!learner) {
     [learner] = await db.insert(usersTable).values({
-      email: EDU_DEMO_LEARNER_EMAIL, firstName: "Maria", lastName: "Alvarez",
+      email: EDU_DEMO_LEARNER_EMAIL, firstName: "Sam", lastName: "Rivera",
       role: "learner", status: "active", partnerId: partner.id, organisationId: org.id,
     }).returning();
   } else {
-    await db.update(usersTable).set({ firstName: "Maria", lastName: "Alvarez" }).where(eq(usersTable.id, learner.id));
+    await db.update(usersTable).set({ firstName: "Sam", lastName: "Rivera" }).where(eq(usersTable.id, learner.id));
+  }
+
+  // Showcase learner (worked portfolio): Maria Alvarez.
+  let showcase = await firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, EDU_SHOWCASE_LEARNER_EMAIL)));
+  if (!showcase) {
+    [showcase] = await db.insert(usersTable).values({
+      email: EDU_SHOWCASE_LEARNER_EMAIL, firstName: "Maria", lastName: "Alvarez",
+      role: "learner", status: "active", partnerId: partner.id, organisationId: org.id,
+    }).returning();
+  } else {
+    await db.update(usersTable).set({ firstName: "Maria", lastName: "Alvarez" }).where(eq(usersTable.id, showcase.id));
   }
 
   await db.update(partnersTable).set({ orgCount: 1 }).where(eq(partnersTable.id, partner.id));
-  return { partnerId: partner.id, demoLearnerId: learner.id };
+  return { partnerId: partner.id, demoLearnerId: learner.id, showcaseLearnerId: showcase.id };
 }

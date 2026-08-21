@@ -1552,9 +1552,14 @@ router.post("/platform/seed-educator-pd", requireAuth, requireSuperAdmin, async 
         WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
     } catch { /* branding best-effort */ }
 
-    // Walkthrough portfolio for the demo educator (Maria Alvarez): AI-Assisted Planning mid-cycle,
-    // Assessment Integrity recognised (mints a verifiable credential).
-    const demoId = seeded.demoLearnerId;
+    // Keep the ENTRY learner (Sam Rivera) empty so /demos/educator starts from the very beginning.
+    await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${seeded.demoLearnerId})`);
+    await db.execute(sql`DELETE FROM evidence_items WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${seeded.demoLearnerId})`);
+    await db.execute(sql`DELETE FROM candidate_credentials WHERE candidate_id = ${seeded.demoLearnerId}`);
+
+    // Walkthrough portfolio for the SHOWCASE educator (Maria Alvarez): AI-Assisted Planning mid-cycle,
+    // Assessment Integrity recognised (mints a verifiable credential). Kept off the demo entry account.
+    const demoId = seeded.showcaseLearnerId;
     if (demoId) {
       const credId = async (code: string): Promise<string | null> => {
         const r = await db.execute(sql`SELECT id FROM practice_credentials WHERE partner_id = ${pid} AND code = ${code} LIMIT 1`);

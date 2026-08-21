@@ -1,6 +1,6 @@
 /*
  * Public demo landing for the Educator Professional Development practice class ("Thoughtful AI in
- * teaching"). One-click, credential-less sign-in as the demo educator (Maria Alvarez), then straight
+ * teaching"). One-click, credential-less sign-in as a fresh demo educator (Sam Rivera), then straight
  * into "My Credentials". Reuses the whole practice engine; everyone is a composite.
  */
 import { useState } from "react";
@@ -37,7 +37,8 @@ export default function DemoEducatorLanding() {
           your own classroom, respects your judgement, and is coached, not tested. You earn credentials by doing real
           teaching and reflecting on it, from AI-assisted lesson design to assessment integrity, with Mutale, a
           thinking-partner who asks rather than tells. Nothing is graded; an experienced reviewer recognises your work or
-          refers it back with developmental feedback. Enter as Maria, a demo teacher part-way through her portfolio.
+          refers it back with developmental feedback. You enter as a teacher just starting out, so you begin where every
+          educator does: a short welcome, a clear goal, and your first credential to choose.
         </p>
 
         <div style={{ marginTop: 28 }}>
