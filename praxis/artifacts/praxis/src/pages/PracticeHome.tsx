@@ -50,6 +50,74 @@ function litStages(m: Mine) {
   };
 }
 
+type Twin = {
+  credentials: Array<{ id: string; title: string; status: string; reflections: number }>;
+  recognised: number; inProgress: number; reflectionTotal: number;
+  stageCounts: Record<string, number>;
+  authenticity: { typedLivePct: number; attestationsConfirmed: number };
+  recommendedNext: { id: string; title: string; summary: string | null } | null;
+};
+const TWIN_MOVES = ['description', 'feelings', 'evaluation', 'analysis', 'conclusion', 'action', 'prediction', 'surprise'];
+
+function LongitudinalTwin() {
+  const { data } = useQuery({ queryKey: ['practice-twin'], queryFn: () => apiFetch<Twin>('/practice/twin') });
+  const [syn, setSyn] = useState<{ themes: string[]; edge: string | null; note?: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!data || data.reflectionTotal === 0) return null;
+  const movesWorked = TWIN_MOVES.filter((k) => (data.stageCounts?.[k] || 0) > 0).length;
+  const reveal = async () => {
+    setBusy(true); setErr(null);
+    try { setSyn(await apiFetch('/practice/twin/synthesis', { method: 'POST', body: JSON.stringify({}) })); }
+    catch (e: any) { setErr(e?.message || 'Could not synthesise just now.'); }
+    finally { setBusy(false); }
+  };
+  const stats = [
+    { label: 'Recognised', value: data.recognised },
+    { label: 'In progress', value: data.inProgress },
+    { label: 'Reflective range', value: `${movesWorked}/8` },
+    { label: 'Typed live', value: `${data.authenticity.typedLivePct}%` },
+  ];
+  return (
+    <EditorialCard accent className="p-6 space-y-4">
+      <div>
+        <Overline>Your cognitive twin, across your practice</Overline>
+        <h2 className="ed-h2 mt-1">How you lead, over time</h2>
+        <p className="text-sm text-muted-foreground mt-1">The model Mutale holds of you across every credential, not just one. It grows as you do, drawn only from your own words.</p>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {stats.map((s) => (
+          <div key={s.label} className="border border-border p-3">
+            <div className="ed-num text-2xl">{s.value}</div>
+            <div className="ed-overline text-muted-foreground mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
+      {syn ? (
+        <div className="space-y-2">
+          {syn.themes?.length ? (
+            <>
+              <Overline>Your leadership signature</Overline>
+              <ul className="space-y-1.5">
+                {syn.themes.map((t, i) => <li key={i} className="text-sm border-l-2 border-primary pl-3">{t}</li>)}
+              </ul>
+              {syn.edge && <p className="text-sm text-muted-foreground border-l-2 border-amber-500 pl-3">Your growth edge: {syn.edge}</p>}
+            </>
+          ) : <p className="text-sm text-muted-foreground">{syn.note}</p>}
+        </div>
+      ) : (
+        <div>
+          <button onClick={reveal} disabled={busy} className="ed-overline text-foreground underline ed-underline inline-flex items-center gap-1.5">{busy ? 'Reading your reflections...' : 'Reveal my leadership signature'}</button>
+          {err && <p className="text-xs text-rose-600 mt-1">{err}</p>}
+        </div>
+      )}
+      {data.recommendedNext && (
+        <p className="text-xs text-muted-foreground border-t border-border pt-3">A practice that could be next for you: <span className="text-foreground font-medium">{data.recommendedNext.title}</span>. Choose it above when you are ready.</p>
+      )}
+    </EditorialCard>
+  );
+}
+
 function CredentialLink({ publicId }: { publicId: string }) {
   const [copied, setCopied] = useState(false);
   const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${publicId}`;
@@ -232,6 +300,8 @@ export function PracticeHome() {
           </div>
         </div>
       )}
+
+      <LongitudinalTwin />
 
       {mine.length >= 2 && !anyLocked && (
         <EditorialCard className="p-5 flex items-center justify-between gap-3">

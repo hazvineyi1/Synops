@@ -674,6 +674,71 @@ router.get("/practice/program-overview", requireAuth, async (req, res) => {
   });
 });
 
+// ── Longitudinal cognitive twin (across all of a candidate's credentials) ─────
+// GET /practice/twin -- the structural model Mutale holds of THIS person across everything they have
+// done: breadth, reflective range, authenticity, and a suggested next practice. Fast, no AI.
+router.get("/practice/twin", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const credentials = await rows<{ id: string; title: string; status: string; reflections: number }>(sql`
+    SELECT cc.id, pc.title, cc.status,
+      (SELECT count(*)::int FROM reflection_entries r WHERE r.candidate_credential_id = cc.id) AS reflections
+    FROM candidate_credentials cc JOIN practice_credentials pc ON pc.id = cc.credential_id
+    WHERE cc.candidate_id = ${uid} ORDER BY cc.sort, cc.created_at`);
+  const stages = await rows<{ stage: string; c: number }>(sql`
+    SELECT r.stage, count(*)::int c FROM reflection_entries r
+    JOIN candidate_credentials cc ON cc.id = r.candidate_credential_id
+    WHERE cc.candidate_id = ${uid} GROUP BY r.stage`);
+  const auth = await rows<{ typed: number; total: number }>(sql`
+    SELECT count(*) FILTER (WHERE r.source = 'typed')::int typed, count(*)::int total
+    FROM reflection_entries r JOIN candidate_credentials cc ON cc.id = r.candidate_credential_id WHERE cc.candidate_id = ${uid}`);
+  const attest = await rows<{ confirmed: number }>(sql`
+    SELECT count(*) FILTER (WHERE a.status = 'confirmed')::int confirmed
+    FROM attestations a JOIN candidate_credentials cc ON cc.id = a.candidate_credential_id WHERE cc.candidate_id = ${uid}`);
+  const pid = await partnerOf(req);
+  const next = pid ? await rows<{ id: string; title: string; summary: string | null }>(sql`
+    SELECT id, title, summary FROM practice_credentials
+    WHERE partner_id = ${pid} AND id NOT IN (SELECT credential_id FROM candidate_credentials WHERE candidate_id = ${uid})
+    ORDER BY sort, title LIMIT 1`) : [];
+  const stageCounts: Record<string, number> = {};
+  for (const s of stages) stageCounts[s.stage] = s.c;
+  res.json({
+    credentials,
+    recognised: credentials.filter((c) => c.status === "reviewed").length,
+    inProgress: credentials.filter((c) => ["in_progress", "chosen", "submitted", "referred"].includes(c.status)).length,
+    reflectionTotal: credentials.reduce((s, c) => s + (c.reflections || 0), 0),
+    stageCounts,
+    authenticity: { typedLivePct: auth[0]?.total ? Math.round((auth[0].typed / auth[0].total) * 100) : 0, attestationsConfirmed: attest[0]?.confirmed || 0 },
+    recommendedNext: next[0] ?? null,
+  });
+});
+
+// POST /practice/twin/synthesis -- Mutale mirrors back the person's leadership signature from ALL their
+// reflections: recurring themes and one growth edge. On demand (AI), fails soft.
+router.post("/practice/twin/synthesis", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const refs = await rows<{ stage: string; content: string }>(sql`
+    SELECT r.stage, r.content FROM reflection_entries r
+    JOIN candidate_credentials cc ON cc.id = r.candidate_credential_id
+    WHERE cc.candidate_id = ${uid} ORDER BY r.created_at`);
+  if (refs.length < 3) { res.json({ themes: [], edge: null, note: "Reflect a little more first, and your signature will start to show." }); return; }
+  const text = refs.map((r) => `(${r.stage}) ${r.content}`).join("\n").slice(0, 12000);
+  const system =
+    "You read a leader's own reflections across their whole practice and mirror back how THEY lead. " +
+    "Name 2 to 4 recurring themes in their leadership, written warmly in the second person (\"You tend to...\"), each grounded in what they actually wrote, plus one honest growth edge. " +
+    "Do not praise emptily and do not invent anything not in their words. Never use em dashes or en dashes.\n\n" +
+    'Return ONLY JSON: {"themes":["...","..."],"edge":"..."}';
+  try {
+    const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 600, system, messages: [{ role: "user", content: text }] }, { timeout: 60000, maxRetries: 1 });
+    const raw = (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("").replace(/[—–]/g, ", ");
+    const m = raw.match(/\{[\s\S]*\}/);
+    const parsed = m ? JSON.parse(m[0]) : null;
+    if (!parsed) { res.status(502).json({ error: "Could not synthesise your signature." }); return; }
+    res.json(parsed);
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Synthesis unavailable" });
+  }
+});
+
 // ── Reviewer certification (calibration set) ──────────────────────────────────
 const CERT_THRESHOLD = 80; // percent agreement across all reference items required to certify.
 
