@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
@@ -79,6 +80,24 @@ CREATE TABLE IF NOT EXISTS evidence_items (
   created_at timestamp NOT NULL DEFAULT now());
 ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS file_data text;
 ALTER TABLE evidence_items ADD COLUMN IF NOT EXISTS file_type text;
+
+-- Third-party attestation: a manager/peer/report confirms, via a magic link, that the real-world
+-- leadership event genuinely happened and the candidate genuinely did it. The strongest anti-fake
+-- signal, because it comes from outside the candidate's own account.
+CREATE TABLE IF NOT EXISTS attestations (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  candidate_credential_id text NOT NULL,
+  token text NOT NULL,
+  relationship text,
+  prompt text,
+  attester_name text,
+  status text NOT NULL DEFAULT 'pending',
+  response_name text,
+  response_role text,
+  response_comment text,
+  responded_at timestamp,
+  created_at timestamp NOT NULL DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS attestations_token_idx ON attestations(token);
 
 CREATE TABLE IF NOT EXISTS credential_reviews (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -211,6 +230,72 @@ router.post("/practice/me/credentials/:id/reflections", requireAuth, async (req,
     INSERT INTO reflection_entries (candidate_credential_id, stage, content, source, typed_ms, paste_count)
     VALUES (${req.params.id}, ${stage || "note"}, ${String(content).slice(0, 8000)}, ${src}, ${tms}, ${pc}) RETURNING *`);
   res.status(201).json(ins[0]);
+});
+
+// ── Attestation (third-party corroboration via magic link) ─────────────────────
+// The candidate creates a request and shares the link with a real witness themselves (WhatsApp,
+// email, in person). We do not send anything on the candidate's behalf.
+router.get("/practice/me/credentials/:id/attestations", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const list = await rows(sql`SELECT id, token, relationship, prompt, attester_name, status, response_name, response_role, response_comment, responded_at, created_at FROM attestations WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at DESC`);
+  res.json(list);
+});
+
+router.post("/practice/me/credentials/:id/attestations", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const { relationship, prompt, attesterName } = req.body ?? {};
+  if (!prompt || !String(prompt).trim()) { res.status(400).json({ error: "prompt is required" }); return; }
+  const rel = ["manager", "peer", "report", "other"].includes(relationship) ? relationship : "other";
+  const token = randomBytes(24).toString("hex");
+  const ins = await rows(sql`
+    INSERT INTO attestations (candidate_credential_id, token, relationship, prompt, attester_name)
+    VALUES (${req.params.id}, ${token}, ${rel}, ${String(prompt).slice(0, 1000)}, ${attesterName ? String(attesterName).slice(0, 200) : null})
+    RETURNING id, token, relationship, prompt, attester_name, status, created_at`);
+  res.status(201).json(ins[0]);
+});
+
+router.delete("/practice/me/attestations/:aid", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const own = await rows(sql`
+    SELECT a.id FROM attestations a JOIN candidate_credentials cc ON cc.id = a.candidate_credential_id
+    WHERE a.id = ${req.params.aid} AND cc.candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  await db.execute(sql`DELETE FROM attestations WHERE id = ${req.params.aid}`);
+  res.json({ ok: true });
+});
+
+// PUBLIC (no auth): the witness opens their magic link and sees only who is asking, and for what.
+router.get("/practice/attest/:token", async (req, res) => {
+  const found = await rows(sql`
+    SELECT a.relationship, a.prompt, a.status, a.response_name, a.response_role, a.response_comment, a.responded_at,
+      pc.title AS credential_title, u.first_name AS candidate_first_name
+    FROM attestations a
+    JOIN candidate_credentials cc ON cc.id = a.candidate_credential_id
+    JOIN practice_credentials pc ON pc.id = cc.credential_id
+    JOIN users u ON u.id = cc.candidate_id
+    WHERE a.token = ${req.params.token} LIMIT 1`);
+  if (!found[0]) { res.status(404).json({ error: "This attestation link is not valid." }); return; }
+  res.json(found[0]);
+});
+
+// PUBLIC (no auth): the witness confirms or declines. One response only.
+router.post("/practice/attest/:token", async (req, res) => {
+  const found = await rows<{ id: string; status: string }>(sql`SELECT id, status FROM attestations WHERE token = ${req.params.token} LIMIT 1`);
+  if (!found[0]) { res.status(404).json({ error: "This attestation link is not valid." }); return; }
+  if (found[0].status !== "pending") { res.status(409).json({ error: "This attestation has already been answered." }); return; }
+  const { name, role, comment, decision } = req.body ?? {};
+  const status = decision === "confirm" ? "confirmed" : decision === "decline" ? "declined" : null;
+  if (!status) { res.status(400).json({ error: "decision must be confirm or decline" }); return; }
+  if (!name || !String(name).trim()) { res.status(400).json({ error: "Please enter your name." }); return; }
+  await db.execute(sql`
+    UPDATE attestations SET status = ${status}, response_name = ${String(name).slice(0, 200)},
+      response_role = ${role ? String(role).slice(0, 200) : null}, response_comment = ${comment ? String(comment).slice(0, 2000) : null},
+      responded_at = now() WHERE token = ${req.params.token}`);
+  res.json({ ok: true, status });
 });
 
 // ── Evidence items ─────────────────────────────────────────────────────────────
@@ -367,7 +452,8 @@ router.get("/practice/portfolio/:id", requireAuth, async (req, res) => {
   const reflections = await rows(sql`SELECT stage, content, created_at, source, typed_ms, paste_count FROM reflection_entries WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
   const evidence = await rows(sql`SELECT kind, title, body, url, created_at FROM evidence_items WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
   const reviews = await rows(sql`SELECT g1, g2, g3, outcome, feedback, created_at FROM credential_reviews WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at DESC`);
-  res.json({ ...head[0], reflections, evidence, reviews });
+  const attestations = await rows(sql`SELECT relationship, prompt, status, response_name, response_role, response_comment, responded_at, created_at FROM attestations WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
+  res.json({ ...head[0], reflections, evidence, reviews, attestations });
 });
 
 // POST /practice/portfolio/:id/review -- record a gateway-based, developmental review. No pass/fail:

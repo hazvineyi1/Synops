@@ -18,10 +18,11 @@ import {
 type QueueRow = { id: string; candidate_id: string; submitted_at: string; code: string; title: string; first_name: string | null; last_name: string | null; email: string; reflection_count: number; evidence_count: number };
 type Reflection = { stage: string; content: string; created_at: string; source?: string | null; typed_ms?: number | null; paste_count?: number | null };
 type Evidence = { kind: string; title: string | null; body: string | null; url: string | null };
+type Attestation = { relationship: string; prompt: string; status: string; response_name: string | null; response_role: string | null; response_comment: string | null; responded_at: string | null; created_at: string };
 type Portfolio = {
   id: string; code: string; title: string; activity_brief: string | null; gateway_guidance: string | null;
   first_name: string | null; last_name: string | null; email: string; justification: string | null;
-  reflections: Reflection[]; evidence: Evidence[];
+  reflections: Reflection[]; evidence: Evidence[]; attestations?: Attestation[];
 };
 
 const name = (r: { first_name: string | null; last_name: string | null; email: string }) =>
@@ -74,8 +75,8 @@ export function PracticeReview() {
   );
 }
 
-function AuthenticitySignals({ reflections }: { reflections: Reflection[] }) {
-  if (!reflections.length) return null;
+function AuthenticitySignals({ reflections, attestations }: { reflections: Reflection[]; attestations: Attestation[] }) {
+  if (!reflections.length && !attestations.length) return null;
   const n = reflections.length;
   const typed = reflections.filter((r) => r.source === 'typed').length;
   const pasted = reflections.filter((r) => r.source === 'pasted').length;
@@ -89,23 +90,44 @@ function AuthenticitySignals({ reflections }: { reflections: Reflection[] }) {
     { label: 'Via WhatsApp', value: String(whatsapp), tone: 'muted' as const },
     { label: 'Across', value: `${days} session${days === 1 ? '' : 's'}`, tone: 'muted' as const },
   ];
+  const confirmed = attestations.filter((a) => a.status === 'confirmed');
   return (
     <Card className="rounded-none p-5 border-primary/20">
       <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Authenticity signals</div>
-      <p className="text-xs text-muted-foreground">How this portfolio was produced. Reflecting in the candidate's own words, typed in the moment, spread over time, is what makes the credential trustworthy. These are signals, not proof, use your judgement.</p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-        {tiles.map((t) => (
-          <div key={t.label} className={`border p-3 ${t.tone === 'warn' ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
-            <div className={`ed-num text-2xl ${t.tone === 'warn' ? 'text-amber-700' : t.tone === 'good' ? 'text-primary' : ''}`}>{t.value}</div>
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">{t.label}</div>
+      <p className="text-xs text-muted-foreground">How this portfolio was produced. Reflecting in the candidate's own words, typed in the moment, spread over time, and confirmed by someone who was there, is what makes the credential trustworthy. These are signals, not proof, use your judgement.</p>
+
+      {reflections.length > 0 && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+            {tiles.map((t) => (
+              <div key={t.label} className={`border p-3 ${t.tone === 'warn' ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
+                <div className={`ed-num text-2xl ${t.tone === 'warn' ? 'text-amber-700' : t.tone === 'good' ? 'text-primary' : ''}`}>{t.value}</div>
+                <div className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">{t.label}</div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {pasted > 0 && (
-        <p className="mt-3 border-l-2 border-amber-500 pl-3 text-xs text-amber-700">{pasted} of {n} reflective entr{pasted === 1 ? 'y was' : 'ies were'} pasted rather than typed live. Worth confirming they are in the candidate's own voice.</p>
+          {pasted > 0 && (
+            <p className="mt-3 border-l-2 border-amber-500 pl-3 text-xs text-amber-700">{pasted} of {n} reflective entr{pasted === 1 ? 'y was' : 'ies were'} pasted rather than typed live. Worth confirming they are in the candidate's own voice.</p>
+          )}
+          {spanDays >= 2 && pasted === 0 && (
+            <p className="mt-3 border-l-2 border-emerald-500 pl-3 text-xs text-emerald-700">Captured live and across {spanDays} days, a strong signal of genuine reflection over real practice.</p>
+          )}
+        </>
       )}
-      {spanDays >= 2 && pasted === 0 && (
-        <p className="mt-3 border-l-2 border-emerald-500 pl-3 text-xs text-emerald-700">Captured live and across {spanDays} days, a strong signal of genuine reflection over real practice.</p>
+
+      {attestations.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <div className="ed-overline text-muted-foreground">Third-party attestation {confirmed.length > 0 && <span className="text-emerald-700">· {confirmed.length} confirmed</span>}</div>
+          {attestations.map((a, i) => (
+            <div key={i} className={`border-l-2 pl-3 text-xs ${a.status === 'confirmed' ? 'border-emerald-500' : a.status === 'declined' ? 'border-rose-500' : 'border-border'}`}>
+              <div className="font-medium">
+                {a.status === 'confirmed' ? `Confirmed by ${a.response_name || 'a witness'}${a.response_role ? `, ${a.response_role}` : ''}` : a.status === 'declined' ? `Declined by ${a.response_name || 'the witness'}` : 'Awaiting a response'} · {a.relationship}
+              </div>
+              <p className="text-muted-foreground">Asked to confirm: {a.prompt}</p>
+              {a.response_comment && <p className="italic mt-0.5">"{a.response_comment}"</p>}
+            </div>
+          ))}
+        </div>
       )}
     </Card>
   );
@@ -151,7 +173,7 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
       </Card>
 
       {/* Authenticity signals: how the portfolio was produced, so recognition rests on real practice. */}
-      <AuthenticitySignals reflections={p.reflections} />
+      <AuthenticitySignals reflections={p.reflections} attestations={p.attestations ?? []} />
 
       {/* Predictions and surprises: predictive processing made reviewable. */}
       {pairCount > 0 && (

@@ -93,6 +93,7 @@ import { PartnerAccounts } from '@/pages/partner/PartnerAccounts';
 import { PartnerSettings } from '@/pages/partner/PartnerSettings';
 import { GradebookBrowser } from '@/pages/GradebookBrowser';
 import { PracticeHome } from '@/pages/PracticeHome';
+import { AttestPage } from '@/pages/AttestPage';
 import { PracticeCanvas } from '@/pages/PracticeCanvas';
 import { PracticeReview } from '@/pages/PracticeReview';
 
@@ -240,6 +241,8 @@ function Routes() {
         <PublicRoute path="/privacy" component={Privacy} />
         <PublicRoute path="/terms" component={Terms} />
         <PublicRoute path="/join/:code" component={JoinCohort} />
+        {/* A witness confirms a candidate's real-world leadership event via magic link. No login. */}
+        <PublicRoute path="/attest/:token" component={AttestPage} />
         <PublicRoute path="/p/:slug" component={PartnerLanding} />
         {/* Clean vanity path for the Enza landing page. */}
         <PublicRoute path="/enzaglobalmedia" component={() => <PartnerLanding params={{ slug: 'enza-global' }} />} />

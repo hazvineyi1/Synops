@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy,
+  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy, Copy, ShieldCheck,
 } from 'lucide-react';
 
 /** Offline capture: pending queue + connection status, flushed automatically when back online. */
@@ -228,6 +228,9 @@ export function PracticeCanvas() {
 
           {/* The growing body of work: everything captured, read-only, always here. */}
           <BodyOfWork reflections={reflections} evidence={evidence} />
+
+          {/* Third-party attestation: outside corroboration, the strongest authenticity signal. */}
+          {cc && <AttestationPanel id={id} readOnly={readOnly} />}
 
           {/* The gateway opens only when the cycle is whole. */}
           {!submitted && (litCount >= 4
@@ -720,6 +723,66 @@ function EvidencePanel({ id, evidence, readOnly, onChange, off, showList = true 
               <Button size="sm" disabled={busy || (kind === 'text' ? !body.trim() : !url.trim())} onClick={submitEvidence} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Add evidence</Button>
             </div>
           )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+type Attestation = { id: string; token: string; relationship: string; prompt: string; attester_name: string | null; status: string; response_name: string | null; response_role: string | null; response_comment: string | null; responded_at: string | null };
+const REL_LABELS: [string, string][] = [['manager', 'Manager'], ['peer', 'Colleague'], ['report', 'Someone I lead'], ['other', 'Other']];
+
+function AttestationPanel({ id, readOnly }: { id: string; readOnly: boolean }) {
+  const qc = useQueryClient();
+  const { data: list = [] } = useQuery({ queryKey: ['practice-attest', id], queryFn: () => apiFetch<Attestation[]>(`/practice/me/credentials/${id}/attestations`), enabled: !!id });
+  const [rel, setRel] = useState('manager');
+  const [prompt, setPrompt] = useState('');
+  const [who, setWho] = useState('');
+  const [copied, setCopied] = useState<string | null>(null);
+  const create = useMutation({ mutationFn: () => apiFetch(`/practice/me/credentials/${id}/attestations`, { method: 'POST', body: JSON.stringify({ relationship: rel, prompt: prompt.trim(), attesterName: who.trim() || null }) }), onSuccess: () => { setPrompt(''); setWho(''); qc.invalidateQueries({ queryKey: ['practice-attest', id] }); } });
+  const del = useMutation({ mutationFn: (aid: string) => apiFetch(`/practice/me/attestations/${aid}`, { method: 'DELETE' }), onSuccess: () => qc.invalidateQueries({ queryKey: ['practice-attest', id] }) });
+  const link = (t: string) => `${typeof window !== 'undefined' ? window.location.origin : ''}/attest/${t}`;
+  const copy = async (t: string) => { try { await navigator.clipboard.writeText(link(t)); setCopied(t); setTimeout(() => setCopied(null), 2000); } catch { /* clipboard blocked */ } };
+  const relLabel = (k: string) => REL_LABELS.find((r) => r[0] === k)?.[1] ?? k;
+
+  return (
+    <Card className="rounded-none p-5 space-y-3">
+      <div className="flex items-center gap-2 ed-overline text-foreground"><ShieldCheck className="h-4 w-4 text-primary" /> Third-party attestation</div>
+      <p className="text-xs text-muted-foreground">Ask someone who was there, a manager, a colleague, or someone you lead, to confirm the real event happened and that it was you. Create a link and send it to them yourself. Their confirmation is the strongest proof your portfolio can carry.</p>
+
+      {list.length > 0 && (
+        <ul className="space-y-2">
+          {list.map((a) => (
+            <li key={a.id} className={`border p-3 text-sm ${a.status === 'confirmed' ? 'border-emerald-500/40 bg-emerald-500/5' : a.status === 'declined' ? 'border-rose-500/40 bg-rose-500/5' : 'border-border'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="ed-overline text-muted-foreground">{a.status === 'confirmed' ? 'Confirmed' : a.status === 'declined' ? 'Declined' : 'Awaiting response'} · {relLabel(a.relationship)}</span>
+                {a.status === 'pending' && !readOnly && <button onClick={() => del.mutate(a.id)} className="text-destructive hover:text-destructive/80" title="Revoke"><Trash2 className="h-3.5 w-3.5" /></button>}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{a.prompt}</p>
+              {a.status === 'confirmed' && <p className="text-xs mt-1.5"><CheckCircle2 className="h-3.5 w-3.5 inline text-emerald-600 mr-1" />{a.response_name}{a.response_role ? `, ${a.response_role}` : ''}{a.response_comment ? ` — "${a.response_comment}"` : ''}</p>}
+              {a.status === 'pending' && (
+                <div className="mt-2 flex items-center gap-2">
+                  <input readOnly value={link(a.token)} onFocus={(e) => e.currentTarget.select()} className="flex-1 min-w-0 rounded-none border border-input bg-muted/30 px-2 py-1 text-[11px] text-muted-foreground" />
+                  <Button size="sm" variant="outline" className="gap-1.5 rounded-none shrink-0" onClick={() => copy(a.token)}>{copied === a.token ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied === a.token ? 'Copied' : 'Copy link'}</Button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!readOnly && (
+        <div className="space-y-2 border border-border p-3">
+          <div className="flex flex-wrap gap-1.5">
+            {REL_LABELS.map(([k, l]) => (
+              <button key={k} onClick={() => setRel(k)} className={`px-2.5 py-1 text-xs ${rel === k ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'}`}>{l}</button>
+            ))}
+          </div>
+          <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={2} placeholder="What should they confirm? e.g. That I led the ward through the night the power failed, in March." className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+          <input value={who} onChange={(e) => setWho(e.target.value)} placeholder="Their name (optional, just for your reference)" className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+          <div className="flex justify-end">
+            <Button size="sm" disabled={!prompt.trim() || create.isPending} onClick={() => create.mutate()} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Create attestation link</Button>
+          </div>
         </div>
       )}
     </Card>
