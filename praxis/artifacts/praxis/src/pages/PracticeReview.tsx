@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, Brain, ShieldCheck,
+  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, Brain, ShieldCheck, Sparkles, Loader2,
 } from 'lucide-react';
 
 /**
@@ -140,6 +140,15 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
   const [g3, setG3] = useState(false);
   const [outcome, setOutcome] = useState<'reviewed' | 'referred'>('reviewed');
   const [feedback, setFeedback] = useState('');
+  const [pre, setPre] = useState<any | null>(null);
+  const [preLoading, setPreLoading] = useState(false);
+  const [preErr, setPreErr] = useState<string | null>(null);
+  const runPre = async () => {
+    setPreLoading(true); setPreErr(null);
+    try { setPre(await apiFetch<any>(`/practice/portfolio/${id}/prescreen`, { method: 'POST', body: JSON.stringify({}) })); }
+    catch (e: any) { setPreErr(e?.message || 'Could not run the pre-screen.'); }
+    finally { setPreLoading(false); }
+  };
 
   const review = useMutation({
     mutationFn: () => apiFetch(`/practice/portfolio/${id}/review`, { method: 'POST', body: JSON.stringify({ g1, g2, g3, outcome, feedback: feedback.trim() }) }),
@@ -235,6 +244,36 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      {/* Reviewer assist: a calibration pre-screen against the shared rubric. Advisory; the human decides. */}
+      <Card className="rounded-none p-5 space-y-3 border-primary/20">
+        <div className="ed-overline text-foreground flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Reviewer assist</div>
+        <p className="text-xs text-muted-foreground">An AI reads this portfolio against the same three-gateway rubric every reviewer uses, and drafts developmental feedback. It is advisory, it keeps judgements consistent between reviewers. You decide the outcome and own the words.</p>
+        {!pre && <Button size="sm" variant="outline" className="rounded-none gap-1.5" disabled={preLoading} onClick={runPre}>{preLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{preLoading ? 'Reading the portfolio...' : 'Run pre-screen'}</Button>}
+        {preErr && <p className="text-xs text-rose-600">{preErr}</p>}
+        {pre && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              {([['g1', 'G1 Relevant activity'], ['g2', 'G2 Personal contribution'], ['g3', 'G3 Learning from practice']] as [string, string][]).map(([k, label]) => {
+                const g = pre[k]; if (!g) return null;
+                const tint = g.verdict === 'met' ? 'text-emerald-700 border-emerald-500/40' : g.verdict === 'partial' ? 'text-amber-700 border-amber-500/40' : 'text-rose-700 border-rose-500/40';
+                return <div key={k} className="text-xs"><span className={`ed-overline border px-1.5 py-0.5 ${tint}`}>{g.verdict}</span> <span className="font-medium">{label}.</span> <span className="text-muted-foreground">{g.rationale}</span></div>;
+              })}
+            </div>
+            {Array.isArray(pre.gaps) && pre.gaps.length > 0 && (
+              <div><div className="ed-overline text-muted-foreground mb-1">Gaps to close</div><ul className="list-disc pl-5 text-xs text-muted-foreground space-y-0.5">{pre.gaps.map((x: string, i: number) => <li key={i}>{x}</li>)}</ul></div>
+            )}
+            {pre.draftFeedback && (
+              <div>
+                <div className="ed-overline text-muted-foreground mb-1">Draft developmental feedback</div>
+                <p className="text-xs whitespace-pre-wrap bg-muted/40 p-2.5">{pre.draftFeedback}</p>
+                <div className="flex justify-end mt-1.5"><Button size="sm" variant="outline" className="rounded-none gap-1.5" onClick={() => setFeedback(pre.draftFeedback)}><ArrowRight className="h-3.5 w-3.5" /> Use as my draft</Button></div>
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">Edit it freely, or ignore it. The feedback you send is yours.</p>
+          </div>
         )}
       </Card>
 

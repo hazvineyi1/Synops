@@ -474,6 +474,54 @@ router.post("/practice/portfolio/:id/review", requireAuth, async (req, res) => {
   res.json({ ok: true, outcome: finalOutcome });
 });
 
+// POST /practice/portfolio/:id/prescreen -- a calibration aid for reviewers. An AI reads the portfolio
+// against the SAME explicit three-gateway rubric every time, so different reviewers reach consistent
+// judgements. It returns a per-gateway verdict with rationale, concrete gaps, and a DRAFT of
+// developmental feedback the reviewer edits. Advisory only, the human decides and owns the words.
+router.post("/practice/portfolio/:id/prescreen", requireAuth, async (req, res) => {
+  if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const head = await rows<{ title: string; activity_brief: string | null; gateway_guidance: string | null }>(sql`
+    SELECT pc.title, pc.activity_brief, pc.gateway_guidance FROM candidate_credentials cc
+    JOIN practice_credentials pc ON pc.id = cc.credential_id WHERE cc.id = ${req.params.id} LIMIT 1`);
+  if (!head[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const reflections = await rows<{ stage: string; content: string }>(sql`SELECT stage, content FROM reflection_entries WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
+  const evidence = await rows<{ kind: string; title: string | null; body: string | null; url: string | null }>(sql`SELECT kind, title, body, url FROM evidence_items WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
+  const attest = await rows<{ status: string; relationship: string; response_name: string | null }>(sql`SELECT status, relationship, response_name FROM attestations WHERE candidate_credential_id = ${req.params.id}`);
+
+  const portfolioText =
+    `Credential: ${head[0].title}\n` +
+    (head[0].activity_brief ? `Activity brief: ${head[0].activity_brief}\n` : "") +
+    (head[0].gateway_guidance ? `Gateway guidance: ${head[0].gateway_guidance}\n` : "") +
+    `\nReflections (${reflections.length}):\n` + reflections.map((r) => `- (${r.stage}) ${r.content}`).join("\n") +
+    `\n\nEvidence (${evidence.length}):\n` + evidence.map((e) => `- [${e.kind}] ${[e.title, e.body, e.url].filter(Boolean).join(" ")}`).join("\n") +
+    `\n\nAttestations: ` + (attest.length ? attest.map((a) => `${a.relationship} ${a.status}${a.response_name ? ` by ${a.response_name}` : ""}`).join("; ") : "none");
+
+  const system =
+    "You are a calibration aid for an independent reviewer of a leadership Practice Credential portfolio. " +
+    "You apply the SAME three-gateway rubric every time so different reviewers reach consistent judgements. You never decide the outcome, a human does. There are no marks or percentages.\n\n" +
+    "The rubric. Judge each gateway as met, partial or unmet, with a one-line rationale grounded in the candidate's own words:\n" +
+    "G1 Relevant activity: the candidate has actually done something substantial and first-hand that is relevant to this credential, not hypothetical and not only reading.\n" +
+    "G2 Personal contribution: the candidate's own actions and decisions are identifiable and central, their 'I', not only the team's 'we'.\n" +
+    "G3 Learning from practice: the reflection shows genuine learning, an insight or changed understanding, not only a description of events.\n\n" +
+    "Then list concrete, specific gaps the candidate could close, and draft warm developmental feedback (150 to 220 words) that names strengths and the single most useful next step. Developmental, never a grade. Never use em dashes or en dashes.\n\n" +
+    "Return ONLY valid JSON, no prose around it, of the form: " +
+    '{"g1":{"verdict":"met","rationale":"..."},"g2":{"verdict":"partial","rationale":"..."},"g3":{"verdict":"unmet","rationale":"..."},"gaps":["...","..."],"draftFeedback":"..."}';
+
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6", max_tokens: 900, system,
+      messages: [{ role: "user", content: portfolioText.slice(0, 12000) }],
+    }, { timeout: 60000, maxRetries: 1 });
+    const raw = (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("").replace(/[—–]/g, ", ");
+    const m = raw.match(/\{[\s\S]*\}/);
+    const parsed = m ? JSON.parse(m[0]) : null;
+    if (!parsed) { res.status(502).json({ error: "Could not parse the pre-screen." }); return; }
+    res.json(parsed);
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Pre-screen unavailable" });
+  }
+});
+
 // ── Socratic coach (Mutale): action-learning / Gibbs thinking-partner ─────────────────────────────
 // Shared by the web canvas and the WhatsApp channel so the coach is identical everywhere.
 // The learning science that governs Mutale. Kept explicit so the coach individualizes and offloads
