@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy, Copy, ShieldCheck,
+  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy, Copy, ShieldCheck, Users,
 } from 'lucide-react';
 
 /** Offline capture: pending queue + connection status, flushed automatically when back online. */
@@ -231,6 +231,10 @@ export function PracticeCanvas() {
 
           {/* Third-party attestation: outside corroboration, the strongest authenticity signal. */}
           {cc && <AttestationPanel id={id} readOnly={readOnly} />}
+
+          {/* Connectivism: share your recognised practice, and learn from peers who worked the same credential. */}
+          {cc && cc.status === 'reviewed' && <ExemplarShare id={id} />}
+          {cc && <PeerExemplars credentialId={cc.credential_id} />}
 
           {/* The gateway opens only when the cycle is whole. */}
           {!submitted && (litCount >= 4
@@ -782,6 +786,68 @@ function AttestationPanel({ id, readOnly }: { id: string; readOnly: boolean }) {
           <input value={who} onChange={(e) => setWho(e.target.value)} placeholder="Their name (optional, just for your reference)" className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           <div className="flex justify-end">
             <Button size="sm" disabled={!prompt.trim() || create.isPending} onClick={() => create.mutate()} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Create attestation link</Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+type Exemplar = { headline: string; excerpt: string | null; author_name: string | null; created_at: string };
+function PeerExemplars({ credentialId }: { credentialId: string }) {
+  const { data = [] } = useQuery({ queryKey: ['practice-exemplars', credentialId], queryFn: () => apiFetch<Exemplar[]>(`/practice/exemplars/${credentialId}`), enabled: !!credentialId });
+  if (!data.length) return null;
+  return (
+    <Card className="rounded-none p-5 space-y-3">
+      <div className="flex items-center gap-2 ed-overline text-foreground"><Users className="h-4 w-4 text-primary" /> Learn from peers</div>
+      <p className="text-xs text-muted-foreground">How others in your programme approached this credential. Learning is also connection.</p>
+      <ul className="space-y-2">
+        {data.map((e, i) => (
+          <li key={i} className="border border-border p-3">
+            <div className="text-sm font-medium">{e.headline}</div>
+            {e.excerpt && <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{e.excerpt}</p>}
+            <div className="text-[11px] text-muted-foreground mt-1">{e.author_name || 'A peer'}</div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+type MyExemplar = { id: string; headline: string; excerpt: string | null; author_name: string | null } | null;
+function ExemplarShare({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const { data: mine } = useQuery({ queryKey: ['practice-my-exemplar', id], queryFn: () => apiFetch<MyExemplar>(`/practice/me/credentials/${id}/exemplar`), enabled: !!id });
+  const [headline, setHeadline] = useState('');
+  const [excerpt, setExcerpt] = useState('');
+  const [anon, setAnon] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (mine) { setHeadline(mine.headline); setExcerpt(mine.excerpt || ''); setAnon(!mine.author_name); } }, [mine]);
+  const save = useMutation({ mutationFn: () => apiFetch(`/practice/me/credentials/${id}/exemplar`, { method: 'POST', body: JSON.stringify({ headline: headline.trim(), excerpt: excerpt.trim(), anonymous: anon }) }), onSuccess: () => { setOpen(false); qc.invalidateQueries({ queryKey: ['practice-my-exemplar', id] }); } });
+  const del = useMutation({ mutationFn: () => apiFetch(`/practice/me/credentials/${id}/exemplar`, { method: 'DELETE' }), onSuccess: () => { qc.invalidateQueries({ queryKey: ['practice-my-exemplar', id] }); setOpen(false); } });
+  const shared = !!mine;
+  return (
+    <Card className="rounded-none p-5 space-y-3">
+      <div className="flex items-center gap-2 ed-overline text-foreground"><Users className="h-4 w-4 text-primary" /> Share with peers</div>
+      <p className="text-xs text-muted-foreground">Your credential is recognised. You can share a short headline and an excerpt to help others in your programme learn from your practice. Optional, and only what you choose.</p>
+      {shared && !open ? (
+        <div className="border border-emerald-500/40 bg-emerald-500/5 p-3">
+          <div className="text-sm font-medium">{mine!.headline}</div>
+          {mine!.excerpt && <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{mine!.excerpt}</p>}
+          <div className="text-[11px] text-muted-foreground mt-1">Shared as {mine!.author_name || 'anonymous'}</div>
+          <div className="flex gap-4 mt-2">
+            <button onClick={() => setOpen(true)} className="ed-overline text-foreground underline">Edit</button>
+            <button onClick={() => del.mutate()} className="ed-overline text-destructive">Unshare</button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2 border border-border p-3">
+          <input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="A one-line headline, e.g. Forming a team no one wanted to join." className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+          <textarea value={excerpt} onChange={(e) => setExcerpt(e.target.value)} rows={3} placeholder="An excerpt worth sharing (optional). Choose what you are comfortable with." className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={anon} onChange={(e) => setAnon(e.target.checked)} /> Share anonymously</label>
+          <div className="flex justify-end gap-2">
+            {shared && <Button size="sm" variant="outline" className="rounded-none" onClick={() => setOpen(false)}>Cancel</Button>}
+            <Button size="sm" disabled={!headline.trim() || save.isPending} onClick={() => save.mutate()} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> {shared ? 'Update' : 'Share'} exemplar</Button>
           </div>
         </div>
       )}

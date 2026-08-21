@@ -150,6 +150,20 @@ CREATE TABLE IF NOT EXISTS issued_credentials (
   issued_at timestamp NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX IF NOT EXISTS issued_credentials_public_idx ON issued_credentials(public_id);
 CREATE UNIQUE INDEX IF NOT EXISTS issued_credentials_cc_idx ON issued_credentials(candidate_credential_id);
+
+-- Connectivism: opt-in peer exemplars. After recognition a candidate may choose to share a headline and
+-- a self-selected excerpt so peers working the same credential can learn from real practice. Strictly
+-- author-written and optional, so nothing personal is exposed without the candidate's choice.
+CREATE TABLE IF NOT EXISTS exemplars (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  candidate_credential_id text NOT NULL,
+  credential_id text NOT NULL,
+  partner_id text NOT NULL,
+  author_name text,
+  headline text NOT NULL,
+  excerpt text,
+  created_at timestamp NOT NULL DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS exemplars_cc_idx ON exemplars(candidate_credential_id);
 `;
 
 /** Rows helper: db.execute over a raw/parameterised sql template returns { rows }. */
@@ -368,6 +382,58 @@ router.post("/practice/attest/:token", async (req, res) => {
       response_role = ${role ? String(role).slice(0, 200) : null}, response_comment = ${comment ? String(comment).slice(0, 2000) : null},
       responded_at = now() WHERE token = ${req.params.token}`);
   res.json({ ok: true, status });
+});
+
+// ── Peer exemplars (connectivism) ─────────────────────────────────────────────
+// The candidate's own exemplar for a credential (their shared version, if any).
+router.get("/practice/me/credentials/:id/exemplar", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const r = await rows(sql`SELECT id, headline, excerpt, author_name FROM exemplars WHERE candidate_credential_id = ${req.params.id} LIMIT 1`);
+  res.json(r[0] ?? null);
+});
+
+// Share (or update) an exemplar. Only for a recognised credential; author-written headline + excerpt.
+router.post("/practice/me/credentials/:id/exemplar", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const cc = await rows<{ credential_id: string; partner_id: string; status: string }>(sql`SELECT credential_id, partner_id, status FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
+  if (!cc[0]) { res.status(404).json({ error: "Not found" }); return; }
+  if (cc[0].status !== "reviewed") { res.status(400).json({ error: "You can share an exemplar once your credential is recognised." }); return; }
+  const { headline, excerpt, anonymous } = req.body ?? {};
+  if (!headline || !String(headline).trim()) { res.status(400).json({ error: "A short headline is required." }); return; }
+  let author: string | null = null;
+  if (!anonymous) {
+    const u = await rows<{ first_name: string | null; last_name: string | null }>(sql`SELECT first_name, last_name FROM users WHERE id = ${uid} LIMIT 1`);
+    author = [u[0]?.first_name, u[0]?.last_name].filter(Boolean).join(" ") || null;
+  }
+  await db.execute(sql`
+    INSERT INTO exemplars (candidate_credential_id, credential_id, partner_id, author_name, headline, excerpt)
+    VALUES (${req.params.id}, ${cc[0].credential_id}, ${cc[0].partner_id}, ${author}, ${String(headline).slice(0, 200)}, ${excerpt ? String(excerpt).slice(0, 1200) : null})
+    ON CONFLICT (candidate_credential_id) DO UPDATE SET author_name = EXCLUDED.author_name, headline = EXCLUDED.headline, excerpt = EXCLUDED.excerpt, created_at = now()`);
+  res.json({ ok: true });
+});
+
+router.delete("/practice/me/credentials/:id/exemplar", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  await db.execute(sql`DELETE FROM exemplars WHERE candidate_credential_id = ${req.params.id}`);
+  res.json({ ok: true });
+});
+
+// Peer exemplars for a credential, within the candidate's own programme. Learn from real practice.
+router.get("/practice/exemplars/:credentialId", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const pid = await partnerOf(req);
+  if (!pid) { res.json([]); return; }
+  const list = await rows(sql`
+    SELECT e.headline, e.excerpt, e.author_name, e.created_at
+    FROM exemplars e
+    WHERE e.credential_id = ${req.params.credentialId} AND e.partner_id = ${pid}
+      AND e.candidate_credential_id NOT IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${uid})
+    ORDER BY e.created_at DESC LIMIT 12`);
+  res.json(list);
 });
 
 // ── Evidence items ─────────────────────────────────────────────────────────────
