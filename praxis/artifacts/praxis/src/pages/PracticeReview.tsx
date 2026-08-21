@@ -16,7 +16,7 @@ import {
  * feedback that returns to the candidate.
  */
 type QueueRow = { id: string; candidate_id: string; submitted_at: string; code: string; title: string; first_name: string | null; last_name: string | null; email: string; reflection_count: number; evidence_count: number };
-type Reflection = { stage: string; content: string; created_at: string };
+type Reflection = { stage: string; content: string; created_at: string; source?: string | null; typed_ms?: number | null; paste_count?: number | null };
 type Evidence = { kind: string; title: string | null; body: string | null; url: string | null };
 type Portfolio = {
   id: string; code: string; title: string; activity_brief: string | null; gateway_guidance: string | null;
@@ -74,6 +74,43 @@ export function PracticeReview() {
   );
 }
 
+function AuthenticitySignals({ reflections }: { reflections: Reflection[] }) {
+  if (!reflections.length) return null;
+  const n = reflections.length;
+  const typed = reflections.filter((r) => r.source === 'typed').length;
+  const pasted = reflections.filter((r) => r.source === 'pasted').length;
+  const whatsapp = reflections.filter((r) => r.source === 'whatsapp').length;
+  const days = new Set(reflections.map((r) => new Date(r.created_at).toDateString())).size;
+  const times = reflections.map((r) => new Date(r.created_at).getTime()).filter((t) => !isNaN(t));
+  const spanDays = times.length ? Math.round((Math.max(...times) - Math.min(...times)) / 86400000) : 0;
+  const tiles = [
+    { label: 'Typed live', value: `${typed}/${n}`, tone: 'good' as const },
+    { label: 'Pasted', value: String(pasted), tone: (pasted > 0 ? 'warn' : 'muted') as const },
+    { label: 'Via WhatsApp', value: String(whatsapp), tone: 'muted' as const },
+    { label: 'Across', value: `${days} session${days === 1 ? '' : 's'}`, tone: 'muted' as const },
+  ];
+  return (
+    <Card className="rounded-none p-5 border-primary/20">
+      <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Authenticity signals</div>
+      <p className="text-xs text-muted-foreground">How this portfolio was produced. Reflecting in the candidate's own words, typed in the moment, spread over time, is what makes the credential trustworthy. These are signals, not proof, use your judgement.</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+        {tiles.map((t) => (
+          <div key={t.label} className={`border p-3 ${t.tone === 'warn' ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
+            <div className={`ed-num text-2xl ${t.tone === 'warn' ? 'text-amber-700' : t.tone === 'good' ? 'text-primary' : ''}`}>{t.value}</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">{t.label}</div>
+          </div>
+        ))}
+      </div>
+      {pasted > 0 && (
+        <p className="mt-3 border-l-2 border-amber-500 pl-3 text-xs text-amber-700">{pasted} of {n} reflective entr{pasted === 1 ? 'y was' : 'ies were'} pasted rather than typed live. Worth confirming they are in the candidate's own voice.</p>
+      )}
+      {spanDays >= 2 && pasted === 0 && (
+        <p className="mt-3 border-l-2 border-emerald-500 pl-3 text-xs text-emerald-700">Captured live and across {spanDays} days, a strong signal of genuine reflection over real practice.</p>
+      )}
+    </Card>
+  );
+}
+
 function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
   const { data: p } = useQuery({ queryKey: ['practice-portfolio', id], queryFn: () => apiFetch<Portfolio>(`/practice/portfolio/${id}`) });
   const [g1, setG1] = useState(false);
@@ -112,6 +149,9 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
         <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Coaching method and integrity</div>
         <p className="text-xs text-muted-foreground">Every reflection below is the candidate's own writing. Their coach, Mutale, is Socratic by design: it carries structure and memory for them (beneficial cognitive offloading, Risko and Gilbert) but never supplies the answer or the correct leadership style. It works the experiential cycle, concrete experience, reflective observation, abstract conceptualization, active experimentation (Kolb, after Dewey, Lewin and Piaget), surfaces predictions and the errors that follow, and co-regulates the thinking without taking it over. What you are reviewing is the candidate's cognition, supported, not replaced.</p>
       </Card>
+
+      {/* Authenticity signals: how the portfolio was produced, so recognition rests on real practice. */}
+      <AuthenticitySignals reflections={p.reflections} />
 
       {/* Predictions and surprises: predictive processing made reviewable. */}
       {pairCount > 0 && (

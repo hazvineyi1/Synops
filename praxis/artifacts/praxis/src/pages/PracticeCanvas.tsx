@@ -46,6 +46,24 @@ function useOffline(ccId: string, onSynced: () => void) {
 }
 
 /**
+ * Authenticity provenance: tracks how a reflection was actually produced, so the portfolio can prove a
+ * person did the thinking (typed live) rather than pasting generated text. A trust signal, never a gate.
+ */
+function useCaptureProvenance() {
+  const startRef = useRef<number | null>(null);
+  const pasteRef = useRef(0);
+  const onType = () => { if (startRef.current == null) startRef.current = Date.now(); };
+  const onPaste = () => { pasteRef.current += 1; };
+  const read = () => ({
+    source: pasteRef.current > 0 ? 'pasted' : 'typed',
+    typedMs: startRef.current ? Date.now() - startRef.current : 0,
+    pasteCount: pasteRef.current,
+  });
+  const reset = () => { startRef.current = null; pasteRef.current = 0; };
+  return { onType, onPaste, read, reset };
+}
+
+/**
  * The Portfolio, rebuilt to adapt to the learning process. It is not a stack of forms: it IS the Kolb
  * cycle. It opens on the move the candidate should make next, foregrounds only that stage's capture
  * tool, tunes Mutale's opening question to that stage, and folds everything already captured into a
@@ -343,19 +361,20 @@ function TwinPanel({ me, cc, reflections, readOnly, onSaved }: { me: any; cc: Mi
   const [openHint, setOpenHint] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  const prov = useCaptureProvenance();
   if (!cc) return null;
   const name = me?.firstName;
   const counts: Record<string, number> = {};
   for (const r of reflections) counts[r.stage] = (counts[r.stage] ?? 0) + 1;
   const earned = MOVES.filter((m) => counts[m.key]).length;
   const complete = earned === MOVES.length;
-  const pick = (key: string) => { setOpenHint((cur) => (cur === key ? null : key)); setDraft(''); };
+  const pick = (key: string) => { setOpenHint((cur) => (cur === key ? null : key)); setDraft(''); prov.reset(); };
   const openMove = MOVES.find((m) => m.key === openHint);
   const save = async () => {
     const text = draft.trim();
     if (!text || !openHint) return;
     setBusy(true);
-    try { await apiFetch(`/practice/me/credentials/${cc.id}/reflections`, { method: 'POST', body: JSON.stringify({ stage: openHint, content: text }) }); setDraft(''); onSaved?.(); }
+    try { await apiFetch(`/practice/me/credentials/${cc.id}/reflections`, { method: 'POST', body: JSON.stringify({ stage: openHint, content: text, ...prov.read() }) }); setDraft(''); prov.reset(); onSaved?.(); }
     catch { /* keep the text to retry */ } finally { setBusy(false); }
   };
 
@@ -410,7 +429,7 @@ function TwinPanel({ me, cc, reflections, readOnly, onSaved }: { me: any; cc: Mi
             <p className="text-xs text-muted-foreground">{openMove.hint} {counts[openHint] ? `You have worked this ${counts[openHint]} time${counts[openHint] === 1 ? '' : 's'}.` : 'Not yet in your portfolio.'}</p>
             {!readOnly && (
               <>
-                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} autoFocus
+                <textarea value={draft} onChange={(e) => { setDraft(e.target.value); prov.onType(); }} onPaste={prov.onPaste} rows={3} autoFocus
                   placeholder={`Write your ${openMove.label.toLowerCase()}...`}
                   className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
                 <div className="flex justify-end">
@@ -466,14 +485,16 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true 
   const [actual, setActual] = useState('');
   const [busy, setBusy] = useState(false);
   const endpoint = `/practice/me/credentials/${id}/reflections`;
+  const prov = useCaptureProvenance();
   const save = async () => {
     const e = expected.trim(), a = actual.trim();
     if (!e && !a) return;
+    const p = prov.read();
     setBusy(true);
     try {
-      if (e) await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ stage: 'prediction', content: e }) });
-      if (a) await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ stage: 'surprise', content: a }) });
-      setExpected(''); setActual(''); onChange();
+      if (e) await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ stage: 'prediction', content: e, ...p }) });
+      if (a) await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ stage: 'surprise', content: a, ...p }) });
+      setExpected(''); setActual(''); prov.reset(); onChange();
     } catch { /* leave the text in place to retry */ } finally { setBusy(false); }
   };
   return (
@@ -508,11 +529,11 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true 
         <div className="space-y-2 border border-border p-3">
           <div>
             <label className="text-xs font-medium">Before it happened, I expected...</label>
-            <textarea value={expected} onChange={(e) => setExpected(e.target.value)} rows={2} placeholder="What did you think would happen?" className="mt-1 w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+            <textarea value={expected} onChange={(e) => { setExpected(e.target.value); prov.onType(); }} onPaste={prov.onPaste} rows={2} placeholder="What did you think would happen?" className="mt-1 w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           </div>
           <div>
             <label className="text-xs font-medium">What actually happened, what surprised me...</label>
-            <textarea value={actual} onChange={(e) => setActual(e.target.value)} rows={2} placeholder="Where did reality differ from your prediction?" className="mt-1 w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+            <textarea value={actual} onChange={(e) => { setActual(e.target.value); prov.onType(); }} onPaste={prov.onPaste} rows={2} placeholder="Where did reality differ from your prediction?" className="mt-1 w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           </div>
           <div className="flex justify-end">
             <Button size="sm" disabled={busy || (!expected.trim() && !actual.trim())} onClick={save} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Log prediction</Button>
@@ -533,18 +554,19 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages
   const endpoint = `/practice/me/credentials/${id}/reflections`;
   const pendingReflections = off.pending.filter((p) => p.kind === 'reflection');
   const timeline = reflections.filter((r) => r.stage !== 'prediction' && r.stage !== 'surprise');
+  const prov = useCaptureProvenance();
 
   const submitReflection = async () => {
     const text = content.trim();
     if (!text) return;
-    const payload = { stage, content: text };
+    const payload = { stage, content: text, ...prov.read() };
     setBusy(true);
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       off.enqueue({ kind: 'reflection', endpoint, payload, display: text, stage });
-      setContent(''); saveDraft(draftKey, ''); setBusy(false); return;
+      setContent(''); saveDraft(draftKey, ''); prov.reset(); setBusy(false); return;
     }
-    try { await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) }); setContent(''); saveDraft(draftKey, ''); onChange(); }
-    catch { off.enqueue({ kind: 'reflection', endpoint, payload, display: text, stage }); setContent(''); saveDraft(draftKey, ''); }
+    try { await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) }); setContent(''); saveDraft(draftKey, ''); prov.reset(); onChange(); }
+    catch { off.enqueue({ kind: 'reflection', endpoint, payload, display: text, stage }); setContent(''); saveDraft(draftKey, ''); prov.reset(); }
     finally { setBusy(false); }
   };
 
@@ -583,7 +605,7 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages
             </div>
           )}
           <p className="text-xs text-muted-foreground">{GIBBS.find((g) => g.key === stage)?.hint}</p>
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} placeholder="Write your reflection..."
+          <textarea value={content} onChange={(e) => { setContent(e.target.value); prov.onType(); }} onPaste={prov.onPaste} rows={3} placeholder="Write your reflection..."
             className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           <div className="flex justify-end">
             <Button size="sm" disabled={!content.trim() || busy} onClick={submitReflection} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Add to reflection</Button>

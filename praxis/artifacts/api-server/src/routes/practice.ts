@@ -63,6 +63,11 @@ CREATE TABLE IF NOT EXISTS reflection_entries (
   stage text NOT NULL DEFAULT 'note',
   content text NOT NULL,
   created_at timestamp NOT NULL DEFAULT now());
+-- Authenticity provenance: how each reflection was actually captured, so a reviewer can trust that a
+-- person did the thinking (typed live, over time) rather than pasting generated text in one sitting.
+ALTER TABLE reflection_entries ADD COLUMN IF NOT EXISTS source text;
+ALTER TABLE reflection_entries ADD COLUMN IF NOT EXISTS typed_ms integer;
+ALTER TABLE reflection_entries ADD COLUMN IF NOT EXISTS paste_count integer DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS evidence_items (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -196,11 +201,15 @@ router.post("/practice/me/credentials/:id/reflections", requireAuth, async (req,
   const uid = req.userId!;
   const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
   if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
-  const { stage, content } = req.body ?? {};
+  const { stage, content, source, typedMs, pasteCount } = req.body ?? {};
   if (!content || !String(content).trim()) { res.status(400).json({ error: "content is required" }); return; }
+  // Provenance is a best-effort trust signal, never a gate: 'typed' (live, in-app), 'pasted', or null.
+  const src = source === "pasted" || source === "typed" || source === "whatsapp" ? source : null;
+  const tms = Number.isFinite(Number(typedMs)) ? Math.max(0, Math.min(3_600_000, Math.round(Number(typedMs)))) : null;
+  const pc = Number.isFinite(Number(pasteCount)) ? Math.max(0, Math.min(999, Math.round(Number(pasteCount)))) : 0;
   const ins = await rows(sql`
-    INSERT INTO reflection_entries (candidate_credential_id, stage, content)
-    VALUES (${req.params.id}, ${stage || "note"}, ${String(content).slice(0, 8000)}) RETURNING *`);
+    INSERT INTO reflection_entries (candidate_credential_id, stage, content, source, typed_ms, paste_count)
+    VALUES (${req.params.id}, ${stage || "note"}, ${String(content).slice(0, 8000)}, ${src}, ${tms}, ${pc}) RETURNING *`);
   res.status(201).json(ins[0]);
 });
 
@@ -355,7 +364,7 @@ router.get("/practice/portfolio/:id", requireAuth, async (req, res) => {
     JOIN users u ON u.id = cc.candidate_id
     WHERE cc.id = ${req.params.id} LIMIT 1`);
   if (!head[0]) { res.status(404).json({ error: "Not found" }); return; }
-  const reflections = await rows(sql`SELECT stage, content, created_at FROM reflection_entries WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
+  const reflections = await rows(sql`SELECT stage, content, created_at, source, typed_ms, paste_count FROM reflection_entries WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
   const evidence = await rows(sql`SELECT kind, title, body, url, created_at FROM evidence_items WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
   const reviews = await rows(sql`SELECT g1, g2, g3, outcome, feedback, created_at FROM credential_reviews WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at DESC`);
   res.json({ ...head[0], reflections, evidence, reviews });
@@ -476,8 +485,8 @@ export async function touchCandidateCredential(id: string): Promise<void> {
 export async function captureWhatsappReflection(candidateCredentialId: string, content: string): Promise<void> {
   try {
     await db.execute(sql`
-      INSERT INTO reflection_entries (candidate_credential_id, stage, content)
-      VALUES (${candidateCredentialId}, 'note', ${content.slice(0, 8000)})`);
+      INSERT INTO reflection_entries (candidate_credential_id, stage, content, source)
+      VALUES (${candidateCredentialId}, 'note', ${content.slice(0, 8000)}, 'whatsapp')`);
     await db.execute(sql`UPDATE candidate_credentials SET updated_at = now() WHERE id = ${candidateCredentialId}`);
   } catch {
     /* best effort */
