@@ -303,6 +303,8 @@ const DEMO_TENANTS: Record<string, DemoTenant> = {
   "executive-learning": { slug: "executive-learning", student: "demo.learner@exec-learning.test", admin: "demo.admin@exec-learning.test", adminRole: "partner_admin" },
   // Zambian clinician leadership demo: the public /demos/mrb link enters the full "Leading with Purpose" course.
   "zambian-leadership": { slug: "zambian-leadership", student: "demo.learner@zcl.test", admin: "demo.admin@zcl.test", adminRole: "partner_admin" },
+  // Educator PD demo: the public /demos/educator link enters the "Thoughtful AI in teaching" practice class.
+  "educator-pd": { slug: "educator-pd", student: "demo.educator@edupd.test", admin: "demo.admin@edupd.test", adminRole: "partner_admin" },
   "synops-k12": {
     slug: "synops-k12", student: "maya.k12@synops-demo.test", studentAlt: "leo.k12@synops-demo.test",
     admin: "teacher.k12@synops-demo.test", adminRole: "partner_admin",

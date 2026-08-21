@@ -36,6 +36,7 @@ import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
 import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
 import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
+import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
 import { PRACTICE_DDL } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
@@ -1490,6 +1491,121 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
     }
     await audit(_req, "platform.seed_mrb_practice", "partner", pid, { credentials: MRB_PRACTICE_CREDENTIALS.length });
     res.json({ ok: true, credentials: MRB_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+// ── Educator Professional Development demo (Thoughtful AI in teaching) ─────────
+const EDU_GATEWAY =
+  "There is no pass or fail. A reviewer either recognises your portfolio or refers it for resubmission, and both come with developmental feedback. Reviewers look for three things: " +
+  "G1 Relevant activity, you actually did something real with your own students or colleagues. " +
+  "G2 Personal contribution, your own teaching decisions and judgement are visible. " +
+  "G3 Learning from practice, your reflection shows what you learned and would do differently. " +
+  "Use something from your own classroom this term; you do not have to start something new. This is adult learning: it builds on your experience and professional judgement, not on being told the answer.";
+
+const EDU_EXAMPLE =
+  "Example (AI-Assisted Lesson Design): One teacher uses an AI tool to draft a unit plan, then documents every change they made and why, showing where their judgement overrode the machine. Another keeps a week of planning notes showing which tasks they let AI carry (finding examples, differentiating a text) and which they kept for themselves (deciding what mattered, knowing their students). Different practice, both strong evidence. Show what YOU decided, and what you learned.";
+
+const EDU_PRACTICE_CREDENTIALS = [
+  { code: "AI-ASSISTED-PLANNING", title: "AI-Assisted Lesson Design", sort: 1,
+    summary: "Plan with AI while keeping the pedagogical judgement only you can make.",
+    brief: "Complete an activity where you used an AI tool to help plan teaching, and can show where you kept the thinking that matters, deciding what your students needed, and where you let AI carry the load that did not. Name the difference between offloading that freed you to teach and offloading that would have replaced your judgement." },
+  { code: "INTEGRITY-AI", title: "Assessment Integrity in the Age of AI", sort: 2,
+    summary: "Redesign an assessment so it stays meaningful when students can use AI.",
+    brief: "Complete an activity where you rethought an assessment so it still tells you what a student can actually do, in a world where AI is available. Show the change you made and your reasoning, and be honest about the trade-offs." },
+  { code: "TEACHING-WITH-AI-STUDENTS", title: "Teaching Students to Use AI Well", sort: 3,
+    summary: "Help students use AI as a thinking partner, not a shortcut around thinking.",
+    brief: "Complete an activity where you taught students to use AI in a way that strengthened their thinking rather than replaced it. Show what you did, how students responded, and what you learned about the line between help and harm." },
+  { code: "AI-FEEDBACK", title: "Feedback in an AI-Rich Classroom", sort: 4,
+    summary: "Use AI to give more and better feedback without losing the human relationship in it.",
+    brief: "Complete an activity where AI helped you give students more, or better, feedback, while you kept the relational core that makes feedback land. Show where the machine helped and where you had to be the teacher." },
+  { code: "AI-EQUITY", title: "Equity and Access with AI", sort: 5,
+    summary: "Make AI narrow the gaps between your students rather than widen them.",
+    brief: "Complete an activity where you made a deliberate choice about AI use with equity in mind, naming who could be advantaged, who could be left behind, and what you did to protect the students most at risk of falling behind." },
+  { code: "AI-TEACHING-STANCE", title: "Your Principled AI Teaching Stance", sort: 6,
+    summary: "Articulate and defend your own considered position on AI in your classroom.",
+    brief: "Complete an activity, a written stance, a staff-meeting contribution, a policy you drafted, where you set out your own principled position on AI in teaching and tested it against a colleague or your students. Show how your thinking changed through the process." },
+];
+
+// POST /platform/seed-educator-pd -- provision the educator PD demo (separate partner + credentials),
+// reusing the whole practice engine. Idempotent. Brands the tenant and seeds a walkthrough portfolio.
+router.post("/platform/seed-educator-pd", requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    await db.execute(sql.raw(PRACTICE_DDL));
+    const seeded = await seedEducatorPD();
+    const pid = seeded.partnerId;
+    for (const c of EDU_PRACTICE_CREDENTIALS) {
+      await db.execute(sql`
+        INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, sort)
+        VALUES (${pid}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${EDU_GATEWAY}, ${EDU_EXAMPLE}, ${c.sort})
+        ON CONFLICT (partner_id, code) DO UPDATE SET
+          title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
+          gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, sort = EXCLUDED.sort`);
+    }
+
+    // Brand the educator programme (indigo + teal, distinct from the MRB petrol blue). Best-effort.
+    try {
+      await db.execute(sql`UPDATE brand_themes SET display_name = 'Educator Professional Development', primary_color = '#3B4CB8', secondary_color = '#5B6EE1', accent_color = '#12A594', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
+      await db.execute(sql`INSERT INTO brand_themes (tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
+        SELECT ${pid}, 'partner', 'Educator Professional Development', '#3B4CB8', '#5B6EE1', '#12A594', 'Practice Credential'
+        WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
+    } catch { /* branding best-effort */ }
+
+    // Walkthrough portfolio for the demo educator (Maria Alvarez): AI-Assisted Planning mid-cycle,
+    // Assessment Integrity recognised (mints a verifiable credential).
+    const demoId = seeded.demoLearnerId;
+    if (demoId) {
+      const credId = async (code: string): Promise<string | null> => {
+        const r = await db.execute(sql`SELECT id FROM practice_credentials WHERE partner_id = ${pid} AND code = ${code} LIMIT 1`);
+        return (r.rows?.[0] as { id?: string } | undefined)?.id ?? null;
+      };
+      const chooseCc = async (code: string, status: string, justification: string, sort: number): Promise<string | null> => {
+        const cid = await credId(code);
+        if (!cid) return null;
+        const r = await db.execute(sql`
+          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status)
+          VALUES (${demoId}, ${cid}, ${pid}, ${sort}, ${justification}, ${status})
+          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = EXCLUDED.status, justification = EXCLUDED.justification
+          RETURNING id`);
+        return (r.rows?.[0] as { id?: string } | undefined)?.id ?? null;
+      };
+      const refl = async (ccId: string, stage: string, content: string) => {
+        await db.execute(sql`INSERT INTO reflection_entries (candidate_credential_id, stage, content, source) VALUES (${ccId}, ${stage}, ${content}, 'typed')`);
+      };
+
+      const plan = await chooseCc("AI-ASSISTED-PLANNING", "in_progress", "I plan with AI every week and want to be clearer about what I keep for myself.", 0);
+      if (plan) {
+        await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${plan}`);
+        await refl(plan, "description", "I used an AI tool to draft a week of Year 9 lessons on persuasive writing, then rebuilt half of it.");
+        await refl(plan, "feelings", "Relieved at first, then uneasy. The draft was fluent but it did not know my students, the three who freeze at a blank page.");
+        await refl(plan, "prediction", "I expected the AI plan would save me time and I would use it almost as-is.");
+        await refl(plan, "surprise", "It saved time on examples and structure, but I spent that time redesigning the opening for my reluctant writers. The judgement moved, it did not disappear.");
+        await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES (${plan}, 'text', 'Annotated plan', 'My AI draft with every change I made marked in the margin, and why.')`);
+        await db.execute(sql`UPDATE candidate_credentials SET self_g1 = true, self_g2 = true WHERE id = ${plan}`);
+      }
+
+      const integrity = await chooseCc("INTEGRITY-AI", "reviewed", "I redesigned my coursework task after half the class used AI on the last one.", 1);
+      if (integrity) {
+        await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${integrity}`);
+        await refl(integrity, "description", "I changed my history source-analysis task from a take-home essay to an in-class annotated response plus a short spoken defence.");
+        await refl(integrity, "analysis", "The old task measured polish, which AI produces cheaply. The new one measures whether they can actually reason with a source in front of them and me.");
+        await refl(integrity, "conclusion", "Integrity is not about banning AI, it is about assessing the thing AI cannot do for them.");
+        await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES (${integrity}, 'text', 'Old and new task', 'Both versions of the task, with my reasoning for the redesign.')`);
+        await db.execute(sql`UPDATE candidate_credentials SET self_g1 = true, self_g2 = true, self_g3 = true, reviewed_at = now() WHERE id = ${integrity}`);
+        const rev = await db.execute(sql`SELECT id FROM credential_reviews WHERE candidate_credential_id = ${integrity} AND calibration = false LIMIT 1`);
+        if (!(rev.rows?.[0])) {
+          await db.execute(sql`INSERT INTO credential_reviews (candidate_credential_id, reviewer_id, g1, g2, g3, outcome, feedback)
+            VALUES (${integrity}, ${demoId}, true, true, true, 'reviewed', 'A sharp redesign. You name exactly what the old task measured and why it no longer holds. To go further, gather one piece of student work under the new task and reflect on what it let you see. Recognised.')`);
+        }
+        await db.execute(sql`INSERT INTO issued_credentials (candidate_credential_id, public_id, recipient_name, credential_title, g1, g2, g3)
+          VALUES (${integrity}, ${"edu-" + Math.random().toString(16).slice(2, 12)}, 'Maria Alvarez', 'Assessment Integrity in the Age of AI', true, true, true)
+          ON CONFLICT (candidate_credential_id) DO NOTHING`);
+      }
+    }
+
+    await audit(_req, "platform.seed_educator_pd", "partner", pid, { credentials: EDU_PRACTICE_CREDENTIALS.length });
+    res.json({ ok: true, credentials: EDU_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }

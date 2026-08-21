@@ -64,6 +64,7 @@ import DemoPEJ from '@/pages/DemoPEJ';
 import DemoPEJ2 from '@/pages/DemoPEJ2';
 import DemoPEJLanding from '@/pages/DemoPEJLanding';
 import DemoMRBLanding from '@/pages/DemoMRBLanding';
+import DemoEducatorLanding from '@/pages/DemoEducatorLanding';
 import { Cases } from '@/pages/Cases';
 import { CaseBuilder } from '@/pages/CaseBuilder';
 import { CaseBegin } from '@/pages/CaseBegin';
@@ -269,6 +270,7 @@ function Routes() {
             introduces both modules; each module page is self-contained and needs no session. */}
         <PublicRoute path="/demos/pej" component={DemoPEJLanding} />
         <PublicRoute path="/demos/mrb" component={DemoMRBLanding} />
+        <PublicRoute path="/demos/educator" component={DemoEducatorLanding} />
         <PublicRoute path="/demos/pej-evd-01" component={DemoPEJ} />
         <PublicRoute path="/demos/pej-evd-02" component={DemoPEJ2} />
 
