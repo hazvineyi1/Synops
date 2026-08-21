@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { useAdaptive } from '@/lib/adaptive';
 import { nextMove, overallProgress } from '@/lib/adaptive';
+import { useBrandTheme } from '@/context/ThemeProvider';
 import { Overline, Rule, EditorialCard, Meter, ModeToggle, NextMoveBanner, CycleRing } from '@/components/editorial';
 import {
   Plus, ArrowRight, Lock, CheckCircle2, MessageSquareQuote, ChevronUp, ChevronDown, ShieldCheck, Copy,
@@ -118,6 +119,52 @@ function LongitudinalTwin() {
   );
 }
 
+function Orientation({ name, programName, isEducator, hasCredentials, onStart }: { name?: string; programName: string; isEducator: boolean; hasCredentials: boolean; onStart: () => void }) {
+  const [open, setOpen] = useState(!hasCredentials || isEducator);
+  const goal = isEducator
+    ? 'Your goal here is to earn practice credentials by trying real things with your own students and reflecting on what happens. There are no courses to sit through and nothing is graded. An experienced educator reviews your work and recognises it, or sends it back with helpful feedback, and you receive a credential you can share and verify.'
+    : 'Your goal here is to earn practice credentials from your real leadership work. There are no courses and nothing is graded. An independent reviewer recognises your portfolio or refers it back with developmental feedback, and you receive a verifiable credential.';
+  const steps: [string, string][] = isEducator ? [
+    ['Choose a focus', 'Pick a credential below that fits something you already do, or want to try, with your students.'],
+    ['Do something real', 'Try it in your own classroom. It does not have to be new, use something from this term.'],
+    ['Reflect with Mutale', 'Talk it through with your coach. Mutale asks the questions; you do the thinking. Capture what you did, what surprised you, and what you learned.'],
+    ['Get recognised', 'When your portfolio is ready, submit it. A reviewer recognises it or refers it back, always with feedback, and issues your verifiable credential.'],
+  ] : [
+    ['Choose a credential', 'Pick a leadership practice you want recognised, and say in a line why.'],
+    ['Do the work', 'Use something real from your practice, from the last six months if you like.'],
+    ['Reflect with Mutale', 'Your Socratic coach helps you turn the experience into articulated learning and evidence.'],
+    ['Get recognised', 'Submit your portfolio. A reviewer recognises it or refers it back, with developmental feedback either way.'],
+  ];
+  return (
+    <EditorialCard accent className="p-6 sm:p-8 space-y-4">
+      <div>
+        <Overline>{hasCredentials ? 'How this works' : 'Start here'}</Overline>
+        <h2 className="ed-h2 mt-1">{name ? `Welcome, ${name}` : `Welcome to ${programName}`}</h2>
+        <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{goal}</p>
+      </div>
+      <button onClick={() => setOpen((o) => !o)} className="ed-overline text-foreground underline ed-underline">
+        {open ? 'Hide the steps' : 'Show me the four steps'}
+      </button>
+      {open && (
+        <ol className="space-y-3">
+          {steps.map(([title, detail], i) => (
+            <li key={i} className="flex gap-3">
+              <span className="ed-num text-lg text-primary w-6 shrink-0">{i + 1}</span>
+              <div><div className="text-sm font-medium">{title}</div><div className="text-sm text-muted-foreground">{detail}</div></div>
+            </li>
+          ))}
+        </ol>
+      )}
+      {!hasCredentials && (
+        <button onClick={onStart} className="group inline-flex items-center gap-2 ed-overline text-foreground underline ed-underline">
+          {isEducator ? 'Start here: choose your first focus' : 'Start here: choose your first credential'}
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+        </button>
+      )}
+    </EditorialCard>
+  );
+}
+
 function CredentialLink({ publicId }: { publicId: string }) {
   const [copied, setCopied] = useState(false);
   const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${publicId}`;
@@ -149,6 +196,9 @@ export function PracticeHome() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
   const { guided } = useAdaptive();
+  const { data: brand } = useBrandTheme();
+  const isEducator = (brand?.displayName || '').toLowerCase().includes('educator');
+  const programName = brand?.displayName || 'Practice';
   const { data: me } = useGetMe();
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const { data: catalogue = [] } = useQuery({ queryKey: ['practice-credentials'], queryFn: () => apiFetch<Credential[]>('/practice/credentials') });
@@ -185,7 +235,7 @@ export function PracticeHome() {
       <div>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <Overline>Practice, not courses</Overline>
+            <Overline>{isEducator ? 'Professional learning, from your own classroom' : 'Practice, not courses'}</Overline>
             <h1 className="ed-display mt-3">{me?.firstName ? `${me.firstName}'s practice` : 'My practice'}</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -203,11 +253,15 @@ export function PracticeHome() {
         )}
         {guided && (
           <p className="text-sm text-muted-foreground mt-4 max-w-2xl">
-            You are not taking a course. Each credential is a cycle you move through in your own practice: have an
-            experience, reflect on it, name what it means, and try it again. The strip fills as you go.
+            {isEducator
+              ? 'You are not sitting a course. You earn each credential by trying something real with your own students, reflecting on what happened, and gathering a little evidence. Work at your own pace; the cycle fills as you go.'
+              : 'You are not taking a course. Each credential is a cycle you move through in your own practice: have an experience, reflect on it, name what it means, and try it again. The strip fills as you go.'}
           </p>
         )}
       </div>
+
+      {/* Start here: a warm orientation with clear goals and steps, especially for new candidates. */}
+      <Orientation name={me?.firstName} programName={programName} isEducator={isEducator} hasCredentials={mine.length > 0} onStart={() => setPicking(true)} />
 
       {/* Adaptive learning path: the single most useful next move */}
       <NextMoveBanner move={move} onCta={onNextMove} />
