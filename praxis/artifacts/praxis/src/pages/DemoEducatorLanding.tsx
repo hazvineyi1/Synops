@@ -71,9 +71,7 @@ export default function DemoEducatorLanding() {
         <div style={{ fontSize: 13.5, color: "#4b5162", marginTop: 32, lineHeight: 1.7, maxWidth: 600, background: "#eeeefb", border: "1px solid #dcdcf3", borderRadius: 12, padding: "16px 18px" }}>
           <p style={{ margin: 0 }}>
             A quick, honest word on privacy. This is a demo, so there is no account and no password. We use your first
-            name only to make the walkthrough feel personal, and we note that a demo was opened, roughly when, and from
-            where, so we know our work is being looked at. Nothing you type here is kept or tied to you, and everyone and
-            everything in the demo is made up. Close the tab whenever you like.
+            name only to make the walkthrough feel personal.
           </p>
         </div>
       </div>
