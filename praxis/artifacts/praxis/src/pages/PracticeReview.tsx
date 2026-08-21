@@ -280,6 +280,8 @@ function PortfolioReview({ id, onDone, mode = 'primary', certItemId, isSuper }: 
   const qc = useQueryClient();
   const [refSaved, setRefSaved] = useState(false);
   const { data: p } = useQuery({ queryKey: ['practice-portfolio', id], queryFn: () => apiFetch<Portfolio>(`/practice/portfolio/${id}`) });
+  const { data: certMe } = useQuery({ queryKey: ['practice-cert-me'], queryFn: () => apiFetch<{ itemsTotal: number; certified: boolean }>('/practice/certification/me'), enabled: !blind });
+  const gated = !blind && !isSuper && !!certMe && certMe.itemsTotal > 0 && !certMe.certified;
   const [g1, setG1] = useState(false);
   const [g2, setG2] = useState(false);
   const [g3, setG3] = useState(false);
@@ -473,13 +475,16 @@ function PortfolioReview({ id, onDone, mode = 'primary', certItemId, isSuper }: 
               className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           </div>
         )}
+        {gated && (
+          <p className="border-l-2 border-amber-500 pl-3 text-xs text-amber-700">You are not yet a certified reviewer. Complete the Certification tab, agreeing closely with the reference set, before your reviews count.</p>
+        )}
         <div className="flex items-center justify-between gap-2">
           {!blind && isSuper && (
             <Button size="sm" variant="outline" className="gap-1.5 rounded-none" disabled={setReference.isPending || refSaved} onClick={() => setReference.mutate()} title="Use your verdict as the reference for reviewer certification">
               {refSaved ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Sparkles className="h-3.5 w-3.5" />} {refSaved ? 'Added to certification set' : 'Set as certification reference'}
             </Button>
           )}
-          <Button disabled={(blind ? false : !feedback.trim()) || review.isPending} onClick={() => review.mutate()} className="gap-1.5 rounded-none ml-auto">
+          <Button disabled={(blind ? false : !feedback.trim()) || gated || review.isPending} onClick={() => review.mutate()} className="gap-1.5 rounded-none ml-auto">
             {review.isPending ? 'Saving...' : certification ? 'Submit my answer' : calibration ? 'Record second opinion' : outcome === 'reviewed' ? 'Recognise & send feedback' : 'Refer & send feedback'}
           </Button>
         </div>

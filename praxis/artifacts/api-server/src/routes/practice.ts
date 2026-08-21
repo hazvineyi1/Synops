@@ -599,6 +599,12 @@ router.get("/practice/portfolio/:id", requireAuth, async (req, res) => {
 router.post("/practice/portfolio/:id/review", requireAuth, async (req, res) => {
   if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
   const uid = req.userId!;
+  // Certification gate: once a reference set exists, only certified reviewers (or a super admin) may
+  // record a live review. If no set exists yet, reviewing is open, so nobody is ever locked out.
+  if (req.dbUser?.role !== "super_admin") {
+    const cs = await certificationStatus(uid);
+    if (cs.itemsTotal > 0 && !cs.certified) { res.status(403).json({ error: "You need to be a certified reviewer before your reviews count. Complete the Certification tab first." }); return; }
+  }
   const { g1, g2, g3, outcome, feedback } = req.body ?? {};
   const finalOutcome = outcome === "referred" ? "referred" : "reviewed";
   if (!feedback || !String(feedback).trim()) { res.status(400).json({ error: "Developmental feedback is required for every outcome." }); return; }
@@ -808,6 +814,17 @@ router.post("/practice/twin/synthesis", requireAuth, async (req, res) => {
 // ── Reviewer certification (calibration set) ──────────────────────────────────
 const CERT_THRESHOLD = 80; // percent agreement across all reference items required to certify.
 
+/** A reviewer's standing against the reference set. Shared by the status route and the review gate. */
+async function certificationStatus(uid: string): Promise<{ itemsTotal: number; itemsAttempted: number; score: number; certified: boolean }> {
+  const itemsTotal = (await rows<{ c: number }>(sql`SELECT count(*)::int c FROM cert_items WHERE active = true`))[0]?.c ?? 0;
+  const attempts = await rows<{ item_id: string; agree_count: number }>(sql`
+    SELECT DISTINCT ON (item_id) item_id, agree_count FROM cert_attempts WHERE reviewer_id = ${uid} ORDER BY item_id, created_at DESC`);
+  const itemsAttempted = attempts.length;
+  const matched = attempts.reduce((s, a) => s + a.agree_count, 0);
+  const score = itemsTotal ? Math.round((matched / (itemsTotal * 4)) * 100) : 0;
+  return { itemsTotal, itemsAttempted, score, certified: itemsTotal > 0 && itemsAttempted >= itemsTotal && score >= CERT_THRESHOLD };
+}
+
 // super_admin designates a portfolio, with an expert reference verdict, as a gold-standard item.
 router.post("/practice/certification/items", requireAuth, async (req, res) => {
   if (req.dbUser?.role !== "super_admin") { res.status(403).json({ error: "Forbidden" }); return; }
@@ -853,15 +870,8 @@ router.post("/practice/certification/items/:itemId/attempt", requireAuth, async 
 // This reviewer's certification status: score against the reference set and whether they are certified.
 router.get("/practice/certification/me", requireAuth, async (req, res) => {
   if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
-  const uid = req.userId!;
-  const itemsTotal = (await rows<{ c: number }>(sql`SELECT count(*)::int c FROM cert_items WHERE active = true`))[0]?.c ?? 0;
-  const attempts = await rows<{ item_id: string; agree_count: number }>(sql`
-    SELECT DISTINCT ON (item_id) item_id, agree_count FROM cert_attempts WHERE reviewer_id = ${uid} ORDER BY item_id, created_at DESC`);
-  const itemsAttempted = attempts.length;
-  const matched = attempts.reduce((s, a) => s + a.agree_count, 0);
-  const score = itemsTotal ? Math.round((matched / (itemsTotal * 4)) * 100) : 0;
-  const certified = itemsTotal > 0 && itemsAttempted >= itemsTotal && score >= CERT_THRESHOLD;
-  res.json({ itemsTotal, itemsAttempted, score, threshold: CERT_THRESHOLD, certified });
+  const s = await certificationStatus(req.userId!);
+  res.json({ ...s, threshold: CERT_THRESHOLD });
 });
 
 // super_admin: roster of reviewers and their certification standing.

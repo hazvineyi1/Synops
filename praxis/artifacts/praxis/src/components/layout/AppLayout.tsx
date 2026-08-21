@@ -218,6 +218,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {
         items: [
           { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
+          { label: t('nav.programInsights', 'Program insights'), href: '/program', icon: TrendingUp },
           { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
         ],
       },
