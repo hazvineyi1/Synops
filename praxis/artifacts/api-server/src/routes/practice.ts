@@ -631,6 +631,49 @@ router.get("/practice/irr", requireAuth, async (req, res) => {
   res.json({ pairs: n, agreement: { g1: pct(agg.g1), g2: pct(agg.g2), g3: pct(agg.g3), outcome: pct(agg.outcome) }, disagreements });
 });
 
+// GET /practice/program-overview -- the institution/employer view: capability and credential activity
+// across a whole programme. Super admin sees all; a partner or org admin sees their own people.
+router.get("/practice/program-overview", requireAuth, async (req, res) => {
+  const role = req.dbUser?.role;
+  if (!isStaff(req) && role !== "org_admin" && role !== "partner_admin") { res.status(403).json({ error: "Forbidden" }); return; }
+  const isSuper = role === "super_admin";
+  const pid = isSuper ? null : await partnerOf(req);
+  const scope = isSuper ? sql`TRUE` : sql`cc.partner_id = ${pid}`;
+  const totals = await rows<any>(sql`
+    SELECT count(DISTINCT cc.candidate_id)::int AS candidates,
+      count(*) FILTER (WHERE cc.status = 'chosen')::int AS chosen,
+      count(*) FILTER (WHERE cc.status = 'in_progress')::int AS in_progress,
+      count(*) FILTER (WHERE cc.status = 'submitted')::int AS submitted,
+      count(*) FILTER (WHERE cc.status = 'reviewed')::int AS reviewed,
+      count(*) FILTER (WHERE cc.status = 'referred')::int AS referred
+    FROM candidate_credentials cc WHERE ${scope}`);
+  const t = totals[0] ?? { reviewed: 0, referred: 0 };
+  const decided = (t.reviewed || 0) + (t.referred || 0);
+  const recognitionRate = decided ? Math.round((t.reviewed / decided) * 100) : 0;
+  const byCredential = await rows<any>(sql`
+    SELECT pc.code, pc.title,
+      count(*) FILTER (WHERE cc.status = 'reviewed')::int AS recognised,
+      count(*) FILTER (WHERE cc.status IN ('in_progress', 'chosen'))::int AS in_progress,
+      count(*) FILTER (WHERE cc.status = 'submitted')::int AS submitted
+    FROM candidate_credentials cc JOIN practice_credentials pc ON pc.id = cc.credential_id
+    WHERE ${scope} GROUP BY pc.code, pc.title ORDER BY recognised DESC, pc.title`);
+  const auth = await rows<any>(sql`
+    SELECT count(*) FILTER (WHERE r.source = 'typed')::int AS typed, count(*)::int AS total
+    FROM reflection_entries r JOIN candidate_credentials cc ON cc.id = r.candidate_credential_id WHERE ${scope}`);
+  const attest = await rows<any>(sql`
+    SELECT count(*) FILTER (WHERE a.status = 'confirmed')::int AS confirmed
+    FROM attestations a JOIN candidate_credentials cc ON cc.id = a.candidate_credential_id WHERE ${scope}`);
+  const recent = await rows<any>(sql`
+    SELECT ic.public_id, ic.recipient_name, ic.credential_title, ic.issued_at
+    FROM issued_credentials ic JOIN candidate_credentials cc ON cc.id = ic.candidate_credential_id
+    WHERE ${scope} AND ic.revoked = false ORDER BY ic.issued_at DESC LIMIT 8`);
+  res.json({
+    totals: t, recognitionRate,
+    authenticity: { typedLivePct: auth[0]?.total ? Math.round((auth[0].typed / auth[0].total) * 100) : 0, attestationsConfirmed: attest[0]?.confirmed || 0 },
+    byCredential, recent,
+  });
+});
+
 // ── Reviewer certification (calibration set) ──────────────────────────────────
 const CERT_THRESHOLD = 80; // percent agreement across all reference items required to certify.
 

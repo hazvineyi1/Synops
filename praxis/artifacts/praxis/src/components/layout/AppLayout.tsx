@@ -282,6 +282,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       return [{
         items: [
           { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
+          { label: t('nav.programInsights', 'Program insights'), href: '/program', icon: TrendingUp },
           { label: t('nav.members'), href: '/org/members', icon: UserCog },
           { label: t('nav.coaching', 'Coaching'), href: '/coaching/sections', icon: Users },
           { label: t('nav.coachingHealth', 'Coaching health'), href: '/coaching/health', icon: TrendingUp },
@@ -331,6 +332,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {
           heading: t('nav.groups.delivery', 'Delivery & Coaching'),
           items: [
+            { label: t('nav.programInsights', 'Program insights'), href: '/program', icon: TrendingUp },
             { label: t('nav.reviewQueue', 'Review queue'), href: '/practice/review', icon: ClipboardCheck },
             { label: t('nav.classInsights', 'Class insights'), href: '/class-insights', icon: Activity },
             { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },

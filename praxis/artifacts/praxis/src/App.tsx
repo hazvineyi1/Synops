@@ -95,6 +95,7 @@ import { GradebookBrowser } from '@/pages/GradebookBrowser';
 import { PracticeHome } from '@/pages/PracticeHome';
 import { AttestPage } from '@/pages/AttestPage';
 import { VerifyPage } from '@/pages/VerifyPage';
+import { ProgramDashboard } from '@/pages/ProgramDashboard';
 import { PracticeCanvas } from '@/pages/PracticeCanvas';
 import { PracticeReview } from '@/pages/PracticeReview';
 
@@ -312,6 +313,7 @@ function Routes() {
         <ProtectedRoute path="/partner/org/:orgId" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/accounts" component={PartnerAccounts} />
         <ProtectedRoute path="/partner/settings" component={PartnerSettings} />
+        <ProtectedRoute path="/program" component={ProgramDashboard} />
         <ProtectedRoute path="/practice/review" component={PracticeReview} />
         <ProtectedRoute path="/practice/c/:id" component={PracticeCanvas} />
         <ProtectedRoute path="/practice" component={PracticeHome} />
