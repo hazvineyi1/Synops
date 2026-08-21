@@ -39,10 +39,15 @@ export function useBrandTheme() {
     ? activePartner
     : null;
   return useQuery({
-    queryKey: ["brand-theme", overrideId],
+    // Key includes the signed-in user so switching accounts/tenants never shows a previous brand, and a
+    // short staleTime with refetch-on-focus means reconfiguring (re-provision, rebrand) shows up on the
+    // next tab focus or navigation, without having to log out and back in.
+    queryKey: ["brand-theme", overrideId, user?.id ?? null],
     queryFn: () => apiFetch<BrandTheme>(`/brand/theme${overrideId ? `?partnerId=${encodeURIComponent(overrideId)}` : ""}`),
     enabled: !!user,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 }
 
