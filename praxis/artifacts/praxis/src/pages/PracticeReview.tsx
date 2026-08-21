@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox,
+  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, Brain, ShieldCheck,
 } from 'lucide-react';
 
 /**
@@ -26,7 +26,7 @@ type Portfolio = {
 
 const name = (r: { first_name: string | null; last_name: string | null; email: string }) =>
   [r.first_name, r.last_name].filter(Boolean).join(' ') || r.email;
-const stageLabel = (k: string) => ({ description: 'What happened', feelings: 'Feelings', evaluation: 'Evaluation', analysis: 'Analysis', conclusion: 'Conclusion', action: 'Action', note: 'Note' } as Record<string, string>)[k] ?? 'Note';
+const stageLabel = (k: string) => ({ description: 'What happened', feelings: 'Feelings', evaluation: 'Evaluation', analysis: 'Analysis', conclusion: 'Conclusion', action: 'Action', note: 'Note', prediction: 'Prediction', surprise: 'What surprised me' } as Record<string, string>)[k] ?? 'Note';
 
 export function PracticeReview() {
   const qc = useQueryClient();
@@ -45,7 +45,7 @@ export function PracticeReview() {
         {/* Queue */}
         <div className="space-y-2">
           {queue.length === 0 && (
-            <Card className="p-6 text-center text-sm text-muted-foreground border-dashed">
+            <Card className="rounded-none p-6 text-center text-sm text-muted-foreground border-dashed">
               <Inbox className="mx-auto h-8 w-8 mb-2 text-muted-foreground/60" /> Your queue is empty.
             </Card>
           )}
@@ -67,7 +67,7 @@ export function PracticeReview() {
         <div>
           {selected
             ? <PortfolioReview id={selected} onDone={() => { setSelected(null); qc.invalidateQueries({ queryKey: ['practice-queue'] }); }} />
-            : <Card className="p-10 text-center text-sm text-muted-foreground">Select a portfolio to review.</Card>}
+            : <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Select a portfolio to review.</Card>}
         </div>
       </div>
     </div>
@@ -87,26 +87,66 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
     onSuccess: onDone,
   });
 
-  if (!p) return <Card className="p-10 text-center text-sm text-muted-foreground">Loading portfolio...</Card>;
+  if (!p) return <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Loading portfolio...</Card>;
+
+  const predictions = p.reflections.filter((r) => r.stage === 'prediction');
+  const surprises = p.reflections.filter((r) => r.stage === 'surprise');
+  const gibbsReflections = p.reflections.filter((r) => r.stage !== 'prediction' && r.stage !== 'surprise');
+  const pairCount = Math.max(predictions.length, surprises.length);
 
   return (
     <div className="space-y-4">
-      <Card className="p-5">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="font-serif text-xl font-bold">{p.title}</h2>
-          <Badge variant="outline" className="text-[10px]">{name(p)}</Badge>
+      <Card className="rounded-none p-5">
+        <div className="ed-overline text-muted-foreground">Portfolio for review</div>
+        <div className="flex items-center gap-2 flex-wrap mt-1.5">
+          <h2 className="ed-h2">{p.title}</h2>
+          <Badge variant="outline" className="text-[10px] rounded-none">{name(p)}</Badge>
         </div>
         {p.activity_brief && <p className="mt-2 text-sm"><span className="font-medium">Activity: </span>{p.activity_brief}</p>}
         {p.justification && <p className="mt-1 text-xs text-muted-foreground italic">Chosen because: "{p.justification}"</p>}
         {p.gateway_guidance && <p className="mt-2 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">{p.gateway_guidance}</p>}
       </Card>
 
+      {/* Coaching method and integrity: how this portfolio was produced, so the reviewer can trust it. */}
+      <Card className="rounded-none p-5 border-primary/20">
+        <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-primary" /> Coaching method and integrity</div>
+        <p className="text-xs text-muted-foreground">Every reflection below is the candidate's own writing. Their coach, Mutale, is Socratic by design: it carries structure and memory for them (beneficial cognitive offloading, Risko and Gilbert) but never supplies the answer or the correct leadership style. It works the experiential cycle, concrete experience, reflective observation, abstract conceptualization, active experimentation (Kolb, after Dewey, Lewin and Piaget), surfaces predictions and the errors that follow, and co-regulates the thinking without taking it over. What you are reviewing is the candidate's cognition, supported, not replaced.</p>
+      </Card>
+
+      {/* Predictions and surprises: predictive processing made reviewable. */}
+      {pairCount > 0 && (
+        <Card className="rounded-none p-5">
+          <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Predictions and surprises ({pairCount})</div>
+          <ol className="space-y-3">
+            {Array.from({ length: pairCount }).map((_, i) => {
+              const pr = predictions[i]; const su = surprises[i];
+              return (
+                <li key={i} className="rounded-xl border border-border overflow-hidden">
+                  {pr && (
+                    <div className="p-3 border-b border-border">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1"><Target className="h-3 w-3" /> They expected</div>
+                      <p className="text-sm whitespace-pre-wrap mt-0.5">{pr.content}</p>
+                    </div>
+                  )}
+                  {su && (
+                    <div className="p-3 bg-amber-500/5">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-amber-700 inline-flex items-center gap-1"><Zap className="h-3 w-3" /> What actually happened</div>
+                      <p className="text-sm whitespace-pre-wrap mt-0.5">{su.content}</p>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </Card>
+      )}
+
       {/* Reflection */}
-      <Card className="p-5">
-        <div className="text-sm font-semibold mb-2 flex items-center gap-2"><MessageSquareQuote className="h-4 w-4 text-primary" /> Reflection ({p.reflections.length})</div>
-        {p.reflections.length === 0 ? <p className="text-sm text-muted-foreground">No reflection captured.</p> : (
+      <Card className="rounded-none p-5">
+        <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><MessageSquareQuote className="h-4 w-4 text-primary" /> Reflection ({gibbsReflections.length})</div>
+        {gibbsReflections.length === 0 ? <p className="text-sm text-muted-foreground">No reflection captured.</p> : (
           <ol className="space-y-2 border-l-2 border-border pl-4">
-            {p.reflections.map((r, i) => (
+            {gibbsReflections.map((r, i) => (
               <li key={i} className="relative">
                 <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary/60" />
                 <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stageLabel(r.stage)} · {new Date(r.created_at).toLocaleDateString()}</div>
@@ -118,8 +158,8 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
       </Card>
 
       {/* Evidence */}
-      <Card className="p-5">
-        <div className="text-sm font-semibold mb-2 flex items-center gap-2"><Paperclip className="h-4 w-4 text-primary" /> Evidence ({p.evidence.length})</div>
+      <Card className="rounded-none p-5">
+        <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><Paperclip className="h-4 w-4 text-primary" /> Evidence ({p.evidence.length})</div>
         {p.evidence.length === 0 ? <p className="text-sm text-muted-foreground">No evidence attached.</p> : (
           <ul className="space-y-2">
             {p.evidence.map((e, i) => (
@@ -137,8 +177,8 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
       </Card>
 
       {/* Review */}
-      <Card className="p-5 space-y-3 border-primary/30">
-        <div className="text-sm font-semibold flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-primary" /> Your review</div>
+      <Card className="rounded-none p-5 space-y-3 border-primary/30">
+        <div className="ed-overline text-foreground flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-primary" /> Your review</div>
         <p className="text-xs text-muted-foreground">Balance the whole portfolio; the gateways are a guide, not a checklist to tick mechanically.</p>
         <div className="space-y-2">
           {[

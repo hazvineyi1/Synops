@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useGetMe } from '@workspace/api-client-react';
 import { apiFetch } from '@/lib/api';
 import { getPending, addPending, removePending, loadDraft, saveDraft, type Pending } from '@/lib/offlineStore';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock,
+  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy,
 } from 'lucide-react';
 
 /** Offline capture: pending queue + connection status, flushed automatically when back online. */
@@ -54,6 +55,7 @@ type Mine = {
   activity_brief: string | null; gateway_guidance: string | null; example_assignment: string | null;
   status: string; self_g1: boolean; self_g2: boolean; self_g3: boolean;
   latest_feedback: string | null; latest_outcome: string | null;
+  justification: string | null;
 };
 type Reflection = { id: string; stage: string; content: string; created_at: string };
 type Evidence = { id: string; kind: string; title: string | null; body: string | null; url: string | null; created_at: string };
@@ -68,7 +70,9 @@ const GIBBS = [
   { key: 'action', label: 'Action', hint: 'What will you do next, and when?' },
   { key: 'note', label: 'Quick note', hint: 'A thought to capture now and come back to.' },
 ];
-const stageLabel = (k: string) => GIBBS.find((g) => g.key === k)?.label ?? 'Note';
+// Predictive-processing stages live alongside the Gibbs stages but are captured in their own panel.
+const EXTRA_LABELS: Record<string, string> = { prediction: 'Prediction', surprise: 'What surprised me' };
+const stageLabel = (k: string) => GIBBS.find((g) => g.key === k)?.label ?? EXTRA_LABELS[k] ?? 'Note';
 
 export function PracticeCanvas() {
   const [, params] = useRoute('/practice/c/:id');
@@ -76,6 +80,7 @@ export function PracticeCanvas() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
 
+  const { data: me } = useGetMe();
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const cc = mine.find((m) => m.id === id);
   const { data: reflections = [] } = useQuery({ queryKey: ['practice-reflections', id], queryFn: () => apiFetch<Reflection[]>(`/practice/me/credentials/${id}/reflections`), enabled: !!id });
@@ -117,10 +122,11 @@ export function PracticeCanvas() {
       )}
 
       {/* Header */}
-      <Card className="p-5">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="font-serif text-2xl font-bold">{cc?.title ?? 'Credential'}</h1>
-          {cc && <Badge variant="outline" className="text-[10px] capitalize">{cc.status.replace('_', ' ')}</Badge>}
+      <Card className="rounded-none p-5">
+        <div className="ed-overline text-muted-foreground">Practice credential</div>
+        <div className="flex items-center gap-2 flex-wrap mt-1.5">
+          <h1 className="ed-h2">{cc?.title ?? 'Credential'}</h1>
+          {cc && <Badge variant="outline" className="text-[10px] capitalize rounded-none">{cc.status.replace('_', ' ')}</Badge>}
         </div>
         {cc?.activity_brief && <p className="mt-2 text-sm"><span className="font-medium">Activity: </span>{cc.activity_brief}</p>}
         <GuidanceStrip cc={cc} />
@@ -132,9 +138,14 @@ export function PracticeCanvas() {
         )}
       </Card>
 
+      {/* Cognitive twin: the model Mutale holds about this candidate, shown to them plainly. This makes
+          the offloading principle visible, Mutale carries the memory and structure, never the thinking. */}
+      <TwinPanel me={me} cc={cc} reflections={reflections} />
+
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
-        {/* Left: reflection + evidence + gateway + submit */}
+        {/* Left: prediction + reflection + evidence + gateway + submit */}
         <div className="space-y-4">
+          <PredictionPanel id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} />
           <ReflectionPanel id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} />
           <EvidencePanel id={id} evidence={evidence} readOnly={readOnly} onChange={invalidate} off={off} />
           <GatewaySubmit cc={cc} reflections={reflections.length} evidence={evidence.length} onChange={invalidate} />
@@ -172,6 +183,165 @@ function GuidanceStrip({ cc }: { cc: any }) {
   );
 }
 
+// The eight reflective "moves" a candidate can collect: the six Gibbs stages plus the two
+// predictive-processing moves. Working all eight = a full reflective range.
+const MOVES = [
+  { key: 'description', label: 'What happened', hint: 'Describe the situation plainly: who, what, when.' },
+  { key: 'feelings', label: 'Feelings', hint: 'Name how you felt, and how others felt or likely felt.' },
+  { key: 'evaluation', label: 'Evaluation', hint: 'What was good or bad about how it went?' },
+  { key: 'analysis', label: 'Analysis', hint: 'Why did it unfold that way? Bring in an idea where your decision needs it.' },
+  { key: 'conclusion', label: 'Conclusion', hint: 'What is the lesson? What would you do differently?' },
+  { key: 'action', label: 'Action', hint: 'What will you do next, and when?' },
+  { key: 'prediction', label: 'Prediction', hint: 'What did you expect to happen beforehand?' },
+  { key: 'surprise', label: 'Surprise', hint: 'Where did reality differ from your prediction?' },
+];
+
+function ReflectiveRing({ earned, total }: { earned: number; total: number }) {
+  const r = 20, c = 2 * Math.PI * r, pct = total ? earned / total : 0;
+  return (
+    <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0" aria-hidden="true">
+      <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted-foreground/25" />
+      <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" strokeLinecap="round" transform="rotate(-90 24 24)"
+        className="stroke-primary" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} style={{ transition: 'stroke-dashoffset .6s ease' }} />
+      <text x="24" y="28" textAnchor="middle" className="fill-foreground" style={{ fontSize: 13, fontWeight: 600 }}>{earned}</text>
+    </svg>
+  );
+}
+
+function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; reflections: Reflection[] }) {
+  const [openHint, setOpenHint] = useState<string | null>(null);
+  if (!cc) return null;
+  const name = me?.firstName;
+  const counts: Record<string, number> = {};
+  for (const r of reflections) counts[r.stage] = (counts[r.stage] ?? 0) + 1;
+  const earned = MOVES.filter((m) => counts[m.key]).length;
+  const complete = earned === MOVES.length;
+
+  return (
+    <Card className="rounded-none p-5 space-y-4 border-primary/20">
+      <div>
+        <div className="flex items-center gap-2 ed-overline text-foreground"><Brain className="h-4 w-4 text-primary" /> What Mutale is learning about how you lead</div>
+        <p className="text-xs text-muted-foreground mt-1">This is the model your coach holds{name ? `, ${name}` : ''}, drawn only from your own words. Mutale remembers it so you do not have to, and uses it to make its questions personal. It never replaces your thinking.</p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div className="rounded-xl border border-border p-3">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Your prior practice, in your words</div>
+          <p className="text-sm mt-1 whitespace-pre-wrap">{cc.justification?.trim() || 'Not captured yet. Tell Mutale why this credential fits your real work.'}</p>
+        </div>
+        <div className="rounded-xl border border-border p-3 flex items-center gap-3">
+          <ReflectiveRing earned={earned} total={MOVES.length} />
+          <div className="min-w-0">
+            <div className="text-sm font-medium">Reflective range</div>
+            <div className="text-xs text-muted-foreground">{complete ? 'Full range explored. Strong work.' : `${earned} of ${MOVES.length} moves explored, tap one to see it`}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {MOVES.map((m) => {
+            const n = counts[m.key] ?? 0; const got = n > 0; const active = openHint === m.key;
+            return (
+              <button key={m.key} type="button" onClick={() => setOpenHint(active ? null : m.key)}
+                aria-pressed={active}
+                className={`group relative text-left rounded-xl border p-2.5 transition-all duration-200 hover:-translate-y-0.5 ${got ? 'border-primary/40 bg-primary/5 hover:bg-primary/10' : 'border-dashed border-border hover:border-primary/30'} ${active ? 'ring-2 ring-primary/40' : ''}`}>
+                <div className="flex items-center gap-2 pr-5">
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full transition-colors ${got ? 'bg-primary text-primary-foreground' : 'border border-border text-transparent'}`}>
+                    <Check className="h-3 w-3" />
+                  </span>
+                  <span className={`text-xs font-medium truncate ${got ? '' : 'text-muted-foreground'}`}>{m.label}</span>
+                </div>
+                {got && <span className="absolute right-1.5 top-1.5 min-w-[18px] rounded-full bg-primary/15 px-1 text-center text-[10px] font-medium text-primary">{n}</span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {openHint && (
+          <p className="rounded-lg bg-muted/40 p-2.5 text-xs text-muted-foreground">
+            {MOVES.find((m) => m.key === openHint)?.hint}{' '}
+            <span className="text-foreground/70">{counts[openHint] ? `You have worked this ${counts[openHint]} time${counts[openHint] === 1 ? '' : 's'}.` : 'Not yet in your portfolio, try it next.'}</span>
+          </p>
+        )}
+
+        {complete && (
+          <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-2.5 text-xs font-medium text-primary">
+            <Trophy className="h-4 w-4" /> Full reflective range: you have worked every move of the cycle.
+          </div>
+        )}
+      </div>
+
+      <p className="text-[11px] text-muted-foreground border-t border-border pt-2">Cognitive twin and co-regulation with AI. Mutale carries the memory and the structure, beneficial offloading, so your attention stays on the thinking that only you can do.</p>
+    </Card>
+  );
+}
+
+function PredictionPanel({ id, reflections, readOnly, onChange }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void }) {
+  const predictions = reflections.filter((r) => r.stage === 'prediction');
+  const surprises = reflections.filter((r) => r.stage === 'surprise');
+  const pairCount = Math.max(predictions.length, surprises.length);
+  const [expected, setExpected] = useState('');
+  const [actual, setActual] = useState('');
+  const [busy, setBusy] = useState(false);
+  const endpoint = `/practice/me/credentials/${id}/reflections`;
+  const save = async () => {
+    const e = expected.trim(), a = actual.trim();
+    if (!e && !a) return;
+    setBusy(true);
+    try {
+      if (e) await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ stage: 'prediction', content: e }) });
+      if (a) await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ stage: 'surprise', content: a }) });
+      setExpected(''); setActual(''); onChange();
+    } catch { /* leave the text in place to retry */ } finally { setBusy(false); }
+  };
+  return (
+    <Card className="rounded-none p-5 space-y-3">
+      <div className="flex items-center gap-2 ed-overline text-foreground"><Target className="h-4 w-4 text-primary" /> Prediction and surprise</div>
+      <p className="text-xs text-muted-foreground">Name what you expected before it happened, then what actually happened. The gap between them, the surprise, is where the learning is. This is predictive processing: a broken prediction teaches you the most.</p>
+      {pairCount > 0 && (
+        <ol className="space-y-3">
+          {Array.from({ length: pairCount }).map((_, i) => {
+            const p = predictions[i]; const s = surprises[i];
+            return (
+              <li key={i} className="rounded-xl border border-border overflow-hidden">
+                {p && (
+                  <div className="p-3 border-b border-border">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1"><Target className="h-3 w-3" /> You expected</div>
+                    <p className="text-sm whitespace-pre-wrap mt-0.5">{p.content}</p>
+                  </div>
+                )}
+                {s && (
+                  <div className="p-3 bg-amber-500/5">
+                    <div className="text-[11px] font-medium uppercase tracking-wide text-amber-700 inline-flex items-center gap-1"><Zap className="h-3 w-3" /> What actually happened</div>
+                    <p className="text-sm whitespace-pre-wrap mt-0.5">{s.content}</p>
+                  </div>
+                )}
+                {p && s && <div className="px-3 py-1.5 text-[11px] text-muted-foreground bg-muted/40">The gap is your prediction error, the insight lives here.</div>}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {!readOnly && (
+        <div className="space-y-2 rounded-xl border border-border p-3">
+          <div>
+            <label className="text-xs font-medium">Before it happened, I expected...</label>
+            <textarea value={expected} onChange={(e) => setExpected(e.target.value)} rows={2} placeholder="What did you think would happen?" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-medium">What actually happened, what surprised me...</label>
+            <textarea value={actual} onChange={(e) => setActual(e.target.value)} rows={2} placeholder="Where did reality differ from your prediction?" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+          </div>
+          <div className="flex justify-end">
+            <Button size="sm" disabled={busy || (!expected.trim() && !actual.trim())} onClick={save} className="gap-1.5"><Plus className="h-4 w-4" /> Log prediction</Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function ReflectionPanel({ id, reflections, readOnly, onChange, off }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline> }) {
   const draftKey = `refl_${id}`;
   const [stage, setStage] = useState('note');
@@ -180,6 +350,8 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off }: { id: str
   useEffect(() => { saveDraft(draftKey, content); }, [content, draftKey]);
   const endpoint = `/practice/me/credentials/${id}/reflections`;
   const pendingReflections = off.pending.filter((p) => p.kind === 'reflection');
+  // Prediction and surprise entries have their own panel above; keep them out of the Gibbs timeline.
+  const timeline = reflections.filter((r) => r.stage !== 'prediction' && r.stage !== 'surprise');
 
   const submitReflection = async () => {
     const text = content.trim();
@@ -196,13 +368,13 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off }: { id: str
   };
 
   return (
-    <Card className="p-5 space-y-3">
-      <div className="flex items-center gap-2 text-sm font-semibold"><Lightbulb className="h-4 w-4 text-primary" /> Reflection</div>
+    <Card className="rounded-none p-5 space-y-3">
+      <div className="flex items-center gap-2 ed-overline text-foreground"><Lightbulb className="h-4 w-4 text-primary" /> Reflection</div>
       <p className="text-xs text-muted-foreground">Reflection happens over time and in bits. Capture a thought whenever it comes, and work the stages as you go. Learning becomes visible here.</p>
 
-      {(reflections.length > 0 || pendingReflections.length > 0) && (
+      {(timeline.length > 0 || pendingReflections.length > 0) && (
         <ol className="space-y-2 border-l-2 border-border pl-4">
-          {reflections.map((r) => (
+          {timeline.map((r) => (
             <li key={r.id} className="relative">
               <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary/60" />
               <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stageLabel(r.stage)} · {new Date(r.created_at).toLocaleDateString()}</div>
@@ -281,8 +453,8 @@ function EvidencePanel({ id, evidence, readOnly, onChange, off }: { id: string; 
   };
 
   return (
-    <Card className="p-5 space-y-3">
-      <div className="flex items-center gap-2 text-sm font-semibold"><Paperclip className="h-4 w-4 text-primary" /> Evidence</div>
+    <Card className="rounded-none p-5 space-y-3">
+      <div className="flex items-center gap-2 ed-overline text-foreground"><Paperclip className="h-4 w-4 text-primary" /> Evidence</div>
       <p className="text-xs text-muted-foreground">Show what you actually did: a note, a link, or a file (a document, a photo of your work, a voice note). Different experiences produce different, valid evidence.</p>
 
       {evidence.length > 0 && (
@@ -371,8 +543,8 @@ function GatewaySubmit({ cc, reflections, evidence, onChange }: { cc: Mine | und
   const ready = allChecked && reflections > 0 && evidence > 0;
 
   return (
-    <Card className="p-5 space-y-3">
-      <div className="flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="h-4 w-4 text-primary" /> Gateway self-check</div>
+    <Card className="rounded-none p-5 space-y-3">
+      <div className="flex items-center gap-2 ed-overline text-foreground"><CheckCircle2 className="h-4 w-4 text-primary" /> Gateway self-check</div>
       <p className="text-xs text-muted-foreground">Before you submit, check your portfolio against the three gateways a reviewer uses. There is no pass or fail: your portfolio is either recognised or referred for resubmission, and both come with developmental feedback.</p>
       <div className="space-y-2">
         {checks.map((c) => (
@@ -406,7 +578,7 @@ function CoachPanel({ cc }: { cc: Mine | undefined }) {
     const next = [...messages, { role: 'user' as const, content: text.trim() }];
     setMessages(next); setInput(''); setLoading(true);
     try {
-      const r = await apiFetch<{ reply: string }>('/practice/coach', { method: 'POST', body: JSON.stringify({ messages: next, credentialTitle: cc?.title, activityBrief: cc?.activity_brief }) });
+      const r = await apiFetch<{ reply: string }>('/practice/coach', { method: 'POST', body: JSON.stringify({ messages: next, candidateCredentialId: cc?.id, credentialTitle: cc?.title, activityBrief: cc?.activity_brief }) });
       setMessages((m) => [...m, { role: 'assistant', content: r.reply }]);
     } catch {
       setMessages((m) => [...m, { role: 'assistant', content: 'I could not respond just now. Try again in a moment.' }]);
@@ -414,7 +586,7 @@ function CoachPanel({ cc }: { cc: Mine | undefined }) {
   };
 
   return (
-    <Card className="p-0 flex flex-col overflow-hidden lg:sticky lg:top-4 h-[70vh]">
+    <Card className="rounded-none p-0 flex flex-col overflow-hidden lg:sticky lg:top-4 h-[70vh]">
       <div className="border-b border-border p-3">
         <div className="text-sm font-semibold">Mutale · your thinking partner</div>
         <p className="text-xs text-muted-foreground">A Socratic coach. Mutale asks, you think. Turn your experience into articulated learning.</p>

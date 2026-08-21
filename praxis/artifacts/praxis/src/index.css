@@ -198,6 +198,52 @@
 }
 
 /*
+  Editorial design system (shared). A futuristic, high-contrast, type-led language: oversized
+  display serif, hairline rules, sharp corners, generous whitespace, a single accent (the brand
+  --primary). Additive utilities, prefixed .ed-, so existing screens are untouched until a screen
+  opts in. Consumed first by the Practice (MRB) flagship, then rolled out across Praxis.
+*/
+@layer components {
+  .ed-card {
+    border: 1px solid hsl(var(--foreground) / 0.14);
+    background: hsl(var(--card));
+    border-radius: 0;
+  }
+  .ed-card-hover { transition: border-color .2s ease, transform .2s ease; }
+  .ed-card-hover:hover { border-color: hsl(var(--foreground) / 0.42); transform: translateY(-2px); }
+  .ed-accentbar { box-shadow: inset 3px 0 0 0 hsl(var(--primary)); }
+}
+@layer utilities {
+  .ed-display {
+    font-family: var(--app-font-serif);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 0.98;
+    font-size: clamp(2.4rem, 5.5vw, 4rem);
+  }
+  .ed-h2 {
+    font-family: var(--app-font-serif);
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    line-height: 1.05;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+  }
+  .ed-overline {
+    font-family: var(--app-font-sans);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+  .ed-num { font-variant-numeric: tabular-nums; font-family: var(--app-font-serif); letter-spacing: -0.01em; }
+  .ed-rule { height: 1px; background: hsl(var(--foreground) / 0.14); border: 0; }
+  .ed-rule-strong { height: 2px; background: hsl(var(--foreground)); border: 0; }
+  .ed-underline { text-underline-offset: 5px; text-decoration-thickness: 1px; }
+  .ed-meter { height: 3px; background: hsl(var(--foreground) / 0.1); overflow: hidden; }
+  .ed-meter > span { display: block; height: 100%; background: hsl(var(--primary)); transition: width .7s cubic-bezier(.2,.7,.2,1); }
+}
+
+/*
   Print rules for the Funder Evidence Report.
 
   The report's "Print / Save PDF" button calls window.print(). Without these rules that

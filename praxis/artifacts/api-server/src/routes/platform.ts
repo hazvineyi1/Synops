@@ -1421,6 +1421,15 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
           gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, sort = EXCLUDED.sort`);
     }
 
+    // Professional MRB brand: the whole environment skins to the Manchester Review Board (deep petrol
+    // blue, warm gold accent). Best-effort so a column difference never fails the seed.
+    try {
+      await db.execute(sql`UPDATE brand_themes SET display_name = 'Manchester Review Board', primary_color = '#1B4965', secondary_color = '#2C6E8E', accent_color = '#C58B2C', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
+      await db.execute(sql`INSERT INTO brand_themes (tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
+        SELECT ${pid}, 'partner', 'Manchester Review Board', '#1B4965', '#2C6E8E', '#C58B2C', 'Practice Credential'
+        WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
+    } catch { /* branding is best-effort */ }
+
     // Build a realistic, walkthrough-ready portfolio for the demo candidate (persona: Chanda Mulenga),
     // so /demos/mrb shows the whole journey live: Ethical Leadership just started, Team Formation
     // mid-cycle (reflections + evidence, wheel ~3/4), Servant Leadership already recognised.

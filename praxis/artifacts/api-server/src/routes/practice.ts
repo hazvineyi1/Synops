@@ -381,14 +381,24 @@ router.post("/practice/portfolio/:id/review", requireAuth, async (req, res) => {
 
 // ── Socratic coach (Mutale): action-learning / Gibbs thinking-partner ─────────────────────────────
 // Shared by the web canvas and the WhatsApp channel so the coach is identical everywhere.
-export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string): Promise<string> {
+// The learning science that governs Mutale. Kept explicit so the coach individualizes and offloads
+// the RIGHT things: it carries structure and memory for the learner, never the thinking itself.
+const MUTALE_SPINE =
+  "How you coach, the learning science that governs you:\n" +
+  "1. The experiential cycle. Move the person one step at a time through their own experience: concrete experience (what they did and felt), reflective observation (looking back), abstract conceptualization (naming the idea or principle), then active experimentation (what they will try next). This is Kolb, built on Dewey's learning by doing, Lewin's action and reflection, and Piaget's assimilation and accommodation. Never run ahead of where they are in the cycle.\n" +
+  "2. Cognitive offloading, used well (Risko and Gilbert). You may carry the LOW-value load for them: remember what they have already said, hold the thread, structure the cycle, offer a word only when a decision needs it. You must NEVER carry the HIGH-value cognition: the noticing, the reflecting, the naming, the deciding. Beneficial offloading frees their working memory to think; detrimental offloading replaces their thinking and stops the learning. When you feel the pull to hand over the answer, that is detrimental offloading. Ask a question instead.\n" +
+  "3. Predictive processing. Help them surface what they expected to happen, then notice the gap between that expectation and what actually happened. The surprise, the prediction error, is where the insight and the aha live. Point them toward it, do not resolve it for them.\n" +
+  "4. Connectivism. Learning is also connection. Where it helps, prompt them to connect this to other people, cases and resources in their network, not only to what is in their own head.\n" +
+  "5. Cognitive twin and co-regulation. You hold a growing model of how THIS person leads, from their prior practice and their own words. Use it to make every question personal to them. Share the effort and the emotion of thinking with them, co-regulate it, but never take the thinking over.\n";
+
+export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string, learnerContext?: string): Promise<string> {
   const history = Array.isArray(messages) ? messages.slice(-16) : [];
   const system =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
-    `You are helping a candidate turn a real leadership experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "leadership"}". ` +
+    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n${MUTALE_SPINE}\n` +
+    (learnerContext ? `Your model of this person (do not read it back to them; use it to individualize every question):\n${learnerContext}\n\n` : "") +
+    `You are helping them turn a real leadership experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "leadership"}". ` +
     (activityBrief ? `The activity brief is: ${activityBrief}\n` : "") +
-    `Work the reflective cycle (Gibbs) with them, one step at a time, in their own experience: description of what happened, feelings, evaluation (what was good or bad), analysis (bring in a leadership idea only when their decision needs it), then conclusion and next actions. ` +
-    `Never lecture, never hand over the "right" answer or the "correct" leadership style, ask one question at a time, and help them name what they already know from practice. Do not grade; a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. Never use em dashes or en dashes.`;
+    `Ask one question at a time, grounded in their own experience and their prior practice. Never lecture, never hand over the right answer or the correct leadership style, and never grade, a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. Never use em dashes or en dashes.`;
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 500,
@@ -399,11 +409,33 @@ export async function mutaleCoachReply(messages: { role: string; content: string
   return (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("").replace(/[—–]/g, ", ").trim();
 }
 
-// POST /practice/coach -- turns a candidate's experience into articulated learning through questions.
+// POST /practice/coach -- turns a candidate's experience into articulated learning through questions,
+// individualised from the candidate's own prior-practice reason and reflection so far (their twin).
 router.post("/practice/coach", requireAuth, async (req, res) => {
-  const { messages, credentialTitle, activityBrief } = req.body ?? {};
+  const uid = req.userId!;
+  const { messages, candidateCredentialId } = req.body ?? {};
+  let title: string | undefined = req.body?.credentialTitle;
+  let brief: string | undefined = req.body?.activityBrief;
+  let context: string | undefined;
+  if (candidateCredentialId) {
+    try {
+      const head = await rows<{ justification: string | null; title: string; activity_brief: string | null }>(sql`
+        SELECT cc.justification, pc.title, pc.activity_brief
+        FROM candidate_credentials cc JOIN practice_credentials pc ON pc.id = cc.credential_id
+        WHERE cc.id = ${candidateCredentialId} AND cc.candidate_id = ${uid} LIMIT 1`);
+      if (head[0]) {
+        title = head[0].title; brief = head[0].activity_brief ?? undefined;
+        const refs = await rows<{ stage: string; content: string }>(sql`SELECT stage, content FROM reflection_entries WHERE candidate_credential_id = ${candidateCredentialId} ORDER BY created_at`);
+        const u = await rows<{ first_name: string | null }>(sql`SELECT first_name FROM users WHERE id = ${uid} LIMIT 1`);
+        const parts = [`Name: ${u[0]?.first_name || "the candidate"}.`];
+        if (head[0].justification) parts.push(`Why they chose this credential (their own prior-practice reason): ${head[0].justification}`);
+        if (refs.length) parts.push(`Their reflection so far, in their own words: ${refs.map((r) => `(${r.stage}) ${r.content}`).join(" | ")}`);
+        context = parts.join("\n");
+      }
+    } catch { /* individualise best-effort; fall back to a generic coach */ }
+  }
   try {
-    res.json({ reply: await mutaleCoachReply(messages, credentialTitle, activityBrief) });
+    res.json({ reply: await mutaleCoachReply(messages, title, brief, context) });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
   }

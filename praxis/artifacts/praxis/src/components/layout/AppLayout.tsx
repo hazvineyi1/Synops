@@ -261,8 +261,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         items: [
           { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.practice', 'My Credentials'), href: '/practice', icon: Compass },
-          { label: t('nav.myCourses'), href: '/courses', icon: BookOpen },
-          { label: t('nav.myGrades', 'My grades'), href: '/grades', icon: TrendingUp },
+          // Practice-credential candidates are not taking courses and are never graded (a human
+          // reviewer decides reviewed or resubmit), so "My courses" and "My grades" are intentionally
+          // removed from the learner nav. Staff keep course authoring in their own nav blocks.
           // K-12 has no AI tutor / case studies; older K-12 learners skip the Coach hub too.
           ...(personaByEmail(user?.email) ? [] : [{ label: t('nav.coach', 'Coach'), href: '/coach-hub', icon: GraduationCap }]),
           { label: t('nav.jotter', 'Jotter'), href: '/jotter', icon: NotebookPen },
