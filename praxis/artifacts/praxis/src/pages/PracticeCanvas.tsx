@@ -122,6 +122,7 @@ export function PracticeCanvas() {
   const { data: me } = useGetMe();
   const { data: brand } = useBrandTheme();
   const isEducator = (brand?.displayName || '').toLowerCase().includes('educator');
+  const coachName = isEducator ? 'Eve' : 'Mutale';
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const cc = mine.find((m) => m.id === id);
   const { data: reflections = [] } = useQuery({ queryKey: ['practice-reflections', id], queryFn: () => apiFetch<Reflection[]>(`/practice/me/credentials/${id}/reflections`), enabled: !!id });
@@ -191,7 +192,7 @@ export function PracticeCanvas() {
       </Card>
 
       {/* The cognitive twin: the model Mutale holds, shown plainly. Tapping a move opens a field to add it. */}
-      <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} />
+      <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} coachName={coachName} />
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
         <div className="space-y-4">
@@ -251,8 +252,8 @@ export function PracticeCanvas() {
           {submitted && <GatewaySubmit cc={cc} reflections={reflections.length} evidence={evidence.length} onChange={invalidate} />}
         </div>
 
-        {/* Mutale, contextual to the current move */}
-        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} />
+        {/* The coach, contextual to the current move */}
+        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} />
       </div>
     </div>
   );
@@ -367,7 +368,7 @@ function BodyOfWork({ reflections, evidence }: { reflections: Reflection[]; evid
   );
 }
 
-function TwinPanel({ me, cc, reflections, readOnly, onSaved }: { me: any; cc: Mine | undefined; reflections: Reflection[]; readOnly?: boolean; onSaved?: () => void }) {
+function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale' }: { me: any; cc: Mine | undefined; reflections: Reflection[]; readOnly?: boolean; onSaved?: () => void; coachName?: string }) {
   const [openHint, setOpenHint] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -391,14 +392,14 @@ function TwinPanel({ me, cc, reflections, readOnly, onSaved }: { me: any; cc: Mi
   return (
     <Card className="rounded-none p-5 space-y-4 border-primary/20">
       <div>
-        <div className="flex items-center gap-2 ed-overline text-foreground"><Brain className="h-4 w-4 text-primary" /> What Mutale is learning about how you lead</div>
-        <p className="text-xs text-muted-foreground mt-1">This is the model your coach holds{name ? `, ${name}` : ''}, drawn only from your own words. Mutale remembers it so you do not have to, and uses it to make its questions personal. It never replaces your thinking.</p>
+        <div className="flex items-center gap-2 ed-overline text-foreground"><Brain className="h-4 w-4 text-primary" /> What {coachName} is learning about how you lead</div>
+        <p className="text-xs text-muted-foreground mt-1">This is the model your coach holds{name ? `, ${name}` : ''}, drawn only from your own words. {coachName} remembers it so you do not have to, and uses it to make its questions personal. It never replaces your thinking.</p>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
         <div className="border border-border p-3">
           <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Your prior practice, in your words</div>
-          <p className="text-sm mt-1 whitespace-pre-wrap">{cc.justification?.trim() || 'Not captured yet. Tell Mutale why this credential fits your real work.'}</p>
+          <p className="text-sm mt-1 whitespace-pre-wrap">{cc.justification?.trim() || `Not captured yet. Tell ${coachName} why this credential fits your real work.`}</p>
         </div>
         <div className="border border-border p-3 flex items-center gap-3">
           <ReflectiveRing earned={earned} total={MOVES.length} />
@@ -459,7 +460,7 @@ function TwinPanel({ me, cc, reflections, readOnly, onSaved }: { me: any; cc: Mi
         )}
       </div>
 
-      <p className="text-[11px] text-muted-foreground border-t border-border pt-2">Cognitive twin and co-regulation with AI. Mutale carries the memory and the structure, beneficial offloading, so your attention stays on the thinking that only you can do.</p>
+      <p className="text-[11px] text-muted-foreground border-t border-border pt-2">Cognitive twin and co-regulation with AI. {coachName} carries the memory and the structure, beneficial offloading, so your attention stays on the thinking that only you can do.</p>
     </Card>
   );
 }
@@ -902,7 +903,7 @@ function GatewaySubmit({ cc, reflections, evidence, onChange }: { cc: Mine | und
   );
 }
 
-function CoachPanel({ cc, stageHint }: { cc: Mine | undefined; stageHint?: string }) {
+function CoachPanel({ cc, stageHint, coachName = 'Mutale' }: { cc: Mine | undefined; stageHint?: string; coachName?: string }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -914,7 +915,7 @@ function CoachPanel({ cc, stageHint }: { cc: Mine | undefined; stageHint?: strin
     const next = [...messages, { role: 'user' as const, content: text.trim() }];
     setMessages(next); setInput(''); setLoading(true);
     try {
-      const r = await apiFetch<{ reply: string }>('/practice/coach', { method: 'POST', body: JSON.stringify({ messages: next, candidateCredentialId: cc?.id, credentialTitle: cc?.title, activityBrief: cc?.activity_brief }) });
+      const r = await apiFetch<{ reply: string }>('/practice/coach', { method: 'POST', body: JSON.stringify({ messages: next, candidateCredentialId: cc?.id, credentialTitle: cc?.title, activityBrief: cc?.activity_brief, coachName }) });
       setMessages((m) => [...m, { role: 'assistant', content: r.reply }]);
     } catch {
       setMessages((m) => [...m, { role: 'assistant', content: 'I could not respond just now. Try again in a moment.' }]);
@@ -924,14 +925,14 @@ function CoachPanel({ cc, stageHint }: { cc: Mine | undefined; stageHint?: strin
   return (
     <Card className="rounded-none p-0 flex flex-col overflow-hidden lg:sticky lg:top-4 h-[70vh]">
       <div className="border-b border-border p-3">
-        <div className="ed-overline text-foreground">Mutale · your thinking partner</div>
-        <p className="text-xs text-muted-foreground mt-1">A Socratic coach. Mutale asks, you think. Turn your experience into articulated learning.</p>
+        <div className="ed-overline text-foreground">{coachName} · your thinking partner</div>
+        <p className="text-xs text-muted-foreground mt-1">A Socratic coach. {coachName} asks, you think. Turn your experience into articulated learning.</p>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
           <div className="text-sm text-muted-foreground space-y-2">
             {stageHint
-              ? <p><span className="font-medium text-foreground">For this move, Mutale asks:</span> <em>"{stageHint}"</em></p>
+              ? <p><span className="font-medium text-foreground">For this move, {coachName} asks:</span> <em>"{stageHint}"</em></p>
               : <p>Start with a real moment. For example: <em>"Two people declined to join the team I was forming, and I'm not sure what to do."</em></p>}
           </div>
         )}
@@ -940,10 +941,10 @@ function CoachPanel({ cc, stageHint }: { cc: Mine | undefined; stageHint?: strin
             <span className={`inline-block max-w-[90%] px-3 py-2 text-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{m.content}</span>
           </div>
         ))}
-        {loading && <div className="text-muted-foreground text-sm inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Mutale is thinking...</div>}
+        {loading && <div className="text-muted-foreground text-sm inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {coachName} is thinking...</div>}
       </div>
       <div className="border-t border-border p-2 flex items-end gap-2">
-        <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={stageHint ? 'Answer Mutale, or tell it what happened...' : 'Tell Mutale what happened...'}
+        <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={stageHint ? `Answer ${coachName}, or tell it what happened...` : `Tell ${coachName} what happened...`}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
           className="flex-1 resize-none rounded-none border border-input bg-background px-3 py-2 text-sm" />
         <Button size="sm" disabled={!input.trim() || loading} onClick={() => send(input)} className="rounded-none"><Send className="h-4 w-4" /></Button>

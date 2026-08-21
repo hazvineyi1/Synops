@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { SessionProvider, useSession } from '@/context/SessionContext';
 import { ThemeApplier } from '@/context/ThemeProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { API } from '@/lib/api';
 import { ConsentGate } from '@/components/ConsentGate';
 import { MfaGate } from '@/components/MfaGate';
 import { MaintenanceBanner } from '@/components/MaintenanceBanner';
@@ -352,6 +353,30 @@ function Routes() {
   );
 }
 
+/**
+ * Measures how long a demo visitor stays: if a demo session id was stored at sign-in, ping every minute
+ * and send an end beacon when the tab closes, so the founder's "time spent" email is accurate.
+ */
+function DemoTracker() {
+  React.useEffect(() => {
+    let id: string | null = null;
+    try { id = window.sessionStorage.getItem('synops_demo_track'); } catch { /* ignore */ }
+    if (!id) return;
+    const send = (action: string) => {
+      const payload = JSON.stringify({ id, action });
+      if (action === 'end' && typeof navigator !== 'undefined' && navigator.sendBeacon) {
+        try { navigator.sendBeacon(`${API}/auth/demo-track`, new Blob([payload], { type: 'application/json' })); return; } catch { /* fall through */ }
+      }
+      fetch(`${API}/auth/demo-track`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+    };
+    const iv = window.setInterval(() => send('ping'), 60000);
+    const end = () => { try { window.sessionStorage.removeItem('synops_demo_track'); } catch { /* ignore */ } send('end'); };
+    window.addEventListener('pagehide', end);
+    return () => { window.clearInterval(iv); window.removeEventListener('pagehide', end); };
+  }, []);
+  return null;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -360,6 +385,7 @@ function App() {
           <WouterRouter base={basePath}>
             <SessionProvider>
               <ThemeApplier />
+              <DemoTracker />
               <K12Adaptation />
               <MaintenanceBanner />
               <Routes />

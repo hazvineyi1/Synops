@@ -59,7 +59,7 @@ interface SessionState {
    * ("student_alt" = a second learner persona, e.g. the K-12 accommodations learner). `tenant`
    * optionally names which demo tenant to enter (e.g. "synops-k12"), so several demos can share a host.
    */
-  demoSignIn: (role: "student" | "student_alt" | "admin", tenant?: string, persona?: string) => Promise<void>;
+  demoSignIn: (role: "student" | "student_alt" | "admin", tenant?: string, persona?: string, name?: string) => Promise<void>;
   /** End a server-side impersonation and restore the admin's OWN session (not a sign-out). */
   stopImpersonating: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -126,7 +126,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return {};
   }, []);
 
-  const demoSignIn = useCallback(async (role: "student" | "student_alt" | "admin", tenant?: string, persona?: string) => {
+  const demoSignIn = useCallback(async (role: "student" | "student_alt" | "admin", tenant?: string, persona?: string, name?: string) => {
     // Remember that this visitor arrived from the marketing site, so the app can offer a
     // one-tap route back to Synops home from anywhere in the demo.
     try { window.localStorage.setItem("synops_from_marketing", "1"); } catch { /* ignore */ }
@@ -135,13 +135,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       // persona selects a specific learner within the tenant (e.g. the K-12 landing's 7 students).
-      body: JSON.stringify({ role, ...(tenant ? { tenant } : {}), ...(persona ? { persona } : {}) }),
+      // name (optional) personalises the demo and is recorded with the access notification.
+      body: JSON.stringify({ role, ...(tenant ? { tenant } : {}), ...(persona ? { persona } : {}), ...(name ? { name } : {}) }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new Error((body as { error?: string }).error ?? "Could not start the demo.");
     }
-    setUser((body as { user: SessionUser }).user);
+    const b = body as { user: SessionUser; demoSessionId?: string };
+    try { if (b.demoSessionId) window.sessionStorage.setItem("synops_demo_track", b.demoSessionId); } catch { /* ignore */ }
+    setUser(b.user);
     setLoading(false);
   }, []);
 

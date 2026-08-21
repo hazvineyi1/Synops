@@ -14,6 +14,7 @@ import {
 import { eq, and, isNull, gt, desc, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { resetCandidatePractice } from "./practice";
+import { startDemoSession, pingDemoSession, endDemoSession } from "../lib/demoTracking";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import {
   hashPassword,
@@ -420,9 +421,15 @@ router.post("/auth/demo-login", async (req, res) => {
   }
 
   // The educator PD demo always starts from the very beginning: wipe the entry learner's portfolio on
-  // every sign-in, so /demos/educator opens at 0% on the welcome, with no re-provisioning needed.
+  // every sign-in (so it opens at 0%), and personalise the demo to the visitor's entered name.
+  const visitorName = String(req.body?.name ?? "").trim().slice(0, 60).replace(/[^\p{L}\p{M} .'-]/gu, "").trim();
   if (tenantKey === "educator-pd" && role === "student" && user.email === tenant.student) {
     await resetCandidatePractice(user.id);
+    if (visitorName) {
+      const first = visitorName.split(/\s+/)[0];
+      await db.update(usersTable).set({ firstName: first, lastName: "" }).where(eq(usersTable.id, user.id));
+      user = { ...user, firstName: first, lastName: "" } as typeof user;
+    }
   }
 
   const token = newSessionToken();
@@ -439,8 +446,25 @@ router.post("/auth/demo-login", async (req, res) => {
     .values({ userId: user.id, email: user.email, outcome: "success", ipAddress: ip, userAgent: typeof ua === "string" ? ua : null })
     .catch(() => {});
 
+  // Record the demo access and email a notification (best-effort). Returns an id the client pings so we
+  // can also capture how long they stayed.
+  const demoSessionId = await startDemoSession({ tenantKey, name: visitorName || null, ip, ua: typeof ua === "string" ? ua : null });
+
   res.cookie(SESSION_COOKIE, token, cookieOptions());
-  res.json({ user: publicUser(user) });
+  res.json({ user: publicUser(user), demoSessionId });
+});
+
+// PUBLIC: demo tracking heartbeat + end (called by the demo pages to measure time spent). Host-locked.
+router.post("/auth/demo-track", async (req, res) => {
+  const configured = (process.env.DEMO_LOGIN_HOSTS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const allowHosts = configured.length ? configured : DEFAULT_DEMO_HOSTS;
+  const host = String(req.headers.host || "").toLowerCase().split(":")[0];
+  if (!allowHosts.includes(host)) { res.status(404).json({ error: "Not found." }); return; }
+  const id = String(req.body?.id ?? "").trim();
+  const action = String(req.body?.action ?? "ping");
+  if (!id) { res.json({ ok: false }); return; }
+  if (action === "end") { await endDemoSession(id); } else { await pingDemoSession(id); }
+  res.json({ ok: true });
 });
 
 /**

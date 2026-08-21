@@ -60,7 +60,7 @@ type Twin = {
 };
 const TWIN_MOVES = ['description', 'feelings', 'evaluation', 'analysis', 'conclusion', 'action', 'prediction', 'surprise'];
 
-function LongitudinalTwin() {
+function LongitudinalTwin({ coachName = 'Mutale' }: { coachName?: string }) {
   const { data } = useQuery({ queryKey: ['practice-twin'], queryFn: () => apiFetch<Twin>('/practice/twin') });
   const [syn, setSyn] = useState<{ themes: string[]; edge: string | null; note?: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -84,7 +84,7 @@ function LongitudinalTwin() {
       <div>
         <Overline>Your cognitive twin, across your practice</Overline>
         <h2 className="ed-h2 mt-1">How you lead, over time</h2>
-        <p className="text-sm text-muted-foreground mt-1">The model Mutale holds of you across every credential, not just one. It grows as you do, drawn only from your own words.</p>
+        <p className="text-sm text-muted-foreground mt-1">The model {coachName} holds of you across every credential, not just one. It grows as you do, drawn only from your own words.</p>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {stats.map((s) => (
@@ -121,18 +121,19 @@ function LongitudinalTwin() {
 
 function Orientation({ name, programName, isEducator, hasCredentials, onStart }: { name?: string; programName: string; isEducator: boolean; hasCredentials: boolean; onStart: () => void }) {
   const [open, setOpen] = useState(!hasCredentials || isEducator);
+  const coachName = isEducator ? 'Eve' : 'Mutale';
   const goal = isEducator
     ? 'Your goal is to earn your first credential: recognition that you can genuinely do one thing in your teaching. You earn it by trying one real thing with your students, reflecting on what happened with your coach, and adding a little evidence. No courses, no grades.'
     : 'Your goal is to earn your first credential: recognition of one real thing you can do as a leader. You earn it by using something real from your work, reflecting on it with your coach, and adding evidence. No courses, no grades.';
   const steps: [string, string][] = isEducator ? [
     ['Choose a focus', 'Pick a credential below that fits something you already do, or want to try, with your students.'],
     ['Do something real', 'Try it in your own classroom. It does not have to be new, use something from this term.'],
-    ['Reflect with Mutale', 'Talk it through with your coach. Mutale asks the questions; you do the thinking. Capture what you did, what surprised you, and what you learned.'],
+    [`Reflect with ${coachName}`, `Talk it through with your coach. ${coachName} asks the questions; you do the thinking. Capture what you did, what surprised you, and what you learned.`],
     ['Get recognised', 'When your portfolio is ready, submit it. A reviewer recognises it or refers it back, always with feedback, and issues your verifiable credential.'],
   ] : [
     ['Choose a credential', 'Pick a leadership practice you want recognised, and say in a line why.'],
     ['Do the work', 'Use something real from your practice, from the last six months if you like.'],
-    ['Reflect with Mutale', 'Your Socratic coach helps you turn the experience into articulated learning and evidence.'],
+    [`Reflect with ${coachName}`, 'Your Socratic coach helps you turn the experience into articulated learning and evidence.'],
     ['Get recognised', 'Submit your portfolio. A reviewer recognises it or refers it back, with developmental feedback either way.'],
   ];
   return (
@@ -208,6 +209,7 @@ export function PracticeHome() {
   const { data: brand } = useBrandTheme();
   const isEducator = (brand?.displayName || '').toLowerCase().includes('educator');
   const programName = brand?.displayName || 'Practice';
+  const coachName = isEducator ? 'Eve' : 'Mutale';
   const { data: me } = useGetMe();
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const { data: catalogue = [] } = useQuery({ queryKey: ['practice-credentials'], queryFn: () => apiFetch<Credential[]>('/practice/credentials') });
@@ -284,7 +286,7 @@ export function PracticeHome() {
           <MessageSquareQuote className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="text-sm">
             <div className="font-medium">Reflect on WhatsApp</div>
-            <div className="text-xs text-muted-foreground">Once your number is linked, message Mutale to reflect on the go, on cheap data. It flows straight into your active credential's cycle.</div>
+            <div className="text-xs text-muted-foreground">Once your number is linked, message {coachName} to reflect on the go, on cheap data. It flows straight into your active credential's cycle.</div>
           </div>
         </EditorialCard>
       )}
@@ -368,7 +370,7 @@ export function PracticeHome() {
         </div>
       )}
 
-      <LongitudinalTwin />
+      <LongitudinalTwin coachName={coachName} />
 
       {mine.length >= 2 && !anyLocked && (
         <EditorialCard className="p-5 flex items-center justify-between gap-3">

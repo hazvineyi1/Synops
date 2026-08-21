@@ -952,14 +952,17 @@ const MUTALE_SPINE =
   "4. Connectivism. Learning is also connection. Where it helps, prompt them to connect this to other people, cases and resources in their network, not only to what is in their own head.\n" +
   "5. Cognitive twin and co-regulation. You hold a growing model of how THIS person leads, from their prior practice and their own words. Use it to make every question personal to them. Share the effort and the emotion of thinking with them, co-regulate it, but never take the thinking over.\n";
 
-export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string, learnerContext?: string): Promise<string> {
+export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string, learnerContext?: string, coachName?: string): Promise<string> {
   const history = Array.isArray(messages) ? messages.slice(-16) : [];
-  const system =
+  const name = coachName && /^[A-Za-z]{2,20}$/.test(coachName) ? coachName : "Mutale";
+  const systemRaw =
     `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n${MUTALE_SPINE}\n` +
     (learnerContext ? `Your model of this person (do not read it back to them; use it to individualize every question):\n${learnerContext}\n\n` : "") +
-    `You are helping them turn a real leadership experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "leadership"}". ` +
+    `You are helping them turn a real experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "their practice"}". ` +
     (activityBrief ? `The activity brief is: ${activityBrief}\n` : "") +
-    `Ask one question at a time, grounded in their own experience and their prior practice. Never lecture, never hand over the right answer or the correct leadership style, and never grade, a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. Never use em dashes or en dashes.`;
+    `Ask one question at a time, grounded in their own experience and their prior practice. Never lecture, never hand over the right answer, and never grade, a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. Never use em dashes or en dashes.`;
+  // Swap the coach's name for programmes that use a different one (e.g. the educator coach is "Eve").
+  const system = name === "Mutale" ? systemRaw : systemRaw.replace(/Mutale/g, name);
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 500,
@@ -974,7 +977,7 @@ export async function mutaleCoachReply(messages: { role: string; content: string
 // individualised from the candidate's own prior-practice reason and reflection so far (their twin).
 router.post("/practice/coach", requireAuth, async (req, res) => {
   const uid = req.userId!;
-  const { messages, candidateCredentialId } = req.body ?? {};
+  const { messages, candidateCredentialId, coachName } = req.body ?? {};
   let title: string | undefined = req.body?.credentialTitle;
   let brief: string | undefined = req.body?.activityBrief;
   let context: string | undefined;
@@ -996,7 +999,7 @@ router.post("/practice/coach", requireAuth, async (req, res) => {
     } catch { /* individualise best-effort; fall back to a generic coach */ }
   }
   try {
-    res.json({ reply: await mutaleCoachReply(messages, title, brief, context) });
+    res.json({ reply: await mutaleCoachReply(messages, title, brief, context, coachName) });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
   }

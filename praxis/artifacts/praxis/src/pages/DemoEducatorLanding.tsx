@@ -9,13 +9,15 @@ import { useSession } from "@/context/SessionContext";
 export default function DemoEducatorLanding() {
   const { demoSignIn } = useSession();
   const [busy, setBusy] = useState(false);
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const enter = async () => {
+    if (!name.trim()) { setError("Pop your first name in first, so Eve can greet you properly."); return; }
     setBusy(true);
     setError(null);
     try {
-      await demoSignIn("student", "educator-pd");
+      await demoSignIn("student", "educator-pd", undefined, name.trim());
       window.location.href = "/practice";
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the demo. Please try again.");
@@ -41,29 +43,39 @@ export default function DemoEducatorLanding() {
           educator does: a short welcome, a clear goal, and your first credential to choose.
         </p>
 
-        <div style={{ marginTop: 28 }}>
+        <div style={{ marginTop: 28, maxWidth: 420 }}>
+          <label htmlFor="demo-name" style={{ fontSize: 13, fontWeight: 600, color: "#1b1f3b", display: "block", marginBottom: 6 }}>First, what should we call you?</label>
+          <input
+            id="demo-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") enter(); }}
+            placeholder="Your first name"
+            style={{ width: "100%", boxSizing: "border-box", padding: "12px 14px", fontSize: 15, border: "1px solid #cdd0e0", borderRadius: 10, background: "#fff" }}
+          />
           <button
             onClick={enter}
             disabled={busy}
             style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              background: "#3B4CB8", color: "#fff", border: "none", borderRadius: 12,
+              display: "inline-flex", alignItems: "center", gap: 8, marginTop: 14,
+              background: "#3B4CB8", color: "#fff", border: "none", borderRadius: 10,
               padding: "14px 22px", fontSize: 15, fontWeight: 600,
               cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1,
             }}
           >
-            {busy ? "Starting the demo…" : "Enter the practice class →"}
+            {busy ? "Getting things ready…" : name.trim() ? `Start, ${name.trim().split(" ")[0]} →` : "Start the demo →"}
           </button>
-          <p style={{ fontSize: 12.5, color: "#6b7280", marginTop: 10 }}>
-            No sign-up. You enter as a demo educator; nothing you do is recorded against a real account.
-          </p>
-          {error && <p style={{ fontSize: 13, color: "#b42318", marginTop: 8 }}>{error}</p>}
+          {error && <p style={{ fontSize: 13, color: "#b42318", marginTop: 10 }}>{error}</p>}
         </div>
 
-        <p style={{ fontSize: 13, color: "#6b7280", marginTop: 40, lineHeight: 1.6 }}>
-          Demo build · credentials and personas are composites, illustrating a professional development programme for an
-          educator audience.
-        </p>
+        <div style={{ fontSize: 13.5, color: "#4b5162", marginTop: 32, lineHeight: 1.7, maxWidth: 600, background: "#eeeefb", border: "1px solid #dcdcf3", borderRadius: 12, padding: "16px 18px" }}>
+          <p style={{ margin: 0 }}>
+            A quick, honest word on privacy. This is a demo, so there is no account and no password. We use your first
+            name only to make the walkthrough feel personal, and we note that a demo was opened, roughly when, and from
+            where, so we know our work is being looked at. Nothing you type here is kept or tied to you, and everyone and
+            everything in the demo is made up. Close the tab whenever you like.
+          </p>
+        </div>
       </div>
     </div>
   );
