@@ -453,6 +453,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision Practice Credentials', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Provision the Educator Professional Development demo (Thoughtful AI in teaching): a separate partner
+  // reusing the whole practice engine, with adult-learning-grounded credentials and a demo educator.
+  const seedEducatorPd = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; credentials?: number }>('/platform/seed-educator-pd', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] });
+      toast({ title: 'Educator PD demo provisioned', description: `${r.credentials ?? 0} credentials created. Enter at /demos/educator.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not provision Educator PD demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Delete every learner-role account and its learning records across the whole platform. Keeps
   // courses, organisations, coaches and admins.
   const removeLearners = useMutation({
@@ -621,6 +632,11 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Provision the MRB executive programme as PRACTICE CREDENTIALS (Option 5)? Creates the credential catalogue + demo candidate. Safe to re-run.')) seedMrbPractice.mutate(); }}
                 title="Provision the MRB executive programme as Practice Credentials">
                 {seedMrbPractice.isPending ? 'Provisioning…' : 'Provision MRB Practice Credentials'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedEducatorPd.isPending}
+                onClick={() => { if (window.confirm('Provision the Educator PD demo (Thoughtful AI in teaching)? Creates a separate partner, 6 credentials, branding and demo educator Maria Alvarez. Safe to re-run. Enter at /demos/educator.')) seedEducatorPd.mutate(); }}
+                title="Provision the Educator Professional Development demo class">
+                {seedEducatorPd.isPending ? 'Provisioning…' : 'Provision Educator PD demo'}
               </Button>
               <Button variant="outline" size="sm" disabled={resetEnza.isPending}
                 className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400"
