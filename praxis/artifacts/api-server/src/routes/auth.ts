@@ -13,6 +13,7 @@ import {
 } from "@workspace/db";
 import { eq, and, isNull, gt, desc, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { resetCandidatePractice } from "./practice";
 import { sendSetPasswordEmail, emailEnabled } from "../lib/email";
 import {
   hashPassword,
@@ -416,6 +417,12 @@ router.post("/auth/demo-login", async (req, res) => {
   if (!user) {
     res.status(500).json({ error: "Could not start the demo session." });
     return;
+  }
+
+  // The educator PD demo always starts from the very beginning: wipe the entry learner's portfolio on
+  // every sign-in, so /demos/educator opens at 0% on the welcome, with no re-provisioning needed.
+  if (tenantKey === "educator-pd" && role === "student" && user.email === tenant.student) {
+    await resetCandidatePractice(user.id);
   }
 
   const token = newSessionToken();

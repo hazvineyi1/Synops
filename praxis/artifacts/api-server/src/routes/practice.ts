@@ -1033,6 +1033,17 @@ export async function touchCandidateCredential(id: string): Promise<void> {
   } catch { /* best effort */ }
 }
 
+/** Wipe a candidate's whole practice portfolio (used to keep a demo entry account always empty). */
+export async function resetCandidatePractice(candidateId: string): Promise<void> {
+  try {
+    await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${candidateId})`);
+    await db.execute(sql`DELETE FROM evidence_items WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${candidateId})`);
+    await db.execute(sql`DELETE FROM attestations WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${candidateId})`);
+    await db.execute(sql`DELETE FROM issued_credentials WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${candidateId})`);
+    await db.execute(sql`DELETE FROM candidate_credentials WHERE candidate_id = ${candidateId}`);
+  } catch { /* best effort; a demo reset never blocks sign-in */ }
+}
+
 /** Capture a WhatsApp reflection message against a candidate credential (stage 'note'). */
 export async function captureWhatsappReflection(candidateCredentialId: string, content: string): Promise<void> {
   try {
