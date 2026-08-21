@@ -155,6 +155,11 @@ function Orientation({ name, programName, isEducator, hasCredentials, onStart }:
           ))}
         </ol>
       )}
+      <div className="border-t border-border pt-3 space-y-1.5 text-xs text-muted-foreground">
+        <div><span className="font-medium text-foreground">A credential</span> is recognition that you can genuinely do one thing in practice, earned by showing real evidence, not by sitting a course or passing a test.</div>
+        <div><span className="font-medium text-foreground">The cycle</span> is the four moves inside every credential: {isEducator ? 'try something real with your students' : 'do something real in your practice'}, reflect on it, name what you learned, and try it again. The progress bar fills as you work them.</div>
+        <div><span className="font-medium text-foreground">Guided and Pro</span> (top right) change how much help you see: Guided explains each step, Pro is a denser view once you know your way around.</div>
+      </div>
       {!hasCredentials && (
         <button onClick={onStart} className="group inline-flex items-center gap-2 ed-overline text-foreground underline ed-underline">
           {isEducator ? 'Start here: choose your first focus' : 'Start here: choose your first credential'}
@@ -246,10 +251,13 @@ export function PracticeHome() {
         </div>
         <Rule strong className="mt-6" />
         {mine.length > 0 && (
-          <div className="mt-4 flex items-center gap-4">
-            <Overline>{stateWord}</Overline>
-            <div className="flex-1"><Meter value={progress} /></div>
-            <div className="ed-num text-sm text-muted-foreground w-10 text-right">{Math.round(progress * 100)}%</div>
+          <div className="mt-4">
+            <div className="flex items-center gap-4">
+              <Overline>{stateWord}</Overline>
+              <div className="flex-1"><Meter value={progress} /></div>
+              <div className="ed-num text-sm text-muted-foreground w-10 text-right">{Math.round(progress * 100)}%</div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1.5">How far you have worked the four-move cycle across all your credentials. It is not a grade, and it does not need to reach 100 percent to submit.</p>
           </div>
         )}
         {guided && (

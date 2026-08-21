@@ -50,11 +50,14 @@ export function CycleRing({ e, r, n, t, size = 76 }: { e: boolean; r: boolean; n
 /** Adaptive interface control: choose the depth the product meets you at. */
 export function ModeToggle() {
   const { mode, set } = useAdaptive();
-  const opts: { key: Mode; label: string }[] = [{ key: 'guided', label: 'Guided' }, { key: 'pro', label: 'Pro' }];
+  const opts: { key: Mode; label: string; hint: string }[] = [
+    { key: 'guided', label: 'Guided', hint: 'Guided: more explanation and step-by-step help. Best when you are new.' },
+    { key: 'pro', label: 'Pro', hint: 'Pro: a denser view with less hand-holding, once you know your way around.' },
+  ];
   return (
-    <div className="inline-flex items-center border border-foreground/15" role="group" aria-label="Interface depth">
+    <div className="inline-flex items-center border border-foreground/15" role="group" aria-label="How much help you see">
       {opts.map((o) => (
-        <button key={o.key} type="button" onClick={() => set(o.key)} aria-pressed={mode === o.key}
+        <button key={o.key} type="button" onClick={() => set(o.key)} aria-pressed={mode === o.key} title={o.hint}
           className={`ed-overline px-3 py-1.5 transition-colors ${mode === o.key ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'}`}>
           {o.label}
         </button>
