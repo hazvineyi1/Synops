@@ -244,6 +244,23 @@
 }
 
 /*
+  Warm variant of the editorial system, for audiences the sharp executive look does not suit (e.g.
+  educators). Same components, softened: rounded corners, gentle shadow instead of hairline borders,
+  more approachable. Opt in by wrapping a screen in `.theme-warm`; nothing else changes.
+*/
+@layer utilities {
+  .theme-warm .ed-card { border-radius: 16px; border-color: hsl(var(--foreground) / 0.08); box-shadow: 0 10px 30px -16px hsl(var(--foreground) / 0.22); }
+  .theme-warm .ed-card-hover:hover { border-color: hsl(var(--primary) / 0.45); box-shadow: 0 16px 40px -18px hsl(var(--primary) / 0.35); }
+  .theme-warm .ed-accentbar { box-shadow: inset 5px 0 0 0 hsl(var(--primary)); }
+  .theme-warm .ed-rule-strong { height: 3px; border-radius: 3px; background: hsl(var(--primary)); }
+  .theme-warm .ed-rule { background: hsl(var(--foreground) / 0.1); }
+  .theme-warm .ed-overline { letter-spacing: 0.16em; }
+  .theme-warm .ed-display { letter-spacing: -0.01em; line-height: 1.02; }
+  .theme-warm .rounded-none { border-radius: 10px; }
+  .theme-warm .ed-meter, .theme-warm .ed-meter > span { border-radius: 999px; }
+}
+
+/*
   Print rules for the Funder Evidence Report.
 
   The report's "Print / Save PDF" button calls window.print(). Without these rules that

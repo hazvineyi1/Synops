@@ -5,6 +5,7 @@ import { useGetMe } from '@workspace/api-client-react';
 import { apiFetch } from '@/lib/api';
 import { getPending, addPending, removePending, loadDraft, saveDraft, type Pending } from '@/lib/offlineStore';
 import { CycleRing } from '@/components/editorial';
+import { useBrandTheme } from '@/context/ThemeProvider';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -119,6 +120,8 @@ export function PracticeCanvas() {
   const qc = useQueryClient();
 
   const { data: me } = useGetMe();
+  const { data: brand } = useBrandTheme();
+  const isEducator = (brand?.displayName || '').toLowerCase().includes('educator');
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const cc = mine.find((m) => m.id === id);
   const { data: reflections = [] } = useQuery({ queryKey: ['practice-reflections', id], queryFn: () => apiFetch<Reflection[]>(`/practice/me/credentials/${id}/reflections`), enabled: !!id });
@@ -146,7 +149,7 @@ export function PracticeCanvas() {
   const stage = CYCLE.find((s) => s.key === activeStage)!;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4">
+    <div className={`max-w-6xl mx-auto space-y-4 ${isEducator ? 'theme-warm' : ''}`}>
       <button onClick={() => navigate('/practice')} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> My credentials</button>
 
       {(!off.online || off.pending.length > 0) && (

@@ -230,13 +230,14 @@ export function PracticeHome() {
   const onNextMove = () => { if (move.href) navigate(move.href); else setPicking(true); };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className={`max-w-4xl mx-auto space-y-8 ${isEducator ? 'theme-warm' : ''}`}>
       {/* Masthead */}
       <div>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
             <Overline>{isEducator ? 'Professional learning, from your own classroom' : 'Practice, not courses'}</Overline>
             <h1 className="ed-display mt-3">{me?.firstName ? `${me.firstName}'s practice` : 'My practice'}</h1>
+            {isEducator && <p className="text-sm text-muted-foreground mt-2">Grow your teaching one real classroom experiment at a time.</p>}
           </div>
           <div className="flex items-center gap-3">
             <ModeToggle />
