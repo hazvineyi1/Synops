@@ -169,8 +169,8 @@ export function PracticeCanvas() {
         )}
       </Card>
 
-      {/* The cognitive twin: the model Mutale holds, shown plainly. */}
-      <TwinPanel me={me} cc={cc} reflections={reflections} />
+      {/* The cognitive twin: the model Mutale holds, shown plainly. Tapping a move opens a field to add it. */}
+      <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} />
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
         <div className="space-y-4">
@@ -339,14 +339,25 @@ function BodyOfWork({ reflections, evidence }: { reflections: Reflection[]; evid
   );
 }
 
-function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; reflections: Reflection[] }) {
+function TwinPanel({ me, cc, reflections, readOnly, onSaved }: { me: any; cc: Mine | undefined; reflections: Reflection[]; readOnly?: boolean; onSaved?: () => void }) {
   const [openHint, setOpenHint] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
   if (!cc) return null;
   const name = me?.firstName;
   const counts: Record<string, number> = {};
   for (const r of reflections) counts[r.stage] = (counts[r.stage] ?? 0) + 1;
   const earned = MOVES.filter((m) => counts[m.key]).length;
   const complete = earned === MOVES.length;
+  const pick = (key: string) => { setOpenHint((cur) => (cur === key ? null : key)); setDraft(''); };
+  const openMove = MOVES.find((m) => m.key === openHint);
+  const save = async () => {
+    const text = draft.trim();
+    if (!text || !openHint) return;
+    setBusy(true);
+    try { await apiFetch(`/practice/me/credentials/${cc.id}/reflections`, { method: 'POST', body: JSON.stringify({ stage: openHint, content: text }) }); setDraft(''); onSaved?.(); }
+    catch { /* keep the text to retry */ } finally { setBusy(false); }
+  };
 
   return (
     <Card className="rounded-none p-5 space-y-4 border-primary/20">
@@ -364,7 +375,7 @@ function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; ref
           <ReflectiveRing earned={earned} total={MOVES.length} />
           <div className="min-w-0">
             <div className="text-sm font-medium">Reflective range</div>
-            <div className="text-xs text-muted-foreground">{complete ? 'Full range explored. Strong work.' : `${earned} of ${MOVES.length} moves explored, tap one to see it`}</div>
+            <div className="text-xs text-muted-foreground">{complete ? 'Full range explored. Strong work.' : `${earned} of ${MOVES.length} moves explored, tap one to add it`}</div>
           </div>
         </div>
       </div>
@@ -374,14 +385,18 @@ function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; ref
           {MOVES.map((m) => {
             const n = counts[m.key] ?? 0; const got = n > 0; const active = openHint === m.key;
             return (
-              <button key={m.key} type="button" onClick={() => setOpenHint(active ? null : m.key)}
+              <button key={m.key} type="button" onClick={() => pick(m.key)}
                 aria-pressed={active}
-                className={`group relative text-left border p-2.5 transition-all duration-200 hover:-translate-y-0.5 ${got ? 'border-primary/40 bg-primary/5 hover:bg-primary/10' : 'border-dashed border-border hover:border-primary/30'} ${active ? 'ring-2 ring-primary/40' : ''}`}>
+                className={`group relative text-left border p-2.5 transition-all duration-200 hover:-translate-y-0.5 ${
+                  active ? 'border-primary bg-primary/10 ring-2 ring-primary/50'
+                    : got ? 'border-primary/40 bg-primary/5 hover:bg-primary/10'
+                      : 'border-dashed border-border hover:border-primary/30'
+                }`}>
                 <div className="flex items-center gap-2 pr-5">
-                  <span className={`flex h-5 w-5 items-center justify-center rounded-full transition-colors ${got ? 'bg-primary text-primary-foreground' : 'border border-border text-transparent'}`}>
+                  <span className={`flex h-5 w-5 items-center justify-center rounded-full transition-colors ${got ? 'bg-primary text-primary-foreground' : active ? 'border-2 border-primary text-transparent' : 'border border-border text-transparent'}`}>
                     <Check className="h-3 w-3" />
                   </span>
-                  <span className={`text-xs font-medium truncate ${got ? '' : 'text-muted-foreground'}`}>{m.label}</span>
+                  <span className={`text-xs font-medium truncate ${got || active ? '' : 'text-muted-foreground'}`}>{m.label}</span>
                 </div>
                 {got && <span className="absolute right-1.5 top-1.5 min-w-[18px] rounded-full bg-primary/15 px-1 text-center text-[10px] font-medium text-primary">{n}</span>}
               </button>
@@ -389,11 +404,23 @@ function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; ref
           })}
         </div>
 
-        {openHint && (
-          <p className="bg-muted/40 p-2.5 text-xs text-muted-foreground">
-            {MOVES.find((m) => m.key === openHint)?.hint}{' '}
-            <span className="text-foreground/70">{counts[openHint] ? `You have worked this ${counts[openHint]} time${counts[openHint] === 1 ? '' : 's'}.` : 'Not yet in your portfolio, try it next.'}</span>
-          </p>
+        {openHint && openMove && (
+          <div className="border border-primary/40 bg-primary/5 p-3 space-y-2">
+            <div className="text-xs font-medium">{openMove.label}</div>
+            <p className="text-xs text-muted-foreground">{openMove.hint} {counts[openHint] ? `You have worked this ${counts[openHint]} time${counts[openHint] === 1 ? '' : 's'}.` : 'Not yet in your portfolio.'}</p>
+            {!readOnly && (
+              <>
+                <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} autoFocus
+                  placeholder={`Write your ${openMove.label.toLowerCase()}...`}
+                  className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+                <div className="flex justify-end">
+                  <Button size="sm" disabled={!draft.trim() || busy} onClick={save} className="gap-1.5 rounded-none">
+                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add to portfolio
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {complete && (
