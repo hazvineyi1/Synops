@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGetMe } from '@workspace/api-client-react';
 import { apiFetch } from '@/lib/api';
 import { getPending, addPending, removePending, loadDraft, saveDraft, type Pending } from '@/lib/offlineStore';
+import { CycleRing } from '@/components/editorial';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,10 +46,10 @@ function useOffline(ccId: string, onSynced: () => void) {
 }
 
 /**
- * Evidence Canvas for a single Practice Credential. This is the practice-first workspace: capture the
- * experience and reflect over time (Gibbs), gather evidence, talk it through with the Socratic coach
- * (Mutale), self-check against the gateway, and submit the portfolio for independent review. There are
- * no modules or lessons here, and no marks: the reviewer returns developmental feedback either way.
+ * The Portfolio, rebuilt to adapt to the learning process. It is not a stack of forms: it IS the Kolb
+ * cycle. It opens on the move the candidate should make next, foregrounds only that stage's capture
+ * tool, tunes Mutale's opening question to that stage, and folds everything already captured into a
+ * growing body of work. The gateway appears only when the cycle is whole. No modules, no marks.
  */
 type Mine = {
   id: string; credential_id: string; code: string; title: string; summary: string | null;
@@ -70,9 +71,28 @@ const GIBBS = [
   { key: 'action', label: 'Action', hint: 'What will you do next, and when?' },
   { key: 'note', label: 'Quick note', hint: 'A thought to capture now and come back to.' },
 ];
-// Predictive-processing stages live alongside the Gibbs stages but are captured in their own panel.
 const EXTRA_LABELS: Record<string, string> = { prediction: 'Prediction', surprise: 'What surprised me' };
 const stageLabel = (k: string) => GIBBS.find((g) => g.key === k)?.label ?? EXTRA_LABELS[k] ?? 'Note';
+
+// The four Kolb moves that organise the portfolio, each mapped to the capture it invites and the
+// question Mutale opens with when the candidate is working that move.
+const CYCLE = [
+  { key: 'e', label: 'Experience', focus: 'Capture what you actually did', reflect: ['description'], coach: 'Walk me through what actually happened. Who was involved, and what did you decide?' },
+  { key: 'r', label: 'Reflect', focus: 'Look back on it', reflect: ['feelings', 'evaluation'], coach: 'Before it happened, what did you expect? Where did reality differ, and how did it feel?' },
+  { key: 'n', label: 'Name it', focus: 'Name the idea it points to', reflect: ['analysis', 'conclusion'], coach: 'What does this tell you about how you lead? Try to name the principle underneath it.' },
+  { key: 't', label: 'Try it', focus: 'Plan your next turn', reflect: ['action'], coach: 'Knowing this, what will you do differently the next time?' },
+] as const;
+
+/** Which Kolb stages this credential's practice has reached, from evidence + reflection stages. */
+function litStages(reflections: Reflection[], evidence: Evidence[]) {
+  const has = (s: string) => reflections.some((r) => r.stage === s);
+  return {
+    e: evidence.length > 0 || has('description'),
+    r: has('feelings') || has('evaluation') || has('note') || has('surprise'),
+    n: has('analysis') || has('conclusion'),
+    t: has('action'),
+  } as Record<string, boolean>;
+}
 
 export function PracticeCanvas() {
   const [, params] = useRoute('/practice/c/:id');
@@ -99,14 +119,20 @@ export function PracticeCanvas() {
   const submitted = cc?.status === 'submitted' || cc?.status === 'reviewed';
   const readOnly = submitted;
 
+  const lit = litStages(reflections, evidence);
+  const litCount = CYCLE.filter((s) => lit[s.key]).length;
+  const firstIncomplete = CYCLE.find((s) => !lit[s.key])?.key ?? 't';
+  // Adaptive default: the portfolio opens on the next move to make; the candidate can jump anywhere.
+  const [picked, setPicked] = useState<string | null>(null);
+  const activeStage = picked ?? firstIncomplete;
+  const stage = CYCLE.find((s) => s.key === activeStage)!;
+
   return (
     <div className="max-w-6xl mx-auto space-y-4">
       <button onClick={() => navigate('/practice')} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> My credentials</button>
 
-      {/* Connection + pending-sync status. On expensive, intermittent data, work is saved on the device
-          and uploaded automatically when back online. */}
       {(!off.online || off.pending.length > 0) && (
-        <div className={`flex items-center justify-between gap-3 rounded-lg border p-3 text-sm ${off.online ? 'border-amber-500/30 bg-amber-500/5 text-amber-800' : 'border-muted bg-muted/40 text-muted-foreground'}`}>
+        <div className={`flex items-center justify-between gap-3 border p-3 text-sm ${off.online ? 'border-amber-500/30 bg-amber-500/5 text-amber-800' : 'border-muted bg-muted/40 text-muted-foreground'}`}>
           <span className="inline-flex items-center gap-2">
             {off.online ? <Clock className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
             {off.online
@@ -114,45 +140,91 @@ export function PracticeCanvas() {
               : "You are offline. Keep working, your reflections and notes are saved on this device and will upload when you reconnect."}
           </span>
           {off.online && off.pending.length > 0 && (
-            <Button size="sm" variant="outline" disabled={off.flushing} onClick={off.flush} className="gap-1.5 shrink-0">
+            <Button size="sm" variant="outline" disabled={off.flushing} onClick={off.flush} className="gap-1.5 shrink-0 rounded-none">
               <RefreshCw className={`h-3.5 w-3.5 ${off.flushing ? 'animate-spin' : ''}`} /> {off.flushing ? 'Syncing...' : 'Sync now'}
             </Button>
           )}
         </div>
       )}
 
-      {/* Header */}
+      {/* Header: the credential and where its cycle stands */}
       <Card className="rounded-none p-5">
-        <div className="ed-overline text-muted-foreground">Practice credential</div>
-        <div className="flex items-center gap-2 flex-wrap mt-1.5">
-          <h1 className="ed-h2">{cc?.title ?? 'Credential'}</h1>
-          {cc && <Badge variant="outline" className="text-[10px] capitalize rounded-none">{cc.status.replace('_', ' ')}</Badge>}
+        <div className="flex items-start gap-4">
+          <CycleRing e={lit.e} r={lit.r} n={lit.n} t={lit.t} />
+          <div className="min-w-0 flex-1">
+            <div className="ed-overline text-muted-foreground">Practice credential</div>
+            <div className="flex items-center gap-2 flex-wrap mt-1.5">
+              <h1 className="ed-h2">{cc?.title ?? 'Credential'}</h1>
+              {cc && <Badge variant="outline" className="text-[10px] capitalize rounded-none">{cc.status.replace('_', ' ')}</Badge>}
+            </div>
+            {cc?.activity_brief && <p className="mt-2 text-sm"><span className="font-medium">Activity: </span>{cc.activity_brief}</p>}
+            <GuidanceStrip cc={cc} />
+          </div>
         </div>
-        {cc?.activity_brief && <p className="mt-2 text-sm"><span className="font-medium">Activity: </span>{cc.activity_brief}</p>}
-        <GuidanceStrip cc={cc} />
         {cc?.latest_feedback && (cc.status === 'reviewed' || cc.status === 'referred') && (
-          <div className={`mt-3 rounded-xl border p-3 text-sm ${cc.status === 'reviewed' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}`}>
+          <div className={`mt-3 border-l-2 pl-3 text-sm ${cc.status === 'reviewed' ? 'border-emerald-500' : 'border-amber-500'}`}>
             <div className="font-medium mb-1">{cc.status === 'reviewed' ? 'Recognised' : 'Referred for resubmission'} · developmental feedback</div>
             <p className="whitespace-pre-wrap text-muted-foreground">{cc.latest_feedback}</p>
           </div>
         )}
       </Card>
 
-      {/* Cognitive twin: the model Mutale holds about this candidate, shown to them plainly. This makes
-          the offloading principle visible, Mutale carries the memory and structure, never the thinking. */}
+      {/* The cognitive twin: the model Mutale holds, shown plainly. */}
       <TwinPanel me={me} cc={cc} reflections={reflections} />
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
-        {/* Left: prediction + reflection + evidence + gateway + submit */}
         <div className="space-y-4">
-          <PredictionPanel id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} />
-          <ReflectionPanel id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} />
-          <EvidencePanel id={id} evidence={evidence} readOnly={readOnly} onChange={invalidate} off={off} />
-          <GatewaySubmit cc={cc} reflections={reflections.length} evidence={evidence.length} onChange={invalidate} />
+          {/* The cycle rail: the portfolio is the cycle, and this is how you move round it. */}
+          <div>
+            <div className="ed-overline text-muted-foreground mb-2">The cycle</div>
+            <StageRail lit={lit} active={activeStage} onPick={setPicked} />
+          </div>
+
+          {/* Adaptive focus zone: only the current move's capture tools, unless submitted. */}
+          {!submitted && (
+            <div className="space-y-4">
+              <div>
+                <div className="ed-overline text-muted-foreground">{lit[stage.key] ? 'Worked, refine or add more' : 'Your focus now'}</div>
+                <h2 className="ed-h2 mt-1">{stage.focus}</h2>
+              </div>
+              {stage.key === 'e' && (
+                <>
+                  <EvidencePanel id={id} evidence={evidence} readOnly={readOnly} onChange={invalidate} off={off} showList={false} />
+                  <ReflectionPanel key="e" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['description']} showTimeline={false} heading="Describe what happened" />
+                </>
+              )}
+              {stage.key === 'r' && (
+                <>
+                  <PredictionPanel key="rp" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} showList={false} />
+                  <ReflectionPanel key="r" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['feelings', 'evaluation']} showTimeline={false} heading="Look back on it" />
+                </>
+              )}
+              {stage.key === 'n' && (
+                <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" />
+              )}
+              {stage.key === 't' && (
+                <ReflectionPanel key="t" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['action']} showTimeline={false} heading="Plan your next turn" />
+              )}
+            </div>
+          )}
+
+          {/* The growing body of work: everything captured, read-only, always here. */}
+          <BodyOfWork reflections={reflections} evidence={evidence} />
+
+          {/* The gateway opens only when the cycle is whole. */}
+          {!submitted && (litCount >= 4
+            ? <GatewaySubmit cc={cc} reflections={reflections.length} evidence={evidence.length} onChange={invalidate} />
+            : (
+              <Card className="rounded-none p-5 flex items-center gap-3 text-sm text-muted-foreground">
+                <Lock className="h-4 w-4 shrink-0" />
+                Work all four moves of the cycle to open the gateway. {4 - litCount} to go.
+              </Card>
+            ))}
+          {submitted && <GatewaySubmit cc={cc} reflections={reflections.length} evidence={evidence.length} onChange={invalidate} />}
         </div>
 
-        {/* Right: Socratic coach */}
-        <CoachPanel cc={cc} />
+        {/* Mutale, contextual to the current move */}
+        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} />
       </div>
     </div>
   );
@@ -171,40 +243,99 @@ function GuidanceStrip({ cc }: { cc: any }) {
       <div className="flex flex-wrap gap-2">
         {items.map((i) => (
           <button key={i.k} onClick={() => setOpen(open === i.k ? null : i.k)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${open === i.k ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted/40'}`}>
+            className={`inline-flex items-center gap-1.5 border px-3 py-1 text-xs ${open === i.k ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted/40'}`}>
             <i.icon className="h-3.5 w-3.5" /> {i.label}
           </button>
         ))}
       </div>
       {items.filter((i) => i.k === open).map((i) => (
-        <p key={i.k} className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground whitespace-pre-wrap">{i.body}</p>
+        <p key={i.k} className="bg-muted/40 p-3 text-xs text-muted-foreground whitespace-pre-wrap">{i.body}</p>
       ))}
     </div>
   );
 }
 
-// The eight reflective "moves" a candidate can collect: the six Gibbs stages plus the two
-// predictive-processing moves. Working all eight = a full reflective range.
-const MOVES = [
-  { key: 'description', label: 'What happened', hint: 'Describe the situation plainly: who, what, when.' },
-  { key: 'feelings', label: 'Feelings', hint: 'Name how you felt, and how others felt or likely felt.' },
-  { key: 'evaluation', label: 'Evaluation', hint: 'What was good or bad about how it went?' },
-  { key: 'analysis', label: 'Analysis', hint: 'Why did it unfold that way? Bring in an idea where your decision needs it.' },
-  { key: 'conclusion', label: 'Conclusion', hint: 'What is the lesson? What would you do differently?' },
-  { key: 'action', label: 'Action', hint: 'What will you do next, and when?' },
-  { key: 'prediction', label: 'Prediction', hint: 'What did you expect to happen beforehand?' },
-  { key: 'surprise', label: 'Surprise', hint: 'Where did reality differ from your prediction?' },
-];
-
-function ReflectiveRing({ earned, total }: { earned: number; total: number }) {
-  const r = 20, c = 2 * Math.PI * r, pct = total ? earned / total : 0;
+function StageRail({ lit, active, onPick }: { lit: Record<string, boolean>; active: string; onPick: (k: string) => void }) {
   return (
-    <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0" aria-hidden="true">
-      <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted-foreground/25" />
-      <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" strokeLinecap="round" transform="rotate(-90 24 24)"
-        className="stroke-primary" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} style={{ transition: 'stroke-dashoffset .6s ease' }} />
-      <text x="24" y="28" textAnchor="middle" className="fill-foreground" style={{ fontSize: 13, fontWeight: 600 }}>{earned}</text>
-    </svg>
+    <div className="grid grid-cols-4 border border-foreground/15">
+      {CYCLE.map((s, i) => {
+        const on = lit[s.key]; const cur = active === s.key;
+        return (
+          <button key={s.key} onClick={() => onPick(s.key)} aria-current={cur}
+            className={`px-3 py-3 text-left border-foreground/15 transition-colors ${i > 0 ? 'border-l' : ''} ${cur ? 'bg-foreground text-background' : 'hover:bg-muted/40'}`}>
+            <div className={`ed-overline inline-flex items-center gap-1.5 ${cur ? 'opacity-80' : on ? 'text-primary' : 'text-muted-foreground'}`}>
+              {on ? <Check className="h-3 w-3" /> : <span className="inline-block h-1.5 w-1.5 rounded-full bg-current opacity-50" />}
+              {String(i + 1).padStart(2, '0')}
+            </div>
+            <div className={`text-xs font-medium mt-1 ${cur || on ? '' : 'text-muted-foreground'}`}>{s.label}</div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The read-only portfolio: everything captured so far, folded into one calm view. */
+function BodyOfWork({ reflections, evidence }: { reflections: Reflection[]; evidence: Evidence[] }) {
+  const predictions = reflections.filter((r) => r.stage === 'prediction');
+  const surprises = reflections.filter((r) => r.stage === 'surprise');
+  const timeline = reflections.filter((r) => r.stage !== 'prediction' && r.stage !== 'surprise');
+  const pairCount = Math.max(predictions.length, surprises.length);
+  if (!reflections.length && !evidence.length) return null;
+  return (
+    <Card className="rounded-none p-5 space-y-4">
+      <div className="ed-overline text-foreground">Your body of work so far</div>
+
+      {pairCount > 0 && (
+        <div className="space-y-2">
+          <div className="ed-overline text-muted-foreground inline-flex items-center gap-1.5"><Target className="h-3 w-3" /> Predictions and surprises</div>
+          <ol className="space-y-2">
+            {Array.from({ length: pairCount }).map((_, i) => {
+              const p = predictions[i]; const s = surprises[i];
+              return (
+                <li key={i} className="border border-border">
+                  {p && <div className="p-2.5 border-b border-border"><div className="text-[11px] uppercase tracking-wide text-muted-foreground">You expected</div><p className="text-sm whitespace-pre-wrap">{p.content}</p></div>}
+                  {s && <div className="p-2.5 bg-amber-500/5"><div className="text-[11px] uppercase tracking-wide text-amber-700">What happened</div><p className="text-sm whitespace-pre-wrap">{s.content}</p></div>}
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      )}
+
+      {timeline.length > 0 && (
+        <div className="space-y-2">
+          <div className="ed-overline text-muted-foreground inline-flex items-center gap-1.5"><Lightbulb className="h-3 w-3" /> Reflection</div>
+          <ol className="space-y-2 border-l-2 border-border pl-4">
+            {timeline.map((r) => (
+              <li key={r.id} className="relative">
+                <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-primary/60" />
+                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{stageLabel(r.stage)} · {new Date(r.created_at).toLocaleDateString()}</div>
+                <p className="text-sm whitespace-pre-wrap">{r.content}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {evidence.length > 0 && (
+        <div className="space-y-2">
+          <div className="ed-overline text-muted-foreground inline-flex items-center gap-1.5"><Paperclip className="h-3 w-3" /> Evidence</div>
+          <ul className="space-y-2">
+            {evidence.map((e) => (
+              <li key={e.id} className="border border-border bg-muted/20 p-2.5">
+                <div className="text-sm font-medium flex items-center gap-1.5">
+                  {e.kind === 'link' ? <Link2 className="h-3.5 w-3.5 text-blue-600" /> : e.kind === 'file' ? <Download className="h-3.5 w-3.5 text-emerald-600" /> : <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />}
+                  {e.kind === 'file' && e.url ? <a href={e.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">{e.title || 'File'}</a> : (e.title || (e.kind === 'link' ? 'Link' : 'Note'))}
+                </div>
+                {e.body && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{e.body}</p>}
+                {e.url && e.kind !== 'file' && <a href={e.url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline break-all">{e.url}</a>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -225,11 +356,11 @@ function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; ref
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
-        <div className="rounded-xl border border-border p-3">
+        <div className="border border-border p-3">
           <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Your prior practice, in your words</div>
           <p className="text-sm mt-1 whitespace-pre-wrap">{cc.justification?.trim() || 'Not captured yet. Tell Mutale why this credential fits your real work.'}</p>
         </div>
-        <div className="rounded-xl border border-border p-3 flex items-center gap-3">
+        <div className="border border-border p-3 flex items-center gap-3">
           <ReflectiveRing earned={earned} total={MOVES.length} />
           <div className="min-w-0">
             <div className="text-sm font-medium">Reflective range</div>
@@ -245,7 +376,7 @@ function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; ref
             return (
               <button key={m.key} type="button" onClick={() => setOpenHint(active ? null : m.key)}
                 aria-pressed={active}
-                className={`group relative text-left rounded-xl border p-2.5 transition-all duration-200 hover:-translate-y-0.5 ${got ? 'border-primary/40 bg-primary/5 hover:bg-primary/10' : 'border-dashed border-border hover:border-primary/30'} ${active ? 'ring-2 ring-primary/40' : ''}`}>
+                className={`group relative text-left border p-2.5 transition-all duration-200 hover:-translate-y-0.5 ${got ? 'border-primary/40 bg-primary/5 hover:bg-primary/10' : 'border-dashed border-border hover:border-primary/30'} ${active ? 'ring-2 ring-primary/40' : ''}`}>
                 <div className="flex items-center gap-2 pr-5">
                   <span className={`flex h-5 w-5 items-center justify-center rounded-full transition-colors ${got ? 'bg-primary text-primary-foreground' : 'border border-border text-transparent'}`}>
                     <Check className="h-3 w-3" />
@@ -259,14 +390,14 @@ function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; ref
         </div>
 
         {openHint && (
-          <p className="rounded-lg bg-muted/40 p-2.5 text-xs text-muted-foreground">
+          <p className="bg-muted/40 p-2.5 text-xs text-muted-foreground">
             {MOVES.find((m) => m.key === openHint)?.hint}{' '}
             <span className="text-foreground/70">{counts[openHint] ? `You have worked this ${counts[openHint]} time${counts[openHint] === 1 ? '' : 's'}.` : 'Not yet in your portfolio, try it next.'}</span>
           </p>
         )}
 
         {complete && (
-          <div className="flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-2.5 text-xs font-medium text-primary">
+          <div className="flex items-center gap-2 border border-primary/30 bg-primary/5 p-2.5 text-xs font-medium text-primary">
             <Trophy className="h-4 w-4" /> Full reflective range: you have worked every move of the cycle.
           </div>
         )}
@@ -277,7 +408,30 @@ function TwinPanel({ me, cc, reflections }: { me: any; cc: Mine | undefined; ref
   );
 }
 
-function PredictionPanel({ id, reflections, readOnly, onChange }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void }) {
+const MOVES = [
+  { key: 'description', label: 'What happened', hint: 'Describe the situation plainly: who, what, when.' },
+  { key: 'feelings', label: 'Feelings', hint: 'Name how you felt, and how others felt or likely felt.' },
+  { key: 'evaluation', label: 'Evaluation', hint: 'What was good or bad about how it went?' },
+  { key: 'analysis', label: 'Analysis', hint: 'Why did it unfold that way? Bring in an idea where your decision needs it.' },
+  { key: 'conclusion', label: 'Conclusion', hint: 'What is the lesson? What would you do differently?' },
+  { key: 'action', label: 'Action', hint: 'What will you do next, and when?' },
+  { key: 'prediction', label: 'Prediction', hint: 'What did you expect to happen beforehand?' },
+  { key: 'surprise', label: 'Surprise', hint: 'Where did reality differ from your prediction?' },
+];
+
+function ReflectiveRing({ earned, total }: { earned: number; total: number }) {
+  const r = 20, c = 2 * Math.PI * r, pct = total ? earned / total : 0;
+  return (
+    <svg viewBox="0 0 48 48" className="h-12 w-12 shrink-0" aria-hidden="true">
+      <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" className="stroke-muted-foreground/25" />
+      <circle cx="24" cy="24" r={r} fill="none" strokeWidth="4" strokeLinecap="round" transform="rotate(-90 24 24)"
+        className="stroke-primary" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} style={{ transition: 'stroke-dashoffset .6s ease' }} />
+      <text x="24" y="28" textAnchor="middle" className="fill-foreground ed-num" style={{ fontSize: 13, fontWeight: 600 }}>{earned}</text>
+    </svg>
+  );
+}
+
+function PredictionPanel({ id, reflections, readOnly, onChange, showList = true }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; showList?: boolean }) {
   const predictions = reflections.filter((r) => r.stage === 'prediction');
   const surprises = reflections.filter((r) => r.stage === 'surprise');
   const pairCount = Math.max(predictions.length, surprises.length);
@@ -299,12 +453,12 @@ function PredictionPanel({ id, reflections, readOnly, onChange }: { id: string; 
     <Card className="rounded-none p-5 space-y-3">
       <div className="flex items-center gap-2 ed-overline text-foreground"><Target className="h-4 w-4 text-primary" /> Prediction and surprise</div>
       <p className="text-xs text-muted-foreground">Name what you expected before it happened, then what actually happened. The gap between them, the surprise, is where the learning is. This is predictive processing: a broken prediction teaches you the most.</p>
-      {pairCount > 0 && (
+      {showList && pairCount > 0 && (
         <ol className="space-y-3">
           {Array.from({ length: pairCount }).map((_, i) => {
             const p = predictions[i]; const s = surprises[i];
             return (
-              <li key={i} className="rounded-xl border border-border overflow-hidden">
+              <li key={i} className="border border-border overflow-hidden">
                 {p && (
                   <div className="p-3 border-b border-border">
                     <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1"><Target className="h-3 w-3" /> You expected</div>
@@ -324,17 +478,17 @@ function PredictionPanel({ id, reflections, readOnly, onChange }: { id: string; 
         </ol>
       )}
       {!readOnly && (
-        <div className="space-y-2 rounded-xl border border-border p-3">
+        <div className="space-y-2 border border-border p-3">
           <div>
             <label className="text-xs font-medium">Before it happened, I expected...</label>
-            <textarea value={expected} onChange={(e) => setExpected(e.target.value)} rows={2} placeholder="What did you think would happen?" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            <textarea value={expected} onChange={(e) => setExpected(e.target.value)} rows={2} placeholder="What did you think would happen?" className="mt-1 w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           </div>
           <div>
             <label className="text-xs font-medium">What actually happened, what surprised me...</label>
-            <textarea value={actual} onChange={(e) => setActual(e.target.value)} rows={2} placeholder="Where did reality differ from your prediction?" className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            <textarea value={actual} onChange={(e) => setActual(e.target.value)} rows={2} placeholder="Where did reality differ from your prediction?" className="mt-1 w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           </div>
           <div className="flex justify-end">
-            <Button size="sm" disabled={busy || (!expected.trim() && !actual.trim())} onClick={save} className="gap-1.5"><Plus className="h-4 w-4" /> Log prediction</Button>
+            <Button size="sm" disabled={busy || (!expected.trim() && !actual.trim())} onClick={save} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Log prediction</Button>
           </div>
         </div>
       )}
@@ -342,15 +496,15 @@ function PredictionPanel({ id, reflections, readOnly, onChange }: { id: string; 
   );
 }
 
-function ReflectionPanel({ id, reflections, readOnly, onChange, off }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline> }) {
-  const draftKey = `refl_${id}`;
-  const [stage, setStage] = useState('note');
+function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection' }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string }) {
+  const draftKey = `refl_${id}_${focusStages ? focusStages.join('-') : 'all'}`;
+  const stagesToShow = focusStages ? GIBBS.filter((g) => focusStages.includes(g.key)) : GIBBS;
+  const [stage, setStage] = useState(focusStages ? focusStages[0] : 'note');
   const [content, setContent] = useState(() => loadDraft(draftKey));
   const [busy, setBusy] = useState(false);
   useEffect(() => { saveDraft(draftKey, content); }, [content, draftKey]);
   const endpoint = `/practice/me/credentials/${id}/reflections`;
   const pendingReflections = off.pending.filter((p) => p.kind === 'reflection');
-  // Prediction and surprise entries have their own panel above; keep them out of the Gibbs timeline.
   const timeline = reflections.filter((r) => r.stage !== 'prediction' && r.stage !== 'surprise');
 
   const submitReflection = async () => {
@@ -369,10 +523,10 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off }: { id: str
 
   return (
     <Card className="rounded-none p-5 space-y-3">
-      <div className="flex items-center gap-2 ed-overline text-foreground"><Lightbulb className="h-4 w-4 text-primary" /> Reflection</div>
-      <p className="text-xs text-muted-foreground">Reflection happens over time and in bits. Capture a thought whenever it comes, and work the stages as you go. Learning becomes visible here.</p>
+      <div className="flex items-center gap-2 ed-overline text-foreground"><Lightbulb className="h-4 w-4 text-primary" /> {heading}</div>
+      {!focusStages && <p className="text-xs text-muted-foreground">Reflection happens over time and in bits. Capture a thought whenever it comes, and work the stages as you go. Learning becomes visible here.</p>}
 
-      {(timeline.length > 0 || pendingReflections.length > 0) && (
+      {showTimeline && (timeline.length > 0 || pendingReflections.length > 0) && (
         <ol className="space-y-2 border-l-2 border-border pl-4">
           {timeline.map((r) => (
             <li key={r.id} className="relative">
@@ -392,18 +546,20 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off }: { id: str
       )}
 
       {!readOnly && (
-        <div className="space-y-2 rounded-xl border border-border p-3">
-          <div className="flex flex-wrap gap-1.5">
-            {GIBBS.map((g) => (
-              <button key={g.key} onClick={() => setStage(g.key)}
-                className={`rounded-full px-2.5 py-1 text-xs ${stage === g.key ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'}`}>{g.label}</button>
-            ))}
-          </div>
+        <div className="space-y-2 border border-border p-3">
+          {stagesToShow.length > 1 && (
+            <div className="flex flex-wrap gap-1.5">
+              {stagesToShow.map((g) => (
+                <button key={g.key} onClick={() => setStage(g.key)}
+                  className={`px-2.5 py-1 text-xs ${stage === g.key ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/70'}`}>{g.label}</button>
+              ))}
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">{GIBBS.find((g) => g.key === stage)?.hint}</p>
           <textarea value={content} onChange={(e) => setContent(e.target.value)} rows={3} placeholder="Write your reflection..."
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+            className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           <div className="flex justify-end">
-            <Button size="sm" disabled={!content.trim() || busy} onClick={submitReflection} className="gap-1.5"><Plus className="h-4 w-4" /> Add to reflection</Button>
+            <Button size="sm" disabled={!content.trim() || busy} onClick={submitReflection} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Add to reflection</Button>
           </div>
         </div>
       )}
@@ -411,7 +567,7 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off }: { id: str
   );
 }
 
-function EvidencePanel({ id, evidence, readOnly, onChange, off }: { id: string; evidence: Evidence[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline> }) {
+function EvidencePanel({ id, evidence, readOnly, onChange, off, showList = true }: { id: string; evidence: Evidence[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; showList?: boolean }) {
   const [kind, setKind] = useState<'text' | 'link' | 'file'>('text');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -423,7 +579,6 @@ function EvidencePanel({ id, evidence, readOnly, onChange, off }: { id: string; 
   const endpoint = `/practice/me/credentials/${id}/evidence`;
   const pendingEvidence = off.pending.filter((p) => p.kind === 'evidence');
 
-  // Notes and links can be captured offline and uploaded on reconnect. Files need a connection.
   const submitEvidence = async () => {
     const payload = { kind, title: title.trim() || null, body: kind === 'text' ? body.trim() : null, url: kind === 'link' ? url.trim() : null };
     const display = title.trim() || (kind === 'link' ? url.trim() : body.trim());
@@ -457,10 +612,10 @@ function EvidencePanel({ id, evidence, readOnly, onChange, off }: { id: string; 
       <div className="flex items-center gap-2 ed-overline text-foreground"><Paperclip className="h-4 w-4 text-primary" /> Evidence</div>
       <p className="text-xs text-muted-foreground">Show what you actually did: a note, a link, or a file (a document, a photo of your work, a voice note). Different experiences produce different, valid evidence.</p>
 
-      {evidence.length > 0 && (
+      {showList && evidence.length > 0 && (
         <ul className="space-y-2">
           {evidence.map((e) => (
-            <li key={e.id} className="flex items-start justify-between gap-2 rounded-lg border border-border bg-muted/20 p-2.5">
+            <li key={e.id} className="flex items-start justify-between gap-2 border border-border bg-muted/20 p-2.5">
               <div className="min-w-0">
                 <div className="text-sm font-medium flex items-center gap-1.5">
                   {e.kind === 'link' ? <Link2 className="h-3.5 w-3.5 text-blue-600" /> : e.kind === 'file' ? <Download className="h-3.5 w-3.5 text-emerald-600" /> : <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -480,7 +635,7 @@ function EvidencePanel({ id, evidence, readOnly, onChange, off }: { id: string; 
       {pendingEvidence.length > 0 && (
         <ul className="space-y-2">
           {pendingEvidence.map((p) => (
-            <li key={p.id} className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 opacity-80">
+            <li key={p.id} className="flex items-start gap-2 border border-amber-500/30 bg-amber-500/5 p-2.5 opacity-80">
               <Clock className="h-3.5 w-3.5 text-amber-600 mt-0.5 shrink-0" />
               <div className="min-w-0">
                 <div className="text-sm font-medium">{p.payload.title || (p.payload.kind === 'link' ? 'Link' : 'Note')} <span className="text-[11px] font-normal text-amber-700">· saved on device</span></div>
@@ -493,19 +648,19 @@ function EvidencePanel({ id, evidence, readOnly, onChange, off }: { id: string; 
       )}
 
       {!readOnly && (
-        <div className="space-y-2 rounded-xl border border-border p-3">
+        <div className="space-y-2 border border-border p-3">
           <div className="flex gap-1.5">
-            <button onClick={() => setKind('text')} className={`rounded-full px-2.5 py-1 text-xs ${kind === 'text' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>Note</button>
-            <button onClick={() => setKind('link')} className={`rounded-full px-2.5 py-1 text-xs ${kind === 'link' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>Link</button>
-            <button onClick={() => setKind('file')} className={`rounded-full px-2.5 py-1 text-xs ${kind === 'file' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>File</button>
+            <button onClick={() => setKind('text')} className={`px-2.5 py-1 text-xs ${kind === 'text' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>Note</button>
+            <button onClick={() => setKind('link')} className={`px-2.5 py-1 text-xs ${kind === 'link' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>Link</button>
+            <button onClick={() => setKind('file')} className={`px-2.5 py-1 text-xs ${kind === 'file' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>File</button>
           </div>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-          {kind === 'text' && <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="Describe the evidence..." className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />}
-          {kind === 'link' && <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />}
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+          {kind === 'text' && <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="Describe the evidence..." className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />}
+          {kind === 'link' && <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />}
           {kind === 'file' && (
             <div>
               <input ref={fileRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
-              <Button size="sm" variant="outline" className="gap-1.5" disabled={uploading} onClick={() => fileRef.current?.click()}>
+              <Button size="sm" variant="outline" className="gap-1.5 rounded-none" disabled={uploading} onClick={() => fileRef.current?.click()}>
                 {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} {uploading ? 'Uploading...' : 'Choose a file'}
               </Button>
               {err && <p className="text-xs text-rose-600 mt-1.5">{err}</p>}
@@ -513,7 +668,7 @@ function EvidencePanel({ id, evidence, readOnly, onChange, off }: { id: string; 
           )}
           {kind !== 'file' && (
             <div className="flex justify-end">
-              <Button size="sm" disabled={busy || (kind === 'text' ? !body.trim() : !url.trim())} onClick={submitEvidence} className="gap-1.5"><Plus className="h-4 w-4" /> Add evidence</Button>
+              <Button size="sm" disabled={busy || (kind === 'text' ? !body.trim() : !url.trim())} onClick={submitEvidence} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Add evidence</Button>
             </div>
           )}
         </div>
@@ -548,25 +703,25 @@ function GatewaySubmit({ cc, reflections, evidence, onChange }: { cc: Mine | und
       <p className="text-xs text-muted-foreground">Before you submit, check your portfolio against the three gateways a reviewer uses. There is no pass or fail: your portfolio is either recognised or referred for resubmission, and both come with developmental feedback.</p>
       <div className="space-y-2">
         {checks.map((c) => (
-          <label key={c.key} className={`flex items-start gap-2.5 rounded-lg border p-2.5 text-sm ${submitted ? 'opacity-70' : 'cursor-pointer hover:bg-muted/30'}`}>
+          <label key={c.key} className={`flex items-start gap-2.5 border p-2.5 text-sm ${submitted ? 'opacity-70' : 'cursor-pointer hover:bg-muted/30'}`}>
             <input type="checkbox" checked={c.on} disabled={submitted} onChange={(e) => patch.mutate({ [c.field]: e.target.checked })} className="mt-0.5 h-4 w-4" />
             <span>{c.label}</span>
           </label>
         ))}
       </div>
       {submitted ? (
-        <div className="rounded-lg bg-blue-500/10 p-3 text-sm text-blue-700 inline-flex items-center gap-2"><Lock className="h-4 w-4" /> Submitted for independent review.</div>
+        <div className="bg-blue-500/10 p-3 text-sm text-blue-700 inline-flex items-center gap-2"><Lock className="h-4 w-4" /> Submitted for independent review.</div>
       ) : (
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">{ready ? 'Ready to submit.' : 'Add at least one reflection and one piece of evidence, and check all three gateways.'}</span>
-          <Button size="sm" disabled={!ready || submit.isPending} onClick={() => submit.mutate()} className="gap-1.5 shrink-0"><Send className="h-4 w-4" /> Submit for review</Button>
+          <Button size="sm" disabled={!ready || submit.isPending} onClick={() => submit.mutate()} className="gap-1.5 shrink-0 rounded-none"><Send className="h-4 w-4" /> Submit for review</Button>
         </div>
       )}
     </Card>
   );
 }
 
-function CoachPanel({ cc }: { cc: Mine | undefined }) {
+function CoachPanel({ cc, stageHint }: { cc: Mine | undefined; stageHint?: string }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -588,27 +743,29 @@ function CoachPanel({ cc }: { cc: Mine | undefined }) {
   return (
     <Card className="rounded-none p-0 flex flex-col overflow-hidden lg:sticky lg:top-4 h-[70vh]">
       <div className="border-b border-border p-3">
-        <div className="text-sm font-semibold">Mutale · your thinking partner</div>
-        <p className="text-xs text-muted-foreground">A Socratic coach. Mutale asks, you think. Turn your experience into articulated learning.</p>
+        <div className="ed-overline text-foreground">Mutale · your thinking partner</div>
+        <p className="text-xs text-muted-foreground mt-1">A Socratic coach. Mutale asks, you think. Turn your experience into articulated learning.</p>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
-          <div className="text-sm text-muted-foreground">
-            <p>Start with a real moment. For example: <em>"Two people declined to join the team I was forming, and I'm not sure what to do."</em></p>
+          <div className="text-sm text-muted-foreground space-y-2">
+            {stageHint
+              ? <p><span className="font-medium text-foreground">For this move, Mutale asks:</span> <em>"{stageHint}"</em></p>
+              : <p>Start with a real moment. For example: <em>"Two people declined to join the team I was forming, and I'm not sure what to do."</em></p>}
           </div>
         )}
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
-            <span className={`inline-block max-w-[90%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{m.content}</span>
+            <span className={`inline-block max-w-[90%] px-3 py-2 text-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{m.content}</span>
           </div>
         ))}
         {loading && <div className="text-muted-foreground text-sm inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Mutale is thinking...</div>}
       </div>
       <div className="border-t border-border p-2 flex items-end gap-2">
-        <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder="Tell Mutale what happened..."
+        <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={stageHint ? 'Answer Mutale, or tell it what happened...' : 'Tell Mutale what happened...'}
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
-          className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm" />
-        <Button size="sm" disabled={!input.trim() || loading} onClick={() => send(input)}><Send className="h-4 w-4" /></Button>
+          className="flex-1 resize-none rounded-none border border-input bg-background px-3 py-2 text-sm" />
+        <Button size="sm" disabled={!input.trim() || loading} onClick={() => send(input)} className="rounded-none"><Send className="h-4 w-4" /></Button>
       </div>
     </Card>
   );

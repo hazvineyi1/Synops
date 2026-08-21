@@ -254,37 +254,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           ],
         }];
       }
-      // Case studies and Activities are reached by learners inside their modules (assigned
-      // as part of the module experience), so they are intentionally NOT top-level nav for
-      // learners. Staff still get them as authoring surfaces in their own nav blocks.
+      // Practice-first build: the candidate's whole world is their credentials, and each credential's
+      // canvas IS their portfolio. Everything from the old LMS learner nav (the course tutor hub,
+      // attendance/sessions, the separate LMS credentials and portfolio pages) is not part of this
+      // build and is removed, so nothing here reaches a page that talks about courses or grades.
+      // Mutale, the reflection coach, is not a nav item: it lives inside each credential where the
+      // thinking happens. K-12 learners use their own slimmed nav above.
       return [{
         items: [
-          { label: t('nav.today'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.practice', 'My Credentials'), href: '/practice', icon: Compass },
-          // Practice-credential candidates are not taking courses and are never graded (a human
-          // reviewer decides reviewed or resubmit), so "My courses" and "My grades" are intentionally
-          // removed from the learner nav. Staff keep course authoring in their own nav blocks.
-          // K-12 has no AI tutor / case studies; older K-12 learners skip the Coach hub too.
-          ...(personaByEmail(user?.email) ? [] : [{ label: t('nav.coach', 'Coach'), href: '/coach-hub', icon: GraduationCap }]),
-          { label: t('nav.jotter', 'Jotter'), href: '/jotter', icon: NotebookPen },
-          { label: t('nav.mySessions', 'My sessions'), href: '/my-attendance', icon: CalendarDays },
-          { label: t('nav.credentials'), href: '/credentials', icon: Award },
-          { label: t('nav.portfolio', 'Portfolio'), href: '/portfolio', icon: Briefcase },
         ],
       }];
     }
 
     if (role === 'coach') {
+      // MRB reviewer: their job is the review queue. The old LMS coaching surfaces (gradebook,
+      // submissions, sessions, case studies, activities) are not part of this build and are removed.
       return [{
         items: [
-          { label: t('nav.overview'), href: '/dashboard', icon: LayoutDashboard },
           { label: t('nav.reviewQueue', 'Review queue'), href: '/practice/review', icon: ClipboardCheck },
           { label: t('nav.learners'), href: '/coach', icon: Users },
-          { label: t('nav.submissions'), href: '/coach/submissions', icon: FileText },
-          { label: t('nav.gradebook', 'Gradebook'), href: '/gradebook', icon: ClipboardList },
-          { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
-          { label: t('nav.cases', 'Case studies'), href: '/cases', icon: Layers },
-          { label: t('nav.activities', 'Activities'), href: '/activities', icon: Activity },
         ],
       }];
     }

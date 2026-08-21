@@ -140,9 +140,11 @@ function partnerSlugForHost(): string | null {
 const DEMO_HOST = 'demo.synops-consulting.com';
 
 function HomeRedirect() {
-  const { isSignedIn, loading } = useSession();
+  const { user, isSignedIn, loading } = useSession();
   if (loading) return <SessionGate />;
-  if (isSignedIn) return <Redirect to="/dashboard" />;
+  // Practice-first build: a candidate's home is their credentials, not the LMS dashboard, so they
+  // never land on a page that talks about courses, modules or grades.
+  if (isSignedIn) return <Redirect to={user?.role === 'learner' ? '/practice' : '/dashboard'} />;
   // The public demo host shows the Synops Demo landing at its root, so the link we send is clean.
   if (typeof window !== 'undefined' && window.location.hostname === DEMO_HOST) return <DemoLanding />;
   const partnerSlug = partnerSlugForHost();
