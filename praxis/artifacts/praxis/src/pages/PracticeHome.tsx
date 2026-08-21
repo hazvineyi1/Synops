@@ -122,8 +122,8 @@ function LongitudinalTwin() {
 function Orientation({ name, programName, isEducator, hasCredentials, onStart }: { name?: string; programName: string; isEducator: boolean; hasCredentials: boolean; onStart: () => void }) {
   const [open, setOpen] = useState(!hasCredentials || isEducator);
   const goal = isEducator
-    ? 'Your goal here is to earn practice credentials by trying real things with your own students and reflecting on what happens. There are no courses to sit through and nothing is graded. An experienced educator reviews your work and recognises it, or sends it back with helpful feedback, and you receive a credential you can share and verify.'
-    : 'Your goal here is to earn practice credentials from your real leadership work. There are no courses and nothing is graded. An independent reviewer recognises your portfolio or refers it back with developmental feedback, and you receive a verifiable credential.';
+    ? 'Your goal is to earn your first credential: recognition that you can genuinely do one thing in your teaching. You earn it by trying one real thing with your students, reflecting on what happened with your coach, and adding a little evidence. No courses, no grades.'
+    : 'Your goal is to earn your first credential: recognition of one real thing you can do as a leader. You earn it by using something real from your work, reflecting on it with your coach, and adding evidence. No courses, no grades.';
   const steps: [string, string][] = isEducator ? [
     ['Choose a focus', 'Pick a credential below that fits something you already do, or want to try, with your students.'],
     ['Do something real', 'Try it in your own classroom. It does not have to be new, use something from this term.'],
@@ -161,10 +161,14 @@ function Orientation({ name, programName, isEducator, hasCredentials, onStart }:
         <div><span className="font-medium text-foreground">Guided and Pro</span> (top right) change how much help you see: Guided explains each step, Pro is a denser view once you know your way around.</div>
       </div>
       {!hasCredentials && (
-        <button onClick={onStart} className="group inline-flex items-center gap-2 ed-overline text-foreground underline ed-underline">
-          {isEducator ? 'Start here: choose your first focus' : 'Start here: choose your first credential'}
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-        </button>
+        <div className="pt-1">
+          <div className="ed-overline text-muted-foreground mb-2">Your first step</div>
+          <Button onClick={onStart} className="rounded-none gap-2">
+            Choose your first credential
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+          <p className="text-xs text-muted-foreground mt-2">Pick one that fits something you {isEducator ? 'already do with your students' : 'already do in your work'}. You can change your mind later.</p>
+        </div>
       )}
     </EditorialCard>
   );
