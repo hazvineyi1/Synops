@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useGetMe } from '@workspace/api-client-react';
 import { apiFetch } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,6 +82,7 @@ function CycleWheel({ e, r, n, t }: { e: boolean; r: boolean; n: boolean; t: boo
 export function PracticeHome() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
+  const { data: me } = useGetMe();
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const { data: catalogue = [] } = useQuery({ queryKey: ['practice-credentials'], queryFn: () => apiFetch<Credential[]>('/practice/credentials') });
 
@@ -112,7 +114,7 @@ export function PracticeHome() {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Compass className="h-5 w-5 text-primary" />
-            <h1 className="text-2xl font-serif font-bold tracking-tight">My practice</h1>
+            <h1 className="text-2xl font-serif font-bold tracking-tight">{me?.firstName ? `${me.firstName}'s practice` : 'My practice'}</h1>
           </div>
           <Button className="gap-1.5" onClick={() => setPicking((p) => !p)}><Plus className="h-4 w-4" /> Choose a credential</Button>
         </div>

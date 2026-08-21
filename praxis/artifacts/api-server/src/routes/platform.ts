@@ -1421,16 +1421,62 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
           gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, sort = EXCLUDED.sort`);
     }
 
-    // Pre-select the first two credentials for the demo candidate so the demo opens populated.
+    // Build a realistic, walkthrough-ready portfolio for the demo candidate (persona: Chanda Mulenga),
+    // so /demos/mrb shows the whole journey live: Ethical Leadership just started, Team Formation
+    // mid-cycle (reflections + evidence, wheel ~3/4), Servant Leadership already recognised.
     const dl = await db.execute(sql`SELECT id FROM users WHERE email = ${ZCL_DEMO_LEARNER_EMAIL} LIMIT 1`);
     const demoId = (dl.rows?.[0] as { id?: string } | undefined)?.id;
     if (demoId) {
-      const creds = await db.execute(sql`SELECT id, sort FROM practice_credentials WHERE partner_id = ${pid} ORDER BY sort LIMIT 2`);
-      for (const row of (creds.rows ?? []) as { id: string; sort: number }[]) {
-        await db.execute(sql`
-          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status)
-          VALUES (${demoId}, ${row.id}, ${pid}, ${row.sort}, ${"Chosen because it reflects the leadership I already practise day to day."}, 'in_progress')
-          ON CONFLICT (candidate_id, credential_id) DO NOTHING`);
+      await db.execute(sql`UPDATE users SET first_name = 'Chanda', last_name = 'Mulenga' WHERE id = ${demoId}`);
+      const credId = async (code: string): Promise<{ id: string; sort: number } | null> => {
+        const r = await db.execute(sql`SELECT id, sort FROM practice_credentials WHERE partner_id = ${pid} AND code = ${code} LIMIT 1`);
+        return (r.rows?.[0] as { id: string; sort: number } | undefined) ?? null;
+      };
+
+      const eth = await credId("ETHICAL-LEADERSHIP");
+      if (eth) await db.execute(sql`
+        INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status)
+        VALUES (${demoId}, ${eth.id}, ${pid}, ${eth.sort}, ${"I want the fairness I already lead by to be recognised."}, 'chosen')
+        ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'chosen'`);
+
+      const tf = await credId("TEAM-FORMATION");
+      if (tf) {
+        const cc = await db.execute(sql`
+          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status, self_g1, self_g2)
+          VALUES (${demoId}, ${tf.id}, ${pid}, ${tf.sort}, ${"I build teams every week. I just never named it."}, 'in_progress', true, true)
+          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'in_progress', justification = EXCLUDED.justification, self_g1 = true, self_g2 = true RETURNING id`);
+        const id = (cc.rows?.[0] as { id?: string } | undefined)?.id;
+        if (id) {
+          await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${id}`);
+          await db.execute(sql`DELETE FROM evidence_items WHERE candidate_credential_id = ${id}`);
+          await db.execute(sql`INSERT INTO reflection_entries (candidate_credential_id, stage, content) VALUES
+            (${id}, 'description', 'During the measles cluster I pulled six people from different roles into one team in a day.'),
+            (${id}, 'feelings', 'When two of the nurses declined it felt like failure. Later I saw that I never told them why it mattered.'),
+            (${id}, 'analysis', 'I chose people for what each could do, not for rank. That is servant leadership, and I have done it for years.')`);
+          await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES
+            (${id}, 'text', 'Measles response duty roster', 'The roster I drew up, showing each role on the team and why they were chosen.')`);
+        }
+      }
+
+      const sv = await credId("SERVANT-LEADERSHIP");
+      if (sv) {
+        const cc = await db.execute(sql`
+          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status, self_g1, self_g2, self_g3, submitted_at, reviewed_at)
+          VALUES (${demoId}, ${sv.id}, ${pid}, ${sv.sort}, ${"I lead by listening first, and I want that recognised."}, 'reviewed', true, true, true, now() - interval '10 days', now() - interval '3 days')
+          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'reviewed', self_g1 = true, self_g2 = true, self_g3 = true RETURNING id`);
+        const id = (cc.rows?.[0] as { id?: string } | undefined)?.id;
+        if (id) {
+          await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${id}`);
+          await db.execute(sql`DELETE FROM evidence_items WHERE candidate_credential_id = ${id}`);
+          await db.execute(sql`DELETE FROM credential_reviews WHERE candidate_credential_id = ${id}`);
+          await db.execute(sql`INSERT INTO reflection_entries (candidate_credential_id, stage, content) VALUES
+            (${id}, 'description', 'A team member came to me overwhelmed. I asked what was really going on before reassigning anything.'),
+            (${id}, 'action', 'Next time I will check capacity before I draw up the roster, not after.')`);
+          await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES
+            (${id}, 'text', 'Note to a colleague', 'The note I wrote her afterward, redistributing two of her rounds.')`);
+          await db.execute(sql`INSERT INTO credential_reviews (candidate_credential_id, reviewer_id, g1, g2, g3, outcome, feedback) VALUES
+            (${id}, ${demoId}, true, true, true, 'reviewed', 'You clearly listen before you act, and the note to your colleague is strong evidence. To go deeper next time, name the moment you chose not to solve it yourself. Recognised.')`);
+        }
       }
     }
     await audit(_req, "platform.seed_mrb_practice", "partner", pid, { credentials: MRB_PRACTICE_CREDENTIALS.length });
