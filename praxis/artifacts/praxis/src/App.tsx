@@ -94,6 +94,7 @@ import { PartnerSettings } from '@/pages/partner/PartnerSettings';
 import { GradebookBrowser } from '@/pages/GradebookBrowser';
 import { PracticeHome } from '@/pages/PracticeHome';
 import { AttestPage } from '@/pages/AttestPage';
+import { VerifyPage } from '@/pages/VerifyPage';
 import { PracticeCanvas } from '@/pages/PracticeCanvas';
 import { PracticeReview } from '@/pages/PracticeReview';
 
@@ -243,6 +244,8 @@ function Routes() {
         <PublicRoute path="/join/:code" component={JoinCohort} />
         {/* A witness confirms a candidate's real-world leadership event via magic link. No login. */}
         <PublicRoute path="/attest/:token" component={AttestPage} />
+        {/* Public credential verification, the shareable proof an employer or registry can check. */}
+        <PublicRoute path="/verify/:publicId" component={VerifyPage} />
         <PublicRoute path="/p/:slug" component={PartnerLanding} />
         {/* Clean vanity path for the Enza landing page. */}
         <PublicRoute path="/enzaglobalmedia" component={() => <PartnerLanding params={{ slug: 'enza-global' }} />} />

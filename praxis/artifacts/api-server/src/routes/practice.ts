@@ -135,6 +135,21 @@ CREATE TABLE IF NOT EXISTS cert_attempts (
   outcome text NOT NULL DEFAULT 'reviewed',
   agree_count integer NOT NULL DEFAULT 0,
   created_at timestamp NOT NULL DEFAULT now());
+
+-- Issued credentials: when a portfolio is recognised, a portable, publicly verifiable record is minted.
+-- The unguessable public_id is the shareable proof; anyone can check it at the issuer's verify page.
+CREATE TABLE IF NOT EXISTS issued_credentials (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  candidate_credential_id text NOT NULL,
+  public_id text NOT NULL,
+  recipient_name text,
+  credential_title text,
+  issuer text NOT NULL DEFAULT 'Manchester Review Board',
+  g1 boolean, g2 boolean, g3 boolean,
+  revoked boolean NOT NULL DEFAULT false,
+  issued_at timestamp NOT NULL DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS issued_credentials_public_idx ON issued_credentials(public_id);
+CREATE UNIQUE INDEX IF NOT EXISTS issued_credentials_cc_idx ON issued_credentials(candidate_credential_id);
 `;
 
 /** Rows helper: db.execute over a raw/parameterised sql template returns { rows }. */
@@ -188,7 +203,8 @@ router.get("/practice/me", requireAuth, async (req, res) => {
       (SELECT count(*)::int FROM evidence_items e WHERE e.candidate_credential_id = cc.id) AS evidence_count,
       (SELECT COALESCE(json_object_agg(stage, c), '{}'::json) FROM (SELECT stage, count(*)::int c FROM reflection_entries WHERE candidate_credential_id = cc.id GROUP BY stage) s) AS stage_counts,
       (SELECT feedback FROM credential_reviews cr WHERE cr.candidate_credential_id = cc.id ORDER BY cr.created_at DESC LIMIT 1) AS latest_feedback,
-      (SELECT outcome FROM credential_reviews cr WHERE cr.candidate_credential_id = cc.id ORDER BY cr.created_at DESC LIMIT 1) AS latest_outcome
+      (SELECT outcome FROM credential_reviews cr WHERE cr.candidate_credential_id = cc.id ORDER BY cr.created_at DESC LIMIT 1) AS latest_outcome,
+      (SELECT public_id FROM issued_credentials ic WHERE ic.candidate_credential_id = cc.id AND ic.revoked = false LIMIT 1) AS credential_public_id
     FROM candidate_credentials cc
     JOIN practice_credentials pc ON pc.id = cc.credential_id
     WHERE cc.candidate_id = ${uid}
@@ -292,6 +308,36 @@ router.delete("/practice/me/attestations/:aid", requireAuth, async (req, res) =>
   if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
   await db.execute(sql`DELETE FROM attestations WHERE id = ${req.params.aid}`);
   res.json({ ok: true });
+});
+
+// PUBLIC (no auth): verify an issued credential by its shareable public id. This is the page anyone
+// (an employer, a registry) checks to confirm the credential is real and current.
+router.get("/practice/verify/:publicId", async (req, res) => {
+  const r = await rows(sql`SELECT public_id, recipient_name, credential_title, issuer, g1, g2, g3, revoked, issued_at FROM issued_credentials WHERE public_id = ${req.params.publicId} LIMIT 1`);
+  if (!r[0]) { res.status(404).json({ error: "No credential with that id." }); return; }
+  res.json(r[0]);
+});
+
+// PUBLIC (no auth): the same credential as an Open Badges style assertion, for machine verification.
+router.get("/practice/verify/:publicId/assertion", async (req, res) => {
+  const r = await rows<{ public_id: string; recipient_name: string | null; credential_title: string | null; issuer: string; revoked: boolean; issued_at: string }>(sql`SELECT public_id, recipient_name, credential_title, issuer, revoked, issued_at FROM issued_credentials WHERE public_id = ${req.params.publicId} LIMIT 1`);
+  if (!r[0]) { res.status(404).json({ error: "No credential with that id." }); return; }
+  res.json({
+    "@context": ["https://www.w3.org/ns/credentials/v2", "https://purl.imsglobal.org/spec/ob/v3p0/context.json"],
+    type: ["VerifiableCredential", "OpenBadgeCredential"],
+    issuer: { type: "Profile", name: r[0].issuer },
+    validFrom: r[0].issued_at,
+    credentialStatus: r[0].revoked ? "revoked" : "valid",
+    credentialSubject: {
+      type: "AchievementSubject",
+      name: r[0].recipient_name,
+      achievement: {
+        type: "Achievement",
+        name: r[0].credential_title,
+        criteria: { narrative: "Recognised through a reviewed practice portfolio judged against three gateways: relevant activity, personal contribution, and learning from practice." },
+      },
+    },
+  });
 });
 
 // PUBLIC (no auth): the witness opens their magic link and sees only who is asking, and for what.
@@ -497,6 +543,21 @@ router.post("/practice/portfolio/:id/review", requireAuth, async (req, res) => {
     VALUES (${req.params.id}, ${uid}, ${!!g1}, ${!!g2}, ${!!g3}, ${finalOutcome}, ${String(feedback).slice(0, 8000)})`);
   await db.execute(sql`
     UPDATE candidate_credentials SET status = ${finalOutcome}, reviewed_at = now(), updated_at = now() WHERE id = ${req.params.id}`);
+  // On recognition, mint a portable, publicly verifiable credential (once per candidate credential).
+  if (finalOutcome === "reviewed") {
+    try {
+      const info = await rows<{ first_name: string | null; last_name: string | null; title: string }>(sql`
+        SELECT u.first_name, u.last_name, pc.title FROM candidate_credentials cc
+        JOIN users u ON u.id = cc.candidate_id JOIN practice_credentials pc ON pc.id = cc.credential_id
+        WHERE cc.id = ${req.params.id} LIMIT 1`);
+      const recipient = [info[0]?.first_name, info[0]?.last_name].filter(Boolean).join(" ") || "Candidate";
+      const publicId = randomBytes(9).toString("hex");
+      await db.execute(sql`
+        INSERT INTO issued_credentials (candidate_credential_id, public_id, recipient_name, credential_title, g1, g2, g3)
+        VALUES (${req.params.id}, ${publicId}, ${recipient}, ${info[0]?.title ?? "Practice Credential"}, ${!!g1}, ${!!g2}, ${!!g3})
+        ON CONFLICT (candidate_credential_id) DO NOTHING`);
+    } catch { /* issuance is best-effort; the review itself already succeeded */ }
+  }
   res.json({ ok: true, outcome: finalOutcome });
 });
 

@@ -8,7 +8,7 @@ import { useAdaptive } from '@/lib/adaptive';
 import { nextMove, overallProgress } from '@/lib/adaptive';
 import { Overline, Rule, EditorialCard, Meter, ModeToggle, NextMoveBanner, CycleRing } from '@/components/editorial';
 import {
-  Plus, ArrowRight, Lock, CheckCircle2, MessageSquareQuote, ChevronUp, ChevronDown,
+  Plus, ArrowRight, Lock, CheckCircle2, MessageSquareQuote, ChevronUp, ChevronDown, ShieldCheck, Copy,
 } from 'lucide-react';
 
 /**
@@ -23,6 +23,7 @@ type Mine = Credential & {
   sequence_locked: boolean; reflection_count: number; evidence_count: number;
   stage_counts: Record<string, number> | null;
   latest_feedback: string | null; latest_outcome: string | null;
+  credential_public_id: string | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -47,6 +48,18 @@ function litStages(m: Mine) {
     n: (sc.analysis ?? 0) > 0 || (sc.conclusion ?? 0) > 0,
     t: (sc.action ?? 0) > 0,
   };
+}
+
+function CredentialLink({ publicId }: { publicId: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${publicId}`;
+  const copy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard blocked */ } };
+  return (
+    <div className="mt-2 flex items-center gap-3 flex-wrap">
+      <a href={url} target="_blank" rel="noreferrer" className="ed-overline text-primary underline ed-underline inline-flex items-center gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Your verified credential</a>
+      <button onClick={copy} className="ed-overline text-muted-foreground hover:text-foreground inline-flex items-center gap-1">{copied ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}{copied ? 'Copied' : 'Copy link'}</button>
+    </div>
+  );
 }
 
 function StageDots({ lit }: { lit: Record<string, boolean> }) {
@@ -186,8 +199,11 @@ export function PracticeHome() {
                       <div className="mt-4"><StageDots lit={lit} /></div>
 
                       {m.status === 'reviewed' && (
-                        <div className="mt-4 inline-flex items-center gap-1.5 border border-emerald-500/40 text-emerald-700 px-2.5 py-1 ed-overline">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Recognised
+                        <div className="mt-4">
+                          <div className="inline-flex items-center gap-1.5 border border-emerald-500/40 text-emerald-700 px-2.5 py-1 ed-overline">
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Recognised
+                          </div>
+                          {m.credential_public_id && <CredentialLink publicId={m.credential_public_id} />}
                         </div>
                       )}
 
