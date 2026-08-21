@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useGetMe } from '@workspace/api-client-react';
 import { apiFetch } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, Brain, ShieldCheck, Sparkles, Loader2,
+  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, Brain, ShieldCheck, Sparkles, Loader2, TrendingUp,
 } from 'lucide-react';
 
 /**
@@ -29,49 +30,130 @@ const name = (r: { first_name: string | null; last_name: string | null; email: s
   [r.first_name, r.last_name].filter(Boolean).join(' ') || r.email;
 const stageLabel = (k: string) => ({ description: 'What happened', feelings: 'Feelings', evaluation: 'Evaluation', analysis: 'Analysis', conclusion: 'Conclusion', action: 'Action', note: 'Note', prediction: 'Prediction', surprise: 'What surprised me' } as Record<string, string>)[k] ?? 'Note';
 
+type CalRow = { id: string; code: string; title: string; first_name: string | null; last_name: string | null; email: string; calibration_count: number };
+type Irr = { pairs: number; agreement: { g1: number; g2: number; g3: number; outcome: number }; disagreements: Array<{ id: string; title: string; name: string; primary: any; calibration: any }> };
+
 export function PracticeReview() {
   const qc = useQueryClient();
+  const { data: me } = useGetMe();
+  const isSuper = (me as any)?.role === 'super_admin';
+  const [tab, setTab] = useState<'queue' | 'calibration'>('queue');
   const [selected, setSelected] = useState<string | null>(null);
+  const [calSelected, setCalSelected] = useState<string | null>(null);
   const { data: queue = [] } = useQuery({ queryKey: ['practice-queue'], queryFn: () => apiFetch<QueueRow[]>('/practice/queue') });
+  const { data: calQueue = [] } = useQuery({ queryKey: ['practice-cal-queue'], queryFn: () => apiFetch<CalRow[]>('/practice/calibration-queue'), enabled: tab === 'calibration' });
+  const { data: irr } = useQuery({ queryKey: ['practice-irr'], queryFn: () => apiFetch<Irr>('/practice/irr'), enabled: tab === 'calibration' && isSuper });
 
   return (
     <div className="max-w-6xl mx-auto space-y-4">
       <PageHeader
-        title="Review queue"
+        title="Review"
         icon={ClipboardCheck}
-        subtitle={`${queue.length} portfolio${queue.length === 1 ? '' : 's'} waiting. You review against the three gateways and return developmental feedback. There is no pass or fail.`}
+        subtitle="Review portfolios against the three gateways, and calibrate with blind second opinions so recognition means the same thing whoever reviews it."
       />
 
-      <div className="grid lg:grid-cols-[320px_1fr] gap-4 items-start">
-        {/* Queue */}
-        <div className="space-y-2">
-          {queue.length === 0 && (
-            <Card className="rounded-none p-6 text-center text-sm text-muted-foreground border-dashed">
-              <Inbox className="mx-auto h-8 w-8 mb-2 text-muted-foreground/60" /> Your queue is empty.
-            </Card>
-          )}
-          {queue.map((q) => (
-            <button key={q.id} onClick={() => setSelected(q.id)}
-              className={`w-full text-left rounded-xl border p-3 transition-colors ${selected === q.id ? 'border-primary/50 bg-primary/5' : 'border-border hover:bg-muted/40'}`}>
-              <div className="font-medium text-sm truncate">{name(q)}</div>
-              <div className="text-xs text-muted-foreground">{q.title}</div>
-              <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
-                <span className="inline-flex items-center gap-1"><MessageSquareQuote className="h-3 w-3" />{q.reflection_count}</span>
-                <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{q.evidence_count}</span>
-                <span>{new Date(q.submitted_at).toLocaleDateString()}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Portfolio + review */}
-        <div>
-          {selected
-            ? <PortfolioReview id={selected} onDone={() => { setSelected(null); qc.invalidateQueries({ queryKey: ['practice-queue'] }); }} />
-            : <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Select a portfolio to review.</Card>}
-        </div>
+      <div className="flex gap-1 border-b border-border">
+        {([['queue', 'Review queue'], ['calibration', 'Calibration']] as ['queue' | 'calibration', string][]).map(([k, l]) => (
+          <button key={k} onClick={() => setTab(k)} className={`ed-overline px-4 py-2 border-b-2 -mb-px ${tab === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{l}</button>
+        ))}
       </div>
+
+      {tab === 'queue' && (
+        <div className="grid lg:grid-cols-[320px_1fr] gap-4 items-start">
+          <div className="space-y-2">
+            {queue.length === 0 && (
+              <Card className="rounded-none p-6 text-center text-sm text-muted-foreground border-dashed">
+                <Inbox className="mx-auto h-8 w-8 mb-2 text-muted-foreground/60" /> Your queue is empty.
+              </Card>
+            )}
+            {queue.map((q) => (
+              <button key={q.id} onClick={() => setSelected(q.id)}
+                className={`w-full text-left border p-3 transition-colors ${selected === q.id ? 'border-primary/50 bg-primary/5' : 'border-border hover:bg-muted/40'}`}>
+                <div className="font-medium text-sm truncate">{name(q)}</div>
+                <div className="text-xs text-muted-foreground">{q.title}</div>
+                <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1"><MessageSquareQuote className="h-3 w-3" />{q.reflection_count}</span>
+                  <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{q.evidence_count}</span>
+                  <span>{new Date(q.submitted_at).toLocaleDateString()}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div>
+            {selected
+              ? <PortfolioReview id={selected} onDone={() => { setSelected(null); qc.invalidateQueries({ queryKey: ['practice-queue'] }); }} />
+              : <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Select a portfolio to review.</Card>}
+          </div>
+        </div>
+      )}
+
+      {tab === 'calibration' && (
+        <div className="space-y-4">
+          {isSuper && <IrrCard irr={irr} />}
+          <div className="grid lg:grid-cols-[320px_1fr] gap-4 items-start">
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Give a blind second opinion on a portfolio someone else has already reviewed. It never changes the candidate's outcome, it measures whether reviewers agree.</p>
+              {calQueue.length === 0 && (
+                <Card className="rounded-none p-6 text-center text-sm text-muted-foreground border-dashed">
+                  <Inbox className="mx-auto h-8 w-8 mb-2 text-muted-foreground/60" /> Nothing to calibrate right now.
+                </Card>
+              )}
+              {calQueue.map((q) => (
+                <button key={q.id} onClick={() => setCalSelected(q.id)}
+                  className={`w-full text-left border p-3 transition-colors ${calSelected === q.id ? 'border-primary/50 bg-primary/5' : 'border-border hover:bg-muted/40'}`}>
+                  <div className="font-medium text-sm truncate">{name(q)}</div>
+                  <div className="text-xs text-muted-foreground">{q.title}</div>
+                  {q.calibration_count > 0 && <div className="text-[11px] text-muted-foreground mt-1">{q.calibration_count} second opinion{q.calibration_count === 1 ? '' : 's'} so far</div>}
+                </button>
+              ))}
+            </div>
+            <div>
+              {calSelected
+                ? <PortfolioReview id={calSelected} mode="calibration" onDone={() => { setCalSelected(null); qc.invalidateQueries({ queryKey: ['practice-cal-queue'] }); qc.invalidateQueries({ queryKey: ['practice-irr'] }); }} />
+                : <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Select a portfolio for a second opinion.</Card>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function IrrCard({ irr }: { irr?: Irr }) {
+  if (!irr) return null;
+  if (!irr.pairs) return (
+    <Card className="rounded-none p-5 border-primary/20">
+      <div className="ed-overline text-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /> Review consistency</div>
+      <p className="text-xs text-muted-foreground mt-1">No second opinions recorded yet. As reviewers calibrate below, agreement between them appears here, the evidence that a credential means the same thing whoever reviews it.</p>
+    </Card>
+  );
+  const tiles = [{ label: 'Outcome', v: irr.agreement.outcome }, { label: 'G1', v: irr.agreement.g1 }, { label: 'G2', v: irr.agreement.g2 }, { label: 'G3', v: irr.agreement.g3 }];
+  const tone = (v: number) => (v >= 80 ? 'text-emerald-700' : v >= 60 ? 'text-amber-700' : 'text-rose-700');
+  return (
+    <Card className="rounded-none p-5 border-primary/20 space-y-3">
+      <div className="ed-overline text-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /> Review consistency · {irr.pairs} double-reviewed</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {tiles.map((t) => (
+          <div key={t.label} className="border border-border p-3">
+            <div className={`ed-num text-2xl ${tone(t.v)}`}>{t.v}%</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mt-0.5">{t.label} agreement</div>
+          </div>
+        ))}
+      </div>
+      {irr.disagreements.length > 0 && (
+        <div>
+          <div className="ed-overline text-muted-foreground mb-1">Where reviewers differed ({irr.disagreements.length})</div>
+          <ul className="space-y-1.5">
+            {irr.disagreements.slice(0, 6).map((d, i) => (
+              <li key={i} className="text-xs border-l-2 border-amber-500 pl-3">
+                <span className="font-medium">{d.name}</span> · {d.title}
+                <span className="text-muted-foreground"> — primary {d.primary.outcome}{d.calibration.outcome !== d.primary.outcome ? `, second ${d.calibration.outcome}` : ''}; gateways differed on {['g1', 'g2', 'g3'].filter((g) => d.primary[g] !== d.calibration[g]).join(', ') || 'none'}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -133,7 +215,8 @@ function AuthenticitySignals({ reflections, attestations }: { reflections: Refle
   );
 }
 
-function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
+function PortfolioReview({ id, onDone, mode = 'primary' }: { id: string; onDone: () => void; mode?: 'primary' | 'calibration' }) {
+  const calibration = mode === 'calibration';
   const { data: p } = useQuery({ queryKey: ['practice-portfolio', id], queryFn: () => apiFetch<Portfolio>(`/practice/portfolio/${id}`) });
   const [g1, setG1] = useState(false);
   const [g2, setG2] = useState(false);
@@ -151,7 +234,7 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
   };
 
   const review = useMutation({
-    mutationFn: () => apiFetch(`/practice/portfolio/${id}/review`, { method: 'POST', body: JSON.stringify({ g1, g2, g3, outcome, feedback: feedback.trim() }) }),
+    mutationFn: () => apiFetch(`/practice/portfolio/${id}/${calibration ? 'calibrate-review' : 'review'}`, { method: 'POST', body: JSON.stringify(calibration ? { g1, g2, g3, outcome } : { g1, g2, g3, outcome, feedback: feedback.trim() }) }),
     onSuccess: onDone,
   });
 
@@ -247,7 +330,15 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
         )}
       </Card>
 
+      {calibration && (
+        <Card className="rounded-none p-4 border-primary/30 bg-primary/5 text-sm">
+          <span className="ed-overline text-primary">Blind second opinion</span>
+          <p className="text-xs text-muted-foreground mt-1">Judge the gateways from the portfolio alone. The first reviewer's decision is hidden on purpose, and the candidate's outcome does not change. This only measures whether reviewers agree.</p>
+        </Card>
+      )}
+
       {/* Reviewer assist: a calibration pre-screen against the shared rubric. Advisory; the human decides. */}
+      {!calibration && (
       <Card className="rounded-none p-5 space-y-3 border-primary/20">
         <div className="ed-overline text-foreground flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Reviewer assist</div>
         <p className="text-xs text-muted-foreground">An AI reads this portfolio against the same three-gateway rubric every reviewer uses, and drafts developmental feedback. It is advisory, it keeps judgements consistent between reviewers. You decide the outcome and own the words.</p>
@@ -276,6 +367,7 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
           </div>
         )}
       </Card>
+      )}
 
       {/* Review */}
       <Card className="rounded-none p-5 space-y-3 border-primary/30">
@@ -304,14 +396,16 @@ function PortfolioReview({ id, onDone }: { id: string; onDone: () => void }) {
             </button>
           </div>
         </div>
-        <div>
-          <div className="text-xs font-medium text-muted-foreground mb-1.5">Developmental feedback (returned to the candidate, required for both outcomes)</div>
-          <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={5} placeholder="What did they do well, what could they develop, and where next? Always developmental, never a mark."
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
-        </div>
+        {!calibration && (
+          <div>
+            <div className="text-xs font-medium text-muted-foreground mb-1.5">Developmental feedback (returned to the candidate, required for both outcomes)</div>
+            <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={5} placeholder="What did they do well, what could they develop, and where next? Always developmental, never a mark."
+              className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+          </div>
+        )}
         <div className="flex justify-end">
-          <Button disabled={!feedback.trim() || review.isPending} onClick={() => review.mutate()} className="gap-1.5">
-            {review.isPending ? 'Sending...' : outcome === 'reviewed' ? 'Recognise & send feedback' : 'Refer & send feedback'}
+          <Button disabled={(calibration ? false : !feedback.trim()) || review.isPending} onClick={() => review.mutate()} className="gap-1.5 rounded-none">
+            {review.isPending ? 'Saving...' : calibration ? 'Record second opinion' : outcome === 'reviewed' ? 'Recognise & send feedback' : 'Refer & send feedback'}
           </Button>
         </div>
       </Card>

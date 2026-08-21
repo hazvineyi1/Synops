@@ -109,6 +109,9 @@ CREATE TABLE IF NOT EXISTS credential_reviews (
   outcome text NOT NULL DEFAULT 'reviewed',
   feedback text NOT NULL DEFAULT '',
   created_at timestamp NOT NULL DEFAULT now());
+-- Inter-rater reliability: a calibration review is a second, blind opinion on an already-reviewed
+-- portfolio. It never changes the candidate's outcome; it only measures whether reviewers agree.
+ALTER TABLE credential_reviews ADD COLUMN IF NOT EXISTS calibration boolean NOT NULL DEFAULT false;
 `;
 
 /** Rows helper: db.execute over a raw/parameterised sql template returns { rows }. */
@@ -472,6 +475,76 @@ router.post("/practice/portfolio/:id/review", requireAuth, async (req, res) => {
   await db.execute(sql`
     UPDATE candidate_credentials SET status = ${finalOutcome}, reviewed_at = now(), updated_at = now() WHERE id = ${req.params.id}`);
   res.json({ ok: true, outcome: finalOutcome });
+});
+
+// ── Inter-rater reliability (calibration) ─────────────────────────────────────
+// GET /practice/calibration-queue -- already-reviewed portfolios this reviewer can give a blind second
+// opinion on (they were not the primary reviewer and have not calibrated it). Never affects candidates.
+router.get("/practice/calibration-queue", requireAuth, async (req, res) => {
+  if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const uid = req.userId!;
+  const isSuper = req.dbUser?.role === "super_admin";
+  const pid = isSuper ? null : await partnerOf(req);
+  const scope = isSuper ? sql`TRUE` : sql`cc.partner_id = ${pid}`;
+  const list = await rows(sql`
+    SELECT cc.id, cc.candidate_id, pc.code, pc.title, u.first_name, u.last_name, u.email,
+      (SELECT count(*)::int FROM credential_reviews cr WHERE cr.candidate_credential_id = cc.id AND cr.calibration = true) AS calibration_count
+    FROM candidate_credentials cc
+    JOIN practice_credentials pc ON pc.id = cc.credential_id
+    JOIN users u ON u.id = cc.candidate_id
+    WHERE cc.status IN ('reviewed','referred') AND ${scope}
+      AND EXISTS (SELECT 1 FROM credential_reviews cr WHERE cr.candidate_credential_id = cc.id AND cr.calibration = false AND cr.reviewer_id <> ${uid})
+      AND NOT EXISTS (SELECT 1 FROM credential_reviews cr WHERE cr.candidate_credential_id = cc.id AND cr.reviewer_id = ${uid})
+    ORDER BY cc.reviewed_at DESC NULLS LAST
+    LIMIT 20`);
+  res.json(list);
+});
+
+// POST /practice/portfolio/:id/calibrate-review -- record a blind second opinion. No developmental
+// feedback, no status change: this only measures whether reviewers agree.
+router.post("/practice/portfolio/:id/calibrate-review", requireAuth, async (req, res) => {
+  if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const uid = req.userId!;
+  const { g1, g2, g3, outcome } = req.body ?? {};
+  const finalOutcome = outcome === "referred" ? "referred" : "reviewed";
+  const cc = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} LIMIT 1`);
+  if (!cc[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const already = await rows(sql`SELECT id FROM credential_reviews WHERE candidate_credential_id = ${req.params.id} AND reviewer_id = ${uid} LIMIT 1`);
+  if (already[0]) { res.status(409).json({ error: "You have already reviewed this portfolio." }); return; }
+  const primary = await rows(sql`SELECT id FROM credential_reviews WHERE candidate_credential_id = ${req.params.id} AND calibration = false LIMIT 1`);
+  if (!primary[0]) { res.status(400).json({ error: "No primary review to calibrate against yet." }); return; }
+  await db.execute(sql`
+    INSERT INTO credential_reviews (candidate_credential_id, reviewer_id, g1, g2, g3, outcome, feedback, calibration)
+    VALUES (${req.params.id}, ${uid}, ${!!g1}, ${!!g2}, ${!!g3}, ${finalOutcome}, '', true)`);
+  res.json({ ok: true });
+});
+
+// GET /practice/irr -- inter-rater reliability across every portfolio with both a primary and a
+// calibration review: how often two independent reviewers agree, per gateway and on the outcome.
+router.get("/practice/irr", requireAuth, async (req, res) => {
+  if (req.dbUser?.role !== "super_admin") { res.status(403).json({ error: "Forbidden" }); return; }
+  const pairs = await rows<{ id: string; title: string; first_name: string | null; last_name: string | null; email: string; p_g1: boolean; p_g2: boolean; p_g3: boolean; p_outcome: string; c_g1: boolean; c_g2: boolean; c_g3: boolean; c_outcome: string }>(sql`
+    SELECT cc.id, pc.title, u.first_name, u.last_name, u.email,
+      p.g1 AS p_g1, p.g2 AS p_g2, p.g3 AS p_g3, p.outcome AS p_outcome,
+      c.g1 AS c_g1, c.g2 AS c_g2, c.g3 AS c_g3, c.outcome AS c_outcome
+    FROM candidate_credentials cc
+    JOIN practice_credentials pc ON pc.id = cc.credential_id
+    JOIN users u ON u.id = cc.candidate_id
+    JOIN LATERAL (SELECT g1, g2, g3, outcome FROM credential_reviews WHERE candidate_credential_id = cc.id AND calibration = false ORDER BY created_at LIMIT 1) p ON true
+    JOIN LATERAL (SELECT g1, g2, g3, outcome FROM credential_reviews WHERE candidate_credential_id = cc.id AND calibration = true ORDER BY created_at LIMIT 1) c ON true`);
+  const n = pairs.length;
+  const agg = { g1: 0, g2: 0, g3: 0, outcome: 0 };
+  const disagreements: any[] = [];
+  for (const p of pairs) {
+    const g1a = p.p_g1 === p.c_g1, g2a = p.p_g2 === p.c_g2, g3a = p.p_g3 === p.c_g3, oa = p.p_outcome === p.c_outcome;
+    if (g1a) agg.g1++;
+    if (g2a) agg.g2++;
+    if (g3a) agg.g3++;
+    if (oa) agg.outcome++;
+    if (!g1a || !g2a || !g3a || !oa) disagreements.push({ id: p.id, title: p.title, name: [p.first_name, p.last_name].filter(Boolean).join(" ") || p.email, primary: { g1: p.p_g1, g2: p.p_g2, g3: p.p_g3, outcome: p.p_outcome }, calibration: { g1: p.c_g1, g2: p.c_g2, g3: p.c_g3, outcome: p.c_outcome } });
+  }
+  const pct = (x: number) => (n ? Math.round((x / n) * 100) : 0);
+  res.json({ pairs: n, agreement: { g1: pct(agg.g1), g2: pct(agg.g2), g3: pct(agg.g3), outcome: pct(agg.outcome) }, disagreements });
 });
 
 // POST /practice/portfolio/:id/prescreen -- a calibration aid for reviewers. An AI reads the portfolio
