@@ -112,6 +112,29 @@ CREATE TABLE IF NOT EXISTS credential_reviews (
 -- Inter-rater reliability: a calibration review is a second, blind opinion on an already-reviewed
 -- portfolio. It never changes the candidate's outcome; it only measures whether reviewers agree.
 ALTER TABLE credential_reviews ADD COLUMN IF NOT EXISTS calibration boolean NOT NULL DEFAULT false;
+
+-- Reviewer certification: a gold-standard set of portfolios with an expert reference verdict. A
+-- reviewer scores each blind, and must agree closely with the reference before reviewing live.
+CREATE TABLE IF NOT EXISTS cert_items (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  candidate_credential_id text NOT NULL,
+  ref_g1 boolean NOT NULL DEFAULT false,
+  ref_g2 boolean NOT NULL DEFAULT false,
+  ref_g3 boolean NOT NULL DEFAULT false,
+  ref_outcome text NOT NULL DEFAULT 'reviewed',
+  note text,
+  active boolean NOT NULL DEFAULT true,
+  created_at timestamp NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS cert_attempts (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  reviewer_id text NOT NULL,
+  item_id text NOT NULL,
+  g1 boolean NOT NULL DEFAULT false,
+  g2 boolean NOT NULL DEFAULT false,
+  g3 boolean NOT NULL DEFAULT false,
+  outcome text NOT NULL DEFAULT 'reviewed',
+  agree_count integer NOT NULL DEFAULT 0,
+  created_at timestamp NOT NULL DEFAULT now());
 `;
 
 /** Rows helper: db.execute over a raw/parameterised sql template returns { rows }. */
@@ -545,6 +568,83 @@ router.get("/practice/irr", requireAuth, async (req, res) => {
   }
   const pct = (x: number) => (n ? Math.round((x / n) * 100) : 0);
   res.json({ pairs: n, agreement: { g1: pct(agg.g1), g2: pct(agg.g2), g3: pct(agg.g3), outcome: pct(agg.outcome) }, disagreements });
+});
+
+// ── Reviewer certification (calibration set) ──────────────────────────────────
+const CERT_THRESHOLD = 80; // percent agreement across all reference items required to certify.
+
+// super_admin designates a portfolio, with an expert reference verdict, as a gold-standard item.
+router.post("/practice/certification/items", requireAuth, async (req, res) => {
+  if (req.dbUser?.role !== "super_admin") { res.status(403).json({ error: "Forbidden" }); return; }
+  const { candidateCredentialId, g1, g2, g3, outcome, note } = req.body ?? {};
+  if (!candidateCredentialId) { res.status(400).json({ error: "candidateCredentialId is required" }); return; }
+  const ref = outcome === "referred" ? "referred" : "reviewed";
+  const ins = await rows(sql`
+    INSERT INTO cert_items (candidate_credential_id, ref_g1, ref_g2, ref_g3, ref_outcome, note)
+    VALUES (${candidateCredentialId}, ${!!g1}, ${!!g2}, ${!!g3}, ${ref}, ${note ? String(note).slice(0, 500) : null})
+    RETURNING id`);
+  res.status(201).json(ins[0]);
+});
+
+// Active certification items. Blind for a reviewer (no reference verdict), full for a super admin.
+router.get("/practice/certification/items", requireAuth, async (req, res) => {
+  if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const uid = req.userId!;
+  const isSuper = req.dbUser?.role === "super_admin";
+  const list = await rows<any>(sql`
+    SELECT ci.id, ci.candidate_credential_id, ci.note, ci.ref_g1, ci.ref_g2, ci.ref_g3, ci.ref_outcome, pc.title,
+      (SELECT count(*)::int FROM cert_attempts a WHERE a.item_id = ci.id AND a.reviewer_id = ${uid}) AS attempted
+    FROM cert_items ci
+    JOIN candidate_credentials cc ON cc.id = ci.candidate_credential_id
+    JOIN practice_credentials pc ON pc.id = cc.credential_id
+    WHERE ci.active = true ORDER BY ci.created_at`);
+  const out = list.map((r) => isSuper ? r : { id: r.id, candidate_credential_id: r.candidate_credential_id, note: r.note, title: r.title, attempted: r.attempted });
+  res.json(out);
+});
+
+// A reviewer submits their verdict on a certification item; agreement vs the reference is scored.
+router.post("/practice/certification/items/:itemId/attempt", requireAuth, async (req, res) => {
+  if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const uid = req.userId!;
+  const { g1, g2, g3, outcome } = req.body ?? {};
+  const ref = await rows<{ ref_g1: boolean; ref_g2: boolean; ref_g3: boolean; ref_outcome: string }>(sql`SELECT ref_g1, ref_g2, ref_g3, ref_outcome FROM cert_items WHERE id = ${req.params.itemId} AND active = true LIMIT 1`);
+  if (!ref[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const fo = outcome === "referred" ? "referred" : "reviewed";
+  const agree = Number(!!g1 === ref[0].ref_g1) + Number(!!g2 === ref[0].ref_g2) + Number(!!g3 === ref[0].ref_g3) + Number(fo === ref[0].ref_outcome);
+  await db.execute(sql`INSERT INTO cert_attempts (reviewer_id, item_id, g1, g2, g3, outcome, agree_count) VALUES (${uid}, ${req.params.itemId}, ${!!g1}, ${!!g2}, ${!!g3}, ${fo}, ${agree})`);
+  res.json({ ok: true, agree, of: 4 });
+});
+
+// This reviewer's certification status: score against the reference set and whether they are certified.
+router.get("/practice/certification/me", requireAuth, async (req, res) => {
+  if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const uid = req.userId!;
+  const itemsTotal = (await rows<{ c: number }>(sql`SELECT count(*)::int c FROM cert_items WHERE active = true`))[0]?.c ?? 0;
+  const attempts = await rows<{ item_id: string; agree_count: number }>(sql`
+    SELECT DISTINCT ON (item_id) item_id, agree_count FROM cert_attempts WHERE reviewer_id = ${uid} ORDER BY item_id, created_at DESC`);
+  const itemsAttempted = attempts.length;
+  const matched = attempts.reduce((s, a) => s + a.agree_count, 0);
+  const score = itemsTotal ? Math.round((matched / (itemsTotal * 4)) * 100) : 0;
+  const certified = itemsTotal > 0 && itemsAttempted >= itemsTotal && score >= CERT_THRESHOLD;
+  res.json({ itemsTotal, itemsAttempted, score, threshold: CERT_THRESHOLD, certified });
+});
+
+// super_admin: roster of reviewers and their certification standing.
+router.get("/practice/certification/reviewers", requireAuth, async (req, res) => {
+  if (req.dbUser?.role !== "super_admin") { res.status(403).json({ error: "Forbidden" }); return; }
+  const itemsTotal = (await rows<{ c: number }>(sql`SELECT count(*)::int c FROM cert_items WHERE active = true`))[0]?.c ?? 0;
+  const roster = await rows<{ first_name: string | null; last_name: string | null; email: string; items: number; matched: number }>(sql`
+    SELECT u.first_name, u.last_name, u.email,
+      count(DISTINCT la.item_id)::int AS items, COALESCE(sum(la.agree_count), 0)::int AS matched
+    FROM users u
+    JOIN LATERAL (SELECT DISTINCT ON (item_id) item_id, agree_count FROM cert_attempts WHERE reviewer_id = u.id ORDER BY item_id, created_at DESC) la ON true
+    WHERE u.role IN ('coach', 'super_admin')
+    GROUP BY u.first_name, u.last_name, u.email`);
+  const reviewers = roster.map((r) => {
+    const score = itemsTotal ? Math.round((r.matched / (itemsTotal * 4)) * 100) : 0;
+    return { name: [r.first_name, r.last_name].filter(Boolean).join(" ") || r.email, items: r.items, itemsTotal, score, certified: itemsTotal > 0 && r.items >= itemsTotal && score >= CERT_THRESHOLD };
+  });
+  res.json({ itemsTotal, reviewers });
 });
 
 // POST /practice/portfolio/:id/prescreen -- a calibration aid for reviewers. An AI reads the portfolio

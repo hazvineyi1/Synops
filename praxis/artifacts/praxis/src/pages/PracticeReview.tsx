@@ -32,17 +32,24 @@ const stageLabel = (k: string) => ({ description: 'What happened', feelings: 'Fe
 
 type CalRow = { id: string; code: string; title: string; first_name: string | null; last_name: string | null; email: string; calibration_count: number };
 type Irr = { pairs: number; agreement: { g1: number; g2: number; g3: number; outcome: number }; disagreements: Array<{ id: string; title: string; name: string; primary: any; calibration: any }> };
+type CertItem = { id: string; candidate_credential_id: string; title: string; note: string | null; attempted: number };
+type CertMe = { itemsTotal: number; itemsAttempted: number; score: number; threshold: number; certified: boolean };
+type CertRoster = { itemsTotal: number; reviewers: Array<{ name: string; items: number; itemsTotal: number; score: number; certified: boolean }> };
 
 export function PracticeReview() {
   const qc = useQueryClient();
   const { data: me } = useGetMe();
   const isSuper = (me as any)?.role === 'super_admin';
-  const [tab, setTab] = useState<'queue' | 'calibration'>('queue');
+  const [tab, setTab] = useState<'queue' | 'calibration' | 'certification'>('queue');
   const [selected, setSelected] = useState<string | null>(null);
   const [calSelected, setCalSelected] = useState<string | null>(null);
+  const [certSel, setCertSel] = useState<{ credId: string; itemId: string } | null>(null);
   const { data: queue = [] } = useQuery({ queryKey: ['practice-queue'], queryFn: () => apiFetch<QueueRow[]>('/practice/queue') });
   const { data: calQueue = [] } = useQuery({ queryKey: ['practice-cal-queue'], queryFn: () => apiFetch<CalRow[]>('/practice/calibration-queue'), enabled: tab === 'calibration' });
   const { data: irr } = useQuery({ queryKey: ['practice-irr'], queryFn: () => apiFetch<Irr>('/practice/irr'), enabled: tab === 'calibration' && isSuper });
+  const { data: certMe } = useQuery({ queryKey: ['practice-cert-me'], queryFn: () => apiFetch<CertMe>('/practice/certification/me'), enabled: tab === 'certification' });
+  const { data: certItems = [] } = useQuery({ queryKey: ['practice-cert-items'], queryFn: () => apiFetch<CertItem[]>('/practice/certification/items'), enabled: tab === 'certification' });
+  const { data: certRoster } = useQuery({ queryKey: ['practice-cert-roster'], queryFn: () => apiFetch<CertRoster>('/practice/certification/reviewers'), enabled: tab === 'certification' && isSuper });
 
   return (
     <div className="max-w-6xl mx-auto space-y-4">
@@ -53,7 +60,7 @@ export function PracticeReview() {
       />
 
       <div className="flex gap-1 border-b border-border">
-        {([['queue', 'Review queue'], ['calibration', 'Calibration']] as ['queue' | 'calibration', string][]).map(([k, l]) => (
+        {([['queue', 'Review queue'], ['calibration', 'Calibration'], ['certification', 'Certification']] as ['queue' | 'calibration' | 'certification', string][]).map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={`ed-overline px-4 py-2 border-b-2 -mb-px ${tab === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{l}</button>
         ))}
       </div>
@@ -81,7 +88,7 @@ export function PracticeReview() {
           </div>
           <div>
             {selected
-              ? <PortfolioReview id={selected} onDone={() => { setSelected(null); qc.invalidateQueries({ queryKey: ['practice-queue'] }); }} />
+              ? <PortfolioReview id={selected} isSuper={isSuper} onDone={() => { setSelected(null); qc.invalidateQueries({ queryKey: ['practice-queue'] }); }} />
               : <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Select a portfolio to review.</Card>}
           </div>
         </div>
@@ -109,8 +116,59 @@ export function PracticeReview() {
             </div>
             <div>
               {calSelected
-                ? <PortfolioReview id={calSelected} mode="calibration" onDone={() => { setCalSelected(null); qc.invalidateQueries({ queryKey: ['practice-cal-queue'] }); qc.invalidateQueries({ queryKey: ['practice-irr'] }); }} />
+                ? <PortfolioReview id={calSelected} mode="calibration" isSuper={isSuper} onDone={() => { setCalSelected(null); qc.invalidateQueries({ queryKey: ['practice-cal-queue'] }); qc.invalidateQueries({ queryKey: ['practice-irr'] }); }} />
                 : <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Select a portfolio for a second opinion.</Card>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'certification' && (
+        <div className="space-y-4">
+          {certMe && (
+            <Card className={`rounded-none p-5 ${certMe.certified ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-primary/20'}`}>
+              <div className="ed-overline text-foreground flex items-center gap-2">
+                {certMe.certified ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <ShieldCheck className="h-4 w-4 text-primary" />}
+                {certMe.certified ? 'You are a certified reviewer' : 'Reviewer certification'}
+              </div>
+              {certMe.itemsTotal === 0
+                ? <p className="text-xs text-muted-foreground mt-1">No certification set has been created yet. A lead reviewer builds one by marking gold-standard portfolios in the review queue.</p>
+                : <p className="text-xs text-muted-foreground mt-1">You have scored {certMe.itemsAttempted} of {certMe.itemsTotal} reference portfolios, agreeing with the expert reference {certMe.score}% of the time. {certMe.certified ? 'You meet the standard.' : `Reach ${certMe.threshold}% across all ${certMe.itemsTotal} to certify.`}</p>}
+            </Card>
+          )}
+
+          {isSuper && certRoster && certRoster.reviewers.length > 0 && (
+            <Card className="rounded-none p-5 border-primary/20 space-y-2">
+              <div className="ed-overline text-foreground flex items-center gap-2"><TrendingUp className="h-4 w-4 text-primary" /> Reviewer roster</div>
+              {certRoster.reviewers.map((r, i) => (
+                <div key={i} className="flex items-center justify-between text-sm border-b border-border pb-1.5 last:border-0">
+                  <span>{r.name}</span>
+                  <span className={`ed-overline ${r.certified ? 'text-emerald-700' : 'text-muted-foreground'}`}>{r.certified ? 'Certified' : `${r.score}% · ${r.items}/${r.itemsTotal}`}</span>
+                </div>
+              ))}
+            </Card>
+          )}
+
+          <div className="grid lg:grid-cols-[320px_1fr] gap-4 items-start">
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">Score each reference portfolio blind. Your agreement with the expert reference certifies you to review live.</p>
+              {certItems.length === 0 && (
+                <Card className="rounded-none p-6 text-center text-sm text-muted-foreground border-dashed">
+                  <Inbox className="mx-auto h-8 w-8 mb-2 text-muted-foreground/60" /> No reference portfolios yet.
+                </Card>
+              )}
+              {certItems.map((it) => (
+                <button key={it.id} onClick={() => setCertSel({ credId: it.candidate_credential_id, itemId: it.id })}
+                  className={`w-full text-left border p-3 transition-colors ${certSel?.itemId === it.id ? 'border-primary/50 bg-primary/5' : 'border-border hover:bg-muted/40'}`}>
+                  <div className="font-medium text-sm truncate">{it.title}</div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">{it.attempted > 0 ? 'Attempted, you can retry' : 'Not attempted'}</div>
+                </button>
+              ))}
+            </div>
+            <div>
+              {certSel
+                ? <PortfolioReview id={certSel.credId} mode="certification" certItemId={certSel.itemId} isSuper={isSuper} onDone={() => { setCertSel(null); qc.invalidateQueries({ queryKey: ['practice-cert-me'] }); qc.invalidateQueries({ queryKey: ['practice-cert-items'] }); qc.invalidateQueries({ queryKey: ['practice-cert-roster'] }); }} />
+                : <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Select a reference portfolio to score.</Card>}
             </div>
           </div>
         </div>
@@ -215,8 +273,12 @@ function AuthenticitySignals({ reflections, attestations }: { reflections: Refle
   );
 }
 
-function PortfolioReview({ id, onDone, mode = 'primary' }: { id: string; onDone: () => void; mode?: 'primary' | 'calibration' }) {
+function PortfolioReview({ id, onDone, mode = 'primary', certItemId, isSuper }: { id: string; onDone: () => void; mode?: 'primary' | 'calibration' | 'certification'; certItemId?: string; isSuper?: boolean }) {
   const calibration = mode === 'calibration';
+  const certification = mode === 'certification';
+  const blind = mode !== 'primary';
+  const qc = useQueryClient();
+  const [refSaved, setRefSaved] = useState(false);
   const { data: p } = useQuery({ queryKey: ['practice-portfolio', id], queryFn: () => apiFetch<Portfolio>(`/practice/portfolio/${id}`) });
   const [g1, setG1] = useState(false);
   const [g2, setG2] = useState(false);
@@ -234,8 +296,14 @@ function PortfolioReview({ id, onDone, mode = 'primary' }: { id: string; onDone:
   };
 
   const review = useMutation({
-    mutationFn: () => apiFetch(`/practice/portfolio/${id}/${calibration ? 'calibrate-review' : 'review'}`, { method: 'POST', body: JSON.stringify(calibration ? { g1, g2, g3, outcome } : { g1, g2, g3, outcome, feedback: feedback.trim() }) }),
+    mutationFn: () => certification
+      ? apiFetch(`/practice/certification/items/${certItemId}/attempt`, { method: 'POST', body: JSON.stringify({ g1, g2, g3, outcome }) })
+      : apiFetch(`/practice/portfolio/${id}/${calibration ? 'calibrate-review' : 'review'}`, { method: 'POST', body: JSON.stringify(calibration ? { g1, g2, g3, outcome } : { g1, g2, g3, outcome, feedback: feedback.trim() }) }),
     onSuccess: onDone,
+  });
+  const setReference = useMutation({
+    mutationFn: () => apiFetch('/practice/certification/items', { method: 'POST', body: JSON.stringify({ candidateCredentialId: id, g1, g2, g3, outcome }) }),
+    onSuccess: () => { setRefSaved(true); qc.invalidateQueries({ queryKey: ['practice-cert-items'] }); },
   });
 
   if (!p) return <Card className="rounded-none p-10 text-center text-sm text-muted-foreground">Loading portfolio...</Card>;
@@ -330,15 +398,17 @@ function PortfolioReview({ id, onDone, mode = 'primary' }: { id: string; onDone:
         )}
       </Card>
 
-      {calibration && (
+      {blind && (
         <Card className="rounded-none p-4 border-primary/30 bg-primary/5 text-sm">
-          <span className="ed-overline text-primary">Blind second opinion</span>
-          <p className="text-xs text-muted-foreground mt-1">Judge the gateways from the portfolio alone. The first reviewer's decision is hidden on purpose, and the candidate's outcome does not change. This only measures whether reviewers agree.</p>
+          <span className="ed-overline text-primary">{certification ? 'Certification, scored against a reference' : 'Blind second opinion'}</span>
+          <p className="text-xs text-muted-foreground mt-1">{certification
+            ? 'Judge the gateways from the portfolio alone. Your answer is compared to an expert reference to certify you as a reviewer. The candidate is not affected.'
+            : 'Judge the gateways from the portfolio alone. The first reviewer\'s decision is hidden on purpose, and the candidate\'s outcome does not change. This only measures whether reviewers agree.'}</p>
         </Card>
       )}
 
       {/* Reviewer assist: a calibration pre-screen against the shared rubric. Advisory; the human decides. */}
-      {!calibration && (
+      {!blind && (
       <Card className="rounded-none p-5 space-y-3 border-primary/20">
         <div className="ed-overline text-foreground flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Reviewer assist</div>
         <p className="text-xs text-muted-foreground">An AI reads this portfolio against the same three-gateway rubric every reviewer uses, and drafts developmental feedback. It is advisory, it keeps judgements consistent between reviewers. You decide the outcome and own the words.</p>
@@ -396,16 +466,21 @@ function PortfolioReview({ id, onDone, mode = 'primary' }: { id: string; onDone:
             </button>
           </div>
         </div>
-        {!calibration && (
+        {!blind && (
           <div>
             <div className="text-xs font-medium text-muted-foreground mb-1.5">Developmental feedback (returned to the candidate, required for both outcomes)</div>
             <textarea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={5} placeholder="What did they do well, what could they develop, and where next? Always developmental, never a mark."
               className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           </div>
         )}
-        <div className="flex justify-end">
-          <Button disabled={(calibration ? false : !feedback.trim()) || review.isPending} onClick={() => review.mutate()} className="gap-1.5 rounded-none">
-            {review.isPending ? 'Saving...' : calibration ? 'Record second opinion' : outcome === 'reviewed' ? 'Recognise & send feedback' : 'Refer & send feedback'}
+        <div className="flex items-center justify-between gap-2">
+          {!blind && isSuper && (
+            <Button size="sm" variant="outline" className="gap-1.5 rounded-none" disabled={setReference.isPending || refSaved} onClick={() => setReference.mutate()} title="Use your verdict as the reference for reviewer certification">
+              {refSaved ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Sparkles className="h-3.5 w-3.5" />} {refSaved ? 'Added to certification set' : 'Set as certification reference'}
+            </Button>
+          )}
+          <Button disabled={(blind ? false : !feedback.trim()) || review.isPending} onClick={() => review.mutate()} className="gap-1.5 rounded-none ml-auto">
+            {review.isPending ? 'Saving...' : certification ? 'Submit my answer' : calibration ? 'Record second opinion' : outcome === 'reviewed' ? 'Recognise & send feedback' : 'Refer & send feedback'}
           </Button>
         </div>
       </Card>
