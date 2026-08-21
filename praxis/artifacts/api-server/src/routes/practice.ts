@@ -136,6 +136,7 @@ router.get("/practice/me", requireAuth, async (req, res) => {
     SELECT cc.*, pc.code, pc.title, pc.summary, pc.activity_brief, pc.gateway_guidance, pc.example_assignment,
       (SELECT count(*)::int FROM reflection_entries r WHERE r.candidate_credential_id = cc.id) AS reflection_count,
       (SELECT count(*)::int FROM evidence_items e WHERE e.candidate_credential_id = cc.id) AS evidence_count,
+      (SELECT COALESCE(json_object_agg(stage, c), '{}'::json) FROM (SELECT stage, count(*)::int c FROM reflection_entries WHERE candidate_credential_id = cc.id GROUP BY stage) s) AS stage_counts,
       (SELECT feedback FROM credential_reviews cr WHERE cr.candidate_credential_id = cc.id ORDER BY cr.created_at DESC LIMIT 1) AS latest_feedback,
       (SELECT outcome FROM credential_reviews cr WHERE cr.candidate_credential_id = cc.id ORDER BY cr.created_at DESC LIMIT 1) AS latest_outcome
     FROM candidate_credentials cc
