@@ -18,7 +18,7 @@ import {
  * practice moves through experience, reflection, naming and trying. The interface adapts, guided or
  * pro density, one recommended next move up top, and a masthead that reads your overall progress.
  */
-type Credential = { id: string; code: string; title: string; summary: string | null; activity_brief: string | null; gateway_guidance: string | null; example_assignment: string | null };
+type Credential = { id: string; code: string; title: string; summary: string | null; activity_brief: string | null; gateway_guidance: string | null; example_assignment: string | null; rationale: string | null };
 type Mine = Credential & {
   credential_id: string; status: string; sort: number; justification: string | null;
   sequence_locked: boolean; reflection_count: number; evidence_count: number;
@@ -410,10 +410,12 @@ function ChooseRow({ cred, isEducator, onChoose, busy }: { cred: Credential; isE
       </button>
       {open && (
         <div className="px-3 pb-3 pt-3 border-t border-border space-y-3">
-          <div>
-            <div className="ed-overline text-muted-foreground">Why this matters</div>
-            <p className="text-sm mt-0.5">{cred.summary}</p>
-          </div>
+          {cred.rationale && (
+            <div>
+              <div className="ed-overline text-muted-foreground">Why this matters</div>
+              <p className="text-sm mt-0.5">{cred.rationale}</p>
+            </div>
+          )}
           {cred.activity_brief && (
             <div>
               <div className="ed-overline text-muted-foreground">What you'll do</div>

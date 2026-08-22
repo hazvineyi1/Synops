@@ -455,13 +455,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* ── Desktop sidebar ─────────────────────────────────── */}
       <aside className={cn("w-64 flex-shrink-0 flex-col hidden", sidebarCollapsed ? "" : "md:flex")} style={{ background: sidebarBg }}>
         <div className="h-16 flex items-center px-6" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
-          <Link href="/dashboard" className="flex items-center gap-2 font-serif font-bold text-xl tracking-tight" style={{ color: '#fff' }}>
+          <Link href="/dashboard" className="flex items-center gap-2 min-w-0" style={{ color: '#fff' }}>
             {brandLogo ? (
-              <img src={brandLogo} alt="" className="h-8 w-8 rounded-sm object-contain" />
+              <img src={brandLogo} alt="" className="h-8 w-8 rounded-sm object-contain shrink-0" />
             ) : (
-              <span className="h-8 w-8 flex items-center justify-center rounded-sm" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>{brandName.charAt(0).toUpperCase()}</span>
+              <span className="h-8 w-8 shrink-0 flex items-center justify-center rounded-sm" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>{brandName.charAt(0).toUpperCase()}</span>
             )}
-            {brandName}
+            <span className="font-serif font-bold text-base leading-tight tracking-tight line-clamp-2 min-w-0">{brandName}</span>
           </Link>
           <button onClick={() => toggleSidebar(true)}
             className="ml-auto hidden md:inline-flex items-center justify-center h-8 w-8 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-colors"

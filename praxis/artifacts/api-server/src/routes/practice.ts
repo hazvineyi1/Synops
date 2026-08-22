@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS practice_credentials (
   sort integer NOT NULL DEFAULT 0,
   created_at timestamp NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX IF NOT EXISTS practice_credentials_partner_code_uq ON practice_credentials (partner_id, code);
+-- A concrete, research-grounded "why this matters" for each credential, distinct from the one-line summary.
+ALTER TABLE practice_credentials ADD COLUMN IF NOT EXISTS rationale text;
 
 CREATE TABLE IF NOT EXISTS candidate_credentials (
   id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -202,7 +204,7 @@ router.get("/practice/credentials", requireAuth, async (req, res) => {
     : await partnerOf(req);
   if (!pid) { res.json([]); return; }
   const list = await rows(sql`
-    SELECT id, code, title, summary, activity_brief, gateway_guidance, example_assignment, sort
+    SELECT id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort
     FROM practice_credentials WHERE partner_id = ${pid} ORDER BY sort, title`);
   res.json(list);
 });

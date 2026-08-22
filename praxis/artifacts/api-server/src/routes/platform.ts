@@ -1380,21 +1380,27 @@ const MRB_GATEWAY =
 const MRB_PRACTICE_CREDENTIALS = [
   { code: "ETHICAL-LEADERSHIP", title: "Ethical Leadership in Practice", sort: 1,
     summary: "Recognise and articulate the ethical principles already underlying how you lead.",
+    rationale: "Ethical decisions under pressure are where leadership is really tested. Research on moral courage and ethical climate shows that a leader who can name and stand behind a principled call sets the tone that shapes a whole team's behaviour. The ability to make that call, and account for it afterwards, is what distinguishes leadership from compliance.",
     brief: "Complete an activity that demonstrates your ability to make and stand behind a leadership decision on ethical grounds, especially where fairness, honesty, accountability or the interests of the vulnerable were at stake." },
   { code: "TEAM-FORMATION", title: "Team Formation", sort: 2,
     summary: "Establish or develop an effective team capable of achieving defined objectives.",
+    rationale: "How a team is formed predicts how it performs. Tuckman's stages and decades of team-effectiveness research show that deliberate composition, a clear shared purpose and early trust, not luck, decide whether a group can do good work. This is upstream of almost everything else the team will go on to achieve.",
     brief: "You are required to complete an activity that demonstrates your ability to establish or develop an effective team capable of achieving defined objectives. Different professional experiences produce different, valid evidence; a team you built over weeks or an existing team you reshaped both count." },
   { code: "SERVANT-LEADERSHIP", title: "Servant Leadership", sort: 3,
     summary: "Lead by listening and removing obstacles before commanding.",
+    rationale: "Hearing a team member's real constraint before acting is consistently linked to higher trust, engagement and psychological safety (Greenleaf; Edmondson). Teams that feel heard surface the problems and take the risks that keep work, and patients, safe. This is not softness; it is what makes a team willing to follow you when it counts.",
     brief: "Complete an activity that demonstrates your ability to hear a team member's actual constraint and act on it, putting the team's capacity to do good work ahead of your own standing." },
   { code: "TRANSFORMATIONAL-LEADERSHIP", title: "Transformational Leadership", sort: 4,
     summary: "Form a clear vision, test it with others, and grow people through it.",
+    rationale: "Transformational leadership, forming a vision and taking people with you, is among the most robustly evidenced predictors of team performance and successful change (Bass). A vision without earned trust is just an announcement; this credential is about the trust that lets a vision actually move.",
     brief: "Complete an activity that demonstrates your ability to develop a vision, test it with the people it affects, and take them with you, earning the trust the change depends on." },
   { code: "SOCIAL-VALUE-LEADERSHIP", title: "Social-Value & Equity Leadership", sort: 5,
     summary: "Name who benefits and who risks being left out, and design for the most vulnerable.",
+    rationale: "Decisions that name who benefits and who is at risk of being left out separate equitable leadership from well-meaning harm. Health-equity research shows neutral decisions tend to advantage the already-advantaged; designing deliberately for the hardest-to-reach is how a leader closes gaps rather than widens them.",
     brief: "Complete an activity that demonstrates your ability to make a leadership decision that names who benefits and, deliberately, who is at risk of being left out, and to mitigate that gap for the poorest or hardest-to-reach group." },
   { code: "LEADING-CHANGE", title: "Leading Change", sort: 6,
     summary: "Design and lead a change that improves outcomes without leaving the vulnerable behind.",
+    rationale: "Most change efforts fail on people, not plans (Kotter). Change that improves outcomes without leaving the vulnerable behind depends on an honest account of who it might exclude. This credential is about leading change that is both effective and fair, and being candid about the trade-offs in your own design.",
     brief: "Complete an activity that demonstrates your ability to design and lead a change to improve effectiveness, pressure-tested against who it might exclude, with an honest account of the equity gaps in your own design." },
 ];
 
@@ -1415,11 +1421,11 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
 
     for (const c of MRB_PRACTICE_CREDENTIALS) {
       await db.execute(sql`
-        INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, sort)
-        VALUES (${pid}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${MRB_GATEWAY}, ${MRB_EXAMPLE_ASSIGNMENT}, ${c.sort})
+        INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort)
+        VALUES (${pid}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${MRB_GATEWAY}, ${MRB_EXAMPLE_ASSIGNMENT}, ${c.rationale}, ${c.sort})
         ON CONFLICT (partner_id, code) DO UPDATE SET
           title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
-          gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, sort = EXCLUDED.sort`);
+          gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, rationale = EXCLUDED.rationale, sort = EXCLUDED.sort`);
     }
 
     // Professional MRB brand: the whole environment skins to the Manchester Review Board (deep petrol
@@ -1510,21 +1516,27 @@ const EDU_EXAMPLE =
 const EDU_PRACTICE_CREDENTIALS = [
   { code: "AI-ASSISTED-PLANNING", title: "AI-Assisted Lesson Design", sort: 1,
     summary: "Plan with AI while keeping the pedagogical judgement only you can make.",
+    rationale: "Planning is where a teacher's expertise actually lives. Research on cognitive offloading (Risko and Gilbert) shows that handing routine load to a tool can free your attention for the harder judgement, knowing your students and anticipating their misconceptions, but offloading that judgement itself quietly erodes the skill. Getting deliberate about which is which is what keeps AI a planning assistant rather than a planning replacement.",
     brief: "Complete an activity where you used an AI tool to help plan teaching, and can show where you kept the thinking that matters, deciding what your students needed, and where you let AI carry the load that did not. Name the difference between offloading that freed you to teach and offloading that would have replaced your judgement." },
   { code: "INTEGRITY-AI", title: "Assessment Integrity in the Age of AI", sort: 2,
     summary: "Redesign an assessment so it stays meaningful when students can use AI.",
+    rationale: "An assessment is only worth something if it measures the student, not the tool. The moment a task can be completed by a generative model, its validity collapses and the results start quietly misleading your teaching decisions. Redesigning toward what AI cannot do for them, reasoning in the moment and defending their own work, is what restores an assessment you can actually trust.",
     brief: "Complete an activity where you rethought an assessment so it still tells you what a student can actually do, in a world where AI is available. Show the change you made and your reasoning, and be honest about the trade-offs." },
   { code: "TEACHING-WITH-AI-STUDENTS", title: "Teaching Students to Use AI Well", sort: 3,
     summary: "Help students use AI as a thinking partner, not a shortcut around thinking.",
+    rationale: "Students are already using AI, and unguided use tends toward over-reliance that removes the very effort that builds learning, recent studies link heavy AI use to weaker metacognition and self-regulation. Teaching students to use it as a scaffold rather than a shortcut preserves the productive struggle, the desirable difficulty, that makes learning durable.",
     brief: "Complete an activity where you taught students to use AI in a way that strengthened their thinking rather than replaced it. Show what you did, how students responded, and what you learned about the line between help and harm." },
   { code: "AI-FEEDBACK", title: "Feedback in an AI-Rich Classroom", sort: 4,
     summary: "Use AI to give more and better feedback without losing the human relationship in it.",
+    rationale: "Feedback is one of the highest-impact things a teacher does, Hattie's synthesis of thousands of studies ranks it near the top, but its power depends on trust, timing and specificity. AI can multiply the volume and speed of feedback; what it cannot do is hold the relationship that makes a student act on it. This is about using the machine for reach while you keep the human core that makes feedback land.",
     brief: "Complete an activity where AI helped you give students more, or better, feedback, while you kept the relational core that makes feedback land. Show where the machine helped and where you had to be the teacher." },
   { code: "AI-EQUITY", title: "Equity and Access with AI", sort: 5,
     summary: "Make AI narrow the gaps between your students rather than widen them.",
+    rationale: "New technology usually widens gaps before it narrows them. The digital divide and the Matthew effect mean the best-supported students tend to benefit most, so uncritical adoption can entrench disadvantage. A deliberate equity decision, naming who could be left behind and protecting them, is what turns AI from a gap-widener into a leveller.",
     brief: "Complete an activity where you made a deliberate choice about AI use with equity in mind, naming who could be advantaged, who could be left behind, and what you did to protect the students most at risk of falling behind." },
   { code: "AI-TEACHING-STANCE", title: "Your Principled AI Teaching Stance", sort: 6,
     summary: "Articulate and defend your own considered position on AI in your classroom.",
+    rationale: "Teachers' beliefs shape classroom practice more than any policy does. Transformative professional learning (Mezirow) comes from surfacing and testing your own assumptions, not from being handed rules. Articulating a stance you can defend turns reactive, inconsistent AI decisions into principled practice your students can rely on.",
     brief: "Complete an activity, a written stance, a staff-meeting contribution, a policy you drafted, where you set out your own principled position on AI in teaching and tested it against a colleague or your students. Show how your thinking changed through the process." },
 ];
 
@@ -1537,11 +1549,11 @@ router.post("/platform/seed-educator-pd", requireAuth, requireSuperAdmin, async 
     const pid = seeded.partnerId;
     for (const c of EDU_PRACTICE_CREDENTIALS) {
       await db.execute(sql`
-        INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, sort)
-        VALUES (${pid}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${EDU_GATEWAY}, ${EDU_EXAMPLE}, ${c.sort})
+        INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort)
+        VALUES (${pid}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${EDU_GATEWAY}, ${EDU_EXAMPLE}, ${c.rationale}, ${c.sort})
         ON CONFLICT (partner_id, code) DO UPDATE SET
           title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
-          gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, sort = EXCLUDED.sort`);
+          gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, rationale = EXCLUDED.rationale, sort = EXCLUDED.sort`);
     }
 
     // Brand the educator programme (indigo + teal, distinct from the MRB petrol blue). Best-effort.
