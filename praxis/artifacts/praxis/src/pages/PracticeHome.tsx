@@ -422,7 +422,7 @@ function ChooseRow({ cred, isEducator, onChoose, busy }: { cred: Credential; isE
               <p className="text-sm text-muted-foreground mt-0.5">{cred.activity_brief}</p>
             </div>
           )}
-          <p className="text-xs text-primary border-l-2 border-primary/40 pl-2.5">{outcome}</p>
+          {!isEducator && <p className="text-xs text-primary border-l-2 border-primary/40 pl-2.5">{outcome}</p>}
           <div>
             <label className="text-xs font-medium">In a line, why does this fit your {isEducator ? 'teaching' : 'work'}?</label>
             <textarea value={why} onChange={(e) => setWhy(e.target.value)} rows={2}
