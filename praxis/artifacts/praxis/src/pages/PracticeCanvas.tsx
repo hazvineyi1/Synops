@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy, Copy, ShieldCheck, Users,
+  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy, Copy, ShieldCheck, Users, X, Sparkles,
 } from 'lucide-react';
 
 /** Offline capture: pending queue + connection status, flushed automatically when back online. */
@@ -171,6 +171,9 @@ export function PracticeCanvas() {
   // When the learner writes in a field, nudge the coach to observe it (ongoing commentary / probe).
   const [observeReq, setObserveReq] = useState<{ text: string; n: number } | null>(null);
   const handleLearnerWrote = (text: string) => { if (text && text.trim().length > 12) setObserveReq({ text: text.trim(), n: Date.now() }); };
+  // Educator flow: picking a field opens Eve in a popup that talks the learner through filling that box.
+  const [eveField, setEveField] = useState<string | null>(null);
+  const openEve = isEducator && !readOnly ? (s: string) => setEveField(s) : undefined;
 
   return (
     <div className={`max-w-6xl mx-auto space-y-4 ${isEducator ? 'theme-warm' : ''}`}>
@@ -215,7 +218,7 @@ export function PracticeCanvas() {
       </Card>
 
       {/* The cognitive twin: the model Mutale holds, shown plainly. Tapping a move opens a field to add it. */}
-      <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} coachName={coachName} onLearnerWrote={handleLearnerWrote} />
+      <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} coachName={coachName} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
         <div className="space-y-4">
@@ -240,20 +243,20 @@ export function PracticeCanvas() {
               {stage.key === 'e' && (
                 <>
                   <EvidencePanel id={id} evidence={evidence} readOnly={readOnly} onChange={invalidate} off={off} showList={false} />
-                  <ReflectionPanel key="e" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['description']} showTimeline={false} heading="Describe what happened" starters={stage.starters} onLearnerWrote={handleLearnerWrote} />
+                  <ReflectionPanel key="e" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['description']} showTimeline={false} heading="Describe what happened" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
                 </>
               )}
               {stage.key === 'r' && (
                 <>
-                  <PredictionPanel key="rp" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} showList={false} onLearnerWrote={handleLearnerWrote} />
-                  <ReflectionPanel key="r" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['feelings', 'evaluation']} showTimeline={false} heading="Look back on it" starters={stage.starters} onLearnerWrote={handleLearnerWrote} />
+                  <PredictionPanel key="rp" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} showList={false} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
+                  <ReflectionPanel key="r" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['feelings', 'evaluation']} showTimeline={false} heading="Look back on it" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
                 </>
               )}
               {stage.key === 'n' && (
-                <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" starters={stage.starters} onLearnerWrote={handleLearnerWrote} />
+                <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
               )}
               {stage.key === 't' && (
-                <ReflectionPanel key="t" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['action']} showTimeline={false} heading="Plan your next turn" starters={stage.starters} onLearnerWrote={handleLearnerWrote} />
+                <ReflectionPanel key="t" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['action']} showTimeline={false} heading="Plan your next turn" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
               )}
             </div>
           )}
@@ -281,8 +284,13 @@ export function PracticeCanvas() {
         </div>
 
         {/* The coach, contextual to the current move */}
-        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} onCaptured={invalidate} readOnly={readOnly} />
+        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} onCaptured={invalidate} readOnly={readOnly} compact={isEducator} />
       </div>
+
+      {/* Eve, focused on one box: opens when the learner picks a field (educator flow). */}
+      {eveField && cc && (
+        <EveFieldModal ccId={cc.id} stage={eveField} coachName={coachName} onClose={() => setEveField(null)} onSaved={invalidate} />
+      )}
     </div>
   );
 }
@@ -420,7 +428,7 @@ function BodyOfWork({ reflections, evidence }: { reflections: Reflection[]; evid
   );
 }
 
-function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale', onLearnerWrote }: { me: any; cc: Mine | undefined; reflections: Reflection[]; readOnly?: boolean; onSaved?: () => void; coachName?: string; onLearnerWrote?: (text: string) => void }) {
+function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale', onLearnerWrote, onAskEve }: { me: any; cc: Mine | undefined; reflections: Reflection[]; readOnly?: boolean; onSaved?: () => void; coachName?: string; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void }) {
   const [openHint, setOpenHint] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -467,7 +475,7 @@ function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale
           {MOVES.map((m) => {
             const n = counts[m.key] ?? 0; const got = n > 0; const active = openHint === m.key;
             return (
-              <button key={m.key} type="button" onClick={() => pick(m.key)}
+              <button key={m.key} type="button" onClick={() => (onAskEve ? onAskEve(m.key) : pick(m.key))}
                 aria-pressed={active}
                 className={`group relative text-left border p-2.5 transition-all duration-200 hover:-translate-y-0.5 ${
                   active ? 'border-primary bg-primary/10 ring-2 ring-primary/50'
@@ -540,7 +548,7 @@ function ReflectiveRing({ earned, total }: { earned: number; total: number }) {
   );
 }
 
-function PredictionPanel({ id, reflections, readOnly, onChange, showList = true, onLearnerWrote }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; showList?: boolean; onLearnerWrote?: (text: string) => void }) {
+function PredictionPanel({ id, reflections, readOnly, onChange, showList = true, onLearnerWrote, onAskEve }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; showList?: boolean; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void }) {
   const predictions = reflections.filter((r) => r.stage === 'prediction');
   const surprises = reflections.filter((r) => r.stage === 'surprise');
   const pairCount = Math.max(predictions.length, surprises.length);
@@ -588,6 +596,15 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true,
           })}
         </ol>
       )}
+      {!readOnly && onAskEve && (
+        <>
+          <button type="button" onClick={() => onAskEve('prediction')}
+            className="w-full inline-flex items-center justify-center gap-2 border border-primary bg-primary/10 text-primary px-3 py-2 text-sm font-medium hover:bg-primary/15">
+            <Sparkles className="h-4 w-4" /> Talk to Eve about what you expected
+          </button>
+          <div className="ed-overline text-muted-foreground text-center">or write it yourself</div>
+        </>
+      )}
       {!readOnly && (
         <div className="space-y-2 border border-border p-3">
           <div>
@@ -607,7 +624,7 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true,
   );
 }
 
-function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection', starters, onLearnerWrote }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string; starters?: string[]; onLearnerWrote?: (text: string) => void }) {
+function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection', starters, onLearnerWrote, onAskEve }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string; starters?: string[]; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void }) {
   const draftKey = `refl_${id}_${focusStages ? focusStages.join('-') : 'all'}`;
   const stagesToShow = focusStages ? GIBBS.filter((g) => focusStages.includes(g.key)) : GIBBS;
   const [stage, setStage] = useState(focusStages ? focusStages[0] : 'note');
@@ -668,6 +685,15 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages
             </div>
           )}
           <p className="text-xs text-muted-foreground">{GIBBS.find((g) => g.key === stage)?.hint}</p>
+          {onAskEve && (
+            <>
+              <button type="button" onClick={() => onAskEve(stage)}
+                className="w-full inline-flex items-center justify-center gap-2 border border-primary bg-primary/10 text-primary px-3 py-2 text-sm font-medium hover:bg-primary/15">
+                <Sparkles className="h-4 w-4" /> Talk to Eve to fill this
+              </button>
+              <div className="ed-overline text-muted-foreground text-center">or write it yourself</div>
+            </>
+          )}
           {starters && starters.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               <span className="text-[11px] text-muted-foreground self-center">Stuck? Start with:</span>
@@ -964,9 +990,109 @@ function GatewaySubmit({ cc, reflections, evidence, onChange }: { cc: Mine | und
   );
 }
 
+// Per-field Eve setup: the label, a one-line hint, and the question Eve opens the popup with. Framed for
+// educators, but usable anywhere. When a learner picks a box, Eve opens here and talks them into filling it.
+const EVE_FIELDS: Record<string, { label: string; hint: string; opener: string }> = {
+  description: { label: 'What happened', hint: 'A plain account of the moment: who, what, when.', opener: "Let's capture what actually happened. Walk me through the moment, what did you do with your students, and when?" },
+  feelings: { label: 'Feelings', hint: 'How you felt, and how your students felt or likely felt.', opener: 'How did it feel in the room, for you and for your students?' },
+  evaluation: { label: 'Evaluation', hint: 'What was good or bad about how it went.', opener: 'As you look back, what went well, and what did not?' },
+  analysis: { label: 'Analysis', hint: 'Why it went the way it did; the idea underneath.', opener: 'Why do you think it went the way it did? What is the idea underneath it?' },
+  conclusion: { label: 'Conclusion', hint: 'The lesson, or a principle you could hand to another teacher.', opener: 'If you handed one lesson from this to another teacher, what would it be?' },
+  action: { label: 'Action', hint: 'One concrete thing you will try next, and when.', opener: 'Knowing this, what is one thing you will try differently next time, and when?' },
+  prediction: { label: 'Prediction', hint: 'What you expected to happen beforehand.', opener: 'Before it happened, what did you expect would happen?' },
+  surprise: { label: 'Surprise', hint: 'Where reality differed from what you expected.', opener: 'Where did it surprise you? Where did reality differ from what you expected?' },
+};
+
 type Capture = { target: 'reflection' | 'evidence'; stage?: string; title?: string; text: string; label: string };
 
-function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq, onCaptured, readOnly }: { cc: Mine | undefined; stageHint?: string; coachName?: string; observeReq?: { text: string; n: number } | null; onCaptured?: () => void; readOnly?: boolean }) {
+/**
+ * Eve, focused on ONE box. A centered popup that opens when a learner picks a field. Eve asks a focused
+ * question, the learner talks, and Eve drafts that box in their own words. Eve-first, but the draft is
+ * always editable and they can write it themselves. Adding it saves straight to that field and closes.
+ */
+function EveFieldModal({ ccId, stage, coachName, onClose, onSaved }: { ccId: string; stage: string; coachName: string; onClose: () => void; onSaved: () => void }) {
+  const field = EVE_FIELDS[stage] ?? { label: 'This box', hint: '', opener: 'Tell me what happened.' };
+  const [messages, setMessages] = useState<ChatMsg[]>([{ role: 'assistant', content: field.opener, kind: 'chat' }]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [lastEveDraft, setLastEveDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, loading]);
+  useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [onClose]);
+
+  const applyDraft = (text: string) => { setLastEveDraft(text); setDraft((d) => (d.trim() === '' || d === lastEveDraft ? text : d)); };
+
+  const send = async (text: string) => {
+    if (!text.trim() || loading) return;
+    const next: ChatMsg[] = [...messages, { role: 'user', content: text.trim(), kind: 'chat' }];
+    setMessages(next); setInput(''); setLoading(true);
+    try {
+      const r = await apiFetch<{ reply: string }>('/practice/coach', { method: 'POST', body: JSON.stringify({ messages: next, candidateCredentialId: ccId, coachName, focusHint: `${field.label}: ${field.hint}` }) });
+      setMessages((m) => [...m, { role: 'assistant', content: r.reply, kind: 'chat' }]);
+      // Draft this box from what they have said, in their own words.
+      try {
+        const cap = await apiFetch<{ captures: Capture[] }>('/practice/coach/capture', { method: 'POST', body: JSON.stringify({ candidateCredentialId: ccId, messages: next, coachName, focusStage: stage }) });
+        if (cap.captures?.[0]?.text) applyDraft(cap.captures[0].text);
+      } catch { /* draft is best-effort */ }
+    } catch {
+      setMessages((m) => [...m, { role: 'assistant', content: 'I could not respond just now. Try again in a moment.', kind: 'chat' }]);
+    } finally { setLoading(false); }
+  };
+
+  const add = async () => {
+    if (!draft.trim()) return;
+    setSaving(true);
+    try {
+      await apiFetch(`/practice/me/credentials/${ccId}/reflections`, { method: 'POST', body: JSON.stringify({ stage, content: draft.trim(), source: 'coached', typedMs: 0, pasteCount: 0 }) });
+      onSaved(); onClose();
+    } catch { /* leave open to retry */ } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className="w-full max-w-lg bg-background border border-border shadow-xl flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-border p-4">
+          <div className="min-w-0">
+            <div className="ed-overline text-primary inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" /> {coachName} · {field.label}</div>
+            <p className="text-xs text-muted-foreground mt-1">{field.hint} Talk it through with {coachName}, and it drafts this box for you.</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0" aria-label="Close"><X className="h-5 w-5" /></button>
+        </div>
+
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-[140px]">
+          {messages.map((m, i) => (
+            <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
+              <span className={`inline-block max-w-[90%] px-3 py-2 text-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{m.content}</span>
+            </div>
+          ))}
+          {loading && <div className="text-muted-foreground text-sm inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {coachName} is thinking...</div>}
+        </div>
+
+        <div className="border-t border-border p-3 space-y-3">
+          <div className="flex items-end gap-2">
+            <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} autoFocus placeholder={`Answer ${coachName}...`}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
+              className="flex-1 resize-none rounded-none border border-input bg-background px-3 py-2 text-sm" />
+            <Button size="sm" disabled={!input.trim() || loading} onClick={() => send(input)} className="rounded-none"><Send className="h-4 w-4" /></Button>
+          </div>
+
+          <div className="border border-primary/30 bg-primary/5 p-2.5 space-y-2">
+            <div className="ed-overline text-muted-foreground">Your {field.label.toLowerCase()} {draft ? '· edit if you like' : '· or write it yourself'}</div>
+            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={3} placeholder={`As you talk, ${coachName} fills this in. You can also type it here.`}
+              className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+            <div className="flex items-center justify-end">
+              <Button size="sm" disabled={!draft.trim() || saving} onClick={add} className="gap-1.5 rounded-none">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add to portfolio</Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq, onCaptured, readOnly, compact }: { cc: Mine | undefined; stageHint?: string; coachName?: string; observeReq?: { text: string; n: number } | null; onCaptured?: () => void; readOnly?: boolean; compact?: boolean }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1077,10 +1203,12 @@ function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq, onCapture
   };
 
   return (
-    <Card className="rounded-none p-0 flex flex-col overflow-hidden lg:sticky lg:top-4 h-[70vh]">
+    <Card className={`rounded-none p-0 flex flex-col overflow-hidden lg:sticky lg:top-4 ${compact ? 'h-[440px]' : 'h-[70vh]'}`}>
       <div className="border-b border-border p-3">
-        <div className="ed-overline text-foreground">{coachName} · your thinking partner</div>
-        <p className="text-xs text-muted-foreground mt-1">A Socratic coach. {coachName} asks, you think, and comments as you write. As you talk, {coachName} drafts portfolio entries from your own words, so you never type the same thing twice.</p>
+        <div className="ed-overline text-foreground">{coachName} · {compact ? 'the bigger conversation' : 'your thinking partner'}</div>
+        <p className="text-xs text-muted-foreground mt-1">{compact
+          ? `Optional. Fill each box with the ${coachName} button on the left. Use this space to think more broadly, or ask ${coachName} anything about your practice.`
+          : `A Socratic coach. ${coachName} asks, you think, and comments as you write. As you talk, ${coachName} drafts portfolio entries from your own words, so you never type the same thing twice.`}</p>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (

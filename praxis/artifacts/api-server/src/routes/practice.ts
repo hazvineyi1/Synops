@@ -1067,15 +1067,18 @@ async function coachCapture(
   existingText: string,
   learnerContext: string | undefined,
   coachName?: string,
+  focusStage?: string,
 ): Promise<Array<{ target: "reflection" | "evidence"; stage?: string; title?: string; text: string }>> {
   const name = coachDisplayName(coachName);
+  const focus = focusStage && CAPTURE_STAGES.includes(focusStage) ? focusStage : undefined;
   const learnerSaid = (Array.isArray(messages) ? messages : [])
     .filter((m) => m.role !== "assistant")
     .map((m) => String(m.content ?? "").trim())
     .filter(Boolean)
     .join("\n---\n")
     .slice(0, 6000);
-  if (learnerSaid.replace(/\s/g, "").length < 40) return [];
+  // A field-focused draft only needs a sentence or two; a general scan wants more before it suggests.
+  if (learnerSaid.replace(/\s/g, "").length < (focus ? 20 : 40)) return [];
   const systemRaw =
     `You help a learner build a reflective portfolio with ${name}. Your ONLY job here is to turn what the ` +
     `learner has ALREADY SAID in conversation into portfolio entries, in THEIR OWN WORDS, so they do not ` +
@@ -1091,6 +1094,7 @@ async function coachCapture(
     `Only propose an entry when the learner has genuinely articulated that content. Do NOT duplicate anything ` +
     `already in their portfolio (shown below). Propose at most TWO entries, the most portfolio-ready ones. If ` +
     `nothing new is ready, return an empty list. Never use em dashes or en dashes.\n\n` +
+    (focus ? `IMPORTANT: right now the learner is filling ONE box: "${CAPTURE_LABELS[focus]}" (stage "${focus}"). Return exactly ONE capture, target "reflection" with stage "${focus}", drafted from what they have said for this box. If they have not yet said enough for it, return an empty list.\n\n` : "") +
     (learnerContext ? `About this person:\n${learnerContext}\n\n` : "") +
     `Already captured (do not repeat these):\n${existingText || "(nothing yet)"}\n\n` +
     `Return ONLY valid JSON of the form: {"captures":[{"target":"reflection","stage":"analysis","title":null,"text":"..."}]}. ` +
@@ -1111,15 +1115,15 @@ async function coachCapture(
     if (c?.target === "evidence") {
       out.push({ target: "evidence", title: c?.title ? String(c.title).slice(0, 120) : undefined, text });
     } else {
-      const stage = CAPTURE_STAGES.includes(String(c?.stage)) ? String(c.stage) : "description";
+      const stage = focus ?? (CAPTURE_STAGES.includes(String(c?.stage)) ? String(c.stage) : "description");
       out.push({ target: "reflection", stage, text });
     }
-    if (out.length >= 2) break;
+    if (out.length >= (focus ? 1 : 2)) break;
   }
   return out;
 }
 
-export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string, learnerContext?: string, coachName?: string): Promise<string> {
+export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string, learnerContext?: string, coachName?: string, focusHint?: string): Promise<string> {
   const history = Array.isArray(messages) ? messages.slice(-16) : [];
   const name = coachDisplayName(coachName);
   const systemRaw =
@@ -1127,6 +1131,7 @@ export async function mutaleCoachReply(messages: { role: string; content: string
     (learnerContext ? `Your model of this person (do not read it back to them; use it to individualize every question):\n${learnerContext}\n\n` : "") +
     `You are helping them turn a real experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "their practice"}". ` +
     (activityBrief ? `The activity brief is: ${activityBrief}\n` : "") +
+    (focusHint ? `Right now you are helping them put ONE specific thing into words: ${focusHint}. Ask one short, focused question at a time to draw exactly this out of their real experience. Stay on this one thing; do not wander to other stages. When they have said enough to fill it, tell them warmly that they have it and they can add it.\n` : "") +
     `Ask one question at a time, grounded in their own experience and their prior practice. Never lecture, never hand over the right answer, and never grade, a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. ${COACH_RESEARCH} Never use em dashes or en dashes.`;
   // Swap the coach's name for programmes that use a different one (e.g. the educator coach is "Eve").
   const system = name === "Mutale" ? systemRaw : systemRaw.replace(/Mutale/g, name);
@@ -1144,12 +1149,12 @@ export async function mutaleCoachReply(messages: { role: string; content: string
 // individualised from the candidate's own prior-practice reason and reflection so far (their twin).
 router.post("/practice/coach", requireAuth, async (req, res) => {
   const uid = req.userId!;
-  const { messages, candidateCredentialId, coachName } = req.body ?? {};
+  const { messages, candidateCredentialId, coachName, focusHint } = req.body ?? {};
   const ctx = await coachContext(uid, candidateCredentialId);
   const title = ctx.title ?? req.body?.credentialTitle;
   const brief = ctx.brief ?? req.body?.activityBrief;
   try {
-    const reply = await mutaleCoachReply(messages, title, brief, ctx.context, coachName);
+    const reply = await mutaleCoachReply(messages, title, brief, ctx.context, coachName, focusHint ? String(focusHint).slice(0, 400) : undefined);
     if (candidateCredentialId && ctx.title) {
       const last = Array.isArray(messages) && messages.length ? messages[messages.length - 1] : null;
       if (last && last.role !== "assistant" && last.content) await saveCoachMsg(candidateCredentialId, "learner", String(last.content), "chat");
@@ -1208,7 +1213,7 @@ router.post("/practice/coach/analysis", requireAuth, async (req, res) => {
 // in their own words, so talking to the coach populates the fields instead of doubling the typing.
 router.post("/practice/coach/capture", requireAuth, async (req, res) => {
   const uid = req.userId!;
-  const { candidateCredentialId, messages, coachName } = req.body ?? {};
+  const { candidateCredentialId, messages, coachName, focusStage } = req.body ?? {};
   const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${candidateCredentialId} AND candidate_id = ${uid} LIMIT 1`);
   if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
   const ctx = await coachContext(uid, candidateCredentialId);
@@ -1223,7 +1228,7 @@ router.post("/practice/coach/capture", requireAuth, async (req, res) => {
     ].join("\n").slice(0, 4000);
   } catch { /* fields may be empty */ }
   try {
-    const captures = await coachCapture(messages, existing, ctx.context, coachName);
+    const captures = await coachCapture(messages, existing, ctx.context, coachName, focusStage ? String(focusStage) : undefined);
     res.json({ captures: captures.map((c) => ({ ...c, label: c.target === "evidence" ? "Evidence" : (CAPTURE_LABELS[c.stage!] ?? "Reflection") })) });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
