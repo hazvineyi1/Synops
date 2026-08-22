@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, Brain, ShieldCheck, Loader2, TrendingUp,
+  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, ShieldCheck, Loader2, TrendingUp,
 } from 'lucide-react';
 
 /**

@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy, Copy, ShieldCheck, Users, X,
+  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Check, Trophy, Copy, ShieldCheck, Users, X,
 } from 'lucide-react';
 
 /** Offline capture: pending queue + connection status, flushed automatically when back online. */
@@ -184,12 +184,14 @@ export function PracticeCanvas() {
       <div className="flex items-center justify-between gap-3">
         <button onClick={() => navigate('/practice')} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> My credentials</button>
         {isEducator && !readOnly && (
-          <button onClick={() => setGuidance(!eveOn)}
-            className={`inline-flex items-center gap-2 border px-3 py-1.5 text-xs font-medium transition-colors ${eveOn ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10' : 'border-border text-muted-foreground hover:bg-muted/40'}`}
+          <button onClick={() => setGuidance(!eveOn)} role="switch" aria-checked={eveOn}
+            className={`inline-flex items-center gap-2.5 rounded-full border px-3 py-1.5 transition-colors ${eveOn ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-border bg-muted/40 hover:bg-muted/60'}`}
             title={eveOn ? 'Eve is guiding you. Click to write on your own.' : 'Eve is off. Click to turn her back on.'}>
-            <Brain className="h-3.5 w-3.5" />
-            {eveOn ? 'Eve: on' : 'Eve: off'}
-            <span className="text-muted-foreground font-normal">· {eveOn ? 'turn off' : 'turn on'}</span>
+            <span className="text-xs font-semibold text-foreground">Eve guidance</span>
+            <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${eveOn ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}>
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${eveOn ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+            </span>
+            <span className={`text-xs font-bold uppercase tracking-wide ${eveOn ? 'text-emerald-600' : 'text-muted-foreground'}`}>{eveOn ? 'On' : 'Off'}</span>
           </button>
         )}
       </div>
@@ -474,7 +476,7 @@ function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale
   return (
     <Card className="rounded-none p-5 space-y-4 border-primary/20">
       <div>
-        <div className="flex items-center gap-2 ed-overline text-foreground"><Brain className="h-4 w-4 text-primary" /> What {coachName} is learning about how you lead</div>
+        <div className="ed-overline text-foreground">What {coachName} is learning about how you lead</div>
         <p className="text-xs text-muted-foreground mt-1">This is the model your coach holds{name ? `, ${name}` : ''}, drawn only from your own words. {coachName} remembers it so you do not have to, and uses it to make its questions personal. It never replaces your thinking.</p>
       </div>
 
