@@ -96,10 +96,18 @@ const stageLabel = (k: string) => GIBBS.find((g) => g.key === k)?.label ?? EXTRA
 // The four Kolb moves that organise the portfolio, each mapped to the capture it invites and the
 // question Mutale opens with when the candidate is working that move.
 const CYCLE = [
-  { key: 'e', label: 'Experience', focus: 'Capture what you actually did', reflect: ['description'], coach: 'Walk me through what actually happened. Who was involved, and what did you decide?' },
-  { key: 'r', label: 'Reflect', focus: 'Look back on it', reflect: ['feelings', 'evaluation'], coach: 'Before it happened, what did you expect? Where did reality differ, and how did it feel?' },
-  { key: 'n', label: 'Name it', focus: 'Name the idea it points to', reflect: ['analysis', 'conclusion'], coach: 'What does this tell you about how you lead? Try to name the principle underneath it.' },
-  { key: 't', label: 'Try it', focus: 'Plan your next turn', reflect: ['action'], coach: 'Knowing this, what will you do differently the next time?' },
+  { key: 'e', label: 'Experience', focus: 'Capture what you actually did', reflect: ['description'],
+    coach: 'Walk me through what actually happened. Who was involved, and what did you decide?',
+    guide: 'Describe what actually happened, in plain words, as if you were telling a colleague over coffee. Who was there? What did you do, step by step? What did you decide, and why? Do not polish it or justify yourself yet, just capture the real moment.' },
+  { key: 'r', label: 'Reflect', focus: 'Look back on it', reflect: ['feelings', 'evaluation'],
+    coach: 'Before it happened, what did you expect? Where did reality differ, and how did it feel?',
+    guide: 'Now look back honestly. How did it feel, for you and for the people involved? What went well, and what did not? What did you expect would happen, and where did it surprise you? The surprise is usually where the learning is.' },
+  { key: 'n', label: 'Name it', focus: 'Name the idea it points to', reflect: ['analysis', 'conclusion'],
+    coach: 'What does this tell you about how you lead? Try to name the principle underneath it.',
+    guide: 'Step back from the single event to the idea underneath it. What does this tell you about how you work? Try to finish this sentence in one line: "What I learned is..." as if it were advice you would give another person.' },
+  { key: 't', label: 'Try it', focus: 'Plan your next turn', reflect: ['action'],
+    coach: 'Knowing this, what will you do differently the next time?',
+    guide: 'Turn the insight into action. What is one concrete thing you will do differently next time, and when? Be specific enough that someone could later check whether you actually did it.' },
 ] as const;
 
 /** Which Kolb stages this credential's practice has reached, from evidence + reflection stages. */
@@ -206,8 +214,12 @@ export function PracticeCanvas() {
           {!submitted && (
             <div className="space-y-4">
               <div>
-                <div className="ed-overline text-muted-foreground">{lit[stage.key] ? 'Worked, refine or add more' : 'Your focus now'}</div>
+                <div className="ed-overline text-muted-foreground">{lit[stage.key] ? 'Worked, refine or add more' : `Step ${CYCLE.findIndex((s) => s.key === stage.key) + 1} of 4 · your focus now`}</div>
                 <h2 className="ed-h2 mt-1">{stage.focus}</h2>
+                <div className="mt-2 border-l-2 border-primary/40 pl-3">
+                  <div className="ed-overline text-muted-foreground">How to respond</div>
+                  <p className="text-sm text-muted-foreground mt-0.5">{stage.guide}</p>
+                </div>
               </div>
               {stage.key === 'e' && (
                 <>
@@ -930,10 +942,16 @@ function CoachPanel({ cc, stageHint, coachName = 'Mutale' }: { cc: Mine | undefi
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
-          <div className="text-sm text-muted-foreground space-y-2">
+          <div className="text-sm text-muted-foreground space-y-3">
+            <div className="border border-border p-3 space-y-1.5">
+              <div className="ed-overline text-foreground">How to use {coachName}</div>
+              <p className="text-xs">{coachName} is your thinking partner, not a search engine. {coachName} will not give you answers or write your reflection for you, but asks questions that help you work out what you already know from your own practice.</p>
+              <p className="text-xs"><span className="font-medium text-foreground">How:</span> tell {coachName} what happened in plain words, then answer the questions honestly, even when you are not sure. There are no wrong answers here.</p>
+              <p className="text-xs"><span className="font-medium text-foreground">Why:</span> putting your own thinking into words is how experience turns into learning. If {coachName} simply handed you the answer, you would learn nothing.</p>
+            </div>
             {stageHint
-              ? <p><span className="font-medium text-foreground">For this move, {coachName} asks:</span> <em>"{stageHint}"</em></p>
-              : <p>Start with a real moment. For example: <em>"Two people declined to join the team I was forming, and I'm not sure what to do."</em></p>}
+              ? <p><span className="font-medium text-foreground">To get going, {coachName} asks:</span> <em>"{stageHint}"</em>  Type your answer below.</p>
+              : <p><span className="font-medium text-foreground">Start with a real moment.</span> For example: <em>"Half my class used AI on the last essay, and I'm not sure how to respond."</em></p>}
           </div>
         )}
         {messages.map((m, i) => (
