@@ -319,7 +319,7 @@ router.post("/practice/me/credentials/:id/reflections", requireAuth, async (req,
   const { stage, content, source, typedMs, pasteCount } = req.body ?? {};
   if (!content || !String(content).trim()) { res.status(400).json({ error: "content is required" }); return; }
   // Provenance is a best-effort trust signal, never a gate: 'typed' (live, in-app), 'pasted', or null.
-  const src = source === "pasted" || source === "typed" || source === "whatsapp" ? source : null;
+  const src = source === "pasted" || source === "typed" || source === "whatsapp" || source === "coached" ? source : null;
   const tms = Number.isFinite(Number(typedMs)) ? Math.max(0, Math.min(3_600_000, Math.round(Number(typedMs)))) : null;
   const pc = Number.isFinite(Number(pasteCount)) ? Math.max(0, Math.min(999, Math.round(Number(pasteCount)))) : 0;
   const ins = await rows(sql`
@@ -1048,6 +1048,77 @@ async function coachAnalysis(learnerContext: string | undefined, coachName?: str
   return coachText(msg);
 }
 
+// Human labels for the portfolio fields a capture can land in (kept in sync with the canvas UI).
+const CAPTURE_LABELS: Record<string, string> = {
+  description: "What happened", feelings: "Feelings", evaluation: "Evaluation",
+  analysis: "Analysis", conclusion: "Conclusion", action: "Action",
+  prediction: "Prediction", surprise: "Surprise",
+};
+const CAPTURE_STAGES = Object.keys(CAPTURE_LABELS);
+
+/**
+ * Turn the conversation into portfolio-ready captures IN THE LEARNER'S OWN WORDS, so they never have to
+ * type the same thing twice. The coach only lightly cleans what the learner actually said and maps it to
+ * the right field (a piece of evidence, or a Kolb/Gibbs reflection stage). It never invents facts, and it
+ * skips anything already captured. Returns up to two suggestions, or an empty list when nothing is ready.
+ */
+async function coachCapture(
+  messages: { role: string; content: string }[],
+  existingText: string,
+  learnerContext: string | undefined,
+  coachName?: string,
+): Promise<Array<{ target: "reflection" | "evidence"; stage?: string; title?: string; text: string }>> {
+  const name = coachDisplayName(coachName);
+  const learnerSaid = (Array.isArray(messages) ? messages : [])
+    .filter((m) => m.role !== "assistant")
+    .map((m) => String(m.content ?? "").trim())
+    .filter(Boolean)
+    .join("\n---\n")
+    .slice(0, 6000);
+  if (learnerSaid.replace(/\s/g, "").length < 40) return [];
+  const systemRaw =
+    `You help a learner build a reflective portfolio with ${name}. Your ONLY job here is to turn what the ` +
+    `learner has ALREADY SAID in conversation into portfolio entries, in THEIR OWN WORDS, so they do not ` +
+    `have to retype anything. You lightly tidy grammar and trim filler, but you never invent facts, never ` +
+    `add detail they did not give, and never write in a voice that is not theirs. Keep first person.\n\n` +
+    `Map each entry to the field it belongs in:\n` +
+    `- target "evidence": a concrete thing they actually did or produced (the raw account of the event/action).\n` +
+    `- target "reflection" with a stage:\n` +
+    `  description = a plain account of what happened; feelings = how they or others felt; evaluation = what ` +
+    `was good or bad; analysis = why it happened / the idea underneath; conclusion = the lesson or portable ` +
+    `principle; action = what they will do next; prediction = what they expected beforehand; surprise = where ` +
+    `reality differed.\n\n` +
+    `Only propose an entry when the learner has genuinely articulated that content. Do NOT duplicate anything ` +
+    `already in their portfolio (shown below). Propose at most TWO entries, the most portfolio-ready ones. If ` +
+    `nothing new is ready, return an empty list. Never use em dashes or en dashes.\n\n` +
+    (learnerContext ? `About this person:\n${learnerContext}\n\n` : "") +
+    `Already captured (do not repeat these):\n${existingText || "(nothing yet)"}\n\n` +
+    `Return ONLY valid JSON of the form: {"captures":[{"target":"reflection","stage":"analysis","title":null,"text":"..."}]}. ` +
+    `For evidence you may set a short "title"; for reflection leave title null and set a valid "stage".`;
+  const msg = await anthropic.messages.create({
+    model: "claude-sonnet-4-6", max_tokens: 700, system: systemRaw,
+    messages: [{ role: "user", content: `Here is everything I have said so far:\n${learnerSaid}` }],
+  }, { timeout: 45000, maxRetries: 1 });
+  const raw = coachText(msg);
+  const m = raw.match(/\{[\s\S]*\}/);
+  if (!m) return [];
+  let parsed: any;
+  try { parsed = JSON.parse(m[0]); } catch { return []; }
+  const out: Array<{ target: "reflection" | "evidence"; stage?: string; title?: string; text: string }> = [];
+  for (const c of Array.isArray(parsed?.captures) ? parsed.captures : []) {
+    const text = String(c?.text ?? "").replace(/[—–]/g, ", ").trim();
+    if (!text || text.length < 12) continue;
+    if (c?.target === "evidence") {
+      out.push({ target: "evidence", title: c?.title ? String(c.title).slice(0, 120) : undefined, text });
+    } else {
+      const stage = CAPTURE_STAGES.includes(String(c?.stage)) ? String(c.stage) : "description";
+      out.push({ target: "reflection", stage, text });
+    }
+    if (out.length >= 2) break;
+  }
+  return out;
+}
+
 export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string, learnerContext?: string, coachName?: string): Promise<string> {
   const history = Array.isArray(messages) ? messages.slice(-16) : [];
   const name = coachDisplayName(coachName);
@@ -1128,6 +1199,32 @@ router.post("/practice/coach/analysis", requireAuth, async (req, res) => {
     const reply = await coachAnalysis(ctx.context, coachName);
     await saveCoachMsg(candidateCredentialId, "eve", reply, "analysis");
     res.json({ reply });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
+  }
+});
+
+// POST /practice/coach/capture -- draft portfolio entries from what the learner said in conversation,
+// in their own words, so talking to the coach populates the fields instead of doubling the typing.
+router.post("/practice/coach/capture", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const { candidateCredentialId, messages, coachName } = req.body ?? {};
+  const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${candidateCredentialId} AND candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const ctx = await coachContext(uid, candidateCredentialId);
+  // Everything already captured, so the coach never suggests a duplicate.
+  let existing = "";
+  try {
+    const refs = await rows<{ stage: string; content: string }>(sql`SELECT stage, content FROM reflection_entries WHERE candidate_credential_id = ${candidateCredentialId} ORDER BY created_at`);
+    const ev = await rows<{ title: string | null; body: string | null }>(sql`SELECT title, body FROM evidence_items WHERE candidate_credential_id = ${candidateCredentialId} ORDER BY created_at`);
+    existing = [
+      ...refs.map((r) => `(${CAPTURE_LABELS[r.stage] ?? r.stage}) ${r.content}`),
+      ...ev.map((e) => `[evidence] ${[e.title, e.body].filter(Boolean).join(" ")}`),
+    ].join("\n").slice(0, 4000);
+  } catch { /* fields may be empty */ }
+  try {
+    const captures = await coachCapture(messages, existing, ctx.context, coachName);
+    res.json({ captures: captures.map((c) => ({ ...c, label: c.target === "evidence" ? "Evidence" : (CAPTURE_LABELS[c.stage!] ?? "Reflection") })) });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
   }

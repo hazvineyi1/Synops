@@ -281,7 +281,7 @@ export function PracticeCanvas() {
         </div>
 
         {/* The coach, contextual to the current move */}
-        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} />
+        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} onCaptured={invalidate} readOnly={readOnly} />
       </div>
     </div>
   );
@@ -964,15 +964,20 @@ function GatewaySubmit({ cc, reflections, evidence, onChange }: { cc: Mine | und
   );
 }
 
-function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq }: { cc: Mine | undefined; stageHint?: string; coachName?: string; observeReq?: { text: string; n: number } | null }) {
+type Capture = { target: 'reflection' | 'evidence'; stage?: string; title?: string; text: string; label: string };
+
+function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq, onCaptured, readOnly }: { cc: Mine | undefined; stageHint?: string; coachName?: string; observeReq?: { text: string; n: number } | null; onCaptured?: () => void; readOnly?: boolean }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [analysing, setAnalysing] = useState(false);
   const [offerAnalysis, setOfferAnalysis] = useState(false);
+  const [captures, setCaptures] = useState<Capture[]>([]);
+  const [drafting, setDrafting] = useState(false);
+  const [savingIdx, setSavingIdx] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastObserve = useRef(0);
-  useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, loading, analysing]);
+  useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, loading, analysing, captures]);
 
   // Load the persisted conversation once, so it is part of the portfolio and survives a reload.
   useEffect(() => {
@@ -982,6 +987,22 @@ function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq }: { cc: M
       .catch(() => {});
   }, [cc?.id]);
 
+  // Draft portfolio entries from what the learner has said, in their own words. Runs quietly in the
+  // background after each message, and on demand, so talking to the coach fills the fields for them.
+  const requestCaptures = useCallback(async (msgs: ChatMsg[], manual = false) => {
+    if (!cc?.id || readOnly) return;
+    if (manual) setDrafting(true);
+    try {
+      const r = await apiFetch<{ captures: Capture[] }>('/practice/coach/capture', { method: 'POST', body: JSON.stringify({ candidateCredentialId: cc.id, messages: msgs, coachName }) });
+      const fresh = Array.isArray(r.captures) ? r.captures : [];
+      // Merge, skipping anything already suggested (same target+text) so cards do not pile up.
+      setCaptures((prev) => {
+        const seen = new Set(prev.map((c) => `${c.target}|${c.text}`));
+        return [...prev, ...fresh.filter((c) => !seen.has(`${c.target}|${c.text}`))];
+      });
+    } catch { /* capture is best-effort */ } finally { if (manual) setDrafting(false); }
+  }, [cc?.id, coachName, readOnly]);
+
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
     const next: ChatMsg[] = [...messages, { role: 'user', content: text.trim(), kind: 'chat' }];
@@ -989,9 +1010,28 @@ function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq }: { cc: M
     try {
       const r = await apiFetch<{ reply: string }>('/practice/coach', { method: 'POST', body: JSON.stringify({ messages: next, candidateCredentialId: cc?.id, credentialTitle: cc?.title, activityBrief: cc?.activity_brief, coachName }) });
       setMessages((m) => [...m, { role: 'assistant', content: r.reply, kind: 'chat' }]);
+      requestCaptures(next); // quietly draft portfolio entries from the exchange
     } catch {
       setMessages((m) => [...m, { role: 'assistant', content: 'I could not respond just now. Try again in a moment.', kind: 'chat' }]);
     } finally { setLoading(false); }
+  };
+
+  const editCapture = (i: number, text: string) => setCaptures((cs) => cs.map((c, j) => (j === i ? { ...c, text } : c)));
+  const dismissCapture = (i: number) => setCaptures((cs) => cs.filter((_, j) => j !== i));
+  const addCapture = async (i: number) => {
+    const c = captures[i];
+    if (!c || !cc?.id || !c.text.trim()) return;
+    setSavingIdx(i);
+    try {
+      if (c.target === 'evidence') {
+        await apiFetch(`/practice/me/credentials/${cc.id}/evidence`, { method: 'POST', body: JSON.stringify({ kind: 'text', title: c.title || null, body: c.text.trim() }) });
+      } else {
+        await apiFetch(`/practice/me/credentials/${cc.id}/reflections`, { method: 'POST', body: JSON.stringify({ stage: c.stage, content: c.text.trim(), source: 'coached', typedMs: 0, pasteCount: 0 }) });
+      }
+      dismissCapture(i);
+      setMessages((m) => [...m, { role: 'assistant', content: `Added to your portfolio under ${c.label}. You can still edit or remove it on the left.`, kind: 'observation' }]);
+      onCaptured?.();
+    } catch { /* leave the card so they can retry */ } finally { setSavingIdx(null); }
   };
 
   // React to a field write: ask the coach to observe it (a brief insight or a probing question).
@@ -1040,7 +1080,7 @@ function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq }: { cc: M
     <Card className="rounded-none p-0 flex flex-col overflow-hidden lg:sticky lg:top-4 h-[70vh]">
       <div className="border-b border-border p-3">
         <div className="ed-overline text-foreground">{coachName} · your thinking partner</div>
-        <p className="text-xs text-muted-foreground mt-1">A Socratic coach. {coachName} asks, you think, and comments as you write. Turn your experience into articulated learning.</p>
+        <p className="text-xs text-muted-foreground mt-1">A Socratic coach. {coachName} asks, you think, and comments as you write. As you talk, {coachName} drafts portfolio entries from your own words, so you never type the same thing twice.</p>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
@@ -1059,14 +1099,35 @@ function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq }: { cc: M
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'text-right' : ''}>{bubble(m)}</div>
         ))}
-        {(loading || analysing) && <div className="text-muted-foreground text-sm inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {coachName} is thinking...</div>}
+        {captures.map((c, i) => (
+          <div key={`cap-${i}`} className="border border-primary/40 bg-primary/5 p-3 space-y-2">
+            <div className="flex items-center gap-1.5 ed-overline text-primary"><Plus className="h-3.5 w-3.5" /> {coachName} can add this · {c.label}</div>
+            <p className="text-[11px] text-muted-foreground">Drawn from your own words. Edit it, then add it to your portfolio.</p>
+            {!readOnly ? (
+              <textarea value={c.text} onChange={(e) => editCapture(i, e.target.value)} rows={3}
+                className="w-full rounded-none border border-input bg-background px-2.5 py-2 text-sm" />
+            ) : <p className="text-sm whitespace-pre-wrap">{c.text}</p>}
+            {!readOnly && (
+              <div className="flex items-center justify-end gap-2">
+                <button onClick={() => dismissCapture(i)} className="ed-overline text-muted-foreground hover:text-foreground">Not this</button>
+                <Button size="sm" disabled={savingIdx === i || !c.text.trim()} onClick={() => addCapture(i)} className="gap-1.5 rounded-none">
+                  {savingIdx === i ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add to {c.label}
+                </Button>
+              </div>
+            )}
+          </div>
+        ))}
+        {(loading || analysing || drafting) && <div className="text-muted-foreground text-sm inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {coachName} is {drafting ? 'drafting your entries' : 'thinking'}...</div>}
         {offerAnalysis && !analysing && (
           <button onClick={analyse} className="ed-overline text-primary underline ed-underline">Yes, {coachName}, show me the pattern you see</button>
         )}
       </div>
       <div className="border-t border-border p-2 space-y-2">
+        {!readOnly && messages.some((m) => m.role === 'user') && !drafting && (
+          <button onClick={() => requestCaptures(messages, true)} className="ed-overline text-primary hover:text-primary/80 inline-flex items-center gap-1"><Plus className="h-3 w-3" /> Turn our talk into portfolio entries</button>
+        )}
         {messages.some((m) => m.role === 'user' || m.kind === 'observation') && !analysing && (
-          <button onClick={analyse} className="ed-overline text-muted-foreground hover:text-foreground">Ask {coachName} to analyse my reflection so far</button>
+          <button onClick={analyse} className="ed-overline text-muted-foreground hover:text-foreground block">Ask {coachName} to analyse my reflection so far</button>
         )}
         <div className="flex items-end gap-2">
           <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={stageHint ? `Answer ${coachName}, or tell it what happened...` : `Tell ${coachName} what happened...`}
