@@ -181,7 +181,18 @@ export function PracticeCanvas() {
 
   return (
     <div className={`max-w-6xl mx-auto space-y-4 ${isEducator ? 'theme-warm' : ''}`}>
-      <button onClick={() => navigate('/practice')} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> My credentials</button>
+      <div className="flex items-center justify-between gap-3">
+        <button onClick={() => navigate('/practice')} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> My credentials</button>
+        {isEducator && !readOnly && (
+          <button onClick={() => setGuidance(!eveOn)}
+            className={`inline-flex items-center gap-2 border px-3 py-1.5 text-xs font-medium transition-colors ${eveOn ? 'border-primary/40 bg-primary/5 text-primary hover:bg-primary/10' : 'border-border text-muted-foreground hover:bg-muted/40'}`}
+            title={eveOn ? 'Eve is guiding you. Click to write on your own.' : 'Eve is off. Click to turn her back on.'}>
+            <Brain className="h-3.5 w-3.5" />
+            {eveOn ? 'Eve: on' : 'Eve: off'}
+            <span className="text-muted-foreground font-normal">· {eveOn ? 'turn off' : 'turn on'}</span>
+          </button>
+        )}
+      </div>
 
       {(!off.online || off.pending.length > 0) && (
         <div className={`flex items-center justify-between gap-3 border p-3 text-sm ${off.online ? 'border-amber-500/30 bg-amber-500/5 text-amber-800' : 'border-muted bg-muted/40 text-muted-foreground'}`}>
