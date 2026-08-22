@@ -292,7 +292,7 @@ export function PracticeHome() {
         </EditorialCard>
       )}
 
-      {(picking || mine.length === 0) && (
+      {picking && (
         <div id="choose-credentials">
           <EditorialCard accent className="p-6 space-y-4">
             <div>
