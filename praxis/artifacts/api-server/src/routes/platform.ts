@@ -37,7 +37,7 @@ import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
 import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
 import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
 import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
-import { PRACTICE_DDL } from "./practice";
+import { PRACTICE_DDL, runPracticeDDL } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
   newSessionToken,
@@ -1412,7 +1412,7 @@ const MRB_EXAMPLE_ASSIGNMENT =
 // exist (reusing the Zambian seed), creates the credential catalogue, and pre-selects two for the demo.
 router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async (_req, res) => {
   try {
-    await db.execute(sql.raw(PRACTICE_DDL));
+    await runPracticeDDL();
     // Reuse the proven Zambian seed to guarantee the partner, org and demo candidate exist.
     await seedZambianLeadership();
     const p = await db.execute(sql`SELECT id FROM partners WHERE slug = 'zambian-leadership' LIMIT 1`);
@@ -1544,7 +1544,7 @@ const EDU_PRACTICE_CREDENTIALS = [
 // reusing the whole practice engine. Idempotent. Brands the tenant and seeds a walkthrough portfolio.
 router.post("/platform/seed-educator-pd", requireAuth, requireSuperAdmin, async (_req, res) => {
   try {
-    await db.execute(sql.raw(PRACTICE_DDL));
+    await runPracticeDDL();
     const seeded = await seedEducatorPD();
     const pid = seeded.partnerId;
     for (const c of EDU_PRACTICE_CREDENTIALS) {

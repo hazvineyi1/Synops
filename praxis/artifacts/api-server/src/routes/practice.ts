@@ -185,6 +185,22 @@ async function rows<T = any>(q: any): Promise<T[]> {
   return (r?.rows ?? []) as T[];
 }
 
+/**
+ * Apply the practice schema one statement at a time (idempotent). Running each statement separately
+ * avoids the "cannot insert multiple commands into a prepared statement" failure that a single
+ * multi-statement execute can hit, and isolates any one failing statement instead of aborting the lot.
+ * The DDL contains no semicolons inside string literals, so splitting on ";" is safe here.
+ */
+export async function runPracticeDDL(): Promise<void> {
+  // Strip line comments first (they can contain semicolons), THEN split on ";". The real statements
+  // have no semicolons inside string literals, so what remains splits cleanly into one command each.
+  const cleaned = PRACTICE_DDL.replace(/--[^\n]*(\n|$)/g, "\n");
+  const statements = cleaned.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
+  for (const stmt of statements) {
+    await db.execute(sql.raw(stmt));
+  }
+}
+
 /** The partner a user belongs to: their own partnerId, else their organisation's partner. */
 async function partnerOf(req: any): Promise<string | null> {
   const u = req.dbUser;
@@ -200,7 +216,7 @@ const isStaff = (req: any) =>
 // One-time schema bootstrap (super admin). Safe to re-run.
 router.post("/practice/_migrate", requireAuth, requireSuperAdmin, async (_req, res) => {
   try {
-    await db.execute(sql.raw(PRACTICE_DDL));
+    await runPracticeDDL();
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Migration failed" });
