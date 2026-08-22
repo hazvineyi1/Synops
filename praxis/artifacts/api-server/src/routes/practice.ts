@@ -176,6 +176,11 @@ CREATE TABLE IF NOT EXISTS coach_messages (
   content text NOT NULL,
   kind text NOT NULL DEFAULT 'chat',
   created_at timestamp NOT NULL DEFAULT now());
+ALTER TABLE coach_messages ADD COLUMN IF NOT EXISTS candidate_credential_id text;
+ALTER TABLE coach_messages ADD COLUMN IF NOT EXISTS role text;
+ALTER TABLE coach_messages ADD COLUMN IF NOT EXISTS content text;
+ALTER TABLE coach_messages ADD COLUMN IF NOT EXISTS kind text DEFAULT 'chat';
+ALTER TABLE coach_messages ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now();
 CREATE INDEX IF NOT EXISTS coach_messages_cc_idx ON coach_messages(candidate_credential_id, created_at);
 `;
 
@@ -197,7 +202,13 @@ export async function runPracticeDDL(): Promise<void> {
   const cleaned = PRACTICE_DDL.replace(/--[^\n]*(\n|$)/g, "\n");
   const statements = cleaned.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
   for (const stmt of statements) {
-    await db.execute(sql.raw(stmt));
+    // The schema is idempotent bootstrap: a single legacy/pre-existing table mismatch on one ALTER or
+    // INDEX must not abort the whole provision. Log and continue; app reads/writes are already guarded.
+    try {
+      await db.execute(sql.raw(stmt));
+    } catch (e: any) {
+      console.warn("[runPracticeDDL] skipped a statement:", (e?.message || e), "::", stmt.slice(0, 80));
+    }
   }
 }
 
