@@ -151,6 +151,9 @@ export function PracticeCanvas() {
   const invalidate = useCallback(() => { qc.invalidateQueries({ queryKey: ['practice-reflections', id] }); qc.invalidateQueries({ queryKey: ['practice-evidence', id] }); qc.invalidateQueries({ queryKey: ['practice-me'] }); }, [qc, id]);
   const off = useOffline(id, invalidate);
 
+  // Entering a credential should start at the top of the page, not wherever the home page was scrolled.
+  useEffect(() => { window.scrollTo(0, 0); }, [id]);
+
   // Opening the canvas starts the credential (chosen -> in progress) so it becomes the active one.
   useEffect(() => {
     if (cc && cc.status === 'chosen') {

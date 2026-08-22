@@ -295,7 +295,7 @@ export function PracticeHome() {
       {/* Adaptive next move, only once they have credentials (a new user starts from the picker below). */}
       {mine.length > 0 && <NextMoveBanner move={move} onCta={onNextMove} />}
 
-      {guided && mine.length > 0 && (
+      {guided && mine.length > 0 && !isEducator && (
         <EditorialCard className="p-5 flex items-start gap-3">
           <MessageSquareQuote className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="text-sm">
