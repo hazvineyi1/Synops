@@ -307,6 +307,8 @@ const DEMO_TENANTS: Record<string, DemoTenant> = {
   "zambian-leadership": { slug: "zambian-leadership", student: "demo.learner@zcl.test", admin: "demo.admin@zcl.test", adminRole: "partner_admin" },
   // Educator PD demo: the public /demos/educator link enters the "Thoughtful AI in teaching" practice class.
   "educator-pd": { slug: "educator-pd", student: "demo.educator@edupd.test", admin: "demo.admin@edupd.test", adminRole: "partner_admin" },
+  // PEJ Justice Practice demo: the public /demos/pej-practice link enters the justice-sector practice class.
+  "pej-practice": { slug: "pej-practice", student: "demo.learner@pej-practice.test", admin: "demo.admin@pej-practice.test", adminRole: "partner_admin" },
   "synops-k12": {
     slug: "synops-k12", student: "maya.k12@synops-demo.test", studentAlt: "leo.k12@synops-demo.test",
     admin: "teacher.k12@synops-demo.test", adminRole: "partner_admin",
@@ -420,10 +422,10 @@ router.post("/auth/demo-login", async (req, res) => {
     return;
   }
 
-  // The educator PD demo always starts from the very beginning: wipe the entry learner's portfolio on
-  // every sign-in (so it opens at 0%), and personalise the demo to the visitor's entered name.
+  // The guided practice demos (educator PD, PEJ Justice) always start from the very beginning: wipe the
+  // entry learner's portfolio on every sign-in (so it opens at 0%), and personalise to the entered name.
   const visitorName = String(req.body?.name ?? "").trim().slice(0, 60).replace(/[^\p{L}\p{M} .'-]/gu, "").trim();
-  if (tenantKey === "educator-pd" && role === "student" && user.email === tenant.student) {
+  if ((tenantKey === "educator-pd" || tenantKey === "pej-practice") && role === "student" && user.email === tenant.student) {
     await resetCandidatePractice(user.id);
     if (visitorName) {
       const first = visitorName.split(/\s+/)[0];

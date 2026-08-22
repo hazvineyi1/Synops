@@ -8,6 +8,7 @@ import { useAdaptive } from '@/lib/adaptive';
 import { nextMove, overallProgress } from '@/lib/adaptive';
 import { useBrandTheme } from '@/context/ThemeProvider';
 import { Overline, Rule, EditorialCard, Meter, ModeToggle, NextMoveBanner, CycleRing } from '@/components/editorial';
+import { demoProfile, type Audience } from '@/lib/demoProfile';
 import {
   Plus, ArrowRight, Lock, CheckCircle2, MessageSquareQuote, ChevronUp, ChevronDown, ShieldCheck, Copy,
 } from 'lucide-react';
@@ -119,23 +120,64 @@ function LongitudinalTwin({ coachName = 'Mutale' }: { coachName?: string }) {
   );
 }
 
-function Orientation({ name, programName, isEducator, hasCredentials, onStart }: { name?: string; programName: string; isEducator: boolean; hasCredentials: boolean; onStart: () => void }) {
-  const [open, setOpen] = useState(!hasCredentials || isEducator);
-  const coachName = isEducator ? 'Eve' : 'Mutale';
-  const goal = isEducator
-    ? 'Your goal is to earn your first credential: recognition that you can genuinely do one thing in your teaching. You earn it by trying one real thing with your students, reflecting on what happened with your coach, and adding a little evidence. No courses, no grades. Why bother? Because these credentials are proof of what you can actually do, built from your real classroom rather than a certificate of attendance, and you can show them to your school, a registration body, or a new employer.'
-    : 'Your goal is to earn your first credential: recognition of one real thing you can do as a leader. You earn it by using something real from your work, reflecting on it with your coach, and adding evidence. No courses, no grades. These credentials are proof of what you can actually do, built from real work rather than a course, and you can share and verify them with anyone who needs to trust it.';
-  const steps: [string, string][] = isEducator ? [
-    ['Choose a focus', 'Pick a credential below that fits something you already do, or want to try, with your students.'],
-    ['Do something real', 'Try it in your own classroom. It does not have to be new, use something from this term.'],
-    [`Reflect with ${coachName}`, `Talk it through with your coach. ${coachName} asks the questions; you do the thinking. Capture what you did, what surprised you, and what you learned.`],
-    ['Get recognised', 'When your portfolio is ready, submit it. A reviewer recognises it or refers it back, always with feedback, and issues your verifiable credential.'],
-  ] : [
-    ['Choose a credential', 'Pick a leadership practice you want recognised, and say in a line why.'],
-    ['Do the work', 'Use something real from your practice, from the last six months if you like.'],
-    [`Reflect with ${coachName}`, 'Your Socratic coach helps you turn the experience into articulated learning and evidence.'],
-    ['Get recognised', 'Submit your portfolio. A reviewer recognises it or refers it back, with developmental feedback either way.'],
-  ];
+// Audience-specific copy so the guided practice class reads right for educators, justice-sector
+// professionals (PEJ) or leaders, without changing the engine underneath.
+const AUD: Record<Audience, {
+  goal: string; steps: (coach: string) => [string, string][]; cycleDo: string; pickFit: string;
+  mastheadOverline: string; mastheadSub?: string; guidedIntro: string; chooseIntro: string;
+  chooseRowFit: string; choosePlaceholder: string;
+}> = {
+  educator: {
+    goal: 'Your goal is to earn your first credential: recognition that you can genuinely do one thing in your teaching. You earn it by trying one real thing with your students, reflecting on what happened with your coach, and adding a little evidence. No courses, no grades. Why bother? Because these credentials are proof of what you can actually do, built from your real classroom rather than a certificate of attendance, and you can show them to your school, a registration body, or a new employer.',
+    steps: (coach) => [
+      ['Choose a focus', 'Pick a credential below that fits something you already do, or want to try, with your students.'],
+      ['Do something real', 'Try it in your own classroom. It does not have to be new, use something from this term.'],
+      [`Reflect with ${coach}`, `Talk it through with your coach. ${coach} asks the questions; you do the thinking. Capture what you did, what surprised you, and what you learned.`],
+      ['Get recognised', 'When your portfolio is ready, submit it. A reviewer recognises it or refers it back, always with feedback, and issues your verifiable credential.'],
+    ],
+    cycleDo: 'try something real with your students', pickFit: 'already do with your students',
+    mastheadOverline: 'Professional learning, from your own classroom',
+    mastheadSub: 'Grow your teaching one real classroom experiment at a time.',
+    guidedIntro: 'You are not sitting a course. You earn each credential by trying something real with your own students, reflecting on what happened, and gathering a little evidence. Work at your own pace; the cycle fills as you go.',
+    chooseIntro: 'Each one below is a single thing you can get recognised for in your teaching. Open one to see why it matters, what it asks of you, and what you will be able to show at the end. Work through them one at a time, in any order, at your own pace.',
+    chooseRowFit: 'teaching', choosePlaceholder: 'e.g. I already plan with AI every week and want to be clearer about it.',
+  },
+  justice: {
+    goal: 'Your goal is to earn your first credential: recognition that you can genuinely do one thing to a defensible standard. You earn it by taking something real from your own casework, reconstructed as a composite, reflecting on it with your coach, and adding a little evidence. No courses, no grades. These credentials are proof of a professional standard you actually hold, built from real work rather than a certificate, and nothing here is reported to your institution.',
+    steps: (coach) => [
+      ['Choose a focus', 'Pick a credential below that fits something you already do in your casework, or want to sharpen.'],
+      ['Do something real', 'Use a real situation from your own files, reconstructed as a composite with initials only. Never enter real case material.'],
+      [`Reflect with ${coach}`, `Talk it through with your coach. ${coach} asks the questions; you do the thinking. Capture what you did, what surprised you, and what you learned.`],
+      ['Get recognised', 'When your portfolio is ready, submit it. A reviewer recognises it or refers it back, always with feedback, and issues your verifiable credential.'],
+    ],
+    cycleDo: 'take something real from your casework', pickFit: 'already do in your casework',
+    mastheadOverline: 'Practice, from your own casework',
+    mastheadSub: 'Sharpen one part of your scene and case work at a time.',
+    guidedIntro: 'You are not sitting a course. You earn each credential by taking something real from your own casework, reconstructed as a composite, reflecting on what happened, and gathering a little evidence. Work at your own pace; the cycle fills as you go.',
+    chooseIntro: 'Each one below is a single thing you can get recognised for in your casework. Open one to see why it matters, what it asks of you, and what you will be able to show at the end. Work through them one at a time, in any order, at your own pace.',
+    chooseRowFit: 'casework', choosePlaceholder: 'e.g. A witness account nearly went in through a leading question of mine last month.',
+  },
+  leadership: {
+    goal: 'Your goal is to earn your first credential: recognition of one real thing you can do as a leader. You earn it by using something real from your work, reflecting on it with your coach, and adding evidence. No courses, no grades. These credentials are proof of what you can actually do, built from real work rather than a course, and you can share and verify them with anyone who needs to trust it.',
+    steps: (coach) => [
+      ['Choose a credential', 'Pick a leadership practice you want recognised, and say in a line why.'],
+      ['Do the work', 'Use something real from your practice, from the last six months if you like.'],
+      [`Reflect with ${coach}`, 'Your Socratic coach helps you turn the experience into articulated learning and evidence.'],
+      ['Get recognised', 'Submit your portfolio. A reviewer recognises it or refers it back, with developmental feedback either way.'],
+    ],
+    cycleDo: 'do something real in your practice', pickFit: 'already do in your work',
+    mastheadOverline: 'Practice, not courses', mastheadSub: undefined,
+    guidedIntro: 'You are not taking a course. Each credential is a cycle you move through in your own practice: have an experience, reflect on it, name what it means, and try it again. The strip fills as you go.',
+    chooseIntro: 'Each one below is a single leadership practice you can get recognised for. Open one to see why it matters, what it asks of you, and what you will be able to show at the end. Work through them one at a time, in any order.',
+    chooseRowFit: 'work', choosePlaceholder: 'e.g. I reshaped a struggling team under real pressure last month.',
+  },
+};
+
+function Orientation({ name, programName, audience, coachName, guided, hasCredentials, onStart }: { name?: string; programName: string; audience: Audience; coachName: string; guided: boolean; hasCredentials: boolean; onStart: () => void }) {
+  const [open, setOpen] = useState(!hasCredentials || guided);
+  const a = AUD[audience];
+  const goal = a.goal;
+  const steps: [string, string][] = a.steps(coachName);
   return (
     <EditorialCard accent className="p-6 sm:p-8 space-y-4">
       <div>
@@ -158,7 +200,7 @@ function Orientation({ name, programName, isEducator, hasCredentials, onStart }:
       )}
       <div className="border-t border-border pt-3 space-y-1.5 text-xs text-muted-foreground">
         <div><span className="font-medium text-foreground">A credential</span> is recognition that you can genuinely do one thing in practice, earned by showing real evidence, not by sitting a course or passing a test.</div>
-        <div><span className="font-medium text-foreground">The cycle</span> is the four moves inside every credential: {isEducator ? 'try something real with your students' : 'do something real in your practice'}, reflect on it, name what you learned, and try it again. The progress bar fills as you work them.</div>
+        <div><span className="font-medium text-foreground">The cycle</span> is the four moves inside every credential: {a.cycleDo}, reflect on it, name what you learned, and try it again. The progress bar fills as you work them.</div>
         <div><span className="font-medium text-foreground">Guided and Pro</span> (top right) change how much help you see: Guided explains each step, Pro is a denser view once you know your way around.</div>
       </div>
       {!hasCredentials && (
@@ -168,7 +210,7 @@ function Orientation({ name, programName, isEducator, hasCredentials, onStart }:
             Choose your first credential
             <ArrowRight className="h-4 w-4" />
           </Button>
-          <p className="text-xs text-muted-foreground mt-2">Pick one that fits something you {isEducator ? 'already do with your students' : 'already do in your work'}. You can change your mind later.</p>
+          <p className="text-xs text-muted-foreground mt-2">Pick one that fits something you {a.pickFit}. You can change your mind later.</p>
         </div>
       )}
     </EditorialCard>
@@ -205,11 +247,13 @@ function StageDots({ lit }: { lit: Record<string, boolean> }) {
 export function PracticeHome() {
   const [, navigate] = useLocation();
   const qc = useQueryClient();
-  const { guided } = useAdaptive();
+  const { guided } = useAdaptive(); // adaptive Guided/Pro density (unrelated to the demo audience)
   const { data: brand } = useBrandTheme();
-  const isEducator = (brand?.displayName || '').toLowerCase().includes('educator');
+  const prof = demoProfile(brand?.displayName);
+  const { audience, coachName, themeClass, showWhatsApp } = prof;
+  const guidedDemo = prof.guided; // the guided practice UX (educator PD, PEJ Justice)
+  const aud = AUD[audience];
   const programName = brand?.displayName || 'Practice';
-  const coachName = isEducator ? 'Eve' : 'Mutale';
   const { data: me } = useGetMe();
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const { data: catalogue = [] } = useQuery({ queryKey: ['practice-credentials'], queryFn: () => apiFetch<Credential[]>('/practice/credentials') });
@@ -221,10 +265,10 @@ export function PracticeHome() {
   const progress = overallProgress(mine as any);
   const move = nextMove(mine as any);
   const stateWord = mine.length === 0 ? 'Not started' : progress === 0 ? 'Beginning' : progress < 0.5 ? 'Underway' : progress < 1 ? 'Deep in practice' : 'Full range';
-  // Educator flow is one-at-a-time: an in-flight credential (anything not yet recognised) locks the rest.
+  // Guided demos are one-at-a-time: an in-flight credential (anything not yet recognised) locks the rest.
   const activeMine = mine.find((m) => m.status !== 'reviewed');
-  const educatorLocked = isEducator && !!activeMine;
-  const statusLabelFor = (s: string) => isEducator
+  const guidedLocked = guidedDemo && !!activeMine;
+  const statusLabelFor = (s: string) => guidedDemo
     ? ({ chosen: 'Not started', in_progress: 'In progress', submitted: 'With a reviewer', reviewed: 'Completed', referred: 'Needs more' } as Record<string, string>)[s] ?? s
     : STATUS_LABEL[s] ?? s;
 
@@ -253,18 +297,18 @@ export function PracticeHome() {
   const onNextMove = () => { if (move.href) navigate(move.href); else goToChoose(); };
 
   return (
-    <div className={`max-w-4xl mx-auto space-y-8 ${isEducator ? 'theme-warm' : ''}`}>
+    <div className={`max-w-4xl mx-auto space-y-8 ${themeClass}`}>
       {/* Masthead */}
       <div>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <Overline>{isEducator ? 'Professional learning, from your own classroom' : 'Practice, not courses'}</Overline>
+            <Overline>{aud.mastheadOverline}</Overline>
             <h1 className="ed-display mt-3">{me?.firstName ? `${me.firstName}'s practice` : 'My practice'}</h1>
-            {isEducator && <p className="text-sm text-muted-foreground mt-2">Grow your teaching one real classroom experiment at a time.</p>}
+            {aud.mastheadSub && <p className="text-sm text-muted-foreground mt-2">{aud.mastheadSub}</p>}
           </div>
           <div className="flex items-center gap-3">
             <ModeToggle />
-            {educatorLocked
+            {guidedLocked
               ? <Button className="gap-1.5 rounded-none" onClick={() => navigate(`/practice/c/${activeMine!.id}`)}><ArrowRight className="h-4 w-4" /> Continue your credential</Button>
               : <Button className="gap-1.5 rounded-none" onClick={() => setPicking((p) => !p)}><Plus className="h-4 w-4" /> Choose a credential</Button>}
           </div>
@@ -281,21 +325,17 @@ export function PracticeHome() {
           </div>
         )}
         {guided && (
-          <p className="text-sm text-muted-foreground mt-4 max-w-2xl">
-            {isEducator
-              ? 'You are not sitting a course. You earn each credential by trying something real with your own students, reflecting on what happened, and gathering a little evidence. Work at your own pace; the cycle fills as you go.'
-              : 'You are not taking a course. Each credential is a cycle you move through in your own practice: have an experience, reflect on it, name what it means, and try it again. The strip fills as you go.'}
-          </p>
+          <p className="text-sm text-muted-foreground mt-4 max-w-2xl">{aud.guidedIntro}</p>
         )}
       </div>
 
       {/* Start here: a warm orientation with clear goals and steps, especially for new candidates. */}
-      <Orientation name={me?.firstName} programName={programName} isEducator={isEducator} hasCredentials={mine.length > 0} onStart={goToChoose} />
+      <Orientation name={me?.firstName} programName={programName} audience={audience} coachName={coachName} guided={guidedDemo} hasCredentials={mine.length > 0} onStart={goToChoose} />
 
       {/* Adaptive next move, only once they have credentials (a new user starts from the picker below). */}
       {mine.length > 0 && <NextMoveBanner move={move} onCta={onNextMove} />}
 
-      {guided && mine.length > 0 && !isEducator && (
+      {guided && mine.length > 0 && showWhatsApp && (
         <EditorialCard className="p-5 flex items-start gap-3">
           <MessageSquareQuote className="h-5 w-5 text-primary shrink-0 mt-0.5" />
           <div className="text-sm">
@@ -311,21 +351,17 @@ export function PracticeHome() {
             <div>
               <Overline>{mine.length === 0 ? 'Start here' : 'Add a credential'}</Overline>
               <h2 className="ed-h2 mt-1">{mine.length === 0 ? 'Where do you want to start?' : 'Choose another credential'}</h2>
-              <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-                {isEducator
-                  ? 'Each one below is a single thing you can get recognised for in your teaching. Open one to see why it matters, what it asks of you, and what you will be able to show at the end. Work through them one at a time, in any order, at your own pace.'
-                  : 'Each one below is a single leadership practice you can get recognised for. Open one to see why it matters, what it asks of you, and what you will be able to show at the end. Work through them one at a time, in any order.'}
-              </p>
+              <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{aud.chooseIntro}</p>
             </div>
             {available.length === 0 && <p className="text-sm text-muted-foreground">You have chosen every credential in this programme.</p>}
-            {educatorLocked && (
+            {guidedLocked && (
               <div className="flex items-start gap-2 border border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-800">
                 <Lock className="h-4 w-4 shrink-0 mt-0.5" />
                 <span>You work one credential at a time. Finish <span className="font-medium">{activeMine!.title}</span> to get it recognised, then the others open up. <button onClick={() => navigate(`/practice/c/${activeMine!.id}`)} className="underline ed-underline">Continue it now</button>.</span>
               </div>
             )}
             <div className="space-y-2">
-              {available.map((c) => <ChooseRow key={c.id} cred={c} isEducator={isEducator} disabled={educatorLocked} onChoose={(justification) => choose.mutate({ credentialId: c.id, justification })} busy={choose.isPending} />)}
+              {available.map((c) => <ChooseRow key={c.id} cred={c} audience={audience} guided={guidedDemo} disabled={guidedLocked} onChoose={(justification) => choose.mutate({ credentialId: c.id, justification })} busy={choose.isPending} />)}
             </div>
           </EditorialCard>
         </div>
@@ -411,10 +447,11 @@ export function PracticeHome() {
   );
 }
 
-function ChooseRow({ cred, isEducator, onChoose, busy, disabled }: { cred: Credential; isEducator: boolean; onChoose: (justification: string) => void; busy: boolean; disabled?: boolean }) {
+function ChooseRow({ cred, audience, guided, onChoose, busy, disabled }: { cred: Credential; audience: Audience; guided: boolean; onChoose: (justification: string) => void; busy: boolean; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [why, setWhy] = useState('');
-  const outcome = isEducator
+  const a = AUD[audience];
+  const outcome = audience === 'educator'
     ? 'At the end: a verifiable credential recognising you can do this, that you can show your school, a registration body, or a new employer.'
     : 'At the end: a verifiable credential recognising you can do this, that you can share and verify.';
   if (disabled) {
@@ -452,11 +489,11 @@ function ChooseRow({ cred, isEducator, onChoose, busy, disabled }: { cred: Crede
               <p className="text-sm text-muted-foreground mt-0.5">{cred.activity_brief}</p>
             </div>
           )}
-          {!isEducator && <p className="text-xs text-primary border-l-2 border-primary/40 pl-2.5">{outcome}</p>}
+          {!guided && <p className="text-xs text-primary border-l-2 border-primary/40 pl-2.5">{outcome}</p>}
           <div>
-            <label className="text-xs font-medium">In a line, why does this fit your {isEducator ? 'teaching' : 'work'}?</label>
+            <label className="text-xs font-medium">In a line, why does this fit your {a.chooseRowFit}?</label>
             <textarea value={why} onChange={(e) => setWhy(e.target.value)} rows={2}
-              placeholder={isEducator ? 'e.g. I already plan with AI every week and want to be clearer about it.' : 'e.g. I reshaped a struggling team under real pressure last month.'}
+              placeholder={a.choosePlaceholder}
               className="mt-1 w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
             <div className="flex justify-end mt-2">
               <Button size="sm" disabled={!why.trim() || busy} onClick={() => onChoose(why.trim())} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Add this credential</Button>

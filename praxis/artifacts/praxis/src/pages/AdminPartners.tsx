@@ -464,6 +464,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision Educator PD demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Provision the PEJ Justice Practice demo: a justice-sector practice-credentials class (prosecutors /
+  // investigators) drawn from the PEJ-EVD-01 objectives, reusing the whole practice engine with coach Mira.
+  const seedPejPractice = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; credentials?: number }>('/platform/seed-pej-practice', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] });
+      toast({ title: 'PEJ Justice Practice demo provisioned', description: `${r.credentials ?? 0} credentials created. Enter at /demos/pej-practice.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not provision PEJ Justice Practice demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Delete every learner-role account and its learning records across the whole platform. Keeps
   // courses, organisations, coaches and admins.
   const removeLearners = useMutation({
@@ -637,6 +648,11 @@ export function AdminPartners() {
                 onClick={() => { if (window.confirm('Provision the Educator PD demo (Thoughtful AI in teaching)? Creates a separate partner, 6 credentials, branding and demo educator Maria Alvarez. Safe to re-run. Enter at /demos/educator.')) seedEducatorPd.mutate(); }}
                 title="Provision the Educator Professional Development demo class">
                 {seedEducatorPd.isPending ? 'Provisioning…' : 'Provision Educator PD demo'}
+              </Button>
+              <Button variant="outline" size="sm" disabled={seedPejPractice.isPending}
+                onClick={() => { if (window.confirm('Provision the PEJ Justice Practice demo (prosecutors/investigators, from PEJ-EVD-01)? Creates a separate partner, 6 credentials, serious branding and a demo investigator. Composite and SME-pending. Safe to re-run. Enter at /demos/pej-practice.')) seedPejPractice.mutate(); }}
+                title="Provision the PEJ Justice Practice demo class">
+                {seedPejPractice.isPending ? 'Provisioning…' : 'Provision PEJ Justice Practice demo'}
               </Button>
               <Button variant="outline" size="sm" disabled={resetEnza.isPending}
                 className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400"

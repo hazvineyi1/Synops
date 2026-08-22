@@ -37,6 +37,7 @@ import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
 import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
 import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
 import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
+import { seedPejPractice } from "../lib/pejPracticeSeed";
 import { PRACTICE_DDL, runPracticeDDL } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
@@ -1623,6 +1624,135 @@ router.post("/platform/seed-educator-pd", requireAuth, requireSuperAdmin, async 
 
     await audit(_req, "platform.seed_educator_pd", "partner", pid, { credentials: EDU_PRACTICE_CREDENTIALS.length });
     res.json({ ok: true, credentials: EDU_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+// ── PEJ Justice Practice demo (prosecutors/investigators) ─────────────────────────────────────────
+// A practice-credentials programme drawn from the PEJ-EVD-01 objectives (documenting a conflict-related
+// crime scene). DEMO ONLY: every credential is composite, uses initials, and is SME sign-off pending.
+const PEJ_GATEWAY =
+  "There is no pass or fail. A reviewer either recognises your portfolio or refers it for resubmission, with developmental feedback either way. Reviewers look for three things: " +
+  "G1 Relevant activity, you actually did this in real casework, reconstructed as a composite with initials only, never real case material. " +
+  "G2 Personal contribution, your own decisions and judgement are visible, not the unit's. " +
+  "G3 Learning from practice, your reflection shows what you learned and would do differently. " +
+  "Nothing here is reported to your institution, no real case material is ever entered, and every legal point is SME sign-off pending in this demo.";
+
+const PEJ_EXAMPLE =
+  "Example (Eliciting an Account Without Leading): one investigator reconstructs a witness contact (initials only), showing the open question they began with and the leading question they consciously avoided. Another annotates their own seizure log to find the single custody gap before a challenge would. Different practice, both strong evidence. Show what YOU decided, and what you learned. This is a demo: all material is composite and SME sign-off is pending.";
+
+const PEJ_PRACTICE_CREDENTIALS = [
+  { code: "PEJ-SCENE-SAFETY", title: "Safety-First Scene Sequencing", sort: 1,
+    summary: "Order your first actions at a hazardous scene so documentation never precedes clearance.",
+    rationale: "No evidentiary goal outranks life-safety. Explosive-ordnance and de-occupation practice treats hazard clearance as a hard precondition before anything is handled, and sequencing your documentation around that floor protects both people and the later admissibility of whatever is recovered. The skill is holding that line at the exact moment evidentiary pressure pushes against it. Specific provisions are SME sign-off pending in this demo.",
+    brief: "On a real deployment, reconstructed as a composite with initials only, show how you sequenced your first documentation actions so that nothing was done to a suspected hazard before clearance. Name the point where evidentiary pressure met the safety floor, and how you held it." },
+  { code: "PEJ-LAWFUL-INSPECTION", title: "A Lawful Inspection That Survives Challenge", sort: 2,
+    summary: "Register a scene inspection so the record would withstand a challenge to admissibility.",
+    rationale: "Admissibility turns less on the find than on the documented lawfulness of how it was obtained. A contemporaneous, complete entry record is what lets a later court reconstruct that the inspection was authorised and regular, and under field or martial-law conditions the documentation burden rises rather than falls. The authority for any specific requirement is SME sign-off pending in this demo.",
+    brief: "Take one inspection you conducted (composite, initials only) and show the components you recorded to make it defensible: authority, time, participants, method, register of entry. Reflect on the single element most likely to be challenged, and how your record answers it." },
+  { code: "PEJ-WITNESS-ELICITATION", title: "Eliciting an Account Without Leading", sort: 3,
+    summary: "Draw out a witness's own account so no fact enters the file through a leading question.",
+    rationale: "Investigative-interviewing research, the cognitive interview (Fisher and Geiselman) and the PEACE framework, shows that open, non-leading elicitation yields fuller and more accurate accounts, while leading questions contaminate memory and later credibility. Keeping the witness's words their own protects both the truth of the account and its evidential weight.",
+    brief: "On a real witness contact (composite, initials only), show how you opened and structured the account to avoid leading. Identify one question you nearly asked that would have led, and what you asked instead." },
+  { code: "PEJ-CHAIN-OF-CUSTODY", title: "Protecting the Chain of Custody", sort: 4,
+    summary: "Find and close the single defect that would break an exhibit's chain of custody.",
+    rationale: "An exhibit's evidential value collapses at the first undocumented gap in custody: integrity is a property of the record, not of the object. The discipline is diagnostic, spotting the one break, the missing signature, the unlogged transfer, before opposing counsel does. Specific handling standards are SME sign-off pending in this demo.",
+    brief: "Take a seizure log, yours or a colleague's (composite), and identify the single defect in the chain of custody. Show how you would remedy or flag it, and reflect on the habit that prevents it next time." },
+  { code: "PEJ-SCENE-RECORD", title: "The Contemporaneous Scene Record", sort: 5,
+    summary: "Produce a one-page scene record and custody memo in which every tainted item is flagged.",
+    rationale: "Contemporaneous notes, made at or near the moment, carry far greater evidential weight than reconstructed ones, and their value lies in the timing and the honesty, including the explicit flagging of anything compromised. A record that hides its own weaknesses is weaker than one that names them.",
+    brief: "Produce, or reconstruct as a composite, a one-page contemporaneous scene record and chain-of-custody memo from real work, with every tainted or doubtful item flagged. Reflect on what flagging a weakness cost you, and why it strengthened the record." },
+  { code: "PEJ-STANDARD-UNDER-PRESSURE", title: "Your Investigative Standard Under Pressure", sort: 6,
+    summary: "Articulate and defend the standard you hold to when conditions make shortcuts tempting.",
+    rationale: "Under field pressure, hazard, exhaustion, martial-law conditions, the gap between the standard on paper and the standard in practice is where cases are won or lost. Reflective practice (Schon's reflection-in-action) turns that gap into method: naming the standard you actually hold to, and where you have felt it strain, converts reactive decisions into a defensible professional standard.",
+    brief: "Set out, in your own words, the standard you hold to at a scene when conditions push toward shortcuts. Anchor it to one real moment (composite) where it was tested, and show where your thinking has changed." },
+];
+
+// POST /platform/seed-pej-practice -- provision the PEJ Justice Practice demo (separate partner +
+// credentials), reusing the whole practice engine. Idempotent. Brands the tenant (serious navy) and
+// seeds a walkthrough portfolio for the showcase learner.
+router.post("/platform/seed-pej-practice", requireAuth, requireSuperAdmin, async (_req, res) => {
+  try {
+    await runPracticeDDL();
+    const seeded = await seedPejPractice();
+    const pid = seeded.partnerId;
+    for (const c of PEJ_PRACTICE_CREDENTIALS) {
+      await db.execute(sql`
+        INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort)
+        VALUES (${pid}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${PEJ_GATEWAY}, ${PEJ_EXAMPLE}, ${c.rationale}, ${c.sort})
+        ON CONFLICT (partner_id, code) DO UPDATE SET
+          title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
+          gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, rationale = EXCLUDED.rationale, sort = EXCLUDED.sort`);
+    }
+
+    // Brand the PEJ programme: serious justice palette (deep navy + slate + restrained brass). Best-effort.
+    try {
+      await db.execute(sql`UPDATE brand_themes SET display_name = 'PEJ Justice Practice', primary_color = '#1B2A4A', secondary_color = '#33456B', accent_color = '#A6813C', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
+      await db.execute(sql`INSERT INTO brand_themes (tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
+        SELECT ${pid}, 'partner', 'PEJ Justice Practice', '#1B2A4A', '#33456B', '#A6813C', 'Practice Credential'
+        WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
+    } catch { /* branding best-effort */ }
+
+    // Keep the ENTRY learner (Sam Koval) empty so /demos/pej-practice starts from the very beginning.
+    await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${seeded.demoLearnerId})`);
+    await db.execute(sql`DELETE FROM evidence_items WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${seeded.demoLearnerId})`);
+    await db.execute(sql`DELETE FROM candidate_credentials WHERE candidate_id = ${seeded.demoLearnerId}`);
+
+    // Walkthrough portfolio for the SHOWCASE investigator (O. Marchenko): Witness Elicitation mid-cycle,
+    // Chain of Custody recognised (mints a verifiable credential). Kept off the demo entry account.
+    const demoId = seeded.showcaseLearnerId;
+    if (demoId) {
+      const credId = async (code: string): Promise<string | null> => {
+        const r = await db.execute(sql`SELECT id FROM practice_credentials WHERE partner_id = ${pid} AND code = ${code} LIMIT 1`);
+        return (r.rows?.[0] as { id?: string } | undefined)?.id ?? null;
+      };
+      const chooseCc = async (code: string, status: string, justification: string, sort: number): Promise<string | null> => {
+        const cid = await credId(code);
+        if (!cid) return null;
+        const r = await db.execute(sql`
+          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status)
+          VALUES (${demoId}, ${cid}, ${pid}, ${sort}, ${justification}, ${status})
+          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = EXCLUDED.status, justification = EXCLUDED.justification
+          RETURNING id`);
+        return (r.rows?.[0] as { id?: string } | undefined)?.id ?? null;
+      };
+      const refl = async (ccId: string, stage: string, content: string) => {
+        await db.execute(sql`INSERT INTO reflection_entries (candidate_credential_id, stage, content, source) VALUES (${ccId}, ${stage}, ${content}, 'typed')`);
+      };
+
+      const witness = await chooseCc("PEJ-WITNESS-ELICITATION", "in_progress", "A witness account nearly went in through a leading question of mine, and I want to be sure it never does.", 0);
+      if (witness) {
+        await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${witness}`);
+        await refl(witness, "description", "At a de-occupied site I took an initial account from a neighbour, W.K., who found the scene. I opened with 'tell me, in your own words, what you saw', and let the silences run.");
+        await refl(witness, "feelings", "Impatient, honestly. I could feel the questions I wanted to ask to confirm what I already suspected, and I had to sit on them.");
+        await refl(witness, "prediction", "I expected an open account would be slower and vaguer than just asking what I needed.");
+        await refl(witness, "surprise", "It was slower, but W.K. volunteered a detail about timing I would never have asked for, and it held up. The account was theirs, not mine.");
+        await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES (${witness}, 'text', 'Contact note (composite)', 'My opening question and the leading question I consciously did not ask, with a line on why.')`);
+        await db.execute(sql`UPDATE candidate_credentials SET self_g1 = true, self_g2 = true WHERE id = ${witness}`);
+      }
+
+      const custody = await chooseCc("PEJ-CHAIN-OF-CUSTODY", "reviewed", "I caught a custody gap in a colleague's log the week a case nearly turned on it.", 1);
+      if (custody) {
+        await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${custody}`);
+        await refl(custody, "description", "Reviewing a colleague's seizure log for three exhibits, I found one item logged out for photography and never logged back in before transfer.");
+        await refl(custody, "analysis", "The object was fine; the record was not. That single unlogged gap is exactly where an admissibility challenge lands, because integrity lives in the paper, not the item.");
+        await refl(custody, "conclusion", "Chain of custody is a documentation discipline before it is a physical one. I now read a log for the gap first, not the contents.");
+        await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES (${custody}, 'text', 'Annotated seizure log (composite)', 'The log with the single custody defect marked, and the remedy noted.')`);
+        await db.execute(sql`UPDATE candidate_credentials SET self_g1 = true, self_g2 = true, self_g3 = true, reviewed_at = now() WHERE id = ${custody}`);
+        const rev = await db.execute(sql`SELECT id FROM credential_reviews WHERE candidate_credential_id = ${custody} AND calibration = false LIMIT 1`);
+        if (!(rev.rows?.[0])) {
+          await db.execute(sql`INSERT INTO credential_reviews (candidate_credential_id, reviewer_id, g1, g2, g3, outcome, feedback)
+            VALUES (${custody}, ${demoId}, true, true, true, 'reviewed', 'A precise diagnosis. You locate the single defect and name why integrity is a property of the record. To go further, add the standard habit that would have caught it at the scene. Recognised.')`);
+        }
+        await db.execute(sql`INSERT INTO issued_credentials (candidate_credential_id, public_id, recipient_name, credential_title, g1, g2, g3)
+          VALUES (${custody}, ${"pej-" + Math.random().toString(16).slice(2, 12)}, 'O. Marchenko', 'Protecting the Chain of Custody', true, true, true)
+          ON CONFLICT (candidate_credential_id) DO NOTHING`);
+      }
+    }
+
+    await audit(_req, "platform.seed_pej_practice", "partner", pid, { credentials: PEJ_PRACTICE_CREDENTIALS.length });
+    res.json({ ok: true, credentials: PEJ_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGetMe } from '@workspace/api-client-react';
 import { apiFetch } from '@/lib/api';
 import { getPending, addPending, removePending, loadDraft, saveDraft, type Pending } from '@/lib/offlineStore';
+import { demoProfile, type Audience } from '@/lib/demoProfile';
 import { CycleRing } from '@/components/editorial';
 import { useBrandTheme } from '@/context/ThemeProvider';
 import { Card } from '@/components/ui/card';
@@ -141,8 +142,7 @@ export function PracticeCanvas() {
 
   const { data: me } = useGetMe();
   const { data: brand } = useBrandTheme();
-  const isEducator = (brand?.displayName || '').toLowerCase().includes('educator');
-  const coachName = isEducator ? 'Eve' : 'Mutale';
+  const { guided, coachName, themeClass, isPEJ, audience } = demoProfile(brand?.displayName);
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const cc = mine.find((m) => m.id === id);
   const { data: reflections = [] } = useQuery({ queryKey: ['practice-reflections', id], queryFn: () => apiFetch<Reflection[]>(`/practice/me/credentials/${id}/reflections`), enabled: !!id });
@@ -180,17 +180,17 @@ export function PracticeCanvas() {
   // Educator flow: picking a field opens Eve in a popup that talks the learner through filling that box.
   // Only when guidance is on; with Eve off, fields fall back to writing directly on the page.
   const [eveField, setEveField] = useState<string | null>(null);
-  const openEve = isEducator && !readOnly && eveOn ? (s: string) => setEveField(s) : undefined;
+  const openEve = guided && !readOnly && eveOn ? (s: string) => setEveField(s) : undefined;
 
   return (
-    <div className={`max-w-6xl mx-auto space-y-4 ${isEducator ? 'theme-warm' : ''}`}>
+    <div className={`max-w-6xl mx-auto space-y-4 ${themeClass}`}>
       <div className="flex items-center justify-between gap-3">
         <button onClick={() => navigate('/practice')} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> My credentials</button>
-        {isEducator && !readOnly && (
+        {guided && !readOnly && (
           <button onClick={() => setGuidance(!eveOn)} role="switch" aria-checked={eveOn}
             className={`inline-flex items-center gap-2.5 rounded-full border px-3 py-1.5 transition-colors ${eveOn ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-border bg-muted/40 hover:bg-muted/60'}`}
-            title={eveOn ? 'Eve is guiding you. Click to write on your own.' : 'Eve is off. Click to turn her back on.'}>
-            <span className="text-xs font-semibold text-foreground">Eve guidance</span>
+            title={eveOn ? `${coachName} is guiding you. Click to write on your own.` : `${coachName} is off. Click to turn guidance back on.`}>
+            <span className="text-xs font-semibold text-foreground">{coachName} guidance</span>
             <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${eveOn ? 'bg-emerald-500' : 'bg-muted-foreground/40'}`}>
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${eveOn ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
             </span>
@@ -240,7 +240,7 @@ export function PracticeCanvas() {
       {/* The cognitive twin: the model Mutale holds, shown plainly. Tapping a move opens a field to add it. */}
       <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} coachName={coachName} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
 
-      <div className={isEducator ? '' : 'grid lg:grid-cols-[1fr_380px] gap-4 items-start'}>
+      <div className={guided ? '' : 'grid lg:grid-cols-[1fr_380px] gap-4 items-start'}>
         <div className="space-y-4">
           {/* The cycle rail: the portfolio is the cycle, and this is how you move round it. */}
           <div>
@@ -258,32 +258,32 @@ export function PracticeCanvas() {
                   <div className="ed-overline text-muted-foreground">How to respond</div>
                   <p className="text-sm text-muted-foreground mt-0.5">{stage.guide}</p>
                 </div>
-                <WorkedExample strong={stage.strong} weak={stage.weak} />
-                {isEducator && (
+                <WorkedExample strong={isPEJ ? JUSTICE_EXAMPLES[stage.key]?.strong ?? stage.strong : stage.strong} weak={isPEJ ? JUSTICE_EXAMPLES[stage.key]?.weak ?? stage.weak : stage.weak} />
+                {guided && (
                   <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                     {eveOn
-                      ? <span>Eve is helping you fill each box. <button onClick={() => setGuidance(false)} className="underline ed-underline hover:text-foreground">Turn Eve off</button></span>
-                      : <span>Eve is off, you are writing these yourself. <button onClick={() => setGuidance(true)} className="underline ed-underline text-primary">Bring Eve back</button></span>}
+                      ? <span>{coachName} is helping you fill each box. <button onClick={() => setGuidance(false)} className="underline ed-underline hover:text-foreground">Turn {coachName} off</button></span>
+                      : <span>{coachName} is off, you are writing these yourself. <button onClick={() => setGuidance(true)} className="underline ed-underline text-primary">Bring {coachName} back</button></span>}
                   </div>
                 )}
               </div>
               {stage.key === 'e' && (
                 <>
                   <EvidencePanel id={id} evidence={evidence} readOnly={readOnly} onChange={invalidate} off={off} showList={false} />
-                  <ReflectionPanel key="e" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['description']} showTimeline={false} heading="Describe what happened" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
+                  <ReflectionPanel key="e" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['description']} showTimeline={false} heading="Describe what happened" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} coachName={coachName} />
                 </>
               )}
               {stage.key === 'r' && (
                 <>
-                  <PredictionPanel key="rp" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} showList={false} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
-                  <ReflectionPanel key="r" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['feelings', 'evaluation']} showTimeline={false} heading="Look back on it" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
+                  <PredictionPanel key="rp" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} showList={false} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} coachName={coachName} />
+                  <ReflectionPanel key="r" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['feelings', 'evaluation']} showTimeline={false} heading="Look back on it" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} coachName={coachName} />
                 </>
               )}
               {stage.key === 'n' && (
-                <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
+                <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} coachName={coachName} />
               )}
               {stage.key === 't' && (
-                <ReflectionPanel key="t" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['action']} showTimeline={false} heading="Plan your next turn" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
+                <ReflectionPanel key="t" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['action']} showTimeline={false} heading="Plan your next turn" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} coachName={coachName} />
               )}
             </div>
           )}
@@ -311,12 +311,12 @@ export function PracticeCanvas() {
         </div>
 
         {/* The wider coach panel is only for the leadership programme; educators use the focused popup. */}
-        {!isEducator && <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} onCaptured={invalidate} readOnly={readOnly} />}
+        {!guided && <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} onCaptured={invalidate} readOnly={readOnly} />}
       </div>
 
-      {/* Eve, focused on one box: opens when the learner picks a field (educator flow). */}
+      {/* The coach, focused on one box: opens when the learner picks a field (guided flow). */}
       {eveField && cc && (
-        <EveFieldModal ccId={cc.id} stage={eveField} coachName={coachName} guidance={eveOn} onGuidanceChange={setGuidance} onClose={() => setEveField(null)} onSaved={invalidate} />
+        <EveFieldModal ccId={cc.id} stage={eveField} coachName={coachName} audience={audience} guidance={eveOn} onGuidanceChange={setGuidance} onClose={() => setEveField(null)} onSaved={invalidate} />
       )}
     </div>
   );
@@ -575,7 +575,7 @@ function ReflectiveRing({ earned, total }: { earned: number; total: number }) {
   );
 }
 
-function PredictionPanel({ id, reflections, readOnly, onChange, showList = true, onLearnerWrote, onAskEve }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; showList?: boolean; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void }) {
+function PredictionPanel({ id, reflections, readOnly, onChange, showList = true, onLearnerWrote, onAskEve, coachName = 'Eve' }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; showList?: boolean; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void; coachName?: string }) {
   const predictions = reflections.filter((r) => r.stage === 'prediction');
   const surprises = reflections.filter((r) => r.stage === 'surprise');
   const pairCount = Math.max(predictions.length, surprises.length);
@@ -627,7 +627,7 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true,
         <>
           <button type="button" onClick={() => onAskEve('prediction')}
             className="w-full inline-flex items-center justify-center gap-2 border border-primary bg-primary/10 text-primary px-3 py-2 text-sm font-medium hover:bg-primary/15">
-Talk to Eve about what you expected
+            Talk to {coachName} about what you expected
           </button>
           <div className="ed-overline text-muted-foreground text-center">or write it yourself</div>
         </>
@@ -651,7 +651,7 @@ Talk to Eve about what you expected
   );
 }
 
-function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection', starters, onLearnerWrote, onAskEve }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string; starters?: string[]; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void }) {
+function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection', starters, onLearnerWrote, onAskEve, coachName = 'Eve' }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string; starters?: string[]; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void; coachName?: string }) {
   const draftKey = `refl_${id}_${focusStages ? focusStages.join('-') : 'all'}`;
   const stagesToShow = focusStages ? GIBBS.filter((g) => focusStages.includes(g.key)) : GIBBS;
   const [stage, setStage] = useState(focusStages ? focusStages[0] : 'note');
@@ -716,7 +716,7 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages
             <>
               <button type="button" onClick={() => onAskEve(stage)}
                 className="w-full inline-flex items-center justify-center gap-2 border border-primary bg-primary/10 text-primary px-3 py-2 text-sm font-medium hover:bg-primary/15">
-Talk to Eve to fill this
+                Talk to {coachName} to fill this
               </button>
               <div className="ed-overline text-muted-foreground text-center">or write it yourself</div>
             </>
@@ -1030,6 +1030,29 @@ const EVE_FIELDS: Record<string, { label: string; hint: string; opener: string }
   surprise: { label: 'Surprise', hint: 'Where reality differed from what you expected.', opener: 'Where did it surprise you? Where did reality differ from what you expected?' },
 };
 
+// Justice-audience variants of the per-field openers (PEJ), framed for prosecutors and investigators.
+const EVE_FIELDS_JUSTICE: Record<string, { label: string; hint: string; opener: string }> = {
+  description: { label: 'What happened', hint: 'A plain account of the moment: who, what, when. Composite, initials only.', opener: "Let's capture what actually happened, as a composite. Walk me through the moment at the scene or in the contact, what did you do, and when?" },
+  feelings: { label: 'Feelings', hint: 'How you felt, and how others at the scene felt or likely felt.', opener: 'What was the pressure like in that moment, for you and for the people there?' },
+  evaluation: { label: 'Evaluation', hint: 'What was sound or unsound about how it went.', opener: 'Looking back, what held up well, and what did not?' },
+  analysis: { label: 'Analysis', hint: 'Why it went the way it did; the principle underneath.', opener: 'Why do you think it went the way it did? What is the principle underneath it?' },
+  conclusion: { label: 'Conclusion', hint: 'The lesson, or a standard you could hand to a colleague.', opener: 'If you handed one lesson from this to a colleague, what would it be?' },
+  action: { label: 'Action', hint: 'One concrete thing you will do differently next time, and when.', opener: 'Knowing this, what is one thing you will do differently at the next scene or contact, and when?' },
+  prediction: { label: 'Prediction', hint: 'What you expected to happen beforehand.', opener: 'Before it happened, what did you expect would happen?' },
+  surprise: { label: 'Surprise', hint: 'Where reality differed from what you expected.', opener: 'Where did it surprise you, where did reality differ from what you expected?' },
+};
+
+// Justice-audience worked examples (strong vs weak) per Kolb move, so PEJ learners see field-relevant models.
+const JUSTICE_EXAMPLES: Record<string, { strong: string; weak: string }> = {
+  e: { strong: 'Specific and first-person: "At the de-occupied site I logged the time, held everyone back from the suspected device, and photographed the approach before anything was touched, because clearance came before the exhibit." Names a real moment, a decision, and a reason.', weak: 'Vague and general: "We documented the scene and secured the evidence." No moment, no decision, nothing a reviewer can actually see you do.' },
+  r: { strong: 'Honest and specific: "I expected the open account to be vaguer than direct questions, but the witness volunteered a timing detail I would not have asked for, and it held." Names a real expectation and a genuine surprise.', weak: 'Tidy and safe: "The interview went well and I got what I needed." Nothing you did not already know, and no surprise to learn from.' },
+  n: { strong: 'A portable principle: "What I learned is that integrity is a property of the record, not the object, so I now read a seizure log for the gap first, not the contents." A one-line idea you could hand to a colleague.', weak: 'A restatement: "I learned that chain of custody is important." Just describes the event again, without an idea that travels beyond it.' },
+  t: { strong: 'Concrete and checkable: "Before I sign any log next week, I will confirm every item logged out has been logged back in, and initial the check." Specific enough that you could verify you did it.', weak: 'A good intention: "I will be more careful with custody records." Nothing specific enough to actually do or check.' },
+};
+
+const fieldFor = (stage: string, audience?: Audience) =>
+  (audience === 'justice' ? EVE_FIELDS_JUSTICE[stage] : EVE_FIELDS[stage]) ?? EVE_FIELDS[stage] ?? { label: 'This box', hint: '', opener: 'Tell me what happened.' };
+
 type Capture = { target: 'reflection' | 'evidence'; stage?: string; title?: string; text: string; label: string };
 
 /**
@@ -1037,8 +1060,8 @@ type Capture = { target: 'reflection' | 'evidence'; stage?: string; title?: stri
  * question, the learner talks, and Eve drafts that box in their own words. Eve-first, but the draft is
  * always editable and they can write it themselves. Adding it saves straight to that field and closes.
  */
-function EveFieldModal({ ccId, stage, coachName, onGuidanceChange, onClose, onSaved }: { ccId: string; stage: string; coachName: string; guidance: boolean; onGuidanceChange: (on: boolean) => void; onClose: () => void; onSaved: () => void }) {
-  const field = EVE_FIELDS[stage] ?? { label: 'This box', hint: '', opener: 'Tell me what happened.' };
+function EveFieldModal({ ccId, stage, coachName, audience, onGuidanceChange, onClose, onSaved }: { ccId: string; stage: string; coachName: string; audience?: Audience; guidance: boolean; onGuidanceChange: (on: boolean) => void; onClose: () => void; onSaved: () => void }) {
+  const field = fieldFor(stage, audience);
   const [messages, setMessages] = useState<ChatMsg[]>([{ role: 'assistant', content: field.opener, kind: 'chat' }]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);

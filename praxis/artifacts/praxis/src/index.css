@@ -258,6 +258,14 @@
   .theme-warm .ed-display { letter-spacing: -0.01em; line-height: 1.02; }
   .theme-warm .rounded-none { border-radius: 10px; }
   .theme-warm .ed-meter, .theme-warm .ed-meter > span { border-radius: 999px; }
+
+  /* Serious variant (PEJ Justice): crisp, formal, restrained. Sharp edges, no soft shadow, a firm
+     left accent bar and a tighter overline. Signals the gravity of justice-sector work. */
+  .theme-serious .ed-card { border-radius: 0; border-color: hsl(var(--foreground) / 0.16); box-shadow: none; }
+  .theme-serious .ed-card-hover:hover { border-color: hsl(var(--primary) / 0.5); box-shadow: none; }
+  .theme-serious .ed-accentbar { box-shadow: inset 4px 0 0 0 hsl(var(--primary)); }
+  .theme-serious .ed-rule-strong { height: 2px; border-radius: 0; background: hsl(var(--primary)); }
+  .theme-serious .ed-overline { letter-spacing: 0.2em; }
 }
 
 /*
