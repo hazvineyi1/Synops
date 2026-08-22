@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy, Copy, ShieldCheck, Users, X, Sparkles,
+  ArrowLeft, Send, Plus, Trash2, CheckCircle2, Lock, BookOpen, Lightbulb, Paperclip, Link2, Loader2, Upload, Download, CloudOff, RefreshCw, Clock, Target, Zap, Brain, Check, Trophy, Copy, ShieldCheck, Users, X,
 } from 'lucide-react';
 
 /** Offline capture: pending queue + connection status, flushed automatically when back online. */
@@ -245,7 +245,6 @@ export function PracticeCanvas() {
                 <WorkedExample strong={stage.strong} weak={stage.weak} />
                 {isEducator && (
                   <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
                     {eveOn
                       ? <span>Eve is helping you fill each box. <button onClick={() => setGuidance(false)} className="underline ed-underline hover:text-foreground">Turn Eve off</button></span>
                       : <span>Eve is off, you are writing these yourself. <button onClick={() => setGuidance(true)} className="underline ed-underline text-primary">Bring Eve back</button></span>}
@@ -612,7 +611,7 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true,
         <>
           <button type="button" onClick={() => onAskEve('prediction')}
             className="w-full inline-flex items-center justify-center gap-2 border border-primary bg-primary/10 text-primary px-3 py-2 text-sm font-medium hover:bg-primary/15">
-            <Sparkles className="h-4 w-4" /> Talk to Eve about what you expected
+Talk to Eve about what you expected
           </button>
           <div className="ed-overline text-muted-foreground text-center">or write it yourself</div>
         </>
@@ -701,7 +700,7 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages
             <>
               <button type="button" onClick={() => onAskEve(stage)}
                 className="w-full inline-flex items-center justify-center gap-2 border border-primary bg-primary/10 text-primary px-3 py-2 text-sm font-medium hover:bg-primary/15">
-                <Sparkles className="h-4 w-4" /> Talk to Eve to fill this
+Talk to Eve to fill this
               </button>
               <div className="ed-overline text-muted-foreground text-center">or write it yourself</div>
             </>
@@ -1070,7 +1069,7 @@ function EveFieldModal({ ccId, stage, coachName, onGuidanceChange, onClose, onSa
       <div className="w-full max-w-lg bg-background border border-border shadow-xl flex flex-col max-h-[85vh]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 border-b border-border p-4">
           <div className="min-w-0">
-            <div className="ed-overline text-primary inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" /> {coachName} · {field.label}</div>
+            <div className="ed-overline text-primary">{coachName} · {field.label}</div>
             <p className="text-xs text-muted-foreground mt-1">{field.hint} Talk it through with {coachName}, and it drafts this box for you. <button onClick={() => { onGuidanceChange(false); onClose(); }} className="underline ed-underline hover:text-foreground">Turn {coachName} off</button></p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0" aria-label="Close"><X className="h-5 w-5" /></button>
@@ -1080,7 +1079,7 @@ function EveFieldModal({ ccId, stage, coachName, onGuidanceChange, onClose, onSa
           <div className="border-b border-border bg-primary/5 p-4">
             <p className="text-sm">Want me to help you think this through, or would you rather write it yourself? You can change this anytime.</p>
             <div className="flex flex-wrap gap-2 mt-3">
-              <Button size="sm" className="rounded-none gap-1.5" onClick={() => decide(true)}><Sparkles className="h-4 w-4" /> Guide me through it</Button>
+              <Button size="sm" className="rounded-none" onClick={() => decide(true)}>Guide me through it</Button>
               <Button size="sm" variant="outline" className="rounded-none" onClick={() => decide(false)}>I'll write it myself</Button>
             </div>
           </div>

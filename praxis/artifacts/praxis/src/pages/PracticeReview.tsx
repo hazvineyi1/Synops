@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, Brain, ShieldCheck, Sparkles, Loader2, TrendingUp,
+  ClipboardCheck, MessageSquareQuote, FileText, Link2, Paperclip, CheckCircle2, ArrowRight, Inbox, Target, Zap, Brain, ShieldCheck, Loader2, TrendingUp,
 } from 'lucide-react';
 
 /**
@@ -431,9 +431,9 @@ function PortfolioReview({ id, onDone, mode = 'primary', certItemId, isSuper }: 
       {/* Reviewer assist: a calibration pre-screen against the shared rubric. Advisory; the human decides. */}
       {!blind && (
       <Card className="rounded-none p-5 space-y-3 border-primary/20">
-        <div className="ed-overline text-foreground flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Reviewer assist</div>
+        <div className="ed-overline text-foreground">Reviewer assist</div>
         <p className="text-xs text-muted-foreground">An AI reads this portfolio against the same three-gateway rubric every reviewer uses, and drafts developmental feedback. It is advisory, it keeps judgements consistent between reviewers. You decide the outcome and own the words.</p>
-        {!pre && <Button size="sm" variant="outline" className="rounded-none gap-1.5" disabled={preLoading} onClick={runPre}>{preLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{preLoading ? 'Reading the portfolio...' : 'Run pre-screen'}</Button>}
+        {!pre && <Button size="sm" variant="outline" className="rounded-none gap-1.5" disabled={preLoading} onClick={runPre}>{preLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{preLoading ? 'Reading the portfolio...' : 'Run pre-screen'}</Button>}
         {preErr && <p className="text-xs text-rose-600">{preErr}</p>}
         {pre && (
           <div className="space-y-3">
@@ -500,7 +500,7 @@ function PortfolioReview({ id, onDone, mode = 'primary', certItemId, isSuper }: 
         <div className="flex items-center justify-between gap-2">
           {!blind && isSuper && (
             <Button size="sm" variant="outline" className="gap-1.5 rounded-none" disabled={setReference.isPending || refSaved} onClick={() => setReference.mutate()} title="Use your verdict as the reference for reviewer certification">
-              {refSaved ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : <Sparkles className="h-3.5 w-3.5" />} {refSaved ? 'Added to certification set' : 'Set as certification reference'}
+              {refSaved ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : null} {refSaved ? 'Added to certification set' : 'Set as certification reference'}
             </Button>
           )}
           <Button disabled={(blind ? false : !feedback.trim()) || gated || review.isPending} onClick={() => review.mutate()} className="gap-1.5 rounded-none ml-auto">
