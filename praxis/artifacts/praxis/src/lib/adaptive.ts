@@ -52,7 +52,7 @@ const KOLB = [
 /** Recognition of where the learner is, turned into one clear next step. */
 export function nextMove(mine: PathCredential[]): NextMove {
   if (!mine.length) {
-    return { tone: 'choose', overline: 'Start here', title: 'Choose your first credential', detail: 'Pick a leadership practice you want recognised. Everything else follows from your own experience.', cta: 'Choose a credential', href: null };
+    return { tone: 'choose', overline: 'Start here', title: 'Choose your first credential', detail: 'Pick a practice you want recognised. Everything else follows from your own experience.', cta: 'Choose a credential', href: null };
   }
   const byOrder = [...mine].sort((a, b) => a.sort - b.sort);
 
@@ -75,7 +75,7 @@ export function nextMove(mine: PathCredential[]): NextMove {
 
   const chosen = byOrder.find((c) => c.status === 'chosen');
   if (chosen) {
-    return { tone: 'start', overline: 'Not yet started', title: `Begin ${chosen.title}`, detail: 'Start with a real moment from your practice. Mutale will help you turn it into learning.', cta: 'Enter the cycle', href: `/practice/c/${chosen.id}` };
+    return { tone: 'start', overline: 'Not yet started', title: `Begin ${chosen.title}`, detail: 'Start with a real moment from your practice. Your coach will help you turn it into learning.', cta: 'Enter the cycle', href: `/practice/c/${chosen.id}` };
   }
 
   return { tone: 'rest', overline: 'All caught up', title: 'Your portfolios are with reviewers', detail: 'Nothing needs you right now. Add another credential when you are ready to keep building.', cta: 'Choose another', href: null };

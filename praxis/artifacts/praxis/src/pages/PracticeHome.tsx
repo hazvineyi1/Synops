@@ -123,8 +123,8 @@ function Orientation({ name, programName, isEducator, hasCredentials, onStart }:
   const [open, setOpen] = useState(!hasCredentials || isEducator);
   const coachName = isEducator ? 'Eve' : 'Mutale';
   const goal = isEducator
-    ? 'Your goal is to earn your first credential: recognition that you can genuinely do one thing in your teaching. You earn it by trying one real thing with your students, reflecting on what happened with your coach, and adding a little evidence. No courses, no grades.'
-    : 'Your goal is to earn your first credential: recognition of one real thing you can do as a leader. You earn it by using something real from your work, reflecting on it with your coach, and adding evidence. No courses, no grades.';
+    ? 'Your goal is to earn your first credential: recognition that you can genuinely do one thing in your teaching. You earn it by trying one real thing with your students, reflecting on what happened with your coach, and adding a little evidence. No courses, no grades. Why bother? Because these credentials are proof of what you can actually do, built from your real classroom rather than a certificate of attendance, and you can show them to your school, a registration body, or a new employer.'
+    : 'Your goal is to earn your first credential: recognition of one real thing you can do as a leader. You earn it by using something real from your work, reflecting on it with your coach, and adding evidence. No courses, no grades. These credentials are proof of what you can actually do, built from real work rather than a course, and you can share and verify them with anyone who needs to trust it.';
   const steps: [string, string][] = isEducator ? [
     ['Choose a focus', 'Pick a credential below that fits something you already do, or want to try, with your students.'],
     ['Do something real', 'Try it in your own classroom. It does not have to be new, use something from this term.'],
@@ -238,7 +238,8 @@ export function PracticeHome() {
     patch.mutate({ id: a.id, body: { sort: b.sort } });
     patch.mutate({ id: b.id, body: { sort: a.sort } });
   };
-  const onNextMove = () => { if (move.href) navigate(move.href); else setPicking(true); };
+  const goToChoose = () => { setPicking(true); setTimeout(() => document.getElementById('choose-credentials')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60); };
+  const onNextMove = () => { if (move.href) navigate(move.href); else goToChoose(); };
 
   return (
     <div className={`max-w-4xl mx-auto space-y-8 ${isEducator ? 'theme-warm' : ''}`}>
@@ -276,10 +277,10 @@ export function PracticeHome() {
       </div>
 
       {/* Start here: a warm orientation with clear goals and steps, especially for new candidates. */}
-      <Orientation name={me?.firstName} programName={programName} isEducator={isEducator} hasCredentials={mine.length > 0} onStart={() => setPicking(true)} />
+      <Orientation name={me?.firstName} programName={programName} isEducator={isEducator} hasCredentials={mine.length > 0} onStart={goToChoose} />
 
-      {/* Adaptive learning path: the single most useful next move */}
-      <NextMoveBanner move={move} onCta={onNextMove} />
+      {/* Adaptive next move, only once they have credentials (a new user starts from the picker below). */}
+      {mine.length > 0 && <NextMoveBanner move={move} onCta={onNextMove} />}
 
       {guided && mine.length > 0 && (
         <EditorialCard className="p-5 flex items-start gap-3">
@@ -292,14 +293,23 @@ export function PracticeHome() {
       )}
 
       {(picking || mine.length === 0) && (
-        <EditorialCard accent className="p-6 space-y-3">
-          <Overline>Choose your credentials</Overline>
-          {guided && <p className="text-xs text-muted-foreground">Pick the leadership practices you want recognised, and say in a line why. You can reorder them freely until you settle your first two, then the sequence locks.</p>}
-          {available.length === 0 && <p className="text-sm text-muted-foreground">You have chosen every credential in this programme.</p>}
-          <div className="space-y-2">
-            {available.map((c) => <ChooseRow key={c.id} cred={c} guided={guided} onChoose={(justification) => choose.mutate({ credentialId: c.id, justification })} busy={choose.isPending} />)}
-          </div>
-        </EditorialCard>
+        <div id="choose-credentials">
+          <EditorialCard accent className="p-6 space-y-4">
+            <div>
+              <Overline>{mine.length === 0 ? 'Start here' : 'Add a credential'}</Overline>
+              <h2 className="ed-h2 mt-1">{mine.length === 0 ? 'Where do you want to start?' : 'Choose another credential'}</h2>
+              <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+                {isEducator
+                  ? 'Each one below is a single thing you can get recognised for in your teaching. Open one to see why it matters, what it asks of you, and what you will be able to show at the end. Work through them one at a time, in any order, at your own pace.'
+                  : 'Each one below is a single leadership practice you can get recognised for. Open one to see why it matters, what it asks of you, and what you will be able to show at the end. Work through them one at a time, in any order.'}
+              </p>
+            </div>
+            {available.length === 0 && <p className="text-sm text-muted-foreground">You have chosen every credential in this programme.</p>}
+            <div className="space-y-2">
+              {available.map((c) => <ChooseRow key={c.id} cred={c} isEducator={isEducator} onChoose={(justification) => choose.mutate({ credentialId: c.id, justification })} busy={choose.isPending} />)}
+            </div>
+          </EditorialCard>
+        </div>
       )}
 
       {/* The cockpit: an editorial Kolb strip per credential */}
@@ -382,25 +392,43 @@ export function PracticeHome() {
   );
 }
 
-function ChooseRow({ cred, guided, onChoose, busy }: { cred: Credential; guided: boolean; onChoose: (justification: string) => void; busy: boolean }) {
+function ChooseRow({ cred, isEducator, onChoose, busy }: { cred: Credential; isEducator: boolean; onChoose: (justification: string) => void; busy: boolean }) {
   const [open, setOpen] = useState(false);
   const [why, setWhy] = useState('');
+  const outcome = isEducator
+    ? 'At the end: a verifiable credential recognising you can do this, that you can show your school, a registration body, or a new employer.'
+    : 'At the end: a verifiable credential recognising you can do this, that you can share and verify.';
   return (
-    <div className="border border-foreground/15 p-3">
-      <div className="flex items-start justify-between gap-3">
+    <div className={`border transition-colors ${open ? 'border-primary/40' : 'border-foreground/15'}`}>
+      {/* Header row: click to expand this credential, so you open and read them one at a time. */}
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="w-full text-left flex items-start justify-between gap-3 p-3 hover:bg-muted/30">
         <div className="min-w-0">
           <div className="font-medium text-sm">{cred.title}</div>
-          {cred.summary && guided && <div className="text-xs text-muted-foreground">{cred.summary}</div>}
+          {cred.summary && <div className="text-xs text-muted-foreground mt-0.5">{cred.summary}</div>}
         </div>
-        <Button size="sm" variant={open ? 'secondary' : 'outline'} className="shrink-0 rounded-none" onClick={() => setOpen((o) => !o)}>{open ? 'Cancel' : 'Choose'}</Button>
-      </div>
+        <ChevronDown className={`h-4 w-4 shrink-0 mt-0.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
       {open && (
-        <div className="mt-2 space-y-2">
-          {cred.activity_brief && <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">Activity: </span>{cred.activity_brief}</p>}
-          <textarea value={why} onChange={(e) => setWhy(e.target.value)} rows={2} placeholder="Why are you choosing this credential? (one or two lines)"
-            className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
-          <div className="flex justify-end">
-            <Button size="sm" disabled={!why.trim() || busy} onClick={() => onChoose(why.trim())} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Add credential</Button>
+        <div className="px-3 pb-3 pt-3 border-t border-border space-y-3">
+          <div>
+            <div className="ed-overline text-muted-foreground">Why this matters</div>
+            <p className="text-sm mt-0.5">{cred.summary}</p>
+          </div>
+          {cred.activity_brief && (
+            <div>
+              <div className="ed-overline text-muted-foreground">What you'll do</div>
+              <p className="text-sm text-muted-foreground mt-0.5">{cred.activity_brief}</p>
+            </div>
+          )}
+          <p className="text-xs text-primary border-l-2 border-primary/40 pl-2.5">{outcome}</p>
+          <div>
+            <label className="text-xs font-medium">In a line, why does this fit your {isEducator ? 'teaching' : 'work'}?</label>
+            <textarea value={why} onChange={(e) => setWhy(e.target.value)} rows={2}
+              placeholder={isEducator ? 'e.g. I already plan with AI every week and want to be clearer about it.' : 'e.g. I reshaped a struggling team under real pressure last month.'}
+              className="mt-1 w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+            <div className="flex justify-end mt-2">
+              <Button size="sm" disabled={!why.trim() || busy} onClick={() => onChoose(why.trim())} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Add this credential</Button>
+            </div>
           </div>
         </div>
       )}
