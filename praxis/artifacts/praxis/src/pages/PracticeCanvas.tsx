@@ -171,9 +171,13 @@ export function PracticeCanvas() {
   // When the learner writes in a field, nudge the coach to observe it (ongoing commentary / probe).
   const [observeReq, setObserveReq] = useState<{ text: string; n: number } | null>(null);
   const handleLearnerWrote = (text: string) => { if (text && text.trim().length > 12) setObserveReq({ text: text.trim(), n: Date.now() }); };
+  // Eve guidance can be turned off entirely; the choice persists, and Eve is always one tap away again.
+  const [eveOn, setEveOn] = useState<boolean>(() => { try { return localStorage.getItem('praxis_eve_guidance') !== 'off'; } catch { return true; } });
+  const setGuidance = (on: boolean) => { setEveOn(on); try { localStorage.setItem('praxis_eve_guidance', on ? 'on' : 'off'); } catch { /* storage blocked */ } };
   // Educator flow: picking a field opens Eve in a popup that talks the learner through filling that box.
+  // Only when guidance is on; with Eve off, fields fall back to writing directly on the page.
   const [eveField, setEveField] = useState<string | null>(null);
-  const openEve = isEducator && !readOnly ? (s: string) => setEveField(s) : undefined;
+  const openEve = isEducator && !readOnly && eveOn ? (s: string) => setEveField(s) : undefined;
 
   return (
     <div className={`max-w-6xl mx-auto space-y-4 ${isEducator ? 'theme-warm' : ''}`}>
@@ -220,7 +224,7 @@ export function PracticeCanvas() {
       {/* The cognitive twin: the model Mutale holds, shown plainly. Tapping a move opens a field to add it. */}
       <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} coachName={coachName} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} />
 
-      <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
+      <div className={isEducator ? '' : 'grid lg:grid-cols-[1fr_380px] gap-4 items-start'}>
         <div className="space-y-4">
           {/* The cycle rail: the portfolio is the cycle, and this is how you move round it. */}
           <div>
@@ -239,6 +243,14 @@ export function PracticeCanvas() {
                   <p className="text-sm text-muted-foreground mt-0.5">{stage.guide}</p>
                 </div>
                 <WorkedExample strong={stage.strong} weak={stage.weak} />
+                {isEducator && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    {eveOn
+                      ? <span>Eve is helping you fill each box. <button onClick={() => setGuidance(false)} className="underline ed-underline hover:text-foreground">Turn Eve off</button></span>
+                      : <span>Eve is off, you are writing these yourself. <button onClick={() => setGuidance(true)} className="underline ed-underline text-primary">Bring Eve back</button></span>}
+                  </div>
+                )}
               </div>
               {stage.key === 'e' && (
                 <>
@@ -283,13 +295,13 @@ export function PracticeCanvas() {
           {submitted && <GatewaySubmit cc={cc} reflections={reflections.length} evidence={evidence.length} onChange={invalidate} />}
         </div>
 
-        {/* The coach, contextual to the current move */}
-        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} onCaptured={invalidate} readOnly={readOnly} compact={isEducator} />
+        {/* The wider coach panel is only for the leadership programme; educators use the focused popup. */}
+        {!isEducator && <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} onCaptured={invalidate} readOnly={readOnly} />}
       </div>
 
       {/* Eve, focused on one box: opens when the learner picks a field (educator flow). */}
       {eveField && cc && (
-        <EveFieldModal ccId={cc.id} stage={eveField} coachName={coachName} onClose={() => setEveField(null)} onSaved={invalidate} />
+        <EveFieldModal ccId={cc.id} stage={eveField} coachName={coachName} guidance={eveOn} onGuidanceChange={setGuidance} onClose={() => setEveField(null)} onSaved={invalidate} />
       )}
     </div>
   );
@@ -1010,7 +1022,7 @@ type Capture = { target: 'reflection' | 'evidence'; stage?: string; title?: stri
  * question, the learner talks, and Eve drafts that box in their own words. Eve-first, but the draft is
  * always editable and they can write it themselves. Adding it saves straight to that field and closes.
  */
-function EveFieldModal({ ccId, stage, coachName, onClose, onSaved }: { ccId: string; stage: string; coachName: string; onClose: () => void; onSaved: () => void }) {
+function EveFieldModal({ ccId, stage, coachName, onGuidanceChange, onClose, onSaved }: { ccId: string; stage: string; coachName: string; guidance: boolean; onGuidanceChange: (on: boolean) => void; onClose: () => void; onSaved: () => void }) {
   const field = EVE_FIELDS[stage] ?? { label: 'This box', hint: '', opener: 'Tell me what happened.' };
   const [messages, setMessages] = useState<ChatMsg[]>([{ role: 'assistant', content: field.opener, kind: 'chat' }]);
   const [input, setInput] = useState('');
@@ -1018,6 +1030,9 @@ function EveFieldModal({ ccId, stage, coachName, onClose, onSaved }: { ccId: str
   const [draft, setDraft] = useState('');
   const [lastEveDraft, setLastEveDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  // First-time offer: the learner can decline guidance entirely and just write it themselves.
+  const [decided, setDecided] = useState<boolean>(() => { try { return localStorage.getItem('praxis_eve_decided') === '1'; } catch { return true; } });
+  const decide = (guideMe: boolean) => { try { localStorage.setItem('praxis_eve_decided', '1'); } catch { /* storage blocked */ } setDecided(true); if (!guideMe) { onGuidanceChange(false); onClose(); } };
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, loading]);
   useEffect(() => { const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [onClose]);
@@ -1056,10 +1071,20 @@ function EveFieldModal({ ccId, stage, coachName, onClose, onSaved }: { ccId: str
         <div className="flex items-start justify-between gap-3 border-b border-border p-4">
           <div className="min-w-0">
             <div className="ed-overline text-primary inline-flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" /> {coachName} · {field.label}</div>
-            <p className="text-xs text-muted-foreground mt-1">{field.hint} Talk it through with {coachName}, and it drafts this box for you.</p>
+            <p className="text-xs text-muted-foreground mt-1">{field.hint} Talk it through with {coachName}, and it drafts this box for you. <button onClick={() => { onGuidanceChange(false); onClose(); }} className="underline ed-underline hover:text-foreground">Turn {coachName} off</button></p>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground shrink-0" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
+
+        {!decided && (
+          <div className="border-b border-border bg-primary/5 p-4">
+            <p className="text-sm">Want me to help you think this through, or would you rather write it yourself? You can change this anytime.</p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              <Button size="sm" className="rounded-none gap-1.5" onClick={() => decide(true)}><Sparkles className="h-4 w-4" /> Guide me through it</Button>
+              <Button size="sm" variant="outline" className="rounded-none" onClick={() => decide(false)}>I'll write it myself</Button>
+            </div>
+          </div>
+        )}
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-2 min-h-[140px]">
           {messages.map((m, i) => (

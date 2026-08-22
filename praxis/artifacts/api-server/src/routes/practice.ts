@@ -1131,7 +1131,12 @@ export async function mutaleCoachReply(messages: { role: string; content: string
     (learnerContext ? `Your model of this person (do not read it back to them; use it to individualize every question):\n${learnerContext}\n\n` : "") +
     `You are helping them turn a real experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "their practice"}". ` +
     (activityBrief ? `The activity brief is: ${activityBrief}\n` : "") +
-    (focusHint ? `Right now you are helping them put ONE specific thing into words: ${focusHint}. Ask one short, focused question at a time to draw exactly this out of their real experience. Stay on this one thing; do not wander to other stages. When they have said enough to fill it, tell them warmly that they have it and they can add it.\n` : "") +
+    (focusHint ? `Right now you are helping them put ONE specific thing into words: ${focusHint}. Ask one short, focused question at a time to draw exactly this out of their real experience. Stay on this one thing; do not wander to other stages.\n` +
+      `Watch the quality of what they give you, warmly and personally:\n` +
+      `- If an answer is vague, generic, or just repeats what they already said, gently say so and ask one specific question to sharpen it (name the actual moment, the real feeling, the concrete detail). Do not simply accept a thin answer.\n` +
+      `- If they drift off this box onto something else, gently steer them back to ${focusHint}.\n` +
+      `- When they have genuinely said enough to fill this box well, tell them warmly and specifically that they have got it now, and ask whether they want to add it or keep refining. Do not drag it out once it is good enough.\n` +
+      `Always refer to their own words and details so it feels personal, never generic.\n` : "") +
     `Ask one question at a time, grounded in their own experience and their prior practice. Never lecture, never hand over the right answer, and never grade, a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. ${COACH_RESEARCH} Never use em dashes or en dashes.`;
   // Swap the coach's name for programmes that use a different one (e.g. the educator coach is "Eve").
   const system = name === "Mutale" ? systemRaw : systemRaw.replace(/Mutale/g, name);
