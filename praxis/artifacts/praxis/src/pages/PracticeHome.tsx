@@ -221,11 +221,22 @@ export function PracticeHome() {
   const progress = overallProgress(mine as any);
   const move = nextMove(mine as any);
   const stateWord = mine.length === 0 ? 'Not started' : progress === 0 ? 'Beginning' : progress < 0.5 ? 'Underway' : progress < 1 ? 'Deep in practice' : 'Full range';
+  // Educator flow is one-at-a-time: an in-flight credential (anything not yet recognised) locks the rest.
+  const activeMine = mine.find((m) => m.status !== 'reviewed');
+  const educatorLocked = isEducator && !!activeMine;
+  const statusLabelFor = (s: string) => isEducator
+    ? ({ chosen: 'Not started', in_progress: 'In progress', submitted: 'With a reviewer', reviewed: 'Completed', referred: 'Needs more' } as Record<string, string>)[s] ?? s
+    : STATUS_LABEL[s] ?? s;
 
   const choose = useMutation({
     mutationFn: (b: { credentialId: string; justification: string }) =>
-      apiFetch('/practice/me/credentials', { method: 'POST', body: JSON.stringify({ credentialId: b.credentialId, justification: b.justification, sort: mine.length }) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['practice-me'] }),
+      apiFetch<{ id: string }>('/practice/me/credentials', { method: 'POST', body: JSON.stringify({ credentialId: b.credentialId, justification: b.justification, sort: mine.length }) }),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['practice-me'] });
+      setPicking(false);
+      // Choosing and saying why takes the learner straight into the cycle, not back to the list.
+      if (created?.id) navigate(`/practice/c/${created.id}`);
+    },
   });
   const patch = useMutation({
     mutationFn: (b: { id: string; body: any }) => apiFetch(`/practice/me/credentials/${b.id}`, { method: 'PATCH', body: JSON.stringify(b.body) }),
@@ -253,7 +264,9 @@ export function PracticeHome() {
           </div>
           <div className="flex items-center gap-3">
             <ModeToggle />
-            <Button className="gap-1.5 rounded-none" onClick={() => setPicking((p) => !p)}><Plus className="h-4 w-4" /> Choose a credential</Button>
+            {educatorLocked
+              ? <Button className="gap-1.5 rounded-none" onClick={() => navigate(`/practice/c/${activeMine!.id}`)}><ArrowRight className="h-4 w-4" /> Continue your credential</Button>
+              : <Button className="gap-1.5 rounded-none" onClick={() => setPicking((p) => !p)}><Plus className="h-4 w-4" /> Choose a credential</Button>}
           </div>
         </div>
         <Rule strong className="mt-6" />
@@ -305,8 +318,14 @@ export function PracticeHome() {
               </p>
             </div>
             {available.length === 0 && <p className="text-sm text-muted-foreground">You have chosen every credential in this programme.</p>}
+            {educatorLocked && (
+              <div className="flex items-start gap-2 border border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-800">
+                <Lock className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>You work one credential at a time. Finish <span className="font-medium">{activeMine!.title}</span> to get it recognised, then the others open up. <button onClick={() => navigate(`/practice/c/${activeMine!.id}`)} className="underline ed-underline">Continue it now</button>.</span>
+              </div>
+            )}
             <div className="space-y-2">
-              {available.map((c) => <ChooseRow key={c.id} cred={c} isEducator={isEducator} onChoose={(justification) => choose.mutate({ credentialId: c.id, justification })} busy={choose.isPending} />)}
+              {available.map((c) => <ChooseRow key={c.id} cred={c} isEducator={isEducator} disabled={educatorLocked} onChoose={(justification) => choose.mutate({ credentialId: c.id, justification })} busy={choose.isPending} />)}
             </div>
           </EditorialCard>
         </div>
@@ -330,7 +349,7 @@ export function PracticeHome() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <Overline className={statusColor(m.status)}>{STATUS_LABEL[m.status] ?? m.status}</Overline>
+                          <Overline className={statusColor(m.status)}>{statusLabelFor(m.status)}</Overline>
                           <h3 className="ed-h2 mt-1.5">{m.title}</h3>
                         </div>
                         {!anyLocked && mine.length > 1 && (
@@ -392,12 +411,23 @@ export function PracticeHome() {
   );
 }
 
-function ChooseRow({ cred, isEducator, onChoose, busy }: { cred: Credential; isEducator: boolean; onChoose: (justification: string) => void; busy: boolean }) {
+function ChooseRow({ cred, isEducator, onChoose, busy, disabled }: { cred: Credential; isEducator: boolean; onChoose: (justification: string) => void; busy: boolean; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [why, setWhy] = useState('');
   const outcome = isEducator
     ? 'At the end: a verifiable credential recognising you can do this, that you can show your school, a registration body, or a new employer.'
     : 'At the end: a verifiable credential recognising you can do this, that you can share and verify.';
+  if (disabled) {
+    return (
+      <div className="border border-foreground/10 bg-muted/20 p-3 flex items-start justify-between gap-3 opacity-60" aria-disabled>
+        <div className="min-w-0">
+          <div className="font-medium text-sm">{cred.title}</div>
+          {cred.summary && <div className="text-xs text-muted-foreground mt-0.5">{cred.summary}</div>}
+        </div>
+        <Lock className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
+      </div>
+    );
+  }
   return (
     <div className={`border transition-colors ${open ? 'border-primary/40' : 'border-foreground/15'}`}>
       {/* Header row: click to expand this credential, so you open and read them one at a time. */}
