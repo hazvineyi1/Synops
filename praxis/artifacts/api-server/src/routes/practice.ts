@@ -166,6 +166,17 @@ CREATE TABLE IF NOT EXISTS exemplars (
   excerpt text,
   created_at timestamp NOT NULL DEFAULT now());
 CREATE UNIQUE INDEX IF NOT EXISTS exemplars_cc_idx ON exemplars(candidate_credential_id);
+
+-- The coach (Eve/Mutale) conversation, persisted so it becomes part of the portfolio: the learner's
+-- messages, the coach's questions, its unprompted observations as the learner writes, and its analyses.
+CREATE TABLE IF NOT EXISTS coach_messages (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  candidate_credential_id text NOT NULL,
+  role text NOT NULL,
+  content text NOT NULL,
+  kind text NOT NULL DEFAULT 'chat',
+  created_at timestamp NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS coach_messages_cc_idx ON coach_messages(candidate_credential_id, created_at);
 `;
 
 /** Rows helper: db.execute over a raw/parameterised sql template returns { rows }. */
@@ -593,7 +604,9 @@ router.get("/practice/portfolio/:id", requireAuth, async (req, res) => {
   const evidence = await rows(sql`SELECT kind, title, body, url, created_at FROM evidence_items WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
   const reviews = await rows(sql`SELECT g1, g2, g3, outcome, feedback, created_at FROM credential_reviews WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at DESC`);
   const attestations = await rows(sql`SELECT relationship, prompt, status, response_name, response_role, response_comment, responded_at, created_at FROM attestations WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
-  res.json({ ...head[0], reflections, evidence, reviews, attestations });
+  let coach: any[] = [];
+  try { coach = await rows(sql`SELECT role, content, kind, created_at FROM coach_messages WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`); } catch { coach = []; }
+  res.json({ ...head[0], reflections, evidence, reviews, attestations, coach });
 });
 
 // POST /practice/portfolio/:id/review -- record a gateway-based, developmental review. No pass/fail:
@@ -954,15 +967,69 @@ const MUTALE_SPINE =
   "4. Connectivism. Learning is also connection. Where it helps, prompt them to connect this to other people, cases and resources in their network, not only to what is in their own head.\n" +
   "5. Cognitive twin and co-regulation. You hold a growing model of how THIS person leads, from their prior practice and their own words. Use it to make every question personal to them. Share the effort and the emotion of thinking with them, co-regulate it, but never take the thinking over.\n";
 
+// Every probe and analysis the coach offers is grounded in real, established research and named plainly.
+const COACH_RESEARCH =
+  "Ground what you say in established, peer-reviewed learning or leadership research and theory, and name the source briefly and naturally in plain language (for example: this is what Schon calls reflection-in-action; research on feedback, Hattie, finds; Mezirow would call this a disorienting dilemma; Kolb's experiential cycle; Risko and Gilbert on cognitive offloading; Vygotsky's zone of proximal development; Bandura on self-efficacy; Dweck on mindset). Only draw on real, well-established work, and never invent a citation, a study, or a statistic.";
+
+const coachDisplayName = (coachName?: string) => (coachName && /^[A-Za-z]{2,20}$/.test(coachName) ? coachName : "Mutale");
+const rename = (text: string, name: string) => (name === "Mutale" ? text : text.replace(/Mutale/g, name));
+const coachText = (msg: any) => (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("").replace(/[—–]/g, ", ").trim();
+
+/** Persist one coach-thread message (best-effort), so the conversation becomes part of the portfolio. */
+async function saveCoachMsg(ccId: string, role: string, content: string, kind: string): Promise<void> {
+  try { await db.execute(sql`INSERT INTO coach_messages (candidate_credential_id, role, content, kind) VALUES (${ccId}, ${role}, ${String(content).slice(0, 8000)}, ${kind})`); } catch { /* best effort */ }
+}
+
+/** Load the individualising context (name, prior reason, reflection so far) for a candidate credential. */
+async function coachContext(uid: string, ccId?: string): Promise<{ title?: string; brief?: string; context?: string }> {
+  if (!ccId) return {};
+  try {
+    const head = await rows<{ justification: string | null; title: string; activity_brief: string | null }>(sql`
+      SELECT cc.justification, pc.title, pc.activity_brief FROM candidate_credentials cc
+      JOIN practice_credentials pc ON pc.id = cc.credential_id WHERE cc.id = ${ccId} AND cc.candidate_id = ${uid} LIMIT 1`);
+    if (!head[0]) return {};
+    const refs = await rows<{ stage: string; content: string }>(sql`SELECT stage, content FROM reflection_entries WHERE candidate_credential_id = ${ccId} ORDER BY created_at`);
+    const u = await rows<{ first_name: string | null }>(sql`SELECT first_name FROM users WHERE id = ${uid} LIMIT 1`);
+    const parts = [`Name: ${u[0]?.first_name || "the candidate"}.`];
+    if (head[0].justification) parts.push(`Why they chose this credential (their own prior-practice reason): ${head[0].justification}`);
+    if (refs.length) parts.push(`Their reflection so far, in their own words: ${refs.map((r) => `(${r.stage}) ${r.content}`).join(" | ")}`);
+    return { title: head[0].title, brief: head[0].activity_brief ?? undefined, context: parts.join("\n") };
+  } catch { return {}; }
+}
+
+/** A short, unprompted observation as the learner writes: a specific insight or one probing question. */
+async function coachObserve(text: string, learnerContext: string | undefined, coachName?: string): Promise<{ reply: string; offerAnalysis: boolean }> {
+  const name = coachDisplayName(coachName);
+  const systemRaw =
+    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    (learnerContext ? `What you know about this person:\n${learnerContext}\n\n` : "") +
+    `The learner has just written something in their reflection. Respond as an ongoing thinking partner reading over their shoulder: in ONE or TWO short sentences, either notice something specific in what they wrote and offer a brief insight, or ask one probing question that pushes their thinking deeper. Do not summarise what they said back to them and do not praise emptily. ${COACH_RESEARCH} About one time in three, end by offering to reflect a bigger pattern back to them, phrased as a short question. Never use em dashes or en dashes.`;
+  const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 220, system: rename(systemRaw, name), messages: [{ role: "user", content: `They just wrote: "${String(text).slice(0, 3000)}"` }] }, { timeout: 45000, maxRetries: 1 });
+  const reply = coachText(msg);
+  const offerAnalysis = /\banalys|\bpattern|would you like|shall i\b/i.test(reply);
+  return { reply, offerAnalysis };
+}
+
+/** On request, reflect back patterns in the learner's whole reflection so far, grounded in research. */
+async function coachAnalysis(learnerContext: string | undefined, coachName?: string): Promise<string> {
+  const name = coachDisplayName(coachName);
+  const systemRaw =
+    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    (learnerContext ? `What you know about this person and their reflection so far:\n${learnerContext}\n\n` : "") +
+    `The learner has asked you for an analysis. Read their whole reflection so far and reflect back, warmly and specifically, two or three patterns in how they are thinking or practising, and one honest edge to push on. ${COACH_RESEARCH} This is a mirror to think against, not a grade and not the final word. Keep it under 180 words. Never use em dashes or en dashes.`;
+  const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 420, system: rename(systemRaw, name), messages: [{ role: "user", content: "Please reflect back what you notice in my reflection so far." }] }, { timeout: 60000, maxRetries: 1 });
+  return coachText(msg);
+}
+
 export async function mutaleCoachReply(messages: { role: string; content: string }[], credentialTitle?: string, activityBrief?: string, learnerContext?: string, coachName?: string): Promise<string> {
   const history = Array.isArray(messages) ? messages.slice(-16) : [];
-  const name = coachName && /^[A-Za-z]{2,20}$/.test(coachName) ? coachName : "Mutale";
+  const name = coachDisplayName(coachName);
   const systemRaw =
     `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n${MUTALE_SPINE}\n` +
     (learnerContext ? `Your model of this person (do not read it back to them; use it to individualize every question):\n${learnerContext}\n\n` : "") +
     `You are helping them turn a real experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "their practice"}". ` +
     (activityBrief ? `The activity brief is: ${activityBrief}\n` : "") +
-    `Ask one question at a time, grounded in their own experience and their prior practice. Never lecture, never hand over the right answer, and never grade, a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. Never use em dashes or en dashes.`;
+    `Ask one question at a time, grounded in their own experience and their prior practice. Never lecture, never hand over the right answer, and never grade, a human reviewer decides reviewed or resubmit. Keep replies short enough to read on a phone. ${COACH_RESEARCH} Never use em dashes or en dashes.`;
   // Swap the coach's name for programmes that use a different one (e.g. the educator coach is "Eve").
   const system = name === "Mutale" ? systemRaw : systemRaw.replace(/Mutale/g, name);
   const msg = await anthropic.messages.create({
@@ -980,28 +1047,60 @@ export async function mutaleCoachReply(messages: { role: string; content: string
 router.post("/practice/coach", requireAuth, async (req, res) => {
   const uid = req.userId!;
   const { messages, candidateCredentialId, coachName } = req.body ?? {};
-  let title: string | undefined = req.body?.credentialTitle;
-  let brief: string | undefined = req.body?.activityBrief;
-  let context: string | undefined;
-  if (candidateCredentialId) {
-    try {
-      const head = await rows<{ justification: string | null; title: string; activity_brief: string | null }>(sql`
-        SELECT cc.justification, pc.title, pc.activity_brief
-        FROM candidate_credentials cc JOIN practice_credentials pc ON pc.id = cc.credential_id
-        WHERE cc.id = ${candidateCredentialId} AND cc.candidate_id = ${uid} LIMIT 1`);
-      if (head[0]) {
-        title = head[0].title; brief = head[0].activity_brief ?? undefined;
-        const refs = await rows<{ stage: string; content: string }>(sql`SELECT stage, content FROM reflection_entries WHERE candidate_credential_id = ${candidateCredentialId} ORDER BY created_at`);
-        const u = await rows<{ first_name: string | null }>(sql`SELECT first_name FROM users WHERE id = ${uid} LIMIT 1`);
-        const parts = [`Name: ${u[0]?.first_name || "the candidate"}.`];
-        if (head[0].justification) parts.push(`Why they chose this credential (their own prior-practice reason): ${head[0].justification}`);
-        if (refs.length) parts.push(`Their reflection so far, in their own words: ${refs.map((r) => `(${r.stage}) ${r.content}`).join(" | ")}`);
-        context = parts.join("\n");
-      }
-    } catch { /* individualise best-effort; fall back to a generic coach */ }
-  }
+  const ctx = await coachContext(uid, candidateCredentialId);
+  const title = ctx.title ?? req.body?.credentialTitle;
+  const brief = ctx.brief ?? req.body?.activityBrief;
   try {
-    res.json({ reply: await mutaleCoachReply(messages, title, brief, context, coachName) });
+    const reply = await mutaleCoachReply(messages, title, brief, ctx.context, coachName);
+    if (candidateCredentialId && ctx.title) {
+      const last = Array.isArray(messages) && messages.length ? messages[messages.length - 1] : null;
+      if (last && last.role !== "assistant" && last.content) await saveCoachMsg(candidateCredentialId, "learner", String(last.content), "chat");
+      await saveCoachMsg(candidateCredentialId, "eve", reply, "chat");
+    }
+    res.json({ reply });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
+  }
+});
+
+// GET the persisted coach conversation for a candidate credential (part of the portfolio).
+router.get("/practice/me/credentials/:id/coach", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  try {
+    const list = await rows(sql`SELECT role, content, kind, created_at FROM coach_messages WHERE candidate_credential_id = ${req.params.id} ORDER BY created_at`);
+    res.json(list);
+  } catch { res.json([]); }
+});
+
+// POST /practice/coach/observe -- the coach notices what the learner just wrote in a field and offers a
+// brief insight or a probing question. Persisted as an unprompted observation.
+router.post("/practice/coach/observe", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const { candidateCredentialId, text, coachName } = req.body ?? {};
+  if (!candidateCredentialId || !text || !String(text).trim()) { res.status(400).json({ error: "candidateCredentialId and text are required" }); return; }
+  const ctx = await coachContext(uid, candidateCredentialId);
+  if (!ctx.title) { res.status(404).json({ error: "Not found" }); return; }
+  try {
+    const { reply, offerAnalysis } = await coachObserve(String(text), ctx.context, coachName);
+    await saveCoachMsg(candidateCredentialId, "eve", reply, "observation");
+    res.json({ reply, offerAnalysis });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
+  }
+});
+
+// POST /practice/coach/analysis -- on request, reflect back patterns in the reflection so far.
+router.post("/practice/coach/analysis", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const { candidateCredentialId, coachName } = req.body ?? {};
+  const ctx = await coachContext(uid, candidateCredentialId);
+  if (!ctx.title) { res.status(404).json({ error: "Not found" }); return; }
+  try {
+    const reply = await coachAnalysis(ctx.context, coachName);
+    await saveCoachMsg(candidateCredentialId, "eve", reply, "analysis");
+    res.json({ reply });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
   }

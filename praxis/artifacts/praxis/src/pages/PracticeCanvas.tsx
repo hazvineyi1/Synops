@@ -79,7 +79,7 @@ type Mine = {
 };
 type Reflection = { id: string; stage: string; content: string; created_at: string };
 type Evidence = { id: string; kind: string; title: string | null; body: string | null; url: string | null; created_at: string };
-type ChatMsg = { role: 'user' | 'assistant'; content: string };
+type ChatMsg = { role: 'user' | 'assistant'; content: string; kind?: 'chat' | 'observation' | 'analysis' };
 
 const GIBBS = [
   { key: 'description', label: 'What happened', hint: 'Describe the situation plainly. Who, what, when.' },
@@ -98,16 +98,28 @@ const stageLabel = (k: string) => GIBBS.find((g) => g.key === k)?.label ?? EXTRA
 const CYCLE = [
   { key: 'e', label: 'Experience', focus: 'Capture what you actually did', reflect: ['description'],
     coach: 'Walk me through what actually happened. Who was involved, and what did you decide?',
-    guide: 'Describe what actually happened, in plain words, as if you were telling a colleague over coffee. Who was there? What did you do, step by step? What did you decide, and why? Do not polish it or justify yourself yet, just capture the real moment.' },
+    guide: 'Describe what actually happened, in plain words, as if you were telling a colleague over coffee. Who was there? What did you do, step by step? What did you decide, and why? Do not polish it or justify yourself yet, just capture the real moment.',
+    starters: ['What actually happened was', 'The moment I mean is', 'I decided to', 'What I did was'],
+    strong: 'Specific and first-person: "On Tuesday I noticed two students had stopped writing, so I paired them rather than pushing them on alone, because I judged the block was confidence, not ability." Names a real moment, a decision, and a reason.',
+    weak: 'Vague and general: "The lesson went fine and most people did the work." No moment, no decision, nothing a reviewer can actually see you do.' },
   { key: 'r', label: 'Reflect', focus: 'Look back on it', reflect: ['feelings', 'evaluation'],
     coach: 'Before it happened, what did you expect? Where did reality differ, and how did it feel?',
-    guide: 'Now look back honestly. How did it feel, for you and for the people involved? What went well, and what did not? What did you expect would happen, and where did it surprise you? The surprise is usually where the learning is.' },
+    guide: 'Now look back honestly. How did it feel, for you and for the people involved? What went well, and what did not? What did you expect would happen, and where did it surprise you? The surprise is usually where the learning is.',
+    starters: ['I expected', 'What surprised me was', 'It felt', 'What worked was', 'What did not work was'],
+    strong: 'Honest and specific: "I expected the pairing to help, but one of them went quieter, not louder. That surprised me, and it made me question whether I had read the room right." Names a real feeling and a genuine surprise.',
+    weak: 'Tidy and safe: "It went well and I was happy with it." Nothing you did not already know, and no surprise to learn from.' },
   { key: 'n', label: 'Name it', focus: 'Name the idea it points to', reflect: ['analysis', 'conclusion'],
     coach: 'What does this tell you about how you lead? Try to name the principle underneath it.',
-    guide: 'Step back from the single event to the idea underneath it. What does this tell you about how you work? Try to finish this sentence in one line: "What I learned is..." as if it were advice you would give another person.' },
+    guide: 'Step back from the single event to the idea underneath it. What does this tell you about how you work? Try to finish this sentence in one line: "What I learned is..." as if it were advice you would give another person.',
+    starters: ['What I learned is', 'The principle underneath this is', 'This tells me that', 'What I would say to another person is'],
+    strong: 'A portable principle: "What I learned is that a quiet student is giving me information, not resisting me, and my first move should be to find out what, not to push harder." A one-line idea you could hand to someone else.',
+    weak: 'A restatement: "I learned that pairing students can help." Just describes the event again, without an idea that travels beyond it.' },
   { key: 't', label: 'Try it', focus: 'Plan your next turn', reflect: ['action'],
     coach: 'Knowing this, what will you do differently the next time?',
-    guide: 'Turn the insight into action. What is one concrete thing you will do differently next time, and when? Be specific enough that someone could later check whether you actually did it.' },
+    guide: 'Turn the insight into action. What is one concrete thing you will do differently next time, and when? Be specific enough that someone could later check whether you actually did it.',
+    starters: ['Next time I will', 'By the end of this week I will', 'The one change I will make is'],
+    strong: 'Concrete and checkable: "Next lesson, before I reassign anyone, I will ask each quiet student one question about where they got stuck, and note what they say." Specific enough that you could check whether you did it.',
+    weak: 'A good intention: "I will try to be more aware of quiet students." Nothing specific enough to actually do or check.' },
 ] as const;
 
 /** Which Kolb stages this credential's practice has reached, from evidence + reflection stages. */
@@ -156,6 +168,9 @@ export function PracticeCanvas() {
   const [picked, setPicked] = useState<string | null>(null);
   const activeStage = picked ?? firstIncomplete;
   const stage = CYCLE.find((s) => s.key === activeStage)!;
+  // When the learner writes in a field, nudge the coach to observe it (ongoing commentary / probe).
+  const [observeReq, setObserveReq] = useState<{ text: string; n: number } | null>(null);
+  const handleLearnerWrote = (text: string) => { if (text && text.trim().length > 12) setObserveReq({ text: text.trim(), n: Date.now() }); };
 
   return (
     <div className={`max-w-6xl mx-auto space-y-4 ${isEducator ? 'theme-warm' : ''}`}>
@@ -200,7 +215,7 @@ export function PracticeCanvas() {
       </Card>
 
       {/* The cognitive twin: the model Mutale holds, shown plainly. Tapping a move opens a field to add it. */}
-      <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} coachName={coachName} />
+      <TwinPanel me={me} cc={cc} reflections={reflections} readOnly={readOnly} onSaved={invalidate} coachName={coachName} onLearnerWrote={handleLearnerWrote} />
 
       <div className="grid lg:grid-cols-[1fr_380px] gap-4 items-start">
         <div className="space-y-4">
@@ -220,24 +235,25 @@ export function PracticeCanvas() {
                   <div className="ed-overline text-muted-foreground">How to respond</div>
                   <p className="text-sm text-muted-foreground mt-0.5">{stage.guide}</p>
                 </div>
+                <WorkedExample strong={stage.strong} weak={stage.weak} />
               </div>
               {stage.key === 'e' && (
                 <>
                   <EvidencePanel id={id} evidence={evidence} readOnly={readOnly} onChange={invalidate} off={off} showList={false} />
-                  <ReflectionPanel key="e" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['description']} showTimeline={false} heading="Describe what happened" />
+                  <ReflectionPanel key="e" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['description']} showTimeline={false} heading="Describe what happened" starters={stage.starters} onLearnerWrote={handleLearnerWrote} />
                 </>
               )}
               {stage.key === 'r' && (
                 <>
-                  <PredictionPanel key="rp" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} showList={false} />
-                  <ReflectionPanel key="r" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['feelings', 'evaluation']} showTimeline={false} heading="Look back on it" />
+                  <PredictionPanel key="rp" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} showList={false} onLearnerWrote={handleLearnerWrote} />
+                  <ReflectionPanel key="r" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['feelings', 'evaluation']} showTimeline={false} heading="Look back on it" starters={stage.starters} onLearnerWrote={handleLearnerWrote} />
                 </>
               )}
               {stage.key === 'n' && (
-                <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" />
+                <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" starters={stage.starters} onLearnerWrote={handleLearnerWrote} />
               )}
               {stage.key === 't' && (
-                <ReflectionPanel key="t" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['action']} showTimeline={false} heading="Plan your next turn" />
+                <ReflectionPanel key="t" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['action']} showTimeline={false} heading="Plan your next turn" starters={stage.starters} onLearnerWrote={handleLearnerWrote} />
               )}
             </div>
           )}
@@ -265,7 +281,7 @@ export function PracticeCanvas() {
         </div>
 
         {/* The coach, contextual to the current move */}
-        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} />
+        <CoachPanel cc={cc} stageHint={submitted ? undefined : stage.coach} coachName={coachName} observeReq={observeReq} />
       </div>
     </div>
   );
@@ -312,6 +328,30 @@ function StageRail({ lit, active, onPick }: { lit: Record<string, boolean>; acti
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** A collapsible pair of examples so learners see what a strong vs weak response looks like. */
+function WorkedExample({ strong, weak }: { strong: string; weak: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-2">
+      <button onClick={() => setOpen((o) => !o)} className="ed-overline text-primary underline ed-underline">
+        {open ? 'Hide the examples' : 'See a strong vs weak response'}
+      </button>
+      {open && (
+        <div className="mt-2 space-y-2">
+          <div className="border-l-2 border-emerald-500 pl-3">
+            <div className="ed-overline text-emerald-700">Strong</div>
+            <p className="text-sm text-muted-foreground mt-0.5">{strong}</p>
+          </div>
+          <div className="border-l-2 border-amber-500 pl-3">
+            <div className="ed-overline text-amber-700">Weak</div>
+            <p className="text-sm text-muted-foreground mt-0.5">{weak}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -380,7 +420,7 @@ function BodyOfWork({ reflections, evidence }: { reflections: Reflection[]; evid
   );
 }
 
-function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale' }: { me: any; cc: Mine | undefined; reflections: Reflection[]; readOnly?: boolean; onSaved?: () => void; coachName?: string }) {
+function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale', onLearnerWrote }: { me: any; cc: Mine | undefined; reflections: Reflection[]; readOnly?: boolean; onSaved?: () => void; coachName?: string; onLearnerWrote?: (text: string) => void }) {
   const [openHint, setOpenHint] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -397,7 +437,7 @@ function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale
     const text = draft.trim();
     if (!text || !openHint) return;
     setBusy(true);
-    try { await apiFetch(`/practice/me/credentials/${cc.id}/reflections`, { method: 'POST', body: JSON.stringify({ stage: openHint, content: text, ...prov.read() }) }); setDraft(''); prov.reset(); onSaved?.(); }
+    try { await apiFetch(`/practice/me/credentials/${cc.id}/reflections`, { method: 'POST', body: JSON.stringify({ stage: openHint, content: text, ...prov.read() }) }); setDraft(''); prov.reset(); onSaved?.(); onLearnerWrote?.(text); }
     catch { /* keep the text to retry */ } finally { setBusy(false); }
   };
 
@@ -500,7 +540,7 @@ function ReflectiveRing({ earned, total }: { earned: number; total: number }) {
   );
 }
 
-function PredictionPanel({ id, reflections, readOnly, onChange, showList = true }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; showList?: boolean }) {
+function PredictionPanel({ id, reflections, readOnly, onChange, showList = true, onLearnerWrote }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; showList?: boolean; onLearnerWrote?: (text: string) => void }) {
   const predictions = reflections.filter((r) => r.stage === 'prediction');
   const surprises = reflections.filter((r) => r.stage === 'surprise');
   const pairCount = Math.max(predictions.length, surprises.length);
@@ -517,7 +557,7 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true 
     try {
       if (e) await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ stage: 'prediction', content: e, ...p }) });
       if (a) await apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ stage: 'surprise', content: a, ...p }) });
-      setExpected(''); setActual(''); prov.reset(); onChange();
+      setExpected(''); setActual(''); prov.reset(); onChange(); onLearnerWrote?.(`${e} ${a}`.trim());
     } catch { /* leave the text in place to retry */ } finally { setBusy(false); }
   };
   return (
@@ -567,7 +607,7 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true 
   );
 }
 
-function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection' }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string }) {
+function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection', starters, onLearnerWrote }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string; starters?: string[]; onLearnerWrote?: (text: string) => void }) {
   const draftKey = `refl_${id}_${focusStages ? focusStages.join('-') : 'all'}`;
   const stagesToShow = focusStages ? GIBBS.filter((g) => focusStages.includes(g.key)) : GIBBS;
   const [stage, setStage] = useState(focusStages ? focusStages[0] : 'note');
@@ -588,7 +628,7 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages
       off.enqueue({ kind: 'reflection', endpoint, payload, display: text, stage });
       setContent(''); saveDraft(draftKey, ''); prov.reset(); setBusy(false); return;
     }
-    try { await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) }); setContent(''); saveDraft(draftKey, ''); prov.reset(); onChange(); }
+    try { await apiFetch(endpoint, { method: 'POST', body: JSON.stringify(payload) }); setContent(''); saveDraft(draftKey, ''); prov.reset(); onChange(); onLearnerWrote?.(text); }
     catch { off.enqueue({ kind: 'reflection', endpoint, payload, display: text, stage }); setContent(''); saveDraft(draftKey, ''); prov.reset(); }
     finally { setBusy(false); }
   };
@@ -628,6 +668,15 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages
             </div>
           )}
           <p className="text-xs text-muted-foreground">{GIBBS.find((g) => g.key === stage)?.hint}</p>
+          {starters && starters.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-[11px] text-muted-foreground self-center">Stuck? Start with:</span>
+              {starters.map((s) => (
+                <button key={s} type="button" onClick={() => { setContent((c) => (c ? `${c} ${s} ` : `${s} `)); prov.onType(); }}
+                  className="rounded-full border border-primary/30 bg-primary/5 px-2.5 py-0.5 text-[11px] text-primary hover:bg-primary/10">{s}…</button>
+              ))}
+            </div>
+          )}
           <textarea value={content} onChange={(e) => { setContent(e.target.value); prov.onType(); }} onPaste={prov.onPaste} rows={3} placeholder="Write your reflection..."
             className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           <div className="flex justify-end">
@@ -915,57 +964,116 @@ function GatewaySubmit({ cc, reflections, evidence, onChange }: { cc: Mine | und
   );
 }
 
-function CoachPanel({ cc, stageHint, coachName = 'Mutale' }: { cc: Mine | undefined; stageHint?: string; coachName?: string }) {
+function CoachPanel({ cc, stageHint, coachName = 'Mutale', observeReq }: { cc: Mine | undefined; stageHint?: string; coachName?: string; observeReq?: { text: string; n: number } | null }) {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [analysing, setAnalysing] = useState(false);
+  const [offerAnalysis, setOfferAnalysis] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, loading]);
+  const lastObserve = useRef(0);
+  useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, loading, analysing]);
+
+  // Load the persisted conversation once, so it is part of the portfolio and survives a reload.
+  useEffect(() => {
+    if (!cc?.id) return;
+    apiFetch<Array<{ role: string; content: string; kind: string }>>(`/practice/me/credentials/${cc.id}/coach`)
+      .then((rows) => { if (Array.isArray(rows) && rows.length) setMessages(rows.map((r) => ({ role: r.role === 'learner' ? 'user' as const : 'assistant' as const, content: r.content, kind: (r.kind as any) || 'chat' }))); })
+      .catch(() => {});
+  }, [cc?.id]);
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
-    const next = [...messages, { role: 'user' as const, content: text.trim() }];
+    const next: ChatMsg[] = [...messages, { role: 'user', content: text.trim(), kind: 'chat' }];
     setMessages(next); setInput(''); setLoading(true);
     try {
       const r = await apiFetch<{ reply: string }>('/practice/coach', { method: 'POST', body: JSON.stringify({ messages: next, candidateCredentialId: cc?.id, credentialTitle: cc?.title, activityBrief: cc?.activity_brief, coachName }) });
-      setMessages((m) => [...m, { role: 'assistant', content: r.reply }]);
+      setMessages((m) => [...m, { role: 'assistant', content: r.reply, kind: 'chat' }]);
     } catch {
-      setMessages((m) => [...m, { role: 'assistant', content: 'I could not respond just now. Try again in a moment.' }]);
+      setMessages((m) => [...m, { role: 'assistant', content: 'I could not respond just now. Try again in a moment.', kind: 'chat' }]);
     } finally { setLoading(false); }
+  };
+
+  // React to a field write: ask the coach to observe it (a brief insight or a probing question).
+  useEffect(() => {
+    if (!observeReq || !cc?.id || observeReq.n === lastObserve.current) return;
+    lastObserve.current = observeReq.n;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await apiFetch<{ reply: string; offerAnalysis?: boolean }>('/practice/coach/observe', { method: 'POST', body: JSON.stringify({ candidateCredentialId: cc.id, text: observeReq.text, coachName }) });
+        if (cancelled) return;
+        setMessages((m) => [...m, { role: 'assistant', content: r.reply, kind: 'observation' }]);
+        if (r.offerAnalysis) setOfferAnalysis(true);
+      } catch { /* observation is best-effort */ }
+    })();
+    return () => { cancelled = true; };
+  }, [observeReq?.n, cc?.id, coachName]);
+
+  const analyse = async () => {
+    if (!cc?.id || analysing) return;
+    setAnalysing(true); setOfferAnalysis(false);
+    try {
+      const r = await apiFetch<{ reply: string }>('/practice/coach/analysis', { method: 'POST', body: JSON.stringify({ candidateCredentialId: cc.id, coachName }) });
+      setMessages((m) => [...m, { role: 'assistant', content: r.reply, kind: 'analysis' }]);
+    } catch {
+      setMessages((m) => [...m, { role: 'assistant', content: 'I could not analyse that just now. Try again in a moment.', kind: 'chat' }]);
+    } finally { setAnalysing(false); }
+  };
+
+  const bubble = (m: ChatMsg) => {
+    if (m.role === 'user') return <span className="inline-block max-w-[90%] px-3 py-2 text-sm whitespace-pre-wrap bg-primary text-primary-foreground">{m.content}</span>;
+    if (m.kind === 'analysis') return (
+      <div className="border-l-2 border-primary bg-primary/5 p-3 text-sm whitespace-pre-wrap">
+        <div className="ed-overline text-primary mb-1">{coachName}'s analysis</div>{m.content}
+      </div>
+    );
+    if (m.kind === 'observation') return (
+      <div className="border-l-2 border-primary/40 pl-3 text-sm whitespace-pre-wrap text-muted-foreground">
+        <span className="ed-overline text-primary mr-1.5">{coachName} notices</span>{m.content}
+      </div>
+    );
+    return <span className="inline-block max-w-[90%] px-3 py-2 text-sm whitespace-pre-wrap bg-muted">{m.content}</span>;
   };
 
   return (
     <Card className="rounded-none p-0 flex flex-col overflow-hidden lg:sticky lg:top-4 h-[70vh]">
       <div className="border-b border-border p-3">
         <div className="ed-overline text-foreground">{coachName} · your thinking partner</div>
-        <p className="text-xs text-muted-foreground mt-1">A Socratic coach. {coachName} asks, you think. Turn your experience into articulated learning.</p>
+        <p className="text-xs text-muted-foreground mt-1">A Socratic coach. {coachName} asks, you think, and comments as you write. Turn your experience into articulated learning.</p>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 && (
           <div className="text-sm text-muted-foreground space-y-3">
             <div className="border border-border p-3 space-y-1.5">
               <div className="ed-overline text-foreground">How to use {coachName}</div>
-              <p className="text-xs">{coachName} is your thinking partner, not a search engine. {coachName} will not give you answers or write your reflection for you, but asks questions that help you work out what you already know from your own practice.</p>
-              <p className="text-xs"><span className="font-medium text-foreground">How:</span> tell {coachName} what happened in plain words, then answer the questions honestly, even when you are not sure. There are no wrong answers here.</p>
+              <p className="text-xs">{coachName} is your thinking partner, not a search engine. {coachName} will not give you answers or write your reflection for you, but asks questions and offers insight, grounded in real research, as you work.</p>
+              <p className="text-xs"><span className="font-medium text-foreground">How:</span> tell {coachName} what happened in plain words, or just start writing in the fields, {coachName} will notice and respond. Answer honestly, even when unsure. There are no wrong answers here.</p>
               <p className="text-xs"><span className="font-medium text-foreground">Why:</span> putting your own thinking into words is how experience turns into learning. If {coachName} simply handed you the answer, you would learn nothing.</p>
             </div>
             {stageHint
               ? <p><span className="font-medium text-foreground">To get going, {coachName} asks:</span> <em>"{stageHint}"</em>  Type your answer below.</p>
-              : <p><span className="font-medium text-foreground">Start with a real moment.</span> For example: <em>"Half my class used AI on the last essay, and I'm not sure how to respond."</em></p>}
+              : <p><span className="font-medium text-foreground">Start with a real moment,</span> here or in the fields on the left.</p>}
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
-            <span className={`inline-block max-w-[90%] px-3 py-2 text-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{m.content}</span>
-          </div>
+          <div key={i} className={m.role === 'user' ? 'text-right' : ''}>{bubble(m)}</div>
         ))}
-        {loading && <div className="text-muted-foreground text-sm inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {coachName} is thinking...</div>}
+        {(loading || analysing) && <div className="text-muted-foreground text-sm inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {coachName} is thinking...</div>}
+        {offerAnalysis && !analysing && (
+          <button onClick={analyse} className="ed-overline text-primary underline ed-underline">Yes, {coachName}, show me the pattern you see</button>
+        )}
       </div>
-      <div className="border-t border-border p-2 flex items-end gap-2">
-        <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={stageHint ? `Answer ${coachName}, or tell it what happened...` : `Tell ${coachName} what happened...`}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
-          className="flex-1 resize-none rounded-none border border-input bg-background px-3 py-2 text-sm" />
-        <Button size="sm" disabled={!input.trim() || loading} onClick={() => send(input)} className="rounded-none"><Send className="h-4 w-4" /></Button>
+      <div className="border-t border-border p-2 space-y-2">
+        {messages.some((m) => m.role === 'user' || m.kind === 'observation') && !analysing && (
+          <button onClick={analyse} className="ed-overline text-muted-foreground hover:text-foreground">Ask {coachName} to analyse my reflection so far</button>
+        )}
+        <div className="flex items-end gap-2">
+          <textarea value={input} onChange={(e) => setInput(e.target.value)} rows={2} placeholder={stageHint ? `Answer ${coachName}, or tell it what happened...` : `Tell ${coachName} what happened...`}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
+            className="flex-1 resize-none rounded-none border border-input bg-background px-3 py-2 text-sm" />
+          <Button size="sm" disabled={!input.trim() || loading} onClick={() => send(input)} className="rounded-none"><Send className="h-4 w-4" /></Button>
+        </div>
       </div>
     </Card>
   );

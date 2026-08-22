@@ -24,6 +24,7 @@ type Portfolio = {
   id: string; code: string; title: string; activity_brief: string | null; gateway_guidance: string | null;
   first_name: string | null; last_name: string | null; email: string; justification: string | null;
   reflections: Reflection[]; evidence: Evidence[]; attestations?: Attestation[];
+  coach?: Array<{ role: string; content: string; kind: string; created_at: string }>;
 };
 
 const name = (r: { first_name: string | null; last_name: string | null; email: string }) =>
@@ -380,6 +381,24 @@ function PortfolioReview({ id, onDone, mode = 'primary', certItemId, isSuper }: 
           </ol>
         )}
       </Card>
+
+      {/* Coaching conversation: the learner's dialogue with the coach, part of the portfolio. */}
+      {p.coach && p.coach.length > 0 && (
+        <Card className="rounded-none p-5">
+          <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><MessageSquareQuote className="h-4 w-4 text-primary" /> Coaching conversation ({p.coach.length})</div>
+          <p className="text-xs text-muted-foreground mb-3">The candidate's dialogue with the coach, its questions, its unprompted observations as they wrote, and any analyses. Evidence of thinking in progress.</p>
+          <ol className="space-y-2">
+            {p.coach.map((m, i) => (
+              <li key={i} className={m.role === 'learner' ? 'text-right' : ''}>
+                <div className={`inline-block max-w-[85%] text-sm px-3 py-1.5 whitespace-pre-wrap ${m.role === 'learner' ? 'bg-primary/10' : m.kind === 'analysis' ? 'border-l-2 border-primary bg-primary/5 text-left' : m.kind === 'observation' ? 'border-l-2 border-primary/40 pl-3 text-muted-foreground text-left' : 'bg-muted'}`}>
+                  {m.role !== 'learner' && m.kind !== 'chat' && <span className="ed-overline text-primary mr-1.5">{m.kind === 'analysis' ? 'Analysis' : 'Notices'}</span>}
+                  {m.content}
+                </div>
+              </li>
+            ))}
+          </ol>
+        </Card>
+      )}
 
       {/* Evidence */}
       <Card className="rounded-none p-5">
