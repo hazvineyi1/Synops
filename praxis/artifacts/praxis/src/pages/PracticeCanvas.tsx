@@ -142,7 +142,7 @@ export function PracticeCanvas() {
 
   const { data: me } = useGetMe();
   const { data: brand } = useBrandTheme();
-  const { guided, coachName, themeClass, isPEJ, audience } = demoProfile(brand?.displayName);
+  const { guided, coachName, themeClass, audience } = demoProfile(brand?.displayName);
   const { data: mine = [] } = useQuery({ queryKey: ['practice-me'], queryFn: () => apiFetch<Mine[]>('/practice/me') });
   const cc = mine.find((m) => m.id === id);
   const { data: reflections = [] } = useQuery({ queryKey: ['practice-reflections', id], queryFn: () => apiFetch<Reflection[]>(`/practice/me/credentials/${id}/reflections`), enabled: !!id });
@@ -258,7 +258,7 @@ export function PracticeCanvas() {
                   <div className="ed-overline text-muted-foreground">How to respond</div>
                   <p className="text-sm text-muted-foreground mt-0.5">{stage.guide}</p>
                 </div>
-                <WorkedExample strong={isPEJ ? JUSTICE_EXAMPLES[stage.key]?.strong ?? stage.strong : stage.strong} weak={isPEJ ? JUSTICE_EXAMPLES[stage.key]?.weak ?? stage.weak : stage.weak} />
+                <WorkedExample strong={examplesFor(stage.key, audience)?.strong ?? stage.strong} weak={examplesFor(stage.key, audience)?.weak ?? stage.weak} />
                 {guided && (
                   <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                     {eveOn
@@ -1050,8 +1050,31 @@ const JUSTICE_EXAMPLES: Record<string, { strong: string; weak: string }> = {
   t: { strong: 'Concrete and checkable: "Before I sign any log next week, I will confirm every item logged out has been logged back in, and initial the check." Specific enough that you could verify you did it.', weak: 'A good intention: "I will be more careful with custody records." Nothing specific enough to actually do or check.' },
 };
 
-const fieldFor = (stage: string, audience?: Audience) =>
-  (audience === 'justice' ? EVE_FIELDS_JUSTICE[stage] : EVE_FIELDS[stage]) ?? EVE_FIELDS[stage] ?? { label: 'This box', hint: '', opener: 'Tell me what happened.' };
+// Leadership-audience variants (MRB), framed for leaders reflecting on their own work.
+const EVE_FIELDS_LEADERSHIP: Record<string, { label: string; hint: string; opener: string }> = {
+  description: { label: 'What happened', hint: 'A plain account of the moment: who, what, when.', opener: "Let's capture what actually happened. Walk me through the moment at work, what did you do, and when?" },
+  feelings: { label: 'Feelings', hint: 'How you felt, and how the people involved felt or likely felt.', opener: 'What was it like in that moment, for you and for the people involved?' },
+  evaluation: { label: 'Evaluation', hint: 'What was good or bad about how it went.', opener: 'As you look back, what went well, and what did not?' },
+  analysis: { label: 'Analysis', hint: 'Why it went the way it did; the principle underneath.', opener: 'Why do you think it went the way it did? What is the principle underneath it?' },
+  conclusion: { label: 'Conclusion', hint: 'The lesson, or a principle you could hand to another leader.', opener: 'If you handed one lesson from this to another leader, what would it be?' },
+  action: { label: 'Action', hint: 'One concrete thing you will do differently next time, and when.', opener: 'Knowing this, what is one thing you will do differently next time, and when?' },
+  prediction: { label: 'Prediction', hint: 'What you expected to happen beforehand.', opener: 'Before it happened, what did you expect would happen?' },
+  surprise: { label: 'Surprise', hint: 'Where reality differed from what you expected.', opener: 'Where did it surprise you, where did reality differ from what you expected?' },
+};
+
+const LEADERSHIP_EXAMPLES: Record<string, { strong: string; weak: string }> = {
+  e: { strong: 'Specific and first-person: "On Monday two people on the team had gone quiet in stand-ups, so I spoke to each of them alone rather than raising it in the group, because I judged it was trust, not performance." Names a real moment, a decision, and a reason.', weak: 'Vague and general: "The team had some issues and I dealt with them." No moment, no decision, nothing a reviewer can actually see you do.' },
+  r: { strong: 'Honest and specific: "I expected the one-to-ones to clear the air, but one person went further into their shell, which made me question whether I had read it right." Names a real feeling and a genuine surprise.', weak: 'Tidy and safe: "It went well and I was happy with how I handled it." Nothing you did not already know, and no surprise to learn from.' },
+  n: { strong: 'A portable principle: "What I learned is that silence from someone I lead is information, not resistance, and my first move should be to understand it, not correct it." A one-line idea you could hand to another leader.', weak: 'A restatement: "I learned that one-to-ones can help." Just describes the event again, without an idea that travels beyond it.' },
+  t: { strong: 'Concrete and checkable: "Before the next retro, I will ask each quieter team member one question about what is getting in their way, and note what they say." Specific enough that you could check whether you did it.', weak: 'A good intention: "I will pay more attention to quiet team members." Nothing specific enough to actually do or check.' },
+};
+
+const fieldFor = (stage: string, audience?: Audience) => {
+  const map = audience === 'justice' ? EVE_FIELDS_JUSTICE : audience === 'leadership' ? EVE_FIELDS_LEADERSHIP : EVE_FIELDS;
+  return map[stage] ?? EVE_FIELDS[stage] ?? { label: 'This box', hint: '', opener: 'Tell me what happened.' };
+};
+const examplesFor = (stageKey: string, audience?: Audience): { strong: string; weak: string } | undefined =>
+  audience === 'justice' ? JUSTICE_EXAMPLES[stageKey] : audience === 'leadership' ? LEADERSHIP_EXAMPLES[stageKey] : undefined;
 
 type Capture = { target: 'reflection' | 'evidence'; stage?: string; title?: string; text: string; label: string };
 
