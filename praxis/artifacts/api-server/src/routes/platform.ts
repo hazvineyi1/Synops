@@ -1677,6 +1677,15 @@ router.post("/platform/seed-pej-practice", requireAuth, requireSuperAdmin, async
     await runPracticeDDL();
     const seeded = await seedPejPractice();
     const pid = seeded.partnerId;
+
+    // Brand the PEJ programme FIRST (serious justice palette: deep navy + slate + restrained brass), so
+    // the guided justice UX (coach Mira, serious theme) is applied even if a later step ever fails. The
+    // display name must contain "PEJ"/"Justice" for the frontend demoProfile to detect the audience.
+    await db.execute(sql`UPDATE brand_themes SET display_name = 'PEJ Justice Practice', primary_color = '#1B2A4A', secondary_color = '#33456B', accent_color = '#A6813C', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
+    await db.execute(sql`INSERT INTO brand_themes (tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
+      SELECT ${pid}, 'partner', 'PEJ Justice Practice', '#1B2A4A', '#33456B', '#A6813C', 'Practice Credential'
+      WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
+
     for (const c of PEJ_PRACTICE_CREDENTIALS) {
       await db.execute(sql`
         INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort)
@@ -1685,14 +1694,6 @@ router.post("/platform/seed-pej-practice", requireAuth, requireSuperAdmin, async
           title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
           gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, rationale = EXCLUDED.rationale, sort = EXCLUDED.sort`);
     }
-
-    // Brand the PEJ programme: serious justice palette (deep navy + slate + restrained brass). Best-effort.
-    try {
-      await db.execute(sql`UPDATE brand_themes SET display_name = 'PEJ Justice Practice', primary_color = '#1B2A4A', secondary_color = '#33456B', accent_color = '#A6813C', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
-      await db.execute(sql`INSERT INTO brand_themes (tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
-        SELECT ${pid}, 'partner', 'PEJ Justice Practice', '#1B2A4A', '#33456B', '#A6813C', 'Practice Credential'
-        WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
-    } catch { /* branding best-effort */ }
 
     // Keep the ENTRY learner (Sam Koval) empty so /demos/pej-practice starts from the very beginning.
     await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id IN (SELECT id FROM candidate_credentials WHERE candidate_id = ${seeded.demoLearnerId})`);
