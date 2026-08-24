@@ -486,13 +486,6 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not remove learners', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
-  // Seed real partner-hub records (billing/funding/documents/delegated admins) for Enza.
-  const seedHub = useMutation({
-    mutationFn: () => apiFetch<{ ok: boolean; seeded: boolean; message?: string }>('/platform/seed-enza-hub', { method: 'POST' }),
-    onSuccess: (r) => { qc.invalidateQueries({ queryKey: ['partners'] }); toast({ title: r.seeded ? 'Enza hub data seeded' : 'Hub data unchanged', description: r.message ?? '' }); },
-    onError: (e: any) => toast({ title: 'Could not seed hub data', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
-  });
-
   // Seed 10 high-demand South African skills courses (platform-owned), assigned to Enza.
   const seedSkills = useMutation({
     mutationFn: () => apiFetch<{ total: number; created: number; assigned: number; error?: string }>('/platform/seed-skills-catalog', { method: 'POST' }),
@@ -588,85 +581,96 @@ export function AdminPartners() {
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <p><strong>Data-seeding &amp; maintenance tools.</strong> These write demo data and can overwrite partner/course/learner records. Each asks for confirmation. Do not run casually against live tenants.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" disabled={seedEnza.isPending}
-                onClick={() => { if (window.confirm('Provision Enza Global Media (brand + 15 courses)? This writes/overwrites partner + course records.')) seedEnza.mutate(); }}
-                title="Provision Enza Global Media with brand + 15 courses">
-                {seedEnza.isPending ? 'Provisioning…' : 'Provision Enza Global'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedSkills.isPending}
-                onClick={() => { if (window.confirm('Seed the 10 high-demand SA skills courses (NQF/SETA-mapped) and assign them to Enza? Run "Build Full Courses" afterwards to fully build every module.')) seedSkills.mutate(); }}
-                title="Seed 10 in-demand South African vocational courses and assign to Enza">
-                {seedSkills.isPending ? 'Seeding…' : 'Seed SA Skills Catalogue'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedFlagship.isPending}
-                onClick={() => { if (window.confirm('Seed the 3 flagship courses (Business Model Canvas, Costing/Pricing/Margin, Compliance Essentials) and assign them to Enza? Run "Build Full Courses" afterwards to fully build every module.')) seedFlagship.mutate(); }}
-                title="Seed the 3 priority flagship courses (8-module architecture) and assign to Enza">
-                {seedFlagship.isPending ? 'Seeding…' : 'Seed Flagship Courses'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={enrich.isPending}
-                onClick={() => { if (window.confirm('Build Full Courses? This REBUILDS every Enza module (replaces beats/readings). Learner progress may need a resync afterward.')) enrich.mutate(); }}
-                title="Build every Enza module into a full lesson">
-                {enrich.isPending ? 'Building…' : 'Build Full Courses'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedCohort.isPending}
-                onClick={() => { if (window.confirm('Seed the Enza demo cohort (org, admin, coach, 4 learners)? This writes demo accounts.')) seedCohort.mutate(); }}
-                title="Seed a realistic Enza delivery cohort">
-                {seedCohort.isPending ? 'Seeding…' : 'Seed Enza Cohort'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedSynopsDemo.isPending}
-                onClick={() => { if (window.confirm('Provision the public Synops Demo tenant (demo.synops-consulting.com): partner, brand, cohort, Demo Learner/Admin, reusing Enza courses?')) seedSynopsDemo.mutate(); }}
-                title="Provision the Synops Demo tenant for demo.synops-consulting.com">
-                {seedSynopsDemo.isPending ? 'Provisioning…' : 'Seed Synops Demo'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedK12.isPending}
-                onClick={() => { if (window.confirm('Provision the public K-12 demo (praxis.synops-consulting.com/k12): Grade-6 Math/ELA/Science/Social Studies/History aligned to Common Core, NGSS and C3, plus Maya (standard) and Leo (accommodations)?')) seedK12.mutate(); }}
-                title="Provision the Synops K-12 demo tenant for praxis.synops-consulting.com/k12">
-                {seedK12.isPending ? 'Provisioning…' : 'Seed K-12 Demo'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedGameLibrary.isPending}
-                onClick={() => { if (window.confirm('Seed the reusable Game Library: Jeopardy, Family Feud, Bingo, Password, Wheel/Guess-the-Word and Escape Room per grade band, plus a curated catalog of commercial titles. Safe to re-run.')) seedGameLibrary.mutate(); }}
-                title="Seed the shared Game Library repository of ready-to-use game activities">
-                {seedGameLibrary.isPending ? 'Seeding…' : 'Seed Game Library'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={resync.isPending}
-                onClick={() => { if (window.confirm('Resync demo learner progress against the current content?')) resync.mutate(); }}
-                title="Re-point the demo learners' progress at the current content">
-                {resync.isPending ? 'Resyncing…' : 'Resync Learner Progress'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedHub.isPending}
-                onClick={() => { if (window.confirm('Seed real partner-hub data (billing, funding, documents, delegated admins) for Enza?')) seedHub.mutate(); }}
-                title="Seed billing/funding/documents/delegated-admins for the Enza partner hubs">
-                {seedHub.isPending ? 'Seeding…' : 'Seed Hub Data'}
-              </Button>
-              <ShipCoursesButton />
-              <Button variant="outline" size="sm" disabled={seedMrbPractice.isPending}
-                onClick={() => { if (window.confirm('Provision the MRB executive programme as PRACTICE CREDENTIALS (Option 5)? Creates the credential catalogue + demo candidate. Safe to re-run.')) seedMrbPractice.mutate(); }}
-                title="Provision the MRB executive programme as Practice Credentials">
-                {seedMrbPractice.isPending ? 'Provisioning…' : 'Provision MRB Practice Credentials'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedEducatorPd.isPending}
-                onClick={() => { if (window.confirm('Provision the Educator PD demo (Thoughtful AI in teaching)? Creates a separate partner, 6 credentials, branding and demo educator Maria Alvarez. Safe to re-run. Enter at /demos/educator.')) seedEducatorPd.mutate(); }}
-                title="Provision the Educator Professional Development demo class">
-                {seedEducatorPd.isPending ? 'Provisioning…' : 'Provision Educator PD demo'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={seedPejPractice.isPending}
-                onClick={() => { if (window.confirm('Provision the PEJ Justice Practice demo (prosecutors/investigators, from PEJ-EVD-01)? Creates a separate partner, 6 credentials, serious branding and a demo investigator. Composite and SME-pending. Safe to re-run. Enter at /demos/pej-practice.')) seedPejPractice.mutate(); }}
-                title="Provision the PEJ Justice Practice demo class">
-                {seedPejPractice.isPending ? 'Provisioning…' : 'Provision PEJ Justice Practice demo'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={resetEnza.isPending}
-                className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400"
-                onClick={() => { if (window.confirm('RESET ENZA to a bare shell: permanently delete ALL of Enza\'s organisations, its whole cohort (learners, coaches, org admins), the seeded Enza Faculty login, partner-owned courses, seeded hub data, and unassign all courses. ONLY the partner, its branding and the partner-admin login remain. This cannot be undone. Continue?')) resetEnza.mutate(); }}
-                title="Wipe Enza's seeded content down to an empty branded partner">
-                <Trash2 className="h-4 w-4 mr-2" /> {resetEnza.isPending ? 'Resetting…' : 'Reset Enza (wipe content)'}
-              </Button>
-              <Button variant="outline" size="sm" disabled={removeLearners.isPending}
-                className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400"
-                onClick={() => { if (window.confirm('REMOVE ALL LEARNERS: permanently delete EVERY learner/student account and its progress, submissions and enrolments across the ENTIRE platform (all partners). Courses, organisations, coaches and admins are kept. This cannot be undone. Continue?')) removeLearners.mutate(); }}
-                title="Delete every learner account and its records platform-wide">
-                <Trash2 className="h-4 w-4 mr-2" /> {removeLearners.isPending ? 'Removing…' : 'Remove all learners'}
-              </Button>
+            {/* Enza Global Media: provision the real partner, its course catalogue, and reset. */}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-amber-800/80 dark:text-amber-300/80 mb-1.5">Enza Global Media</div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedEnza.isPending}
+                  onClick={() => { if (window.confirm('Provision Enza Global Media (brand + 15 courses)? This writes/overwrites partner + course records. No demo org or learners are created.')) seedEnza.mutate(); }}
+                  title="Provision Enza Global Media with brand + platform courses">
+                  {seedEnza.isPending ? 'Provisioning…' : 'Provision Enza Global'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedSkills.isPending}
+                  onClick={() => { if (window.confirm('Seed the 10 high-demand SA skills courses (NQF/SETA-mapped) and assign them to Enza? Run "Build Full Courses" afterwards to fully build every module.')) seedSkills.mutate(); }}
+                  title="Seed 10 in-demand South African vocational courses and assign to Enza">
+                  {seedSkills.isPending ? 'Seeding…' : 'Seed SA Skills Catalogue'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedFlagship.isPending}
+                  onClick={() => { if (window.confirm('Seed the 3 flagship courses (Business Model Canvas, Costing/Pricing/Margin, Compliance Essentials) and assign them to Enza? Run "Build Full Courses" afterwards to fully build every module.')) seedFlagship.mutate(); }}
+                  title="Seed the 3 priority flagship courses (8-module architecture) and assign to Enza">
+                  {seedFlagship.isPending ? 'Seeding…' : 'Seed Flagship Courses'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={enrich.isPending}
+                  onClick={() => { if (window.confirm('Build Full Courses? This REBUILDS every Enza course module, generating full lesson content (beats + readings) from each module title and objectives. It REPLACES existing content; learner progress may need a resync afterward. Continue?')) enrich.mutate(); }}
+                  title="Generate full lesson content (beats + readings) for every Enza module from its title/objectives">
+                  {enrich.isPending ? 'Building…' : 'Build Full Courses'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedCohort.isPending}
+                  onClick={() => { if (window.confirm('Seed the Enza DEMO cohort? This creates a demo organisation (Enza SMME Academy), an org admin, a coach and 4 demo learners. Only run this if you want demo delivery data. Continue?')) seedCohort.mutate(); }}
+                  title="Seed a demo Enza delivery cohort (creates a demo organisation + learners)">
+                  {seedCohort.isPending ? 'Seeding…' : 'Seed Enza Cohort (demo)'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={resync.isPending}
+                  onClick={() => { if (window.confirm('Resync demo learner progress against the current content?')) resync.mutate(); }}
+                  title="Re-point the demo learners' progress at the current content">
+                  {resync.isPending ? 'Resyncing…' : 'Resync Learner Progress'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400" disabled={resetEnza.isPending}
+                  onClick={() => { if (window.confirm('RESET ENZA to a bare shell: permanently delete ALL of Enza\'s organisations, its whole cohort (learners, coaches, org admins), the seeded Enza Faculty login, partner-owned courses, seeded hub data, and unassign all courses. ONLY the partner, its branding and the partner-admin login remain. This cannot be undone. Continue?')) resetEnza.mutate(); }}
+                  title="Wipe Enza's seeded content down to a bare branded partner">
+                  <Trash2 className="h-4 w-4 mr-2" /> {resetEnza.isPending ? 'Resetting…' : 'Reset Enza (wipe content)'}
+                </Button>
+              </div>
+            </div>
+
+            {/* Demos & other programmes: each is its own partner/tenant. */}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-amber-800/80 dark:text-amber-300/80 mb-1.5">Demos &amp; other programmes</div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedSynopsDemo.isPending}
+                  onClick={() => { if (window.confirm('Provision the public Synops Demo tenant (demo.synops-consulting.com): partner, brand, cohort, Demo Learner/Admin, reusing Enza courses?')) seedSynopsDemo.mutate(); }}
+                  title="Provision the Synops Demo tenant for demo.synops-consulting.com">
+                  {seedSynopsDemo.isPending ? 'Provisioning…' : 'Seed Synops Demo'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedK12.isPending}
+                  onClick={() => { if (window.confirm('Provision the public K-12 demo (praxis.synops-consulting.com/k12): Grade-6 Math/ELA/Science/Social Studies/History aligned to Common Core, NGSS and C3, plus Maya (standard) and Leo (accommodations)?')) seedK12.mutate(); }}
+                  title="Provision the Synops K-12 demo tenant for praxis.synops-consulting.com/k12">
+                  {seedK12.isPending ? 'Provisioning…' : 'Seed K-12 Demo'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedMrbPractice.isPending}
+                  onClick={() => { if (window.confirm('Provision the MRB executive programme as PRACTICE CREDENTIALS (Option 5)? Creates the credential catalogue + demo candidate. Safe to re-run.')) seedMrbPractice.mutate(); }}
+                  title="Provision the MRB executive programme as Practice Credentials">
+                  {seedMrbPractice.isPending ? 'Provisioning…' : 'Provision MRB Practice'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedEducatorPd.isPending}
+                  onClick={() => { if (window.confirm('Provision the Educator PD demo (Thoughtful AI in teaching)? Creates a separate partner, 6 credentials, branding and demo educator Maria Alvarez. Safe to re-run. Enter at /demos/educator.')) seedEducatorPd.mutate(); }}
+                  title="Provision the Educator Professional Development demo class">
+                  {seedEducatorPd.isPending ? 'Provisioning…' : 'Provision Educator PD demo'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedPejPractice.isPending}
+                  onClick={() => { if (window.confirm('Provision the PEJ Justice Practice demo (prosecutors/investigators, from PEJ-EVD-01)? Creates a separate partner, 6 credentials, serious branding and a demo investigator. Composite and SME-pending. Safe to re-run. Enter at /demos/pej-practice.')) seedPejPractice.mutate(); }}
+                  title="Provision the PEJ Justice Practice demo class">
+                  {seedPejPractice.isPending ? 'Provisioning…' : 'Provision PEJ Justice demo'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedGameLibrary.isPending}
+                  onClick={() => { if (window.confirm('Seed the reusable Game Library: Jeopardy, Family Feud, Bingo, Password, Wheel/Guess-the-Word and Escape Room per grade band, plus a curated catalog of commercial titles. Safe to re-run.')) seedGameLibrary.mutate(); }}
+                  title="Seed the shared Game Library repository of ready-to-use game activities">
+                  {seedGameLibrary.isPending ? 'Seeding…' : 'Seed Game Library'}
+                </Button>
+              </div>
+            </div>
+
+            {/* Platform tools + destructive maintenance. */}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-amber-800/80 dark:text-amber-300/80 mb-1.5">Platform tools</div>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <ShipCoursesButton />
+                <Button variant="outline" size="sm" className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400" disabled={removeLearners.isPending}
+                  onClick={() => { if (window.confirm('REMOVE ALL LEARNERS: permanently delete EVERY learner/student account and its progress, submissions and enrolments across the ENTIRE platform (all partners). Courses, organisations, coaches and admins are kept. This cannot be undone. Continue?')) removeLearners.mutate(); }}
+                  title="Delete every learner account and its records platform-wide">
+                  <Trash2 className="h-4 w-4 mr-2" /> {removeLearners.isPending ? 'Removing…' : 'Remove all learners (platform-wide)'}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -769,7 +773,7 @@ function ShipCoursesButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5"><ArrowRight className="h-4 w-4" /> Ship courses to partner</Button>
+        <Button variant="outline" size="sm" className="w-full justify-start gap-1.5"><ArrowRight className="h-4 w-4" /> Ship courses to partner</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-lg max-w-[calc(100vw-2rem)] overflow-x-hidden">
         <DialogHeader>
