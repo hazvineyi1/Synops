@@ -657,7 +657,7 @@ export function AdminPartners() {
               </Button>
               <Button variant="outline" size="sm" disabled={resetEnza.isPending}
                 className="border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400"
-                onClick={() => { if (window.confirm('RESET ENZA: permanently delete ALL of Enza\'s organisations, its whole cohort (org admins, coaches, learners), partner-owned courses, and seeded hub data (billing/funding/documents). The partner, its branding and the partner admin login are kept. This cannot be undone. Continue?')) resetEnza.mutate(); }}
+                onClick={() => { if (window.confirm('RESET ENZA to a bare shell: permanently delete ALL of Enza\'s organisations, its whole cohort (learners, coaches, org admins), the seeded Enza Faculty login, partner-owned courses, seeded hub data, and unassign all courses. ONLY the partner, its branding and the partner-admin login remain. This cannot be undone. Continue?')) resetEnza.mutate(); }}
                 title="Wipe Enza's seeded content down to an empty branded partner">
                 <Trash2 className="h-4 w-4 mr-2" /> {resetEnza.isPending ? 'Resetting…' : 'Reset Enza (wipe content)'}
               </Button>

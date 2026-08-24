@@ -1316,8 +1316,11 @@ router.post("/platform/reset-enza", requireAuth, requireSuperAdmin, async (req, 
     sql`DELETE FROM partner_documents WHERE partner_id = ${pid}`,
     sql`DELETE FROM partner_announcements WHERE partner_id = ${pid}`,
     sql`DELETE FROM platform_filings WHERE partner_id = ${pid}`,
-    // Finally the cohort users, then the orgs. Partner row + brand + partner-level admins are kept.
+    // Finally the users, then the orgs. Remove EVERY Enza user except the partner-admin login(s), so a
+    // reset leaves a true shell: no cohort, no coaches, no org admins, and no seeded "Enza Faculty"
+    // instructional-designer. The partner row, its branding and the partner_admin login are kept.
     sql`DELETE FROM users WHERE organisation_id IN ${orgsSub}`,
+    sql`DELETE FROM users WHERE partner_id = ${pid} AND role <> 'partner_admin'`,
     sql`DELETE FROM organisations WHERE partner_id = ${pid}`,
   ];
   for (const s of statements) {
