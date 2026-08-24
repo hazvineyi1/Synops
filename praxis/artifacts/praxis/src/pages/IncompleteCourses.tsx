@@ -19,6 +19,7 @@ type ModuleDetail = {
   published: boolean;
   complete: boolean;
   missing: MissingComponent[];
+  optional?: boolean;
 };
 type IncompleteCourse = {
   id: string;
@@ -173,11 +174,17 @@ export function IncompleteCourses() {
         // Decorate each course with readiness so we can sort and summarise.
         const decorated = courses.map((course) => {
           const modules = course.modules ?? [];
-          const doneCount = modules.filter((m) => m.complete && m.published).length;
+          // A module blocks catalogue eligibility exactly as the server computes it: a core module must
+          // be published AND complete; an INCLUDED (published) optional add-on must be complete; an
+          // EXCLUDED (draft) optional add-on never blocks. Keeping this in sync means the readiness the
+          // page shows matches the backend's `complete` verdict even when optional add-ons are present.
+          const isBlocking = (m: ModuleDetail) =>
+            m.optional ? (m.published ? !m.complete : false) : (!m.published || !m.complete);
           const total = modules.length;
-          // Every module is fully built and published; the only thing left is to publish the
-          // course itself. That is when we offer the one-click move to the catalogue.
-          const readyForCatalogue = total > 0 && doneCount === total && course.status !== 'published';
+          const blocking = modules.filter(isBlocking).length;
+          const doneCount = total - blocking;
+          // Nothing left is blocking; the only step is publishing the course itself -> offer the move.
+          const readyForCatalogue = total > 0 && blocking === 0 && course.status !== 'published';
           const ratio = total > 0 ? doneCount / total : 0;
           return { course, modules, doneCount, total, readyForCatalogue, ratio };
         });
@@ -292,7 +299,12 @@ export function IncompleteCourses() {
                           <Trash2 className="h-4 w-4" />
                           <span className="sr-only">{deletingId === course.id ? 'Deleting...' : 'Delete'}</span>
                         </Button>
-                        {readyForCatalogue ? (
+                        {/* Always allow opening the course to edit it — even when it is catalogue-ready
+                            (you still need to get in to tweak modules, syllabus, optional add-ons). */}
+                        <Button size="sm" variant="outline" onClick={() => navigate(`/courses/${course.id}`)}>
+                          Open <ArrowRight className="ml-1.5 h-4 w-4" />
+                        </Button>
+                        {readyForCatalogue && (
                           <Button
                             size="sm"
                             onClick={() => publishToCatalogue(course.id)}
@@ -301,10 +313,6 @@ export function IncompleteCourses() {
                           >
                             <Library className="mr-1.5 h-4 w-4" />
                             {publishingId === course.id ? 'Moving...' : 'Move to catalogue'}
-                          </Button>
-                        ) : (
-                          <Button size="sm" variant="outline" onClick={() => navigate(`/courses/${course.id}`)}>
-                            Open <ArrowRight className="ml-1.5 h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -345,6 +353,9 @@ export function IncompleteCourses() {
                                   <div className="mb-2 flex items-center justify-between gap-3">
                                     <div className="flex min-w-0 items-center gap-2">
                                       <span className="truncate text-sm font-medium text-foreground">{m.moduleTitle || 'Untitled module'}</span>
+                                      {m.optional && (
+                                        <Badge variant="outline" className="shrink-0 text-[10px] border-amber-400 text-amber-700 dark:text-amber-400">Optional add-on</Badge>
+                                      )}
                                       {moduleReady ? (
                                         <Badge className="gap-1 border-transparent bg-emerald-500/15 text-[10px] text-emerald-700 hover:bg-emerald-500/15">
                                           <CheckCircle2 className="h-3 w-3" /> Published
@@ -353,18 +364,29 @@ export function IncompleteCourses() {
                                         <Badge variant="outline" className="text-[10px] capitalize">{m.status}</Badge>
                                       )}
                                     </div>
-                                    {/* Publish this one module on its own, as soon as it is fully built. */}
-                                    {readyToPublish && (
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      {/* Open this module to edit it directly. */}
                                       <Button
                                         size="sm"
-                                        onClick={() => publishModule(m.moduleId)}
-                                        disabled={publishingModuleId === m.moduleId}
-                                        className="h-7 shrink-0 bg-emerald-600 px-2.5 text-xs text-white hover:bg-emerald-700"
+                                        variant="ghost"
+                                        onClick={() => navigate(`/courses/${course.id}/modules/${m.moduleId}`)}
+                                        className="h-7 px-2 text-xs"
                                       >
-                                        <Library className="mr-1 h-3.5 w-3.5" />
-                                        {publishingModuleId === m.moduleId ? 'Publishing...' : 'Publish module'}
+                                        Open <ArrowRight className="ml-1 h-3.5 w-3.5" />
                                       </Button>
-                                    )}
+                                      {/* Publish this one module on its own, as soon as it is fully built. */}
+                                      {readyToPublish && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => publishModule(m.moduleId)}
+                                          disabled={publishingModuleId === m.moduleId}
+                                          className="h-7 bg-emerald-600 px-2.5 text-xs text-white hover:bg-emerald-700"
+                                        >
+                                          <Library className="mr-1 h-3.5 w-3.5" />
+                                          {publishingModuleId === m.moduleId ? 'Publishing...' : 'Publish module'}
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
 
                                   {/* How far to completion: built count + bar. */}
@@ -392,7 +414,7 @@ export function IncompleteCourses() {
                                             {c.label}
                                           </li>
                                         ))}
-                                        {!m.published && !readyToPublish && (
+                                        {!m.published && !readyToPublish && !m.optional && (
                                           <li className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700">
                                             <AlertTriangle className="h-3 w-3" /> Not published yet
                                           </li>
@@ -403,6 +425,13 @@ export function IncompleteCourses() {
                                     <p className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
                                       <CheckCircle2 className="h-3.5 w-3.5" />
                                       {m.published ? 'All components built and published.' : 'All components built. Ready to publish.'}
+                                    </p>
+                                  )}
+
+                                  {/* An optional add-on that is not included never blocks the course. */}
+                                  {m.optional && !m.published && (
+                                    <p className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-amber-700">
+                                      <AlertTriangle className="h-3.5 w-3.5" /> Optional add-on — not included in this course; it does not block publishing.
                                     </p>
                                   )}
                                 </div>
