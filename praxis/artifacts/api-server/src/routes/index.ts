@@ -64,6 +64,7 @@ import adminCatalogRouter from "./adminCatalog";
 import liveGamesRouter from "./liveGames";
 import gameStudioRouter from "./gameStudio";
 import mathCoachRouter from "./mathCoach";
+import changeRequestsRouter from "./changeRequests";
 import devRouter, { devRoutesEnabled } from "./dev";
 
 const router = Router();
@@ -133,6 +134,7 @@ router.use(partnerLandingRouter);
 router.use(consentRouter);
 router.use(dataRightsRouter);
 router.use(cleanupRouter);
+router.use(changeRequestsRouter);
 // Defense in depth: the dev router is not even mounted unless explicitly enabled (see routes/dev.ts).
 if (devRoutesEnabled) router.use(devRouter);
 

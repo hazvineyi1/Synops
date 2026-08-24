@@ -46,6 +46,8 @@ import {
 } from 'lucide-react';
 import { useReadAloud } from '@/lib/speech';
 import { useSession } from '@/context/SessionContext';
+import { getActivePartnerId } from '@/lib/partnerHubData';
+import { RequestChangeButton } from '@/components/RequestChangeButton';
 import { isK12DemoEmail, personaByEmail, type K12Persona } from '@/lib/k12Personas';
 import { picturesInText } from '@/lib/kidPictures';
 import { figureSvg } from '@/lib/k12Figures';
@@ -3760,9 +3762,14 @@ function ModuleHubView({
     onSuccess: (s) => navigate(`/learn/${s.id}`),
   });
 
-  // Instructor authoring: role gate + persist module objectives/modality.
+  // Instructor authoring: only the platform owner (super admin, NOT acting inside a partner) may build
+  // or edit a course. Partner-side staff (partner_admin, org_admin, coach) and a super admin who has
+  // stepped into a partner hub are read-only here — they view the course and can REQUEST changes, but
+  // never author. This mirrors CourseDetail's canInstruct so the module page and course page agree.
   const { data: me } = useGetMe();
-  const canInstruct = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(me?.role ?? '');
+  const canInstruct = me?.role === 'super_admin' && !getActivePartnerId();
+  // Partner-side staff view courses read-only and REQUEST changes instead of editing.
+  const isPartnerStaff = ['partner_admin', 'org_admin', 'coach'].includes(me?.role ?? '');
   // "View as student" carries across the whole course via a shared flag, so a module previews as a
   // learner too. Staff can toggle it here as well.
   const [previewAsStudent, setPreviewAsStudent] = useState(() => { try { return localStorage.getItem('viewAsStudent') === '1'; } catch { return false; } });
@@ -4125,12 +4132,21 @@ function ModuleHubView({
               <Users className="h-4 w-4" />{previewAsStudent ? 'Exit student view' : 'View as student'}
             </Button>
           )}
+          {isPartnerStaff && (
+            <RequestChangeButton className="ml-auto shrink-0" context={{
+              courseId,
+              courseTitle: course?.title ?? courseFull?.title ?? undefined,
+              moduleId,
+              moduleTitle: mod?.title ?? undefined,
+              section: tab ? tab.charAt(0).toUpperCase() + tab.slice(1) : undefined,
+            }} />
+          )}
           {/* Visible entry to WhatsApp coaching: opens the Coach hub where the learner opts in and
               registers a number, then coaches over WhatsApp (Mutale for this course). */}
           <button
             onClick={() => navigate('/coach-hub')}
             title="Coach on WhatsApp"
-            className={cn('inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 shrink-0 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300', canInstruct ? '' : 'ml-auto')}
+            className={cn('inline-flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 shrink-0 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300', (canInstruct || isPartnerStaff) ? '' : 'ml-auto')}
           >
             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.1c-.24.68-1.4 1.3-1.94 1.38-.5.07-1.13.1-1.82-.11-.42-.13-.96-.31-1.65-.61-2.9-1.25-4.79-4.17-4.94-4.36-.14-.19-1.18-1.57-1.18-2.99s.75-2.12 1.02-2.41c.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.57.81 1.98.88 2.12.07.14.12.31.02.5-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.17.29.74 1.22 1.59 1.97 1.09.97 2.01 1.28 2.29 1.42.28.14.45.12.61-.07.17-.19.71-.83.9-1.11.19-.29.38-.24.64-.14.26.09 1.65.78 1.93.92.28.14.47.21.54.33.07.11.07.68-.17 1.36z" /></svg>
             <span className="hidden sm:inline">WhatsApp</span>

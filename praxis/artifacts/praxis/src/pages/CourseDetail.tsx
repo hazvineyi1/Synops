@@ -3,6 +3,7 @@ import { useParams, useSearch, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiFetch, API } from '@/lib/api';
 import { getActivePartnerId } from '@/lib/partnerHubData';
+import { RequestChangeButton } from '@/components/RequestChangeButton';
 import { BLOOM_LEVELS, bloomColor, generateObjectives, type BloomLevel } from '@/lib/courseDevEngine';
 import { courseLevelLabel } from '@/lib/courseLevel';
 import { personaByEmail } from '@/lib/k12Personas';
@@ -2822,6 +2823,13 @@ export function CourseDetail() {
             <Users className="h-4 w-4" />
             {previewAsStudent ? 'Exit student view' : 'View as student'}
           </Button>
+        )}
+        {['partner_admin', 'org_admin', 'coach'].includes(role) && (
+          <RequestChangeButton context={{
+            courseId,
+            courseTitle: course.title,
+            section: activeTab ? activeTab.charAt(0).toUpperCase() + activeTab.slice(1) : undefined,
+          }} />
         )}
       </div>
       {previewAsStudent && (

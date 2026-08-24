@@ -45,6 +45,7 @@ import {
   RotateCcw,
   ChevronDown,
   Home,
+  MessageSquarePlus,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail, getActivePartnerId, setActivePartner } from '@/lib/partnerHubData';
@@ -66,7 +67,7 @@ const SUPER_BG = 'hsl(263 45% 15%)';
 const CONTENT_BG = 'hsl(43 30% 97%)';
 const HAIRLINE = 'rgba(255,255,255,0.07)';
 
-type NavItem = { label: string; href: string; icon: React.ElementType; confirm?: string };
+type NavItem = { label: string; href: string; icon: React.ElementType; confirm?: string; badge?: number };
 type NavGroup = { heading?: string; items: NavItem[] };
 
 function ShellNavLink({
@@ -89,7 +90,7 @@ function ShellNavLink({
       : 'rgba(255,255,255,0.5)';
   const background = active ? 'rgba(255,255,255,0.10)' : hover ? 'rgba(255,255,255,0.05)' : 'transparent';
   const cls = `flex items-center gap-3 rounded-md font-medium transition-colors ${large ? 'px-4 py-3 text-base' : 'px-3 py-2.5 text-sm'}`;
-  const inner = (<><item.icon className={large ? 'h-5 w-5 shrink-0' : 'h-4 w-4 shrink-0'} />{item.label}</>);
+  const inner = (<><item.icon className={large ? 'h-5 w-5 shrink-0' : 'h-4 w-4 shrink-0'} /><span className="min-w-0 truncate">{item.label}</span>{item.badge ? <span className="ml-auto shrink-0 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-slate-900">{item.badge > 9 ? '9+' : item.badge}</span> : null}</>);
   // Items marked with `confirm` are deliberate actions (e.g. leaving an organisation): they never
   // navigate on a stray click, only after the person explicitly confirms.
   if (item.confirm) {
@@ -144,6 +145,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     enabled: !!user,
   });
   const unreadCount = notifCount?.count ?? 0;
+  // Open partner change-requests, shown as a badge on the super-admin nav item.
+  const { data: changeReqCount } = useQuery({
+    queryKey: ['change-requests-open-count'],
+    queryFn: () => apiFetch<{ count: number }>('/change-requests/open-count'),
+    refetchInterval: 60000,
+    enabled: !!user && user.role === 'super_admin',
+  });
+  const openChangeRequests = changeReqCount?.count ?? 0;
 
   if (loading || !user) {
     return (
@@ -347,6 +356,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: GraduationCap },
             { label: t('nav.incompleteCourses', 'Incomplete courses'), href: '/incomplete-courses', icon: FileWarning },
+            { label: t('nav.changeRequests', 'Change requests'), href: '/change-requests', icon: MessageSquarePlus, badge: openChangeRequests || undefined },
           ],
         },
         {

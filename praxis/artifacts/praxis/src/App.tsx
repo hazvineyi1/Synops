@@ -21,6 +21,7 @@ import { StudioNew } from '@/pages/StudioNew';
 import { StudioEdit } from '@/pages/StudioEdit';
 import { Courses } from '@/pages/Courses';
 import { IncompleteCourses } from '@/pages/IncompleteCourses';
+import { ChangeRequests } from '@/pages/ChangeRequests';
 import { CourseDetail } from '@/pages/CourseDetail';
 import { CourseBuilder } from '@/pages/CourseBuilder';
 import { AssignmentDetail } from '@/pages/AssignmentDetail';
@@ -328,6 +329,7 @@ function Routes() {
         <ProtectedRoute path="/gradebook" component={GradebookBrowser} />
         <ProtectedRoute path="/courses/:courseId/modules/:moduleId" component={ModuleViewer} />
         <ProtectedRoute path="/incomplete-courses" component={IncompleteCourses} />
+        <ProtectedRoute path="/change-requests" component={ChangeRequests} />
         <ProtectedRoute path="/courses/new" component={CourseBuilder} />
         <ProtectedRoute path="/courses/:courseId" component={CourseDetail} />
         <ProtectedRoute path="/courses" component={Courses} />
