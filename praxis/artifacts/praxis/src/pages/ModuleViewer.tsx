@@ -179,6 +179,7 @@ interface ModuleDetail {
   lessonType?: string;
   objectives?: string[];
   modality?: 'async' | 'sync' | 'hybrid';
+  optional?: boolean;
   beats: Beat[];
 }
 
@@ -1220,7 +1221,10 @@ export function ModuleViewer() {
           <span className="hidden sm:inline truncate max-w-[140px]">{mod?.title ?? 'Module'}</span>
         </Button>
         <span className="text-muted-foreground/40 hidden sm:inline">/</span>
-        <h1 className="font-semibold text-sm truncate flex-1 hidden sm:block">{mod.title}</h1>
+        <h1 className="font-semibold text-sm truncate hidden sm:block">{mod.title}</h1>
+        {mod.optional && (
+          <Badge variant="outline" className="hidden sm:inline-flex text-[10px] border-amber-400 text-amber-700 dark:text-amber-400 shrink-0">Optional add-on</Badge>
+        )}
         <div className="flex items-center gap-3 ml-auto shrink-0">
           <div className="hidden sm:flex items-center gap-2">
             <Clock className="h-3 w-3 text-muted-foreground" />
