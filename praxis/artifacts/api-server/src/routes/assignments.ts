@@ -12,6 +12,7 @@ import { onGradeEvent } from "../lib/gradebookAlerts";
 import { extractFromBuffer } from "../lib/extractText";
 import { generateAssignmentGrade } from "../lib/assignmentEngine";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { parseModelJson } from "../lib/modelJson";
 import type { AssignmentCriterionScore } from "@workspace/db";
 
 const router = Router();
@@ -598,12 +599,11 @@ router.post("/assignments/:assignmentId/rubric/generate", requireAuth, async (re
   const context = `Assignment title: ${a.title}\nType: ${a.submissionType}\nDescription: ${a.description ?? ""}\nInstructions: ${(a.instructions ?? "").replace(/<[^>]+>/g, " ")}\nModule objectives: ${objectives.join("; ")}\nModule content:\n${readingText}`.slice(0, 12000);
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-6", max_tokens: 1500,
+      model: "claude-sonnet-4-6", max_tokens: 4000,
       messages: [{ role: "user", content: `You are an assessment designer. Build a grading rubric for the assignment below, grounded in its actual content and the module objectives, so each criterion measures something this assignment genuinely asks the learner to do. Produce 4 to 5 criteria. Each criterion has a short name, a maxPoints, and 3 to 4 performance levels from strongest to weakest, each with a label, points (0 to maxPoints, top level = maxPoints and lowest = 0), and a one sentence description specific to THIS assignment. The criteria maxPoints must sum to ${total}. Never use em dashes.\n\n${context}\n\nReturn ONLY JSON, no markdown: {"criteria":[{"name":"...","maxPoints":25,"levels":[{"label":"Excellent","points":25,"description":"..."},{"label":"Proficient","points":18,"description":"..."},{"label":"Developing","points":10,"description":"..."},{"label":"Beginning","points":0,"description":"..."}]}]}` }],
-    }, { timeout: 60000, maxRetries: 1 });
+    }, { timeout: 90000, maxRetries: 2 });
     const raw = (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("").replace(/[—–]/g, ", ");
-    const mm = raw.match(/\{[\s\S]*\}/);
-    const parsed = mm ? JSON.parse(mm[0]) : null;
+    const parsed = parseModelJson(raw);
     const criteria = Array.isArray(parsed?.criteria) ? parsed.criteria.map((c: any) => ({
       name: String(c.name || "Criterion").slice(0, 120),
       maxPoints: Math.max(0, Math.round(Number(c.maxPoints) || 0)),

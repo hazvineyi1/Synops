@@ -6,6 +6,7 @@ import { requireAuth, requireRole, requireHub } from "../middlewares/requireAuth
 import { canParticipateInCourse, canStaffActOnCourse, canViewCourseCatalog } from "../lib/scope";
 import { loadCourseCompleteness, type CourseCompleteness } from "../lib/courseCompleteness";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
+import { parseModelJson } from "../lib/modelJson";
 import { uploadObject, storageEnabled } from "../lib/supabaseStorage";
 
 // Courses belong to the super admin (tenantId "platform") and are assigned OUT to partners.
@@ -233,7 +234,7 @@ router.get("/courses/:courseId/alignment", requireAuth, async (req, res) => {
       };
       const message = await anthropic.messages.create({
         model: "claude-sonnet-4-6",
-        max_tokens: 2000,
+        max_tokens: 4000,
         messages: [{
           role: "user",
           content: `You are a curriculum alignment reviewer using backward design. For each course objective, decide which modules ADDRESS it (teach toward it) and which assessments ASSESS it. Judge from the module titles/objectives AND from each assessment's title, kind and brief description, not the title alone. An assessment ASSESSES an objective when a learner doing it would have to demonstrate that objective, even if the wording differs; align it wherever it plausibly measures the objective. Do not require an exact keyword match. Only exclude an item when it clearly has nothing to do with the objective.
@@ -246,11 +247,18 @@ Return ONLY JSON, no markdown: { "alignment": [ { "objective": "<verbatim course
       });
       const content = message.content[0];
       if (content && content.type === "text") {
-        let parsed: { alignment?: Array<{ objective?: string; modules?: unknown; assessments?: unknown; note?: unknown }> } | null;
-        try { parsed = JSON.parse(content.text); } catch { const m = content.text.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : null; }
+        const parsed = parseModelJson(content.text) as { alignment?: Array<{ objective?: string; modules?: unknown; assessments?: unknown; note?: unknown }> } | null;
         if (parsed?.alignment) {
+          // Match on a normalised objective, not an exact string. The model was asked to echo each
+          // objective verbatim, but any tiny drift (a trailing period, a smart quote, collapsed spaces)
+          // made the old `=== o` lookup miss and the whole row fell back to "not taught / not assessed".
+          const norm = (s: string) => String(s ?? "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+          const byObjective = new Map(parsed.alignment.map((a) => [norm(a.objective ?? ""), a] as const));
           alignment = courseObjectives.map((o) => {
-            const row = parsed!.alignment!.find((a) => a.objective === o) ?? {};
+            const key = norm(o);
+            const row = byObjective.get(key)
+              ?? parsed.alignment!.find((a) => { const n = norm(a.objective ?? ""); return n && (n.startsWith(key.slice(0, 40)) || key.startsWith(n.slice(0, 40))); })
+              ?? {};
             const mods = Array.isArray(row.modules) ? row.modules.map(String) : [];
             const asmts = Array.isArray(row.assessments) ? row.assessments.map(String) : [];
             return { objective: o, modules: mods, assessments: asmts, covered: mods.length > 0, assessed: asmts.length > 0, note: String(row.note ?? "") };
