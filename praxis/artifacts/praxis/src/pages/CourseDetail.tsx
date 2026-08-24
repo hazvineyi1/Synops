@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearch, useLocation } from 'wouter';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiFetch, API } from '@/lib/api';
 import { getActivePartnerId } from '@/lib/partnerHubData';
 import { BLOOM_LEVELS, bloomColor, generateObjectives, type BloomLevel } from '@/lib/courseDevEngine';
@@ -517,6 +517,25 @@ function NewDiscussion({ courseId, modules }: { courseId: string; modules: { id:
 interface Course { id: string; title: string; description: string; status: string; competencyTags: string[]; nqfLevel?: number; objectives?: string[]; thumbnailUrl?: string; catalogDescription?: string; }
 interface Module { id: string; courseId: string; title: string; description?: string; order: number; status: string; lessonType?: string; estimatedMinutes: number; beatCount: number; beats?: Beat[]; optional?: boolean; }
 interface Beat { id: string; type: string; title: string; order: number; videoUrl?: string; narration?: string | null; bulletPoints?: string[] | null; scenario?: string | null; }
+
+/**
+ * A course is platform-owned and rendered in many places (this detail page, the learner catalogue, the
+ * Incomplete-courses repository, and every partner's Courses page). When a super admin edits the course
+ * or one of its modules, refresh ALL of those surfaces at once so the change shows everywhere it appears
+ * rather than only on the page being edited. React Query does prefix matching, so ['courses'] covers the
+ * catalogue and the ['courses','incomplete'] list, and ['received-courses'] covers every partner.
+ */
+function invalidateCourseEverywhere(qc: QueryClient, courseId: string) {
+  // Manually-keyed surfaces.
+  qc.invalidateQueries({ queryKey: ['course', courseId] });
+  qc.invalidateQueries({ queryKey: ['modules', courseId] });
+  qc.invalidateQueries({ queryKey: ['courses'] });          // Incomplete-courses repository (['courses','incomplete'])
+  qc.invalidateQueries({ queryKey: ['received-courses'] });  // every partner's Courses page
+  qc.invalidateQueries({ queryKey: ['shippable-courses'] });
+  // Generated api-client hooks key by URL path (e.g. ['/api/courses'] for the catalogue). Catch every
+  // course endpoint so the learner catalogue and any course-scoped generated query refresh too.
+  qc.invalidateQueries({ predicate: (q) => typeof q.queryKey?.[0] === 'string' && (q.queryKey[0] as string).startsWith('/api/course') });
+}
 interface Assignment { id: string; title: string; description?: string; dueDate?: string; pointsPossible: number; published: boolean; }
 interface Discussion { id: string; title: string; body: string; isPinned?: boolean; replyCount: number; createdAt: string; author?: { firstName: string; lastName: string; }; }
 interface Announcement { id: string; title: string; body: string; pinned?: boolean; createdAt: string; author?: { firstName: string; lastName: string; }; }
@@ -1421,7 +1440,9 @@ function ModuleRow({ mod, canEdit = false, prev, next, index }: { mod: Module; c
   const canOpen = !isEmpty || canEdit;
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState(mod.title);
-  const refresh = () => qc.invalidateQueries({ queryKey: ['modules', mod.courseId] });
+  // Module edits change the course's completeness verdict and what learners/partners see, so refresh the
+  // course and every surface it appears on, not just the module list.
+  const refresh = () => invalidateCourseEverywhere(qc, mod.courseId);
 
   const del = useMutation({
     mutationFn: () => apiFetch(`/modules/${mod.id}`, { method: 'DELETE' }),
@@ -1695,9 +1716,13 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
               <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
                 {(modules ?? []).map((m, i) => (
                   <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
-                    className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left text-muted-foreground hover:text-foreground hover:bg-muted/60">
+                    title={m.optional ? (m.status === 'published' ? 'Optional add-on (included in the course)' : 'Optional add-on (not included / unpublished)') : (m.status !== 'published' ? 'Not published yet' : undefined)}
+                    className={cn('w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left hover:bg-muted/60',
+                      m.optional ? 'text-amber-700 dark:text-amber-400 hover:text-amber-800' : 'text-muted-foreground hover:text-foreground',
+                      m.status !== 'published' && 'opacity-60')}>
                     <span className="text-[10px] font-bold tabular-nums shrink-0 w-5">{String(i + 1).padStart(2, '0')}</span>
-                    <span className="truncate">{m.title}</span>
+                    <span className="truncate flex-1">{m.title}</span>
+                    {m.optional && <span className="shrink-0 rounded border border-amber-400/60 px-1 text-[9px] font-semibold uppercase tracking-wide text-amber-600">Opt</span>}
                   </button>
                 ))}
                 {isInstructor && (
@@ -2632,7 +2657,7 @@ export function CourseDetail() {
   const saveCourse = useMutation({
     mutationFn: (patch: Record<string, unknown>) =>
       apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['course', courseId] }),
+    onSuccess: () => invalidateCourseEverywhere(qc, courseId),
     onError: (e) => alert(e instanceof Error ? e.message : 'Could not save. Please try again.'),
   });
 
