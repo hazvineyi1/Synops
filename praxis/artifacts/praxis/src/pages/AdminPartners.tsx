@@ -771,28 +771,28 @@ function ShipCoursesButton() {
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-1.5"><ArrowRight className="h-4 w-4" /> Ship courses to partner</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-w-[calc(100vw-2rem)] overflow-x-hidden">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /> Ship completed courses to a partner</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 min-w-0"><BookOpen className="h-5 w-5 text-primary shrink-0" /> <span className="truncate">Ship completed courses to a partner</span></DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
-          <div>
+        <div className="space-y-4 min-w-0">
+          <div className="min-w-0">
             <Label className="text-xs">Partner</Label>
             <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)}
-              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+              className="mt-1 h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm">
               <option value="">Select a partner…</option>
               {partnerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
-          <div>
+          <div className="min-w-0">
             <Label className="text-xs">Courses ({sel.size} selected)</Label>
-            <div className="mt-1 max-h-64 overflow-y-auto rounded-md border border-border divide-y">
+            <div className="mt-1 max-h-64 overflow-y-auto overflow-x-hidden rounded-md border border-border divide-y">
               {courses.length === 0 && <div className="p-3 text-sm text-muted-foreground">No platform courses found. Adopt courses to the platform first.</div>}
               {courses.map((c) => (
-                <label key={c.id} className="flex items-center gap-2.5 p-2.5 text-sm cursor-pointer hover:bg-muted/30">
-                  <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="h-4 w-4" />
-                  <span className="flex-1 truncate">{c.title}</span>
-                  {c.status && <span className="text-[11px] text-muted-foreground capitalize">{c.status}</span>}
+                <label key={c.id} className="flex items-center gap-2.5 p-2.5 text-sm cursor-pointer hover:bg-muted/30 min-w-0">
+                  <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 min-w-0 truncate">{c.title}</span>
+                  {c.status && <span className="text-[11px] text-muted-foreground capitalize shrink-0">{c.status}</span>}
                 </label>
               ))}
             </div>
