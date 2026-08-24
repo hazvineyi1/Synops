@@ -2312,6 +2312,9 @@ const SYL_SECTIONS: { key: string; title: string; placeholder: string }[] = [
 ];
 const EMPTY_SYL: Record<string, any> = { descriptionHtml: '', objectivesHtml: '', scheduleHtml: '', assessmentHtml: '', responsibilitiesHtml: '', materialsHtml: '', communicationHtml: '', basics: {} };
 const parseSyl = (j: string | null): Record<string, any> => { try { return { ...EMPTY_SYL, ...(JSON.parse(j || '{}')) }; } catch { return { ...EMPTY_SYL }; } };
+// Heal historic double-escaped syllabus/schedule values ("&lt;p&gt;...") so they render as real HTML
+// rather than showing literal tags. A no-op for content that is already clean.
+const sylHeal = (s: any) => { const v = String(s ?? ''); return /&lt;\/?[a-zA-Z]/.test(v) ? v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'") : v; };
 
 // A collapsible section that instructors can edit inline with rich text.
 function EditableBlock({ title, html, isInstructor, onSave, saving, placeholder, defaultOpen = true }: { title: string; html: string; isInstructor: boolean; onSave: (html: string) => void; saving: boolean; placeholder?: string; defaultOpen?: boolean }) {
@@ -2353,7 +2356,10 @@ function SyllabusTab({ courseId, syllabusJson, isInstructor, onSave, saving, ban
   const [err, setErr] = useState<string | null>(null);
   const syl = parseSyl(syllabusJson);
   const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const descHtml = syl.descriptionHtml || (syl.basics?.description ? `<p>${esc(syl.basics.description)}</p>` : '');
+  // Only wrap+escape when the value is PLAIN text. If it already contains HTML tags, use it as-is, so a
+  // description the AI returned as HTML is never double-escaped into visible <p> tags.
+  const htmlize = (s: string) => { const v = String(s ?? ''); return /<[a-zA-Z][^>]*>/.test(v) ? v : (v.trim() ? `<p>${esc(v)}</p>` : ''); };
+  const descHtml = sylHeal(syl.descriptionHtml || htmlize(syl.basics?.description || ''));
   const saveField = (key: string, html: string) => onSave(JSON.stringify({ ...parseSyl(syllabusJson), [key]: html }));
 
   const generate = async () => {
@@ -2364,7 +2370,7 @@ function SyllabusTab({ courseId, syllabusJson, isInstructor, onSave, saving, ban
       const cur = parseSyl(syllabusJson);
       onSave(JSON.stringify({
         ...cur,
-        descriptionHtml: g.basics?.description ? `<p>${esc(g.basics.description)}</p>` : cur.descriptionHtml,
+        descriptionHtml: g.descriptionHtml || (g.basics?.description ? htmlize(g.basics.description) : cur.descriptionHtml),
         objectivesHtml: g.objectivesHtml ?? cur.objectivesHtml,
         scheduleHtml: g.scheduleHtml ?? cur.scheduleHtml,
         assessmentHtml: g.assessmentHtml ?? cur.assessmentHtml,
@@ -2388,7 +2394,7 @@ function SyllabusTab({ courseId, syllabusJson, isInstructor, onSave, saving, ban
       <div className="max-w-3xl mx-auto space-y-3">
         <EditableBlock title="Course description" html={descHtml} isInstructor={isInstructor} onSave={(h) => saveField('descriptionHtml', h)} saving={saving} placeholder="Describe the course in a few sentences." />
         {SYL_SECTIONS.map((s) => (
-          <EditableBlock key={s.key} title={s.title} html={syl[s.key] ?? ''} isInstructor={isInstructor} onSave={(h) => saveField(s.key, h)} saving={saving} placeholder={s.placeholder} />
+          <EditableBlock key={s.key} title={s.title} html={sylHeal(syl[s.key] ?? '')} isInstructor={isInstructor} onSave={(h) => saveField(s.key, h)} saving={saving} placeholder={s.placeholder} />
         ))}
       </div>
     </div>
@@ -2405,7 +2411,7 @@ function ScheduleTab({ syllabusJson, isInstructor, onSave, saving, bannerUrl, on
     <div className="space-y-4">
       <SectionBanner title="Course Schedule" icon={Calendar} bannerUrl={bannerUrl} isInstructor={isInstructor} onBannerSave={onBannerSave} />
       <div className="max-w-3xl mx-auto">
-        <EditableBlock title="Course Schedule" html={syl.scheduleHtml ?? ''} isInstructor={isInstructor} onSave={(h) => saveField('scheduleHtml', h)} saving={saving} placeholder="Outline topics, readings, deadlines, exams and holidays — week by week." />
+        <EditableBlock title="Course Schedule" html={sylHeal(syl.scheduleHtml ?? '')} isInstructor={isInstructor} onSave={(h) => saveField('scheduleHtml', h)} saving={saving} placeholder="Outline topics, readings, deadlines, exams and holidays — week by week." />
       </div>
     </div>
   );
