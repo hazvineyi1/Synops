@@ -170,7 +170,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   // (or a partner admin) it is navy, so the colour itself tells you which context you are in.
   // Program insights (/program) is a partner/org-scoped page. When a super admin is acting inside a
   // partner (an active partner is selected), it must stay in the partner hub, not bounce to the platform.
-  const inPartnerContext = location.startsWith('/partner') || (location.startsWith('/program') && !!getActivePartnerId());
+  // Program insights (/program) and an opened course (/courses/...) are partner-scoped when a super admin
+  // is acting inside a partner (an active partner is selected): stay in the partner hub, don't bounce to
+  // the platform shell.
+  const inPartnerContext = location.startsWith('/partner') || ((location.startsWith('/program') || location.startsWith('/courses')) && !!getActivePartnerId());
   const isSuperPlatform = role === 'super_admin' && !inPartnerContext;
   const sidebarBg = isSuperPlatform ? SUPER_BG : SIDEBAR_BG;
   // A super admin has no partnerId of their own; the partner they are "acting as" is the persisted
@@ -251,7 +254,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     // Super admin INSIDE a specific partner's hub: the focused partner nav, plus an escape back to
     // the all-partners overview. (Org context is handled above; the partner list lives at the
     // platform overview, so there is no separate Partners page here.)
-    if (role === 'super_admin' && (location === '/partner' || location.startsWith('/partner/') || (location.startsWith('/program') && !!getActivePartnerId()))) {
+    if (role === 'super_admin' && (location === '/partner' || location.startsWith('/partner/') || ((location.startsWith('/program') || location.startsWith('/courses')) && !!getActivePartnerId()))) {
       return [
         { items: [{ label: t('nav.allPartners', 'All partners'), href: '/platform-overview', icon: ArrowLeft }] },
         ...partnerHubGroups(),

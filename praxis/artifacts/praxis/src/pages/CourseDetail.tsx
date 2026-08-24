@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearch, useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, API } from '@/lib/api';
+import { getActivePartnerId } from '@/lib/partnerHubData';
 import { BLOOM_LEVELS, bloomColor, generateObjectives, type BloomLevel } from '@/lib/courseDevEngine';
 import { courseLevelLabel } from '@/lib/courseLevel';
 import { personaByEmail } from '@/lib/k12Personas';
@@ -2515,11 +2516,11 @@ export function CourseDetail() {
 
   const { data: user } = useGetMe();
   const role = user?.role ?? 'learner';
-  // Building a course (modules, banners, syllabus, alignment, rubrics) is the platform owner's job:
-  // strictly the super admin. A partner never builds a course it received; it only views it (and can
-  // walk it as a student) before allocating. So a partner_admin is a pure viewer here, and every
-  // authoring surface below is gated on the super admin.
-  const canInstruct = role === 'super_admin';
+  // Building a course (modules, banners, syllabus, alignment, rubrics) is the platform owner's job and
+  // only happens at the platform level. A partner never builds a course it received, and a super admin
+  // ACTING INSIDE a partner (an active partner is selected) also sees the partner's view-only version,
+  // not the build view. So authoring is available only to a super admin at the platform level.
+  const canInstruct = role === 'super_admin' && !getActivePartnerId();
   // "View as student": staff can preview the course exactly as a learner sees it while building.
   // When on, isInstructor renders false so all instructor controls/tabs hide and learner views show.
   const [previewAsStudent, setPreviewAsStudent] = useState(() => { try { return localStorage.getItem('viewAsStudent') === '1'; } catch { return false; } });
