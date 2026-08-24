@@ -220,6 +220,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           { label: t('nav.partnerOverview', 'Overview'), href: '/partner', icon: LayoutDashboard },
           { label: t('nav.programInsights', 'Program insights'), href: '/program', icon: TrendingUp },
           { label: t('nav.organisations', 'Organisations'), href: '/partner/organisations', icon: Building },
+          { label: t('nav.partnerCourses', 'Courses'), href: '/partner/courses', icon: BookOpen },
         ],
       },
       {

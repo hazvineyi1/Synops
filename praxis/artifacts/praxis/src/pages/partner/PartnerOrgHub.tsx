@@ -381,8 +381,10 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
         <div className="space-y-4">
           <Card className="p-4 flex items-start gap-3 text-sm">
             <BookOpen className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div className="text-muted-foreground">The course catalog for {orgObj.name}. Courses are delivered to learners by assigning them to a <button className="text-primary underline" onClick={() => navigate(`${base}/classes`)}>class</button>.</div>
+            <div className="text-muted-foreground">The course catalog for {orgObj.name}. Courses are delivered to learners by assigning them to a <button className="text-primary underline" onClick={() => navigate(`${base}/classes`)}>class</button>, or enrol everyone at once below.</div>
           </Card>
+
+          <AllocatedCoursesCard orgId={orgId} orgName={orgObj.name} onClassNav={() => navigate(`${base}/classes`)} />
 
           {assignedCourses.length > 0 && (
             <Card className="p-4">
@@ -709,5 +711,51 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
 
       <AssignWizard orgId={orgId} orgName={orgObj.name} open={wizardOpen} onClose={() => setWizardOpen(false)} onDone={() => { qcHub.invalidateQueries({ queryKey: ['org-classes', orgId] }); qcHub.invalidateQueries({ queryKey: ['partner-members', partnerId] }); }} />
     </div>
+  );
+}
+
+/** Courses the partner has allocated to THIS organisation, each with a one-click "enrol every learner"
+ * action (the whole-org path) plus a pointer to the class path for finer control. */
+function AllocatedCoursesCard({ orgId, orgName, onClassNav }: { orgId: string; orgName: string; onClassNav: () => void }) {
+  const qc = useQueryClient();
+  const [flash, setFlash] = React.useState<string | null>(null);
+  const { data: allocated = [] } = useQuery({
+    queryKey: ['org-assigned-courses', orgId],
+    queryFn: () => apiFetch<Array<{ id: string; title: string; status: string | null }>>(`/organisations/${orgId}/assigned-courses`),
+    enabled: !!orgId,
+  });
+  const enrolAll = useMutation({
+    mutationFn: (courseId: string) => apiFetch<{ enrolled: number; total?: number; message?: string }>(`/organisations/${orgId}/courses/${courseId}/enrol-all`, { method: 'POST' }),
+    onSuccess: (r, courseId) => {
+      const t = allocated.find((c) => c.id === courseId)?.title ?? 'the course';
+      setFlash(r.message ? r.message : `Enrolled ${r.enrolled} new learner${r.enrolled === 1 ? '' : 's'} into ${t}${r.total ? ` (${r.total} total in this organisation)` : ''}.`);
+      qc.invalidateQueries({ queryKey: ['org-courses', orgId] });
+      setTimeout(() => setFlash(null), 4000);
+    },
+    onError: () => setFlash('Could not enrol learners. Please try again.'),
+  });
+  if (!allocated.length) return null;
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="text-sm font-semibold">Allocated to {orgName}</h3>
+        <Badge variant="secondary" className="ml-auto">{allocated.length}</Badge>
+      </div>
+      <p className="text-xs text-muted-foreground mb-3">Courses your partner has allocated to this organisation. Enrol every learner in one click, or use a <button className="text-primary underline" onClick={onClassNav}>class</button> for specific groups.</p>
+      {flash && <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 p-2.5 text-xs text-emerald-700">{flash}</div>}
+      <div className="grid sm:grid-cols-2 gap-2">
+        {allocated.map((c) => (
+          <div key={c.id} className="rounded-lg border border-border p-3 flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="font-medium text-sm truncate">{c.title}</div>
+              {c.status && <div className="text-[11px] text-muted-foreground capitalize">{c.status}</div>}
+            </div>
+            <Button size="sm" variant="outline" className="gap-1.5 shrink-0" disabled={enrolAll.isPending} onClick={() => enrolAll.mutate(c.id)}>
+              <GraduationCap className="h-3.5 w-3.5" /> Enrol all
+            </Button>
+          </div>
+        ))}
+      </div>
+    </Card>
   );
 }

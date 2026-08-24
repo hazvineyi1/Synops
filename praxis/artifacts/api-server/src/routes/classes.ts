@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   orgClassesTable, orgClassLearnersTable, orgClassCoursesTable, orgClassStaffTable,
-  organisationsTable, enrolmentsTable, usersTable, coursesTable,
+  organisationsTable, enrolmentsTable, usersTable, coursesTable, coursePartnerAssignmentsTable,
 } from "@workspace/db";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -24,6 +24,39 @@ async function ensureTables() {
   await db.execute(sql`CREATE TABLE IF NOT EXISTS org_class_learners (id text PRIMARY KEY, class_id text NOT NULL, learner_id text NOT NULL)`);
   await db.execute(sql`CREATE TABLE IF NOT EXISTS org_class_courses (id text PRIMARY KEY, class_id text NOT NULL, course_id text NOT NULL)`);
   await db.execute(sql`CREATE TABLE IF NOT EXISTS org_class_staff (id text PRIMARY KEY, class_id text NOT NULL, staff_id text NOT NULL, role text NOT NULL DEFAULT 'facilitator')`);
+  // Partner -> organisation course allocation (the middle hop). A course the super admin gave the
+  // partner is only available to an organisation once the partner allocates it here.
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS org_course_assignments (id text PRIMARY KEY DEFAULT gen_random_uuid()::text, org_id text NOT NULL, course_id text NOT NULL, partner_id text, assigned_by text, assigned_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS org_course_assignments_org_course_uidx ON org_course_assignments (org_id, course_id)`);
+}
+
+/** Course ids the super admin has assigned to this partner (the pool a partner may allocate to its orgs). */
+async function partnerCourseIdSet(partnerId: string): Promise<Set<string>> {
+  try {
+    const rows = await db.select({ courseId: coursePartnerAssignmentsTable.courseId }).from(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.partnerId, partnerId));
+    return new Set(rows.map((r) => r.courseId));
+  } catch { return new Set(); }
+}
+
+/**
+ * Per-partner opt-in gating. A partner uses org-level allocation as soon as it has ANY
+ * org_course_assignments row; until then every partner behaves exactly as before (no gating), so
+ * existing partners are untouched. Once opted in, an org may only run courses allocated to it.
+ */
+async function partnerUsesOrgGating(partnerId: string | null | undefined): Promise<boolean> {
+  if (!partnerId) return false;
+  try {
+    const r = (await db.execute(sql`SELECT 1 FROM org_course_assignments WHERE partner_id = ${partnerId} LIMIT 1`)).rows;
+    return r.length > 0;
+  } catch { return false; }
+}
+
+/** Course ids allocated to a specific org. */
+async function orgAllocatedCourseIdSet(orgId: string): Promise<Set<string>> {
+  try {
+    const rows = (await db.execute(sql`SELECT course_id FROM org_course_assignments WHERE org_id = ${orgId}`)).rows as { course_id: string }[];
+    return new Set(rows.map((r) => r.course_id));
+  } catch { return new Set(); }
 }
 
 type U = { role: string; partnerId?: string | null; organisationId?: string | null };
@@ -203,11 +236,18 @@ router.put("/classes/:classId/learners", requireAuth, async (req, res) => {
   res.json({ learnerIds });
 });
 
-// PUT /classes/:classId/courses { courseIds }, replace the assigned courses.
+// PUT /classes/:classId/courses { courseIds }, replace the assigned courses. Once the partner uses
+// org-level allocation, a class may only carry courses allocated to its organisation (true gating).
 router.put("/classes/:classId/courses", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
   if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
-  const courseIds = strArr(req.body?.courseIds);
+  let courseIds = strArr(req.body?.courseIds);
+  if (await partnerUsesOrgGating(org!.partnerId)) {
+    const allocated = await orgAllocatedCourseIdSet(cls.orgId);
+    const blocked = courseIds.filter((id) => !allocated.has(id));
+    if (blocked.length) { res.status(403).json({ error: "Some courses are not allocated to this organisation. Ask your partner administrator to allocate them first." }); return; }
+    courseIds = courseIds.filter((id) => allocated.has(id));
+  }
   await db.delete(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id));
   if (courseIds.length) await db.insert(orgClassCoursesTable).values(courseIds.map((courseId) => ({ classId: cls.id, courseId })));
   res.json({ courseIds });
@@ -243,6 +283,107 @@ router.post("/classes/:classId/enrol", requireAuth, async (req, res) => {
   if (toInsert.length) await db.insert(enrolmentsTable).values(toInsert);
   await logAudit(req, "class.enrol", "org_class", cls.id, { enrolled: toInsert.length });
   res.json({ enrolled: toInsert.length });
+});
+
+// ── Middle hop: partner -> organisation course allocation ─────────────────────────────────────────
+
+// GET /my-partner/received-courses, the courses the super admin has given the caller's partner, each
+// with which of the partner's organisations it is currently allocated to. For the partner (Enza) hub.
+router.get("/my-partner/received-courses", requireAuth, async (req, res) => {
+  const u = req.dbUser!;
+  const partnerId = (isSuperAdmin(u.role) && typeof req.query.partnerId === "string" && req.query.partnerId) ? req.query.partnerId : u.partnerId;
+  if (!partnerId || (!isSuperAdmin(u.role) && u.role !== "partner_admin")) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    await ensureTables();
+    const ids = [...(await partnerCourseIdSet(partnerId))];
+    if (!ids.length) { res.json({ courses: [], orgs: [] }); return; }
+    const [courses, orgs, allocs] = await Promise.all([
+      db.select({ id: coursesTable.id, title: coursesTable.title, status: coursesTable.status }).from(coursesTable).where(inArray(coursesTable.id, ids)),
+      db.select({ id: organisationsTable.id, name: organisationsTable.name }).from(organisationsTable).where(eq(organisationsTable.partnerId, partnerId)),
+      db.execute(sql`SELECT course_id, org_id FROM org_course_assignments WHERE partner_id = ${partnerId}`),
+    ]);
+    const allocRows = (allocs.rows ?? []) as { course_id: string; org_id: string }[];
+    const orgsByCourse = allocRows.reduce<Record<string, string[]>>((m, r) => { (m[r.course_id] ??= []).push(r.org_id); return m; }, {});
+    res.json({
+      courses: courses.map((c) => ({ id: c.id, title: c.title, status: c.status, orgIds: orgsByCourse[c.id] ?? [] })),
+      orgs: orgs.map((o) => ({ id: o.id, name: o.name })),
+    });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Failed to load received courses" });
+  }
+});
+
+// PUT /partner-courses/:courseId/orgs { orgIds }, set which of the partner's organisations receive this
+// course. Partner-admin (own partner) or super admin. The course must be one assigned to the partner.
+router.put("/partner-courses/:courseId/orgs", requireAuth, async (req, res) => {
+  const u = req.dbUser!;
+  const courseId = req.params.courseId;
+  const partnerId = (isSuperAdmin(u.role) && typeof req.body?.partnerId === "string" && req.body.partnerId) ? req.body.partnerId : u.partnerId;
+  if (!partnerId || (!isSuperAdmin(u.role) && u.role !== "partner_admin")) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!(await partnerCourseIdSet(partnerId)).has(courseId)) { res.status(403).json({ error: "That course is not assigned to your partner." }); return; }
+  await ensureTables();
+  // Only orgs that actually belong to this partner may be targeted.
+  const partnerOrgs = await db.select({ id: organisationsTable.id }).from(organisationsTable).where(eq(organisationsTable.partnerId, partnerId));
+  const valid = new Set(partnerOrgs.map((o) => o.id));
+  const orgIds = strArr(req.body?.orgIds).filter((id) => valid.has(id));
+  await db.execute(sql`DELETE FROM org_course_assignments WHERE course_id = ${courseId} AND partner_id = ${partnerId}`);
+  for (const orgId of orgIds) {
+    await db.execute(sql`INSERT INTO org_course_assignments (org_id, course_id, partner_id, assigned_by) VALUES (${orgId}, ${courseId}, ${partnerId}, ${u.id}) ON CONFLICT (org_id, course_id) DO NOTHING`);
+  }
+  await logAudit(req, "course.allocate_orgs", "course", courseId, { partnerId, orgIds });
+  res.json({ courseId, orgIds });
+});
+
+// GET /organisations/:orgId/assigned-courses, the courses allocated to this org (the pool it may run).
+router.get("/organisations/:orgId/assigned-courses", requireAuth, async (req, res) => {
+  const { orgId } = req.params;
+  const org = await orgFor(orgId);
+  if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
+  try {
+    await ensureTables();
+    const rows = (await db.execute(sql`SELECT course_id FROM org_course_assignments WHERE org_id = ${orgId}`)).rows as { course_id: string }[];
+    const ids = rows.map((r) => r.course_id);
+    if (!ids.length) { res.json([]); return; }
+    const courses = await db.select({ id: coursesTable.id, title: coursesTable.title, status: coursesTable.status }).from(coursesTable).where(inArray(coursesTable.id, ids));
+    res.json(courses);
+  } catch { res.json([]); }
+});
+
+// PUT /organisations/:orgId/assigned-courses { courseIds }, replace the org's allocated set. Admin only.
+// Every course must be one the super admin assigned to this org's partner.
+router.put("/organisations/:orgId/assigned-courses", requireAuth, async (req, res) => {
+  const { orgId } = req.params;
+  const org = await orgFor(orgId);
+  if (!canAdminOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
+  await ensureTables();
+  const pool = await partnerCourseIdSet(org!.partnerId ?? "");
+  const courseIds = strArr(req.body?.courseIds).filter((id) => pool.has(id));
+  await db.execute(sql`DELETE FROM org_course_assignments WHERE org_id = ${orgId}`);
+  for (const courseId of courseIds) {
+    await db.execute(sql`INSERT INTO org_course_assignments (org_id, course_id, partner_id, assigned_by) VALUES (${orgId}, ${courseId}, ${org!.partnerId}, ${req.dbUser!.id}) ON CONFLICT (org_id, course_id) DO NOTHING`);
+  }
+  await logAudit(req, "org.assign_courses", "organisation", orgId, { courseIds });
+  res.json({ courseIds });
+});
+
+// POST /organisations/:orgId/courses/:courseId/enrol-all, enrol every active learner in the org into
+// the course in one click. Admin only; the course must be allocated to this org.
+router.post("/organisations/:orgId/courses/:courseId/enrol-all", requireAuth, async (req, res) => {
+  const { orgId, courseId } = req.params;
+  const org = await orgFor(orgId);
+  if (!canAdminOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
+  await ensureTables();
+  const allocated = (await db.execute(sql`SELECT 1 FROM org_course_assignments WHERE org_id = ${orgId} AND course_id = ${courseId} LIMIT 1`)).rows;
+  if (!allocated.length) { res.status(403).json({ error: "That course is not allocated to this organisation." }); return; }
+  const learners = await db.select({ id: usersTable.id }).from(usersTable).where(and(eq(usersTable.organisationId, orgId), eq(usersTable.role, "learner"), eq(usersTable.status, "active")));
+  const learnerIds = learners.map((l) => l.id);
+  if (!learnerIds.length) { res.json({ enrolled: 0, message: "This organisation has no active learners yet." }); return; }
+  const existing = await db.select({ userId: enrolmentsTable.userId }).from(enrolmentsTable).where(and(eq(enrolmentsTable.courseId, courseId), inArray(enrolmentsTable.userId, learnerIds)));
+  const has = new Set(existing.map((e) => e.userId));
+  const toInsert = learnerIds.filter((id) => !has.has(id)).map((userId) => ({ userId, courseId }));
+  if (toInsert.length) await db.insert(enrolmentsTable).values(toInsert);
+  await logAudit(req, "org.enrol_all", "course", courseId, { orgId, enrolled: toInsert.length });
+  res.json({ enrolled: toInsert.length, total: learnerIds.length });
 });
 
 export default router;

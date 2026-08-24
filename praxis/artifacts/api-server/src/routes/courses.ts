@@ -1023,6 +1023,35 @@ router.put("/partners/:partnerId/courses", requireAuth, requireRole("super_admin
   res.json({ courseIds });
 });
 
+// GET /courses/shippable (super admin), the platform-owned courses that can be shipped to a partner,
+// with status so the UI can foreground finished ones. Powers the bulk "ship to partner" picker.
+router.get("/courses/shippable", requireAuth, requireRole("super_admin"), async (_req, res) => {
+  const rows = await db
+    .select({ id: coursesTable.id, title: coursesTable.title, status: coursesTable.status })
+    .from(coursesTable)
+    .where(eq(coursesTable.tenantId, "platform"))
+    .orderBy(coursesTable.title);
+  res.json(rows);
+});
+
+// POST /platform/ship-courses { partnerId, courseIds } (super admin), ADD a set of platform courses to
+// a partner without disturbing what they already have. Idempotent (skips duplicates).
+router.post("/platform/ship-courses", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const partnerId = typeof req.body?.partnerId === "string" ? req.body.partnerId : "";
+  const courseIds = Array.isArray(req.body?.courseIds)
+    ? [...new Set((req.body.courseIds as unknown[]).filter((c): c is string => typeof c === "string" && c.length > 0))]
+    : [];
+  if (!partnerId || !courseIds.length) { res.status(400).json({ error: "partnerId and at least one courseId are required." }); return; }
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS course_partner_assignments (
+      id text PRIMARY KEY, course_id text NOT NULL, partner_id text NOT NULL, assigned_by text, assigned_at timestamptz NOT NULL DEFAULT now())`);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS course_partner_assignments_course_partner_uidx ON course_partner_assignments (course_id, partner_id)`);
+  await db.insert(coursePartnerAssignmentsTable)
+    .values(courseIds.map((courseId) => ({ courseId, partnerId, assignedBy: req.dbUser!.id })))
+    .onConflictDoNothing();
+  res.json({ ok: true, partnerId, shipped: courseIds.length });
+});
+
 // GET /courses/:courseId
 router.get("/courses/:courseId", requireAuth, async (req, res) => {
   const course = await db.query.coursesTable.findFirst({

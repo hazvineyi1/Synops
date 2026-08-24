@@ -86,6 +86,7 @@ import { MyGrades } from '@/pages/MyGrades';
 import { Jotter } from '@/pages/Jotter';
 import { PartnerOverview } from '@/pages/partner/PartnerOverview';
 import { PartnerOrganisations } from '@/pages/partner/PartnerOrganisations';
+import { PartnerCourses } from '@/pages/partner/PartnerCourses';
 import { PartnerOrgHub } from '@/pages/partner/PartnerOrgHub';
 import { PartnerImpersonateView } from '@/pages/partner/PartnerImpersonateView';
 import { PartnerPartners } from '@/pages/partner/PartnerPartners';
@@ -312,6 +313,7 @@ function Routes() {
         <ProtectedRoute path="/learning" component={LearningHub} />
         <ProtectedRoute path="/partner/partners" component={PartnerPartners} />
         <ProtectedRoute path="/partner/organisations" component={PartnerOrganisations} />
+        <ProtectedRoute path="/partner/courses" component={PartnerCourses} />
         <ProtectedRoute path="/partner/impersonate/:orgId/:userId" component={PartnerImpersonateView} />
         <ProtectedRoute path="/partner/org/:orgId/classes/:classId" component={PartnerOrgHub} />
         <ProtectedRoute path="/partner/org/:orgId/:section" component={PartnerOrgHub} />

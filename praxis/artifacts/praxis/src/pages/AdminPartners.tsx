@@ -639,6 +639,7 @@ export function AdminPartners() {
                 title="Seed billing/funding/documents/delegated-admins for the Enza partner hubs">
                 {seedHub.isPending ? 'Seeding…' : 'Seed Hub Data'}
               </Button>
+              <ShipCoursesButton />
               <Button variant="outline" size="sm" disabled={seedMrbPractice.isPending}
                 onClick={() => { if (window.confirm('Provision the MRB executive programme as PRACTICE CREDENTIALS (Option 5)? Creates the credential catalogue + demo candidate. Safe to re-run.')) seedMrbPractice.mutate(); }}
                 title="Provision the MRB executive programme as Practice Credentials">
@@ -736,5 +737,74 @@ export function AdminPartners() {
         <PartnerDetailDialog partner={selectedPartner} onClose={() => setSelectedPartner(null)} />
       </Dialog>
     </div>
+  );
+}
+
+/** Super-admin bulk "ship completed courses to a partner": pick a partner, multi-select platform
+ * courses, and add them to that partner's pool in one go (idempotent). */
+function ShipCoursesButton() {
+  const { toast } = useToast();
+  const { data: partnersData } = useListPartners();
+  const partnerList: Array<{ id: string; name: string }> = Array.isArray(partnersData)
+    ? (partnersData as any) : ((partnersData as any)?.partners ?? []);
+  const [open, setOpen] = useState(false);
+  const [partnerId, setPartnerId] = useState('');
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const { data: courses = [] } = useQuery({
+    queryKey: ['shippable-courses'],
+    queryFn: () => apiFetch<Array<{ id: string; title: string; status: string | null }>>('/courses/shippable'),
+    enabled: open,
+  });
+  const ship = useMutation({
+    mutationFn: () => apiFetch<{ shipped: number }>('/platform/ship-courses', { method: 'POST', body: JSON.stringify({ partnerId, courseIds: [...sel] }) }),
+    onSuccess: (r) => {
+      const pn = partnerList.find((p) => p.id === partnerId)?.name ?? 'the partner';
+      toast({ title: 'Courses shipped', description: `${r.shipped} course${r.shipped === 1 ? '' : 's'} added to ${pn}. They can now allocate them to organisations.` });
+      setOpen(false); setSel(new Set());
+    },
+    onError: (e: any) => toast({ title: 'Could not ship courses', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+  const toggle = (id: string) => setSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5"><ArrowRight className="h-4 w-4" /> Ship courses to partner</Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><BookOpen className="h-5 w-5 text-primary" /> Ship completed courses to a partner</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label className="text-xs">Partner</Label>
+            <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)}
+              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <option value="">Select a partner…</option>
+              {partnerList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label className="text-xs">Courses ({sel.size} selected)</Label>
+            <div className="mt-1 max-h-64 overflow-y-auto rounded-md border border-border divide-y">
+              {courses.length === 0 && <div className="p-3 text-sm text-muted-foreground">No platform courses found. Adopt courses to the platform first.</div>}
+              {courses.map((c) => (
+                <label key={c.id} className="flex items-center gap-2.5 p-2.5 text-sm cursor-pointer hover:bg-muted/30">
+                  <input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} className="h-4 w-4" />
+                  <span className="flex-1 truncate">{c.title}</span>
+                  {c.status && <span className="text-[11px] text-muted-foreground capitalize">{c.status}</span>}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button disabled={!partnerId || sel.size === 0 || ship.isPending} onClick={() => ship.mutate()} className="gap-1.5">
+              <ArrowRight className="h-4 w-4" /> {ship.isPending ? 'Shipping…' : `Ship ${sel.size || ''} course${sel.size === 1 ? '' : 's'}`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
