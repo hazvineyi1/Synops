@@ -66,7 +66,7 @@ const SUPER_BG = 'hsl(263 45% 15%)';
 const CONTENT_BG = 'hsl(43 30% 97%)';
 const HAIRLINE = 'rgba(255,255,255,0.07)';
 
-type NavItem = { label: string; href: string; icon: React.ElementType };
+type NavItem = { label: string; href: string; icon: React.ElementType; confirm?: string };
 type NavGroup = { heading?: string; items: NavItem[] };
 
 function ShellNavLink({
@@ -81,23 +81,36 @@ function ShellNavLink({
   onClick?: () => void;
 }) {
   const [hover, setHover] = useState(false);
+  const [, navigate] = useLocation();
   const color = active
     ? 'rgba(255,255,255,0.95)'
     : hover
       ? 'rgba(255,255,255,0.82)'
       : 'rgba(255,255,255,0.5)';
   const background = active ? 'rgba(255,255,255,0.10)' : hover ? 'rgba(255,255,255,0.05)' : 'transparent';
+  const cls = `flex items-center gap-3 rounded-md font-medium transition-colors ${large ? 'px-4 py-3 text-base' : 'px-3 py-2.5 text-sm'}`;
+  const inner = (<><item.icon className={large ? 'h-5 w-5 shrink-0' : 'h-4 w-4 shrink-0'} />{item.label}</>);
+  // Items marked with `confirm` are deliberate actions (e.g. leaving an organisation): they never
+  // navigate on a stray click, only after the person explicitly confirms.
+  if (item.confirm) {
+    return (
+      <button type="button" onClick={() => { if (window.confirm(item.confirm)) { onClick?.(); navigate(item.href); } }}
+        className={`${cls} w-full text-left`} style={{ background, color }}
+        onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+        {inner}
+      </button>
+    );
+  }
   return (
     <Link
       href={item.href}
       onClick={onClick}
-      className={`flex items-center gap-3 rounded-md font-medium transition-colors ${large ? 'px-4 py-3 text-base' : 'px-3 py-2.5 text-sm'}`}
+      className={cls}
       style={{ background, color }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <item.icon className={large ? 'h-5 w-5 shrink-0' : 'h-4 w-4 shrink-0'} />
-      {item.label}
+      {inner}
     </Link>
   );
 }
@@ -195,7 +208,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       const org = orgDetail(orgHub, orgId).org;
       const orgName = org?.name ?? t('nav.organisation', 'Organisation');
       return [
-        { items: [{ label: t('nav.allOrganisations', 'All organisations'), href: '/partner/organisations', icon: ArrowLeft }] },
+        { items: [{ label: t('nav.exitOrganisation', 'Exit organisation'), href: '/partner/organisations', icon: ArrowLeft, confirm: `Leave ${orgName} and return to all organisations?` }] },
         {
           heading: orgName,
           items: [

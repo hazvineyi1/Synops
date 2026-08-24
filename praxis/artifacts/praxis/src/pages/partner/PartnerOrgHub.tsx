@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AssignWizard } from './AssignWizard';
 import { cn } from '@/lib/utils';
 import {
-  Building, Users, BookOpen, GraduationCap, ClipboardList, Landmark, FileText, Wallet,
+  Building, Users, BookOpen, GraduationCap, ClipboardList, FileText, Wallet,
   Settings, TrendingUp, Receipt, ShieldCheck, Upload, ChevronRight, CheckCircle2, AlertTriangle,
   UserPlus, KeyRound, Ban, RotateCcw, Settings2, Layers, Check, Send, LifeBuoy,
   Phone, MapPin, Mail, Smartphone, Link2, Plus,
@@ -655,9 +655,8 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
 
                     {/* Programme */}
                     <div className="rounded-lg border border-border p-3">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Programme &amp; funding</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Programme</div>
                       <div className="grid sm:grid-cols-2 gap-x-4">
-                        <ProfileRow icon={Landmark} label="Funder">{selectedLearner.funder}</ProfileRow>
                         <ProfileRow icon={BookOpen} label="Current course">{selectedLearner.course}</ProfileRow>
                         <ProfileRow icon={TrendingUp} label="Progress">
                           <span className="flex items-center gap-2"><Progress value={selectedLearner.progress} className="h-1.5 w-24" /> {selectedLearner.progress}%</span>

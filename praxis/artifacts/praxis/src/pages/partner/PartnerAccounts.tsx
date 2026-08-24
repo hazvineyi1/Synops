@@ -25,8 +25,6 @@ interface LoginEv { at: string; outcome: string; ip: string; device: string; imp
 
 const CAPS = [
   'View all organisations',
-  'Financial Hub & invoicing',
-  'Funders Hub & agreements',
   'Create org / coach accounts',
   'Create learner accounts',
   'Manage course catalog',
@@ -35,13 +33,13 @@ const CAPS = [
 ] as const;
 type Tier = 'Partner' | 'Coach' | 'Org-admin' | 'Learner';
 const MATRIX: Record<Tier, boolean[]> = {
-  Partner:   [true, true, true, true, true, true, true, false],
-  Coach:     [false, false, false, true, true, true, true, false],
-  'Org-admin': [false, false, false, false, true, true, true, false],
-  Learner:   [false, false, false, false, false, false, false, true],
+  Partner:   [true, true, true, true, true, false],
+  Coach:     [false, true, true, true, true, false],
+  'Org-admin': [false, false, true, true, true, false],
+  Learner:   [false, false, false, false, false, true],
 };
 const TIER_NOTE: Record<Tier, string> = {
-  Partner: 'Top-level account. Owns Financial Hub, Funders Hub, branding and platform admin.',
+  Partner: 'Top-level account. Owns branding and platform admin.',
   Coach: 'Delegated provisioning tier. Creates and manages Organisation accounts.',
   'Org-admin': 'Manages Learners, catalog and activities for its own cohort.',
   Learner: 'End user. Consumes courses and generates progress data.',
@@ -361,7 +359,7 @@ export function PartnerAccounts() {
             <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
             <div className="text-muted-foreground">
               Delegate a single organisation to a junior admin and grant only the powers you choose. A delegated admin
-              is <span className="text-foreground font-medium">confined to their one organisation</span> and can do nothing beyond the powers allocated here -               Main-Admin surfaces (Financial Hub, Funders, other organisations) stay out of reach.
+              is <span className="text-foreground font-medium">confined to their one organisation</span> and can do nothing beyond the powers allocated here -               other organisations stay out of reach.
             </div>
           </Card>
 

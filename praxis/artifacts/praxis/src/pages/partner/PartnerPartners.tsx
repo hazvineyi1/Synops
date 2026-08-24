@@ -88,7 +88,7 @@ export function PartnerPartners() {
 
       <Card className="p-4 flex items-start gap-3 text-sm border-dashed">
         <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-        <div className="text-muted-foreground">Opening a partner sets it as the active partner: the Overview, Organisations, Financial Hub, Funders, Documents, Accounts, Communications and Audit - and every organisation and class beneath - all resolve to that partner. Return here any time to switch.</div>
+        <div className="text-muted-foreground">Opening a partner sets it as the active partner: the Overview, Organisations, Courses and Accounts - and every organisation and class beneath - all resolve to that partner. Return here any time to switch.</div>
       </Card>
     </div>
   );
