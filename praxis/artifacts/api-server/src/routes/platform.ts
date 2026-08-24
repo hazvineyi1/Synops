@@ -202,6 +202,37 @@ router.post("/platform/users/:id/impersonate", requireAuth, requireSuperAdmin, a
 });
 
 /**
+ * POST /platform/partners/:partnerId/impersonate-admin - one-click "View as partner admin".
+ * Resolves the partner's own partner_admin and starts a short-lived impersonation session, so a super
+ * admin sees the app EXACTLY as that partner's admin (the restricted partner-admin view). This is
+ * deliberately different from the super-admin "active partner" overlay, which keeps super-admin powers.
+ */
+router.post("/platform/partners/:partnerId/impersonate-admin", requireAuth, requireSuperAdmin, async (req, res) => {
+  const { partnerId } = req.params;
+  const [target] = await db
+    .select()
+    .from(usersTable)
+    .where(and(eq(usersTable.partnerId, partnerId), eq(usersTable.role, "partner_admin"), eq(usersTable.status, "active")))
+    .limit(1);
+  if (!target) { res.status(404).json({ error: "This partner has no active partner admin to view as." }); return; }
+  if (target.id === req.userId) { res.status(400).json({ error: "You are already yourself." }); return; }
+
+  const adminToken = req.cookies?.[SESSION_COOKIE];
+  const token = newSessionToken();
+  await db.insert(authSessionsTable).values({
+    token, userId: target.id, impersonatorId: req.userId!,
+    ipAddress: clientIp(req as any), userAgent: (req.headers["user-agent"] as string) ?? null,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  });
+  await db.insert(loginEventsTable).values({ userId: target.id, email: target.email, outcome: "impersonated", ipAddress: clientIp(req as any), impersonatorId: req.userId! });
+  await audit(req, "user.impersonate", "user", target.id, { email: target.email, via: "partner_admin_button" });
+
+  if (adminToken) res.cookie(IMPERSONATOR_COOKIE, adminToken, cookieOptions(60 * 60 * 1000));
+  res.cookie(SESSION_COOKIE, token, cookieOptions(60 * 60 * 1000));
+  res.json({ ok: true, impersonating: { id: target.id, email: target.email } });
+});
+
+/**
  * POST /platform/stop-impersonating
  * Available to ANY signed-in user: while impersonating, the caller IS the target, not
  * an admin -- so a super_admin gate here would make it impossible to get back.
