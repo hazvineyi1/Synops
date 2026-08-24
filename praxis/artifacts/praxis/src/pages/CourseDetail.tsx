@@ -503,7 +503,7 @@ function NewDiscussion({ courseId, modules }: { courseId: string; modules: { id:
 
 // --- Types ---
 interface Course { id: string; title: string; description: string; status: string; competencyTags: string[]; nqfLevel?: number; objectives?: string[]; thumbnailUrl?: string; catalogDescription?: string; }
-interface Module { id: string; courseId: string; title: string; description?: string; order: number; status: string; lessonType?: string; estimatedMinutes: number; beatCount: number; beats?: Beat[]; }
+interface Module { id: string; courseId: string; title: string; description?: string; order: number; status: string; lessonType?: string; estimatedMinutes: number; beatCount: number; beats?: Beat[]; optional?: boolean; }
 interface Beat { id: string; type: string; title: string; order: number; videoUrl?: string; narration?: string | null; bulletPoints?: string[] | null; scenario?: string | null; }
 interface Assignment { id: string; title: string; description?: string; dueDate?: string; pointsPossible: number; published: boolean; }
 interface Discussion { id: string; title: string; body: string; isPinned?: boolean; replyCount: number; createdAt: string; author?: { firstName: string; lastName: string; }; }
@@ -1428,6 +1428,16 @@ function ModuleRow({ mod, canEdit = false, prev, next, index }: { mod: Module; c
     },
     onSuccess: refresh,
   });
+  // Optional add-on: mark/unmark a module as an optional add-on, and (when optional) include/exclude it
+  // from the delivered course by publishing/unpublishing it, so learners only see included add-ons.
+  const setOptional = useMutation({
+    mutationFn: (optional: boolean) => apiFetch(`/modules/${mod.id}`, { method: 'PATCH', body: JSON.stringify({ optional }) }),
+    onSuccess: refresh,
+  });
+  const setStatus = useMutation({
+    mutationFn: (status: string) => apiFetch(`/modules/${mod.id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+    onSuccess: refresh,
+  });
   const busy = swap.isPending || rename.isPending;
 
   return (
@@ -1436,6 +1446,7 @@ function ModuleRow({ mod, canEdit = false, prev, next, index }: { mod: Module; c
         'transition-shadow',
         canOpen && !renaming && 'hover:shadow-md cursor-pointer',
         isEmpty && 'opacity-60',
+        mod.optional && 'border-amber-300/70 bg-amber-50/30 dark:bg-amber-950/10',
       )}
       onClick={() => canOpen && !renaming && navigate(`/courses/${mod.courseId}/modules/${mod.id}`)}
     >
@@ -1477,11 +1488,26 @@ function ModuleRow({ mod, canEdit = false, prev, next, index }: { mod: Module; c
           </div>
           {/* Status + edit controls */}
           <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {mod.optional && (
+              <Badge variant="outline" className="text-xs border-amber-400 text-amber-700 dark:text-amber-400">Optional add-on</Badge>
+            )}
             <Badge variant={mod.status === 'published' ? 'default' : 'secondary'} className="text-xs">
               {mod.status}
             </Badge>
+            {canEdit && !renaming && mod.optional && (
+              <Button size="sm" variant="outline" className="h-8 text-xs" disabled={setStatus.isPending}
+                title={mod.status === 'published' ? 'Remove this optional add-on from the delivered course' : 'Add this optional add-on to the delivered course'}
+                onClick={() => setStatus.mutate(mod.status === 'published' ? 'draft' : 'published')}>
+                {mod.status === 'published' ? 'Remove from course' : 'Add to course'}
+              </Button>
+            )}
             {canEdit && !renaming && (
               <>
+                <Button size="sm" variant="ghost" className={cn('h-8 text-xs', mod.optional ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground')} disabled={setOptional.isPending}
+                  title={mod.optional ? 'This is an optional add-on. Click to make it a core module.' : 'Mark this module as an optional add-on that can be added or removed'}
+                  onClick={() => setOptional.mutate(!mod.optional)}>
+                  {mod.optional ? 'Make core' : 'Make optional'}
+                </Button>
                 <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Rename module"
                   onClick={() => { setNameDraft(mod.title); setRenaming(true); }}>
                   <Pencil className="h-4 w-4" />
@@ -3082,6 +3108,7 @@ export function CourseDetail() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium truncate">{m.title}</span>
+                              {m.optional && <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-700 dark:text-amber-400 shrink-0">{L('Optional add-on', 'Complemento opcional')}</Badge>}
                               {recommended && <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">{L('Start here', 'Empieza aquí')}</Badge>}
                             </div>
                             <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">

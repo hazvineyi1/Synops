@@ -42,6 +42,7 @@ function toModuleResponse(m: typeof modulesTable.$inferSelect) {
     lessonType: m.lessonType ?? 'socratic',
     objectives: m.objectives ?? [],
     modality: m.modality ?? 'async',
+    optional: (m as { optional?: boolean }).optional ?? false,
     order: m.order,
     beatCount: m.beatCount,
     estimatedMinutes: m.estimatedMinutes,
@@ -121,7 +122,7 @@ router.patch("/modules/:moduleId", requireAuth, requireRole("super_admin", "part
   if (!existing) { res.status(404).json({ error: "Not found" }); return; }
   if (!(await staffOn(req, res, existing.courseId))) return;
 
-  const { title, description, status, lessonType, estimatedMinutes, order, objectives, modality, bannerUrl, overviewConfig, railConfig } = req.body;
+  const { title, description, status, lessonType, estimatedMinutes, order, objectives, modality, bannerUrl, overviewConfig, railConfig, optional } = req.body;
   const [updated] = await db
     .update(modulesTable)
     .set({
@@ -129,6 +130,7 @@ router.patch("/modules/:moduleId", requireAuth, requireRole("super_admin", "part
       // Only overwrite when provided, so a partial PATCH never wipes them.
       ...(objectives !== undefined ? { objectives } : {}),
       ...(modality !== undefined ? { modality } : {}),
+      ...(optional !== undefined ? { optional: !!optional } as Record<string, unknown> : {}),
       ...(bannerUrl !== undefined ? { bannerUrl: bannerUrl || null } : {}),
       ...(overviewConfig !== undefined ? { overviewConfig } as Record<string, unknown> : {}),
       ...(railConfig !== undefined ? { railConfig } as Record<string, unknown> : {}),

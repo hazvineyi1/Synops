@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -41,6 +41,9 @@ export const modulesTable = pgTable("modules", {
   // How this module/class is delivered.
   modality: moduleModalityEnum("module_modality").notNull().default("async"),
   order: integer("order").notNull().default(0),
+  // Optional add-on: a module that is not part of the core (source-manual) course, clearly labelled and
+  // freely includable/removable. Purely additive; core modules stay optional=false.
+  optional: boolean("is_optional").notNull().default(false),
   beatCount: integer("beat_count").notNull().default(0),
   estimatedMinutes: integer("estimated_minutes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
