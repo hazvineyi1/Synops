@@ -239,7 +239,9 @@ export function Courses() {
                   </p>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-4 mb-4">
                     <Layers className="h-3.5 w-3.5" />
-                    {course.moduleCount || 0} modules · Self-paced
+                    {/* Learner-facing count: published modules only, so removed optional add-ons and
+                        drafts don't inflate it. Falls back to the total if the field isn't present. */}
+                    {((course as { publishedModuleCount?: number }).publishedModuleCount ?? course.moduleCount) || 0} modules · Self-paced
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" className="flex-1" onClick={() => navigate(`/courses/${course.id}`)}>

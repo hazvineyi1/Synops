@@ -49,6 +49,10 @@ function toCourseResponse(c: typeof coursesTable.$inferSelect, completeness?: Co
     tenantId: c.tenantId,
     status: c.status,
     moduleCount: c.moduleCount,
+    // Learner-facing count: only the modules a learner will actually see (published). Excludes drafts
+    // and REMOVED optional add-ons, so the catalogue card doesn't over-count. Falls back to the total
+    // when completeness wasn't computed (callers that don't need the learner count).
+    publishedModuleCount: completeness ? completeness.modules.filter((m) => m.published).length : undefined,
     enrolmentCount: c.enrolmentCount,
     competencyTags: c.competencyTags,
     objectives: c.objectives ?? [],

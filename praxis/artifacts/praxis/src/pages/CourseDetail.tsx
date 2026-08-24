@@ -1617,10 +1617,13 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
   activeTab: string;
   setTab: (t: string) => void;
   isInstructor: boolean;
-  modules?: { id: string; title: string }[];
+  modules?: { id: string; title: string; status?: string; optional?: boolean }[];
   navigate: (to: string) => void;
   savedConfig?: string | null;
 }) {
+  // Learners only ever see the modules that are actually delivered (published). Removed optional
+  // add-ons and drafts stay hidden from them; authors still see every module (marked + dimmed).
+  const tocModules = isInstructor ? (modules ?? []) : (modules ?? []).filter((m) => m.status === 'published');
   const STORAGE = `toc-hidden:${courseId}`;
   const [hidden, setHidden] = useState<Set<string>>(() => {
     try { const raw = localStorage.getItem(STORAGE); return new Set<string>(raw ? JSON.parse(raw) : []); } catch { return new Set<string>(); }
@@ -1667,7 +1670,7 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
     const cfg = JSON.stringify({ order, hidden: [...hidden], labels });
     apiFetch(`/courses/${courseId}`, { method: 'PATCH', body: JSON.stringify({ tocConfig: cfg }) }).catch(() => { /* non-fatal */ });
   };
-  const hasModules = (modules?.length ?? 0) > 0;
+  const hasModules = tocModules.length > 0;
   return (
     <aside className="lg:w-full shrink-0 lg:sticky lg:top-4 self-start mb-6 lg:mb-0 lg:border-r lg:border-border lg:pr-4 lg:min-h-[70vh]">
       <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-border">
@@ -1714,7 +1717,7 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
             </div>
             {t.id === 'modules' && hasModules && modulesOpen && (
               <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-2">
-                {(modules ?? []).map((m, i) => (
+                {tocModules.map((m, i) => (
                   <button key={m.id} onClick={() => navigate(`/courses/${courseId}/modules/${m.id}`)}
                     title={m.optional ? (m.status === 'published' ? 'Optional add-on (included in the course)' : 'Optional add-on (not included / unpublished)') : (m.status !== 'published' ? 'Not published yet' : undefined)}
                     className={cn('w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-left hover:bg-muted/60',
