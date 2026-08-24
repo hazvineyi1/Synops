@@ -751,8 +751,11 @@ router.get("/practice/program-overview", requireAuth, async (req, res) => {
   const role = req.dbUser?.role;
   if (!isStaff(req) && role !== "org_admin" && role !== "partner_admin") { res.status(403).json({ error: "Forbidden" }); return; }
   const isSuper = role === "super_admin";
-  const pid = isSuper ? null : await partnerOf(req);
-  const scope = isSuper ? sql`TRUE` : sql`cc.partner_id = ${pid}`;
+  // A super admin acting inside a partner hub passes ?partnerId= and must see ONLY that partner's
+  // people, never a cross-partner mix. Without it (true platform level) they see everything.
+  const overridePid = isSuper && typeof req.query.partnerId === "string" && req.query.partnerId ? req.query.partnerId : null;
+  const pid = overridePid ?? (isSuper ? null : await partnerOf(req));
+  const scope = (isSuper && !overridePid) ? sql`TRUE` : sql`cc.partner_id = ${pid}`;
   const totals = await rows<any>(sql`
     SELECT count(DISTINCT cc.candidate_id)::int AS candidates,
       count(*) FILTER (WHERE cc.status = 'chosen')::int AS chosen,

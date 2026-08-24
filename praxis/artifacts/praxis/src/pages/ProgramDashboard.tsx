@@ -1,6 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
+import { useSession } from '@/context/SessionContext';
+import { getActivePartnerId } from '@/lib/partnerHubData';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { BarChart3, Award, ShieldCheck, Users, ExternalLink } from 'lucide-react';
@@ -19,7 +21,11 @@ type Overview = {
 };
 
 export function ProgramDashboard() {
-  const { data } = useQuery({ queryKey: ['practice-program'], queryFn: () => apiFetch<Overview>('/practice/program-overview') });
+  const { user } = useSession();
+  // Scope to the partner we are acting inside, so a super admin never sees a cross-partner mix.
+  const pid = user?.partnerId ?? getActivePartnerId() ?? '';
+  const q = pid ? `?partnerId=${encodeURIComponent(pid)}` : '';
+  const { data } = useQuery({ queryKey: ['practice-program', pid], queryFn: () => apiFetch<Overview>(`/practice/program-overview${q}`) });
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
