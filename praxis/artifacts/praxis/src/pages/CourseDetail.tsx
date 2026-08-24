@@ -2515,7 +2515,11 @@ export function CourseDetail() {
 
   const { data: user } = useGetMe();
   const role = user?.role ?? 'learner';
-  const canInstruct = ['coach', 'org_admin', 'partner_admin', 'super_admin'].includes(role);
+  // Building a course (modules, banners, syllabus, alignment, rubrics) is the platform owner's job:
+  // strictly the super admin. A partner never builds a course it received; it only views it (and can
+  // walk it as a student) before allocating. So a partner_admin is a pure viewer here, and every
+  // authoring surface below is gated on the super admin.
+  const canInstruct = role === 'super_admin';
   // "View as student": staff can preview the course exactly as a learner sees it while building.
   // When on, isInstructor renders false so all instructor controls/tabs hide and learner views show.
   const [previewAsStudent, setPreviewAsStudent] = useState(() => { try { return localStorage.getItem('viewAsStudent') === '1'; } catch { return false; } });

@@ -1,6 +1,6 @@
 import { db } from "@workspace/db";
 import {
-  partnersTable, brandThemesTable, organisationsTable, usersTable,
+  partnersTable, brandThemesTable, usersTable,
   coursesTable, modulesTable, beatsTable, moduleReadingsTable,
   caseScenariosTable, interactiveActivitiesTable, discussionsTable, assignmentsTable,
   coursePartnerAssignmentsTable, enrolmentsTable,
@@ -89,7 +89,7 @@ async function applyBrand(partnerId: string): Promise<void> {
 
 // Create one course and all of its content (modules, beats, reading, case, interactive, discussion,
 // assignment). Returns the new course id. Thrown errors are handled per-course by ensureEnzaCourses.
-async function createCourseContent(c: (typeof COURSES)[number], orgId: string, facultyId: string): Promise<string> {
+async function createCourseContent(c: (typeof COURSES)[number], orgId: string | null, facultyId: string): Promise<string> {
   const [course] = await db.insert(coursesTable).values({
     title: c.title, description: c.description, tenantId: "platform", status: "published",
     competencyTags: c.tags, objectives: c.objectives, nqfLevel: c.nqf,
@@ -195,18 +195,32 @@ async function healAssignmentsTable(): Promise<void> {
   }
 }
 
+/** The Enza content author, partner-level (no organisation). Heals an existing faculty that was tied to
+ * the old "Enza SMME Academy" demo org so re-provisioning never resurrects that org. */
+async function ensureEnzaFaculty(partnerId: string): Promise<{ id: string }> {
+  const existing = await firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, "curriculum@enzaglobalmedia.co.za")));
+  if (existing) {
+    if ((existing as { organisationId?: string | null }).organisationId) {
+      await db.update(usersTable).set({ organisationId: null }).where(eq(usersTable.id, existing.id));
+    }
+    return { id: existing.id };
+  }
+  const [created] = await db.insert(usersTable).values({
+    email: "curriculum@enzaglobalmedia.co.za", firstName: "Enza", lastName: "Faculty",
+    role: "instructional_designer", status: "active", partnerId, organisationId: null,
+  }).returning();
+  return { id: created.id };
+}
+
 async function ensureEnzaCourses(partnerId: string): Promise<{ total: number; created: number; error: string | null }> {
   await db.execute(sql`CREATE TABLE IF NOT EXISTS course_partner_assignments (id text PRIMARY KEY, course_id text NOT NULL, partner_id text NOT NULL, assigned_by text, assigned_at timestamptz NOT NULL DEFAULT now())`);
   await healAssignmentsTable();
 
-  let org = await firstOrNull(await db.select().from(organisationsTable).where(and(eq(organisationsTable.partnerId, partnerId), eq(organisationsTable.name, "Enza SMME Academy"))));
-  if (!org) {
-    [org] = await db.insert(organisationsTable).values({ name: "Enza SMME Academy", partnerId, industry: "Enterprise & Supplier Development" }).returning();
-  }
-  let faculty = await firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, "curriculum@enzaglobalmedia.co.za")));
-  if (!faculty) {
-    [faculty] = await db.insert(usersTable).values({ email: "curriculum@enzaglobalmedia.co.za", firstName: "Enza", lastName: "Faculty", role: "instructional_designer", status: "active", partnerId, organisationId: org.id }).returning();
-  }
+  // Provisioning Enza must NOT recreate a delivery organisation. The old "Enza SMME Academy" demo org
+  // kept coming back on every provision even after being deleted, so we no longer create it: the
+  // faculty author is partner-level (no org), and course library content is authored at platform scope
+  // (organisationId null). The partner builds its own organisations from the hub.
+  const faculty = await ensureEnzaFaculty(partnerId);
 
   let created = 0;
   let error: string | null = null;
@@ -215,7 +229,7 @@ async function ensureEnzaCourses(partnerId: string): Promise<{ total: number; cr
       let course = await firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
       let courseId: string;
       if (course) { courseId = course.id; }
-      else { courseId = await createCourseContent(c, org.id, faculty.id); created++; }
+      else { courseId = await createCourseContent(c, null, faculty.id); created++; }
 
       // Backfill the applied-project assignment on courses that an earlier run created before the
       // assignments table was healed (they have every other piece but no assignment).
@@ -280,20 +294,11 @@ export async function seedEnza(): Promise<{ created: boolean; partnerId?: string
   // 2. Brand theme (partner tenant) - logo, favicon, colours from the website
   await applyBrand(partner.id);
 
-  // 3. Organisation
-  const [org] = await db.insert(organisationsTable).values({
-    name: "Enza SMME Academy", partnerId: partner.id, industry: "Enterprise & Supplier Development",
-  }).returning();
+  // 3. No delivery organisation is seeded. Enza starts clean and builds its own organisations from the
+  // hub; the content author below is partner-level. (The old "Enza SMME Academy" demo org is gone.)
+  await db.update(partnersTable).set({ orgCount: 0 }).where(eq(partnersTable.id, partner.id));
 
-  // 4. Faculty author (used as content author)
-  const [faculty] = await db.insert(usersTable).values({
-    email: "curriculum@enzaglobalmedia.co.za", firstName: "Enza", lastName: "Faculty",
-    role: "instructional_designer", status: "active", partnerId: partner.id, organisationId: org.id,
-  }).returning();
-
-  await db.update(partnersTable).set({ orgCount: 1 }).where(eq(partnersTable.id, partner.id));
-
-  // 5. Courses + content - shared, self-healing, per-course resilient provisioning.
+  // 4. Courses + content - shared, self-healing (ensureEnzaCourses provisions the partner-level author).
   const seeded = await ensureEnzaCourses(partner.id);
 
   return { created: true, partnerId: partner.id, courses: seeded.total, message: `Enza provisioned with ${seeded.total} courses.${seeded.error ? " First error: " + seeded.error : ""}` };
