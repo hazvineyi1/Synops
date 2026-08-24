@@ -106,6 +106,13 @@ export interface ModuleCompleteness {
   /** All nine components present. Independent of the module's publish status. */
   complete: boolean;
   missing: MissingComponent[];
+  /**
+   * Optional add-on module. Optional modules NEVER block course publishing. An optional module that is
+   * excluded from the delivered course (draft / not published) is ignored entirely. An optional module
+   * that the author has INCLUDED (published) must still be complete, exactly like a core module.
+   * Absent/undefined is treated as a required (core) module.
+   */
+  optional?: boolean;
 }
 
 /** Per-module reason a course is not catalogue-eligible (drives the repository UI). */
@@ -160,19 +167,30 @@ export function evaluateCourse(input: CourseInput): CourseCompleteness {
   if (input.courseStatus !== "published") courseIssues.push("Course is not published yet");
   if (input.modules.length === 0) courseIssues.push("Course has no modules yet");
 
+  // Does this module block catalogue eligibility?
+  //  - Core (required) module: must be published AND complete.
+  //  - Optional add-on module that is INCLUDED (published): must be complete (but its "not published"
+  //    state can never apply — it is published to be included).
+  //  - Optional add-on module that is EXCLUDED (draft / not published): ignored entirely; never blocks.
+  const blocksEligibility = (m: ModuleCompleteness): boolean => {
+    if (m.optional) return m.published ? !m.complete : false;
+    return !m.published || !m.complete;
+  };
+
   const incompleteReasons: IncompleteModuleReason[] = [];
   for (const m of input.modules) {
-    const blocks = !m.published || !m.complete;
-    if (!blocks) continue;
+    if (!blocksEligibility(m)) continue;
     const missing = m.missing.map((x) => x.label);
-    if (!m.published) missing.push("Module is not published yet (still a draft or in review)");
+    // The "not published" note only makes sense for a core module still in draft. An included optional
+    // module is published by definition; an excluded optional module never reaches this branch.
+    if (!m.optional && !m.published) missing.push("Module is not published yet (still a draft or in review)");
     incompleteReasons.push({ moduleId: m.moduleId, moduleTitle: m.moduleTitle, moduleStatus: m.status, missing });
   }
 
   const complete =
     input.courseStatus === "published" &&
     input.modules.length > 0 &&
-    input.modules.every((m) => m.published && m.complete);
+    !input.modules.some(blocksEligibility);
 
   return {
     courseId: input.courseId,
@@ -214,6 +232,7 @@ export async function loadCourseCompleteness(courseInfos: { id: string; status: 
       objectives: modulesTable.objectives,
       status: modulesTable.status,
       beatCount: modulesTable.beatCount,
+      optional: modulesTable.optional,
     })
     .from(modulesTable)
     .where(inArray(modulesTable.courseId, courseIds));
@@ -325,6 +344,7 @@ export async function loadCourseCompleteness(courseInfos: { id: string; status: 
       published: m.status === "published",
       complete: evalResult.complete,
       missing: evalResult.missing,
+      optional: m.optional ?? false,
     };
     if (!modulesByCourse.has(m.courseId)) modulesByCourse.set(m.courseId, []);
     modulesByCourse.get(m.courseId)!.push(mc);

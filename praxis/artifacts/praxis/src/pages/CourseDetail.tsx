@@ -2894,39 +2894,76 @@ export function CourseDetail() {
           {!isK12Learner && course.competencyTags?.map((t: string) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}
         </div>
 
-        {/* Instructor: once every module is built and published, move the course into the learner
-            catalogue in one click (or confirm it is already live). The completeness verdict comes
-            straight from the course response. */}
+        {/* Instructor publish/edit lifecycle. A live course can be UNPUBLISHED to edit (it drops to the
+            "Incomplete courses" repository until republished). A draft/editing course can be REPUBLISHED
+            in one click. Optional add-on modules never block publishing; only core (required) modules and
+            any INCLUDED optional module must be complete for the course to re-enter the catalogue. */}
         {isInstructor && (() => {
           const comp = course as unknown as { complete?: boolean; moduleCount?: number; incompleteReasons?: unknown[] };
           const reasons = Array.isArray(comp.incompleteReasons) ? comp.incompleteReasons : [];
-          const modulesReady = reasons.length === 0 && (comp.moduleCount ?? 0) > 0;
+          const requiredReady = reasons.length === 0 && (comp.moduleCount ?? 0) > 0;
+          const isPublished = course.status === 'published';
+          const unpublishToEdit = () => {
+            if (window.confirm(`Unpublish "${course.title}" to edit it?\n\nIt will leave the learner catalogue and move to Incomplete courses until you republish. Enrolled learners won't see it while it is unpublished.`)) {
+              saveCourse.mutate({ status: 'draft' });
+            }
+          };
+
+          // Live in the catalogue: everything required is complete and the course is published.
           if (comp.complete) {
             return (
               <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-300">
                 <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
                 <span>This course is live in the course catalogue.</span>
-                <Button size="sm" variant="outline" className="ml-auto" onClick={() => navigate('/courses')}>View in catalogue</Button>
+                <div className="ml-auto flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => navigate('/courses')}>View in catalogue</Button>
+                  <Button size="sm" variant="outline" disabled={saveCourse.isPending} onClick={unpublishToEdit}>
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" /> {saveCourse.isPending ? 'Unpublishing…' : 'Unpublish to edit'}
+                  </Button>
+                </div>
               </div>
             );
           }
-          if (modulesReady && course.status !== 'published') {
+
+          // Published but a core / included-optional module still needs work: it stays out of the
+          // catalogue until fixed. Still offer Unpublish to edit.
+          if (isPublished) {
             return (
-              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-800 dark:text-emerald-300">
-                <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
-                <span>Every module is built and published. Move this course to the catalogue to make it available to learners.</span>
-                <Button
-                  size="sm"
-                  className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white"
-                  disabled={saveCourse.isPending}
-                  onClick={() => saveCourse.mutate({ status: 'published' })}
-                >
-                  <BookOpen className="mr-1.5 h-4 w-4" /> {saveCourse.isPending ? 'Moving...' : 'Move to course catalogue'}
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                <span>
+                  Set to published, but {reasons.length} required module{reasons.length === 1 ? '' : 's'} still need{reasons.length === 1 ? 's' : ''} work before it appears in the catalogue. Optional add-ons never block publishing.
+                </span>
+                <Button size="sm" variant="outline" className="ml-auto" disabled={saveCourse.isPending} onClick={unpublishToEdit}>
+                  <Pencil className="mr-1.5 h-3.5 w-3.5" /> Unpublish to edit
                 </Button>
               </div>
             );
           }
-          return null;
+
+          // Draft / editing: offer Republish. Always available — optional add-ons never block it.
+          return (
+            <div className={`mt-4 flex flex-wrap items-center gap-3 rounded-xl border p-3 text-sm ${requiredReady ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300' : 'border-border bg-muted/40 text-muted-foreground'}`}>
+              {requiredReady
+                ? <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
+                : <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />}
+              <span>
+                {requiredReady
+                  ? 'This course is in editing. Everything required is complete — republish to make it live again.'
+                  : (comp.moduleCount ?? 0) === 0
+                    ? 'This course has no modules yet. Add and build modules, then republish.'
+                    : `This course is in editing. ${reasons.length} required module${reasons.length === 1 ? '' : 's'} still need${reasons.length === 1 ? 's' : ''} work. Optional add-ons don't block republishing.`}
+              </span>
+              <Button
+                size="sm"
+                className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={saveCourse.isPending || (comp.moduleCount ?? 0) === 0}
+                onClick={() => saveCourse.mutate({ status: 'published' })}
+              >
+                <BookOpen className="mr-1.5 h-4 w-4" /> {saveCourse.isPending ? 'Republishing…' : 'Republish to catalogue'}
+              </Button>
+            </div>
+          );
         })()}
 
         {role === 'learner' && !enrolment && (
