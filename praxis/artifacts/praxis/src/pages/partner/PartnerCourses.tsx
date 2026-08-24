@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSession } from '@/context/SessionContext';
 import { apiFetch } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, ChevronDown, CheckCircle2, Building } from 'lucide-react';
+import { BookOpen, ChevronDown, CheckCircle2, Building, ExternalLink } from 'lucide-react';
 import { getActivePartnerId } from '@/lib/partnerHubData';
 
 /**
@@ -60,6 +61,7 @@ export function PartnerCourses() {
 }
 
 function CourseRow({ course, orgs, partnerId, onSaved }: { course: ReceivedCourse; orgs: OrgLite[]; partnerId: string; onSaved: () => void }) {
+  const [, navigate] = useLocation();
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState<Set<string>>(new Set(course.orgIds));
   const [flash, setFlash] = useState(false);
@@ -74,18 +76,26 @@ function CourseRow({ course, orgs, partnerId, onSaved }: { course: ReceivedCours
 
   return (
     <Card className="p-0 overflow-hidden">
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-muted/30">
-        <div className="min-w-0">
-          <div className="font-semibold truncate">{course.title}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {course.status && <span className="capitalize mr-2">{course.status}</span>}
-            {course.orgIds.length > 0
-              ? `Allocated to ${course.orgIds.length} organisation${course.orgIds.length === 1 ? '' : 's'}`
-              : 'Not allocated to any organisation yet'}
+      <div className="w-full flex items-center gap-3 p-4">
+        <button onClick={() => setOpen((o) => !o)} className="flex-1 min-w-0 flex items-center gap-3 text-left">
+          <div className="min-w-0">
+            <div className="font-semibold truncate">{course.title}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {course.status && <span className="capitalize mr-2">{course.status}</span>}
+              {course.orgIds.length > 0
+                ? `Allocated to ${course.orgIds.length} organisation${course.orgIds.length === 1 ? '' : 's'}`
+                : 'Not allocated to any organisation yet'}
+            </div>
           </div>
-        </div>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
+        </button>
+        <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => navigate(`/courses/${course.id}`)}
+          title="Open the full course. Use 'View as student' inside to go through it as a learner would.">
+          <ExternalLink className="h-3.5 w-3.5" /> View course
+        </Button>
+        <button onClick={() => setOpen((o) => !o)} className="shrink-0 text-muted-foreground" aria-label="Toggle allocation">
+          <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
       {open && (
         <div className="border-t border-border p-4 space-y-3">
           <div className="text-xs font-medium text-muted-foreground">Which organisations should run this course?</div>

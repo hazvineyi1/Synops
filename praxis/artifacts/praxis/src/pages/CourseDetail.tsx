@@ -210,6 +210,12 @@ function InstructorAssignmentCard({ courseId, a, onOpen }: { courseId: string; a
     mutationFn: () => apiFetch(`/assignments/${a.id}`, { method: 'DELETE' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['assignments', courseId] }),
   });
+  const [flash, setFlash] = useState<string | null>(null);
+  const genRubric = useMutation({
+    mutationFn: () => apiFetch(`/assignments/${a.id}/rubric/generate`, { method: 'POST', body: JSON.stringify({}) }),
+    onSuccess: () => { setFlash('Rubric generated from the content and attached. The AI grader will use it.'); qc.invalidateQueries({ queryKey: ['rubrics', courseId] }); setTimeout(() => setFlash(null), 4000); },
+    onError: (e) => { setFlash(e instanceof Error ? e.message : 'Could not generate a rubric.'); setTimeout(() => setFlash(null), 4000); },
+  });
 
   if (editing) {
     return (
@@ -241,10 +247,15 @@ function InstructorAssignmentCard({ courseId, a, onOpen }: { courseId: string; a
         <button className="flex-1 min-w-0 text-left" onClick={onOpen}>
           <div className="font-medium text-foreground flex items-center gap-2">{a.title}{!a.published && <Badge variant="outline" className="text-[10px]">Draft</Badge>}</div>
           {a.description && <div className="text-sm text-muted-foreground truncate">{a.description}</div>}
+          {flash && <div className="text-xs text-emerald-600 mt-1">{flash}</div>}
         </button>
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className="text-sm text-muted-foreground">{a.pointsPossible} pts</span>
           {a.dueDate && <Badge variant={isOverdue(a.dueDate) ? 'destructive' : 'outline'} className="text-xs">{isOverdue(a.dueDate) ? 'OVERDUE' : formatDate(a.dueDate)}</Badge>}
+          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" disabled={genRubric.isPending} onClick={() => genRubric.mutate()}
+            title="Generate a grading rubric from this assignment's content and module objectives, and attach it">
+            <ClipboardList className="h-3.5 w-3.5" /> {genRubric.isPending ? 'Generating…' : 'Generate rubric'}
+          </Button>
           <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditing(true)} title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
           <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-red-600" title="Delete"
             onClick={() => { if (window.confirm(`Delete "${a.title}"? This cannot be undone.`)) del.mutate(); }}><Trash2 className="h-3.5 w-3.5" /></Button>

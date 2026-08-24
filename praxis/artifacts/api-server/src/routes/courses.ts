@@ -196,7 +196,19 @@ router.get("/courses/:courseId/alignment", requireAuth, async (req, res) => {
   const modules = await db.select({ id: modulesTable.id, title: modulesTable.title, objectives: modulesTable.objectives })
     .from(modulesTable).where(eq(modulesTable.courseId, courseId));
   const modIds = modules.map((m) => m.id);
-  const assessments = await db.select({ title: assignmentsTable.title }).from(assignmentsTable).where(eq(assignmentsTable.courseId, courseId));
+  // Assessable items = assignments (with their brief), interactive activities, and case studies. Feeding
+  // the AI the DESCRIPTIONS (not just titles) is what lets it see that an assessment actually tests an
+  // objective, which title-only judging missed.
+  const asgRows = await db.select().from(assignmentsTable).where(eq(assignmentsTable.courseId, courseId));
+  const actRows = modIds.length ? await db.select({ title: interactiveActivitiesTable.title, kind: interactiveActivitiesTable.kind }).from(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.courseId, courseId)) : [];
+  const caseRows = modIds.length ? await db.select({ title: caseScenariosTable.title }).from(caseScenariosTable).where(inArray(caseScenariosTable.moduleId, modIds)) : [];
+  const brief = (a: any) => String(a?.description ?? a?.instructions ?? a?.prompt ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 300);
+  const assessableItems = [
+    ...asgRows.map((a: any) => ({ title: a.title, kind: "assignment", brief: brief(a) })),
+    ...actRows.map((a) => ({ title: a.title, kind: `activity (${a.kind})`, brief: "" })),
+    ...caseRows.map((c) => ({ title: c.title, kind: "case study", brief: "" })),
+  ].filter((x) => x.title);
+  const assessments = assessableItems; // used below for counts + the AI input
   let beats: Array<{ videoUrl: string | null; transcript: string | null; narration: string }> = [];
   if (modIds.length) {
     beats = await db.select({ videoUrl: beatsTable.videoUrl, transcript: beatsTable.transcript, narration: beatsTable.narration })
@@ -213,14 +225,14 @@ router.get("/courses/:courseId/alignment", requireAuth, async (req, res) => {
       const input = {
         courseObjectives,
         modules: modules.map((m) => ({ title: m.title, objectives: m.objectives ?? [] })),
-        assessments: assessments.map((a) => a.title),
+        assessments: assessableItems.map((a) => ({ title: a.title, kind: a.kind, brief: a.brief })),
       };
       const message = await anthropic.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 2000,
         messages: [{
           role: "user",
-          content: `You are a curriculum alignment reviewer. For each course objective, decide which modules ADDRESS it (teach toward it) and which assessments ASSESS it, judging from the titles and module objectives. Be strict: include a module or assessment only if it clearly relates.
+          content: `You are a curriculum alignment reviewer using backward design. For each course objective, decide which modules ADDRESS it (teach toward it) and which assessments ASSESS it. Judge from the module titles/objectives AND from each assessment's title, kind and brief description, not the title alone. An assessment ASSESSES an objective when a learner doing it would have to demonstrate that objective, even if the wording differs; align it wherever it plausibly measures the objective. Do not require an exact keyword match. Only exclude an item when it clearly has nothing to do with the objective.
 
 Data (JSON):
 ${JSON.stringify(input)}

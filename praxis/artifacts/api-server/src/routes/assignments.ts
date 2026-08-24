@@ -579,6 +579,46 @@ router.get("/courses/:courseId/rubrics", requireAuth, async (req, res) => {
   res.json(rubrics);
 });
 
+// POST /assignments/:assignmentId/rubric/generate -- AI-generate a content-aware rubric for an
+// assignment from its brief + the module's objectives and reading text, save it to the rubrics table
+// (the one the grader reads) and attach it. Staff only.
+router.post("/assignments/:assignmentId/rubric/generate", requireAuth, async (req, res) => {
+  const a = await db.query.assignmentsTable.findFirst({ where: eq(assignmentsTable.id, req.params.assignmentId) });
+  if (!a) { res.status(404).json({ error: "Not found" }); return; }
+  if (!(await staffOn(req, res, a.courseId))) return;
+  let objectives: string[] = [];
+  let readingText = "";
+  if (a.moduleId) {
+    const m = await db.query.modulesTable.findFirst({ where: eq(modulesTable.id, a.moduleId) });
+    objectives = (m?.objectives ?? []).filter(Boolean);
+    const readings = await db.select({ content: moduleReadingsTable.content }).from(moduleReadingsTable).where(eq(moduleReadingsTable.moduleId, a.moduleId));
+    readingText = readings.map((r) => r.content ?? "").join("\n").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 8000);
+  }
+  const total = Math.round(Number(a.pointsPossible) || 100);
+  const context = `Assignment title: ${a.title}\nType: ${a.submissionType}\nDescription: ${a.description ?? ""}\nInstructions: ${(a.instructions ?? "").replace(/<[^>]+>/g, " ")}\nModule objectives: ${objectives.join("; ")}\nModule content:\n${readingText}`.slice(0, 12000);
+  try {
+    const msg = await anthropic.messages.create({
+      model: "claude-sonnet-4-6", max_tokens: 1500,
+      messages: [{ role: "user", content: `You are an assessment designer. Build a grading rubric for the assignment below, grounded in its actual content and the module objectives, so each criterion measures something this assignment genuinely asks the learner to do. Produce 4 to 5 criteria. Each criterion has a short name, a maxPoints, and 3 to 4 performance levels from strongest to weakest, each with a label, points (0 to maxPoints, top level = maxPoints and lowest = 0), and a one sentence description specific to THIS assignment. The criteria maxPoints must sum to ${total}. Never use em dashes.\n\n${context}\n\nReturn ONLY JSON, no markdown: {"criteria":[{"name":"...","maxPoints":25,"levels":[{"label":"Excellent","points":25,"description":"..."},{"label":"Proficient","points":18,"description":"..."},{"label":"Developing","points":10,"description":"..."},{"label":"Beginning","points":0,"description":"..."}]}]}` }],
+    }, { timeout: 60000, maxRetries: 1 });
+    const raw = (msg.content as any[]).filter((b) => b.type === "text").map((b) => b.text).join("").replace(/[—–]/g, ", ");
+    const mm = raw.match(/\{[\s\S]*\}/);
+    const parsed = mm ? JSON.parse(mm[0]) : null;
+    const criteria = Array.isArray(parsed?.criteria) ? parsed.criteria.map((c: any) => ({
+      name: String(c.name || "Criterion").slice(0, 120),
+      maxPoints: Math.max(0, Math.round(Number(c.maxPoints) || 0)),
+      levels: (Array.isArray(c.levels) ? c.levels : []).map((l: any) => ({ label: String(l.label || "").slice(0, 40), points: Math.max(0, Math.round(Number(l.points) || 0)), description: String(l.description || "").slice(0, 300) })),
+    })).filter((c: any) => c.name && c.levels.length) : [];
+    if (!criteria.length) { res.status(502).json({ error: "Could not generate a rubric. Try again." }); return; }
+    const totalPoints = criteria.reduce((s: number, c: any) => s + c.maxPoints, 0) || total;
+    const [rubric] = await db.insert(rubricsTable).values({ courseId: a.courseId, title: `${a.title} rubric`, criteria, totalPoints }).returning();
+    await db.update(assignmentsTable).set({ rubricId: rubric.id }).where(eq(assignmentsTable.id, a.id));
+    res.json(rubric);
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Rubric generation failed" });
+  }
+});
+
 router.post("/rubrics", requireAuth, async (req, res) => {
   const { courseId, title, criteria, totalPoints } = req.body;
   // courseId arrives in the BODY here, so it is caller-supplied and must be checked before
