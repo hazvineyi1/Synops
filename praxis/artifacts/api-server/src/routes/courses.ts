@@ -1064,6 +1064,19 @@ router.post("/platform/ship-courses", requireAuth, requireRole("super_admin"), a
   res.json({ ok: true, partnerId, shipped: courseIds.length });
 });
 
+// POST /platform/unship-course { partnerId, courseId } (super admin), REMOVE one platform course from a
+// partner. Reversible: deletes only the partner assignment and that course's org allocations for this
+// partner, leaving the course itself in the platform catalogue so it can be re-shipped later. Class and
+// enrolment rows are left untouched so re-adding restores prior state.
+router.post("/platform/unship-course", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const partnerId = typeof req.body?.partnerId === "string" ? req.body.partnerId : "";
+  const courseId = typeof req.body?.courseId === "string" ? req.body.courseId : "";
+  if (!partnerId || !courseId) { res.status(400).json({ error: "partnerId and courseId are required." }); return; }
+  await db.execute(sql`DELETE FROM course_partner_assignments WHERE partner_id = ${partnerId} AND course_id = ${courseId}`);
+  await db.execute(sql`DELETE FROM org_course_assignments WHERE partner_id = ${partnerId} AND course_id = ${courseId}`);
+  res.json({ ok: true, partnerId, courseId, removed: true });
+});
+
 // GET /courses/:courseId
 router.get("/courses/:courseId", requireAuth, async (req, res) => {
   const course = await db.query.coursesTable.findFirst({

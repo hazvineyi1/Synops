@@ -31,7 +31,6 @@ import { seedEnzaCohort, resyncEnzaProgress } from "../lib/enzaCohortSeed";
 import { seedSynopsDemo } from "../lib/synopsDemoSeed";
 import { seedK12 } from "../lib/k12Seed";
 import { seedGameLibrary } from "../lib/gameLibrarySeed";
-import { seedEnzaHub } from "../lib/enzaHubSeed";
 import { seedSkillsCatalog } from "../lib/skillsCatalogSeed";
 import { seedFlagshipCourses } from "../lib/flagshipCoursesSeed";
 import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
@@ -1150,21 +1149,6 @@ router.post("/platform/seed-game-library", requireAuth, requireSuperAdmin, async
     const result = await seedGameLibrary(req.userId!);
     await audit(req, "platform.seed_game_library", "activity", "game-library", result);
     res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
-  }
-});
-
-/**
- * POST /platform/seed-enza-hub - seed REAL partner-hub records (billing, funding, documents,
- * delegated admins) for the live Enza partner so the Financial/Funders/Documents/Accounts hubs
- * show genuine figures instead of empty. Idempotent. Super admin only.
- */
-router.post("/platform/seed-enza-hub", requireAuth, requireSuperAdmin, async (req, res) => {
-  try {
-    const r = await seedEnzaHub();
-    await audit(req, "platform.seed_enza_hub", "partner", "enza", { seeded: r.seeded });
-    res.json(r);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }

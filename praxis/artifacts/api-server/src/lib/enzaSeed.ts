@@ -220,53 +220,14 @@ async function ensureEnzaCourses(partnerId: string): Promise<{ total: number; cr
   // kept coming back on every provision even after being deleted, so we no longer create it: the
   // faculty author is partner-level (no org), and course library content is authored at platform scope
   // (organisationId null). The partner builds its own organisations from the hub.
-  const faculty = await ensureEnzaFaculty(partnerId);
-
-  let created = 0;
-  let error: string | null = null;
-  for (const c of COURSES) {
-    try {
-      let course = await firstOrNull(await db.select().from(coursesTable).where(and(eq(coursesTable.title, c.title), eq(coursesTable.tenantId, "platform"))));
-      let courseId: string;
-      if (course) { courseId = course.id; }
-      else { courseId = await createCourseContent(c, null, faculty.id); created++; }
-
-      // Backfill the applied-project assignment on courses that an earlier run created before the
-      // assignments table was healed (they have every other piece but no assignment).
-      const hasAssignment = await db.select({ id: assignmentsTable.id }).from(assignmentsTable).where(eq(assignmentsTable.courseId, courseId)).limit(1);
-      if (hasAssignment.length === 0) {
-        const firstMod = await firstOrNull(await db.select({ id: modulesTable.id }).from(modulesTable).where(eq(modulesTable.courseId, courseId)));
-        await db.insert(assignmentsTable).values({
-          courseId, moduleId: firstMod?.id ?? null,
-          title: `Applied project: ${c.title}`,
-          description: `A practical, real-world application of everything in this course to a business of your choice.`,
-          instructions: `Choose a real business (your own or one you can access). Produce a short, practical output (2-4 pages or a completed template) that demonstrates the course objectives:\n\n${c.objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}\n\nGround every recommendation in the real numbers and context of the business. Be specific and actionable - Enza values implementation over theory.`,
-          submissionType: "file_upload", pointsPossible: "100", published: true, position: 0,
-        });
-      }
-
-      const has = await db.select({ id: coursePartnerAssignmentsTable.id }).from(coursePartnerAssignmentsTable)
-        .where(and(eq(coursePartnerAssignmentsTable.courseId, courseId), eq(coursePartnerAssignmentsTable.partnerId, partnerId)));
-      if (has.length === 0) await db.insert(coursePartnerAssignmentsTable).values({ courseId, partnerId, assignedBy: faculty.id });
-    } catch (e) {
-      if (!error) error = (e instanceof Error ? e.message : String(e)).slice(0, 240);
-    }
-  }
-  // Reconcile: Enza should hold only the course(s) in COURSES. Unassign any other course currently
-  // assigned to Enza and un-enrol the cohort from it. Non-destructive: the platform catalog keeps the
-  // course rows; they simply leave the Enza demo (which is now a single one-lesson course).
-  const keptTitles = new Set(COURSES.map((c) => c.title));
-  const assigned = await db.select().from(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.partnerId, partnerId));
-  for (const a of assigned) {
-    const [course] = await db.select({ id: coursesTable.id, title: coursesTable.title }).from(coursesTable).where(eq(coursesTable.id, a.courseId)).limit(1);
-    if (course && !keptTitles.has(course.title)) {
-      await db.delete(enrolmentsTable).where(eq(enrolmentsTable.courseId, a.courseId)).catch(() => {});
-      await db.delete(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.id, a.id)).catch(() => {});
-    }
-  }
-
+  // Enza is provisioned as a BARE SHELL: partner + branding + partner-admin only. Provisioning must
+  // NOT seed or assign any demo course, and must NOT reconcile-delete courses that are already
+  // assigned. The old behaviour (force-assign the COURSES set, then delete anything not in it) is why
+  // "Enza Foundations" kept reappearing on its own AND why manually-shipped courses like "Business
+  // Planning" silently vanished. Courses are now added/removed deliberately by the super admin from the
+  // partner Courses page; provisioning just reports how many are currently assigned.
   const total = (await db.select({ id: coursePartnerAssignmentsTable.id }).from(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.partnerId, partnerId))).length;
-  return { total, created, error };
+  return { total, created: 0, error: null };
 }
 
 export async function seedEnza(): Promise<{ created: boolean; partnerId?: string; courses?: number; message?: string }> {

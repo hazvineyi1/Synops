@@ -1605,7 +1605,7 @@ function CourseToc({ courseId, activeTab, setTab, isInstructor, modules, navigat
     try { const raw = localStorage.getItem(STORAGE); return new Set<string>(raw ? JSON.parse(raw) : []); } catch { return new Set<string>(); }
   });
   const [customizing, setCustomizing] = useState(false);
-  const [modulesOpen, setModulesOpen] = useState(true);
+  const [modulesOpen, setModulesOpen] = useState(false);
   const toggle = (id: string) => setHidden((prev) => {
     const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id);
     try { localStorage.setItem(STORAGE, JSON.stringify([...n])); } catch { /* ignore */ }
@@ -2314,7 +2314,16 @@ const EMPTY_SYL: Record<string, any> = { descriptionHtml: '', objectivesHtml: ''
 const parseSyl = (j: string | null): Record<string, any> => { try { return { ...EMPTY_SYL, ...(JSON.parse(j || '{}')) }; } catch { return { ...EMPTY_SYL }; } };
 // Heal historic double-escaped syllabus/schedule values ("&lt;p&gt;...") so they render as real HTML
 // rather than showing literal tags. A no-op for content that is already clean.
-const sylHeal = (s: any) => { const v = String(s ?? ''); return /&lt;\/?[a-zA-Z]/.test(v) ? v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'") : v; };
+const sylHeal = (s: any) => {
+  let v = String(s ?? '');
+  if (/&lt;\/?[a-zA-Z]/.test(v)) {
+    v = v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  }
+  // Decoding a double-wrapped value ("<p>&lt;p&gt;…&lt;/p&gt;</p>") leaves redundant nested tags
+  // ("<p><p>…</p></p>"). Collapse those so the block renders as a single clean paragraph/list.
+  v = v.replace(/<p>\s*<p>/gi, '<p>').replace(/<\/p>\s*<\/p>/gi, '</p>');
+  return v;
+};
 
 // A collapsible section that instructors can edit inline with rich text.
 function EditableBlock({ title, html, isInstructor, onSave, saving, placeholder, defaultOpen = true }: { title: string; html: string; isInstructor: boolean; onSave: (html: string) => void; saving: boolean; placeholder?: string; defaultOpen?: boolean }) {
