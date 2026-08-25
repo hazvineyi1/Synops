@@ -152,7 +152,18 @@ export function PracticeCanvas() {
   const off = useOffline(id, invalidate);
 
   // Entering a credential should start at the top of the page, not wherever the home page was scrolled.
-  useEffect(() => { window.scrollTo(0, 0); }, [id]);
+  // The early call can fire before the credential's content has loaded (so the page is still short and
+  // the scroll is a no-op); once cc resolves the page grows tall, so we re-assert top then, and again on
+  // the next frame after paint. We also turn off the browser's scroll restoration, which would otherwise
+  // drop the reader back to their previous position on this URL.
+  useEffect(() => {
+    if ('scrollRestoration' in history) { try { history.scrollRestoration = 'manual'; } catch { /* ignore */ } }
+  }, []);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    const r = requestAnimationFrame(() => window.scrollTo(0, 0));
+    return () => cancelAnimationFrame(r);
+  }, [id, cc?.id]);
 
   // Opening the canvas starts the credential (chosen -> in progress) so it becomes the active one.
   useEffect(() => {
