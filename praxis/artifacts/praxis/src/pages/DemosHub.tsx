@@ -1,12 +1,15 @@
 import React from 'react';
-import { useGetMe } from '@workspace/api-client-react';
+import { useLocation } from 'wouter';
+import { useGetMe, useListPartners } from '@workspace/api-client-react';
+import { setActivePartner } from '@/lib/partnerHubData';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Compass, ExternalLink, FileWarning } from 'lucide-react';
+import { Compass, ExternalLink, FileWarning, Pencil } from 'lucide-react';
 
 /**
- * Super-admin "Demos" hub: quick access to every public demo entry. Each link opens the practice
- * experience for that partner (no sign-up; it signs you in as that demo's learner in a new tab).
+ * Super-admin "Demos" hub: quick access to every public demo entry. Each card can either open the
+ * public practice experience (signs you in as that demo's learner in a new tab) or drop the
+ * super-admin into that partner's hub to edit its practice credentials.
  */
 const DEMOS = [
   {
@@ -28,6 +31,8 @@ const DEMOS = [
 
 export function DemosHub() {
   const { data: me } = useGetMe();
+  const { data: partners } = useListPartners();
+  const [, navigate] = useLocation();
   const isSuper = me?.role === 'super_admin';
 
   if (!isSuper) {
@@ -40,6 +45,19 @@ export function DemosHub() {
     );
   }
 
+  const partnerIdFor = (name: string): string | undefined => {
+    const want = name.trim().toLowerCase();
+    const match = (partners ?? []).find((p: any) => (p?.name ?? '').trim().toLowerCase() === want);
+    return match?.id;
+  };
+
+  const editAsSuper = (name: string) => {
+    const id = partnerIdFor(name);
+    if (!id) return;
+    setActivePartner(id);
+    navigate('/partner/courses');
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div>
@@ -48,23 +66,38 @@ export function DemosHub() {
           <h1 className="text-2xl font-serif font-bold tracking-tight">Demos</h1>
         </div>
         <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-          The public demo experiences for the practice partners. Each opens the reflective practice format (no modules or activities). Opening a demo signs you in as that demo's learner in a new tab — close it and sign back in as yourself to return to the console.
+          The public demo experiences for the practice partners. <strong>Open demo</strong> launches the reflective practice format in a new tab (it signs you in as that demo's learner — close it and sign back in as yourself to return). <strong>Edit</strong> drops you into that partner's hub as super admin to change its practice credentials.
         </p>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">
-        {DEMOS.map((d) => (
-          <Card key={d.path} className="p-4 flex flex-col">
-            <div className="font-serif font-semibold">{d.name}</div>
-            <p className="text-sm text-muted-foreground mt-1 flex-1">{d.blurb}</p>
-            <code className="mt-2 text-[11px] text-muted-foreground truncate">{d.path}</code>
-            <a href={d.path} target="_blank" rel="noreferrer" className="mt-3">
-              <Button size="sm" className="w-full gap-1.5">
-                <ExternalLink className="h-3.5 w-3.5" /> Open demo
-              </Button>
-            </a>
-          </Card>
-        ))}
+        {DEMOS.map((d) => {
+          const canEdit = !!partnerIdFor(d.name);
+          return (
+            <Card key={d.path} className="p-4 flex flex-col">
+              <div className="font-serif font-semibold">{d.name}</div>
+              <p className="text-sm text-muted-foreground mt-1 flex-1">{d.blurb}</p>
+              <code className="mt-2 text-[11px] text-muted-foreground truncate">{d.path}</code>
+              <div className="mt-3 flex gap-2">
+                <a href={d.path} target="_blank" rel="noreferrer" className="flex-1">
+                  <Button size="sm" className="w-full gap-1.5">
+                    <ExternalLink className="h-3.5 w-3.5" /> Open demo
+                  </Button>
+                </a>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  disabled={!canEdit}
+                  title={canEdit ? 'Edit this demo’s practice credentials as super admin' : 'Partner not found'}
+                  onClick={() => editAsSuper(d.name)}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
