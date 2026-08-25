@@ -1186,9 +1186,11 @@ router.delete("/courses/:courseId", requireAuth, async (req, res) => {
 // exact title (across tenants), cascading its children. Used to remove a stray demo course that is hard
 // to reach in the UI (e.g. an archived one). Registered before any /courses/:id-style POST.
 router.post("/courses/_delete-by-title", requireAuth, requireRole("super_admin"), async (req, res) => {
-  const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
-  if (!title) { res.status(400).json({ error: "title is required." }); return; }
-  const targets = await db.select({ id: coursesTable.id }).from(coursesTable).where(eq(coursesTable.title, title));
+  const titles = Array.isArray(req.body?.titles)
+    ? (req.body.titles as unknown[]).filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim())
+    : (typeof req.body?.title === "string" && req.body.title.trim() ? [req.body.title.trim()] : []);
+  if (!titles.length) { res.status(400).json({ error: "title(s) required." }); return; }
+  const targets = await db.select({ id: coursesTable.id }).from(coursesTable).where(inArray(coursesTable.title, titles));
   for (const { id: courseId } of targets) {
     try {
       const mods = await db.select({ id: modulesTable.id }).from(modulesTable).where(eq(modulesTable.courseId, courseId));

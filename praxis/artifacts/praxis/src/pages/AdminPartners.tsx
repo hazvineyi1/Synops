@@ -475,35 +475,20 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision PEJ Justice Practice demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
-  // Build the Educator "Teaching Well with AI" demo COURSE into the Educator partner's org.
-  const seedEducatorCourse = useMutation({
-    mutationFn: () => apiFetch<{ ok: boolean; created?: boolean; message?: string }>('/platform/seed-educator-course', { method: 'POST' }),
-    onSuccess: (r) => {
-      refetch(); qc.invalidateQueries({ queryKey: ['partners'] }); qc.invalidateQueries({ queryKey: ['courses'] });
-      toast({ title: 'Educator demo course ready', description: r.message ?? 'Built and assigned to the Educator org.' });
-    },
-    onError: (e: any) => toast({ title: 'Could not build the Educator course', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
-  });
-
-  // Build the PEJ Justice demo COURSE into the PEJ partner's org (populates its Courses list).
-  const seedPejCourse = useMutation({
-    mutationFn: () => apiFetch<{ ok: boolean; created?: boolean; message?: string }>('/platform/seed-pej-course', { method: 'POST' }),
-    onSuccess: (r) => {
-      refetch(); qc.invalidateQueries({ queryKey: ['partners'] }); qc.invalidateQueries({ queryKey: ['courses'] });
-      toast({ title: 'PEJ demo course ready', description: r.message ?? 'Built and assigned to the PEJ org.' });
-    },
-    onError: (e: any) => toast({ title: 'Could not build the PEJ course', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
-  });
-
-  // One-off cleanup: permanently delete the stray "Leading with Purpose" MRB course (all copies). MRB's
-  // demo is its practice credentials (/practice), not this course.
-  const deleteStrayMrbCourse = useMutation({
-    mutationFn: () => apiFetch<{ ok: boolean; deleted?: number }>('/courses/_delete-by-title', { method: 'POST', body: JSON.stringify({ title: 'Leading with Purpose · Zambian Clinician Leadership' }) }),
+  // The practice partners (MRB, PEJ, Educator) use the practice-experience format, not traditional
+  // module/activity courses. This permanently deletes the traditional demo courses that were built for
+  // them, so only the practice credentials remain.
+  const deleteDemoCourses = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; deleted?: number }>('/courses/_delete-by-title', { method: 'POST', body: JSON.stringify({ titles: [
+      'Leading with Purpose · Zambian Clinician Leadership',
+      'Teaching Well with AI',
+      'Justice-Sector Practice: Sound Decisions Under Pressure',
+    ] }) }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ['courses'] });
-      toast({ title: 'Old MRB course deleted', description: `${r.deleted ?? 0} course${r.deleted === 1 ? '' : 's'} permanently removed. MRB's demo is its practice credentials.` });
+      toast({ title: 'Traditional demo courses deleted', description: `${r.deleted ?? 0} course${r.deleted === 1 ? '' : 's'} removed. MRB, PEJ and Educator are practice-credential demos.` });
     },
-    onError: (e: any) => toast({ title: 'Could not delete the course', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+    onError: (e: any) => toast({ title: 'Could not delete the courses', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
   // Delete every learner-role account and its learning records across the whole platform. Keeps
@@ -683,16 +668,6 @@ export function AdminPartners() {
                   title="Provision the PEJ Justice Practice demo class">
                   {seedPejPractice.isPending ? 'Provisioning…' : 'Provision PEJ Justice demo'}
                 </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedPejCourse.isPending}
-                  onClick={() => { if (window.confirm('Build the PEJ Justice demo COURSE (Justice-Sector Practice: Sound Decisions Under Pressure) and add it to the PEJ org\'s Courses? Safe to re-run.')) seedPejCourse.mutate(); }}
-                  title="Build the PEJ Justice demo course into the PEJ org">
-                  {seedPejCourse.isPending ? 'Building…' : 'Build PEJ demo course'}
-                </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedEducatorCourse.isPending}
-                  onClick={() => { if (window.confirm('Build the Educator demo COURSE (Teaching Well with AI) and add it to the Educator org\'s Courses? Safe to re-run.')) seedEducatorCourse.mutate(); }}
-                  title="Build the Educator demo course into the Educator org">
-                  {seedEducatorCourse.isPending ? 'Building…' : 'Build Educator demo course'}
-                </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedGameLibrary.isPending}
                   onClick={() => { if (window.confirm('Seed the reusable Game Library: Jeopardy, Family Feud, Bingo, Password, Wheel/Guess-the-Word and Escape Room per grade band, plus a curated catalog of commercial titles. Safe to re-run.')) seedGameLibrary.mutate(); }}
                   title="Seed the shared Game Library repository of ready-to-use game activities">
@@ -706,10 +681,10 @@ export function AdminPartners() {
               <div className="text-xs font-semibold uppercase tracking-wide text-amber-800/80 dark:text-amber-300/80 mb-1.5">Platform tools</div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <ShipCoursesButton />
-                <Button variant="outline" size="sm" className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400" disabled={deleteStrayMrbCourse.isPending}
-                  onClick={() => { if (window.confirm('Permanently delete the old "Leading with Purpose · Zambian Clinician Leadership" course (all copies) and everything in it? MRB\'s demo is its practice credentials, not this course. This cannot be undone.')) deleteStrayMrbCourse.mutate(); }}
-                  title="Permanently delete the stray MRB course">
-                  {deleteStrayMrbCourse.isPending ? 'Deleting…' : 'Delete old MRB course'}
+                <Button variant="outline" size="sm" className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400" disabled={deleteDemoCourses.isPending}
+                  onClick={() => { if (window.confirm('Permanently delete the traditional demo courses for the practice partners (Leading with Purpose, Teaching Well with AI, Justice-Sector Practice) and everything in them? MRB, PEJ and Educator are practice-credential demos, not courses. This cannot be undone.')) deleteDemoCourses.mutate(); }}
+                  title="Permanently delete the traditional practice-partner demo courses">
+                  {deleteDemoCourses.isPending ? 'Deleting…' : 'Delete demo courses'}
                 </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400" disabled={removeLearners.isPending}
                   onClick={() => { if (window.confirm('REMOVE ALL LEARNERS: permanently delete EVERY learner/student account and its progress, submissions and enrolments across the ENTIRE platform (all partners). Courses, organisations, coaches and admins are kept. This cannot be undone. Continue?')) removeLearners.mutate(); }}
