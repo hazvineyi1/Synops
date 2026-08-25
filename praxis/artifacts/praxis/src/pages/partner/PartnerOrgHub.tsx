@@ -421,7 +421,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
                       <td className="p-3 text-right tabular-nums">{c.enrolled}</td>
                       <td className="p-3">{inClasses.length === 0 ? <span className="text-xs text-muted-foreground">-</span> : <div className="flex flex-wrap gap-1">{inClasses.map((cl) => <span key={cl.id} className="rounded bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">{cl.name}</span>)}</div>}</td>
                       <td className="p-3"><Badge variant={c.status === 'active' ? 'secondary' : 'outline'} className="capitalize">{c.status}</Badge></td>
-                      <td className="p-3 text-right"><button className="text-xs font-medium text-primary hover:underline" onClick={() => navigate(`/courses/${c.id}/gradebook`)}>Gradebook →</button></td>
+                      <td className="p-3 text-right"><div className="flex items-center justify-end gap-3"><button className="text-xs font-medium text-primary hover:underline" onClick={() => navigate(`/courses/${c.id}`)}>Open →</button><button className="text-xs font-medium text-primary hover:underline" onClick={() => navigate(`/courses/${c.id}/gradebook`)}>Gradebook →</button></div></td>
                     </tr>
                   );
                 })}
@@ -717,6 +717,7 @@ export function PartnerOrgHub({ params }: { params?: { orgId?: string; section?:
  * action (the whole-org path) plus a pointer to the class path for finer control. */
 function AllocatedCoursesCard({ orgId, orgName, onClassNav }: { orgId: string; orgName: string; onClassNav: () => void }) {
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
   const [flash, setFlash] = React.useState<string | null>(null);
   const { data: allocated = [] } = useQuery({
     queryKey: ['org-assigned-courses', orgId],
@@ -745,13 +746,18 @@ function AllocatedCoursesCard({ orgId, orgName, onClassNav }: { orgId: string; o
       <div className="grid sm:grid-cols-2 gap-2">
         {allocated.map((c) => (
           <div key={c.id} className="rounded-lg border border-border p-3 flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="font-medium text-sm truncate">{c.title}</div>
+            <button className="min-w-0 text-left" onClick={() => navigate(`/courses/${c.id}`)} title="Open the course">
+              <div className="font-medium text-sm truncate hover:text-primary">{c.title}</div>
               {c.status && <div className="text-[11px] text-muted-foreground capitalize">{c.status}</div>}
+            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/courses/${c.id}`)} title="Open the course to view or edit it">
+                <BookOpen className="h-3.5 w-3.5" /> View course
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5" disabled={enrolAll.isPending} onClick={() => enrolAll.mutate(c.id)}>
+                <GraduationCap className="h-3.5 w-3.5" /> Enrol all
+              </Button>
             </div>
-            <Button size="sm" variant="outline" className="gap-1.5 shrink-0" disabled={enrolAll.isPending} onClick={() => enrolAll.mutate(c.id)}>
-              <GraduationCap className="h-3.5 w-3.5" /> Enrol all
-            </Button>
           </div>
         ))}
       </div>
