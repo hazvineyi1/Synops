@@ -276,6 +276,18 @@ router.get("/classes/:classId/assignable-courses", requireAuth, async (req, res)
   res.json(courses);
 });
 
+// GET /organisations/:orgId/assignable-courses -- the same partner pool, scoped to an org (not a
+// specific class). Powers the Assign wizard, which may target a new class that has no id yet.
+router.get("/organisations/:orgId/assignable-courses", requireAuth, async (req, res) => {
+  const org = await orgFor(req.params.orgId);
+  if (!canAccessOrg(req.dbUser!, org)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const pool = await classCoursePool(org?.partnerId, req.params.orgId);
+  if (!pool.size) { res.json([]); return; }
+  const courses = await db.select({ id: coursesTable.id, title: coursesTable.title, status: coursesTable.status })
+    .from(coursesTable).where(inArray(coursesTable.id, [...pool]));
+  res.json(courses);
+});
+
 // POST /classes/_cleanup-leaked-courses (super admin) -- one-time repair: remove any class->course
 // assignment whose course is NOT in that class's partner pool. Fixes historic leaks (e.g. an Enza-only
 // course that ended up assigned to every partner's classes). Idempotent.
