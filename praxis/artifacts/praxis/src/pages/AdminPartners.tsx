@@ -687,7 +687,7 @@ export function AdminPartners() {
                   <th className="px-6 py-4 font-medium">Orgs</th>
                   <th className="px-6 py-4 font-medium">Learners</th>
                   <th className="px-6 py-4 font-medium">Status</th>
-                  <th className="px-6 py-4 font-medium text-right">Actions</th>
+                  <th className="px-4 py-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y border-t border-border">
@@ -714,18 +714,18 @@ export function AdminPartners() {
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${partner.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{partner.status}</span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button size="sm" className="gap-1.5" onClick={() => enterPartner(partner.id)} title={`Open ${partner.name}'s hub as super admin`}>
+                    <td className="px-4 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                        <Button size="sm" className="gap-1.5 shrink-0" onClick={() => enterPartner(partner.id)} title={`Open ${partner.name}'s hub as super admin`}>
                           Enter hub <ArrowRight className="h-3.5 w-3.5" />
                         </Button>
                         <a href={partner.slug === 'enza-global' ? '/enzaglobalmedia' : `/p/${partner.slug}`} target="_blank" rel="noreferrer">
-                          <Button variant="outline" size="sm" className="gap-1.5"><Building className="h-3.5 w-3.5" />Landing</Button>
+                          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Open landing page"><Building className="h-4 w-4" /></Button>
                         </a>
-                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSelectedPartner(partner)}><Palette className="h-3.5 w-3.5" />Configure</Button>
-                        <Button variant="ghost" size="sm" className="gap-1.5 text-red-600 hover:text-red-700" disabled={deletePartner.isPending}
+                        <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Configure branding" onClick={() => setSelectedPartner(partner)}><Palette className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-red-600 hover:text-red-700" title="Delete partner" disabled={deletePartner.isPending}
                           onClick={() => { if (window.confirm(`Delete partner "${partner.name}" and ALL its organisations, learners, courses and data? This cannot be undone.`)) deletePartner.mutate(partner.id); }}>
-                          <Trash2 className="h-3.5 w-3.5" />Delete
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </td>
