@@ -475,6 +475,17 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision PEJ Justice Practice demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // One-off cleanup: permanently delete the stray "Leading with Purpose" MRB course (all copies). MRB's
+  // demo is its practice credentials (/practice), not this course.
+  const deleteStrayMrbCourse = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; deleted?: number }>('/courses/_delete-by-title', { method: 'POST', body: JSON.stringify({ title: 'Leading with Purpose · Zambian Clinician Leadership' }) }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['courses'] });
+      toast({ title: 'Old MRB course deleted', description: `${r.deleted ?? 0} course${r.deleted === 1 ? '' : 's'} permanently removed. MRB's demo is its practice credentials.` });
+    },
+    onError: (e: any) => toast({ title: 'Could not delete the course', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Delete every learner-role account and its learning records across the whole platform. Keeps
   // courses, organisations, coaches and admins.
   const removeLearners = useMutation({
@@ -665,6 +676,11 @@ export function AdminPartners() {
               <div className="text-xs font-semibold uppercase tracking-wide text-amber-800/80 dark:text-amber-300/80 mb-1.5">Platform tools</div>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <ShipCoursesButton />
+                <Button variant="outline" size="sm" className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400" disabled={deleteStrayMrbCourse.isPending}
+                  onClick={() => { if (window.confirm('Permanently delete the old "Leading with Purpose · Zambian Clinician Leadership" course (all copies) and everything in it? MRB\'s demo is its practice credentials, not this course. This cannot be undone.')) deleteStrayMrbCourse.mutate(); }}
+                  title="Permanently delete the stray MRB course">
+                  {deleteStrayMrbCourse.isPending ? 'Deleting…' : 'Delete old MRB course'}
+                </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800 dark:text-red-400" disabled={removeLearners.isPending}
                   onClick={() => { if (window.confirm('REMOVE ALL LEARNERS: permanently delete EVERY learner/student account and its progress, submissions and enrolments across the ENTIRE platform (all partners). Courses, organisations, coaches and admins are kept. This cannot be undone. Continue?')) removeLearners.mutate(); }}
                   title="Delete every learner account and its records platform-wide">

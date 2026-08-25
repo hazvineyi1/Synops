@@ -1182,6 +1182,37 @@ router.delete("/courses/:courseId", requireAuth, async (req, res) => {
   res.status(204).send();
 });
 
+// POST /courses/_delete-by-title { title } (super admin) -- permanently delete EVERY course with this
+// exact title (across tenants), cascading its children. Used to remove a stray demo course that is hard
+// to reach in the UI (e.g. an archived one). Registered before any /courses/:id-style POST.
+router.post("/courses/_delete-by-title", requireAuth, requireRole("super_admin"), async (req, res) => {
+  const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
+  if (!title) { res.status(400).json({ error: "title is required." }); return; }
+  const targets = await db.select({ id: coursesTable.id }).from(coursesTable).where(eq(coursesTable.title, title));
+  for (const { id: courseId } of targets) {
+    try {
+      const mods = await db.select({ id: modulesTable.id }).from(modulesTable).where(eq(modulesTable.courseId, courseId));
+      const modIds = mods.map((m) => m.id);
+      if (modIds.length) {
+        await db.delete(beatsTable).where(inArray(beatsTable.moduleId, modIds)).catch(() => {});
+        await db.delete(caseScenariosTable).where(inArray(caseScenariosTable.moduleId, modIds)).catch(() => {});
+      }
+      await db.delete(beatProgressTable).where(eq(beatProgressTable.courseId, courseId)).catch(() => {});
+      await db.delete(moduleReadingsTable).where(eq(moduleReadingsTable.courseId, courseId)).catch(() => {});
+      await db.delete(interactiveActivitiesTable).where(eq(interactiveActivitiesTable.courseId, courseId)).catch(() => {});
+      await db.delete(discussionsTable).where(eq(discussionsTable.courseId, courseId)).catch(() => {});
+      await db.delete(assignmentsTable).where(eq(assignmentsTable.courseId, courseId)).catch(() => {});
+      await db.delete(enrolmentsTable).where(eq(enrolmentsTable.courseId, courseId)).catch(() => {});
+      await db.delete(coursePartnerAssignmentsTable).where(eq(coursePartnerAssignmentsTable.courseId, courseId)).catch(() => {});
+      await db.execute(sql`DELETE FROM org_course_assignments WHERE course_id = ${courseId}`).catch(() => {});
+      await db.execute(sql`DELETE FROM org_class_courses WHERE course_id = ${courseId}`).catch(() => {});
+      await db.delete(modulesTable).where(eq(modulesTable.courseId, courseId)).catch(() => {});
+    } catch { /* best-effort */ }
+    await db.delete(coursesTable).where(eq(coursesTable.id, courseId));
+  }
+  res.json({ ok: true, deleted: targets.length });
+});
+
 // POST /courses/:courseId/clone -- deep-copy a course with its modules, beats, assignments and
 // course-linked interactive activities. The copy starts as a draft owned by the caller's tenant.
 router.post("/courses/:courseId/clone", requireAuth, requireRole("super_admin", "partner_admin", "org_admin", "coach", "instructional_designer"), async (req, res) => {
