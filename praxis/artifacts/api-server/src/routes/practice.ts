@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
+import { logAudit } from "../lib/audit";
 import { uploadObject, storageEnabled } from "../lib/supabaseStorage";
 
 /**
@@ -245,6 +246,81 @@ router.get("/practice/credentials", requireAuth, async (req, res) => {
     SELECT id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort
     FROM practice_credentials WHERE partner_id = ${pid} ORDER BY sort, title`);
   res.json(list);
+});
+
+// ── Credential authoring (super admin) ────────────────────────────────────────
+// A blank starter every new credential begins from, so a super admin shapes it rather than facing an
+// empty form. The reflective structure ("stations": Experience -> Reflect -> Name it -> Try it, and the
+// Gibbs moves) is a SHARED pedagogical framework applied to every credential, not per-credential data,
+// so it is not part of this template.
+const CREDENTIAL_TEMPLATE = {
+  code: "",
+  title: "New practice credential",
+  summary: "One line on what this credential recognises.",
+  activity_brief: "Complete an activity that demonstrates this capability in a real situation where something was genuinely at stake.",
+  gateway_guidance: "How this is reviewed: the reviewer looks for evidence you actually did the thing, reflected on it honestly, named the idea it points to, and planned your next move. Pass or resubmit with developmental feedback — never a percentage.",
+  example_assignment: "Example: a short account of a real decision or action you took, in your own words, with what you would do differently next time.",
+  rationale: "Why this matters: a short, research-grounded note on why this capability distinguishes strong practice.",
+};
+
+// GET /practice/credentials/template -- the starter values for a new credential (super admin form prefill).
+router.get("/practice/credentials/template", requireAuth, requireSuperAdmin, async (_req, res) => {
+  res.json(CREDENTIAL_TEMPLATE);
+});
+
+// POST /practice/credentials { partnerId, ...fields } -- create a credential for a partner from the
+// template (any field supplied overrides the template default).
+router.post("/practice/credentials", requireAuth, requireSuperAdmin, async (req, res) => {
+  const b = req.body ?? {};
+  const partnerId = typeof b.partnerId === "string" ? b.partnerId.trim() : "";
+  if (!partnerId) { res.status(400).json({ error: "partnerId is required." }); return; }
+  const pick = (v: unknown, fb: string) => (typeof v === "string" && v.trim() ? v.trim() : fb);
+  const code = pick(b.code, `cred-${Date.now().toString(36)}`);
+  const [mx] = await rows<{ m: number }>(sql`SELECT COALESCE(MAX(sort),0)+1 AS m FROM practice_credentials WHERE partner_id = ${partnerId}`);
+  const sort = Number.isFinite(Number(b.sort)) ? Math.round(Number(b.sort)) : (mx?.m ?? 0);
+  const [row] = await rows<{ id: string }>(sql`
+    INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort)
+    VALUES (${partnerId}, ${code}, ${pick(b.title, CREDENTIAL_TEMPLATE.title)}, ${pick(b.summary, CREDENTIAL_TEMPLATE.summary)},
+      ${pick(b.activity_brief, CREDENTIAL_TEMPLATE.activity_brief)}, ${pick(b.gateway_guidance, CREDENTIAL_TEMPLATE.gateway_guidance)},
+      ${pick(b.example_assignment, CREDENTIAL_TEMPLATE.example_assignment)}, ${pick(b.rationale, CREDENTIAL_TEMPLATE.rationale)}, ${sort})
+    ON CONFLICT (partner_id, code) DO NOTHING
+    RETURNING id`);
+  if (!row) { res.status(409).json({ error: "A credential with that code already exists for this partner." }); return; }
+  await logAudit(req, "practice_credential.create", "practice_credential", row.id, { partnerId, code });
+  res.status(201).json({ id: row.id });
+});
+
+// PATCH /practice/credentials/:id -- edit a credential's fields. Only the fields supplied are changed
+// (COALESCE keeps the rest), so the editor can save the whole form or a single field.
+router.patch("/practice/credentials/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+  const b = req.body ?? {};
+  const val = (k: string) => (typeof b[k] === "string" ? String(b[k]) : null);
+  const sortVal = Number.isFinite(Number(b.sort)) ? Math.round(Number(b.sort)) : null;
+  const [row] = await rows<{ id: string }>(sql`
+    UPDATE practice_credentials SET
+      title = COALESCE(${val("title")}, title),
+      code = COALESCE(${val("code")}, code),
+      summary = COALESCE(${val("summary")}, summary),
+      activity_brief = COALESCE(${val("activity_brief")}, activity_brief),
+      gateway_guidance = COALESCE(${val("gateway_guidance")}, gateway_guidance),
+      example_assignment = COALESCE(${val("example_assignment")}, example_assignment),
+      rationale = COALESCE(${val("rationale")}, rationale),
+      sort = COALESCE(${sortVal}, sort)
+    WHERE id = ${req.params.id}
+    RETURNING id`);
+  if (!row) { res.status(404).json({ error: "Credential not found." }); return; }
+  await logAudit(req, "practice_credential.update", "practice_credential", row.id, {});
+  res.json({ ok: true, id: row.id });
+});
+
+// DELETE /practice/credentials/:id -- remove a credential. Guarded: refuses if any candidate has chosen
+// it, so a live programme can't lose a credential learners are working on.
+router.delete("/practice/credentials/:id", requireAuth, requireSuperAdmin, async (req, res) => {
+  const [inUse] = await rows<{ n: number }>(sql`SELECT count(*)::int AS n FROM candidate_credentials WHERE credential_id = ${req.params.id}`);
+  if ((inUse?.n ?? 0) > 0) { res.status(409).json({ error: `In use by ${inUse.n} candidate(s); cannot delete.` }); return; }
+  await rows(sql`DELETE FROM practice_credentials WHERE id = ${req.params.id}`);
+  await logAudit(req, "practice_credential.delete", "practice_credential", req.params.id, {});
+  res.json({ ok: true });
 });
 
 // ── Candidate credentials (chosen, justified, sequenced) ──────────────────────
