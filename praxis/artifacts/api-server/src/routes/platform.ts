@@ -260,6 +260,59 @@ router.post("/platform/stop-impersonating", requireAuth, async (req, res) => {
 });
 
 /**
+ * POST /platform/demos/:slug/enter - super-admin one-click "preview this demo as its learner".
+ * Unlike the public /demos/* landings (which run demo-login and REPLACE the caller's session with the
+ * demo learner - so a super admin who used them would be dropped at /sign-in on the way back), this
+ * impersonates the demo learner while stashing the admin's own session in the impersonator cookie. The
+ * "Stop impersonating" banner then restores super admin with no logout. Resolves the demo learner by the
+ * partner's stable slug, mirroring demo-login's fallback (known demo email, else first active learner).
+ */
+const DEMO_LEARNER_EMAIL: Record<string, string> = {
+  "pej-practice": "demo.learner@pej-practice.test",
+  "educator-pd": "demo.educator@edupd.test",
+  "zambian-leadership": "demo.learner@zcl.test",
+};
+router.post("/platform/demos/:slug/enter", requireAuth, requireSuperAdmin, async (req, res) => {
+  const slug = String(req.params.slug || "").trim().toLowerCase();
+  const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, slug)).limit(1);
+  if (!partner) { res.status(404).json({ error: "That demo partner is not provisioned yet." }); return; }
+
+  // Prefer the dedicated demo learner; fall back to any active learner in the partner.
+  let target: typeof usersTable.$inferSelect | undefined;
+  const knownEmail = DEMO_LEARNER_EMAIL[slug];
+  if (knownEmail) {
+    [target] = await db.select().from(usersTable).where(eq(usersTable.email, knownEmail)).limit(1);
+  }
+  if (!target) {
+    const learners = await db
+      .select()
+      .from(usersTable)
+      .where(and(eq(usersTable.partnerId, partner.id), eq(usersTable.role, "learner"), eq(usersTable.status, "active")))
+      .limit(200);
+    const live = learners
+      .filter((u) => !(u as { deletedAt?: Date | null }).deletedAt && !(u as { archivedAt?: Date | null }).archivedAt)
+      .sort((a, b) => a.email.localeCompare(b.email));
+    target = live.find((u) => !!u.organisationId) ?? live[0];
+  }
+  if (!target) { res.status(404).json({ error: "This demo has no learner to preview yet. Provision it first." }); return; }
+  if (target.id === req.userId) { res.status(400).json({ error: "You are already yourself." }); return; }
+
+  const adminToken = req.cookies?.[SESSION_COOKIE];
+  const token = newSessionToken();
+  await db.insert(authSessionsTable).values({
+    token, userId: target.id, impersonatorId: req.userId!,
+    ipAddress: clientIp(req as any), userAgent: (req.headers["user-agent"] as string) ?? null,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+  });
+  await db.insert(loginEventsTable).values({ userId: target.id, email: target.email, outcome: "impersonated", ipAddress: clientIp(req as any), impersonatorId: req.userId! });
+  await audit(req, "user.impersonate", "user", target.id, { email: target.email, via: "demo_preview", slug });
+
+  if (adminToken) res.cookie(IMPERSONATOR_COOKIE, adminToken, cookieOptions(60 * 60 * 1000));
+  res.cookie(SESSION_COOKIE, token, cookieOptions(60 * 60 * 1000));
+  res.json({ ok: true, impersonating: { id: target.id, email: target.email } });
+});
+
+/**
  * POST /platform/users, create a new user with any role and return a one-time set-password link.
  * The account starts as "invited" with no password; the returned link lets them set one (or an admin
  * hands it over). This is the missing "add a user" path: users used to only be creatable against an
@@ -1461,8 +1514,8 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
     // blue, warm gold accent). Best-effort so a column difference never fails the seed.
     try {
       await db.execute(sql`UPDATE brand_themes SET display_name = 'Manchester Review Board', primary_color = '#1B4965', secondary_color = '#2C6E8E', accent_color = '#C58B2C', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
-      await db.execute(sql`INSERT INTO brand_themes (tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
-        SELECT ${pid}, 'partner', 'Manchester Review Board', '#1B4965', '#2C6E8E', '#C58B2C', 'Practice Credential'
+      await db.execute(sql`INSERT INTO brand_themes (id, tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
+        SELECT gen_random_uuid()::text, ${pid}, 'partner', 'Manchester Review Board', '#1B4965', '#2C6E8E', '#C58B2C', 'Practice Credential'
         WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
     } catch { /* branding is best-effort */ }
 
@@ -1588,8 +1641,8 @@ router.post("/platform/seed-educator-pd", requireAuth, requireSuperAdmin, async 
     // Brand the educator programme (indigo + teal, distinct from the MRB petrol blue). Best-effort.
     try {
       await db.execute(sql`UPDATE brand_themes SET display_name = 'Educator Professional Development', primary_color = '#3B4CB8', secondary_color = '#5B6EE1', accent_color = '#12A594', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
-      await db.execute(sql`INSERT INTO brand_themes (tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
-        SELECT ${pid}, 'partner', 'Educator Professional Development', '#3B4CB8', '#5B6EE1', '#12A594', 'Practice Credential'
+      await db.execute(sql`INSERT INTO brand_themes (id, tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
+        SELECT gen_random_uuid()::text, ${pid}, 'partner', 'Educator Professional Development', '#3B4CB8', '#5B6EE1', '#12A594', 'Practice Credential'
         WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
     } catch { /* branding best-effort */ }
 
@@ -1709,10 +1762,12 @@ router.post("/platform/seed-pej-practice", requireAuth, requireSuperAdmin, async
     // Brand the PEJ programme FIRST (serious justice palette: deep navy + slate + restrained brass), so
     // the guided justice UX (coach Mira, serious theme) is applied even if a later step ever fails. The
     // display name must contain "PEJ"/"Justice" for the frontend demoProfile to detect the audience.
-    await db.execute(sql`UPDATE brand_themes SET display_name = 'PEJ Justice Practice', primary_color = '#1B2A4A', secondary_color = '#33456B', accent_color = '#A6813C', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
-    await db.execute(sql`INSERT INTO brand_themes (tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
-      SELECT ${pid}, 'partner', 'PEJ Justice Practice', '#1B2A4A', '#33456B', '#A6813C', 'Practice Credential'
-      WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
+    try {
+      await db.execute(sql`UPDATE brand_themes SET display_name = 'PEJ Justice Practice', primary_color = '#1B2A4A', secondary_color = '#33456B', accent_color = '#A6813C', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
+      await db.execute(sql`INSERT INTO brand_themes (id, tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
+        SELECT gen_random_uuid()::text, ${pid}, 'partner', 'PEJ Justice Practice', '#1B2A4A', '#33456B', '#A6813C', 'Practice Credential'
+        WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
+    } catch { /* branding is best-effort; must never block credential seeding below */ }
 
     for (const c of PEJ_PRACTICE_CREDENTIALS) {
       await db.execute(sql`

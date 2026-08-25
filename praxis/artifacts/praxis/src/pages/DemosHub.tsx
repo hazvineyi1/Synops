@@ -1,15 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation } from 'wouter';
 import { useGetMe, useListPartners } from '@workspace/api-client-react';
 import { setActivePartner } from '@/lib/partnerHubData';
+import { apiFetch } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Compass, ExternalLink, FileWarning, Pencil } from 'lucide-react';
+import { Compass, ExternalLink, FileWarning, Pencil, PlayCircle } from 'lucide-react';
 
 /**
- * Super-admin "Demos" hub: quick access to every public demo entry. Each card can either open the
- * public practice experience (signs you in as that demo's learner in a new tab) or drop the
- * super-admin into that partner's hub to edit its practice credentials.
+ * Super-admin "Demos" hub. Each card offers three actions:
+ *  - Open demo: previews the learner experience by IMPERSONATING the demo learner, which keeps the
+ *    super-admin session alive (stashed in the impersonator cookie). A "Stop impersonating" banner
+ *    returns you with no logout. This is deliberately NOT the public /demos/* landing, which runs
+ *    demo-login and replaces your session with the learner's - dropping you at /sign-in on the way back.
+ *  - Edit: enters that partner's hub as super admin to change its practice credentials.
+ *  - Public link: the shareable /demos/* URL (signs the visitor in as the demo learner) - for prospects.
  */
 const DEMOS = [
   {
@@ -36,6 +41,8 @@ export function DemosHub() {
   const { data: me } = useGetMe();
   const { data: partners } = useListPartners();
   const [, navigate] = useLocation();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
   const isSuper = me?.role === 'super_admin';
 
   if (!isSuper) {
@@ -64,12 +71,26 @@ export function DemosHub() {
       const list = (partners ?? []) as Array<{ slug?: string; name?: string }>;
       const found = list.map((p) => `${p?.name ?? '?'} (${p?.slug ?? '?'})`).join(', ') || 'none loaded';
       window.alert(
-        `Couldn't find the "${d.name}" partner (looking for slug "${d.slug}").\n\nPartners currently loaded: ${found}.\n\nIf it's missing, open the demo once (Open demo) to provision it, then try Edit again.`,
+        `Couldn't find the "${d.name}" partner (looking for slug "${d.slug}").\n\nPartners currently loaded: ${found}.`,
       );
       return;
     }
     setActivePartner(id);
     navigate('/partner/courses');
+  };
+
+  // Preview the demo AS its learner while keeping the super-admin session (impersonation). The
+  // "Stop impersonating" banner on /practice returns you — no logout, no /sign-in bounce.
+  const preview = async (d: { slug: string; name: string }) => {
+    setBusy(d.slug);
+    setErr(null);
+    try {
+      await apiFetch(`/platform/demos/${d.slug}/enter`, { method: 'POST' });
+      window.location.href = '/practice';
+    } catch (e) {
+      setErr(`${d.name}: ${e instanceof Error ? e.message : 'Could not open the demo.'}`);
+      setBusy(null);
+    }
   };
 
   return (
@@ -80,36 +101,48 @@ export function DemosHub() {
           <h1 className="text-2xl font-serif font-bold tracking-tight">Demos</h1>
         </div>
         <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-          The public demo experiences for the practice partners. <strong>Open demo</strong> launches the reflective practice format in a new tab (it signs you in as that demo's learner — close it and sign back in as yourself to return). <strong>Edit</strong> drops you into that partner's hub as super admin to change its practice credentials.
+          <strong>Open demo</strong> previews the learner experience while keeping your super-admin session — a “Stop impersonating” banner brings you straight back, no logout. <strong>Edit</strong> opens that partner's practice credentials. <strong>Public link</strong> is the shareable URL for prospects (it signs the visitor in as the demo learner).
         </p>
       </div>
 
+      {err && (
+        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{err}</div>
+      )}
+
       <div className="grid sm:grid-cols-2 gap-3">
-        {DEMOS.map((d) => {
-          return (
-            <Card key={d.path} className="p-4 flex flex-col">
-              <div className="font-serif font-semibold">{d.name}</div>
-              <p className="text-sm text-muted-foreground mt-1 flex-1">{d.blurb}</p>
-              <code className="mt-2 text-[11px] text-muted-foreground truncate">{d.path}</code>
-              <div className="mt-3 flex gap-2">
-                <a href={d.path} target="_blank" rel="noreferrer" className="flex-1">
-                  <Button size="sm" className="w-full gap-1.5">
-                    <ExternalLink className="h-3.5 w-3.5" /> Open demo
-                  </Button>
-                </a>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  title="Edit this demo’s practice credentials as super admin"
-                  onClick={() => editAsSuper(d)}
-                >
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </Button>
-              </div>
-            </Card>
-          );
-        })}
+        {DEMOS.map((d) => (
+          <Card key={d.path} className="p-4 flex flex-col">
+            <div className="font-serif font-semibold">{d.name}</div>
+            <p className="text-sm text-muted-foreground mt-1 flex-1">{d.blurb}</p>
+            <div className="mt-3 flex gap-2">
+              <Button
+                size="sm"
+                className="flex-1 gap-1.5"
+                disabled={busy === d.slug}
+                onClick={() => preview(d)}
+              >
+                <PlayCircle className="h-3.5 w-3.5" /> {busy === d.slug ? 'Opening…' : 'Open demo'}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                title="Edit this demo’s practice credentials as super admin"
+                onClick={() => editAsSuper(d)}
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit
+              </Button>
+            </div>
+            <a
+              href={d.path}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 text-[11px] text-muted-foreground hover:underline inline-flex items-center gap-1"
+            >
+              <ExternalLink className="h-3 w-3" /> Public link ({d.path})
+            </a>
+          </Card>
+        ))}
       </div>
     </div>
   );
