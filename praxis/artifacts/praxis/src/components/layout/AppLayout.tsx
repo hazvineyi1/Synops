@@ -506,16 +506,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         )}
 
         {role === 'super_admin' && (
-          <div className="px-4 py-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide"
+          <div className="px-4 py-2.5 flex flex-col gap-2 text-[11px] font-bold uppercase tracking-wide"
             style={{ color: '#ffffff', background: 'rgba(255,255,255,0.08)', borderBottom: `1px solid ${HAIRLINE}` }}>
-            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: isSuperPlatform ? '#c4b5fd' : '#fbbf24' }} />
-            <span className="truncate">{isSuperPlatform ? t('nav.superAdminPlatform', 'Super Admin · Platform') : `${t('nav.insidePartner', 'Inside partner')} · ${activePartnerName ?? ''}`}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: isSuperPlatform ? '#c4b5fd' : '#fbbf24' }} />
+              <span className="truncate">{isSuperPlatform ? t('nav.superAdminPlatform', 'Super Admin · Platform') : `${t('nav.insidePartner', 'Inside partner')} · ${activePartnerName ?? ''}`}</span>
+            </div>
             {/* Exit back to the super-admin platform, and a true "view as partner admin" impersonation.
-                The latter is NOT the same as this super-admin overlay: it starts a real impersonation
+                Stacked on their own row (full width) so the long labels never overflow the sidebar. The
+                impersonation is NOT the same as this super-admin overlay: it starts a real impersonation
                 session so you see exactly the restricted partner-admin view (use "Stop impersonating"
                 in the top banner to return). */}
             {!isSuperPlatform && (
-              <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   onClick={async () => {
                     if (!actingPartnerId) return;
@@ -527,17 +530,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       window.alert(e instanceof Error ? e.message : 'Could not view as partner admin.');
                     }
                   }}
-                  className="inline-flex items-center gap-1 rounded-md bg-amber-400/90 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-slate-900 transition-colors hover:bg-amber-300"
+                  className="inline-flex flex-1 min-w-0 items-center justify-center gap-1 rounded-md bg-amber-400/90 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-slate-900 transition-colors hover:bg-amber-300"
                   title="Start a real partner-admin impersonation session (restricted view)"
                 >
-                  <UserCog className="h-3 w-3" /> View as partner admin
+                  <UserCog className="h-3 w-3 shrink-0" /> <span className="truncate">View as partner admin</span>
                 </button>
                 <button
                   onClick={() => { setActivePartner(null); navigate('/platform-overview'); }}
-                  className="inline-flex items-center gap-1 rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-white transition-colors hover:bg-white/25"
+                  className="inline-flex shrink-0 items-center justify-center gap-1 rounded-md bg-white/15 px-2 py-1 text-[10px] font-semibold normal-case tracking-normal text-white transition-colors hover:bg-white/25"
                   title="Exit to the super-admin platform"
                 >
-                  <ArrowLeft className="h-3 w-3" /> Exit to platform
+                  <ArrowLeft className="h-3 w-3 shrink-0" /> Exit
                 </button>
               </div>
             )}
