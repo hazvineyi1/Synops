@@ -264,8 +264,19 @@ const CREDENTIAL_TEMPLATE = {
 };
 
 // GET /practice/credentials/template -- the starter values for a new credential (super admin form prefill).
+// Registered BEFORE the /:id route so "template" is not captured as an id.
 router.get("/practice/credentials/template", requireAuth, requireSuperAdmin, async (_req, res) => {
   res.json(CREDENTIAL_TEMPLATE);
+});
+
+// GET /practice/credentials/one/:id -- a single credential (staff), for the in-place editor.
+router.get("/practice/credentials/one/:id", requireAuth, async (req, res) => {
+  if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const [row] = await rows(sql`
+    SELECT id, partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort
+    FROM practice_credentials WHERE id = ${req.params.id} LIMIT 1`);
+  if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(row);
 });
 
 // POST /practice/credentials { partnerId, ...fields } -- create a credential for a partner from the

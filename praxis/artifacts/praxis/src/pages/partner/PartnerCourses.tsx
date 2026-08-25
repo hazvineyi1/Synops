@@ -7,9 +7,6 @@ import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { BookOpen, ChevronDown, CheckCircle2, Building, ExternalLink, Plus, Trash2, Compass, Pencil } from 'lucide-react';
 import { getActivePartnerId } from '@/lib/partnerHubData';
 
@@ -105,14 +102,16 @@ export function PartnerCourses() {
  */
 function PracticeCredentialsSection({ partnerId, q, isSuper }: { partnerId: string; q: string; isSuper: boolean }) {
   const [, navigate] = useLocation();
-  const qc = useQueryClient();
-  const [editing, setEditing] = useState<PracticeCredential | 'new' | null>(null);
   const { data: creds = [] } = useQuery({
     queryKey: ['practice-credentials', partnerId],
     queryFn: () => apiFetch<PracticeCredential[]>(`/practice/credentials${q}`),
     enabled: !!partnerId,
   });
-  const refresh = () => qc.invalidateQueries({ queryKey: ['practice-credentials', partnerId] });
+  // Create a blank credential from the template, then open it straight in the in-place editor.
+  const create = useMutation({
+    mutationFn: () => apiFetch<{ id: string }>('/practice/credentials', { method: 'POST', body: JSON.stringify({ partnerId }) }),
+    onSuccess: (r) => { if (r?.id) navigate(`/practice/credential/${r.id}`); },
+  });
   // Nothing to show for a non-super partner with no credentials; a super admin always gets the panel so
   // they can add the partner's first credential.
   if (!creds.length && !isSuper) return null;
@@ -124,8 +123,8 @@ function PracticeCredentialsSection({ partnerId, q, isSuper }: { partnerId: stri
         <h2 className="text-sm font-semibold">Practice credentials</h2>
         <span className="text-xs text-muted-foreground">Delivered through the practice track, not the course catalogue.</span>
         {isSuper && (
-          <Button size="sm" variant="outline" className="ml-auto gap-1.5" onClick={() => setEditing('new')}>
-            <Plus className="h-3.5 w-3.5" /> Add credential
+          <Button size="sm" variant="outline" className="ml-auto gap-1.5" disabled={create.isPending} onClick={() => create.mutate()}>
+            <Plus className="h-3.5 w-3.5" /> {create.isPending ? 'Creating…' : 'Add credential'}
           </Button>
         )}
       </div>
@@ -133,7 +132,8 @@ function PracticeCredentialsSection({ partnerId, q, isSuper }: { partnerId: stri
         <Card className="p-4 text-sm text-muted-foreground border-dashed">This partner has no practice credentials yet. Use “Add credential” to create one from the template.</Card>
       )}
       {creds.map((c) => (
-        <Card key={c.id} className="p-4">
+        <Card key={c.id} className={`p-4 ${isSuper ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+          onClick={isSuper ? () => navigate(`/practice/credential/${c.id}`) : undefined}>
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -144,7 +144,7 @@ function PracticeCredentialsSection({ partnerId, q, isSuper }: { partnerId: stri
               {c.activity_brief && <p className="text-xs text-muted-foreground mt-1"><span className="font-medium text-foreground/70">Activity: </span>{c.activity_brief}</p>}
             </div>
             {isSuper && (
-              <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={() => setEditing(c)}>
+              <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={(e) => { e.stopPropagation(); navigate(`/practice/credential/${c.id}`); }}>
                 <Pencil className="h-3.5 w-3.5" /> Edit
               </Button>
             )}
@@ -152,100 +152,12 @@ function PracticeCredentialsSection({ partnerId, q, isSuper }: { partnerId: stri
         </Card>
       ))}
       <Card className="p-3 border-dashed text-xs text-muted-foreground flex flex-wrap items-center gap-2">
-        <span>Learners work through these in the practice track. {isSuper ? 'The reflective cycle (Experience → Reflect → Name it → Try it) is a shared framework across all credentials. To see a learner’s view, impersonate a candidate; to review submissions, open the Review queue.' : 'Open the practice track to continue.'}</span>
+        <span>{isSuper ? 'Open a credential to edit it exactly as the learner sees it. The reflective cycle (Experience → Reflect → Name it → Try it) is shared across all credentials. To review submissions, open the Review queue.' : 'Open the practice track to continue.'}</span>
         <Button size="sm" variant="outline" className="ml-auto gap-1.5" onClick={() => navigate(isSuper ? '/practice/review' : '/practice')}>
           <ExternalLink className="h-3.5 w-3.5" /> {isSuper ? 'Review queue' : 'Open practice track'}
         </Button>
       </Card>
-
-      {editing && (
-        <CredentialEditor
-          partnerId={partnerId}
-          credential={editing === 'new' ? null : editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); refresh(); }}
-        />
-      )}
     </div>
-  );
-}
-
-// Super-admin editor for a practice credential (create from template, or edit an existing one).
-function CredentialEditor({ partnerId, credential, onClose, onSaved }: {
-  partnerId: string; credential: PracticeCredential | null; onClose: () => void; onSaved: () => void;
-}) {
-  const isNew = !credential;
-  const [f, setF] = useState({
-    title: credential?.title ?? '',
-    code: credential?.code ?? '',
-    summary: credential?.summary ?? '',
-    activity_brief: credential?.activity_brief ?? '',
-    gateway_guidance: credential?.gateway_guidance ?? '',
-    example_assignment: credential?.example_assignment ?? '',
-    rationale: credential?.rationale ?? '',
-  });
-  const [loadedTemplate, setLoadedTemplate] = useState(false);
-
-  // For a NEW credential, prefill the fields from the server template so the author shapes rather than
-  // starts blank.
-  useQuery({
-    queryKey: ['credential-template'],
-    queryFn: async () => {
-      const t = await apiFetch<Record<string, string>>('/practice/credentials/template');
-      if (isNew && !loadedTemplate) {
-        setF((cur) => ({
-          title: cur.title || t.title || '', code: cur.code, summary: cur.summary || t.summary || '',
-          activity_brief: cur.activity_brief || t.activity_brief || '', gateway_guidance: cur.gateway_guidance || t.gateway_guidance || '',
-          example_assignment: cur.example_assignment || t.example_assignment || '', rationale: cur.rationale || t.rationale || '',
-        }));
-        setLoadedTemplate(true);
-      }
-      return t;
-    },
-    enabled: isNew,
-  });
-
-  const save = useMutation({
-    mutationFn: () => isNew
-      ? apiFetch('/practice/credentials', { method: 'POST', body: JSON.stringify({ partnerId, ...f }) })
-      : apiFetch(`/practice/credentials/${credential!.id}`, { method: 'PATCH', body: JSON.stringify(f) }),
-    onSuccess: onSaved,
-  });
-
-  const field = (key: keyof typeof f, label: string, hint: string, rows = 3) => (
-    <label className="block text-sm">
-      <span className="mb-1 block font-medium">{label}</span>
-      {rows === 1
-        ? <Input value={f[key]} onChange={(e) => setF((p) => ({ ...p, [key]: e.target.value }))} placeholder={hint} />
-        : <Textarea rows={rows} value={f[key]} onChange={(e) => setF((p) => ({ ...p, [key]: e.target.value }))} placeholder={hint} />}
-    </label>
-  );
-
-  return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-2xl max-h-[88vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isNew ? 'Add practice credential' : 'Edit practice credential'}</DialogTitle>
-          <DialogDescription>Shape what learners must demonstrate and how it’s reviewed. The reflective cycle (Experience → Reflect → Name it → Try it) is shared across all credentials and isn’t edited here.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          {field('title', 'Title', 'e.g. Ethical Leadership in Practice', 1)}
-          {field('code', 'Code', 'A short unique code for this partner, e.g. ELP', 1)}
-          {field('summary', 'Summary', 'One line on what this credential recognises.', 2)}
-          {field('activity_brief', 'Activity', 'What the learner must do to demonstrate this capability.', 3)}
-          {field('gateway_guidance', 'How this is reviewed', 'What the reviewer looks for; pass or resubmit with feedback.', 3)}
-          {field('example_assignment', 'Example', 'A concrete example of what a strong submission looks like.', 3)}
-          {field('rationale', 'Why this matters', 'A short, research-grounded note on why this capability matters.', 3)}
-          {save.isError && <p className="text-xs text-destructive">Could not save. {(save.error as Error)?.message}</p>}
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button disabled={!f.title.trim() || save.isPending} onClick={() => save.mutate()}>
-            {save.isPending ? 'Saving…' : isNew ? 'Create credential' : 'Save changes'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 
