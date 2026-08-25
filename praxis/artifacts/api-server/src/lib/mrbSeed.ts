@@ -300,28 +300,22 @@ export async function seedZambianLeadership(): Promise<{
 
   await db.update(partnersTable).set({ orgCount: 1 }).where(eq(partnersTable.id, partner.id));
 
-  // 4. Course + modules, owned by the partner tenant
-  const { courseId, created: createdCourse } = await ensureCourseAndModules(partner.id, org.id, faculty.id);
-
-  // 5. Demo learner enrolled in the course, so the public /demos/mrb link drops a visitor straight into
-  //    the full published course as an enrolled learner.
+  // MRB's demo is its PRACTICE CREDENTIALS (/practice), NOT a course. This seed used to also build the
+  // "Leading with Purpose" course, which is why that course kept reappearing after it was deleted. It no
+  // longer creates a course or a course enrolment — it only guarantees the partner, org and faculty that
+  // the practice-credential seed needs. The demo learner is ensured (no course to enrol into).
   let demoLearner = await firstOrNull(await db.select().from(usersTable).where(eq(usersTable.email, ZCL_DEMO_LEARNER_EMAIL)));
   if (!demoLearner) {
-    [demoLearner] = await db.insert(usersTable).values({
+    await db.insert(usersTable).values({
       email: ZCL_DEMO_LEARNER_EMAIL, firstName: "Demo", lastName: "Learner",
       role: "learner", status: "active", partnerId: partner.id, organisationId: org.id,
-    }).returning();
-  }
-  const enrolled = await db.select().from(enrolmentsTable)
-    .where(and(eq(enrolmentsTable.userId, demoLearner.id), eq(enrolmentsTable.courseId, courseId)));
-  if (!enrolled.length) {
-    await db.insert(enrolmentsTable).values({ userId: demoLearner.id, courseId, status: "active" });
+    });
   }
 
   return {
-    created: createdPartner || createdCourse,
+    created: createdPartner,
     partnerId: partner.id,
-    courseId,
-    message: `Zambian Clinician Leadership ${createdPartner ? "created" : "already existed"}; course "${COURSE.title}" ${createdCourse ? "created" : "present"} with ${MODULES.length} modules housed under the partner.`,
+    courseId: "",
+    message: `Zambian Clinician Leadership ${createdPartner ? "created" : "already existed"}; partner, org and demo learner ensured. No course is created (MRB is a practice-credential demo).`,
   };
 }
