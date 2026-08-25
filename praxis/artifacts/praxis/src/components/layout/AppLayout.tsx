@@ -10,6 +10,7 @@ import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import SupportChat from '@/components/SupportChat';
 import {
   LayoutDashboard,
+  LayoutTemplate,
   BookOpen,
   Award,
   Compass,
@@ -370,6 +371,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           heading: t('nav.groups.courses', 'Courses'),
           items: [
             { label: t('nav.courseCatalog', 'Courses'), href: '/courses', icon: GraduationCap },
+            { label: t('nav.templateLibrary', 'Template library'), href: '/admin/templates', icon: LayoutTemplate },
             { label: t('nav.incompleteCourses', 'Incomplete courses'), href: '/incomplete-courses', icon: FileWarning },
             { label: t('nav.changeRequests', 'Change requests'), href: '/change-requests', icon: MessageSquarePlus, badge: openChangeRequests || undefined },
           ],

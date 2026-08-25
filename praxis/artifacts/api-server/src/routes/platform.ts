@@ -18,6 +18,7 @@ import {
   platformFilingsTable,
   partnerDocumentsTable,
   coursesTable,
+  modulesTable,
   opsAnomaliesTable,
 } from "@workspace/db";
 import { eq, and, isNull, desc, sql, or, ilike, gte, count, type SQL } from "drizzle-orm";
@@ -310,6 +311,140 @@ router.post("/platform/demos/:slug/enter", requireAuth, requireSuperAdmin, async
   if (adminToken) res.cookie(IMPERSONATOR_COOKIE, adminToken, cookieOptions(60 * 60 * 1000));
   res.cookie(SESSION_COOKIE, token, cookieOptions(60 * 60 * 1000));
   res.json({ ok: true, impersonating: { id: target.id, email: target.email } });
+});
+
+/* ------------------------------------------------------------------------------------------------
+ * Template Library. A registry of starter templates, one per course type the platform builds. Using
+ * a template scaffolds a real DRAFT (a course + starter modules, or a partner's starter practice
+ * credentials) that the builder then edits - so every new build starts from a consistent, well-formed
+ * structure instead of a blank page.
+ * ---------------------------------------------------------------------------------------------- */
+type TemplateModule = { title: string; description: string; estimatedMinutes: number; objectives: string[] };
+type TemplateCredential = { code: string; title: string; summary: string; brief: string; rationale: string };
+type CourseTemplate = {
+  key: string;
+  name: string;
+  kind: "course" | "practice";
+  audience: string;
+  summary: string;
+  creates: string[];      // human-readable "what applying this makes"
+  competencyTags?: string[];
+  courseObjectives?: string[];
+  modules?: TemplateModule[];
+  credentials?: TemplateCredential[];
+  gateway?: string;
+  example?: string;
+};
+
+const COURSE_TEMPLATES: CourseTemplate[] = [
+  {
+    key: "traditional-module",
+    name: "Traditional Module Course",
+    kind: "course",
+    audience: "Backward-design course (modules → objectives → assessment → activities)",
+    summary: "The standard structured course built on Understanding by Design: modules that move from foundations to application to demonstration, each with measurable objectives.",
+    creates: ["A draft course owned by the platform", "3 starter modules (Foundations, Application, Demonstration)", "Measurable objectives on each module", "Ready to open in the course editor"],
+    competencyTags: [],
+    courseObjectives: [
+      "Explain the core concepts and why they matter in practice.",
+      "Apply the concepts to a realistic scenario.",
+      "Demonstrate competence through an authentic assessment.",
+    ],
+    modules: [
+      { title: "Module 1 · Foundations", description: "Establish the core concepts, vocabulary, and prior-knowledge assumptions. Front-load the ideas everything else builds on.", estimatedMinutes: 90, objectives: ["Define the key terms and concepts.", "Explain how the concepts relate to each other."] },
+      { title: "Module 2 · Application", description: "Learners apply the foundations to realistic problems. Scaffold from worked examples to independent practice.", estimatedMinutes: 120, objectives: ["Apply the concepts to a realistic scenario.", "Analyse a case and justify a decision."] },
+      { title: "Module 3 · Demonstration & Assessment", description: "An authentic assessment where learners demonstrate competence. Aligns back to the course objectives.", estimatedMinutes: 120, objectives: ["Produce work that demonstrates the course objectives.", "Evaluate their own work against the rubric."] },
+    ],
+  },
+  {
+    key: "k12-standards",
+    name: "K-12 Standards Course",
+    kind: "course",
+    audience: "Grade-level course aligned to standards (CCSS / NGSS / C3), with an accommodations mindset",
+    summary: "A standards-first course for younger learners: units anchored to specific standards, age-appropriate activities, and a built-in place for accommodations.",
+    creates: ["A draft course owned by the platform", "3 standards-anchored units", "A K-12 competency tag", "Ready to open in the course editor"],
+    competencyTags: ["K-12"],
+    courseObjectives: [
+      "Meet the targeted grade-level standards.",
+      "Engage younger learners with age-appropriate, multi-modal activities.",
+      "Provide accessible pathways for diverse learners.",
+    ],
+    modules: [
+      { title: "Unit 1 · Anchor & Explore", description: "Introduce the anchoring phenomenon or big question. Tag the specific standards this unit addresses.", estimatedMinutes: 60, objectives: ["Connect the unit to the targeted standard.", "Explore the anchoring question."] },
+      { title: "Unit 2 · Investigate & Practice", description: "Hands-on investigation and guided practice. Build in accommodations and multiple means of engagement.", estimatedMinutes: 75, objectives: ["Investigate using age-appropriate methods.", "Practise the target skill with support."] },
+      { title: "Unit 3 · Show What You Know", description: "A performance task and reflection that evidences the standard. Include an accommodations layer.", estimatedMinutes: 60, objectives: ["Demonstrate the standard through a performance task.", "Reflect on their learning."] },
+    ],
+  },
+  {
+    key: "practice-credential",
+    name: "Practice-Credential Experience",
+    kind: "practice",
+    audience: "Reflective /practice format: earn credentials from real work, coached, gateway-reviewed",
+    summary: "The practice-first format (MRB / PEJ / Educator style): a set of credentials a learner earns by taking something real from their work, reflecting with a coach, and gathering evidence. Seeds a starter credential set for a partner you choose.",
+    creates: ["3 starter practice credentials on the chosen partner", "Each with a summary, activity brief, and rationale", "Ready to edit in the partner's practice credentials"],
+    credentials: [
+      { code: "PC-01", title: "Practice Credential One", summary: "Recognition of one real thing the learner can do, drawn from their own work.", brief: "Take something real from your practice, reconstruct it as a composite if needed, and reflect on it with your coach.", rationale: "Anchors the credential in authentic, real-world practice rather than a test." },
+      { code: "PC-02", title: "Practice Credential Two", summary: "A second capability, evidenced through the reflective cycle.", brief: "Choose a second real experience, work the four-move cycle, and gather a little evidence.", rationale: "Builds range across more than one situation." },
+      { code: "PC-03", title: "Practice Credential Three", summary: "A capstone capability that integrates the earlier two.", brief: "Bring something that draws the earlier credentials together, and reflect on what it means for how you practise.", rationale: "Integrates the prior credentials into a fuller picture of competence." },
+    ],
+    gateway: "An experienced reviewer recognises the work when the cycle is whole and the evidence is real, or refers it back with developmental feedback. Nothing is graded.",
+    example: "Reconstruct a real situation from your own work as a composite (no confidential detail), reflect on what happened and why, and note what you would do differently next time.",
+  },
+];
+
+// GET /platform/templates - the library metadata (no scaffolding happens here).
+router.get("/platform/templates", requireAuth, requireSuperAdmin, async (_req, res) => {
+  res.json(COURSE_TEMPLATES.map((t) => ({
+    key: t.key, name: t.name, kind: t.kind, audience: t.audience, summary: t.summary, creates: t.creates,
+    moduleCount: t.modules?.length ?? 0, credentialCount: t.credentials?.length ?? 0,
+  })));
+});
+
+// POST /platform/templates/use { key, partnerId? } - scaffold a real draft from a template.
+router.post("/platform/templates/use", requireAuth, requireSuperAdmin, async (req, res) => {
+  const key = String(req.body?.key || "").trim();
+  const tpl = COURSE_TEMPLATES.find((t) => t.key === key);
+  if (!tpl) { res.status(404).json({ error: "Unknown template." }); return; }
+
+  if (tpl.kind === "course") {
+    const [course] = await db.insert(coursesTable).values({
+      title: `${tpl.name} (new draft)`,
+      description: tpl.summary,
+      tenantId: "platform",
+      status: "draft",
+      competencyTags: tpl.competencyTags ?? [],
+      objectives: tpl.courseObjectives ?? [],
+    }).returning();
+    let order = 0;
+    for (const m of tpl.modules ?? []) {
+      await db.insert(modulesTable).values({
+        courseId: course.id, title: m.title, description: m.description,
+        estimatedMinutes: m.estimatedMinutes, order: order++, objectives: m.objectives,
+      });
+    }
+    await db.update(coursesTable).set({ moduleCount: tpl.modules?.length ?? 0 }).where(eq(coursesTable.id, course.id));
+    await audit(req, "template.use", "course", course.id, { template: tpl.key });
+    res.json({ ok: true, kind: "course", courseId: course.id, redirect: `/courses/${course.id}`, message: `Created a draft course from "${tpl.name}".` });
+    return;
+  }
+
+  // practice: seed a starter credential set on a chosen partner.
+  const partnerId = String(req.body?.partnerId || "").trim();
+  if (!partnerId) { res.status(400).json({ error: "Choose a partner to seed this practice-credential template on." }); return; }
+  const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.id, partnerId)).limit(1);
+  if (!partner) { res.status(404).json({ error: "Partner not found." }); return; }
+  await runPracticeDDL();
+  let sort = 0;
+  for (const c of tpl.credentials ?? []) {
+    await db.execute(sql`
+      INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort)
+      VALUES (${partnerId}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${tpl.gateway ?? ""}, ${tpl.example ?? ""}, ${c.rationale}, ${sort++})
+      ON CONFLICT (partner_id, code) DO UPDATE SET
+        title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
+        gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, rationale = EXCLUDED.rationale, sort = EXCLUDED.sort`);
+  }
+  await audit(req, "template.use", "partner", partnerId, { template: tpl.key });
+  res.json({ ok: true, kind: "practice", partnerId, redirect: `/partner/courses`, message: `Seeded ${tpl.credentials?.length ?? 0} starter credentials on ${partner.name}. Open the partner's practice credentials to edit them.` });
 });
 
 /**
