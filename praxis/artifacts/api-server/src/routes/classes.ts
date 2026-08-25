@@ -59,6 +59,17 @@ async function orgAllocatedCourseIdSet(orgId: string): Promise<Set<string>> {
   } catch { return new Set(); }
 }
 
+/**
+ * The ONLY courses a class in this org may carry. A class must never be able to run a course the
+ * platform never gave the partner — otherwise (as happened) an Enza-only course showed up in every
+ * partner's class picker. If the partner uses org-level allocation, the pool is what's allocated to the
+ * org; otherwise it's everything the partner has received. Never the whole platform catalogue.
+ */
+async function classCoursePool(partnerId: string | null | undefined, orgId: string): Promise<Set<string>> {
+  if (await partnerUsesOrgGating(partnerId)) return orgAllocatedCourseIdSet(orgId);
+  return partnerCourseIdSet(partnerId ?? "");
+}
+
 type U = { role: string; partnerId?: string | null; organisationId?: string | null };
 async function orgFor(orgId: string) {
   return db.query.organisationsTable.findFirst({ where: eq(organisationsTable.id, orgId) });
@@ -242,15 +253,50 @@ router.put("/classes/:classId/courses", requireAuth, async (req, res) => {
   const { cls, org } = await classWithOrg(req.params.classId);
   if (!cls || !canAdminOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
   let courseIds = strArr(req.body?.courseIds);
-  if (await partnerUsesOrgGating(org!.partnerId)) {
-    const allocated = await orgAllocatedCourseIdSet(cls.orgId);
-    const blocked = courseIds.filter((id) => !allocated.has(id));
-    if (blocked.length) { res.status(403).json({ error: "Some courses are not allocated to this organisation. Ask your partner administrator to allocate them first." }); return; }
-    courseIds = courseIds.filter((id) => allocated.has(id));
-  }
+  // Always scope to the partner's pool (received courses, or org-allocated when org-gating is on). This
+  // is the fix for courses leaking across partners: a class can never carry a course its partner lacks.
+  const pool = await classCoursePool(org!.partnerId, cls.orgId);
+  const blocked = courseIds.filter((id) => !pool.has(id));
+  if (blocked.length) { res.status(403).json({ error: "Some courses are not available to this organisation. They must be assigned to the partner (and allocated to the organisation) first." }); return; }
+  courseIds = courseIds.filter((id) => pool.has(id));
   await db.delete(orgClassCoursesTable).where(eq(orgClassCoursesTable.classId, cls.id));
   if (courseIds.length) await db.insert(orgClassCoursesTable).values(courseIds.map((courseId) => ({ classId: cls.id, courseId })));
   res.json({ courseIds });
+});
+
+// GET /classes/:classId/assignable-courses -- the pool a class may pick from (partner's received / org-
+// allocated courses only). Powers the class course picker so it never lists the whole catalogue.
+router.get("/classes/:classId/assignable-courses", requireAuth, async (req, res) => {
+  const { cls, org } = await classWithOrg(req.params.classId);
+  if (!cls || !canAccessOrg(req.dbUser!, org)) { res.status(cls ? 403 : 404).json({ error: cls ? "Forbidden" : "Not found" }); return; }
+  const pool = await classCoursePool(org!.partnerId, cls.orgId);
+  if (!pool.size) { res.json([]); return; }
+  const courses = await db.select({ id: coursesTable.id, title: coursesTable.title, status: coursesTable.status })
+    .from(coursesTable).where(inArray(coursesTable.id, [...pool]));
+  res.json(courses);
+});
+
+// POST /classes/_cleanup-leaked-courses (super admin) -- one-time repair: remove any class->course
+// assignment whose course is NOT in that class's partner pool. Fixes historic leaks (e.g. an Enza-only
+// course that ended up assigned to every partner's classes). Idempotent.
+router.post("/classes/_cleanup-leaked-courses", requireAuth, async (req, res) => {
+  if (req.dbUser!.role !== "super_admin") { res.status(403).json({ error: "Forbidden" }); return; }
+  await ensureTables();
+  const rows = (await db.execute(sql`
+    SELECT occ.id AS row_id, occ.course_id, oc.org_id, o.partner_id
+    FROM org_class_courses occ
+    JOIN org_classes oc ON oc.id = occ.class_id
+    JOIN organisations o ON o.id = oc.org_id`)).rows as { row_id: string; course_id: string; org_id: string; partner_id: string | null }[];
+  const poolCache = new Map<string, Set<string>>();
+  let removed = 0;
+  for (const r of rows) {
+    const key = `${r.partner_id ?? ""}::${r.org_id}`;
+    let pool = poolCache.get(key);
+    if (!pool) { pool = await classCoursePool(r.partner_id, r.org_id); poolCache.set(key, pool); }
+    if (!pool.has(r.course_id)) { await db.execute(sql`DELETE FROM org_class_courses WHERE id = ${r.row_id}`); removed++; }
+  }
+  await logAudit(req, "classes.cleanup_leaked_courses", "platform", "classes", { removed });
+  res.json({ ok: true, removed });
 });
 
 // PUT /classes/:classId/staff { staff: [{staffId, role}] }, replace staff assignments.

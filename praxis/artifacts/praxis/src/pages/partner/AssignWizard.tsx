@@ -46,7 +46,8 @@ export function AssignWizard({
 
   const { data: membersData } = useQuery({ queryKey: ['organisation-members', orgId], queryFn: () => apiFetch<Member[]>(`/organisations/${orgId}/members`), enabled: open && !!orgId });
   const { data: classesData } = useQuery({ queryKey: ['org-classes', orgId], queryFn: () => apiFetch<ClassRow[]>(`/organisations/${orgId}/classes`), enabled: open && !!orgId });
-  const { data: coursesData } = useQuery({ queryKey: ['courses'], queryFn: () => apiFetch<Course[]>('/courses'), enabled: open });
+  // Scope to this class's partner pool (not the whole catalogue) so no other partner's course leaks in.
+  const { data: coursesData } = useQuery({ queryKey: ['class-assignable-courses', classId], queryFn: () => apiFetch<Course[]>(`/classes/${classId}/assignable-courses`), enabled: open && !!classId });
   const learners = useMemo(() => (membersData ?? []).filter((m) => m.role === 'learner'), [membersData]);
   const classes = classesData ?? [];
   const courses = coursesData ?? [];

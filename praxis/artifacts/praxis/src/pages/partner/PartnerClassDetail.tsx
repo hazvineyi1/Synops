@@ -37,7 +37,9 @@ export function PartnerClassDetail({ orgId, classId }: { orgId: string; classId:
 
   const { data: cls, isLoading } = useQuery({ queryKey: ['class', classId], queryFn: () => apiFetch<ClassDetail>(`/classes/${classId}`), enabled: !!classId });
   const { data: membersData } = useQuery({ queryKey: ['organisation-members', orgId], queryFn: () => apiFetch<Member[]>(`/organisations/${orgId}/members`), enabled: !!orgId });
-  const { data: coursesData } = useQuery({ queryKey: ['courses'], queryFn: () => apiFetch<Course[]>('/courses') });
+  // Only the courses this class's partner actually has (received / org-allocated) — NOT the whole
+  // platform catalogue. Prevents another partner's course leaking into this class's picker.
+  const { data: coursesData } = useQuery({ queryKey: ['class-assignable-courses', classId], queryFn: () => apiFetch<Course[]>(`/classes/${classId}/assignable-courses`), enabled: !!classId });
   const learners = (membersData ?? []).filter((m) => m.role === 'learner');
   const staff = (membersData ?? []).filter((m) => STAFF_ROLES.includes(m.role));
   const courses = coursesData ?? [];
