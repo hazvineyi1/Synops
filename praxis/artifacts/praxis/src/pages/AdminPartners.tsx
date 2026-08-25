@@ -475,6 +475,16 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision PEJ Justice Practice demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Build the PEJ Justice demo COURSE into the PEJ partner's org (populates its Courses list).
+  const seedPejCourse = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; created?: boolean; message?: string }>('/platform/seed-pej-course', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] }); qc.invalidateQueries({ queryKey: ['courses'] });
+      toast({ title: 'PEJ demo course ready', description: r.message ?? 'Built and assigned to the PEJ org.' });
+    },
+    onError: (e: any) => toast({ title: 'Could not build the PEJ course', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // One-off cleanup: permanently delete the stray "Leading with Purpose" MRB course (all copies). MRB's
   // demo is its practice credentials (/practice), not this course.
   const deleteStrayMrbCourse = useMutation({
@@ -662,6 +672,11 @@ export function AdminPartners() {
                   onClick={() => { if (window.confirm('Provision the PEJ Justice Practice demo (prosecutors/investigators, from PEJ-EVD-01)? Creates a separate partner, 6 credentials, serious branding and a demo investigator. Composite and SME-pending. Safe to re-run. Enter at /demos/pej-practice.')) seedPejPractice.mutate(); }}
                   title="Provision the PEJ Justice Practice demo class">
                   {seedPejPractice.isPending ? 'Provisioning…' : 'Provision PEJ Justice demo'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedPejCourse.isPending}
+                  onClick={() => { if (window.confirm('Build the PEJ Justice demo COURSE (Justice-Sector Practice: Sound Decisions Under Pressure) and add it to the PEJ org\'s Courses? Safe to re-run.')) seedPejCourse.mutate(); }}
+                  title="Build the PEJ Justice demo course into the PEJ org">
+                  {seedPejCourse.isPending ? 'Building…' : 'Build PEJ demo course'}
                 </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedGameLibrary.isPending}
                   onClick={() => { if (window.confirm('Seed the reusable Game Library: Jeopardy, Family Feud, Bingo, Password, Wheel/Guess-the-Word and Escape Room per grade band, plus a curated catalog of commercial titles. Safe to re-run.')) seedGameLibrary.mutate(); }}

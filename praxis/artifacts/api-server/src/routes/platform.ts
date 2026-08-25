@@ -38,6 +38,7 @@ import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
 import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
 import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
 import { seedPejPractice } from "../lib/pejPracticeSeed";
+import { seedPejCourse } from "../lib/pejCourseSeed";
 import { PRACTICE_DDL, runPracticeDDL } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
@@ -1700,6 +1701,18 @@ const PEJ_PRACTICE_CREDENTIALS = [
 // POST /platform/seed-pej-practice -- provision the PEJ Justice Practice demo (separate partner +
 // credentials), reusing the whole practice engine. Idempotent. Brands the tenant (serious navy) and
 // seeds a walkthrough portfolio for the showcase learner.
+// POST /platform/seed-pej-course -- build (or re-assign) the PEJ Justice demo COURSE into the PEJ
+// partner's org, so its Courses list is populated alongside the practice credentials.
+router.post("/platform/seed-pej-course", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await seedPejCourse();
+    await audit(req, "platform.seed_pej_course", "course", r.courseId ?? "pej", { created: r.created });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
 router.post("/platform/seed-pej-practice", requireAuth, requireSuperAdmin, async (_req, res) => {
   try {
     await runPracticeDDL();
