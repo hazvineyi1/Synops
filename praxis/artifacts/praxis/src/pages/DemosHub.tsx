@@ -60,7 +60,14 @@ export function DemosHub() {
 
   const editAsSuper = (d: { slug: string; name: string }) => {
     const id = partnerIdFor(d);
-    if (!id) return;
+    if (!id) {
+      const list = (partners ?? []) as Array<{ slug?: string; name?: string }>;
+      const found = list.map((p) => `${p?.name ?? '?'} (${p?.slug ?? '?'})`).join(', ') || 'none loaded';
+      window.alert(
+        `Couldn't find the "${d.name}" partner (looking for slug "${d.slug}").\n\nPartners currently loaded: ${found}.\n\nIf it's missing, open the demo once (Open demo) to provision it, then try Edit again.`,
+      );
+      return;
+    }
     setActivePartner(id);
     navigate('/partner/courses');
   };
@@ -79,7 +86,6 @@ export function DemosHub() {
 
       <div className="grid sm:grid-cols-2 gap-3">
         {DEMOS.map((d) => {
-          const canEdit = !!partnerIdFor(d);
           return (
             <Card key={d.path} className="p-4 flex flex-col">
               <div className="font-serif font-semibold">{d.name}</div>
@@ -95,8 +101,7 @@ export function DemosHub() {
                   size="sm"
                   variant="outline"
                   className="gap-1.5"
-                  disabled={!canEdit}
-                  title={canEdit ? 'Edit this demo’s practice credentials as super admin' : 'Partner not found'}
+                  title="Edit this demo’s practice credentials as super admin"
                   onClick={() => editAsSuper(d)}
                 >
                   <Pencil className="h-3.5 w-3.5" /> Edit
