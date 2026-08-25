@@ -6,7 +6,8 @@ import { apiFetch } from '@/lib/api';
 import { PageHeader } from '@/components/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, ChevronDown, CheckCircle2, Building, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { BookOpen, ChevronDown, CheckCircle2, Building, ExternalLink, Plus, Trash2, Compass } from 'lucide-react';
 import { getActivePartnerId } from '@/lib/partnerHubData';
 
 /**
@@ -23,6 +24,7 @@ type ReceivedCourse = { id: string; title: string; status: string | null; orgIds
 type OrgLite = { id: string; name: string };
 type Received = { courses: ReceivedCourse[]; orgs: OrgLite[] };
 type Shippable = { id: string; title: string; status: string | null };
+type PracticeCredential = { id: string; code: string; title: string; summary: string | null; activity_brief: string | null };
 
 export function PartnerCourses() {
   const { user } = useSession();
@@ -83,6 +85,53 @@ export function PartnerCourses() {
           <Building className="h-4 w-4 mt-0.5 shrink-0" /> You have no organisations yet. Create one under Organisations, then allocate courses to it here.
         </Card>
       )}
+
+      <PracticeCredentialsSection partnerId={partnerId} q={q} isSuper={isSuper} />
+    </div>
+  );
+}
+
+/**
+ * Practice credentials are a SEPARATE track from catalogue courses (they live in practice_credentials,
+ * delivered through /practice, reviewed in the Review queue). They never appear in the course list, so
+ * a partner that runs a practice programme (e.g. Manchester Review Board) looked "empty" here. This
+ * surfaces them, clearly labelled, so they're discoverable from the hub.
+ */
+function PracticeCredentialsSection({ partnerId, q, isSuper }: { partnerId: string; q: string; isSuper: boolean }) {
+  const [, navigate] = useLocation();
+  const { data: creds = [] } = useQuery({
+    queryKey: ['practice-credentials', partnerId],
+    queryFn: () => apiFetch<PracticeCredential[]>(`/practice/credentials${q}`),
+    enabled: !!partnerId,
+  });
+  if (!creds.length) return null;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 pt-2">
+        <Compass className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-semibold">Practice credentials</h2>
+        <span className="text-xs text-muted-foreground">Delivered through the practice track, not the course catalogue.</span>
+      </div>
+      {creds.map((c) => (
+        <Card key={c.id} className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold">{c.title}</span>
+                <Badge variant="outline" className="text-[10px] border-primary/40 text-primary shrink-0">Practice credential</Badge>
+              </div>
+              {c.summary && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.summary}</p>}
+              {c.activity_brief && <p className="text-xs text-muted-foreground mt-1"><span className="font-medium text-foreground/70">Activity: </span>{c.activity_brief}</p>}
+            </div>
+          </div>
+        </Card>
+      ))}
+      <Card className="p-3 border-dashed text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+        <span>Learners work through these in the practice track. {isSuper ? 'To see a learner’s view, impersonate a candidate; to review submissions, open the Review queue.' : 'Open the practice track to continue.'}</span>
+        <Button size="sm" variant="outline" className="ml-auto gap-1.5" onClick={() => navigate(isSuper ? '/practice/review' : '/practice')}>
+          <ExternalLink className="h-3.5 w-3.5" /> {isSuper ? 'Review queue' : 'Open practice track'}
+        </Button>
+      </Card>
     </div>
   );
 }
