@@ -160,8 +160,15 @@ export function PracticeCanvas() {
     if ('scrollRestoration' in history) { try { history.scrollRestoration = 'manual'; } catch { /* ignore */ } }
   }, []);
   useEffect(() => {
-    window.scrollTo(0, 0);
-    const r = requestAnimationFrame(() => window.scrollTo(0, 0));
+    // The app scrolls inside #app-main-scroll (a fixed-height flex layout), not the window - so reset
+    // THAT. Re-assert once cc resolves (the page grows tall then) and again on the next frame.
+    const toTop = () => {
+      const el = document.getElementById('app-main-scroll');
+      if (el) el.scrollTop = 0;
+      window.scrollTo(0, 0);
+    };
+    toTop();
+    const r = requestAnimationFrame(toTop);
     return () => cancelAnimationFrame(r);
   }, [id, cc?.id]);
 

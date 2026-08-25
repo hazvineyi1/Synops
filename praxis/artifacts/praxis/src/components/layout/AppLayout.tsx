@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -133,6 +133,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const toggleSidebar = (next: boolean) => { setSidebarCollapsed(next); try { localStorage.setItem('praxis_sidebar_collapsed', next ? '1' : '0'); } catch { /* ok */ } };
   const [commandQuery, setCommandQuery] = useState('');
   const [location, navigate] = useLocation();
+
+  // The app scrolls inside this container, not the window (the shell is a fixed-height flex layout).
+  // Reset it to the top on every route change so a new page never opens partway down where the last
+  // one was scrolled. Also disable the browser's own scroll restoration, which fights this.
+  const mainScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if ('scrollRestoration' in history) { try { history.scrollRestoration = 'manual'; } catch { /* ignore */ } }
+  }, []);
+  useEffect(() => {
+    const el = mainScrollRef.current;
+    if (el) el.scrollTop = 0;
+    const r = requestAnimationFrame(() => { if (mainScrollRef.current) mainScrollRef.current.scrollTop = 0; });
+    return () => cancelAnimationFrame(r);
+  }, [location]);
 
   const handleSignOut = () => {
     void signOut();
@@ -788,8 +802,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Page content */}
-        <div className="flex-1 overflow-auto p-4 pb-24 md:p-10 md:pb-10">
+        {/* Page content. id lets pages reset THIS scroller (the app scrolls here, not the window). */}
+        <div id="app-main-scroll" ref={mainScrollRef} className="flex-1 overflow-auto p-4 pb-24 md:p-10 md:pb-10">
           <div className="max-w-6xl mx-auto">
             {children}
           </div>
