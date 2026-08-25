@@ -708,22 +708,9 @@ router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res)
   const soon = now + 60 * 24 * 60 * 60 * 1000; // 60 days
   const safeCount = async (fn: () => Promise<number>) => { try { return await fn(); } catch { return 0; } };
 
-  const expiringFunding = await safeCount(async () => {
-    const rows = await db.select({ expiry: fundingAgreementsTable.expiry, status: fundingAgreementsTable.status }).from(fundingAgreementsTable);
-    return rows.filter((r) => {
-      if (r.status === "expired") return true;
-      if (!r.expiry) return false;
-      const t = Date.parse(r.expiry);
-      return Number.isFinite(t) && t <= soon;
-    }).length;
-  });
   // Count in SQL (WHERE ... ) instead of pulling whole tables into Node and filtering, these grow
   // linearly with platform size; the users/enrolments scans especially would hurt at scale.
   const sqlCount = async (q: Promise<Array<{ c: number }>>) => { const [r] = await q; return Number(r?.c ?? 0); };
-  const unpaidInvoices = await safeCount(() => sqlCount(
-    db.select({ c: sql<number>`count(*)` }).from(billingInvoicesTable).where(sql`${billingInvoicesTable.status} <> 'paid'`)));
-  const actionDocs = await safeCount(() => sqlCount(
-    db.select({ c: sql<number>`count(*)` }).from(partnerDocumentsTable).where(eq(partnerDocumentsTable.status, "action-required"))));
   const onboardingPartners = await safeCount(() => sqlCount(
     db.select({ c: sql<number>`count(*)` }).from(partnersTable).where(eq(partnersTable.status, "onboarding"))));
   const draftCourses = await safeCount(() => sqlCount(
@@ -741,10 +728,9 @@ router.get("/platform/alerts", requireAuth, requireSuperAdmin, async (_req, res)
       .innerJoin(usersTable, eq(usersTable.id, enrolmentsTable.userId))
       .where(and(eq(enrolmentsTable.status, "active"), eq(usersTable.role, "learner")))));
 
+  // Financial/document signals (funding agreements, unpaid invoices, filing documents) were removed:
+  // the platform does not carry billing/funding data, so those tiles were always empty and misleading.
   const alerts = [
-    { id: "funding", label: "funding agreements expiring", count: expiringFunding, severity: expiringFunding ? "warn" : "ok", detail: "Within 60 days or already expired" },
-    { id: "invoices", label: "unpaid invoices", count: unpaidInvoices, severity: unpaidInvoices ? "warn" : "ok", detail: "Awaiting payment across partners" },
-    { id: "documents", label: "documents need action", count: actionDocs, severity: actionDocs ? "warn" : "ok", detail: "Filing entries flagged action-required" },
     { id: "onboarding", label: "partners onboarding", count: onboardingPartners, severity: onboardingPartners ? "info" : "ok", detail: "Not yet marked active" },
     { id: "drafts", label: "courses in draft", count: draftCourses, severity: draftCourses ? "info" : "ok", detail: "Not yet published to partners" },
   ];

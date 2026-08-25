@@ -129,7 +129,7 @@ export function PlatformOverview() {
             {openAlerts.length ? <><BellRing className="h-3 w-3" /> {openAlerts.length} to review</> : <><CheckCircle2 className="h-3 w-3" /> All clear</>}
           </Badge>
         </div>
-        <div className="mt-3 grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
           {alerts.map((a) => {
             const s = ALERT_SEV[a.severity] ?? ALERT_SEV.ok;
             return (
