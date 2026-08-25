@@ -341,6 +341,8 @@ function UserDialog({
   const { toast } = useToast();
   const { user: me } = useSession();
   const [resetLink, setResetLink] = useState<string | null>(null);
+  const [tempPw, setTempPw] = useState<string | null>(null);
+  const [tempCopied, setTempCopied] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const { data: detail } = useQuery({
@@ -389,6 +391,12 @@ function UserDialog({
     onError: (e: unknown) => toast({ title: "Could not create reset link", description: e instanceof Error ? e.message : "", variant: "destructive" }),
   });
 
+  const makeTempPassword = useMutation({
+    mutationFn: () => platformApi.tempPassword(user!.id),
+    onSuccess: (r) => { setTempPw(r.tempPassword); },
+    onError: (e: unknown) => toast({ title: "Could not issue a temporary password", description: e instanceof Error ? e.message : "", variant: "destructive" }),
+  });
+
   const del = useMutation({
     mutationFn: () => platformApi.deleteUser(user!.id),
     onSuccess: () => { toast({ title: "User deleted" }); invalidate(); onClose(); },
@@ -408,7 +416,7 @@ function UserDialog({
   };
 
   return (
-    <Dialog open={!!user} onOpenChange={(o) => { if (!o) { setResetLink(null); onClose(); } }}>
+    <Dialog open={!!user} onOpenChange={(o) => { if (!o) { setResetLink(null); setTempPw(null); onClose(); } }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -452,6 +460,18 @@ function UserDialog({
             </div>
           )}
 
+          {tempPw && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+              <div className="text-xs font-medium text-amber-700 mb-1">Temporary password — copy it now, it won't be shown again. The user must change it at first sign-in.</div>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 truncate text-sm font-semibold bg-background rounded px-2 py-1 border">{tempPw}</code>
+                <Button size="sm" variant="outline" onClick={async () => { await navigator.clipboard.writeText(tempPw).catch(() => {}); setTempCopied(true); setTimeout(() => setTempCopied(false), 1500); }}>
+                  {tempCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {detail?.logins && detail.logins.length > 0 && (
             <div>
               <div className="text-muted-foreground text-xs mb-1">Recent sign-in attempts</div>
@@ -477,6 +497,9 @@ function UserDialog({
           </Button>
           <Button size="sm" variant="outline" onClick={() => makeResetLink.mutate()} disabled={makeResetLink.isPending}>
             Reset link
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => makeTempPassword.mutate()} disabled={makeTempPassword.isPending}>
+            Temp password
           </Button>
           <Button size="sm" variant="outline" onClick={() => action.mutate("revoke")} disabled={action.isPending}>
             Revoke sessions

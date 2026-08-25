@@ -45,6 +45,9 @@ export const usersTable = pgTable("users", {
    * set a password, and for legacy Clerk users until they reset.
    */
   passwordHash: text("password_hash"),
+  // Set true when an admin issues a temporary password: the user is forced to choose a new one on
+  // their next sign-in, and the flag is cleared once they do. Column healed in at boot.
+  mustChangePassword: boolean("must_change_password").notNull().default(false),
   status: userStatusEnum("status").notNull().default("active"),
   // Soft-lifecycle timestamps (kept OUTSIDE the status enum so we never have to migrate the enum).
   // archivedAt: hidden from the active roster but fully recoverable, all data retained.

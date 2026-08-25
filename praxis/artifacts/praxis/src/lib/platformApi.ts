@@ -191,6 +191,12 @@ export const platformApi = {
       { method: "POST" },
     ),
 
+  tempPassword: (id: string) =>
+    req<{ tempPassword: string; email: string }>(
+      `/platform/users/${id}/temp-password`,
+      { method: "POST" },
+    ),
+
   suspend: (id: string) => req<{ ok: boolean }>(`/platform/users/${id}/suspend`, { method: "POST" }),
   reactivate: (id: string) => req<{ ok: boolean }>(`/platform/users/${id}/reactivate`, { method: "POST" }),
   revokeSessions: (id: string) =>

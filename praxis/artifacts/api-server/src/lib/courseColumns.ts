@@ -23,6 +23,8 @@ export async function ensureCourseColumns(): Promise<void> {
     await db.execute(sql`ALTER TABLE interactive_activities ADD COLUMN IF NOT EXISTS spec jsonb`);
     await db.execute(sql`ALTER TABLE interactive_activities ADD COLUMN IF NOT EXISTS rubric_id text`);
     await db.execute(sql`ALTER TABLE case_scenarios ADD COLUMN IF NOT EXISTS rubric_id text`);
+    // Forced password change after an admin issues a temporary password.
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false`);
   } catch (err) {
     logger.error({ err }, "ensureCourseColumns failed");
   }

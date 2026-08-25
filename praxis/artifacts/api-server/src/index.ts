@@ -11,8 +11,6 @@ void initObservability();
 // Fire-and-forget: dedupe + add the unique indexes that make credential/funded-seat/gradebook
 // writes race-safe. Never throws; skips any table that isn't present yet.
 void ensureIntegrityConstraints();
-// Fire-and-forget: add course-builder columns (catalog_description) if missing. Idempotent.
-void ensureCourseColumns();
 // Fire-and-forget: rewrite the one untrue "interactive video" demo announcement to a truthful
 // message. Idempotent + guarded on the old text; never blocks boot.
 void correctSeededAnnouncements();
@@ -33,14 +31,26 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-const server = app.listen(port, (err) => {
-  if (err) {
-    logger.error({ err }, "Error listening on port");
-    process.exit(1);
-  }
+let server: ReturnType<typeof app.listen> | undefined;
 
-  logger.info({ port }, "Server listening");
-});
+// Add course-builder columns AND the auth-critical users.must_change_password column BEFORE we accept
+// traffic. That column is read on every sign-in, so serving requests before the (idempotent) ALTER runs
+// could make the first login after a deploy fail with "column does not exist". A few IF NOT EXISTS
+// ALTERs cost milliseconds; on later boots they are no-ops.
+void (async () => {
+  try {
+    await ensureCourseColumns();
+  } catch (err) {
+    logger.error({ err }, "ensureCourseColumns (pre-listen) failed");
+  }
+  server = app.listen(port, (err) => {
+    if (err) {
+      logger.error({ err }, "Error listening on port");
+      process.exit(1);
+    }
+    logger.info({ port }, "Server listening");
+  });
+})();
 
 // Graceful shutdown: stop accepting new connections, let in-flight requests
 // finish, then exit. Railway sends SIGTERM on deploy/redeploy; SIGINT is local
@@ -52,6 +62,7 @@ function shutdown(signal: string): void {
   shuttingDown = true;
   logger.info({ signal }, "Shutting down");
 
+  if (!server) { process.exit(0); }
   server.close((err) => {
     if (err) {
       logger.error({ err }, "Error during graceful shutdown");

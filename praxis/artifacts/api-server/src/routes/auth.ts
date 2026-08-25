@@ -11,7 +11,8 @@ import {
   loginEventsTable,
   mfaFactorsTable,
 } from "@workspace/db";
-import { eq, and, isNull, gt, desc, asc } from "drizzle-orm";
+import { eq, and, isNull, gt, desc, asc, ne, sql } from "drizzle-orm";
+import { notifyLogin, notifyLogout } from "../lib/securityAlerts";
 import { requireAuth } from "../middlewares/requireAuth";
 import { resetCandidatePractice } from "./practice";
 import { startDemoSession, pingDemoSession, endDemoSession } from "../lib/demoTracking";
@@ -64,6 +65,9 @@ function publicUser(u: typeof usersTable.$inferSelect, impersonatorId?: string) 
     // 2FA policy: admin roles must enrol. The SPA gates the console until they do.
     mfaEnabled: !!u.mfaEnabled,
     mfaSetupRequired: mfaSetupRequired(u),
+    // Set when an admin issued a temporary password: the SPA blocks the app behind a "set a new
+    // password" screen until the user chooses one (which clears this flag).
+    mustChangePassword: !!(u as { mustChangePassword?: boolean }).mustChangePassword,
   };
 }
 
@@ -177,6 +181,8 @@ router.post("/auth/login", async (req, res) => {
     .where(eq(usersTable.id, user.id));
 
   await logAttempt("success");
+  // Fire-and-forget security alert to the super admin (partner-side accounts only).
+  void notifyLogin(user, ip, typeof ua === "string" ? ua : null);
 
   res.cookie(SESSION_COOKIE, token, cookieOptions());
   res.json({ user: publicUser(user) });
@@ -512,6 +518,15 @@ router.get("/auth/demo-course", async (req, res) => {
 router.post("/auth/logout", async (req, res) => {
   const token = req.cookies?.[SESSION_COOKIE];
   if (token) {
+    // Before revoking, email the super admin a session summary (duration + activity) for partner-side
+    // accounts. Best-effort; must not block logout. Look up the user via the session token.
+    try {
+      const [session] = await db.select({ userId: authSessionsTable.userId }).from(authSessionsTable).where(eq(authSessionsTable.token, token)).limit(1);
+      if (session) {
+        const [u] = await db.select().from(usersTable).where(eq(usersTable.id, session.userId)).limit(1);
+        if (u) void notifyLogout(u, token);
+      }
+    } catch { /* best-effort */ }
     await db
       .update(authSessionsTable)
       .set({ revokedAt: new Date() })
@@ -666,7 +681,7 @@ router.post("/auth/change-password", requireAuth, async (req, res) => {
 
   await db
     .update(usersTable)
-    .set({ passwordHash: hashPassword(next) })
+    .set({ passwordHash: hashPassword(next), mustChangePassword: false })
     .where(eq(usersTable.id, req.userId!));
 
   // Keep the current session; revoke all the others.
@@ -689,6 +704,29 @@ router.post("/auth/change-password", requireAuth, async (req, res) => {
   });
   res.cookie(SESSION_COOKIE, token, cookieOptions());
 
+  res.json({ ok: true });
+});
+
+/**
+ * POST /auth/force-set-password — used only by the forced first-login gate. The caller is already
+ * authenticated (they signed in with the temporary password), so no current password is required; but
+ * it ONLY works while must_change_password is set, so it can't be used as a normal password change.
+ * Clears the flag and rotates other sessions.
+ */
+router.post("/auth/force-set-password", requireAuth, async (req, res) => {
+  if (req.impersonatorId) { res.status(403).json({ error: "You cannot change a password while impersonating." }); return; }
+  if (!(req.dbUser as { mustChangePassword?: boolean }).mustChangePassword) {
+    res.status(400).json({ error: "No password change is required." });
+    return;
+  }
+  const next = String(req.body?.newPassword ?? "");
+  const problem = passwordProblem(next);
+  if (problem) { res.status(400).json({ error: problem }); return; }
+  await db.update(usersTable).set({ passwordHash: hashPassword(next), mustChangePassword: false }).where(eq(usersTable.id, req.userId!));
+  // Rotate: revoke every other session, keep this one.
+  const keep = req.cookies?.[SESSION_COOKIE];
+  await db.update(authSessionsTable).set({ revokedAt: new Date() })
+    .where(and(eq(authSessionsTable.userId, req.userId!), isNull(authSessionsTable.revokedAt), keep ? ne(authSessionsTable.token, keep) : sql`true`));
   res.json({ ok: true });
 });
 

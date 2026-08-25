@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomBytes } from "crypto";
 import { db } from "@workspace/db";
 import {
   usersTable,
@@ -350,6 +351,29 @@ router.post("/platform/users/:id/reset-link", requireAuth, requireSuperAdmin, as
   const link = `${appBase(req)}/reset-password?token=${token}`;
   const emailed = emailEnabled() ? (await sendSetPasswordEmail(user.email, [user.firstName, user.lastName].filter(Boolean).join(" ") || null, link, "reset")).ok : false;
   res.json({ link, expiresAt, email: user.email, emailed });
+});
+
+/**
+ * POST /platform/users/:id/temp-password (super admin) — issue a TEMPORARY password to hand to a user
+ * (e.g. a new partner admin). They are forced to choose their own password on the next sign-in
+ * (must_change_password), and every live session is revoked so the old credential is dead. The
+ * plaintext is returned ONCE so the admin can relay it; only its hash is stored.
+ */
+router.post("/platform/users/:id/temp-password", requireAuth, requireSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  if (!user) { res.status(404).json({ error: "User not found" }); return; }
+  // Readable, unambiguous charset (no 0/O/1/l/I), grouped in fours: e.g. "Xk7m-Qp2r-9tLw".
+  const CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const raw = Array.from(randomBytes(12)).map((b) => CHARS[b % CHARS.length]).join("");
+  const tempPassword = raw.replace(/(.{4})(?=.)/g, "$1-");
+  await db.update(usersTable)
+    .set({ passwordHash: hashPassword(tempPassword), mustChangePassword: true, status: user.status === "suspended" ? "suspended" : "active" })
+    .where(eq(usersTable.id, id));
+  await db.update(authSessionsTable).set({ revokedAt: new Date() })
+    .where(and(eq(authSessionsTable.userId, id), isNull(authSessionsTable.revokedAt)));
+  await audit(req, "user.temp_password", "user", user.id, { email: user.email });
+  res.json({ tempPassword, email: user.email });
 });
 
 /** POST /platform/users/:id/suspend, blocks sign-in AND kills live sessions. */

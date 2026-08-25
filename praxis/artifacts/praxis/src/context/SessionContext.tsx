@@ -36,6 +36,8 @@ export interface SessionUser {
   mfaEnabled?: boolean;
   /** True when the user's role requires 2FA but they have not enabled it yet. */
   mfaSetupRequired?: boolean;
+  /** True when an admin issued a temporary password: force a new one before the app unlocks. */
+  mustChangePassword?: boolean;
 }
 
 interface SessionState {

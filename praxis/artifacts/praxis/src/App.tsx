@@ -9,6 +9,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { API } from '@/lib/api';
 import { ConsentGate } from '@/components/ConsentGate';
 import { MfaGate } from '@/components/MfaGate';
+import { ForcePasswordChange } from '@/components/ForcePasswordChange';
 import { MaintenanceBanner } from '@/components/MaintenanceBanner';
 
 // Pages
@@ -181,6 +182,8 @@ function ProtectedRoute({
       {(params) => {
         if (loading) return <SessionGate />;
         if (!isSignedIn) return <Redirect to="/sign-in" />;
+        // Temporary password: force the user to set their own before anything else.
+        if (user?.mustChangePassword) return <ForcePasswordChange />;
         // POPIA: block until the current privacy policy is accepted.
         if (user?.consentRequired) return <ConsentGate />;
         // 2FA policy: admin roles must enrol. Leave /security reachable so they can.
@@ -210,6 +213,7 @@ function FocusRoute({
       {(params) => {
         if (loading) return <SessionGate />;
         if (!isSignedIn) return <Redirect to="/sign-in" />;
+        if (user?.mustChangePassword) return <ForcePasswordChange />;
         if (user?.consentRequired) return <ConsentGate />;
         return <Component params={params} />;
       }}
