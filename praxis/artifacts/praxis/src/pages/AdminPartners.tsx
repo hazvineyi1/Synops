@@ -475,6 +475,16 @@ export function AdminPartners() {
     onError: (e: any) => toast({ title: 'Could not provision PEJ Justice Practice demo', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
   });
 
+  // Build the Educator "Teaching Well with AI" demo COURSE into the Educator partner's org.
+  const seedEducatorCourse = useMutation({
+    mutationFn: () => apiFetch<{ ok: boolean; created?: boolean; message?: string }>('/platform/seed-educator-course', { method: 'POST' }),
+    onSuccess: (r) => {
+      refetch(); qc.invalidateQueries({ queryKey: ['partners'] }); qc.invalidateQueries({ queryKey: ['courses'] });
+      toast({ title: 'Educator demo course ready', description: r.message ?? 'Built and assigned to the Educator org.' });
+    },
+    onError: (e: any) => toast({ title: 'Could not build the Educator course', description: e?.message ?? 'Please try again.', variant: 'destructive' }),
+  });
+
   // Build the PEJ Justice demo COURSE into the PEJ partner's org (populates its Courses list).
   const seedPejCourse = useMutation({
     mutationFn: () => apiFetch<{ ok: boolean; created?: boolean; message?: string }>('/platform/seed-pej-course', { method: 'POST' }),
@@ -677,6 +687,11 @@ export function AdminPartners() {
                   onClick={() => { if (window.confirm('Build the PEJ Justice demo COURSE (Justice-Sector Practice: Sound Decisions Under Pressure) and add it to the PEJ org\'s Courses? Safe to re-run.')) seedPejCourse.mutate(); }}
                   title="Build the PEJ Justice demo course into the PEJ org">
                   {seedPejCourse.isPending ? 'Building…' : 'Build PEJ demo course'}
+                </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedEducatorCourse.isPending}
+                  onClick={() => { if (window.confirm('Build the Educator demo COURSE (Teaching Well with AI) and add it to the Educator org\'s Courses? Safe to re-run.')) seedEducatorCourse.mutate(); }}
+                  title="Build the Educator demo course into the Educator org">
+                  {seedEducatorCourse.isPending ? 'Building…' : 'Build Educator demo course'}
                 </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start" disabled={seedGameLibrary.isPending}
                   onClick={() => { if (window.confirm('Seed the reusable Game Library: Jeopardy, Family Feud, Bingo, Password, Wheel/Guess-the-Word and Escape Room per grade band, plus a curated catalog of commercial titles. Safe to re-run.')) seedGameLibrary.mutate(); }}

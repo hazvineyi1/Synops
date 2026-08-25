@@ -39,6 +39,7 @@ import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
 import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
 import { seedPejPractice } from "../lib/pejPracticeSeed";
 import { seedPejCourse } from "../lib/pejCourseSeed";
+import { seedEducatorCourse } from "../lib/educatorCourseSeed";
 import { PRACTICE_DDL, runPracticeDDL } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import {
@@ -1707,6 +1708,18 @@ router.post("/platform/seed-pej-course", requireAuth, requireSuperAdmin, async (
   try {
     const r = await seedPejCourse();
     await audit(req, "platform.seed_pej_course", "course", r.courseId ?? "pej", { created: r.created });
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+// POST /platform/seed-educator-course -- build (or re-assign) the Educator "Teaching Well with AI"
+// demo COURSE into the Educator partner's org.
+router.post("/platform/seed-educator-course", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const r = await seedEducatorCourse();
+    await audit(req, "platform.seed_educator_course", "course", r.courseId ?? "educator", { created: r.created });
     res.json(r);
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
