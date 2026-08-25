@@ -346,6 +346,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.overview', 'Overview'), href: '/platform-overview', icon: LayoutDashboard },
             { label: t('nav.partnerManagement', 'Partner management'), href: '/admin/partners', icon: Building },
+            { label: t('nav.demos', 'Demos'), href: '/admin/demos', icon: Compass },
           ],
         },
         {
