@@ -37,12 +37,6 @@ export function PlatformOverview() {
     queryKey: ['organisations'],
     queryFn: () => apiFetch<ApiOrg[]>('/organisations'),
   });
-  const { data: fin } = useQuery({
-    queryKey: ['platform-financials'],
-    queryFn: () => apiFetch<{ partners: { id: string; mrrGross: number; outstanding: number; funderValue: number; vatCollected: number }[]; totals: { mrrGross: number; outstanding: number; funderValue: number; vatCollected: number } }>('/platform/financials'),
-  });
-  const finTotals = fin?.totals ?? { mrrGross: 0, outstanding: 0, funderValue: 0, vatCollected: 0 };
-  const finByPartner = new Map((fin?.partners ?? []).map((p) => [p.id, p]));
   const { data: alertData } = useQuery({
     queryKey: ['platform-alerts'],
     queryFn: () => apiFetch<{ alerts: { id: string; label: string; count: number; severity: string; detail: string }[]; health: { learners: number; activeLearners: number; activeEnrolments: number; engagementRate: number } }>('/platform/alerts'),
@@ -213,19 +207,13 @@ export function PlatformOverview() {
         </div>
       </div>
 
-      {/* Platform financials, REAL, aggregated across partners */}
+      {/* Learner engagement, REAL, aggregated across partners. (Financial metrics were removed: the
+          platform does not carry billing/funding data.) */}
       <Card className="p-5">
-        <SectionTitle>Platform financials</SectionTitle>
-        <p className="mt-1 text-xs text-muted-foreground">Aggregated live from every partner's subscriptions, invoices and funding agreements.</p>
-        <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Wallet className="h-3.5 w-3.5" /> Monthly recurring</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(finTotals.mrrGross)}</div></div>
-          <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Receipt className="h-3.5 w-3.5" /> Outstanding</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(finTotals.outstanding)}</div></div>
-          <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Landmark className="h-3.5 w-3.5" /> Funding value</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(finTotals.funderValue)}</div></div>
-          <div className="rounded-lg border border-border p-3"><div className="text-xs text-muted-foreground flex items-center gap-1"><Percent className="h-3.5 w-3.5" /> VAT collected</div><div className="mt-1 text-xl font-bold tabular-nums">{ZAR(finTotals.vatCollected)}</div></div>
-        </div>
-        <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
-          <HeartPulse className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Learner engagement <span className="font-semibold text-foreground">{alertHealth.engagementRate}%</span> <span className="text-muted-foreground">({alertHealth.activeLearners} of {alertHealth.learners} learners active across {alertHealth.activeEnrolments} enrolments)</span></span>
+        <SectionTitle>Learner engagement</SectionTitle>
+        <div className="mt-3 flex items-center gap-2">
+          <HeartPulse className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Learner engagement <span className="font-semibold text-foreground">{alertHealth.engagementRate}%</span> <span className="text-muted-foreground">({alertHealth.activeLearners} of {alertHealth.learners} learners active across {alertHealth.activeEnrolments} enrolments)</span></span>
         </div>
       </Card>
     </div>
