@@ -16,16 +16,19 @@ const DEMOS = [
     name: 'Educator Professional Development',
     blurb: 'AI in teaching — practice credentials (lesson design, assessment integrity, teaching students to use AI well). Coached practice, reflective cycle.',
     path: '/demos/educator',
+    slug: 'educator-pd',
   },
   {
     name: 'PEJ Justice Practice',
     blurb: 'Justice-sector guided practice — decisions under pressure (scene sequencing, lawful inspection, eliciting accounts). Serious, decision-first.',
     path: '/demos/pej-practice',
+    slug: 'pej-practice',
   },
   {
     name: 'Manchester Review Board',
     blurb: 'Ethical / values-driven leadership — practice credentials (ethical leadership, team formation, servant leadership). Coached by Mutale.',
     path: '/demos/mrb',
+    slug: 'zambian-leadership',
   },
 ];
 
@@ -45,14 +48,18 @@ export function DemosHub() {
     );
   }
 
-  const partnerIdFor = (name: string): string | undefined => {
-    const want = name.trim().toLowerCase();
-    const match = (partners ?? []).find((p: any) => (p?.name ?? '').trim().toLowerCase() === want);
-    return match?.id;
+  // Resolve the partner id from its stable slug, falling back to the display name. Slugs never
+  // change; display names can (the MRB demo's partner is named "Zambian Clinician Leadership").
+  const partnerIdFor = (d: { slug: string; name: string }): string | undefined => {
+    const list = (partners ?? []) as Array<{ id: string; slug?: string; name?: string }>;
+    const bySlug = list.find((p) => (p?.slug ?? '').trim().toLowerCase() === d.slug.toLowerCase());
+    if (bySlug) return bySlug.id;
+    const want = d.name.trim().toLowerCase();
+    return list.find((p) => (p?.name ?? '').trim().toLowerCase() === want)?.id;
   };
 
-  const editAsSuper = (name: string) => {
-    const id = partnerIdFor(name);
+  const editAsSuper = (d: { slug: string; name: string }) => {
+    const id = partnerIdFor(d);
     if (!id) return;
     setActivePartner(id);
     navigate('/partner/courses');
@@ -72,7 +79,7 @@ export function DemosHub() {
 
       <div className="grid sm:grid-cols-2 gap-3">
         {DEMOS.map((d) => {
-          const canEdit = !!partnerIdFor(d.name);
+          const canEdit = !!partnerIdFor(d);
           return (
             <Card key={d.path} className="p-4 flex flex-col">
               <div className="font-serif font-semibold">{d.name}</div>
@@ -90,7 +97,7 @@ export function DemosHub() {
                   className="gap-1.5"
                   disabled={!canEdit}
                   title={canEdit ? 'Edit this demo’s practice credentials as super admin' : 'Partner not found'}
-                  onClick={() => editAsSuper(d.name)}
+                  onClick={() => editAsSuper(d)}
                 >
                   <Pencil className="h-3.5 w-3.5" /> Edit
                 </Button>
