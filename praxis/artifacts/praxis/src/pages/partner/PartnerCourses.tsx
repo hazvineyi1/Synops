@@ -65,6 +65,10 @@ export function PartnerCourses() {
           : 'Courses the platform has assigned to you. Allocate each one to the organisations that should run it.'}
       />
 
+      {/* Practice credentials first: for a practice partner (e.g. MRB) this is the main thing, so it
+          leads rather than sitting under the catalogue-course tools. */}
+      <PracticeCredentialsSection partnerId={partnerId} q={q} isSuper={isSuper} />
+
       {isSuper && (
         <AddCoursesPanel addable={addable} partnerId={partnerId} onAdded={invalidate} />
       )}
@@ -88,8 +92,6 @@ export function PartnerCourses() {
           <Building className="h-4 w-4 mt-0.5 shrink-0" /> You have no organisations yet. Create one under Organisations, then allocate courses to it here.
         </Card>
       )}
-
-      <PracticeCredentialsSection partnerId={partnerId} q={q} isSuper={isSuper} />
     </div>
   );
 }
