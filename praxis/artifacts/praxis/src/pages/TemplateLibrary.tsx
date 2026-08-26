@@ -5,7 +5,7 @@ import { setActivePartner } from '@/lib/partnerHubData';
 import { apiFetch } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LayoutTemplate, FileWarning, Check, Loader2, BookOpen, Award } from 'lucide-react';
+import { LayoutTemplate, FileWarning, Check, Loader2, BookOpen, Award, Sparkles } from 'lucide-react';
 
 type Template = {
   key: string;
@@ -28,6 +28,7 @@ export function TemplateLibrary() {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [partnerFor, setPartnerFor] = useState<Record<string, string>>({});
+  const [promptFor, setPromptFor] = useState<Record<string, string>>({});
   const isSuper = me?.role === 'super_admin';
 
   React.useEffect(() => {
@@ -45,20 +46,23 @@ export function TemplateLibrary() {
     );
   }
 
-  const useTemplate = async (t: Template) => {
+  const run = async (t: Template, mode: 'use' | 'ai') => {
     setErr(null);
     const partnerId = t.kind === 'practice' ? partnerFor[t.key] : undefined;
     if (t.kind === 'practice' && !partnerId) { setErr(`Choose a partner for "${t.name}" first.`); return; }
-    setBusy(t.key);
+    const prompt = (promptFor[t.key] ?? '').trim();
+    if (mode === 'ai' && !prompt) { setErr(`Describe what AI should develop for "${t.name}" first.`); return; }
+    setBusy(`${t.key}:${mode}`);
     try {
-      const r = await apiFetch<UseResult>('/platform/templates/use', {
+      const path = mode === 'ai' ? '/platform/templates/develop' : '/platform/templates/use';
+      const r = await apiFetch<UseResult>(path, {
         method: 'POST',
-        body: JSON.stringify({ key: t.key, ...(partnerId ? { partnerId } : {}) }),
+        body: JSON.stringify({ key: t.key, ...(partnerId ? { partnerId } : {}), ...(mode === 'ai' ? { prompt } : {}) }),
       });
       if (r.kind === 'practice' && r.partnerId) setActivePartner(r.partnerId);
       navigate(r.redirect);
     } catch (e) {
-      setErr(`${t.name}: ${e instanceof Error ? e.message : 'Could not use this template.'}`);
+      setErr(`${t.name}: ${e instanceof Error ? e.message : 'Could not build from this template.'}`);
       setBusy(null);
     }
   };
@@ -107,8 +111,8 @@ export function TemplateLibrary() {
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              {t.kind === 'practice' && (
+            {t.kind === 'practice' && (
+              <div className="mt-4">
                 <select
                   value={partnerFor[t.key] ?? ''}
                   onChange={(e) => setPartnerFor((p) => ({ ...p, [t.key]: e.target.value }))}
@@ -119,11 +123,40 @@ export function TemplateLibrary() {
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
-              )}
-              <Button size="sm" disabled={busy === t.key} onClick={() => useTemplate(t)} className="gap-1.5">
-                {busy === t.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LayoutTemplate className="h-3.5 w-3.5" />}
-                {busy === t.key ? 'Creating…' : 'Use template'}
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center gap-2">
+              <Button size="sm" variant="outline" disabled={busy === `${t.key}:use`} onClick={() => run(t, 'use')} className="gap-1.5">
+                {busy === `${t.key}:use` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LayoutTemplate className="h-3.5 w-3.5" />}
+                {busy === `${t.key}:use` ? 'Creating…' : 'Use starter'}
               </Button>
+              <span className="text-xs text-muted-foreground">— a clean scaffold you fill in yourself.</span>
+            </div>
+
+            {/* AI development option — available on every template. */}
+            <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                <Sparkles className="h-4 w-4" /> Develop with AI
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Describe your {t.kind === 'practice' ? 'practice programme' : 'course'} and AI drafts the {t.kind === 'practice' ? 'credentials' : 'modules and objectives'} for you, tailored to your brief. You still review and edit everything.
+              </p>
+              <textarea
+                value={promptFor[t.key] ?? ''}
+                onChange={(e) => setPromptFor((p) => ({ ...p, [t.key]: e.target.value }))}
+                rows={2}
+                placeholder={t.kind === 'practice'
+                  ? 'e.g. Frontline supervision in community health: prioritising, delegating, difficult conversations…'
+                  : 'e.g. Introduction to financial literacy for first-year undergraduates, 6 weeks, online…'}
+                className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+              <div className="mt-2">
+                <Button size="sm" disabled={busy === `${t.key}:ai`} onClick={() => run(t, 'ai')} className="gap-1.5">
+                  {busy === `${t.key}:ai` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {busy === `${t.key}:ai` ? 'Developing…' : 'Develop with AI'}
+                </Button>
+              </div>
             </div>
           </Card>
         ))}

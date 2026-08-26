@@ -41,6 +41,7 @@ import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
 import { seedPejPractice } from "../lib/pejPracticeSeed";
 import { PRACTICE_DDL, runPracticeDDL } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
+import { anthropic } from "@workspace/integrations-anthropic-ai";
 import {
   newSessionToken,
   sessionExpiry,
@@ -445,6 +446,94 @@ router.post("/platform/templates/use", requireAuth, requireSuperAdmin, async (re
   }
   await audit(req, "template.use", "partner", partnerId, { template: tpl.key });
   res.json({ ok: true, kind: "practice", partnerId, redirect: `/partner/courses`, message: `Seeded ${tpl.credentials?.length ?? 0} starter credentials on ${partner.name}. Open the partner's practice credentials to edit them.` });
+});
+
+// Ask the model for a JSON object (prefill "{" to force JSON), tolerant of code fences / stray prose.
+async function aiJson<T>(prompt: string): Promise<T | null> {
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 3000,
+      messages: [{ role: "user", content: prompt }, { role: "assistant", content: "{" }],
+    }, { timeout: 120000, maxRetries: 2 });
+    const c = message.content[0];
+    const raw = "{" + (c && c.type === "text" ? c.text : "");
+    const s = raw.indexOf("{"); const e = raw.lastIndexOf("}");
+    if (s === -1 || e === -1) return null;
+    return JSON.parse(raw.slice(s, e + 1)) as T;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("aiJson failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+// POST /platform/templates/develop { key, prompt, partnerId? } - the AI development path: generate
+// content tailored to the author's brief, then scaffold it. Falls back to the static template if the
+// model errors or returns nothing, so it never dead-ends.
+router.post("/platform/templates/develop", requireAuth, requireSuperAdmin, async (req, res) => {
+  const key = String(req.body?.key || "").trim();
+  const prompt = String(req.body?.prompt || "").trim().slice(0, 2000);
+  const tpl = COURSE_TEMPLATES.find((t) => t.key === key);
+  if (!tpl) { res.status(404).json({ error: "Unknown template." }); return; }
+  if (!prompt) { res.status(400).json({ error: "Describe the course or topic you want AI to develop." }); return; }
+
+  if (tpl.kind === "course") {
+    const flavour = tpl.key === "k12-standards"
+      ? "a K-12, standards-aligned course for younger learners (age-appropriate, multi-modal, with accommodations in mind)"
+      : "a higher-education / professional course built on backward design (Understanding by Design)";
+    const gen = await aiJson<{ title?: string; objectives?: string[]; modules?: Array<{ title?: string; description?: string; estimatedMinutes?: number; objectives?: string[] }> }>(
+      `You are an expert instructional designer. Design ${flavour} on this brief:\n\n"${prompt}"\n\nReturn ONLY a JSON object of the form:\n{"title": string, "objectives": [3-5 measurable, learner-facing course objectives], "modules": [{"title": string, "description": string, "estimatedMinutes": number, "objectives": [2-3 measurable module objectives]}]}\nProvide 3 to 5 modules that scaffold from foundations to application to authentic demonstration. Keep objectives measurable (observable verbs). No preamble.`,
+    );
+    const title = (gen?.title || `${tpl.name}: ${prompt}`).slice(0, 200);
+    const objectives = (gen?.objectives ?? tpl.courseObjectives ?? []).filter((x) => typeof x === "string").slice(0, 8);
+    const modules = (gen?.modules && gen.modules.length ? gen.modules : (tpl.modules ?? [])).slice(0, 8);
+    const [course] = await db.insert(coursesTable).values({
+      title, description: `AI-developed from the "${tpl.name}" template.\n\nBrief: ${prompt}`,
+      tenantId: "platform", status: "draft",
+      competencyTags: tpl.competencyTags ?? [], objectives,
+    }).returning();
+    let order = 0;
+    for (const m of modules) {
+      await db.insert(modulesTable).values({
+        courseId: course.id,
+        title: String(m.title || `Module ${order + 1}`).slice(0, 200),
+        description: String(m.description || "").slice(0, 4000),
+        estimatedMinutes: Number.isFinite(m.estimatedMinutes) ? Number(m.estimatedMinutes) : 90,
+        order: order++,
+        objectives: Array.isArray(m.objectives) ? m.objectives.filter((x) => typeof x === "string").slice(0, 6) : [],
+      });
+    }
+    await db.update(coursesTable).set({ moduleCount: modules.length }).where(eq(coursesTable.id, course.id));
+    await audit(req, "template.develop", "course", course.id, { template: tpl.key, ai: true });
+    res.json({ ok: true, kind: "course", courseId: course.id, redirect: `/courses/${course.id}`, message: `AI developed a draft course from "${tpl.name}".`, aiUsed: !!gen });
+    return;
+  }
+
+  // practice: AI-generate a credential set from the brief, seed on the chosen partner.
+  const partnerId = String(req.body?.partnerId || "").trim();
+  if (!partnerId) { res.status(400).json({ error: "Choose a partner to seed this practice-credential template on." }); return; }
+  const [partner] = await db.select().from(partnersTable).where(eq(partnersTable.id, partnerId)).limit(1);
+  if (!partner) { res.status(404).json({ error: "Partner not found." }); return; }
+  const gen = await aiJson<{ credentials?: Array<{ code?: string; title?: string; summary?: string; brief?: string; rationale?: string }>; gateway?: string; example?: string }>(
+    `You are designing a PRACTICE-CREDENTIAL programme (learners earn credentials from real work, reflecting with a coach through a four-move cycle: experience, reflect, name it, try it; a reviewer recognises the work or refers it back; nothing is graded). Brief:\n\n"${prompt}"\n\nReturn ONLY a JSON object:\n{"credentials": [{"code": "PC-01", "title": string, "summary": string, "brief": string, "rationale": string}], "gateway": string, "example": string}\nProvide 3 to 5 credentials that build in range. "brief" tells the learner what real thing to bring and reflect on. "gateway" is what a reviewer looks for. "example" is a safe, composite example activity. No preamble.`,
+  );
+  const creds = (gen?.credentials && gen.credentials.length ? gen.credentials : (tpl.credentials ?? [])).slice(0, 6);
+  const gateway = gen?.gateway || tpl.gateway || "";
+  const example = gen?.example || tpl.example || "";
+  await runPracticeDDL();
+  let sort = 0;
+  for (const c of creds) {
+    const code = String(c.code || `PC-${String(sort + 1).padStart(2, "0")}`).slice(0, 20);
+    await db.execute(sql`
+      INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort)
+      VALUES (${partnerId}, ${code}, ${String(c.title || "Practice Credential").slice(0, 200)}, ${String(c.summary || "").slice(0, 2000)}, ${String(c.brief || "").slice(0, 2000)}, ${gateway}, ${example}, ${String(c.rationale || "").slice(0, 2000)}, ${sort++})
+      ON CONFLICT (partner_id, code) DO UPDATE SET
+        title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
+        gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, rationale = EXCLUDED.rationale, sort = EXCLUDED.sort`);
+  }
+  await audit(req, "template.develop", "partner", partnerId, { template: tpl.key, ai: true });
+  res.json({ ok: true, kind: "practice", partnerId, redirect: `/partner/courses`, message: `AI developed ${creds.length} credentials on ${partner.name}. Open the partner's practice credentials to edit them.`, aiUsed: !!gen });
 });
 
 /**
