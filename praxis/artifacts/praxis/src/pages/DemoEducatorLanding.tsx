@@ -37,7 +37,7 @@ export default function DemoEducatorLanding() {
         <p style={{ fontSize: 16, lineHeight: 1.6, color: "#374151", maxWidth: 640, margin: 0 }}>
           A practice-first professional development class for educators, built on adult learning theory: it starts from
           your own classroom, respects your judgement, and is coached, not tested. You earn credentials by doing real
-          teaching and reflecting on it, from AI-assisted lesson design to assessment integrity, with Mutale, a
+          teaching and reflecting on it, from AI-assisted lesson design to assessment integrity, with Eve, a
           thinking-partner who asks rather than tells. Nothing is graded; an experienced reviewer recognises your work or
           refers it back with developmental feedback. You enter as a teacher just starting out, so you begin where every
           educator does: a short welcome, a clear goal, and your first credential to choose.
