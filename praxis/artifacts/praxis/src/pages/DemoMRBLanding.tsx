@@ -30,8 +30,8 @@ export default function DemoMRBLanding() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f6f4ef", color: "#1c2430" }}>
-      <div style={{ maxWidth: 780, margin: "0 auto", padding: "56px 24px 72px" }}>
-        <p style={{ fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase", color: "#6b7280", margin: 0 }}>
+      <main style={{ maxWidth: 780, margin: "0 auto", padding: "56px 24px 72px" }}>
+        <p style={{ fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4b5563", margin: 0 }}>
           Synops Praxis · Interactive demo
         </p>
         <h1 style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 34, lineHeight: 1.15, margin: "10px 0 12px" }}>
@@ -58,17 +58,17 @@ export default function DemoMRBLanding() {
           >
             {busy ? "Starting the demo…" : "Enter the full course →"}
           </button>
-          <p style={{ fontSize: 12.5, color: "#6b7280", marginTop: 10 }}>
+          <p style={{ fontSize: 12.5, color: "#4b5563", marginTop: 10 }}>
             No sign-up. You enter as a demo learner enrolled in the course; nothing you do is recorded against a real account.
           </p>
           {error && <p style={{ fontSize: 13, color: "#b42318", marginTop: 8 }}>{error}</p>}
         </div>
 
-        <p style={{ fontSize: 13, color: "#6b7280", marginTop: 40, lineHeight: 1.6 }}>
+        <p style={{ fontSize: 13, color: "#4b5563", marginTop: 40, lineHeight: 1.6 }}>
           Demo build v0.1 · policy and regulatory references are illustrative placeholders, pending subject-matter-expert
           and Zambian health-law sign-off. Rubrics are first drafts for tutor-trio and academic-board review.
         </p>
-      </div>
+      </main>
     </div>
   );
 }

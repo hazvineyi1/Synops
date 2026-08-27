@@ -28,7 +28,7 @@ export default function DemoPejPracticeLanding() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0f172a", color: "#e8ecf4" }}>
-      <div style={{ maxWidth: 780, margin: "0 auto", padding: "56px 24px 72px" }}>
+      <main style={{ maxWidth: 780, margin: "0 auto", padding: "56px 24px 72px" }}>
         <p style={{ fontSize: 13, letterSpacing: "0.18em", textTransform: "uppercase", color: "#93a2c4", margin: 0 }}>
           Synops · Justice-sector practice demo
         </p>
@@ -79,7 +79,7 @@ export default function DemoPejPracticeLanding() {
             pending, not operational guidance.
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -27,8 +27,8 @@ export default function DemoEducatorLanding() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f5f5fb", color: "#1b1f3b" }}>
-      <div style={{ maxWidth: 780, margin: "0 auto", padding: "56px 24px 72px" }}>
-        <p style={{ fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase", color: "#6b7280", margin: 0 }}>
+      <main style={{ maxWidth: 780, margin: "0 auto", padding: "56px 24px 72px" }}>
+        <p style={{ fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4b5563", margin: 0 }}>
           Synops · Professional development demo
         </p>
         <h1 style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 34, lineHeight: 1.15, margin: "10px 0 12px" }}>
@@ -74,7 +74,7 @@ export default function DemoEducatorLanding() {
             name only to make the walkthrough feel personal.
           </p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
