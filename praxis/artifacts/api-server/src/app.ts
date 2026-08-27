@@ -174,6 +174,65 @@ const bundleDir = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.resolve(bundleDir, "../../praxis/dist/public");
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
+
+  // ── Per-route metadata for public pages that are shared as links ──
+  // Praxis is a client-rendered SPA, so anything that fetches a URL WITHOUT running JavaScript (other
+  // AI assistants, link-preview bots, crawlers) only sees the generic index.html shell. For the public
+  // demo pages we inject a real <title>, description, Open Graph/Twitter tags AND a <noscript> summary
+  // into the served HTML, so a non-JS fetcher gets an accurate picture of the specific page.
+  const PAGE_META: Record<string, { title: string; description: string; body: string }> = {
+    "/demos/educator": {
+      title: "Educator Professional Development — Synops Praxis Demo",
+      description: "A practice-credentials demo for educators: earn credentials for thoughtful AI use in teaching — lesson design, assessment integrity, and teaching students to use AI well — by trying something real with your own students and reflecting on it with a coach.",
+      body: "Educator Professional Development is a practice-first demo on Synops Praxis. Rather than a course, educators earn credentials by taking something real from their own teaching, reflecting on it through a four-move cycle (experience, reflect, name it, try it), and gathering light evidence. A coach named Eve asks rather than tells. Credentials cover thoughtful AI in teaching: lesson and activity design, assessment integrity, and helping students use AI well. Nothing is graded; an experienced reviewer recognises the work or refers it back with developmental feedback.",
+    },
+    "/demos/pej-practice": {
+      title: "PEJ Justice Practice — Synops Praxis Demo",
+      description: "A justice-sector guided-practice demo for prosecutors and investigators: documenting a conflict-related crime scene — safety-first sequencing, a lawful inspection that survives challenge, eliciting an account without leading, chain of custody, and the contemporaneous record — coached by Mira.",
+      body: "PEJ Justice Practice is a practice-first demo on Synops Praxis for prosecutors and investigators. You earn credentials by taking something real from your own casework (reconstructed as a composite, with no confidential detail) and reflecting on it with a coach named Mira, who asks rather than tells. Themes include safety-first scene sequencing, a lawful inspection that survives challenge, eliciting an account without leading, protecting the chain of custody, and the contemporaneous scene record. Every legal point is illustrative and SME sign-off pending. Nothing is graded; a reviewer recognises the work or refers it back with feedback.",
+    },
+    "/demos/mrb": {
+      title: "Manchester Review Board — Synops Praxis Demo",
+      description: "A values-driven leadership practice-credentials demo: earn recognition for real leadership — ethical leadership, forming a team, and servant leadership — by bringing something real from your work and reflecting on it with a coach named Mutale.",
+      body: "Manchester Review Board is a practice-first leadership demo on Synops Praxis. Instead of a course, you earn credentials by bringing something real you have done as a leader and reflecting on it through a four-move cycle (experience, reflect, name it, try it) with a coach named Mutale. Credentials cover ethical leadership, forming and leading a team, and servant leadership. Nothing is graded; an experienced reviewer recognises your work or refers it back with developmental feedback, and recognised credentials are verifiable.",
+    },
+  };
+  const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  app.get(Object.keys(PAGE_META), (req, res, next) => {
+    const meta = PAGE_META[req.path];
+    if (!meta) { next(); return; }
+    try {
+      let html = fs.readFileSync(path.join(clientDist, "index.html"), "utf8");
+      const t = escapeHtml(meta.title); const d = escapeHtml(meta.description);
+      const tags = [
+        `<title>${t}</title>`,
+        `<meta name="description" content="${d}" />`,
+        `<meta property="og:title" content="${t}" />`,
+        `<meta property="og:description" content="${d}" />`,
+        `<meta property="og:type" content="website" />`,
+        `<meta name="twitter:card" content="summary" />`,
+        `<meta name="twitter:title" content="${t}" />`,
+        `<meta name="twitter:description" content="${d}" />`,
+      ].join("\n    ");
+      // Strip the generic tags from the shell so the page-specific ones below are the only ones a
+      // fetcher sees (otherwise the earlier, generic "Praxis learning platform" tags win).
+      html = html
+        .replace(/<title>[\s\S]*?<\/title>/i, "")
+        .replace(/<meta\s+name="description"[^>]*>/i, "")
+        .replace(/<meta\s+property="og:title"[^>]*>/i, "")
+        .replace(/<meta\s+property="og:description"[^>]*>/i, "")
+        .replace(/<meta\s+name="twitter:card"[^>]*>/i, "")
+        .replace(/<meta\s+name="twitter:title"[^>]*>/i, "")
+        .replace(/<meta\s+name="twitter:description"[^>]*>/i, "");
+      html = html.replace(/<\/head>/i, `    ${tags}\n  </head>`);
+      // A human-readable summary a non-JS fetcher can read. Kept in <noscript> so real browsers (JS on)
+      // never render it — no flash — while crawlers and other assistants that read raw HTML still see it.
+      const summary = `<noscript><main><h1>${escapeHtml(meta.title)}</h1><p>${escapeHtml(meta.body)}</p></main></noscript>`;
+      html = html.replace(/(<body[^>]*>)/i, `$1\n    ${summary}`);
+      res.set("Content-Type", "text/html; charset=utf-8").send(html);
+    } catch { next(); }
+  });
+
   // SPA fallback: any non-/api GET returns index.html so client-side routing works on
   // deep links and refreshes. The negative lookahead keeps /api/* on the API.
   app.get(/^(?!\/api).*/, (_req, res) => {
