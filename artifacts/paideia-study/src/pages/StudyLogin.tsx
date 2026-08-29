@@ -25,7 +25,10 @@ export default function StudyLogin() {
       // but only internal paths to avoid open redirects.
       const next = new URLSearchParams(window.location.search).get("next");
       const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
-      setLoc(safeNext ?? "/coach");
+      // Hard navigation (not client-side) so the auth provider refetches /me. That is what surfaces
+      // the first-login `mustChangePassword` gate for accounts still on the shared default password.
+      const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+      window.location.href = `${base}${safeNext ?? "/coach"}`;
     } catch (err: any) {
       setError(err?.data?.error || "Invalid email or password");
     } finally {

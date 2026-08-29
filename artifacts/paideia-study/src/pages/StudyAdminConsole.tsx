@@ -283,7 +283,7 @@ function Roster() {
           <CardContent className="p-3 flex flex-wrap items-end gap-2">
             <div><label className="text-xs">Email</label><Input value={nu.email} onChange={(e) => setNu({ ...nu, email: e.target.value })} placeholder="user@example.com" /></div>
             <div><label className="text-xs">Name</label><Input value={nu.name} onChange={(e) => setNu({ ...nu, name: e.target.value })} placeholder="Full name" /></div>
-            <div><label className="text-xs">Password</label><Input type="password" value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="min 8 chars" /></div>
+            <div><label className="text-xs">Password (optional)</label><Input type="password" value={nu.password} onChange={(e) => setNu({ ...nu, password: e.target.value })} placeholder="Blank = Password123" /></div>
             <div>
               <label className="text-xs block">Tier</label>
               <select className="border rounded h-9 px-2 text-sm bg-background" value={nu.tier} onChange={(e) => setNu({ ...nu, tier: e.target.value })}>

@@ -16,6 +16,7 @@ import StudyResetPassword from "@/pages/StudyResetPassword";
 import StudySignup from "@/pages/StudySignup";
 import StudyPrivacy from "@/pages/StudyPrivacy";
 import { StudyConsentGate } from "@/components/StudyConsentGate";
+import { StudyChangePassword } from "@/components/StudyChangePassword";
 import { StudyMaintenanceBanner } from "@/components/StudyMaintenanceBanner";
 import StudyTerms from "@/pages/StudyTerms";
 import StudyHelp from "@/pages/StudyHelp";
@@ -104,6 +105,8 @@ function Protected({ component: Component }: { component: ComponentType<any> }) 
   if (!user) return null;
   // POPIA: block protected content until the current privacy policy is accepted.
   if ((user as { consentRequired?: boolean }).consentRequired) return <StudyConsentGate />;
+  // First-login: block until they replace the shared default password with their own.
+  if ((user as { mustChangePassword?: boolean }).mustChangePassword) return <StudyChangePassword />;
   return <Component />;
 }
 

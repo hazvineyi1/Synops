@@ -202,6 +202,12 @@ router.post("/signup", rateLimit({ windowMs: 60 * 60 * 1000, max: 5 }), async (r
   });
 });
 
+// New accounts are provisioned with this shared default password. A learner still using it is
+// forced to choose their own on first sign-in. We detect it by hashing the default against the stored
+// hash, so it needs no extra schema column and clears itself the moment they change their password.
+const DEFAULT_PASSWORD = "Password123";
+const usingDefaultPassword = (hash: string) => verifyPassword(DEFAULT_PASSWORD, hash);
+
 router.post("/login", rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }), async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -263,6 +269,8 @@ router.get("/me", async (req, res) => {
     consentVersion: u.consentVersion ?? null,
     privacyPolicyVersion: PRIVACY_POLICY_VERSION,
     consentRequired: consentRequired(u.consentVersion),
+    // First-login gate: still on the shared default password -> must set their own before using Coach.
+    mustChangePassword: usingDefaultPassword(u.passwordHash),
   });
 });
 
@@ -419,6 +427,34 @@ router.post(
     res.json({ ok: true, message: "Password updated. You can now sign in." });
   },
 );
+
+// POST /study/auth/change-password { newPassword }
+// A signed-in learner sets their own password. Powers the forced first-login change (an account still
+// on the shared default is gated to this) and a voluntary change. Rejects the default so the account
+// can't stay on it. Revokes every existing session (kicking out anyone else holding the default) and
+// re-issues a fresh one for the caller, so they stay signed in.
+router.post("/change-password", requireStudyUser, async (req, res) => {
+  const parsed = z.object({ newPassword: z.string().min(8).max(200) }).safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Password must be at least 8 characters." });
+    return;
+  }
+  const newPassword = parsed.data.newPassword;
+  if (newPassword === DEFAULT_PASSWORD) {
+    res.status(400).json({ error: "Please choose a password different from the default one." });
+    return;
+  }
+  const userId = req.studyUser!.id;
+  await db
+    .update(studyUsersTable)
+    .set({ passwordHash: hashPassword(newPassword) })
+    .where(eq(studyUsersTable.id, userId));
+  await db.delete(studySessionsTable).where(eq(studySessionsTable.userId, userId));
+  const token = newSessionToken();
+  await db.insert(studySessionsTable).values({ token, userId, expiresAt: studySessionExpiry() });
+  res.cookie(STUDY_SESSION_COOKIE, token, cookieOptions());
+  res.json({ ok: true });
+});
 
 // ── One-click demo sign-in ───────────────────────────────────────────────────
 // Password-free entry into the fixed Synops Coach demo learner, for "try it live" on the

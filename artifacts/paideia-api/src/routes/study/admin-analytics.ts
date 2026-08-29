@@ -503,7 +503,10 @@ router.post("/users/:id/reactivate", async (req, res) => {
 router.post("/users", async (req, res) => {
   const email = String(req.body?.email ?? "").trim().toLowerCase();
   const name = String(req.body?.name ?? "").trim();
-  const password = String(req.body?.password ?? "");
+  // New accounts default to the shared onboarding password unless the admin sets a custom one. A
+  // learner who still has this default is forced to choose their own on first sign-in (see the
+  // `mustChangePassword` gate in study/auth), so it never stays in use.
+  const password = String(req.body?.password ?? "").trim() || "Password123";
   if (!email || !name) {
     res.status(400).json({ error: "email and name are required" });
     return;
