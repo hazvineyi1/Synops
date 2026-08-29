@@ -54,10 +54,21 @@ export function Nav() {
           </nav>
           
           <div className="hidden md:flex items-center gap-6">
+            {/* Log in for already-registered Synops Coach users. This is a real navigation into the
+                Coach app (a separate SPA served at /study/), so it must be an <a>, not a wouter <Link>
+                (which would stay inside the marketing app and 404). */}
+            <a
+              href="/study/login"
+              className={`text-[15px] font-medium transition-colors hover:text-accent ${
+                isScrolled ? "text-foreground" : "text-white/90"
+              }`}
+            >
+              Log in
+            </a>
             {/* "Start free trial" (Synops Teacher signup) hidden for now. Product
                 not yet publicly launched. Restore when ready. */}
             <Link
-              href="/contact" 
+              href="/contact"
               className={`text-[14px] font-bold px-5 py-2.5 rounded-[6px] transition-colors ${
                 isScrolled ? "bg-primary text-white hover:bg-primary/90" : "bg-accent text-white hover:bg-accent/90"
               }`}
@@ -93,8 +104,15 @@ export function Nav() {
               ))}
             </div>
             <div className="flex flex-col gap-4 pt-4">
-              <Link 
-                href="/contact" 
+              <a
+                href="/study/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-center text-[16px] font-semibold px-5 py-4 rounded-[6px] border border-border text-foreground"
+              >
+                Log in
+              </a>
+              <Link
+                href="/contact"
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full text-center text-[16px] font-bold px-5 py-4 rounded-[6px] bg-primary text-white"
               >
