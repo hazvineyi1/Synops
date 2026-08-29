@@ -410,6 +410,16 @@ function ProductExplorer() {
                 >
                   {p.href ? p.cta ?? "Open" : "Request access"} &rarr;
                 </a>
+                {/* Already-registered users of a live product (e.g. Synops Coach) sign in here. Real
+                    navigation into a separate app, so a plain <a>, not a wouter <Link>. */}
+                {p.loginHref && (
+                  <a
+                    href={p.loginHref}
+                    className="inline-block px-6 py-2.5 text-[14px] font-bold rounded-[6px] border border-border text-foreground hover:border-accent hover:text-accent transition-colors"
+                  >
+                    Log in
+                  </a>
+                )}
               </div>
             </div>
 
@@ -459,6 +469,8 @@ type Product = {
   // Live products (e.g. Praxis) render a direct action button; private-beta ones don't.
   href?: string;
   cta?: string;
+  // Registered users of a live product sign in here (e.g. Synops Coach -> /study/login).
+  loginHref?: string;
   // Optional category chip shown next to the name (e.g. "LMS").
   tag?: string;
   // Optional walkthrough video (file in /public); shown in the right panel
@@ -505,6 +517,8 @@ const PRODUCTS: Product[] = [
     scale: "Scales to a whole cohort.",
     samples: COACH_SAMPLES,
     accent: "primary" as const,
+    // Registered Synops Coach users sign in here (the Coach app is served at /study/).
+    loginHref: "/study/login",
   },
   {
     slug: "builder",
