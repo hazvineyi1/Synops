@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
+import { PHENOMENA, EXCLUDED_FRAMEWORKS, phenomenonById, lensById, catalogueForMatcher } from "../lib/practiceLibrary";
 import { logAudit } from "../lib/audit";
 import { uploadObject, storageEnabled } from "../lib/supabaseStorage";
 
@@ -1325,6 +1326,142 @@ router.post("/practice/coach/capture", requireAuth, async (req, res) => {
   try {
     const captures = await coachCapture(messages, existing, ctx.context, coachName, focusStage ? String(focusStage) : undefined);
     res.json({ captures: captures.map((c) => ({ ...c, label: c.target === "evidence" ? "Evidence" : (CAPTURE_LABELS[c.stage!] ?? "Reflection") })) });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
+  }
+});
+
+/* ───────────────────────────────────────────────────────────────────────────────────────────────
+ * Practice Hub — theory discovery ("Name it" stage). The candidate describes an experience; the
+ * system recognises PHENOMENA (in their own language) and offers SEVERAL lenses. Mutale never decides
+ * which applies; the candidate chooses and then critically tests the fit. Retrieval, not recall: every
+ * lens comes from the curated library, never the model's own memory, and excluded frameworks are barred.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────── */
+
+// POST /practice/name/inquiry { candidateCredentialId, questions } — the ASKING-practice beat. Before
+// theory, the candidate drafts the questions they would ask their team/stakeholders to understand what
+// happened. Mutale coaches the QUALITY of their questions; it never answers them. The questions are
+// saved as portfolio evidence of the candidate's inquiry skill.
+router.post("/practice/name/inquiry", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const { candidateCredentialId, questions, coachName } = req.body ?? {};
+  const qtext = String(questions ?? "").trim();
+  if (!candidateCredentialId || !qtext) { res.status(400).json({ error: "candidateCredentialId and questions are required" }); return; }
+  const ctx = await coachContext(uid, candidateCredentialId);
+  if (!ctx.title) { res.status(404).json({ error: "Not found" }); return; }
+  const name = coachDisplayName(coachName);
+  const systemRaw =
+    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    (ctx.context ? `What you know about this person and their experience:\n${ctx.context}\n\n` : "") +
+    `Asking good questions of other people is a core leadership skill, distinct from answering questions about oneself. The candidate has drafted the questions they would ASK their team or stakeholders to understand what happened. Your job is to coach the QUALITY of their questions. You must NOT answer the questions and must NOT tell them what the answers might be.\n` +
+    `In under 130 words, warmly and specifically: note which of their questions are genuinely open versus leading or loaded; which get at causes rather than symptoms; and offer ONE sharper question they could ask instead, as a suggestion for them to consider. Refer to their actual questions. Never use em dashes or en dashes.`;
+  try {
+    const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 320, system: rename(systemRaw, name), messages: [{ role: "user", content: `The questions I would ask:\n${qtext.slice(0, 3000)}` }] }, { timeout: 45000, maxRetries: 1 });
+    const reply = coachText(msg);
+    await saveCoachMsg(candidateCredentialId, "learner", qtext, "inquiry");
+    await saveCoachMsg(candidateCredentialId, "eve", reply, "inquiry_feedback");
+    res.json({ reply });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
+  }
+});
+
+// POST /practice/name/phenomena { candidateCredentialId } — recognise 2-4 candidate phenomena in the
+// learner's own account, chosen ONLY from the curated catalogue (retrieval, never open recall). Returns
+// each with a tentative, second-person "why this might fit you" so the candidate can choose.
+router.post("/practice/name/phenomena", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const { candidateCredentialId } = req.body ?? {};
+  const ctx = await coachContext(uid, candidateCredentialId);
+  if (!ctx.title) { res.status(404).json({ error: "Not found" }); return; }
+  const system =
+    `You help a leadership candidate make sense of a real experience. You are given a fixed CATALOGUE of ` +
+    `phenomena. Choose the 2 to 4 catalogue entries whose description best matches what the candidate is ` +
+    `describing. You MUST only choose ids from the catalogue; never invent a phenomenon and never name any ` +
+    `theory or framework (especially not: ${EXCLUDED_FRAMEWORKS.slice(0, 8).join(", ")}). Offer possibilities ` +
+    `tentatively, never as a diagnosis.\n\n` +
+    `CATALOGUE:\n${catalogueForMatcher()}\n\n` +
+    `Return ONLY JSON: {"picks":[{"id":"<catalogue id>","why":"<one short sentence, second person, tentative, referring to their actual situation>"}]}. ` +
+    `Order by best fit. If little matches, still return the 2 closest.`;
+  try {
+    const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 600, system, messages: [{ role: "user", content: `The candidate's account:\n${(ctx.context ?? "").slice(0, 5000)}` }] }, { timeout: 60000, maxRetries: 2 });
+    const raw = coachText(msg);
+    const m = raw.match(/\{[\s\S]*\}/);
+    let picks: Array<{ id: string; why?: string }> = [];
+    if (m) { try { picks = JSON.parse(m[0]).picks ?? []; } catch { picks = []; } }
+    const out = picks
+      .map((p) => { const ph = phenomenonById(String(p.id)); return ph ? { id: ph.id, label: ph.label, why: String(p.why ?? "").replace(/[—–]/g, ", ").trim() } : null; })
+      .filter(Boolean)
+      .slice(0, 4);
+    // Fallback: if the model returned nothing usable, offer the first two catalogue entries plainly.
+    const safe = out.length ? out : PHENOMENA.slice(0, 2).map((p) => ({ id: p.id, label: p.label, why: "" }));
+    res.json({ phenomena: safe });
+  } catch (err) {
+    res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
+  }
+});
+
+// GET /practice/name/phenomena/:id/lenses — the several lenses for a chosen phenomenon (bite-size,
+// text/audio-first). Straight from the library; no model call.
+router.get("/practice/name/phenomena/:id/lenses", requireAuth, async (req, res) => {
+  const ph = phenomenonById(String(req.params.id));
+  if (!ph) { res.status(404).json({ error: "Unknown phenomenon" }); return; }
+  res.json({
+    phenomenon: { id: ph.id, label: ph.label },
+    lenses: ph.lenses.map((l) => ({ id: l.id, name: l.name, tradition: l.tradition, gist: l.gist, origin: l.origin })),
+  });
+});
+
+// POST /practice/name/select { candidateCredentialId, phenomenonId, lensId } — record the candidate's
+// choice of phenomenon + lens as part of the portfolio (the intellectual work is theirs).
+router.post("/practice/name/select", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const { candidateCredentialId, phenomenonId, lensId } = req.body ?? {};
+  const own = await rows(sql`SELECT id FROM candidate_credentials WHERE id = ${candidateCredentialId} AND candidate_id = ${uid} LIMIT 1`);
+  if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
+  const ph = phenomenonById(String(phenomenonId));
+  const lens = ph ? lensById(ph.id, String(lensId)) : undefined;
+  if (!ph || !lens) { res.status(400).json({ error: "Unknown phenomenon or lens" }); return; }
+  await saveCoachMsg(candidateCredentialId, "learner", `Phenomenon: ${ph.label}\nLens chosen: ${lens.name} (${lens.origin})`, "lens");
+  res.json({ ok: true });
+});
+
+// POST /practice/name/interrogate { candidateCredentialId, phenomenonId, lensId } — after the candidate
+// selects a lens, Mutale returns them to their experience and asks them to TEST the fit: evidence for,
+// what the lens does not explain, and an alternative. Grounded in their own account and the lens's edge.
+router.post("/practice/name/interrogate", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const { candidateCredentialId, phenomenonId, lensId, coachName } = req.body ?? {};
+  const ctx = await coachContext(uid, candidateCredentialId);
+  if (!ctx.title) { res.status(404).json({ error: "Not found" }); return; }
+  const ph = phenomenonById(String(phenomenonId));
+  const lens = ph ? lensById(ph.id, String(lensId)) : undefined;
+  if (!ph || !lens) { res.status(400).json({ error: "Unknown phenomenon or lens" }); return; }
+  const name = coachDisplayName(coachName);
+  const systemRaw =
+    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    (ctx.context ? `The candidate's own account:\n${ctx.context}\n\n` : "") +
+    `The candidate has chosen to look at their experience through this lens:\n` +
+    `Lens: ${lens.name}. In plain terms: ${lens.gist}. What it does NOT explain: ${lens.edge}. (Origin: ${lens.origin}.)\n\n` +
+    `Do NOT tell them whether the lens is right. Help them do the intellectual work of testing the fit. ` +
+    `Return ONLY JSON: {"questions":["...","...","..."]} with EXACTLY three short questions, in this order: ` +
+    `(1) asks what evidence in THEIR account supports this explanation; (2) asks what this lens does not ` +
+    `explain about what happened, drawing on its known edge; (3) asks which other explanation might fit and ` +
+    `why. Refer to their actual situation in each. Never use em dashes or en dashes.`;
+  try {
+    const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 500, system: rename(systemRaw, name), messages: [{ role: "user", content: "Help me test whether this lens really fits my experience." }] }, { timeout: 60000, maxRetries: 1 });
+    const raw = coachText(msg);
+    const m = raw.match(/\{[\s\S]*\}/);
+    let questions: string[] = [];
+    if (m) { try { questions = (JSON.parse(m[0]).questions ?? []).map((q: unknown) => String(q).replace(/[—–]/g, ", ").trim()).filter(Boolean); } catch { questions = []; } }
+    if (!questions.length) {
+      questions = [
+        `What in your own account is the strongest evidence that this is really about ${ph.label.toLowerCase()}?`,
+        `What does this lens fail to explain about what happened?`,
+        `Which other explanation might fit, and what would make you prefer it?`,
+      ];
+    }
+    res.json({ questions: questions.slice(0, 3) });
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
   }

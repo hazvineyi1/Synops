@@ -5,6 +5,7 @@ import { useGetMe } from '@workspace/api-client-react';
 import { apiFetch } from '@/lib/api';
 import { getPending, addPending, removePending, loadDraft, saveDraft, type Pending } from '@/lib/offlineStore';
 import { demoProfile, type Audience } from '@/lib/demoProfile';
+import { NameItDiscovery } from '@/pages/NameItDiscovery';
 import { CycleRing } from '@/components/editorial';
 import { useBrandTheme } from '@/context/ThemeProvider';
 import { Card } from '@/components/ui/card';
@@ -298,7 +299,10 @@ export function PracticeCanvas() {
                 </>
               )}
               {stage.key === 'n' && (
-                <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} coachName={coachName} />
+                <>
+                  {audience === 'leadership' && !readOnly && <NameItDiscovery id={id} coachName={coachName} onSaved={invalidate} />}
+                  <ReflectionPanel key="n" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['analysis', 'conclusion']} showTimeline={false} heading="Name the idea it points to" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} coachName={coachName} />
+                </>
               )}
               {stage.key === 't' && (
                 <ReflectionPanel key="t" id={id} reflections={reflections} readOnly={readOnly} onChange={invalidate} off={off} focusStages={['action']} showTimeline={false} heading="Plan your next turn" starters={stage.starters} onLearnerWrote={handleLearnerWrote} onAskEve={openEve} coachName={coachName} />
