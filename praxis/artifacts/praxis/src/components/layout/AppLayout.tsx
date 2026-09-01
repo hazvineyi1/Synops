@@ -307,6 +307,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       return [{
         items: [
           { label: t('nav.practice', 'My Credentials'), href: '/practice', icon: Compass },
+          { label: t('nav.learningSets', 'Learning Sets'), href: '/practice/sets', icon: Users },
         ],
       }];
     }

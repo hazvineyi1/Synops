@@ -184,6 +184,43 @@ ALTER TABLE coach_messages ADD COLUMN IF NOT EXISTS content text;
 ALTER TABLE coach_messages ADD COLUMN IF NOT EXISTS kind text DEFAULT 'chat';
 ALTER TABLE coach_messages ADD COLUMN IF NOT EXISTS created_at timestamp DEFAULT now();
 CREATE INDEX IF NOT EXISTS coach_messages_cc_idx ON coach_messages(candidate_credential_id, created_at);
+
+-- ── Asynchronous Learning Sets ──────────────────────────────────────────────────────────────────
+-- A written, questions-first set: a member brings an experience, the group asks (round one accepts
+-- ONLY questions), the author answers, and only then are lenses proposed. The structure enforces the
+-- discipline instead of a live facilitator, and every question is a durable record of the asking skill.
+CREATE TABLE IF NOT EXISTS learning_sets (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  partner_id text,
+  title text NOT NULL,
+  created_at timestamp NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS learning_set_members (
+  set_id text NOT NULL,
+  user_id text NOT NULL,
+  role text NOT NULL DEFAULT 'member',
+  created_at timestamp NOT NULL DEFAULT now(),
+  PRIMARY KEY (set_id, user_id));
+CREATE TABLE IF NOT EXISTS learning_set_topics (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  set_id text NOT NULL,
+  author_id text NOT NULL,
+  title text NOT NULL,
+  experience text NOT NULL,
+  phenomenon text,
+  round integer NOT NULL DEFAULT 1,
+  status text NOT NULL DEFAULT 'questions',
+  created_at timestamp NOT NULL DEFAULT now(),
+  updated_at timestamp NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS learning_set_topics_set_idx ON learning_set_topics(set_id, updated_at);
+CREATE TABLE IF NOT EXISTS learning_set_posts (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  topic_id text NOT NULL,
+  author_id text NOT NULL,
+  kind text NOT NULL,
+  body text NOT NULL,
+  round integer NOT NULL DEFAULT 1,
+  created_at timestamp NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS learning_set_posts_topic_idx ON learning_set_posts(topic_id, created_at);
 `;
 
 /** Rows helper: db.execute over a raw/parameterised sql template returns { rows }. */
@@ -1465,6 +1502,142 @@ router.post("/practice/name/interrogate", requireAuth, async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: err instanceof Error ? err.message : "Coach unavailable" });
   }
+});
+
+/* ───────────────────────────────────────────────────────────────────────────────────────────────
+ * Asynchronous Learning Sets. A member brings an experience; the group asks questions (round one accepts
+ * ONLY questions — enforced here, not by a facilitator); the author answers, which opens the next round;
+ * then lenses are proposed. Every question is durable, assessable evidence of the asking skill.
+ * ─────────────────────────────────────────────────────────────────────────────────────────────── */
+const NAME_SQL = sql`coalesce(nullif(trim(coalesce(u.first_name,'') || ' ' || coalesce(u.last_name,'')),''), u.email)`;
+const MIN_QUESTIONS_PER_ROUND = 2;
+
+async function setRole(setId: string, uid: string): Promise<string | null> {
+  const r = await rows<{ role: string }>(sql`SELECT role FROM learning_set_members WHERE set_id = ${setId} AND user_id = ${uid} LIMIT 1`);
+  return r[0]?.role ?? null;
+}
+
+// POST /practice/sets  (super admin) { title, partnerId?, emails?: string[] } — create a set of members.
+router.post("/practice/sets", requireAuth, requireSuperAdmin, async (req, res) => {
+  await runPracticeDDL();
+  const title = String(req.body?.title ?? "").trim();
+  if (!title) { res.status(400).json({ error: "title is required" }); return; }
+  const partnerId = req.body?.partnerId ? String(req.body.partnerId) : null;
+  const [set] = await rows<{ id: string }>(sql`INSERT INTO learning_sets (partner_id, title) VALUES (${partnerId}, ${title.slice(0, 200)}) RETURNING id`);
+  await db.execute(sql`INSERT INTO learning_set_members (set_id, user_id, role) VALUES (${set.id}, ${req.userId!}, 'facilitator') ON CONFLICT (set_id, user_id) DO NOTHING`);
+  const emails: string[] = Array.isArray(req.body?.emails) ? req.body.emails.map((e: any) => String(e).trim().toLowerCase()).filter(Boolean) : [];
+  let added = 0;
+  for (const email of emails.slice(0, 50)) {
+    const u = await rows<{ id: string }>(sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`);
+    if (u[0]) { await db.execute(sql`INSERT INTO learning_set_members (set_id, user_id, role) VALUES (${set.id}, ${u[0].id}, 'member') ON CONFLICT (set_id, user_id) DO NOTHING`); added++; }
+  }
+  res.status(201).json({ id: set.id, added });
+});
+
+// POST /practice/sets/:id/members (super admin) { emails: string[] }
+router.post("/practice/sets/:id/members", requireAuth, requireSuperAdmin, async (req, res) => {
+  const emails: string[] = Array.isArray(req.body?.emails) ? req.body.emails.map((e: any) => String(e).trim().toLowerCase()).filter(Boolean) : [];
+  let added = 0;
+  for (const email of emails.slice(0, 50)) {
+    const u = await rows<{ id: string }>(sql`SELECT id FROM users WHERE lower(email) = ${email} LIMIT 1`);
+    if (u[0]) { await db.execute(sql`INSERT INTO learning_set_members (set_id, user_id, role) VALUES (${req.params.id}, ${u[0].id}, 'member') ON CONFLICT (set_id, user_id) DO NOTHING`); added++; }
+  }
+  res.json({ added });
+});
+
+// GET /practice/sets/mine — the sets the current user belongs to.
+router.get("/practice/sets/mine", requireAuth, async (req, res) => {
+  await runPracticeDDL();
+  const list = await rows(sql`
+    SELECT s.id, s.title, s.created_at,
+      (SELECT count(*)::int FROM learning_set_members m WHERE m.set_id = s.id) AS member_count,
+      (SELECT count(*)::int FROM learning_set_topics t WHERE t.set_id = s.id) AS topic_count
+    FROM learning_sets s
+    JOIN learning_set_members me ON me.set_id = s.id AND me.user_id = ${req.userId!}
+    ORDER BY s.created_at DESC`);
+  res.json(list);
+});
+
+// GET /practice/sets/:id — set detail: members and topics.
+router.get("/practice/sets/:id", requireAuth, async (req, res) => {
+  const role = await setRole(req.params.id, req.userId!);
+  if (!role) { res.status(403).json({ error: "Not a member of this set" }); return; }
+  const set = (await rows(sql`SELECT id, title, created_at FROM learning_sets WHERE id = ${req.params.id} LIMIT 1`))[0];
+  if (!set) { res.status(404).json({ error: "Not found" }); return; }
+  const members = await rows(sql`
+    SELECT u.id, ${NAME_SQL} AS name, m.role
+    FROM learning_set_members m JOIN users u ON u.id = m.user_id WHERE m.set_id = ${req.params.id} ORDER BY m.role, name`);
+  const topics = await rows(sql`
+    SELECT t.id, t.title, t.status, t.round, t.created_at, (t.author_id = ${req.userId!}) AS is_author,
+      ${NAME_SQL} AS author,
+      (SELECT count(*)::int FROM learning_set_posts p WHERE p.topic_id = t.id AND p.kind = 'question') AS question_count
+    FROM learning_set_topics t JOIN users u ON u.id = t.author_id WHERE t.set_id = ${req.params.id} ORDER BY t.updated_at DESC`);
+  res.json({ set, role, members, topics });
+});
+
+// POST /practice/sets/:id/topics { title, experience, phenomenon? } — bring a problem to the set.
+router.post("/practice/sets/:id/topics", requireAuth, async (req, res) => {
+  const role = await setRole(req.params.id, req.userId!);
+  if (!role) { res.status(403).json({ error: "Not a member of this set" }); return; }
+  const title = String(req.body?.title ?? "").trim();
+  const experience = String(req.body?.experience ?? "").trim();
+  if (!title || !experience) { res.status(400).json({ error: "title and experience are required" }); return; }
+  const phenomenon = req.body?.phenomenon ? String(req.body.phenomenon).slice(0, 2000) : null;
+  const [t] = await rows<{ id: string }>(sql`INSERT INTO learning_set_topics (set_id, author_id, title, experience, phenomenon) VALUES (${req.params.id}, ${req.userId!}, ${title.slice(0, 200)}, ${experience.slice(0, 6000)}, ${phenomenon}) RETURNING id`);
+  res.status(201).json({ id: t.id });
+});
+
+// GET /practice/topics/:id — topic thread + my participation this round.
+router.get("/practice/topics/:id", requireAuth, async (req, res) => {
+  const t = (await rows<{ id: string; set_id: string; author_id: string; title: string; experience: string; phenomenon: string | null; round: number; status: string }>(
+    sql`SELECT id, set_id, author_id, title, experience, phenomenon, round, status FROM learning_set_topics WHERE id = ${req.params.id} LIMIT 1`))[0];
+  if (!t) { res.status(404).json({ error: "Not found" }); return; }
+  const role = await setRole(t.set_id, req.userId!);
+  if (!role) { res.status(403).json({ error: "Not a member" }); return; }
+  const authorName = (await rows<{ name: string }>(sql`SELECT ${NAME_SQL} AS name FROM users u WHERE u.id = ${t.author_id} LIMIT 1`))[0]?.name ?? "A member";
+  const posts = await rows(sql`
+    SELECT p.id, p.kind, p.body, p.round, p.created_at, (p.author_id = ${req.userId!}) AS is_mine, ${NAME_SQL} AS author
+    FROM learning_set_posts p JOIN users u ON u.id = p.author_id WHERE p.topic_id = ${req.params.id} ORDER BY p.created_at`);
+  const myQuestionsThisRound = (await rows<{ c: number }>(sql`SELECT count(*)::int AS c FROM learning_set_posts WHERE topic_id = ${req.params.id} AND author_id = ${req.userId!} AND kind = 'question' AND round = ${t.round}`))[0]?.c ?? 0;
+  res.json({
+    topic: { id: t.id, setId: t.set_id, title: t.title, experience: t.experience, phenomenon: t.phenomenon, round: t.round, status: t.status, author: authorName, isAuthor: t.author_id === req.userId! },
+    posts, myQuestionsThisRound, minQuestionsPerRound: MIN_QUESTIONS_PER_ROUND,
+  });
+});
+
+// POST /practice/topics/:id/posts { body } — post to a topic. Round one accepts ONLY questions from
+// non-authors; the author's post is an answer, which opens the next round. In the lens phase, non-authors
+// propose lenses. Enforced server-side, so the structure does the facilitating.
+router.post("/practice/topics/:id/posts", requireAuth, async (req, res) => {
+  const t = (await rows<{ set_id: string; author_id: string; status: string; round: number }>(
+    sql`SELECT set_id, author_id, status, round FROM learning_set_topics WHERE id = ${req.params.id} LIMIT 1`))[0];
+  if (!t) { res.status(404).json({ error: "Not found" }); return; }
+  const role = await setRole(t.set_id, req.userId!);
+  if (!role) { res.status(403).json({ error: "Not a member" }); return; }
+  const body = String(req.body?.body ?? "").trim();
+  if (!body) { res.status(400).json({ error: "Write something first." }); return; }
+  if (t.status === "closed") { res.status(400).json({ error: "This topic is closed." }); return; }
+  const isAuthor = t.author_id === req.userId!;
+  // The rule that makes an async set work: in the questions phase non-authors may ONLY ask questions.
+  const kind = isAuthor ? "answer" : t.status === "lenses" ? "lens" : "question";
+  await db.execute(sql`INSERT INTO learning_set_posts (topic_id, author_id, kind, body, round) VALUES (${req.params.id}, ${req.userId!}, ${kind}, ${body.slice(0, 6000)}, ${t.round})`);
+  if (isAuthor && kind === "answer" && t.status === "questions") {
+    // Answering opens a fresh round so the group can ask again with the new information.
+    await db.execute(sql`UPDATE learning_set_topics SET round = round + 1, updated_at = now() WHERE id = ${req.params.id}`);
+  } else {
+    await db.execute(sql`UPDATE learning_set_topics SET updated_at = now() WHERE id = ${req.params.id}`);
+  }
+  res.status(201).json({ ok: true, kind });
+});
+
+// POST /practice/topics/:id/advance — the author moves the topic on: questions → lenses → closed.
+router.post("/practice/topics/:id/advance", requireAuth, async (req, res) => {
+  const t = (await rows<{ author_id: string; status: string }>(sql`SELECT author_id, status FROM learning_set_topics WHERE id = ${req.params.id} LIMIT 1`))[0];
+  if (!t) { res.status(404).json({ error: "Not found" }); return; }
+  if (t.author_id !== req.userId!) { res.status(403).json({ error: "Only the person who brought this can move it on." }); return; }
+  const next = t.status === "questions" ? "lenses" : "closed";
+  await db.execute(sql`UPDATE learning_set_topics SET status = ${next}, updated_at = now() WHERE id = ${req.params.id}`);
+  res.json({ ok: true, status: next });
 });
 
 /** The candidate's active credential for capturing WhatsApp reflection: their most recently touched
