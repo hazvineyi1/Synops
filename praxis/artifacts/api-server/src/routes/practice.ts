@@ -1640,6 +1640,82 @@ router.post("/practice/topics/:id/advance", requireAuth, async (req, res) => {
   res.json({ ok: true, status: next });
 });
 
+// POST /practice/sets/seed-demo — build a complete, worked Learning Set on the MRB demo partner so the
+// full questions-first experience can be seen. Demo-scoped: it only ever touches the "zambian-leadership"
+// demo partner and a fixed demo set, so it is safe to run and idempotent (it rebuilds that one set).
+router.post("/practice/sets/seed-demo", requireAuth, async (req, res) => {
+  await runPracticeDDL();
+  const partner = (await rows<{ id: string }>(sql`SELECT id FROM partners WHERE slug = 'zambian-leadership' LIMIT 1`))[0];
+  if (!partner) { res.status(404).json({ error: "MRB demo partner not found" }); return; }
+  // Chanda = the demo entry learner the viewer becomes (falls back to any active learner in the partner).
+  let chanda = (await rows<{ id: string }>(sql`SELECT id FROM users WHERE lower(email) = 'demo.learner@zcl.test' LIMIT 1`))[0];
+  if (!chanda) chanda = (await rows<{ id: string }>(sql`SELECT id FROM users WHERE partner_id = ${partner.id} AND role = 'learner' AND status = 'active' ORDER BY email LIMIT 1`))[0];
+  if (!chanda) { res.status(404).json({ error: "No demo learner to seed" }); return; }
+
+  const peers = [
+    { email: "kwame.set@zcl.demo", first: "Kwame", last: "Banda" },
+    { email: "naledi.set@zcl.demo", first: "Naledi", last: "Phiri" },
+    { email: "grace.set@zcl.demo", first: "Grace", last: "Tembo" },
+    { email: "joseph.set@zcl.demo", first: "Joseph", last: "Mwale" },
+  ];
+  const pid: Record<string, string> = {};
+  for (const p of peers) {
+    let u = (await rows<{ id: string }>(sql`SELECT id FROM users WHERE lower(email) = ${p.email} LIMIT 1`))[0];
+    if (!u) {
+      u = (await rows<{ id: string }>(sql`
+        INSERT INTO users (id, email, first_name, last_name, role, status, partner_id, password_hash)
+        VALUES (gen_random_uuid()::text, ${p.email}, ${p.first}, ${p.last}, 'learner', 'active', ${partner.id}, 'seed-no-login')
+        RETURNING id`))[0];
+    }
+    pid[p.first] = u.id;
+  }
+
+  const title = "Clinical leaders — cohort 1";
+  for (const s of await rows<{ id: string }>(sql`SELECT id FROM learning_sets WHERE partner_id = ${partner.id} AND title = ${title}`)) {
+    for (const t of await rows<{ id: string }>(sql`SELECT id FROM learning_set_topics WHERE set_id = ${s.id}`)) {
+      await db.execute(sql`DELETE FROM learning_set_posts WHERE topic_id = ${t.id}`);
+    }
+    await db.execute(sql`DELETE FROM learning_set_topics WHERE set_id = ${s.id}`);
+    await db.execute(sql`DELETE FROM learning_set_members WHERE set_id = ${s.id}`);
+    await db.execute(sql`DELETE FROM learning_sets WHERE id = ${s.id}`);
+  }
+  const set = (await rows<{ id: string }>(sql`INSERT INTO learning_sets (partner_id, title) VALUES (${partner.id}, ${title}) RETURNING id`))[0];
+  const members = [chanda.id, pid.Kwame, pid.Naledi, pid.Grace, pid.Joseph];
+  for (const uid of members) await db.execute(sql`INSERT INTO learning_set_members (set_id, user_id, role) VALUES (${set.id}, ${uid}, 'member') ON CONFLICT (set_id, user_id) DO NOTHING`);
+
+  const mkTopic = async (authorId: string, ttl: string, exp: string, phen: string, round: number, status: string): Promise<string> =>
+    (await rows<{ id: string }>(sql`INSERT INTO learning_set_topics (set_id, author_id, title, experience, phenomenon, round, status) VALUES (${set.id}, ${authorId}, ${ttl}, ${exp}, ${phen}, ${round}, ${status}) RETURNING id`))[0].id;
+  const mkPost = async (topicId: string, authorId: string, kind: string, body: string, round: number): Promise<void> => {
+    await db.execute(sql`INSERT INTO learning_set_posts (topic_id, author_id, kind, body, round) VALUES (${topicId}, ${authorId}, ${kind}, ${body}, ${round})`);
+  };
+
+  // Topic A — Kwame brings it; Chanda is a questioner (shows her asking skill).
+  const tA = await mkTopic(pid.Kwame, "My deputy agrees deadlines then misses them",
+    "In our one-to-ones my deputy agrees to every deadline I put to him, then quietly misses them. I cannot tell if he is overloaded or avoiding something.",
+    "Whether he actually commits, or just agrees to end the conversation.", 2, "lenses");
+  await mkPost(tA, chanda.id, "question", "When you agree the deadline together, who says the date first, you or him?", 1);
+  await mkPost(tA, pid.Naledi, "question", "What happens right before he agrees, does he pause, or agree quickly?", 1);
+  await mkPost(tA, chanda.id, "question", "What would make it safe for him to tell you a date is not realistic?", 1);
+  await mkPost(tA, pid.Grace, "question", "Does he ever miss a deadline he set himself, or only the ones you set?", 1);
+  await mkPost(tA, pid.Kwame, "answer", "Honestly, I usually say the date first and he agrees straight away without pushing back. And now you ask, he does hit the deadlines he sets himself.", 1);
+  await mkPost(tA, chanda.id, "question", "So when you set the date for him, does he own it the same way he owns his own?", 2);
+  await mkPost(tA, pid.Joseph, "question", "What do you think would change if he proposed the date himself?", 2);
+  await mkPost(tA, chanda.id, "lens", "This might be the same thing I hit with my nurses, agreeing to save face in the moment, then the real position showing up later.", 2);
+  await mkPost(tA, pid.Grace, "lens", "Could be commitment versus compliance, he complies with your date but never actually commits to it.", 2);
+
+  // Topic B — Chanda brings her own (shows her topic being worked).
+  const tB = await mkTopic(chanda.id, "Two experienced nurses have gone quiet",
+    "Two experienced nurses keep going quiet in team meetings. I cannot tell if they disagree with me or have checked out.",
+    "Whether it feels safe for them to disagree with me.", 2, "questions");
+  await mkPost(tB, pid.Naledi, "question", "When did the silence start, was there a moment it changed?", 1);
+  await mkPost(tB, pid.Kwame, "question", "What tends to happen just before they go quiet?", 1);
+  await mkPost(tB, chanda.id, "answer", "It changed after I overruled one of them publicly on a rota decision. Outside meetings they are both fine and still do the work.", 1);
+  await mkPost(tB, pid.Grace, "question", "What do you think that public overrule cost her in front of the others?", 2);
+  await mkPost(tB, pid.Joseph, "question", "There was a time you did listen to her, months ago. What made that one feel safe?", 2);
+
+  res.json({ ok: true, setId: set.id, members: members.length, topics: 2 });
+});
+
 /** The candidate's active credential for capturing WhatsApp reflection: their most recently touched
  * in-progress credential, else their first chosen one. Returns the row id + title + brief, or null. */
 export async function activeCandidateCredential(candidateId: string): Promise<{ id: string; title: string; activity_brief: string | null } | null> {
