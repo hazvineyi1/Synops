@@ -1,0 +1,8 @@
+{
+  "name": "djh-stakeholder-demo",
+  "private": true,
+  "version": "0.7.0",
+  "description": "Digital Justice Hub stakeholder demonstration (fictional training material only)",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=20" }
+}
