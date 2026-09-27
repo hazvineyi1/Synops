@@ -18,8 +18,8 @@ async function api(method, url, body, headers = {}) {
 
 /* ---------------- i18n (interface chrome) ---------------- */
 const T = {
-  en: { brand: "Digital Justice Hub", sub: "Learning and professional resources", home: "Dashboard", course: "Pillaging Case", guide: "Case guide", admin: "Approvals", signout: "Sign out", signin: "Sign in", request: "Request access", saved: "Saved", saving: "Saving…", failed: "Not saved. Your text is still here.", retry: "Retry", prev: "Previous", next: "Next", continue: "Continue", resume: "Resume", start: "Start" },
-  uk: { brand: "Цифровий хаб правосуддя", sub: "Навчання та професійні ресурси", home: "Панель", course: "Справа про розграбування", guide: "Помічник зі справи", admin: "Затвердження", signout: "Вийти", signin: "Увійти", request: "Подати запит", saved: "Збережено", saving: "Збереження…", failed: "Не збережено. Ваш текст залишається тут.", retry: "Повторити", prev: "Назад", next: "Далі", continue: "Продовжити", resume: "Продовжити", start: "Почати" },
+  en: { brand: "Digital Justice Hub", sub: "Learning and professional resources", home: "My courses", course: "Course", guide: "Case guide", admin: "Approvals", signout: "Sign out", signin: "Sign in", request: "Request access", saved: "Saved", saving: "Saving…", failed: "Not saved. Your text is still here.", retry: "Retry", prev: "Previous", next: "Next", continue: "Continue", resume: "Resume", start: "Start" },
+  uk: { brand: "Цифровий хаб правосуддя", sub: "Навчання та професійні ресурси", home: "Мої курси", course: "Курс", guide: "Помічник зі справи", admin: "Затвердження", signout: "Вийти", signin: "Увійти", request: "Подати запит", saved: "Збережено", saving: "Збереження…", failed: "Не збережено. Ваш текст залишається тут.", retry: "Повторити", prev: "Назад", next: "Далі", continue: "Продовжити", resume: "Продовжити", start: "Почати" },
 };
 const S = { lang: localGet("djh.lang") || "en", me: null, ai: false, content: null, prog: { state: {}, seq: 0 }, status: null, chat: [], chatOpen: localGet("djh.chat") !== "0", saveState: "idle", savedAt: null, errs: {}, sending: false, pending: {} };
 const t = (k) => (T[S.lang] && T[S.lang][k]) || T.en[k] || k;
@@ -27,20 +27,20 @@ function localGet(k) { try { return localStorage.getItem(k); } catch (_) { retur
 function localSet(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }
 
 /* ---------------- header ---------------- */
-const LOGO = `<svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="8" fill="#13294B"/><path d="M7 13h8c5 0 5 7 10 7h8" stroke="#3DD6C4" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M7 20h26" stroke="#F5B942" stroke-width="3.2" stroke-linecap="round"/><path d="M7 27h8c5 0 5-7 10-7h8" stroke="#FF8B66" stroke-width="3.2" fill="none" stroke-linecap="round"/></svg>`;
+const LOGO = `<svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="8" fill="#00585E"/><path d="M7 13h8c5 0 5 7 10 7h8" stroke="#3DD6C4" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M7 20h26" stroke="#F5B942" stroke-width="3.2" stroke-linecap="round"/><path d="M7 27h8c5 0 5-7 10-7h8" stroke="#FF8B66" stroke-width="3.2" fill="none" stroke-linecap="round"/></svg>`;
 const ICON_CHAT = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>`;
 function paintHeader(active) {
   document.documentElement.lang = S.lang;
   const me = S.me;
   const nav = me ? [["#/dashboard", t("home"), "dashboard"], ["#/course/grn01", t("course"), "course"], ["#/guide", t("guide"), "guide"]].concat(me.role === "admin" ? [["#/admin", t("admin"), "admin"]] : []) : [];
+  const navHtml = nav.length ? `<nav class="hnav" aria-label="Main">${nav.map((n) => `<a href="${n[0]}"${active === n[2] ? ' aria-current="page"' : ""}>${esc(n[1])}</a>`).join("")}</nav>` : "";
   $("#site").innerHTML = `<div class="minibar"><div class="wrap">
-    <a class="brand" href="${me ? "#/dashboard" : "#/login"}">${LOGO}<span><b>${esc(t("brand"))}</b><span>${esc(t("sub"))}</span></span></a>
+    <a class="brand" href="${me ? "#/dashboard" : "#/login"}">${LOGO}<span><b>${esc(t("brand"))}</b></span></a>
+    ${navHtml}
     <div class="hright">
-      ${me ? `<a class="ibtn" href="#/guide" aria-label="${esc(t("guide"))}" title="${esc(t("guide"))}">${ICON_CHAT}</a>` : ""}
       <div class="langsw" role="group" aria-label="Interface language"><button type="button" data-lang="uk" lang="uk" aria-pressed="${S.lang === "uk"}">УКР</button><button type="button" data-lang="en" lang="en" aria-pressed="${S.lang === "en"}">EN</button></div>
-      ${me ? `<span class="avatar" aria-hidden="true">${esc(me.name.charAt(0))}</span><span class="who"><b>${esc(me.name)}</b><span>${esc(me.prole)}</span></span><button type="button" class="btn small" data-act="logout">${esc(t("signout"))}</button>` : ""}
-    </div></div></div>
-    ${nav.length ? `<nav class="navbar" aria-label="Main"><ul>${nav.map((n) => `<li><a href="${n[0]}"${active === n[2] ? ' aria-current="page"' : ""}>${esc(n[1])}</a></li>`).join("")}</ul></nav>` : ""}`;
+      ${me ? `<span class="avatar" aria-hidden="true">${esc(me.name.charAt(0))}</span><span class="who"><b>${esc(me.name)}</b><span>${esc(me.prole)}</span></span><button type="button" class="btn small" data-act="logout">${esc(t("signout"))}</button>` : `<a class="btn small" href="#/login">${esc(t("signin"))}</a><a class="btn small primary" href="#/register">${esc(t("request"))}</a>`}
+    </div></div></div>`;
 }
 
 /* ---------------- router ---------------- */
@@ -80,7 +80,7 @@ function fieldErr(k) { return S.errs[k] ? `<span class="err" id="e-${k}">${esc(S
 function inv(k) { return S.errs[k] ? ` aria-invalid="true" aria-describedby="e-${k}"` : ""; }
 function errSummary() { const k = Object.keys(S.errs); if (!k.length) return ""; return `<div class="notice crit" id="errsum" role="alert"><p><b>${k.length} thing${k.length > 1 ? "s" : ""} to fix</b></p><ul class="small">${k.map((x) => `<li><a href="#f-${x}" data-focus="f-${x}">${esc(S.errs[x])}</a></li>`).join("")}</ul></div>`; }
 function vLogin(msg) {
-  setMain(`<div class="login"><div class="loginart"><p class="eyebrow" style="color:#A8B6CB">${esc(t("brand"))}</p><h1>Practical learning for justice professionals investigating and prosecuting international crimes</h1><p>Courses, reference resources and professional discussion for prosecutors, investigators, analysts and judges in Ukraine. Each role follows its own route through the same cases.</p>${mapArt()}</div>
+  setMain(`<div class="login"><div class="loginart"><p class="eyebrow" style="color:#E8A317">${esc(t("brand"))}</p><h1>Courses for international crimes casework</h1><p>Short courses built on fictional case files, with a route for each profession. Free for approved justice professionals in Ukraine.</p>${mapArt()}</div>
   <div class="logincard"><h2 id="loginH">${esc(t("signin"))}</h2>${msg ? `<div class="notice ok"><p>${esc(msg)}</p></div>` : ""}<div id="loginErr"></div>
   <form id="loginForm" class="stack" novalidate><div class="field"><label for="f-email">Work email</label><input id="f-email" type="email" autocomplete="username" required></div><div class="field"><label for="f-password">Password</label><input id="f-password" type="password" autocomplete="current-password" required></div><button class="btn primary" type="submit">${esc(t("signin"))}</button></form>
   <p class="small">No account? <a href="#/register">${esc(t("request"))}</a></p>
@@ -111,7 +111,7 @@ function vRegistered() {
 
 /* ---------------- dashboard ---------------- */
 function banner() {
-  return `<svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="320" height="160" fill="#13294B"/><path d="M0 58H90C120 58 120 34 150 34H200C230 34 230 58 260 58H320" stroke="#3DD6C4" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M0 80H320" stroke="#F5B942" stroke-width="7" stroke-linecap="round"/><path d="M0 102H160C190 102 190 128 220 128H320" stroke="#FF8B66" stroke-width="7" fill="none" stroke-linecap="round"/><rect x="146" y="44" width="18" height="72" rx="9" fill="#F5B942" stroke="#13294B" stroke-width="3"/></svg>`;
+  return `<svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="320" height="160" fill="#00585E"/><path d="M0 58H90C120 58 120 34 150 34H200C230 34 230 58 260 58H320" stroke="#3DD6C4" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M0 80H320" stroke="#F5B942" stroke-width="7" stroke-linecap="round"/><path d="M0 102H160C190 102 190 128 220 128H320" stroke="#FF8B66" stroke-width="7" fill="none" stroke-linecap="round"/><rect x="146" y="44" width="18" height="72" rx="9" fill="#F5B942" stroke="#13294B" stroke-width="3"/></svg>`;
 }
 async function vDashboard() {
   const d = await api("GET", "/api/dashboard"); S.ai = d.ai; const st = d.status, me = d.user; S.me = me;
