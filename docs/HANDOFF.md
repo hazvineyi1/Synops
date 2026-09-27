@@ -2,6 +2,10 @@
 
 Status: pilot app live on Railway; course interface designed and prototyped. This document tells a developer what to build next and where the source of truth for each decision lives.
 
+## 0. Delivery model
+
+Self-paced (decided 27 Sep 2026). No cohorts, weeks or deadlines. Courses are organised by units with time estimates; the place is always saved; briefs are reviewed in the order received; expert sessions are optional recordings. Invitation codes remain for institution verification only.
+
 ## 1. Where things are
 
 | What | Where |

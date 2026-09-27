@@ -237,9 +237,10 @@ app.get("/api/dashboard", A.requireUser, wrap(async (req, res) => {
   const s = await status(req.user.id);
   const chats = (await q("SELECT count(*)::int n FROM chat_messages WHERE user_id=$1 AND role='learner'", [req.user.id])).rows[0].n;
   res.json({ user: A.publicUser(req.user), status: s, chats, ai: AI.aiEnabled(),
-    announcements: [{ title: "Welcome to the pilot cohort", by: "Course team", date: "2026-09-24", body: "The Pillaging Case is open for self-study. Reviewer feedback opens once reviewer capacity is confirmed for your cohort. Fictional material only." }],
-    todo: [{ date: "2026-10-03", title: C.ROUTES[req.user.route === "jud" ? "pro" : req.user.route].product, note: "GRN01 · assigned by your institution", link: "#/course/grn01" },
-           { date: "2026-10-08", title: "Facilitated case clinic", note: "Optional · 45 min · online" }] });
+    announcements: [{ title: "Welcome to the Digital Justice Hub", by: "Course team", date: "2026-09-24", body: "The Pillaging Case is open for self-paced study. Start any time and go at your own pace; your place is saved. Reviewers score submitted briefs in the order received. Fictional material only." }],
+    todo: [{ tag: "Next", title: "Continue the Pillaging Case", note: "About 60 minutes in short topics · your place is saved", link: "#/course/grn01" },
+           { tag: "Then", title: C.ROUTES[req.user.route === "jud" ? "pro" : req.user.route].product, note: "Topic 12 · no deadline · reviewed after you submit", link: "#/course/grn01" },
+           { tag: "Any time", title: "Recorded expert session", note: "Optional · watch when it suits you" }] });
 }));
 
 /* ---------- AI case guide ---------- */

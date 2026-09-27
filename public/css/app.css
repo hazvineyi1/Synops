@@ -170,3 +170,4 @@ h1{font-weight:800}
 .hero-band{background:var(--accent-soft);border-radius:8px;padding:1.6rem 1.75rem;display:flex;flex-direction:column;gap:.6rem}
 main:focus{outline:none}
 @media (max-width:700px){.minibar .wrap{padding-block:.5rem;gap:.5rem}}
+.todo li{grid-template-columns:76px 1fr}.todo .dt{font-size:.66rem;letter-spacing:.04em;color:var(--accent)}
