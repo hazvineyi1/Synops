@@ -51,25 +51,28 @@ Figma: no Figma connection exists yet. To move the canvas into Figma, connect th
 
 ## 4. Layout
 
-- Minibar 40px, navy navbar 44px, course bar 48px.
+- Single white header 64px; course tabs bar under it inside a course (Outline, Progress, Dates, Live sessions, Discussion, Case guide).
 - TOC 272px on the left; main flexes; case guide 360px open or a 44px tab when closed.
 - Breakpoints: 1280 and up full; 1024 to 1279 guide overlays main; 720 to 1023 TOC becomes a drawer; below 720 single column with a sticky bottom action bar and the guide as a bottom sheet.
 - Prose reading width max 780px. Touch targets 44px on phones. Reflow to 320px with no horizontal scroll.
 
-## 5. Tokens (match `public/css/app.css`)
+## 5. Tokens: Academy direction (chosen 27 Sep 2026; match `public/css/app.css`)
 
 | Token | Value |
 |---|---|
-| page | #F6F7F9 |
-| panel | #FFFFFF |
-| ink / ink2 / muted | #202122 / #494C4E / #6A7075 |
-| line / line-soft | #CDD5DC / #E3E9F1 |
-| accent / hover | #006FBF / #005A9C |
-| navbar | #13294B |
-| ok / warn / crit | #1E8E3E / #B06D00 / #C5221F, with tints #E6F4EA / #FDF3DC / #FCE8E6 |
+| page / surface | #F5F7F8 / #FFFFFF |
+| ink / ink2 / muted | #15212B / #33404A / #5A6772 |
+| line / input line | #DDE3E8 / #AFBAC3 |
+| primary / hover / tint | #00585E / #00464B / #E7F0F0 |
+| footer and dark bands | #12303A |
+| highlight | #E8A317 |
+| ok / warn / crit | #1E7A3E / #7A4B00 / #B3261E, with tints #E6F4EA / #FDF6E7 / #FCE8E6 |
 | route: investigation / prosecution / judiciary | #0E7C70 / #A15C00 / #C2410C |
-| fonts | Source Sans 3; IBM Plex Mono for IDs and receipts |
-| radius | 6px; chips 11px; citations 4px |
+| fonts | Noto Sans (covers Ukrainian Cyrillic); Noto Sans Mono for IDs and receipts |
+| shape | cards radius 8, buttons radius 6 at 44 to 46px, chips and search fully rounded |
+| header | single white 64px row: logo, tabs with teal underline, language switch, account |
+
+The Academy screens are on the canvas page "Chosen · Academy (full flow)", boards 01 to 12. Board 12 holds the tokens.
 
 ## 6. Screen to API map
 
