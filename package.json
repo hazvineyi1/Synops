@@ -1,0 +1,19 @@
+{
+  "name": "djh-pilot-app",
+  "version": "0.1.0",
+  "description": "Digital Justice Hub pilot: dashboard, GRN01 course player and grounded AI case guide",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "SEED_DEMO=1 node server/index.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "express": "^4.22.3",
+    "pg": "^8.23.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}
