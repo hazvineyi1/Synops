@@ -20,12 +20,12 @@ export default function Insights() {
     <div className="min-h-screen pt-[88px]">
       <section className="bg-background pt-24 pb-20 px-6 border-b border-border">
         <div className="max-w-[1200px] mx-auto">
-          <span className="block text-[13px] font-bold uppercase tracking-widest text-accent mb-5">Education Technology &amp; AI</span>
+          <span className="block text-[13px] font-bold uppercase tracking-widest text-accent mb-5">Learning, AI &amp; Operations</span>
           <h1 className="text-5xl md:text-[64px] font-bold text-primary leading-[1.1] tracking-tight mb-6">
             Insights
           </h1>
           <p className="text-[22px] text-muted-foreground leading-relaxed max-w-3xl">
-            Perspectives on education technology and AI, learning science, and the operational rigor that makes our platforms hold up in the real world.
+            Perspectives on learning design, AI in operations, and the program discipline that makes the work hold up in the real world.
           </p>
         </div>
       </section>

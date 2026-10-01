@@ -11,9 +11,11 @@ import { Footer } from "@/components/layout/Footer";
 
 import Home from "@/pages/Home";
 import About from "@/pages/About";
-import Capabilities from "@/pages/Capabilities";
-import Healthcare from "@/pages/Healthcare";
-import Learning from "@/pages/Learning";
+import Services from "@/pages/Services";
+import Industries from "@/pages/Industries";
+import Work from "@/pages/Work";
+import Approach from "@/pages/Approach";
+import Contracting from "@/pages/Contracting";
 import Products from "@/pages/Products";
 import TryDemo from "@/pages/TryDemo";
 import Insights from "@/pages/Insights";
@@ -44,19 +46,48 @@ function AnalyticsTracker() {
   return null;
 }
 
+// Scroll to top on page change, or to the #anchor when one is present
+// (e.g. /services#ai). Waits a frame so the target section has rendered.
+function ScrollManager() {
+  const [loc] = useLocation();
+  useEffect(() => {
+    const go = () => {
+      const id = window.location.hash.slice(1);
+      const el = id ? document.getElementById(id) : null;
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      else window.scrollTo(0, 0);
+    };
+    const t = window.setTimeout(go, 60);
+    window.addEventListener("hashchange", go);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("hashchange", go);
+    };
+  }, [loc]);
+  return null;
+}
+
 function Router() {
   return (
     <div className="flex flex-col min-h-[100dvh]">
       <AnalyticsTracker />
+      <ScrollManager />
       <Nav />
       <main className="flex-1">
         <Switch>
-          {/* Marketing site routes. Platforms merged into Products. */}
+          {/* Consulting site routes. */}
           <Route path="/" component={Home} />
+          <Route path="/services" component={Services} />
+          <Route path="/industries" component={Industries} />
+          <Route path="/work" component={Work} />
+          <Route path="/approach" component={Approach} />
+          <Route path="/contracting" component={Contracting} />
           <Route path="/about" component={About} />
-          <Route path="/capabilities" component={Capabilities} />
-          <Route path="/healthcare" component={Healthcare} />
-          <Route path="/learning" component={Learning} />
+          {/* Old practice pages now live inside Services / Industries. */}
+          <Route path="/capabilities"><Redirect to="/services" /></Route>
+          <Route path="/learning"><Redirect to="/services" /></Route>
+          <Route path="/healthcare"><Redirect to="/industries" /></Route>
+          <Route path="/public-sector"><Redirect to="/contracting" /></Route>
           {/* Platforms merged into Products; keep the path as a redirect so old links resolve. */}
           <Route path="/platforms"><Redirect to="/products" /></Route>
           <Route path="/products" component={Products} />

@@ -10,7 +10,7 @@ export default function About() {
         <div className="max-w-[800px] mx-auto">
           <motion.h1
             initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-            className="text-white text-5xl md:text-[64px] font-bold leading-[1.1] tracking-tight mb-8"
+            className="font-display text-white text-5xl md:text-[64px] font-semibold leading-[1.08] tracking-tight mb-8"
           >
             About Synops
           </motion.h1>
@@ -19,7 +19,7 @@ export default function About() {
             className="text-[20px] text-white/80 leading-relaxed max-w-3xl mx-auto space-y-6"
           >
             <p>
-              An operations, delivery, and AI consultancy. We design, build, and run the systems that make organizations work, including programs, data, learning, and AI, for clients across the public sector, education, and finance.
+              A learning, AI and operations consultancy. We help organizations train their people, modernize how learning is delivered, and put AI to work in daily operations, for clients in justice, higher education, workforce development, health and the public sector across the US, the UK and Southern Africa.
             </p>
             <p>
               We don't hand over a slide deck and wish you luck. We build the workflow, ship the course, stand up the platform, and stay until your team can run it without us. Certified project leadership, real operational depth, and production results.
@@ -31,9 +31,9 @@ export default function About() {
       <section className="py-24 px-6 bg-white">
         <div className="max-w-[1200px] mx-auto">
           <div className="max-w-3xl mb-16">
-            <h2 className="text-4xl font-bold text-primary tracking-tight mb-6">Leadership</h2>
+            <h2 className="font-display text-4xl font-semibold text-primary tracking-tight mb-6">Leadership</h2>
             <p className="text-[20px] text-muted-foreground leading-relaxed">
-              Synops is led by its founder and co-founder, who bring together operations, program management, learning design, and AI. Our delivery package also covers data and business intelligence, finance and accounting operations, systems integration, and cybersecurity, brought in as each engagement requires.
+              Synops is led by its founder and co-founder, who bring together operations, program management, learning design, and AI. Specialist associates in data, systems integration and security join engagements as each one requires.
             </p>
           </div>
 
@@ -67,7 +67,7 @@ export default function About() {
               </div>
               <div className="md:col-span-8 text-[18px] text-muted-foreground leading-relaxed">
                 <p>
-                  A learning scientist and instructional-design leader with more than 15 years designing and quality-assuring education across legal, higher-ed, and K-12 domains. As lead instructional designer and senior QA specialist, shipped over 40 courses and curricula. Led an AI-integration initiative that trained designers in generative-AI evaluation and prompt engineering, and built custom GPT models. Administers major LMS platforms, applies learning analytics to lift engagement, and enforces Quality Matters, Section 508, and WCAG 2.1 AA standards.
+                  A learning scientist and instructional-design leader with more than 15 years designing and quality-assuring education across legal, higher-ed, and K-12 domains. As lead instructional designer and senior QA specialist, shipped over 40 courses and curricula. Led an AI-integration initiative that trained designers in generative-AI evaluation and prompt engineering, and built custom GPT models. Administers major LMS platforms and enforces Quality Matters, Section 508, and WCAG 2.1 AA standards. Today leads Synops's e-learning work for justice-sector and credentialing clients, builds the firm's learning platforms and AI agents, and teaches doctoral-level education courses.
                 </p>
               </div>
             </div>
@@ -101,7 +101,7 @@ export default function About() {
 
       <section className="py-24 px-6 bg-background border-t border-border">
         <div className="max-w-[1200px] mx-auto">
-          <h2 className="text-4xl font-bold text-primary tracking-tight mb-16">Core Values</h2>
+          <h2 className="font-display text-4xl font-semibold text-primary tracking-tight mb-16">Core Values</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-white border border-border p-10 rounded-none">
               <h3 className="text-2xl font-bold text-foreground mb-4">Rigor</h3>
@@ -125,7 +125,7 @@ export default function About() {
 
       <CTASection
         heading="Let's build something that lasts"
-        subtext="Bring us your hardest learning or operational challenge. We build, and we advise."
+        subtext="Bring us your hardest learning, AI or operational challenge. We advise, and then we build."
         buttonLabel="Book a consultation"
         href="/contact"
       />

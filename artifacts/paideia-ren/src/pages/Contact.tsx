@@ -34,9 +34,12 @@ export default function Contact() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const areaMap: Record<string, string> = {
-        healthcare: "Healthcare & Operations",
-        learning: "Learning, EdTech & AI",
-        platforms: "Platforms & SaaS",
+        learning: "Learning Design & E-Learning",
+        platforms: "LMS & Learning Platforms",
+        ai: "AI Integration & Automation",
+        operations: "Operations & Program Management",
+        healthcare: "Operations & Program Management",
+        contracting: "Public Sector & Contracting",
         other: "Other"
       };
       const area = params.get("area");
@@ -90,11 +93,11 @@ export default function Contact() {
     <div className="min-h-screen pt-[88px] bg-background">
       <section className="py-24 max-w-[800px] mx-auto px-6">
         <div className="text-center mb-16">
-          <h1 className="text-5xl md:text-[64px] font-bold text-primary leading-[1.1] tracking-tight mb-6">
-            Tell us what you need
+          <h1 className="font-display text-5xl md:text-[60px] font-semibold text-primary leading-[1.08] tracking-tight mb-6">
+            Book a consultation
           </h1>
           <p className="text-[20px] text-muted-foreground leading-relaxed">
-            Whether you are a school exploring our curriculum platform, a provider streamlining operations, or an organization building new technology, share a few details and our team will follow up.
+            Tell us what is not working: a training program, a learning platform, an operation that needs AI, or a program that is slipping. A principal will reply within two business days to set up a 30-minute call.
           </p>
         </div>
 
@@ -136,9 +139,11 @@ export default function Contact() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Healthcare & Operations">Healthcare & Operations</SelectItem>
-                      <SelectItem value="Learning, EdTech & AI">Learning, EdTech & AI</SelectItem>
-                      <SelectItem value="Platforms & SaaS">Platforms & SaaS</SelectItem>
+                      <SelectItem value="Learning Design & E-Learning">Learning Design & E-Learning</SelectItem>
+                      <SelectItem value="LMS & Learning Platforms">LMS & Learning Platforms</SelectItem>
+                      <SelectItem value="AI Integration & Automation">AI Integration & Automation</SelectItem>
+                      <SelectItem value="Operations & Program Management">Operations & Program Management</SelectItem>
+                      <SelectItem value="Public Sector & Contracting">Public Sector & Contracting</SelectItem>
                       <SelectItem value="Other">Other</SelectItem>
                     </SelectContent>
                   </Select>
@@ -150,14 +155,14 @@ export default function Contact() {
                 <FormItem>
                   <FormLabel className="text-[14px] font-bold">How can we help? *</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Tell us about your project or inquiry..." className="rounded-[4px] min-h-[160px] resize-y" />
+                    <Textarea {...field} placeholder="What are you trying to fix or build? Any deadlines or constraints?" className="rounded-[4px] min-h-[160px] resize-y" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               
               <Button type="submit" disabled={submitting} size="lg" className="w-full bg-primary hover:bg-primary/90 text-white h-14 text-[16px] font-bold rounded-[6px]">
-                {submitting ? "Sending..." : "Submit interest"}
+                {submitting ? "Sending..." : "Request a consultation"}
               </Button>
               
               <p className="text-center text-[14px] text-muted-foreground pt-4">

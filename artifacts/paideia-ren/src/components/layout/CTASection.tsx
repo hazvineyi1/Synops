@@ -12,7 +12,7 @@ export function CTASection({ heading, subtext, buttonLabel, href }: CTASectionPr
   return (
     <section className="bg-primary-hero py-24 px-6 border-t border-primary/20">
       <div className="max-w-[800px] mx-auto text-center">
-        <h2 className="text-white text-4xl md:text-[44px] font-bold tracking-tight leading-[1.1] mb-6">
+        <h2 className="font-display text-white text-4xl md:text-[44px] font-semibold tracking-tight leading-[1.1] mb-6">
           {heading}
         </h2>
         <p className="text-[18px] text-white/80 leading-relaxed mb-10 max-w-2xl mx-auto">

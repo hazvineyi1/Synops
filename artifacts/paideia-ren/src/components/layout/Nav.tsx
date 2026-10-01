@@ -16,14 +16,13 @@ export function Nav() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Top nav: 4 items (Products, Capabilities, Learning & AI, About). Healthcare is now
-  // one proof area under Capabilities (still routed at /healthcare for inbound links).
-  // Insights lives in the footer.
+  // Consulting-first nav. Platforms (/products) and demos live in the footer as
+  // accelerators; old paths (/capabilities, /learning, /healthcare) redirect.
   const navLinks = [
-    { href: "/products", label: "Products" },
-    { href: "/demo", label: "Try a demo" },
-    { href: "/capabilities", label: "Capabilities" },
-    { href: "/learning", label: "Learning & AI" },
+    { href: "/services", label: "Services" },
+    { href: "/industries", label: "Industries" },
+    { href: "/work", label: "Our work" },
+    { href: "/approach", label: "Approach" },
     { href: "/about", label: "About" },
   ];
 
