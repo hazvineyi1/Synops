@@ -39,7 +39,7 @@ import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
 import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
 import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
 import { seedPejPractice } from "../lib/pejPracticeSeed";
-import { PRACTICE_DDL, runPracticeDDL } from "./practice";
+import { PRACTICE_DDL, runPracticeDDL, seedMrbFramework } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import {
@@ -1802,7 +1802,11 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
       }
     }
     await audit(_req, "platform.seed_mrb_practice", "partner", pid, { credentials: MRB_PRACTICE_CREDENTIALS.length });
-    res.json({ ok: true, credentials: MRB_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId });
+    // Framework v2.1 (12 Core Competencies, credential links, draft Zimbabwe programme). Best-effort and
+    // invisible to candidates: new framework credentials are unpublished and the programme is a draft.
+    let framework: unknown = null;
+    try { framework = await seedMrbFramework(pid); } catch (e) { framework = { error: e instanceof Error ? e.message : String(e) }; }
+    res.json({ ok: true, credentials: MRB_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId, framework });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }

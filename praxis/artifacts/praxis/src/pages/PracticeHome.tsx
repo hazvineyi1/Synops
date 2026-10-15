@@ -19,7 +19,13 @@ import {
  * practice moves through experience, reflection, naming and trying. The interface adapts, guided or
  * pro density, one recommended next move up top, and a masthead that reads your overall progress.
  */
-type Credential = { id: string; code: string; title: string; summary: string | null; activity_brief: string | null; gateway_guidance: string | null; example_assignment: string | null; rationale: string | null };
+type Credential = {
+  id: string; code: string; title: string; summary: string | null; activity_brief: string | null; gateway_guidance: string | null; example_assignment: string | null; rationale: string | null;
+  // Framework v2.1 (present once the framework is loaded): the competency this credential primarily
+  // develops, its learning outcomes, and the practice areas it belongs to in a live programme.
+  primary_competency?: { num: number; title: string } | null; learning_outcomes?: string | null;
+  practice_areas?: Array<{ area: string; mandatory: boolean }>;
+};
 type Mine = Credential & {
   credential_id: string; status: string; sort: number; justification: string | null;
   sequence_locked: boolean; reflection_count: number; evidence_count: number;
@@ -472,6 +478,14 @@ function ChooseRow({ cred, audience, guided, onChoose, busy, disabled }: { cred:
         <div className="min-w-0">
           <div className="font-medium text-sm">{cred.title}</div>
           {cred.summary && <div className="text-xs text-muted-foreground mt-0.5">{cred.summary}</div>}
+          {(cred.primary_competency || (cred.practice_areas && cred.practice_areas.length > 0)) && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5 text-[10px]">
+              {cred.practice_areas?.map((pa) => (
+                <span key={pa.area} className="border border-foreground/15 px-1.5 py-0.5">{pa.area}{pa.mandatory ? ' · required' : ''}</span>
+              ))}
+              {cred.primary_competency && <span className="text-muted-foreground px-0.5 py-0.5">Develops: {cred.primary_competency.title}</span>}
+            </div>
+          )}
         </div>
         <ChevronDown className={`h-4 w-4 shrink-0 mt-0.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -487,6 +501,14 @@ function ChooseRow({ cred, audience, guided, onChoose, busy, disabled }: { cred:
             <div>
               <div className="ed-overline text-muted-foreground">What you'll do</div>
               <p className="text-sm text-muted-foreground mt-0.5">{cred.activity_brief}</p>
+            </div>
+          )}
+          {cred.learning_outcomes && (
+            <div>
+              <div className="ed-overline text-muted-foreground">What reviewers look for</div>
+              <ul className="text-sm text-muted-foreground mt-0.5 list-disc pl-5 space-y-0.5">
+                {cred.learning_outcomes.split('\n').map((l) => l.trim()).filter(Boolean).map((l, i) => <li key={i}>{l}</li>)}
+              </ul>
             </div>
           )}
           {!guided && <p className="text-xs text-primary border-l-2 border-primary/40 pl-2.5">{outcome}</p>}

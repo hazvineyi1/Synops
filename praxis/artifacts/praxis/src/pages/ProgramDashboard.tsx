@@ -17,6 +17,7 @@ type Overview = {
   recognitionRate: number;
   authenticity: { typedLivePct: number; attestationsConfirmed: number };
   byCredential: Array<{ code: string; title: string; recognised: number; in_progress: number; submitted: number }>;
+  byCompetency?: Array<{ num: number; title: string; primary_recognised: number; secondary_recognised: number; people: number }>;
   recent: Array<{ public_id: string; recipient_name: string | null; credential_title: string | null; issued_at: string }>;
 };
 
@@ -83,6 +84,24 @@ export function ProgramDashboard() {
               </div>
             )}
           </Card>
+
+          {data.byCompetency && data.byCompetency.length > 0 && (
+            <Card className="rounded-none p-5">
+              <div className="ed-overline text-foreground mb-1">Collective capability by Core Competency</div>
+              <p className="text-xs text-muted-foreground mb-3">
+                Recognised credentials, counted against each competency they develop (primary or secondary). No one person is
+                expected to cover all twelve; this shows how the group covers them together.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+                {data.byCompetency.map((c) => (
+                  <div key={c.num} className="flex items-center justify-between gap-2 text-sm border-b border-border/60 py-1">
+                    <span className="min-w-0"><span className="ed-num text-muted-foreground mr-1.5">{c.num}</span>{c.title}</span>
+                    <span className="text-xs text-muted-foreground shrink-0">{c.primary_recognised} primary · {c.secondary_recognised} secondary · {c.people} {c.people === 1 ? 'person' : 'people'}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
 
           <div className="grid sm:grid-cols-2 gap-4">
             <Card className="rounded-none p-5">

@@ -108,6 +108,8 @@ import { ProgramDashboard } from '@/pages/ProgramDashboard';
 import { PracticeCanvas } from '@/pages/PracticeCanvas';
 import { PracticeReview } from '@/pages/PracticeReview';
 import { PracticeCredentialEdit } from '@/pages/PracticeCredentialEdit';
+import { PracticeFramework } from '@/pages/PracticeFramework';
+import { PracticeTutoring } from '@/pages/PracticeTutoring';
 
 // Layout
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -331,6 +333,8 @@ function Routes() {
         <ProtectedRoute path="/partner/settings" component={PartnerSettings} />
         <ProtectedRoute path="/program" component={ProgramDashboard} />
         <ProtectedRoute path="/practice/review" component={PracticeReview} />
+        <ProtectedRoute path="/practice/framework" component={PracticeFramework} />
+        <ProtectedRoute path="/practice/tutoring" component={PracticeTutoring} />
         <ProtectedRoute path="/practice/credential/:id" component={PracticeCredentialEdit} />
         <ProtectedRoute path="/practice/c/:id" component={PracticeCanvas} />
         <ProtectedRoute path="/practice/sets/:id/t/:tid" component={PracticeTopic} />
