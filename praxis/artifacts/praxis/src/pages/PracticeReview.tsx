@@ -480,10 +480,10 @@ function PortfolioReview({ id, onDone, mode = 'primary', certItemId, isSuper }: 
           <div className="text-xs font-medium text-muted-foreground mb-1.5">Outcome</div>
           <div className="flex gap-2">
             <button onClick={() => setOutcome('reviewed')} className={`flex-1 rounded-lg border p-2.5 text-sm ${outcome === 'reviewed' ? 'border-emerald-500/50 bg-emerald-500/5 text-emerald-700' : 'border-border hover:bg-muted/30'}`}>
-              <CheckCircle2 className="h-4 w-4 inline mr-1.5" /> Recognised
+              <CheckCircle2 className="h-4 w-4 inline mr-1.5" /> Accept
             </button>
             <button onClick={() => setOutcome('referred')} className={`flex-1 rounded-lg border p-2.5 text-sm ${outcome === 'referred' ? 'border-amber-500/50 bg-amber-500/5 text-amber-700' : 'border-border hover:bg-muted/30'}`}>
-              <ArrowRight className="h-4 w-4 inline mr-1.5" /> Refer for resubmission
+              <ArrowRight className="h-4 w-4 inline mr-1.5" /> Invite resubmission
             </button>
           </div>
         </div>
@@ -504,7 +504,7 @@ function PortfolioReview({ id, onDone, mode = 'primary', certItemId, isSuper }: 
             </Button>
           )}
           <Button disabled={(blind ? false : !feedback.trim()) || gated || review.isPending} onClick={() => review.mutate()} className="gap-1.5 rounded-none ml-auto">
-            {review.isPending ? 'Saving...' : certification ? 'Submit my answer' : calibration ? 'Record second opinion' : outcome === 'reviewed' ? 'Recognise & send feedback' : 'Refer & send feedback'}
+            {review.isPending ? 'Saving...' : certification ? 'Submit my answer' : calibration ? 'Record second opinion' : outcome === 'reviewed' ? 'Accept and send feedback' : 'Invite resubmission and send feedback'}
           </Button>
         </div>
       </Card>

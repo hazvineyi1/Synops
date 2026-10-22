@@ -10,6 +10,8 @@ import { ShieldCheck, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 type Cred = {
   public_id: string; recipient_name: string | null; credential_title: string | null;
   issuer: string; g1: boolean; g2: boolean; g3: boolean; revoked: boolean; issued_at: string;
+  // Present when the credential belongs to a framework (MRB Framework for Advanced Leadership Practice).
+  competencies?: Array<{ num: number; title: string; primary: boolean }>; framework?: string; valid_until?: string;
 };
 
 const GATES: [keyof Cred, string][] = [['g1', 'Relevant activity'], ['g2', 'Personal contribution'], ['g3', 'Learning from practice']];
@@ -59,8 +61,20 @@ export function VerifyPage({ params }: { params?: { publicId?: string } }) {
         <p className="ed-h2 mt-1">{data.credential_title}</p>
       </div>
 
+      {data.competencies && data.competencies.length > 0 && (
+        <div>
+          <div className="ed-overline text-muted-foreground mb-2">Core Competencies developed</div>
+          <div className="space-y-1 text-sm">
+            {data.competencies.map((c) => (
+              <div key={c.num}>{c.num}. {c.title}{c.primary && <span className="text-muted-foreground"> (primary)</span>}</div>
+            ))}
+          </div>
+          {data.framework && <div className="text-xs text-muted-foreground mt-1.5">{data.framework}</div>}
+        </div>
+      )}
+
       <div>
-        <div className="ed-overline text-muted-foreground mb-2">Recognised against three gateways</div>
+        <div className="ed-overline text-muted-foreground mb-2">Reviewed against three gateways</div>
         <div className="space-y-1.5">
           {GATES.map(([k, label]) => (
             <div key={k as string} className="flex items-center gap-2 text-sm">
@@ -74,8 +88,11 @@ export function VerifyPage({ params }: { params?: { publicId?: string } }) {
       <div className="ed-rule" />
       <div className="text-xs text-muted-foreground space-y-1">
         <div>Issued by <span className="text-foreground font-medium">{data.issuer}</span> on {issued}.</div>
+        {data.valid_until && !data.revoked && (
+          <div>Current until {new Date(data.valid_until).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}, after which renewal or revalidation may be recommended.</div>
+        )}
         <div>Verification id: <span className="font-mono">{data.public_id}</span></div>
-        <div>Recognition follows a reviewed practice portfolio: real evidence, the candidate's own reflection, and an independent human review. <a href={`/api/practice/verify/${data.public_id}/assertion`} className="text-primary hover:underline">Machine-readable record</a>.</div>
+        <div>The credential follows a reviewed practice portfolio: real evidence, the candidate's own reflection, and an independent human review. <a href={`/api/practice/verify/${data.public_id}/assertion`} className="text-primary hover:underline">Machine-readable record</a>.</div>
       </div>
     </div>
   );

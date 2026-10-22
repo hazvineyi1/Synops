@@ -4,7 +4,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
-import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
+import { practiceCoachPersona } from "../lib/mrbCoach";
 import { PHENOMENA, EXCLUDED_FRAMEWORKS, phenomenonById, lensById, catalogueForMatcher } from "../lib/practiceLibrary";
 import { logAudit } from "../lib/audit";
 import { FRAMEWORK_COMPETENCIES, FRAMEWORK_VERSION, LEGACY_CODE_TO_FRAMEWORK, ZIMBABWE_PROGRAMME, ZIMBABWE_NOTES } from "../lib/mrbFramework";
@@ -602,14 +602,44 @@ router.delete("/practice/me/attestations/:aid", requireAuth, async (req, res) =>
 router.get("/practice/verify/:publicId", async (req, res) => {
   const r = await rows(sql`SELECT public_id, recipient_name, credential_title, issuer, g1, g2, g3, revoked, issued_at FROM issued_credentials WHERE public_id = ${req.params.publicId} LIMIT 1`);
   if (!r[0]) { res.status(404).json({ error: "No credential with that id." }); return; }
-  res.json(r[0]);
+  res.json({ ...r[0], ...(await frameworkFacts(req.params.publicId, (r[0] as any).issued_at)) });
 });
+
+/**
+ * Framework facts for an issued credential, when its credential is linked to a framework: the
+ * competencies it develops (primary first) and, under MRB framework v2.1, a ten-year validity period.
+ * Empty for credentials outside a framework, so other programmes' certificates are unchanged.
+ */
+async function frameworkFacts(publicId: string, issuedAt: string): Promise<{ competencies?: { num: number; title: string; primary: boolean }[]; framework?: string; valid_until?: string }> {
+  try {
+    const comps = await rows<{ num: number; title: string; primary: boolean; version: string | null }>(sql`
+      SELECT fc.num, fc.title, ccm.is_primary AS primary, fc.version
+      FROM issued_credentials ic
+      JOIN candidate_credentials cc ON cc.id = ic.candidate_credential_id
+      JOIN credential_competencies ccm ON ccm.credential_id = cc.credential_id
+      JOIN framework_competencies fc ON fc.id = ccm.competency_id
+      WHERE ic.public_id = ${publicId}
+      ORDER BY ccm.is_primary DESC, fc.num`);
+    if (!comps.length) return {};
+    const until = new Date(issuedAt);
+    until.setFullYear(until.getFullYear() + 10);
+    return {
+      competencies: comps.map(({ num, title, primary }) => ({ num, title, primary })),
+      framework: `Framework for Advanced Leadership Practice v${comps[0].version ?? FRAMEWORK_VERSION}`,
+      valid_until: until.toISOString(),
+    };
+  } catch {
+    return {};
+  }
+}
 
 // PUBLIC (no auth): the same credential as an Open Badges style assertion, for machine verification.
 router.get("/practice/verify/:publicId/assertion", async (req, res) => {
   const r = await rows<{ public_id: string; recipient_name: string | null; credential_title: string | null; issuer: string; revoked: boolean; issued_at: string }>(sql`SELECT public_id, recipient_name, credential_title, issuer, revoked, issued_at FROM issued_credentials WHERE public_id = ${req.params.publicId} LIMIT 1`);
   if (!r[0]) { res.status(404).json({ error: "No credential with that id." }); return; }
+  const fw = await frameworkFacts(r[0].public_id, r[0].issued_at);
   res.json({
+    ...(fw.valid_until ? { validUntil: fw.valid_until } : {}),
     "@context": ["https://www.w3.org/ns/credentials/v2", "https://purl.imsglobal.org/spec/ob/v3p0/context.json"],
     type: ["VerifiableCredential", "OpenBadgeCredential"],
     issuer: { type: "Profile", name: r[0].issuer },
@@ -622,6 +652,7 @@ router.get("/practice/verify/:publicId/assertion", async (req, res) => {
         type: "Achievement",
         name: r[0].credential_title,
         criteria: { narrative: "Recognised through a reviewed practice portfolio judged against three gateways: relevant activity, personal contribution, and learning from practice." },
+        ...(fw.competencies ? { alignment: fw.competencies.map((c) => ({ type: ["Alignment"], targetName: c.title, targetFramework: fw.framework, targetCode: String(c.num) })) } : {}),
       },
     },
   });
@@ -1571,7 +1602,7 @@ async function coachContext(uid: string, ccId?: string): Promise<{ title?: strin
 async function coachObserve(text: string, learnerContext: string | undefined, coachName?: string): Promise<{ reply: string; offerAnalysis: boolean }> {
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    `You are ${practiceCoachPersona(name)}\n\n` +
     (learnerContext ? `What you know about this person:\n${learnerContext}\n\n` : "") +
     `The learner has just written something in their reflection. Respond as an ongoing thinking partner reading over their shoulder: in ONE or TWO short sentences, either notice something specific in what they wrote and offer a brief insight, or ask one probing question that pushes their thinking deeper. Do not summarise what they said back to them and do not praise emptily. ${COACH_RESEARCH} About one time in three, end by offering to reflect a bigger pattern back to them, phrased as a short question. Never use em dashes or en dashes.`;
   const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 220, system: rename(systemRaw, name), messages: [{ role: "user", content: `They just wrote: "${String(text).slice(0, 3000)}"` }] }, { timeout: 45000, maxRetries: 1 });
@@ -1584,7 +1615,7 @@ async function coachObserve(text: string, learnerContext: string | undefined, co
 async function coachAnalysis(learnerContext: string | undefined, coachName?: string): Promise<string> {
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    `You are ${practiceCoachPersona(name)}\n\n` +
     (learnerContext ? `What you know about this person and their reflection so far:\n${learnerContext}\n\n` : "") +
     `The learner has asked you for an analysis. Read their whole reflection so far and reflect back, warmly and specifically, two or three patterns in how they are thinking or practising, and one honest edge to push on. ${COACH_RESEARCH} This is a mirror to think against, not a grade and not the final word. Keep it under 180 words. Never use em dashes or en dashes.`;
   const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 420, system: rename(systemRaw, name), messages: [{ role: "user", content: "Please reflect back what you notice in my reflection so far." }] }, { timeout: 60000, maxRetries: 1 });
@@ -1670,7 +1701,7 @@ export async function mutaleCoachReply(messages: { role: string; content: string
   const history = Array.isArray(messages) ? messages.slice(-16) : [];
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n${MUTALE_SPINE}\n` +
+    `You are ${practiceCoachPersona(name)}\n\n${MUTALE_SPINE}\n` +
     (learnerContext ? `Your model of this person (do not read it back to them; use it to individualize every question):\n${learnerContext}\n\n` : "") +
     `You are helping them turn a real experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "their practice"}". ` +
     (activityBrief ? `The activity brief is: ${activityBrief}\n` : "") +
@@ -1803,7 +1834,7 @@ router.post("/practice/name/inquiry", requireAuth, async (req, res) => {
   if (!ctx.title) { res.status(404).json({ error: "Not found" }); return; }
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    `You are ${practiceCoachPersona(name)}\n\n` +
     (ctx.context ? `What you know about this person and their experience:\n${ctx.context}\n\n` : "") +
     `Asking good questions of other people is a core leadership skill, distinct from answering questions about oneself. The candidate has drafted the questions they would ASK their team or stakeholders to understand what happened. Your job is to coach the QUALITY of their questions. You must NOT answer the questions and must NOT tell them what the answers might be.\n` +
     `In under 130 words, warmly and specifically: note which of their questions are genuinely open versus leading or loaded; which get at causes rather than symptoms; and offer ONE sharper question they could ask instead, as a suggestion for them to consider. Refer to their actual questions. Never use em dashes or en dashes.`;
@@ -1891,7 +1922,7 @@ router.post("/practice/name/interrogate", requireAuth, async (req, res) => {
   if (!ph || !lens) { res.status(400).json({ error: "Unknown phenomenon or lens" }); return; }
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    `You are ${practiceCoachPersona(name)}\n\n` +
     (ctx.context ? `The candidate's own account:\n${ctx.context}\n\n` : "") +
     `The candidate has chosen to look at their experience through this lens:\n` +
     `Lens: ${lens.name}. In plain terms: ${lens.gist}. What it does NOT explain: ${lens.edge}. (Origin: ${lens.origin}.)\n\n` +

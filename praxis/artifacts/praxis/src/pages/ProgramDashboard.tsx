@@ -39,7 +39,7 @@ export function ProgramDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { label: 'Professionals', value: data.totals.candidates, icon: Users },
-              { label: 'Recognised', value: data.totals.reviewed, icon: Award },
+              { label: 'Accepted', value: data.totals.reviewed, icon: Award },
               { label: 'Recognition rate', value: `${data.recognitionRate}%`, icon: BarChart3 },
               { label: 'In review', value: data.totals.submitted, icon: ShieldCheck },
             ].map((k) => (
@@ -65,10 +65,10 @@ export function ProgramDashboard() {
                       <div key={c.code}>
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium">{c.title}</span>
-                          <span className="ed-num text-muted-foreground">{c.recognised} recognised</span>
+                          <span className="ed-num text-muted-foreground">{c.recognised} accepted</span>
                         </div>
                         <div className="mt-1 flex h-3 w-full bg-muted/40" style={{ width: `${Math.max(6, (total / max) * 100)}%` }}>
-                          {c.recognised > 0 && <div className="bg-emerald-500" style={{ width: `${(c.recognised / total) * 100}%` }} title={`${c.recognised} recognised`} />}
+                          {c.recognised > 0 && <div className="bg-emerald-500" style={{ width: `${(c.recognised / total) * 100}%` }} title={`${c.recognised} accepted`} />}
                           {c.submitted > 0 && <div className="bg-primary" style={{ width: `${(c.submitted / total) * 100}%` }} title={`${c.submitted} in review`} />}
                           {c.in_progress > 0 && <div className="bg-muted-foreground/40" style={{ width: `${(c.in_progress / total) * 100}%` }} title={`${c.in_progress} in progress`} />}
                         </div>
@@ -77,7 +77,7 @@ export function ProgramDashboard() {
                   });
                 })()}
                 <div className="flex flex-wrap gap-4 pt-1 text-[11px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 bg-emerald-500" /> Recognised</span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 bg-emerald-500" /> Accepted</span>
                   <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 bg-primary" /> In review</span>
                   <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 bg-muted-foreground/40" /> In progress</span>
                 </div>
@@ -89,7 +89,7 @@ export function ProgramDashboard() {
             <Card className="rounded-none p-5">
               <div className="ed-overline text-foreground mb-1">Collective capability by Core Competency</div>
               <p className="text-xs text-muted-foreground mb-3">
-                Recognised credentials, counted against each competency they develop (primary or secondary). No one person is
+                Accepted credentials, counted against each competency they develop (primary or secondary). No one person is
                 expected to cover all twelve; this shows how the group covers them together.
               </p>
               <div className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
@@ -111,7 +111,7 @@ export function ProgramDashboard() {
             </Card>
 
             <Card className="rounded-none p-5">
-              <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><Award className="h-4 w-4 text-primary" /> Recently recognised</div>
+              <div className="ed-overline text-foreground mb-2 flex items-center gap-2"><Award className="h-4 w-4 text-primary" /> Recently accepted</div>
               {data.recent.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No credentials issued yet.</p>
               ) : (
