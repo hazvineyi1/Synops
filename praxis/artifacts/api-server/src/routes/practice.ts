@@ -4,9 +4,10 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, requireSuperAdmin } from "../middlewares/requireAuth";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
-import { MUTALE_PERSONA, MUTALE_CONSTRAINTS } from "../lib/mrbCoach";
+import { practiceCoachPersona } from "../lib/mrbCoach";
 import { PHENOMENA, EXCLUDED_FRAMEWORKS, phenomenonById, lensById, catalogueForMatcher } from "../lib/practiceLibrary";
 import { logAudit } from "../lib/audit";
+import { FRAMEWORK_COMPETENCIES, FRAMEWORK_VERSION, LEGACY_CODE_TO_FRAMEWORK, ZIMBABWE_PROGRAMME, ZIMBABWE_NOTES } from "../lib/mrbFramework";
 import { uploadObject, storageEnabled } from "../lib/supabaseStorage";
 
 /**
@@ -221,6 +222,64 @@ CREATE TABLE IF NOT EXISTS learning_set_posts (
   round integer NOT NULL DEFAULT 1,
   created_at timestamp NOT NULL DEFAULT now());
 CREATE INDEX IF NOT EXISTS learning_set_posts_topic_idx ON learning_set_posts(topic_id, created_at);
+
+-- ── Framework for Advanced Leadership Practice (MRB, v2.1) ──────────────────────────────────────
+-- Three layers: 12 Core Competencies (MRB-owned) / credentials (one primary competency, optional
+-- secondary contributions) / programme-specific practice areas that group credentials. A credential
+-- seeded from the framework but not yet authored is unpublished, so candidates never see an empty one.
+ALTER TABLE practice_credentials ADD COLUMN IF NOT EXISTS learning_outcomes text;
+ALTER TABLE practice_credentials ADD COLUMN IF NOT EXISTS framework_name text;
+ALTER TABLE practice_credentials ADD COLUMN IF NOT EXISTS published boolean NOT NULL DEFAULT true;
+CREATE TABLE IF NOT EXISTS framework_competencies (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  partner_id text NOT NULL,
+  num integer NOT NULL,
+  code text NOT NULL,
+  title text NOT NULL,
+  definition text,
+  version text,
+  created_at timestamp NOT NULL DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS framework_competencies_uq ON framework_competencies(partner_id, code);
+CREATE TABLE IF NOT EXISTS credential_competencies (
+  credential_id text NOT NULL,
+  competency_id text NOT NULL,
+  is_primary boolean NOT NULL DEFAULT false,
+  PRIMARY KEY (credential_id, competency_id));
+CREATE TABLE IF NOT EXISTS practice_programmes (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  partner_id text NOT NULL,
+  code text NOT NULL,
+  title text NOT NULL,
+  status text NOT NULL DEFAULT 'draft',
+  notes text,
+  created_at timestamp NOT NULL DEFAULT now());
+CREATE UNIQUE INDEX IF NOT EXISTS practice_programmes_uq ON practice_programmes(partner_id, code);
+CREATE TABLE IF NOT EXISTS practice_areas (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  programme_id text NOT NULL,
+  code text NOT NULL,
+  title text NOT NULL,
+  sort integer NOT NULL DEFAULT 0);
+CREATE UNIQUE INDEX IF NOT EXISTS practice_areas_uq ON practice_areas(programme_id, code);
+CREATE TABLE IF NOT EXISTS practice_area_credentials (
+  area_id text NOT NULL,
+  credential_id text NOT NULL,
+  mandatory boolean NOT NULL DEFAULT false,
+  is_new boolean NOT NULL DEFAULT false,
+  note text,
+  sort integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (area_id, credential_id));
+
+-- Tutors: the framework has each candidate agree a learning plan with their tutor. Tutors coach and
+-- never review their own candidates, so a tutor assignment also excludes that person from review.
+CREATE TABLE IF NOT EXISTS tutor_assignments (
+  candidate_id text NOT NULL,
+  tutor_id text NOT NULL,
+  partner_id text,
+  created_at timestamp NOT NULL DEFAULT now(),
+  PRIMARY KEY (candidate_id, tutor_id));
+ALTER TABLE candidate_credentials ADD COLUMN IF NOT EXISTS plan_approved_by text;
+ALTER TABLE candidate_credentials ADD COLUMN IF NOT EXISTS plan_approved_at timestamp;
 `;
 
 /** Rows helper: db.execute over a raw/parameterised sql template returns { rows }. */
@@ -280,9 +339,39 @@ router.get("/practice/credentials", requireAuth, async (req, res) => {
     ? req.query.partnerId
     : await partnerOf(req);
   if (!pid) { res.json([]); return; }
-  const list = await rows(sql`
-    SELECT id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort
-    FROM practice_credentials WHERE partner_id = ${pid} ORDER BY sort, title`);
+  // Staff see the whole catalogue (including unpublished framework credentials awaiting content).
+  // Candidates see: the credentials of the partner's ACTIVE programme when one exists, otherwise the
+  // published catalogue. A draft programme changes nothing for candidates.
+  const staffView = isStaff(req) && req.query.all === "1";
+  let active: { id: string }[] = [];
+  try {
+    active = await rows<{ id: string }>(sql`SELECT id FROM practice_programmes WHERE partner_id = ${pid} AND status = 'active'`);
+  } catch { /* framework tables not migrated yet */ }
+  const filter = staffView
+    ? sql`TRUE`
+    : active.length
+      ? sql`pc.id IN (SELECT pac.credential_id FROM practice_area_credentials pac JOIN practice_areas pa ON pa.id = pac.area_id
+                      JOIN practice_programmes pp ON pp.id = pa.programme_id WHERE pp.partner_id = ${pid} AND pp.status = 'active')`
+      : sql`COALESCE(pc.published, true) = true`;
+  let list: any[];
+  try {
+    list = await rows(sql`
+      SELECT pc.id, pc.code, pc.title, pc.summary, pc.activity_brief, pc.gateway_guidance, pc.example_assignment, pc.rationale,
+        pc.learning_outcomes, pc.framework_name, pc.published, pc.sort,
+        (SELECT json_build_object('num', fc.num, 'title', fc.title) FROM credential_competencies ccm
+           JOIN framework_competencies fc ON fc.id = ccm.competency_id
+           WHERE ccm.credential_id = pc.id AND ccm.is_primary LIMIT 1) AS primary_competency,
+        (SELECT COALESCE(json_agg(json_build_object('area', pa.title, 'mandatory', pac.mandatory) ORDER BY pa.sort), '[]'::json)
+           FROM practice_area_credentials pac JOIN practice_areas pa ON pa.id = pac.area_id
+           JOIN practice_programmes pp ON pp.id = pa.programme_id
+           WHERE pac.credential_id = pc.id AND pp.status = 'active') AS practice_areas
+      FROM practice_credentials pc WHERE pc.partner_id = ${pid} AND ${filter} ORDER BY pc.sort, pc.title`);
+  } catch {
+    // Pre-migration fallback: the original catalogue shape.
+    list = await rows(sql`
+      SELECT id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort
+      FROM practice_credentials WHERE partner_id = ${pid} ORDER BY sort, title`);
+  }
   res.json(list);
 });
 
@@ -314,6 +403,15 @@ router.get("/practice/credentials/one/:id", requireAuth, async (req, res) => {
     SELECT id, partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort
     FROM practice_credentials WHERE id = ${req.params.id} LIMIT 1`);
   if (!row) { res.status(404).json({ error: "Not found" }); return; }
+  // Framework fields are read separately so the editor still works before the framework migration runs.
+  try {
+    const [fw] = await rows<any>(sql`SELECT learning_outcomes, framework_name, published FROM practice_credentials WHERE id = ${req.params.id}`);
+    const comps = await rows<any>(sql`
+      SELECT fc.num, fc.title, ccm.is_primary FROM credential_competencies ccm
+      JOIN framework_competencies fc ON fc.id = ccm.competency_id
+      WHERE ccm.credential_id = ${req.params.id} ORDER BY ccm.is_primary DESC, fc.num`);
+    Object.assign(row as any, fw ?? {}, { competencies: comps });
+  } catch { /* pre-migration */ }
   res.json(row);
 });
 
@@ -358,6 +456,16 @@ router.patch("/practice/credentials/:id", requireAuth, requireSuperAdmin, async 
     WHERE id = ${req.params.id}
     RETURNING id`);
   if (!row) { res.status(404).json({ error: "Credential not found." }); return; }
+  // Framework fields (separate statement so a pre-migration database still saves the core fields).
+  const pub = typeof b.published === "boolean" ? b.published : null;
+  if (val("learning_outcomes") !== null || pub !== null) {
+    try {
+      await db.execute(sql`UPDATE practice_credentials SET
+        learning_outcomes = COALESCE(${val("learning_outcomes")}, learning_outcomes),
+        published = COALESCE(${pub}, published)
+        WHERE id = ${req.params.id}`);
+    } catch { res.status(409).json({ error: "Run the practice migration first (framework fields missing)." }); return; }
+  }
   await logAudit(req, "practice_credential.update", "practice_credential", row.id, {});
   res.json({ ok: true, id: row.id });
 });
@@ -494,14 +602,44 @@ router.delete("/practice/me/attestations/:aid", requireAuth, async (req, res) =>
 router.get("/practice/verify/:publicId", async (req, res) => {
   const r = await rows(sql`SELECT public_id, recipient_name, credential_title, issuer, g1, g2, g3, revoked, issued_at FROM issued_credentials WHERE public_id = ${req.params.publicId} LIMIT 1`);
   if (!r[0]) { res.status(404).json({ error: "No credential with that id." }); return; }
-  res.json(r[0]);
+  res.json({ ...r[0], ...(await frameworkFacts(req.params.publicId, (r[0] as any).issued_at)) });
 });
+
+/**
+ * Framework facts for an issued credential, when its credential is linked to a framework: the
+ * competencies it develops (primary first) and, under MRB framework v2.1, a ten-year validity period.
+ * Empty for credentials outside a framework, so other programmes' certificates are unchanged.
+ */
+async function frameworkFacts(publicId: string, issuedAt: string): Promise<{ competencies?: { num: number; title: string; primary: boolean }[]; framework?: string; valid_until?: string }> {
+  try {
+    const comps = await rows<{ num: number; title: string; primary: boolean; version: string | null }>(sql`
+      SELECT fc.num, fc.title, ccm.is_primary AS primary, fc.version
+      FROM issued_credentials ic
+      JOIN candidate_credentials cc ON cc.id = ic.candidate_credential_id
+      JOIN credential_competencies ccm ON ccm.credential_id = cc.credential_id
+      JOIN framework_competencies fc ON fc.id = ccm.competency_id
+      WHERE ic.public_id = ${publicId}
+      ORDER BY ccm.is_primary DESC, fc.num`);
+    if (!comps.length) return {};
+    const until = new Date(issuedAt);
+    until.setFullYear(until.getFullYear() + 10);
+    return {
+      competencies: comps.map(({ num, title, primary }) => ({ num, title, primary })),
+      framework: `Framework for Advanced Leadership Practice v${comps[0].version ?? FRAMEWORK_VERSION}`,
+      valid_until: until.toISOString(),
+    };
+  } catch {
+    return {};
+  }
+}
 
 // PUBLIC (no auth): the same credential as an Open Badges style assertion, for machine verification.
 router.get("/practice/verify/:publicId/assertion", async (req, res) => {
   const r = await rows<{ public_id: string; recipient_name: string | null; credential_title: string | null; issuer: string; revoked: boolean; issued_at: string }>(sql`SELECT public_id, recipient_name, credential_title, issuer, revoked, issued_at FROM issued_credentials WHERE public_id = ${req.params.publicId} LIMIT 1`);
   if (!r[0]) { res.status(404).json({ error: "No credential with that id." }); return; }
+  const fw = await frameworkFacts(r[0].public_id, r[0].issued_at);
   res.json({
+    ...(fw.valid_until ? { validUntil: fw.valid_until } : {}),
     "@context": ["https://www.w3.org/ns/credentials/v2", "https://purl.imsglobal.org/spec/ob/v3p0/context.json"],
     type: ["VerifiableCredential", "OpenBadgeCredential"],
     issuer: { type: "Profile", name: r[0].issuer },
@@ -514,6 +652,7 @@ router.get("/practice/verify/:publicId/assertion", async (req, res) => {
         type: "Achievement",
         name: r[0].credential_title,
         criteria: { narrative: "Recognised through a reviewed practice portfolio judged against three gateways: relevant activity, personal contribution, and learning from practice." },
+        ...(fw.competencies ? { alignment: fw.competencies.map((c) => ({ type: ["Alignment"], targetName: c.title, targetFramework: fw.framework, targetCode: String(c.num) })) } : {}),
       },
     },
   });
@@ -703,15 +842,21 @@ router.post("/practice/me/credentials/:id/submit", requireAuth, async (req, res)
     SELECT id, partner_id, reviewer_id FROM candidate_credentials WHERE id = ${req.params.id} AND candidate_id = ${uid} LIMIT 1`);
   if (!own[0]) { res.status(404).json({ error: "Not found" }); return; }
   // Assign to the partner's reviewer with the smallest current queue (<=16), keeping any prior reviewer.
-  let reviewerId = own[0].reviewer_id;
+  // Reviewers are independent of tutors: a candidate's own tutor is never assigned as their reviewer
+  // (and a prior assignment to them is dropped).
+  let tutorIds: string[] = [];
+  try {
+    tutorIds = (await rows<{ tutor_id: string }>(sql`SELECT tutor_id FROM tutor_assignments WHERE candidate_id = ${uid}`)).map((t) => t.tutor_id);
+  } catch { /* pre-migration: no tutor assignments */ }
+  let reviewerId = own[0].reviewer_id && !tutorIds.includes(own[0].reviewer_id) ? own[0].reviewer_id : null;
   if (!reviewerId) {
     const r = await rows<{ id: string }>(sql`
       SELECT u.id,
         (SELECT count(*)::int FROM candidate_credentials q WHERE q.reviewer_id = u.id AND q.status = 'submitted') AS load
       FROM users u
       WHERE u.role = 'coach' AND u.organisation_id IN (SELECT id FROM organisations WHERE partner_id = ${own[0].partner_id})
-      ORDER BY load ASC LIMIT 1`);
-    reviewerId = r[0]?.id ?? null;
+      ORDER BY load ASC LIMIT 25`);
+    reviewerId = r.find((x) => !tutorIds.includes(x.id))?.id ?? null;
   }
   await db.execute(sql`
     UPDATE candidate_credentials SET status = 'submitted', reviewer_id = ${reviewerId}, submitted_at = now(), updated_at = now()
@@ -870,6 +1015,292 @@ router.get("/practice/irr", requireAuth, async (req, res) => {
   res.json({ pairs: n, agreement: { g1: pct(agg.g1), g2: pct(agg.g2), g3: pct(agg.g3), outcome: pct(agg.outcome) }, disagreements });
 });
 
+// ── Framework for Advanced Leadership Practice ────────────────────────────────
+// Staff resolve the partner from ?partnerId= (super admin acting in a hub) or their own partner.
+async function staffPartner(req: any): Promise<string | null> {
+  if (typeof req.query.partnerId === "string" && req.query.partnerId && req.dbUser?.role === "super_admin") return req.query.partnerId;
+  if (req.dbUser?.role === "super_admin" && !(await partnerOf(req))) {
+    const [p] = await rows<{ id: string }>(sql`SELECT id FROM partners WHERE slug = 'zambian-leadership' LIMIT 1`);
+    return p?.id ?? null;
+  }
+  return partnerOf(req);
+}
+const canAdminFramework = (req: any) => ["super_admin", "partner_admin"].includes(req.dbUser?.role);
+/** A partner admin may only act on candidates and programmes in their own partner. */
+async function inAdminScope(req: any, candidateId: string | null, programmeId: string | null): Promise<boolean> {
+  if (req.dbUser?.role === "super_admin") return true;
+  const pid = await partnerOf(req);
+  if (!pid) return false;
+  if (candidateId) {
+    const [u] = await rows(sql`SELECT 1 FROM users u WHERE u.id = ${candidateId}
+      AND (u.partner_id = ${pid} OR u.organisation_id IN (SELECT id FROM organisations WHERE partner_id = ${pid}))`);
+    if (!u) return false;
+  }
+  if (programmeId) {
+    const [p] = await rows(sql`SELECT 1 FROM practice_programmes WHERE id = ${programmeId} AND partner_id = ${pid}`);
+    if (!p) return false;
+  }
+  return true;
+}
+
+/**
+ * Seed (idempotent) the 12 competencies, link every framework credential to its primary and secondary
+ * competencies, and create the proposed Zimbabwe programme as a DRAFT. Existing credentials keep their
+ * codes and candidate data. Framework credentials not yet in the catalogue are added UNPUBLISHED (no
+ * candidate sees them until MRB supplies content). Re-running never overwrites authored content,
+ * mandatory flags, or a programme status someone has changed.
+ */
+export async function seedMrbFramework(pid: string): Promise<{ competencies: number; credentialsAdded: number; links: number; areas: number }> {
+  await runPracticeDDL();
+  const compId: Record<number, string> = {};
+  for (const c of FRAMEWORK_COMPETENCIES) {
+    const [r] = await rows<{ id: string }>(sql`
+      INSERT INTO framework_competencies (partner_id, num, code, title, definition, version)
+      VALUES (${pid}, ${c.num}, ${c.code}, ${c.title}, ${c.definition}, ${FRAMEWORK_VERSION})
+      ON CONFLICT (partner_id, code) DO UPDATE SET num = EXCLUDED.num, title = EXCLUDED.title, definition = EXCLUDED.definition, version = EXCLUDED.version
+      RETURNING id`);
+    compId[c.num] = r.id;
+  }
+  // Link the legacy credentials to their framework names.
+  for (const [code, name] of Object.entries(LEGACY_CODE_TO_FRAMEWORK)) {
+    await db.execute(sql`UPDATE practice_credentials SET framework_name = ${name} WHERE partner_id = ${pid} AND code = ${code} AND framework_name IS NULL`);
+  }
+  // Ensure every framework credential exists once.
+  const credId: Record<string, string> = {};
+  let added = 0;
+  const [mx] = await rows<{ m: number }>(sql`SELECT COALESCE(MAX(sort),0) AS m FROM practice_credentials WHERE partner_id = ${pid}`);
+  let sort = (mx?.m ?? 0) + 100;
+  for (const c of FRAMEWORK_COMPETENCIES) {
+    for (const name of c.primary) {
+      const [existing] = await rows<{ id: string }>(sql`
+        SELECT id FROM practice_credentials WHERE partner_id = ${pid} AND (framework_name = ${name} OR (framework_name IS NULL AND lower(title) = lower(${name}))) LIMIT 1`);
+      if (existing) {
+        credId[name] = existing.id;
+        await db.execute(sql`UPDATE practice_credentials SET framework_name = ${name} WHERE id = ${existing.id} AND framework_name IS NULL`);
+        continue;
+      }
+      const code = "FW-" + name.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      const [r] = await rows<{ id: string }>(sql`
+        INSERT INTO practice_credentials (partner_id, code, title, framework_name, published, sort)
+        VALUES (${pid}, ${code}, ${name}, ${name}, false, ${sort++})
+        ON CONFLICT (partner_id, code) DO UPDATE SET framework_name = EXCLUDED.framework_name
+        RETURNING id`);
+      credId[name] = r.id;
+      added++;
+    }
+  }
+  // Primary and secondary competency links (framework-owned, so refreshed on every seed).
+  let links = 0;
+  for (const c of FRAMEWORK_COMPETENCIES) {
+    for (const [names, primary] of [[c.primary, true], [c.secondary, false]] as const) {
+      for (const name of names) {
+        const id = credId[name];
+        if (!id) continue;
+        await db.execute(sql`
+          INSERT INTO credential_competencies (credential_id, competency_id, is_primary)
+          VALUES (${id}, ${compId[c.num]}, ${primary})
+          ON CONFLICT (credential_id, competency_id) DO UPDATE SET is_primary = credential_competencies.is_primary OR EXCLUDED.is_primary`);
+        links++;
+      }
+    }
+  }
+  // Proposed Zimbabwe programme, as a draft.
+  const [prog] = await rows<{ id: string }>(sql`
+    INSERT INTO practice_programmes (partner_id, code, title, status, notes)
+    VALUES (${pid}, ${ZIMBABWE_PROGRAMME.code}, ${ZIMBABWE_PROGRAMME.title}, 'draft', ${ZIMBABWE_PROGRAMME.notes})
+    ON CONFLICT (partner_id, code) DO UPDATE SET title = EXCLUDED.title, notes = EXCLUDED.notes
+    RETURNING id`);
+  let i = 0;
+  for (const a of ZIMBABWE_PROGRAMME.areas) {
+    const [area] = await rows<{ id: string }>(sql`
+      INSERT INTO practice_areas (programme_id, code, title, sort) VALUES (${prog.id}, ${a.code}, ${a.title}, ${i++})
+      ON CONFLICT (programme_id, code) DO UPDATE SET title = EXCLUDED.title, sort = EXCLUDED.sort
+      RETURNING id`);
+    let j = 0;
+    for (const name of a.credentials) {
+      if (!credId[name]) continue;
+      await db.execute(sql`
+        INSERT INTO practice_area_credentials (area_id, credential_id, note, sort)
+        VALUES (${area.id}, ${credId[name]}, ${ZIMBABWE_NOTES[name] ?? null}, ${j++})
+        ON CONFLICT (area_id, credential_id) DO UPDATE SET note = EXCLUDED.note, sort = EXCLUDED.sort`);
+    }
+  }
+  return { competencies: FRAMEWORK_COMPETENCIES.length, credentialsAdded: added, links, areas: ZIMBABWE_PROGRAMME.areas.length };
+}
+
+// POST /practice/framework/seed -- load framework v2.1 + the draft Zimbabwe programme (super admin).
+router.post("/practice/framework/seed", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    const pid = await staffPartner(req);
+    if (!pid) { res.status(400).json({ error: "No partner in scope. Open the MRB partner hub first." }); return; }
+    const result = await seedMrbFramework(pid);
+    await logAudit(req, "practice_framework.seed", "partner", pid, result);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "Framework seed failed" });
+  }
+});
+
+// GET /practice/framework -- competencies, credentials with their competency links, and programmes with
+// practice areas. Also returns per-programme coverage: how many credentials map to each competency
+// as primary, so gaps in a programme design are visible.
+router.get("/practice/framework", requireAuth, async (req, res) => {
+  if (!isStaff(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const pid = await staffPartner(req);
+  if (!pid) { res.json({ competencies: [], credentials: [], programmes: [] }); return; }
+  try {
+    const competencies = await rows(sql`SELECT id, num, code, title, definition, version FROM framework_competencies WHERE partner_id = ${pid} ORDER BY num`);
+    const credentials = await rows(sql`
+      SELECT pc.id, pc.code, pc.title, pc.framework_name, pc.published,
+        (pc.activity_brief IS NOT NULL AND pc.activity_brief <> '') AS has_activity,
+        (pc.learning_outcomes IS NOT NULL AND pc.learning_outcomes <> '') AS has_outcomes,
+        COALESCE((SELECT json_agg(json_build_object('competency_id', ccm.competency_id, 'primary', ccm.is_primary))
+          FROM credential_competencies ccm WHERE ccm.credential_id = pc.id), '[]'::json) AS links,
+        (SELECT count(*)::int FROM candidate_credentials cc WHERE cc.credential_id = pc.id) AS candidates
+      FROM practice_credentials pc WHERE pc.partner_id = ${pid} ORDER BY pc.sort, pc.title`);
+    const programmes = await rows(sql`
+      SELECT pp.id, pp.code, pp.title, pp.status, pp.notes,
+        COALESCE((SELECT json_agg(json_build_object('id', pa.id, 'code', pa.code, 'title', pa.title,
+          'credentials', COALESCE((SELECT json_agg(json_build_object('credential_id', pac.credential_id, 'mandatory', pac.mandatory,
+              'is_new', pac.is_new, 'note', pac.note) ORDER BY pac.sort)
+            FROM practice_area_credentials pac WHERE pac.area_id = pa.id), '[]'::json)) ORDER BY pa.sort)
+          FROM practice_areas pa WHERE pa.programme_id = pp.id), '[]'::json) AS areas
+      FROM practice_programmes pp WHERE pp.partner_id = ${pid} ORDER BY pp.created_at`);
+    res.json({ partnerId: pid, competencies, credentials, programmes });
+  } catch {
+    res.json({ partnerId: pid, competencies: [], credentials: [], programmes: [], needsMigration: true });
+  }
+});
+
+// PATCH /practice/programmes/:id { status: 'draft'|'active'|'archived' } -- activating a programme makes
+// its practice areas the candidate catalogue for this partner. Refused while any of its credentials
+// lacks an activity, so candidates never meet an empty credential.
+router.patch("/practice/programmes/:id", requireAuth, async (req, res) => {
+  if (!canAdminFramework(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const status = String(req.body?.status ?? "");
+  if (!["draft", "active", "archived"].includes(status)) { res.status(400).json({ error: "status must be draft, active or archived" }); return; }
+  const [prog] = await rows<{ partner_id: string }>(sql`SELECT partner_id FROM practice_programmes WHERE id = ${req.params.id}`);
+  if (!prog) { res.status(404).json({ error: "Programme not found" }); return; }
+  if (req.dbUser?.role !== "super_admin" && prog.partner_id !== (await partnerOf(req))) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (status === "active") {
+    const empty = await rows<{ title: string }>(sql`
+      SELECT DISTINCT pc.title FROM practice_area_credentials pac JOIN practice_areas pa ON pa.id = pac.area_id
+      JOIN practice_credentials pc ON pc.id = pac.credential_id
+      WHERE pa.programme_id = ${req.params.id} AND (pc.activity_brief IS NULL OR pc.activity_brief = '')`);
+    if (empty.length) {
+      res.status(409).json({ error: `These credentials have no activity yet: ${empty.map((e) => e.title).join(", ")}.` });
+      return;
+    }
+  }
+  await db.execute(sql`UPDATE practice_programmes SET status = ${status} WHERE id = ${req.params.id}`);
+  if (status === "active") {
+    await db.execute(sql`UPDATE practice_credentials SET published = true WHERE id IN (
+      SELECT pac.credential_id FROM practice_area_credentials pac JOIN practice_areas pa ON pa.id = pac.area_id WHERE pa.programme_id = ${req.params.id})`);
+  }
+  await logAudit(req, "practice_programme.status", "practice_programme", req.params.id, { status });
+  res.json({ ok: true });
+});
+
+// PATCH /practice/areas/:areaId/credentials/:credentialId { mandatory?, is_new?, note? }
+router.patch("/practice/areas/:areaId/credentials/:credentialId", requireAuth, async (req, res) => {
+  if (!canAdminFramework(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  const [area] = await rows<{ programme_id: string }>(sql`SELECT programme_id FROM practice_areas WHERE id = ${req.params.areaId}`);
+  if (!area || !(await inAdminScope(req, null, area.programme_id))) { res.status(404).json({ error: "Not found" }); return; }
+  const b = req.body ?? {};
+  const bool = (v: unknown) => (typeof v === "boolean" ? v : null);
+  const note = typeof b.note === "string" ? b.note : null;
+  const [r] = await rows<{ area_id: string }>(sql`
+    UPDATE practice_area_credentials SET
+      mandatory = COALESCE(${bool(b.mandatory)}, mandatory),
+      is_new = COALESCE(${bool(b.is_new)}, is_new),
+      note = COALESCE(${note}, note)
+    WHERE area_id = ${req.params.areaId} AND credential_id = ${req.params.credentialId}
+    RETURNING area_id`);
+  if (!r) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ ok: true });
+});
+
+// ── Tutors and learning plans ─────────────────────────────────────────────────
+// GET /practice/tutoring -- for partner/super admins: candidates, possible tutors (coach role) and the
+// current assignments. For a tutor: their own tutees and each tutee's chosen credentials (the plan).
+router.get("/practice/tutoring", requireAuth, async (req, res) => {
+  const role = req.dbUser?.role;
+  try {
+    if (canAdminFramework(req)) {
+      const pid = await staffPartner(req);
+      if (!pid) { res.json({ mode: "admin", candidates: [], tutors: [], assignments: [] }); return; }
+      const inPartner = sql`(u.partner_id = ${pid} OR u.organisation_id IN (SELECT id FROM organisations WHERE partner_id = ${pid}))`;
+      const candidates = await rows(sql`
+        SELECT u.id, u.first_name, u.last_name, u.email FROM users u
+        WHERE u.role = 'learner' AND ${inPartner}
+          AND EXISTS (SELECT 1 FROM candidate_credentials cc WHERE cc.candidate_id = u.id)
+        ORDER BY u.first_name, u.last_name`);
+      const tutors = await rows(sql`SELECT u.id, u.first_name, u.last_name, u.email FROM users u WHERE u.role = 'coach' AND ${inPartner} ORDER BY u.first_name`);
+      const assignments = await rows(sql`SELECT candidate_id, tutor_id FROM tutor_assignments WHERE partner_id = ${pid}`);
+      res.json({ mode: "admin", partnerId: pid, candidates, tutors, assignments });
+      return;
+    }
+    if (role === "coach") {
+      const tutees = await rows(sql`
+        SELECT u.id, u.first_name, u.last_name, u.email,
+          COALESCE((SELECT json_agg(json_build_object('id', cc.id, 'title', pc.title, 'sort', cc.sort, 'status', cc.status,
+            'justification', cc.justification, 'plan_approved_at', cc.plan_approved_at) ORDER BY cc.sort, cc.created_at)
+            FROM candidate_credentials cc JOIN practice_credentials pc ON pc.id = cc.credential_id
+            WHERE cc.candidate_id = u.id), '[]'::json) AS plan
+        FROM tutor_assignments ta JOIN users u ON u.id = ta.candidate_id
+        WHERE ta.tutor_id = ${req.userId!} ORDER BY u.first_name`);
+      res.json({ mode: "tutor", tutees });
+      return;
+    }
+    res.status(403).json({ error: "Forbidden" });
+  } catch {
+    res.json({ mode: "admin", candidates: [], tutors: [], assignments: [], needsMigration: true });
+  }
+});
+
+// PUT /practice/tutoring/:candidateId { tutorId | null } -- set (or clear) a candidate's tutor.
+router.put("/practice/tutoring/:candidateId", requireAuth, async (req, res) => {
+  if (!canAdminFramework(req)) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!(await inAdminScope(req, req.params.candidateId, null))) { res.status(403).json({ error: "Forbidden" }); return; }
+  const pid = await staffPartner(req);
+  const tutorId = typeof req.body?.tutorId === "string" && req.body.tutorId ? req.body.tutorId : null;
+  await db.execute(sql`DELETE FROM tutor_assignments WHERE candidate_id = ${req.params.candidateId}`);
+  if (tutorId) {
+    await db.execute(sql`INSERT INTO tutor_assignments (candidate_id, tutor_id, partner_id) VALUES (${req.params.candidateId}, ${tutorId}, ${pid})`);
+    // A tutor must never review their own candidate: move any open review they hold to another reviewer
+    // in the same partner (smallest queue first). If nobody else is available it is left unassigned,
+    // where a super admin still sees it in the review queue.
+    const held = await rows<{ id: string; partner_id: string }>(sql`SELECT id, partner_id FROM candidate_credentials
+      WHERE candidate_id = ${req.params.candidateId} AND reviewer_id = ${tutorId} AND status = 'submitted'`);
+    for (const h of held) {
+      const [next] = await rows<{ id: string }>(sql`
+        SELECT u.id FROM users u
+        WHERE u.role = 'coach' AND u.id <> ${tutorId}
+          AND u.organisation_id IN (SELECT id FROM organisations WHERE partner_id = ${h.partner_id})
+        ORDER BY (SELECT count(*) FROM candidate_credentials q WHERE q.reviewer_id = u.id AND q.status = 'submitted') ASC LIMIT 1`);
+      await db.execute(sql`UPDATE candidate_credentials SET reviewer_id = ${next?.id ?? null} WHERE id = ${h.id}`);
+    }
+  }
+  await logAudit(req, "practice_tutor.assign", "user", req.params.candidateId, { tutorId });
+  res.json({ ok: true });
+});
+
+// POST /practice/tutoring/:candidateId/approve-plan -- the tutor agrees the candidate's learning plan
+// (their chosen credentials and order). Recorded per credential so later additions show as unagreed.
+router.post("/practice/tutoring/:candidateId/approve-plan", requireAuth, async (req, res) => {
+  const uid = req.userId!;
+  const isAdmin = canAdminFramework(req);
+  if (isAdmin && !(await inAdminScope(req, req.params.candidateId, null))) { res.status(403).json({ error: "Forbidden" }); return; }
+  if (!isAdmin) {
+    const [own] = await rows(sql`SELECT 1 FROM tutor_assignments WHERE candidate_id = ${req.params.candidateId} AND tutor_id = ${uid}`);
+    if (!own) { res.status(403).json({ error: "Only this candidate's tutor can agree their plan." }); return; }
+  }
+  await db.execute(sql`UPDATE candidate_credentials SET plan_approved_by = ${uid}, plan_approved_at = now(), updated_at = now()
+    WHERE candidate_id = ${req.params.candidateId} AND plan_approved_at IS NULL`);
+  await logAudit(req, "practice_plan.approve", "user", req.params.candidateId, {});
+  res.json({ ok: true });
+});
+
 // GET /practice/program-overview -- the institution/employer view: capability and credential activity
 // across a whole programme. Super admin sees all; a partner or org admin sees their own people.
 router.get("/practice/program-overview", requireAuth, async (req, res) => {
@@ -899,6 +1330,21 @@ router.get("/practice/program-overview", requireAuth, async (req, res) => {
       count(*) FILTER (WHERE cc.status = 'submitted')::int AS submitted
     FROM candidate_credentials cc JOIN practice_credentials pc ON pc.id = cc.credential_id
     WHERE ${scope} GROUP BY pc.code, pc.title ORDER BY recognised DESC, pc.title`);
+  // Collective capability (framework design principle): recognised credentials rolled up to the 12
+  // Core Competencies, primary and secondary, across everyone in scope. Empty before the framework seed.
+  let byCompetency: any[] = [];
+  try {
+    byCompetency = await rows<any>(sql`
+      SELECT fc.num, fc.title,
+        count(*) FILTER (WHERE ccm.is_primary)::int AS primary_recognised,
+        count(*) FILTER (WHERE NOT ccm.is_primary)::int AS secondary_recognised,
+        count(DISTINCT cc.candidate_id)::int AS people
+      FROM candidate_credentials cc
+      JOIN credential_competencies ccm ON ccm.credential_id = cc.credential_id
+      JOIN framework_competencies fc ON fc.id = ccm.competency_id
+      WHERE ${scope} AND cc.status = 'reviewed'
+      GROUP BY fc.num, fc.title ORDER BY fc.num`);
+  } catch { /* framework not migrated */ }
   const auth = await rows<any>(sql`
     SELECT count(*) FILTER (WHERE r.source = 'typed')::int AS typed, count(*)::int AS total
     FROM reflection_entries r JOIN candidate_credentials cc ON cc.id = r.candidate_credential_id WHERE ${scope}`);
@@ -912,7 +1358,7 @@ router.get("/practice/program-overview", requireAuth, async (req, res) => {
   res.json({
     totals: t, recognitionRate,
     authenticity: { typedLivePct: auth[0]?.total ? Math.round((auth[0].typed / auth[0].total) * 100) : 0, attestationsConfirmed: attest[0]?.confirmed || 0 },
-    byCredential, recent,
+    byCredential, byCompetency, recent,
   });
 });
 
@@ -1156,7 +1602,7 @@ async function coachContext(uid: string, ccId?: string): Promise<{ title?: strin
 async function coachObserve(text: string, learnerContext: string | undefined, coachName?: string): Promise<{ reply: string; offerAnalysis: boolean }> {
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    `You are ${practiceCoachPersona(name)}\n\n` +
     (learnerContext ? `What you know about this person:\n${learnerContext}\n\n` : "") +
     `The learner has just written something in their reflection. Respond as an ongoing thinking partner reading over their shoulder: in ONE or TWO short sentences, either notice something specific in what they wrote and offer a brief insight, or ask one probing question that pushes their thinking deeper. Do not summarise what they said back to them and do not praise emptily. ${COACH_RESEARCH} About one time in three, end by offering to reflect a bigger pattern back to them, phrased as a short question. Never use em dashes or en dashes.`;
   const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 220, system: rename(systemRaw, name), messages: [{ role: "user", content: `They just wrote: "${String(text).slice(0, 3000)}"` }] }, { timeout: 45000, maxRetries: 1 });
@@ -1169,7 +1615,7 @@ async function coachObserve(text: string, learnerContext: string | undefined, co
 async function coachAnalysis(learnerContext: string | undefined, coachName?: string): Promise<string> {
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    `You are ${practiceCoachPersona(name)}\n\n` +
     (learnerContext ? `What you know about this person and their reflection so far:\n${learnerContext}\n\n` : "") +
     `The learner has asked you for an analysis. Read their whole reflection so far and reflect back, warmly and specifically, two or three patterns in how they are thinking or practising, and one honest edge to push on. ${COACH_RESEARCH} This is a mirror to think against, not a grade and not the final word. Keep it under 180 words. Never use em dashes or en dashes.`;
   const msg = await anthropic.messages.create({ model: "claude-sonnet-4-6", max_tokens: 420, system: rename(systemRaw, name), messages: [{ role: "user", content: "Please reflect back what you notice in my reflection so far." }] }, { timeout: 60000, maxRetries: 1 });
@@ -1255,7 +1701,7 @@ export async function mutaleCoachReply(messages: { role: string; content: string
   const history = Array.isArray(messages) ? messages.slice(-16) : [];
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n${MUTALE_SPINE}\n` +
+    `You are ${practiceCoachPersona(name)}\n\n${MUTALE_SPINE}\n` +
     (learnerContext ? `Your model of this person (do not read it back to them; use it to individualize every question):\n${learnerContext}\n\n` : "") +
     `You are helping them turn a real experience into articulated learning and evidence for the Practice Credential "${credentialTitle ?? "their practice"}". ` +
     (activityBrief ? `The activity brief is: ${activityBrief}\n` : "") +
@@ -1388,7 +1834,7 @@ router.post("/practice/name/inquiry", requireAuth, async (req, res) => {
   if (!ctx.title) { res.status(404).json({ error: "Not found" }); return; }
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    `You are ${practiceCoachPersona(name)}\n\n` +
     (ctx.context ? `What you know about this person and their experience:\n${ctx.context}\n\n` : "") +
     `Asking good questions of other people is a core leadership skill, distinct from answering questions about oneself. The candidate has drafted the questions they would ASK their team or stakeholders to understand what happened. Your job is to coach the QUALITY of their questions. You must NOT answer the questions and must NOT tell them what the answers might be.\n` +
     `In under 130 words, warmly and specifically: note which of their questions are genuinely open versus leading or loaded; which get at causes rather than symptoms; and offer ONE sharper question they could ask instead, as a suggestion for them to consider. Refer to their actual questions. Never use em dashes or en dashes.`;
@@ -1476,7 +1922,7 @@ router.post("/practice/name/interrogate", requireAuth, async (req, res) => {
   if (!ph || !lens) { res.status(400).json({ error: "Unknown phenomenon or lens" }); return; }
   const name = coachDisplayName(coachName);
   const systemRaw =
-    `You are ${MUTALE_PERSONA}\n\n${MUTALE_CONSTRAINTS}\n\n` +
+    `You are ${practiceCoachPersona(name)}\n\n` +
     (ctx.context ? `The candidate's own account:\n${ctx.context}\n\n` : "") +
     `The candidate has chosen to look at their experience through this lens:\n` +
     `Lens: ${lens.name}. In plain terms: ${lens.gist}. What it does NOT explain: ${lens.edge}. (Origin: ${lens.origin}.)\n\n` +

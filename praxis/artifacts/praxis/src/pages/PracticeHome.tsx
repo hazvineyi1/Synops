@@ -19,7 +19,13 @@ import {
  * practice moves through experience, reflection, naming and trying. The interface adapts, guided or
  * pro density, one recommended next move up top, and a masthead that reads your overall progress.
  */
-type Credential = { id: string; code: string; title: string; summary: string | null; activity_brief: string | null; gateway_guidance: string | null; example_assignment: string | null; rationale: string | null };
+type Credential = {
+  id: string; code: string; title: string; summary: string | null; activity_brief: string | null; gateway_guidance: string | null; example_assignment: string | null; rationale: string | null;
+  // Framework v2.1 (present once the framework is loaded): the competency this credential primarily
+  // develops, its learning outcomes, and the practice areas it belongs to in a live programme.
+  primary_competency?: { num: number; title: string } | null; learning_outcomes?: string | null;
+  practice_areas?: Array<{ area: string; mandatory: boolean }>;
+};
 type Mine = Credential & {
   credential_id: string; status: string; sort: number; justification: string | null;
   sequence_locked: boolean; reflection_count: number; evidence_count: number;
@@ -29,7 +35,7 @@ type Mine = Credential & {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-  chosen: 'Not yet started', in_progress: 'In the cycle', submitted: 'With a reviewer', reviewed: 'Recognised', referred: 'Come back with more',
+  chosen: 'Not yet started', in_progress: 'In the cycle', submitted: 'With a reviewer', reviewed: 'Accepted', referred: 'Resubmission invited',
 };
 const statusColor = (s: string) =>
   s === 'reviewed' ? 'text-emerald-600' : s === 'referred' ? 'text-amber-600' : s === 'submitted' ? 'text-primary' : 'text-muted-foreground';
@@ -75,7 +81,7 @@ function LongitudinalTwin({ coachName = 'Mutale' }: { coachName?: string }) {
     finally { setBusy(false); }
   };
   const stats = [
-    { label: 'Recognised', value: data.recognised },
+    { label: 'Accepted', value: data.recognised },
     { label: 'In progress', value: data.inProgress },
     { label: 'Reflective range', value: `${movesWorked}/8` },
     { label: 'Typed live', value: `${data.authenticity.typedLivePct}%` },
@@ -158,12 +164,12 @@ const AUD: Record<Audience, {
     chooseRowFit: 'casework', choosePlaceholder: 'e.g. A witness account nearly went in through a leading question of mine last month.',
   },
   leadership: {
-    goal: 'Your goal is to earn your first credential: recognition of one real thing you can do as a leader. You earn it by using something real from your work, reflecting on it with your coach, and adding evidence. No courses, no grades. These credentials are proof of what you can actually do, built from real work rather than a course, and you can share and verify them with anyone who needs to trust it.',
+    goal: 'Your goal is to earn Practice Credentials: recognition of real leadership you already exercise through and with other people. You earn each one by using something real from your work, reflecting on it with your coach, and adding evidence. No courses, no grades. Each credential develops one of the twelve Core Competencies in the Framework for Advanced Leadership Practice, and accepted credentials can be shared and verified by anyone who needs to trust them.',
     steps: (coach) => [
-      ['Choose a credential', 'Pick a leadership practice you want recognised, and say in a line why.'],
-      ['Do the work', 'Use something real from your practice, from the last six months if you like.'],
-      [`Reflect with ${coach}`, 'Your Socratic coach helps you turn the experience into articulated learning and evidence.'],
-      ['Get recognised', 'Submit your portfolio. A reviewer recognises it or refers it back, with developmental feedback either way.'],
+      ['Choose and agree your plan', 'Pick the credentials you want recognised, say in a line why, and agree the plan with your tutor.'],
+      ['Do the work', 'Use something real from your practice, from the last six months if you like. Use roles, not names.'],
+      [`Reflect with ${coach}`, 'Your coach asks rather than tells, helping you see what happened for you and for the people around you.'],
+      ['Submit for review', 'An independent reviewer, never your tutor, accepts it or invites a resubmission, with developmental feedback either way.'],
     ],
     cycleDo: 'do something real in your practice', pickFit: 'already do in your work',
     mastheadOverline: 'Practice, not courses', mastheadSub: undefined,
@@ -403,7 +409,7 @@ export function PracticeHome() {
                       {m.status === 'reviewed' && (
                         <div className="mt-4">
                           <div className="inline-flex items-center gap-1.5 border border-emerald-500/40 text-emerald-700 px-2.5 py-1 ed-overline">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Recognised
+                            <CheckCircle2 className="h-3.5 w-3.5" /> Accepted
                           </div>
                           {m.credential_public_id && <CredentialLink publicId={m.credential_public_id} />}
                         </div>
@@ -413,7 +419,7 @@ export function PracticeHome() {
                         <div className={`mt-4 border-l-2 pl-3 text-sm ${m.status === 'reviewed' ? 'border-emerald-500' : 'border-amber-500'}`}>
                           <div className="flex items-center gap-1.5 font-medium mb-1">
                             {m.status === 'reviewed' ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <ArrowRight className="h-4 w-4 text-amber-600" />}
-                            {m.status === 'reviewed' ? 'Recognised' : 'Referred for resubmission'} · developmental feedback
+                            {m.status === 'reviewed' ? 'Reviewed and accepted' : 'Reviewed, resubmission invited'} · developmental feedback
                           </div>
                           <p className="whitespace-pre-wrap text-muted-foreground">{m.latest_feedback}</p>
                         </div>
@@ -472,6 +478,14 @@ function ChooseRow({ cred, audience, guided, onChoose, busy, disabled }: { cred:
         <div className="min-w-0">
           <div className="font-medium text-sm">{cred.title}</div>
           {cred.summary && <div className="text-xs text-muted-foreground mt-0.5">{cred.summary}</div>}
+          {(cred.primary_competency || (cred.practice_areas && cred.practice_areas.length > 0)) && (
+            <div className="flex flex-wrap gap-1.5 mt-1.5 text-[10px]">
+              {cred.practice_areas?.map((pa) => (
+                <span key={pa.area} className="border border-foreground/15 px-1.5 py-0.5">{pa.area}{pa.mandatory ? ' · required' : ''}</span>
+              ))}
+              {cred.primary_competency && <span className="text-muted-foreground px-0.5 py-0.5">Develops: {cred.primary_competency.title}</span>}
+            </div>
+          )}
         </div>
         <ChevronDown className={`h-4 w-4 shrink-0 mt-0.5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -487,6 +501,14 @@ function ChooseRow({ cred, audience, guided, onChoose, busy, disabled }: { cred:
             <div>
               <div className="ed-overline text-muted-foreground">What you'll do</div>
               <p className="text-sm text-muted-foreground mt-0.5">{cred.activity_brief}</p>
+            </div>
+          )}
+          {cred.learning_outcomes && (
+            <div>
+              <div className="ed-overline text-muted-foreground">What reviewers look for</div>
+              <ul className="text-sm text-muted-foreground mt-0.5 list-disc pl-5 space-y-0.5">
+                {cred.learning_outcomes.split('\n').map((l) => l.trim()).filter(Boolean).map((l, i) => <li key={i}>{l}</li>)}
+              </ul>
             </div>
           )}
           {!guided && <p className="text-xs text-primary border-l-2 border-primary/40 pl-2.5">{outcome}</p>}

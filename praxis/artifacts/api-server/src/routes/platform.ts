@@ -39,7 +39,7 @@ import { seedExecutiveLearning } from "../lib/executiveLearningSeed";
 import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
 import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
 import { seedPejPractice } from "../lib/pejPracticeSeed";
-import { PRACTICE_DDL, runPracticeDDL } from "./practice";
+import { PRACTICE_DDL, runPracticeDDL, seedMrbFramework } from "./practice";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import {
@@ -1684,13 +1684,13 @@ const MRB_GATEWAY =
   "You may use an activity you completed in the last six months; you do not have to start something new.";
 
 const MRB_PRACTICE_CREDENTIALS = [
-  { code: "ETHICAL-LEADERSHIP", title: "Ethical Leadership in Practice", sort: 1,
-    summary: "Recognise and articulate the ethical principles already underlying how you lead.",
-    rationale: "Ethical decisions under pressure are where leadership is really tested. Research on moral courage and ethical climate shows that a leader who can name and stand behind a principled call sets the tone that shapes a whole team's behaviour. The ability to make that call, and account for it afterwards, is what distinguishes leadership from compliance.",
+  { code: "ETHICAL-LEADERSHIP", title: "Ethical Leadership", sort: 1,
+    summary: "Make and stand behind a principled leadership decision, accounting for its effect on everyone it touches.",
+    rationale: "Ethical decisions under pressure are where leadership is really tested. Research on ethical climate and moral courage shows that a leader who can name a principled call, explain it honestly and stand behind it shapes what a whole team believes is acceptable. Under ubuntu the test is not only whether the decision was right for the organisation, but what it did to trust, to obligations, and to the people it affected.",
     brief: "Complete an activity that demonstrates your ability to make and stand behind a leadership decision on ethical grounds, especially where fairness, honesty, accountability or the interests of the vulnerable were at stake." },
   { code: "TEAM-FORMATION", title: "Team Formation", sort: 2,
     summary: "Establish or develop an effective team capable of achieving defined objectives.",
-    rationale: "How a team is formed predicts how it performs. Tuckman's stages and decades of team-effectiveness research show that deliberate composition, a clear shared purpose and early trust, not luck, decide whether a group can do good work. This is upstream of almost everything else the team will go on to achieve.",
+    rationale: "How a team is formed shapes what it can achieve. Research on psychological safety (Edmondson) and on team composition shows that a clear shared purpose, clear roles and early trust, not luck, decide whether a group can do good work. Under ubuntu a team is a set of mutual obligations: members owe each other contribution and support, and the leader's work is to make that reciprocity real.",
     brief: "You are required to complete an activity that demonstrates your ability to establish or develop an effective team capable of achieving defined objectives. Different professional experiences produce different, valid evidence; a team you built over weeks or an existing team you reshaped both count." },
   { code: "SERVANT-LEADERSHIP", title: "Servant Leadership", sort: 3,
     summary: "Lead by listening and removing obstacles before commanding.",
@@ -1700,13 +1700,13 @@ const MRB_PRACTICE_CREDENTIALS = [
     summary: "Form a clear vision, test it with others, and grow people through it.",
     rationale: "Transformational leadership, forming a vision and taking people with you, is among the most robustly evidenced predictors of team performance and successful change (Bass). A vision without earned trust is just an announcement; this credential is about the trust that lets a vision actually move.",
     brief: "Complete an activity that demonstrates your ability to develop a vision, test it with the people it affects, and take them with you, earning the trust the change depends on." },
-  { code: "SOCIAL-VALUE-LEADERSHIP", title: "Social-Value & Equity Leadership", sort: 5,
-    summary: "Name who benefits and who risks being left out, and design for the most vulnerable.",
-    rationale: "Decisions that name who benefits and who is at risk of being left out separate equitable leadership from well-meaning harm. Health-equity research shows neutral decisions tend to advantage the already-advantaged; designing deliberately for the hardest-to-reach is how a leader closes gaps rather than widens them.",
+  { code: "SOCIAL-VALUE-LEADERSHIP", title: "Social Value Action", sort: 5,
+    summary: "Act so that the people and communities around your work gain, not only your organisation, designing for those most at risk of being left out.",
+    rationale: "Decisions that name who benefits and who risks being left out separate equitable leadership from well-meaning harm. Health-equity research shows that apparently neutral decisions tend to advantage the already-advantaged. The framework asks leaders to strengthen communities rather than exploit them, so this credential is about designing deliberately for the hardest-to-reach.",
     brief: "Complete an activity that demonstrates your ability to make a leadership decision that names who benefits and, deliberately, who is at risk of being left out, and to mitigate that gap for the poorest or hardest-to-reach group." },
-  { code: "LEADING-CHANGE", title: "Leading Change", sort: 6,
-    summary: "Design and lead a change that improves outcomes without leaving the vulnerable behind.",
-    rationale: "Most change efforts fail on people, not plans (Kotter). Change that improves outcomes without leaving the vulnerable behind depends on an honest account of who it might exclude. This credential is about leading change that is both effective and fair, and being candid about the trade-offs in your own design.",
+  { code: "LEADING-CHANGE", title: "Leading Organisational Change", sort: 6,
+    summary: "Lead a change that improves outcomes and keeps people with you, including those it could leave behind.",
+    rationale: "Change usually succeeds or fails on people rather than plans. Research on procedural justice and change readiness shows that people accept change they did not choose when the process is fair, they have a voice, and the reasons are explained. This credential is about leading change that is both effective and fair, and being candid about the trade-offs in your own design.",
     brief: "Complete an activity that demonstrates your ability to design and lead a change to improve effectiveness, pressure-tested against who it might exclude, with an honest account of the equity gaps in your own design." },
 ];
 
@@ -1744,65 +1744,106 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
     } catch { /* branding is best-effort */ }
 
     // Build a realistic, walkthrough-ready portfolio for the demo candidate (persona: Chanda Mulenga),
-    // so /demos/mrb shows the whole journey live: Ethical Leadership just started, Team Formation
-    // mid-cycle (reflections + evidence, wheel ~3/4), Servant Leadership already recognised.
-    const dl = await db.execute(sql`SELECT id FROM users WHERE email = ${ZCL_DEMO_LEARNER_EMAIL} LIMIT 1`);
-    const demoId = (dl.rows?.[0] as { id?: string } | undefined)?.id;
+    // grounded in what MRB's tutors say candidates actually bring: change handed down from above,
+    // feeling they do not belong in senior rooms, authority undermined in difficult conversations,
+    // pressure from work and family at once, and pressure to bend due process. Ethical Leadership just
+    // chosen, Team Formation mid-cycle, Servant Leadership reviewed and accepted (with a verifiable
+    // record). A composite tutor agrees her plan and a separate composite reviewer reviewed her work,
+    // so a visitor sees the tutor / coach / reviewer separation the framework requires.
+    const dl = await db.execute(sql`SELECT id, organisation_id FROM users WHERE email = ${ZCL_DEMO_LEARNER_EMAIL} LIMIT 1`);
+    const demoRow = dl.rows?.[0] as { id?: string; organisation_id?: string } | undefined;
+    const demoId = demoRow?.id;
     if (demoId) {
       await db.execute(sql`UPDATE users SET first_name = 'Chanda', last_name = 'Mulenga' WHERE id = ${demoId}`);
-      const credId = async (code: string): Promise<{ id: string; sort: number } | null> => {
-        const r = await db.execute(sql`SELECT id, sort FROM practice_credentials WHERE partner_id = ${pid} AND code = ${code} LIMIT 1`);
-        return (r.rows?.[0] as { id: string; sort: number } | undefined) ?? null;
+      const staff = async (email: string, first: string, last: string): Promise<string> => {
+        const found = await db.execute(sql`SELECT id FROM users WHERE email = ${email} LIMIT 1`);
+        const existing = (found.rows?.[0] as { id?: string } | undefined)?.id;
+        if (existing) return existing;
+        const made = await db.execute(sql`
+          INSERT INTO users (id, email, first_name, last_name, role, status, organisation_id)
+          VALUES (gen_random_uuid()::text, ${email}, ${first}, ${last}, 'coach', 'active', ${demoRow?.organisation_id ?? null}) RETURNING id`);
+        return (made.rows?.[0] as { id: string }).id;
+      };
+      const tutorId = await staff("demo.tutor@zcl.test", "Tendai", "Moyo");
+      const reviewerId = await staff("demo.reviewer@zcl.test", "Ruth", "Banda");
+      await db.execute(sql`DELETE FROM tutor_assignments WHERE candidate_id = ${demoId}`);
+      await db.execute(sql`INSERT INTO tutor_assignments (candidate_id, tutor_id, partner_id) VALUES (${demoId}, ${tutorId}, ${pid})`);
+
+      const credId = async (code: string): Promise<{ id: string; sort: number; title: string } | null> => {
+        const r = await db.execute(sql`SELECT id, sort, title FROM practice_credentials WHERE partner_id = ${pid} AND code = ${code} LIMIT 1`);
+        return (r.rows?.[0] as { id: string; sort: number; title: string } | undefined) ?? null;
+      };
+      const reset = async (id: string) => {
+        await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${id}`);
+        await db.execute(sql`DELETE FROM evidence_items WHERE candidate_credential_id = ${id}`);
+        await db.execute(sql`DELETE FROM credential_reviews WHERE candidate_credential_id = ${id}`);
+        await db.execute(sql`DELETE FROM coach_messages WHERE candidate_credential_id = ${id}`);
+        await db.execute(sql`DELETE FROM issued_credentials WHERE candidate_credential_id = ${id}`);
       };
 
       const eth = await credId("ETHICAL-LEADERSHIP");
-      if (eth) await db.execute(sql`
-        INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status)
-        VALUES (${demoId}, ${eth.id}, ${pid}, ${eth.sort}, ${"I want the fairness I already lead by to be recognised."}, 'chosen')
-        ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'chosen'`);
+      if (eth) {
+        const cc = await db.execute(sql`
+          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status, reviewer_id, plan_approved_by, plan_approved_at)
+          VALUES (${demoId}, ${eth.id}, ${pid}, ${eth.sort}, ${"I was asked to sign off a contract that had skipped due process, and I refused. I want to understand what that decision protected, and what it cost the people around me."}, 'chosen', NULL, ${tutorId}, now() - interval '20 days')
+          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'chosen', justification = EXCLUDED.justification, reviewer_id = NULL,
+            self_g1 = false, self_g2 = false, self_g3 = false, plan_approved_by = EXCLUDED.plan_approved_by, plan_approved_at = EXCLUDED.plan_approved_at RETURNING id`);
+        const id = (cc.rows?.[0] as { id?: string } | undefined)?.id;
+        if (id) await reset(id);
+      }
 
       const tf = await credId("TEAM-FORMATION");
       if (tf) {
         const cc = await db.execute(sql`
-          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status, self_g1, self_g2)
-          VALUES (${demoId}, ${tf.id}, ${pid}, ${tf.sort}, ${"I build teams every week. I just never named it."}, 'in_progress', true, true)
-          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'in_progress', justification = EXCLUDED.justification, self_g1 = true, self_g2 = true RETURNING id`);
+          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status, self_g1, self_g2, plan_approved_by, plan_approved_at)
+          VALUES (${demoId}, ${tf.id}, ${pid}, ${tf.sort}, ${"I pulled a working group together from three units to deliver a change none of us chose. I did it, but I felt I was winging it."}, 'in_progress', true, true, ${tutorId}, now() - interval '20 days')
+          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'in_progress', justification = EXCLUDED.justification, reviewer_id = NULL,
+            self_g1 = true, self_g2 = true, self_g3 = false, plan_approved_by = EXCLUDED.plan_approved_by, plan_approved_at = EXCLUDED.plan_approved_at RETURNING id`);
         const id = (cc.rows?.[0] as { id?: string } | undefined)?.id;
         if (id) {
-          await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${id}`);
-          await db.execute(sql`DELETE FROM evidence_items WHERE candidate_credential_id = ${id}`);
-          await db.execute(sql`INSERT INTO reflection_entries (candidate_credential_id, stage, content) VALUES
-            (${id}, 'description', 'During the measles cluster I pulled six people from different roles into one team in a day.'),
-            (${id}, 'feelings', 'When two of the nurses declined it felt like failure. Later I saw that I never told them why it mattered.'),
-            (${id}, 'analysis', 'I chose people for what each could do, not for rank. That is servant leadership, and I have done it for years.')`);
+          await reset(id);
+          await db.execute(sql`INSERT INTO reflection_entries (candidate_credential_id, stage, content, source) VALUES
+            (${id}, 'description', 'Head office sent down a new reporting process with two weeks to implement it. I formed a working group from three units that had never worked together. I was not the most senior person in the room.', 'typed'),
+            (${id}, 'prediction', 'I expected the senior consultant to block the plan because it added work to his unit.', 'typed'),
+            (${id}, 'feelings', 'In the first meeting he talked over me twice. I felt I did not belong there, that I was winging it, and I went home and said nothing to anyone.', 'typed'),
+            (${id}, 'surprise', 'He backed the plan once his unit''s workload was written into it. The resistance was about his people, not about me.', 'typed'),
+            (${id}, 'analysis', 'I chose people for what each could bring, not for rank, and we agreed who owed what to whom before we touched the tasks. What I called winging it was a method I had never named.', 'typed')`);
           await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES
-            (${id}, 'text', 'Measles response duty roster', 'The roster I drew up, showing each role on the team and why they were chosen.')`);
+            (${id}, 'text', 'Working group terms of reference (anonymised)', 'Roles, what each unit committed to the others, and how we would raise problems. Names replaced with roles.')`);
         }
       }
 
       const sv = await credId("SERVANT-LEADERSHIP");
       if (sv) {
         const cc = await db.execute(sql`
-          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status, self_g1, self_g2, self_g3, submitted_at, reviewed_at)
-          VALUES (${demoId}, ${sv.id}, ${pid}, ${sv.sort}, ${"I lead by listening first, and I want that recognised."}, 'reviewed', true, true, true, now() - interval '10 days', now() - interval '3 days')
-          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'reviewed', self_g1 = true, self_g2 = true, self_g3 = true RETURNING id`);
+          INSERT INTO candidate_credentials (candidate_id, credential_id, partner_id, sort, justification, status, self_g1, self_g2, self_g3, submitted_at, reviewed_at, reviewer_id, plan_approved_by, plan_approved_at)
+          VALUES (${demoId}, ${sv.id}, ${pid}, ${sv.sort}, ${"People bring me their problems before they bring them to anyone else. I want to understand why, and have it recognised."}, 'reviewed', true, true, true, now() - interval '10 days', now() - interval '3 days', ${reviewerId}, ${tutorId}, now() - interval '40 days')
+          ON CONFLICT (candidate_id, credential_id) DO UPDATE SET status = 'reviewed', justification = EXCLUDED.justification, self_g1 = true, self_g2 = true, self_g3 = true,
+            reviewer_id = EXCLUDED.reviewer_id, plan_approved_by = EXCLUDED.plan_approved_by, plan_approved_at = EXCLUDED.plan_approved_at RETURNING id`);
         const id = (cc.rows?.[0] as { id?: string } | undefined)?.id;
         if (id) {
-          await db.execute(sql`DELETE FROM reflection_entries WHERE candidate_credential_id = ${id}`);
-          await db.execute(sql`DELETE FROM evidence_items WHERE candidate_credential_id = ${id}`);
-          await db.execute(sql`DELETE FROM credential_reviews WHERE candidate_credential_id = ${id}`);
-          await db.execute(sql`INSERT INTO reflection_entries (candidate_credential_id, stage, content) VALUES
-            (${id}, 'description', 'A team member came to me overwhelmed. I asked what was really going on before reassigning anything.'),
-            (${id}, 'action', 'Next time I will check capacity before I draw up the roster, not after.')`);
+          await reset(id);
+          await db.execute(sql`INSERT INTO reflection_entries (candidate_credential_id, stage, content, source) VALUES
+            (${id}, 'description', 'A unit manager told me she could not take on the new reporting on top of her shifts and caring for her mother. I asked what was really going on before reassigning anything.', 'typed'),
+            (${id}, 'feelings', 'My first instinct was to take the work back myself. I was tired too, and I felt guilty asking anyone for more.', 'typed'),
+            (${id}, 'analysis', 'Taking it back would have looked kind but taught the team that the leader absorbs everything. Asking first meant we found a fairer split that she could live with, at work and at home.', 'typed'),
+            (${id}, 'action', 'Next time I will ask about capacity, at work and at home, before I draw up the plan, not after.', 'typed')`);
           await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES
-            (${id}, 'text', 'Note to a colleague', 'The note I wrote her afterward, redistributing two of her rounds.')`);
+            (${id}, 'text', 'Note to a colleague (anonymised)', 'The note I wrote afterwards, redistributing two of her reporting tasks and agreeing a check-in date.')`);
           await db.execute(sql`INSERT INTO credential_reviews (candidate_credential_id, reviewer_id, g1, g2, g3, outcome, feedback) VALUES
-            (${id}, ${demoId}, true, true, true, 'reviewed', 'You clearly listen before you act, and the note to your colleague is strong evidence. To go deeper next time, name the moment you chose not to solve it yourself. Recognised.')`);
+            (${id}, ${reviewerId}, true, true, true, 'reviewed', ${"Reviewed and accepted. You listened before you acted, and you took her obligations at home as seriously as her role at work, which is the human-centred stance the framework describes. Your note is good evidence of what you did. To go further, name the moment you chose not to solve it yourself, and what that cost you."})`);
+          await db.execute(sql`INSERT INTO issued_credentials (candidate_credential_id, public_id, recipient_name, credential_title, issuer, g1, g2, g3, issued_at)
+            VALUES (${id}, ${"mrbdemo" + String(id).replace(/[^a-z0-9]/gi, "").slice(0, 10)}, 'Chanda Mulenga', ${sv.title}, 'Manchester Review Board', true, true, true, now() - interval '3 days')
+            ON CONFLICT (candidate_credential_id) DO NOTHING`);
         }
       }
     }
     await audit(_req, "platform.seed_mrb_practice", "partner", pid, { credentials: MRB_PRACTICE_CREDENTIALS.length });
-    res.json({ ok: true, credentials: MRB_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId });
+    // Framework v2.1 (12 Core Competencies, credential links, draft Zimbabwe programme). Best-effort and
+    // invisible to candidates: new framework credentials are unpublished and the programme is a draft.
+    let framework: unknown = null;
+    try { framework = await seedMrbFramework(pid); } catch (e) { framework = { error: e instanceof Error ? e.message : String(e) }; }
+    res.json({ ok: true, credentials: MRB_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId, framework });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
   }
