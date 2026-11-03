@@ -1810,6 +1810,15 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
             (${id}, 'analysis', 'I chose people for what each could bring, not for rank, and we agreed who owed what to whom before we touched the tasks. What I called winging it was a method I had never named.', 'typed')`);
           await db.execute(sql`INSERT INTO evidence_items (candidate_credential_id, kind, title, body) VALUES
             (${id}, 'text', 'Working group terms of reference (anonymised)', 'Roles, what each unit committed to the others, and how we would raise problems. Names replaced with roles.')`);
+          // A composite coaching thread so a visitor sees how Mutale works (asks, never tells) even
+          // before they type, plus the lens the candidate chose in "Name it".
+          await db.execute(sql`INSERT INTO coach_messages (candidate_credential_id, role, content, kind, created_at) VALUES
+            (${id}, 'eve', 'Before we get to any theory: when the senior consultant talked over you, what did you do in that moment, and what did you do afterwards?', 'chat', now() - interval '6 days'),
+            (${id}, 'learner', 'In the moment I stopped talking. Afterwards I went to see him on his own and asked what the plan would cost his unit.', 'chat', now() - interval '6 days' + interval '2 minutes'),
+            (${id}, 'eve', 'So the conversation that changed things happened one to one, not in the room. What did you learn about him there that you could not have learned in front of the group?', 'chat', now() - interval '6 days' + interval '3 minutes'),
+            (${id}, 'learner', 'That his team had already absorbed two changes this year. He was protecting them.', 'chat', now() - interval '6 days' + interval '5 minutes'),
+            (${id}, 'eve', 'You moved from defending your own standing to understanding what he owed his team. That shift is worth putting into your analysis in your own words.', 'observation', now() - interval '5 days'),
+            (${id}, 'learner', 'Phenomenon: I have to implement a change I did not choose' || chr(10) || 'Lens chosen: Middle managers as sense-makers (Middle-manager sensemaking during change, Balogun & Johnson; the strategic role of middle managers, Floyd & Wooldridge.)', 'lens', now() - interval '4 days')`);
         }
       }
 
