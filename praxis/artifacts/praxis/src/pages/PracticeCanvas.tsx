@@ -250,7 +250,7 @@ export function PracticeCanvas() {
         </div>
         {cc?.latest_feedback && (cc.status === 'reviewed' || cc.status === 'referred') && (
           <div className={`mt-3 border-l-2 pl-3 text-sm ${cc.status === 'reviewed' ? 'border-emerald-500' : 'border-amber-500'}`}>
-            <div className="font-medium mb-1">{cc.status === 'reviewed' ? 'Recognised' : 'Referred for resubmission'} · developmental feedback</div>
+            <div className="font-medium mb-1">{cc.status === 'reviewed' ? 'Reviewed and accepted' : 'Reviewed, resubmission invited'} · developmental feedback</div>
             <p className="whitespace-pre-wrap text-muted-foreground">{cc.latest_feedback}</p>
           </div>
         )}
@@ -552,6 +552,7 @@ function TwinPanel({ me, cc, reflections, readOnly, onSaved, coachName = 'Mutale
                 <textarea value={draft} onChange={(e) => { setDraft(e.target.value); prov.onType(); }} onPaste={prov.onPaste} rows={3} autoFocus
                   placeholder={`Write your ${openMove.label.toLowerCase()}...`}
                   className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+                <AnonymityNote />
                 <div className="flex justify-end">
                   <Button size="sm" disabled={!draft.trim() || busy} onClick={save} className="gap-1.5 rounded-none">
                     {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add to portfolio
@@ -673,6 +674,20 @@ function PredictionPanel({ id, reflections, readOnly, onChange, showList = true,
   );
 }
 
+/**
+ * Anonymity reminder shown beside every place a candidate writes. Candidates describe real workplaces,
+ * sometimes including wrongdoing, so names of people, organisations, patients and suppliers stay out.
+ */
+function AnonymityNote() {
+  return (
+    <p className="text-[11px] text-muted-foreground leading-snug">
+      Use roles, not names: "a senior colleague", "a regional supplier", "a patient". Leave out anything that identifies a
+      person or organisation. If you are describing possible wrongdoing, also talk to your tutor or use your organisation's
+      formal reporting route.
+    </p>
+  );
+}
+
 function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection', starters, onLearnerWrote, onAskEve, coachName = 'Eve' }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string; starters?: string[]; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void; coachName?: string }) {
   const draftKey = `refl_${id}_${focusStages ? focusStages.join('-') : 'all'}`;
   const stagesToShow = focusStages ? GIBBS.filter((g) => focusStages.includes(g.key)) : GIBBS;
@@ -754,6 +769,7 @@ function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages
           )}
           <textarea value={content} onChange={(e) => { setContent(e.target.value); prov.onType(); }} onPaste={prov.onPaste} rows={3} placeholder="Write your reflection..."
             className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
+          <AnonymityNote />
           <div className="flex justify-end">
             <Button size="sm" disabled={!content.trim() || busy} onClick={submitReflection} className="gap-1.5 rounded-none"><Plus className="h-4 w-4" /> Add to reflection</Button>
           </div>
@@ -852,6 +868,7 @@ function EvidencePanel({ id, evidence, readOnly, onChange, off, showList = true 
           </div>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />
           {kind === 'text' && <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="Describe the evidence..." className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />}
+          <AnonymityNote />
           {kind === 'link' && <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://..." className="w-full rounded-none border border-input bg-background px-3 py-2 text-sm" />}
           {kind === 'file' && (
             <div>
@@ -969,7 +986,7 @@ function ExemplarShare({ id }: { id: string }) {
   return (
     <Card className="rounded-none p-5 space-y-3">
       <div className="flex items-center gap-2 ed-overline text-foreground"><Users className="h-4 w-4 text-primary" /> Share with peers</div>
-      <p className="text-xs text-muted-foreground">Your credential is recognised. You can share a short headline and an excerpt to help others in your programme learn from your practice. Optional, and only what you choose.</p>
+      <p className="text-xs text-muted-foreground">Your credential has been accepted. You can share a short headline and an excerpt to help others in your programme learn from your practice. Optional, and only what you choose.</p>
       {shared && !open ? (
         <div className="border border-emerald-500/40 bg-emerald-500/5 p-3">
           <div className="text-sm font-medium">{mine!.headline}</div>

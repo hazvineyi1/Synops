@@ -10,6 +10,9 @@ import { ArrowLeft, CheckCircle2, BookOpen, Eye, Compass } from 'lucide-react';
 type Credential = {
   id: string; partner_id: string; code: string; title: string; summary: string | null;
   activity_brief: string | null; gateway_guidance: string | null; example_assignment: string | null; rationale: string | null;
+  // Framework v2.1 fields (absent before the framework migration runs).
+  learning_outcomes?: string | null; framework_name?: string | null; published?: boolean;
+  competencies?: Array<{ num: number; title: string; is_primary: boolean }>;
 };
 
 // The shared reflective cycle every credential uses (read-only preview here — it's the same framework
@@ -37,7 +40,7 @@ export function PracticeCredentialEdit() {
     enabled: !!id,
   });
 
-  const save = async (field: keyof Credential, value: string) => {
+  const save = async (field: keyof Credential, value: string | boolean) => {
     await apiFetch(`/practice/credentials/${id}`, { method: 'PATCH', body: JSON.stringify({ [field]: value }) });
     refetch();
   };
@@ -48,8 +51,8 @@ export function PracticeCredentialEdit() {
   return (
     <div className="max-w-3xl mx-auto space-y-4 py-2">
       <div className="flex items-center justify-between gap-3">
-        <button onClick={() => navigate('/partner/courses')} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Back to Courses
+        <button onClick={() => (window.history.length > 1 ? window.history.back() : navigate('/partner/courses'))} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-[10px] gap-1"><Eye className="h-3 w-3" /> Editing — this is the learner’s view</Badge>
@@ -62,9 +65,26 @@ export function PracticeCredentialEdit() {
         <InlineField as="title" value={cred.title} placeholder="Credential title" onSave={(v) => save('title', v)} />
         <InlineField value={cred.summary ?? ''} placeholder="One line on what this credential recognises." muted onSave={(v) => save('summary', v)} />
 
+        {cred.competencies && cred.competencies.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground">Framework{cred.framework_name && cred.framework_name !== cred.title ? ` (${cred.framework_name})` : ''}:</span>
+            {cred.competencies.map((c) => (
+              <Badge key={c.num} variant={c.is_primary ? 'default' : 'outline'} className="text-[10px]">
+                {c.num}. {c.title}{c.is_primary ? ' (primary)' : ''}
+              </Badge>
+            ))}
+          </div>
+        )}
+
         <FieldBlock label="Activity" hint="What the learner must do to demonstrate this.">
           <InlineField value={cred.activity_brief ?? ''} placeholder="Describe the activity…" onSave={(v) => save('activity_brief', v)} />
         </FieldBlock>
+
+        {cred.learning_outcomes !== undefined && (
+          <FieldBlock label="Learning outcomes" hint="From MRB: the specialist knowledge, practical capability and reflective outcomes reviewers assess against. One per line.">
+            <InlineField value={cred.learning_outcomes ?? ''} placeholder="Add the learning outcomes, one per line…" onSave={(v) => save('learning_outcomes', v)} />
+          </FieldBlock>
+        )}
 
         <FieldBlock label="How this is reviewed" icon={<CheckCircle2 className="h-3.5 w-3.5" />} hint="What the reviewer looks for; pass or resubmit with feedback.">
           <InlineField value={cred.gateway_guidance ?? ''} placeholder="Describe how it’s reviewed…" onSave={(v) => save('gateway_guidance', v)} />
@@ -81,6 +101,11 @@ export function PracticeCredentialEdit() {
         <div className="flex items-center gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
           <span className="font-medium">Code</span>
           <InlineField value={cred.code} placeholder="short-code" compact onSave={(v) => save('code', v)} />
+          {cred.published !== undefined && (
+            <label className="ml-auto inline-flex items-center gap-1.5 shrink-0 cursor-pointer" title="Unpublished credentials are hidden from candidates unless they belong to a live programme">
+              <input type="checkbox" checked={!!cred.published} onChange={(e) => save('published', e.target.checked)} /> Visible to candidates
+            </label>
+          )}
         </div>
       </Card>
 

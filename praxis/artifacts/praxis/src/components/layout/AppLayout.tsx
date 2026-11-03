@@ -47,6 +47,8 @@ import {
   ChevronDown,
   Home,
   MessageSquarePlus,
+  Network,
+  UserCheck,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail, getActivePartnerId, setActivePartner } from '@/lib/partnerHubData';
@@ -318,6 +320,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       return [{
         items: [
           { label: t('nav.reviewQueue', 'Review queue'), href: '/practice/review', icon: ClipboardCheck },
+          { label: t('nav.myCandidates', 'My candidates'), href: '/practice/tutoring', icon: UserCheck },
           { label: t('nav.learners'), href: '/coach', icon: Users },
         ],
       }];
@@ -382,6 +385,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           items: [
             { label: t('nav.programInsights', 'Program insights'), href: '/program', icon: TrendingUp },
             { label: t('nav.reviewQueue', 'Review queue'), href: '/practice/review', icon: ClipboardCheck },
+            { label: t('nav.framework', 'Leadership framework'), href: '/practice/framework', icon: Network },
+            { label: t('nav.tutors', 'Tutors'), href: '/practice/tutoring', icon: UserCheck },
             { label: t('nav.classInsights', 'Class insights'), href: '/class-insights', icon: Activity },
             { label: t('nav.sessions', 'Sessions'), href: '/delivery', icon: CalendarDays },
             { label: t('nav.learners', 'Coaching'), href: '/coach', icon: Users },
