@@ -1578,7 +1578,25 @@ const coachText = (msg: any) => (msg.content as any[]).filter((b) => b.type === 
 
 /** Persist one coach-thread message (best-effort), so the conversation becomes part of the portfolio. */
 async function saveCoachMsg(ccId: string, role: string, content: string, kind: string): Promise<void> {
-  try { await db.execute(sql`INSERT INTO coach_messages (candidate_credential_id, role, content, kind) VALUES (${ccId}, ${role}, ${String(content).slice(0, 8000)}, ${kind})`); } catch { /* best effort */ }
+  try { await insertCoachMessage(ccId, role, content, kind); } catch { /* best effort */ }
+}
+
+/**
+ * Insert one practice coach message. The table name coach_messages is shared with the gradebook's
+ * off-track alert thread (schema/gradebook.ts), which has NOT NULL id / alert_id / from_user_id / body
+ * columns. Where that table exists, a plain insert fails, so practice threads were silently never saved.
+ * Try the practice shape first, then fall back to filling the gradebook's required columns too
+ * (alert_id is namespaced "practice:<id>" so it can never match a real alert).
+ */
+export async function insertCoachMessage(ccId: string, role: string, content: string, kind: string, agoMinutes = 0): Promise<void> {
+  const text = String(content).slice(0, 8000);
+  const at = sql`now() - make_interval(mins => ${Math.max(0, Math.round(agoMinutes))})`;
+  try {
+    await db.execute(sql`INSERT INTO coach_messages (candidate_credential_id, role, content, kind, created_at) VALUES (${ccId}, ${role}, ${text}, ${kind}, ${at})`);
+  } catch {
+    await db.execute(sql`INSERT INTO coach_messages (id, alert_id, from_user_id, from_role, body, candidate_credential_id, role, content, kind, created_at)
+      VALUES (gen_random_uuid()::text, ${"practice:" + ccId}, ${""}, ${role === "learner" ? "learner" : "coach"}, ${text}, ${ccId}, ${role}, ${text}, ${kind}, ${at})`);
+  }
 }
 
 /** Load the individualising context (name, prior reason, reflection so far) for a candidate credential. */
