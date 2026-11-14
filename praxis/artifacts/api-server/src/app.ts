@@ -16,6 +16,7 @@ import { registerPwa } from "./pwa";
 import { logger } from "./lib/logger";
 import { captureError } from "./lib/observability";
 import { shouldRedirectToCanonical } from "./lib/canonicalHost";
+import { hubMode, injectHubMeta, mrbHubRedirectTarget } from "./lib/hub";
 
 const app: Express = express();
 
@@ -173,7 +174,24 @@ registerPwa(app);
 const bundleDir = path.dirname(fileURLToPath(import.meta.url));
 const clientDist = path.resolve(bundleDir, "../../praxis/dist/public");
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  // Hub mode (HUB_MODE=mrb): every index.html this service sends carries <meta name="praxis-hub">, so
+  // the SPA opens as that client's hub. express.static must not serve index.html for "/" itself in
+  // that case, or the root would skip the injection.
+  const HUB = hubMode();
+  const sendShell = (res: Response) => {
+    if (!HUB) { res.sendFile(path.join(clientDist, "index.html")); return; }
+    const html = injectHubMeta(fs.readFileSync(path.join(clientDist, "index.html"), "utf8"), HUB);
+    res.set("Content-Type", "text/html; charset=utf-8").send(html);
+  };
+
+  // Go-live redirect, MAIN Praxis service only: once MRB_HUB_URL is set, the old public MRB demo link
+  // permanently moves to the MRB hub's own address. Unset = the demo stays where it is.
+  const mrbTarget = mrbHubRedirectTarget(HUB);
+  if (mrbTarget) {
+    app.get(["/demos/mrb", "/demos/mrb/"], (_req, res) => { res.redirect(301, `${mrbTarget}/`); });
+  }
+
+  app.use(express.static(clientDist, HUB ? { index: false } : undefined));
 
   // ── Per-route metadata for public pages that are shared as links ──
   // Praxis is a client-rendered SPA, so anything that fetches a URL WITHOUT running JavaScript (other
@@ -229,6 +247,7 @@ if (fs.existsSync(clientDist)) {
       // never render it — no flash — while crawlers and other assistants that read raw HTML still see it.
       const summary = `<noscript><main><h1>${escapeHtml(meta.title)}</h1><p>${escapeHtml(meta.body)}</p></main></noscript>`;
       html = html.replace(/(<body[^>]*>)/i, `$1\n    ${summary}`);
+      html = injectHubMeta(html, HUB);
       res.set("Content-Type", "text/html; charset=utf-8").send(html);
     } catch { next(); }
   });
@@ -236,7 +255,7 @@ if (fs.existsSync(clientDist)) {
   // SPA fallback: any non-/api GET returns index.html so client-side routing works on
   // deep links and refreshes. The negative lookahead keeps /api/* on the API.
   app.get(/^(?!\/api).*/, (_req, res) => {
-    res.sendFile(path.join(clientDist, "index.html"));
+    sendShell(res);
   });
 }
 

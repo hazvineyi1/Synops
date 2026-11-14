@@ -40,6 +40,7 @@ import { seedZambianLeadership, ZCL_DEMO_LEARNER_EMAIL } from "../lib/mrbSeed";
 import { seedEducatorPD, EDU_DEMO_LEARNER_EMAIL } from "../lib/educatorSeed";
 import { seedPejPractice } from "../lib/pejPracticeSeed";
 import { PRACTICE_DDL, runPracticeDDL, seedMrbFramework } from "./practice";
+import { normaliseHost } from "../lib/brandResolve";
 import { enrichEnzaCourses } from "../lib/enzaEnrich";
 import { anthropic } from "@workspace/integrations-anthropic-ai";
 import {
@@ -1855,6 +1856,58 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
     res.json({ ok: true, credentials: MRB_PRACTICE_CREDENTIALS.length, demoSeeded: !!demoId, framework });
   } catch (err) {
     res.status(500).json({ error: err instanceof Error ? err.message : "Seed failed" });
+  }
+});
+
+// POST /platform/seed-mrb-hub { customDomain? } -- provision the LIVE MRB Practice Hub tenant on a
+// fresh database (the MRB hub's own deployment). Unlike seed-mrb-practice this creates NO demo
+// candidate, tutor, reviewer, reflections or issued credentials: only the MRB partner and organisation,
+// the practice credential catalogue, framework v2.1 (12 Core Competencies, links, draft Zimbabwe
+// programme) and the MRB brand, bound to the hub's own address so sign-in shows MRB's name and colours.
+// Idempotent: re-running refreshes catalogue wording and never touches candidate data.
+const MRB_HUB_SLUG = "the-mrb";
+router.post("/platform/seed-mrb-hub", requireAuth, requireSuperAdmin, async (req, res) => {
+  try {
+    await runPracticeDDL();
+    const domainIn = typeof req.body?.customDomain === "string" ? req.body.customDomain : (process.env.MRB_HUB_HOST ?? "");
+    const customDomain = normaliseHost(domainIn) || null;
+
+    let [partner] = await db.select().from(partnersTable).where(eq(partnersTable.slug, MRB_HUB_SLUG)).limit(1);
+    if (!partner) {
+      [partner] = await db.insert(partnersTable).values({
+        name: "The Manchester Review Board", slug: MRB_HUB_SLUG, status: "active", contactEmail: "info@synops-consulting.com",
+      }).returning();
+    }
+    const pid = partner.id;
+    let [org] = await db.select().from(organisationsTable)
+      .where(and(eq(organisationsTable.partnerId, pid), eq(organisationsTable.name, "The Manchester Review Board"))).limit(1);
+    if (!org) {
+      [org] = await db.insert(organisationsTable).values({
+        name: "The Manchester Review Board", partnerId: pid, industry: "Advanced leadership practice",
+      }).returning();
+      await db.update(partnersTable).set({ orgCount: 1 }).where(eq(partnersTable.id, pid));
+    }
+
+    for (const c of MRB_PRACTICE_CREDENTIALS) {
+      await db.execute(sql`
+        INSERT INTO practice_credentials (partner_id, code, title, summary, activity_brief, gateway_guidance, example_assignment, rationale, sort)
+        VALUES (${pid}, ${c.code}, ${c.title}, ${c.summary}, ${c.brief}, ${MRB_GATEWAY}, ${MRB_EXAMPLE_ASSIGNMENT}, ${c.rationale}, ${c.sort})
+        ON CONFLICT (partner_id, code) DO UPDATE SET
+          title = EXCLUDED.title, summary = EXCLUDED.summary, activity_brief = EXCLUDED.activity_brief,
+          gateway_guidance = EXCLUDED.gateway_guidance, example_assignment = EXCLUDED.example_assignment, rationale = EXCLUDED.rationale, sort = EXCLUDED.sort`);
+    }
+
+    // MRB brand (deep petrol blue, warm gold), bound to the hub's own host when one is given.
+    await db.execute(sql`UPDATE brand_themes SET display_name = 'The Manchester Review Board', primary_color = '#1B4965', secondary_color = '#2C6E8E', accent_color = '#C58B2C', credential_title = 'Practice Credential', custom_domain = COALESCE(${customDomain}, custom_domain), updated_at = now() WHERE tenant_id = ${pid}`);
+    await db.execute(sql`INSERT INTO brand_themes (id, tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title, custom_domain)
+      SELECT gen_random_uuid()::text, ${pid}, 'partner', 'The Manchester Review Board', '#1B4965', '#2C6E8E', '#C58B2C', 'Practice Credential', ${customDomain}
+      WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
+
+    const framework = await seedMrbFramework(pid);
+    await audit(req, "platform.seed_mrb_hub", "partner", pid, { credentials: MRB_PRACTICE_CREDENTIALS.length, customDomain });
+    res.json({ ok: true, partnerId: pid, organisationId: org.id, credentials: MRB_PRACTICE_CREDENTIALS.length, customDomain, framework });
+  } catch (err) {
+    res.status(500).json({ error: err instanceof Error ? err.message : "MRB hub seed failed" });
   }
 });
 

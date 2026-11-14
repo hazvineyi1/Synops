@@ -69,6 +69,7 @@ import DemoPEJ from '@/pages/DemoPEJ';
 import DemoPEJ2 from '@/pages/DemoPEJ2';
 import DemoPEJLanding from '@/pages/DemoPEJLanding';
 import DemoMRBLanding from '@/pages/DemoMRBLanding';
+import { isMrbHub } from '@/lib/hub';
 import DemoEducatorLanding from '@/pages/DemoEducatorLanding';
 import DemoPejPracticeLanding from '@/pages/DemoPejPracticeLanding';
 import { Cases } from '@/pages/Cases';
@@ -154,12 +155,25 @@ function partnerSlugForHost(): string | null {
 
 const DEMO_HOST = 'demo.synops-consulting.com';
 
+/** Public pages hidden on the MRB hub's own address (they belong to other Synops clients and demos). */
+const MRB_HUB_HIDDEN_PATHS = [
+  '/demo', '/k12', '/request-access', '/p/:slug', '/enzaglobalmedia',
+  '/demos/pej', '/demos/educator', '/demos/pej-practice', '/demos/pej-evd-01', '/demos/pej-evd-02',
+];
+
 function HomeRedirect() {
   const { user, isSignedIn, loading } = useSession();
   if (loading) return <SessionGate />;
   // Practice-first build: a candidate's home is their credentials, not the LMS dashboard, so they
   // never land on a page that talks about courses, modules or grades.
-  if (isSignedIn) return <Redirect to={user?.role === 'learner' ? '/practice' : '/dashboard'} />;
+  if (isSignedIn) {
+    // MRB hub: reviewers and tutors (role coach) start at their review queue, candidates at their
+    // credentials. Admins keep the dashboard and their management tools.
+    if (isMrbHub && user?.role === 'coach') return <Redirect to="/practice/review" />;
+    return <Redirect to={user?.role === 'learner' ? '/practice' : '/dashboard'} />;
+  }
+  // MRB hub at its own address: the root is the MRB Practice Hub front door, with sign-in.
+  if (isMrbHub) return <DemoMRBLanding mode="hub" />;
   // The public demo host shows the Synops Demo landing at its root, so the link we send is clean.
   if (typeof window !== 'undefined' && window.location.hostname === DEMO_HOST) return <DemoLanding />;
   const partnerSlug = partnerSlugForHost();
@@ -241,6 +255,11 @@ function Routes() {
   return (
       <Switch>
         <Route path="/" component={HomeRedirect} />
+        {/* MRB hub at its own address: other Synops demos and partner landings are not part of this
+            hub, so their public links fall back to the MRB front door. */}
+        {isMrbHub && MRB_HUB_HIDDEN_PATHS.map((p) => (
+          <Route key={p} path={p}><Redirect to="/" /></Route>
+        ))}
 
         {/* Auth */}
         <PublicRoute path="/demo" component={DemoLanding} />
