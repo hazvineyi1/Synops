@@ -272,7 +272,7 @@ async function createTeacherDemo(): Promise<void> {
 
     // Answers keyed by question number (1..5). Correct answers as strings.
     const correct: Record<string, string> = { "1": "3:5", "2": "3", "3": "True", "4": "5 kg for $12.00", "5": "6" };
-    const scenarios = [
+    const scenarios: { i: number; answers: Record<string, string>; status: string }[] = [
       { i: 0, answers: { "1": "3:5", "2": "3", "3": "True", "4": "5 kg for $12.00", "5": "6" }, status: "graded" },
       { i: 1, answers: { "1": "3:5", "2": "3", "3": "True", "4": "3 kg for $7.50", "5": "6" }, status: "graded" },
       { i: 2, answers: { "1": "5:3", "2": "3", "3": "True", "4": "5 kg for $12.00", "5": "4" }, status: "graded" },
