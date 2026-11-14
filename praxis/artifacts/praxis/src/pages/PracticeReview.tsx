@@ -227,7 +227,7 @@ function AuthenticitySignals({ reflections, attestations }: { reflections: Refle
   const spanDays = times.length ? Math.round((Math.max(...times) - Math.min(...times)) / 86400000) : 0;
   const tiles = [
     { label: 'Typed live', value: `${typed}/${n}`, tone: 'good' as const },
-    { label: 'Pasted', value: String(pasted), tone: (pasted > 0 ? 'warn' : 'muted') as const },
+    { label: 'Pasted', value: String(pasted), tone: pasted > 0 ? ('warn' as const) : ('muted' as const) },
     { label: 'Via WhatsApp', value: String(whatsapp), tone: 'muted' as const },
     { label: 'Across', value: `${days} session${days === 1 ? '' : 's'}`, tone: 'muted' as const },
   ];

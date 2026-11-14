@@ -688,7 +688,7 @@ function AnonymityNote() {
   );
 }
 
-function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection', starters, onLearnerWrote, onAskEve, coachName = 'Eve' }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string; starters?: string[]; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void; coachName?: string }) {
+function ReflectionPanel({ id, reflections, readOnly, onChange, off, focusStages, showTimeline = true, heading = 'Reflection', starters, onLearnerWrote, onAskEve, coachName = 'Eve' }: { id: string; reflections: Reflection[]; readOnly: boolean; onChange: () => void; off: ReturnType<typeof useOffline>; focusStages?: string[]; showTimeline?: boolean; heading?: string; starters?: readonly string[]; onLearnerWrote?: (text: string) => void; onAskEve?: (stage: string) => void; coachName?: string }) {
   const draftKey = `refl_${id}_${focusStages ? focusStages.join('-') : 'all'}`;
   const stagesToShow = focusStages ? GIBBS.filter((g) => focusStages.includes(g.key)) : GIBBS;
   const [stage, setStage] = useState(focusStages ? focusStages[0] : 'note');

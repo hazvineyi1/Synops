@@ -111,7 +111,7 @@ export function ActivityBuilder({ onClose, onCreated, activity }: { onClose: () 
               <div><Label className="text-sm">Bloom's</Label>
                 <select value={bloom} onChange={(e) => setBloom(e.target.value)} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm">{BLOOMS.map((b) => <option key={b}>{b}</option>)}</select></div>
               <div><Label className="text-sm">Difficulty</Label>
-                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm capitalize">{DIFFS.map((d) => <option key={d} value={d}>{d}</option>)}</select></div>
+                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as typeof difficulty)} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm capitalize">{DIFFS.map((d) => <option key={d} value={d}>{d}</option>)}</select></div>
               <div><Label className="text-sm">Published</Label>
                 <select value={published ? "1" : "0"} onChange={(e) => setPublished(e.target.value === "1")} className="w-full rounded-md border border-input bg-background px-2 py-2 text-sm"><option value="1">Yes</option><option value="0">Draft</option></select></div>
             </div>

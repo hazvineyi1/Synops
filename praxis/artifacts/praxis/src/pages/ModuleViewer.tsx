@@ -1482,6 +1482,7 @@ const TAB_COLOR: Record<HubTab, { border: string; text: string; activeBg: string
   cases:       { border: 'border-teal-300 dark:border-teal-800',       text: 'text-teal-700 dark:text-teal-300',       activeBg: 'bg-teal-600' },
   participate: { border: 'border-sky-300 dark:border-sky-800',         text: 'text-sky-700 dark:text-sky-300',         activeBg: 'bg-sky-600' },
   assignments: { border: 'border-amber-300 dark:border-amber-800',     text: 'text-amber-700 dark:text-amber-300',     activeBg: 'bg-amber-600' },
+  assessment:  { border: 'border-fuchsia-300 dark:border-fuchsia-800', text: 'text-fuchsia-700 dark:text-fuchsia-300', activeBg: 'bg-fuchsia-600' },
   workshop:    { border: 'border-rose-300 dark:border-rose-800',       text: 'text-rose-700 dark:text-rose-300',       activeBg: 'bg-rose-600' },
 };
 
@@ -3965,7 +3966,7 @@ function ModuleHubView({
   const railRank = (id: string) => { const i = railOrder.indexOf(id); return i === -1 ? 1000 : i; };
   const orderedRailTabs = [...railTabs].sort((a, b) => railRank(a.id) - railRank(b.id));
   const moveRail = (id: string, dir: -1 | 1) => {
-    const ids = orderedRailTabs.map((t) => t.id);
+    const ids: string[] = orderedRailTabs.map((t) => t.id);
     const idx = ids.indexOf(id); const j = idx + dir;
     if (j < 0 || j >= ids.length) return;
     [ids[idx], ids[j]] = [ids[j], ids[idx]];
