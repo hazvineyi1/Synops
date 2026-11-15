@@ -31,7 +31,7 @@ function countSyllables(word: string): number {
 }
 function fleschKincaidGrade(text: string): number {
   const sentences = Math.max(1, (text.match(/[.!?]+/g) || []).length);
-  const words = text.match(/[A-Za-z]+/g) || [];
+  const words: string[] = text.match(/[A-Za-z]+/g) ?? [];
   const wordCount = Math.max(1, words.length);
   const syllables = words.reduce((s, w) => s + countSyllables(w), 0);
   const grade = 0.39 * (wordCount / sentences) + 11.8 * (syllables / wordCount) - 15.59;

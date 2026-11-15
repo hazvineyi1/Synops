@@ -336,7 +336,7 @@ export function PracticeHome() {
       </div>
 
       {/* Start here: a warm orientation with clear goals and steps, especially for new candidates. */}
-      <Orientation name={me?.firstName} programName={programName} audience={audience} coachName={coachName} guided={guidedDemo} hasCredentials={mine.length > 0} onStart={goToChoose} />
+      <Orientation name={me?.firstName ?? undefined} programName={programName} audience={audience} coachName={coachName} guided={guidedDemo} hasCredentials={mine.length > 0} onStart={goToChoose} />
 
       {/* Adaptive next move, only once they have credentials (a new user starts from the picker below). */}
       {mine.length > 0 && <NextMoveBanner move={move} onCta={onNextMove} />}

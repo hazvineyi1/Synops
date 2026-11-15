@@ -5,6 +5,7 @@ import { ensureIntegrityConstraints } from "./lib/dbHardening";
 import { ensureCourseColumns } from "./lib/courseColumns";
 import { correctSeededAnnouncements } from "./lib/seedCorrections";
 import { startOpsAgent } from "./lib/opsAgent";
+import { bootstrapSuperAdmin } from "./lib/bootstrapAdmin";
 
 // Fire-and-forget: enables Sentry when SENTRY_DSN is set, otherwise a no-op. Never blocks boot.
 void initObservability();
@@ -14,6 +15,9 @@ void ensureIntegrityConstraints();
 // Fire-and-forget: rewrite the one untrue "interactive video" demo announcement to a truthful
 // message. Idempotent + guarded on the old text; never blocks boot.
 void correctSeededAnnouncements();
+// Fresh database only (e.g. a new hub deployment): ensure one super admin when
+// BOOTSTRAP_SUPER_ADMIN_EMAIL is set and none exists yet. Never throws, never blocks boot.
+void bootstrapSuperAdmin();
 // Always-on ops agent: scan platform signals every minute and maintain the anomaly feed.
 startOpsAgent();
 

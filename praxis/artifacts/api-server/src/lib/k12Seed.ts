@@ -56,7 +56,7 @@ interface K12Module {
   points: string[]; reading: string; minutes: number;
   standards: Std[]; quiz: { q: string; options: string[]; answer: number; img?: string; emoji?: string }[];
   caseContext: string; caseOpening: string;
-  game?: "choice" | "find" | "match" | "memory" | "puzzle" | "pair" | "sort";   // default "choice"; each lesson uses a different one
+  game?: "choice" | "find" | "match" | "memory" | "puzzle" | "pair" | "sort" | "ladder" | "ememory";   // default "choice"; each lesson uses a different one
   video?: string;   // YouTube id/URL → adds a "Watch" step to the lesson
 }
 interface K12Persona {
@@ -1157,7 +1157,7 @@ export async function seedK12(): Promise<{ ok: boolean; partnerId?: string; cour
         await db.insert(interactiveActivitiesTable).values({
           organisationId: org.id, courseId: sofiaMathId, moduleId: smMod.id, title,
           instructions: "Resuelve cada problema. Arrastra el punto en la recta numérica o escribe tu respuesta. ¿Atascado? Pregúntale al tutor, te ayuda con pistas, ¡nunca con la respuesta!",
-          html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "beginner",
+          html, source: "html", kind: "math-coach", bloomsLevel: "Apply", difficulty: "foundational",
           isLibrary: false, tags: ["math-coach", "game:mathcoach", "band:35", "subject:Math", "lang:es"], published: true, createdByUserId: facultyId,
         });
       }

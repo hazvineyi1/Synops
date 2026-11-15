@@ -5,9 +5,13 @@
  * names and tests the ideas that explain it, and submits evidence to an independent reviewer. The
  * framework underneath is MRB's Framework for Advanced Leadership Practice (v2.1), grounded in ubuntu.
  * One click signs the visitor in as the composite demo candidate and opens "My Credentials".
+ *
+ * mode="hub" is the front door of the live MRB Practice Hub at its own address: same story, but the
+ * button signs a real candidate, tutor or reviewer in, and the demo wording is dropped.
  */
 import { useState } from "react";
 import { useSession } from "@/context/SessionContext";
+import { useLocation } from "wouter";
 
 const INK = "#14212b";
 const PETROL = "#1B4965";
@@ -29,12 +33,15 @@ const PEOPLE = [
   { who: "An independent reviewer", what: "An academic or experienced practitioner who reviews your portfolio. MRB moderates decisions." },
 ];
 
-export default function DemoMRBLanding() {
+export default function DemoMRBLanding({ mode = "demo" }: { mode?: "demo" | "hub" }) {
+  const hub = mode === "hub";
   const { demoSignIn } = useSession();
+  const [, navigate] = useLocation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const enter = async () => {
+    if (hub) { navigate("/sign-in"); return; }
     setBusy(true);
     setError(null);
     try {
@@ -50,14 +57,16 @@ export default function DemoMRBLanding() {
     <div style={{ minHeight: "100vh", background: "#f6f4ef", color: INK }}>
       <main style={{ maxWidth: 800, margin: "0 auto", padding: "56px 20px 72px" }}>
         <p style={{ fontSize: 12.5, letterSpacing: "0.14em", textTransform: "uppercase", color: PETROL, margin: 0, fontWeight: 600 }}>
-          The Manchester Review Board · Practice Hub demo
+          {hub ? "The Manchester Review Board · Practice Hub" : "The Manchester Review Board · Practice Hub demo"}
         </p>
         <h1 style={{ fontFamily: SERIF, fontSize: 36, lineHeight: 1.12, margin: "10px 0 14px" }}>
           Advanced Leadership Practice
         </h1>
         <p style={{ fontSize: 17, lineHeight: 1.6, color: "#2b3440", maxWidth: 660, margin: 0 }}>
-          Leadership is exercised through people, not over them. This demo shows how a leader turns real work into a
-          recognised Practice Credential, assessed against MRB's Framework for Advanced Leadership Practice.
+          Leadership is exercised through people, not over them.{" "}
+          {hub
+            ? "This is where you turn your real work into a recognised Practice Credential, reviewed against MRB's Framework for Advanced Leadership Practice."
+            : "This demo shows how a leader turns real work into a recognised Practice Credential, assessed against MRB's Framework for Advanced Leadership Practice."}
         </p>
         <p style={{ fontSize: 15, lineHeight: 1.65, color: MUTED, maxWidth: 660, margin: "12px 0 0" }}>
           The framework is grounded in <em>ubuntu</em>: leadership as a responsibility that comes from our connection to
@@ -76,11 +85,12 @@ export default function DemoMRBLanding() {
               cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1,
             }}
           >
-            {busy ? "Opening the Practice Hub…" : "Enter the Practice Hub →"}
+            {hub ? "Sign in to the Practice Hub →" : busy ? "Opening the Practice Hub…" : "Enter the Practice Hub →"}
           </button>
           <p style={{ fontSize: 13, color: MUTED, marginTop: 10, maxWidth: 620 }}>
-            No sign-up. You enter as Chanda Mulenga, a composite candidate with credentials at different stages. Nothing
-            you do is recorded against a real account.
+            {hub
+              ? "Use the email address MRB invited you with. First time here? Choose Forgot password on the sign-in page to set yours."
+              : "No sign-up. You enter as Chanda Mulenga, a composite candidate with credentials at different stages. Nothing you do is recorded against a real account."}
           </p>
           {error && <p style={{ fontSize: 13, color: "#b42318", marginTop: 8 }}>{error}</p>}
         </div>
@@ -124,9 +134,9 @@ export default function DemoMRBLanding() {
         </section>
 
         <p style={{ fontSize: 12.5, color: MUTED, marginTop: 44, lineHeight: 1.6, borderTop: "1px solid #e4e0d6", paddingTop: 14 }}>
-          Demo build. People, organisations and examples are composites. Credential wording and examples are illustrative
-          until approved by the MRB academic board. Framework for Advanced Leadership Practice v2.1, published by The
-          Manchester Review Board.
+          {hub
+            ? "Framework for Advanced Leadership Practice v2.1, published by The Manchester Review Board. The Practice Hub is run for MRB by Synops Consulting."
+            : "Demo build. People, organisations and examples are composites. Credential wording and examples are illustrative until approved by the MRB academic board. Framework for Advanced Leadership Practice v2.1, published by The Manchester Review Board."}
         </p>
       </main>
     </div>

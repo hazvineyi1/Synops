@@ -109,7 +109,7 @@ export function CaseEmbed({ params }: { params?: { token?: string } }) {
         id: sessionId, caseId: "", status: "completed", messages, promptCount, promptLimit,
         engagementScore: d.engagementScore ?? null, engagementNarrative: d.engagementNarrative ?? null,
         conceptsAddressed: d.conceptsAddressed ?? [], reasoningStrengths: d.reasoningStrengths ?? [],
-        developmentAreas: d.developmentAreas ?? [], rubricScores: d.rubricScores ?? [],
+        developmentAreas: d.developmentAreas ?? [], recommendations: d.recommendations ?? [], rubricScores: d.rubricScores ?? [],
         createdAt: "", completedAt: null,
       });
     } catch (e) { setError(e instanceof Error ? e.message : "Analysis failed"); }

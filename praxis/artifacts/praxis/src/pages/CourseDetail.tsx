@@ -1137,6 +1137,7 @@ function CourseArchitect({ courseId, onScaffolded, defaultOpen = false }: { cour
       const t = setTimeout(() => cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 250);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [defaultOpen]);
   // Restore a previously generated blueprint so it is not lost when the author navigates away and
   // comes back before applying it.
@@ -1921,7 +1922,7 @@ function GenerateCoursework({ courseId, modules }: { courseId: string; modules?:
   const toggleGame = (id: string) => setGameTypes((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const gather = async (moduleId: string) => {
-    const list = await apiFetch<{ id: string; hasContent: boolean }[]>(`/modules/${moduleId}/readings`).catch(() => []);
+    const list = await apiFetch<{ id: string; hasContent: boolean }[]>(`/modules/${moduleId}/readings`).catch((): { id: string; hasContent: boolean }[] => []);
     const parts: string[] = [];
     for (const r of (list ?? []).filter((x) => x.hasContent)) {
       try { const full = await apiFetch<{ content: string }>(`/readings/${r.id}`); if (full.content) parts.push(full.content); } catch { /* skip */ }
