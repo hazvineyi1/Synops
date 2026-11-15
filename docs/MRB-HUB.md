@@ -16,10 +16,14 @@ What is shared: the codebase, the image, CI, and every Praxis fix.
   go to My Credentials, reviewers and tutors (role `coach`) to the review queue, admins to the dashboard.
 - Other Synops demos and partner landings (`/demo`, `/k12`, `/demos/pej*`, `/demos/educator`, `/p/:slug`,
   `/enzaglobalmedia`, `/request-access`) redirect to `/` on the hub.
-- `POST /api/platform/seed-mrb-hub` (super admin) creates the live MRB tenant on a fresh database: the
-  partner `the-mrb`, its organisation, the practice credential catalogue, framework v2.1 (12 Core
-  Competencies, links, draft Zimbabwe programme) and the MRB brand bound to the hub's host. It creates
-  **no** demo candidate, tutor, reviewer or sample work. Idempotent.
+- **Automatic MRB setup at start-up** (hub mode only): the MRB partner `the-mrb`, its organisation,
+  framework v2.1 (12 Core Competencies, links, draft Zimbabwe programme) and the MRB brand bound to
+  `MRB_HUB_HOST`. Idempotent, runs on every boot, never creates demo candidates, tutors, reviewers or
+  sample work. It does **not** load the six published practice credentials: which credentials MRB
+  offers is MRB's decision. Switch the start-up run off with `MRB_HUB_AUTOSETUP=0`.
+- `POST /api/platform/seed-mrb-hub` (super admin) runs the same setup by hand. Body
+  `{ "includeCatalogue": true }` also loads the six published practice credentials, only once MRB
+  has confirmed them.
 - `BOOTSTRAP_SUPER_ADMIN_EMAIL` creates the first super admin on a fresh database (only when none
   exists). Set a password with **Forgot password**, or issue a link from the platform console.
 - `MRB_HUB_URL` on the **main** Praxis service 301-redirects the old `/demos/mrb` link to the hub.
@@ -53,8 +57,8 @@ What is shared: the codebase, the image, CI, and every Praxis fix.
 5. Settings, Networking: add the custom domain `mrb.synops-consulting.com`. Railway shows a CNAME
    target. Add that CNAME (and any verification record) at the synops-consulting.com DNS provider.
    HTTPS is issued automatically.
-6. Sign in as the bootstrap admin, then run `POST /api/platform/seed-mrb-hub` (body optional:
-   `{ "customDomain": "mrb.synops-consulting.com" }`).
+6. The hub loads the MRB tenant, framework and brand itself on start. Sign in as the bootstrap admin
+   (set the password with Forgot password).
 7. Smoke test: `/api/readyz`, the MRB front door at `/`, sign-in branding, a Mutale reply on a
    credential, and a credential submission reaching the review queue.
 8. Add the hub database to the nightly backup workflow (`.github/workflows/db-backup.yml`) as its own
