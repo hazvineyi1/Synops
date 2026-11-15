@@ -15,6 +15,7 @@ export interface PublicBrand {
   secondaryColor: string | null;
   accentColor: string;
   credentialTitle: string;
+  fontFamily: string | null;
 }
 
 const DEFAULT_PUBLIC_BRAND: PublicBrand = {
@@ -24,6 +25,7 @@ const DEFAULT_PUBLIC_BRAND: PublicBrand = {
   secondaryColor: null,
   accentColor: "#10b981",
   credentialTitle: "PraxisMark",
+  fontFamily: null,
 };
 
 function toPublicBrand(t: typeof brandThemesTable.$inferSelect | undefined | null): PublicBrand {
@@ -35,6 +37,7 @@ function toPublicBrand(t: typeof brandThemesTable.$inferSelect | undefined | nul
     secondaryColor: t.secondaryColor || null,
     accentColor: t.accentColor || DEFAULT_PUBLIC_BRAND.accentColor,
     credentialTitle: t.credentialTitle || DEFAULT_PUBLIC_BRAND.credentialTitle,
+    fontFamily: t.fontFamily || null,
   };
 }
 
