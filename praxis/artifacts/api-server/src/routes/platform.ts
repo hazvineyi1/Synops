@@ -1677,6 +1677,12 @@ router.post("/platform/remove-all-learners", requireAuth, requireSuperAdmin, asy
 // The MRB executive Practice Credentials. Practice-first: each names a leadership practice a candidate
 // can evidence from their own work, not a body of content to be taught. Gateway guidance is common
 // (G1 relevant activity, G2 personal contribution, G3 learning from practice); no pass/fail.
+// MRB's visual identity, taken from themrb.org.uk (Nov 2026): charcoal panels and buttons, the green
+// of its logotype and cart button, Inter body text (headings stay Playfair Display, as on its site).
+const MRB_BRAND = { primary: "#353535", secondary: "#3FB383", accent: "#4DC187", font: "Inter, system-ui, sans-serif" };
+// Text wordmark in MRB's logotype colours, served by the SPA. Replace with MRB's official logo file.
+const MRB_WORDMARK_PATH = "/brand/mrb-wordmark.png";
+
 const MRB_GATEWAY =
   "There is no pass or fail. A reviewer either recognises your portfolio or refers it for resubmission, and both come with developmental feedback. Reviewers look for three things: " +
   "G1 Relevant activity - you have actually done something substantially relevant to this credential. " +
@@ -1738,9 +1744,9 @@ router.post("/platform/seed-mrb-practice", requireAuth, requireSuperAdmin, async
     // Professional MRB brand: the whole environment skins to the Manchester Review Board (deep petrol
     // blue, warm gold accent). Best-effort so a column difference never fails the seed.
     try {
-      await db.execute(sql`UPDATE brand_themes SET display_name = 'Manchester Review Board', primary_color = '#1B4965', secondary_color = '#2C6E8E', accent_color = '#C58B2C', credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
-      await db.execute(sql`INSERT INTO brand_themes (id, tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title)
-        SELECT gen_random_uuid()::text, ${pid}, 'partner', 'Manchester Review Board', '#1B4965', '#2C6E8E', '#C58B2C', 'Practice Credential'
+      await db.execute(sql`UPDATE brand_themes SET display_name = 'Manchester Review Board', primary_color = ${MRB_BRAND.primary}, secondary_color = ${MRB_BRAND.secondary}, accent_color = ${MRB_BRAND.accent}, font_family = ${MRB_BRAND.font}, credential_title = 'Practice Credential', updated_at = now() WHERE tenant_id = ${pid}`);
+      await db.execute(sql`INSERT INTO brand_themes (id, tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, font_family, credential_title)
+        SELECT gen_random_uuid()::text, ${pid}, 'partner', 'Manchester Review Board', ${MRB_BRAND.primary}, ${MRB_BRAND.secondary}, ${MRB_BRAND.accent}, ${MRB_BRAND.font}, 'Practice Credential'
         WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
     } catch { /* branding is best-effort */ }
 
@@ -1903,10 +1909,14 @@ export async function provisionMrbHubTenant(opts: { customDomain?: string | null
     }
   }
 
-  // MRB brand (deep petrol blue, warm gold), bound to the hub's own host when one is given.
-  await db.execute(sql`UPDATE brand_themes SET display_name = 'The Manchester Review Board', primary_color = '#1B4965', secondary_color = '#2C6E8E', accent_color = '#C58B2C', credential_title = 'Practice Credential', custom_domain = COALESCE(${customDomain}, custom_domain), updated_at = now() WHERE tenant_id = ${pid}`);
-  await db.execute(sql`INSERT INTO brand_themes (id, tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, credential_title, custom_domain)
-    SELECT gen_random_uuid()::text, ${pid}, 'partner', 'The Manchester Review Board', '#1B4965', '#2C6E8E', '#C58B2C', 'Practice Credential', ${customDomain}
+  // MRB brand, matched to themrb.org.uk: charcoal (#353535) as the primary, MRB green (#3FB383 for
+  // buttons, #4DC187 from the logotype) as secondary and accent, Inter for text, and the MRB wordmark.
+  // Bound to the hub's own host when one is given. The logo URL is absolute so emails and certificates
+  // can load it; it waits on the hub's host.
+  const logoUrl = customDomain ? `https://${customDomain}${MRB_WORDMARK_PATH}` : null;
+  await db.execute(sql`UPDATE brand_themes SET display_name = 'The Manchester Review Board', primary_color = ${MRB_BRAND.primary}, secondary_color = ${MRB_BRAND.secondary}, accent_color = ${MRB_BRAND.accent}, font_family = ${MRB_BRAND.font}, logo_url = COALESCE(${logoUrl}, logo_url), credential_title = 'Practice Credential', custom_domain = COALESCE(${customDomain}, custom_domain), updated_at = now() WHERE tenant_id = ${pid}`);
+  await db.execute(sql`INSERT INTO brand_themes (id, tenant_id, tenant_type, display_name, primary_color, secondary_color, accent_color, font_family, logo_url, credential_title, custom_domain)
+    SELECT gen_random_uuid()::text, ${pid}, 'partner', 'The Manchester Review Board', ${MRB_BRAND.primary}, ${MRB_BRAND.secondary}, ${MRB_BRAND.accent}, ${MRB_BRAND.font}, ${logoUrl}, 'Practice Credential', ${customDomain}
     WHERE NOT EXISTS (SELECT 1 FROM brand_themes WHERE tenant_id = ${pid})`);
 
   const framework = await seedMrbFramework(pid);

@@ -306,3 +306,26 @@
     margin: 18mm;
   }
 }
+
+/* MRB Practice Hub at its own address (HUB_MODE=mrb): MRB's site sets text in Inter and headings in
+   Playfair Display, so the hub does the same. Inter is loaded in index.html. */
+html.hub-mrb {
+  --app-font-sans: 'Inter', system-ui, sans-serif;
+  /* Neutral greys, as on themrb.org.uk, in place of the default blue-slate. The brand primary
+     (charcoal) is set at runtime from the MRB theme. */
+  --background: 0 0% 98%;
+  --foreground: 0 0% 15%;
+  --card-foreground: 0 0% 15%;
+  --popover-foreground: 0 0% 15%;
+  --secondary: 0 0% 94%;
+  --secondary-foreground: 0 0% 15%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 37%;
+  --accent: 0 0% 94%;
+  --accent-foreground: 0 0% 15%;
+  --border: 0 0% 90%;
+  --card-border: 0 0% 90%;
+  --popover-border: 0 0% 90%;
+  --input: 0 0% 90%;
+}
+html.hub-mrb body { font-family: 'Inter', system-ui, sans-serif; }

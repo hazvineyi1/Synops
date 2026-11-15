@@ -14,3 +14,6 @@ function readHub(): string {
 
 export const HUB: string = readHub();
 export const isMrbHub = HUB === 'mrb';
+
+// MRB hub: switch the app's text face to Inter (MRB's site font); headings keep Playfair Display.
+if (isMrbHub && typeof document !== 'undefined') document.documentElement.classList.add('hub-mrb');

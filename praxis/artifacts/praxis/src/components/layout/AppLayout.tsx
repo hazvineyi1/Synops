@@ -54,6 +54,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getPartnerHub, findHubByOrgId, orgDetail, getActivePartnerId, setActivePartner } from '@/lib/partnerHubData';
 import { personaByEmail } from '@/lib/k12Personas';
 import { cn } from '@/lib/utils';
+import { isMrbHub } from '@/lib/hub';
 
 /* ─────────────────────────────────────────────────────────────────────────
  * Sokratify theme: one dark-navy sidebar + warm off-white content across the
@@ -61,13 +62,14 @@ import { cn } from '@/lib/utils';
  * the shell chrome is dark, so every role - and the Platform Console - shares one
  * cohesive look.
  * ──────────────────────────────────────────────────────────────────────── */
-const SIDEBAR_BG = 'hsl(222 47% 11%)';
+// The MRB hub at its own address uses MRB's charcoal (themrb.org.uk) instead of navy.
+const SIDEBAR_BG = isMrbHub ? '#353535' : 'hsl(222 47% 11%)';
 // Super admin at the platform level gets a distinct deep-violet shell, so it is always obvious you
 // are viewing as the platform owner. The moment a super admin steps into a partner (or a partner
 // admin signs in), the shell reverts to the navy partner colour - a clear "you are now inside a
 // partner, not the platform" cue.
 const SUPER_BG = 'hsl(263 45% 15%)';
-const CONTENT_BG = 'hsl(43 30% 97%)';
+const CONTENT_BG = isMrbHub ? '#FAFAFA' : 'hsl(43 30% 97%)';
 const HAIRLINE = 'rgba(255,255,255,0.07)';
 
 type NavItem = { label: string; href: string; icon: React.ElementType; confirm?: string; badge?: number };
@@ -508,12 +510,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className={cn("w-64 flex-shrink-0 flex-col hidden", sidebarCollapsed ? "" : "md:flex")} style={{ background: sidebarBg }}>
         <div className="h-16 flex items-center px-6" style={{ borderBottom: `1px solid ${HAIRLINE}` }}>
           <Link href="/dashboard" className="flex items-center gap-2 min-w-0" style={{ color: '#fff' }}>
-            {brandLogo ? (
-              <img src={brandLogo} alt="" className="h-8 w-8 rounded-sm object-contain shrink-0" />
+            {isMrbHub && brandLogo ? (
+              // MRB hub: the full wordmark on a white chip, as in MRB's own white header.
+              <span className="rounded-md bg-white px-2.5 py-1.5 shrink-0">
+                <img src={brandLogo} alt={brandName} className="h-7 w-auto max-w-[150px] object-contain" />
+              </span>
             ) : (
-              <span className="h-8 w-8 shrink-0 flex items-center justify-center rounded-sm" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>{brandName.charAt(0).toUpperCase()}</span>
+              <>
+                {brandLogo ? (
+                  <img src={brandLogo} alt="" className="h-8 w-8 rounded-sm object-contain shrink-0" />
+                ) : (
+                  <span className="h-8 w-8 shrink-0 flex items-center justify-center rounded-sm" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>{brandName.charAt(0).toUpperCase()}</span>
+                )}
+                <span className="font-serif font-bold text-base leading-tight tracking-tight line-clamp-2 min-w-0">{brandName}</span>
+              </>
             )}
-            <span className="font-serif font-bold text-base leading-tight tracking-tight line-clamp-2 min-w-0">{brandName}</span>
           </Link>
           <button onClick={() => toggleSidebar(true)}
             className="ml-auto hidden md:inline-flex items-center justify-center h-8 w-8 rounded-md text-white/60 hover:text-white hover:bg-white/10 transition-colors"
