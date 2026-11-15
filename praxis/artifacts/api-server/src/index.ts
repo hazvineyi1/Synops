@@ -6,6 +6,7 @@ import { ensureCourseColumns } from "./lib/courseColumns";
 import { correctSeededAnnouncements } from "./lib/seedCorrections";
 import { startOpsAgent } from "./lib/opsAgent";
 import { bootstrapSuperAdmin } from "./lib/bootstrapAdmin";
+import { autoSetupHub } from "./lib/hubAutoSetup";
 
 // Fire-and-forget: enables Sentry when SENTRY_DSN is set, otherwise a no-op. Never blocks boot.
 void initObservability();
@@ -18,6 +19,8 @@ void correctSeededAnnouncements();
 // Fresh database only (e.g. a new hub deployment): ensure one super admin when
 // BOOTSTRAP_SUPER_ADMIN_EMAIL is set and none exists yet. Never throws, never blocks boot.
 void bootstrapSuperAdmin();
+// MRB hub only (HUB_MODE=mrb): load the MRB tenant, framework and brand. Never blocks boot.
+void autoSetupHub();
 // Always-on ops agent: scan platform signals every minute and maintain the anomaly feed.
 startOpsAgent();
 
